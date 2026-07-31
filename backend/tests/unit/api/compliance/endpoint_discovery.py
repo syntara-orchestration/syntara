@@ -28,7 +28,7 @@ _ACTION_OPERATION_PREFIXES = (
 )
 
 # OpenAPI tag for AAP Controller BFF proxy endpoints (locked to upstream response shape).
-_AAP_PROXY_TAG = "Ansible Automation Platform"
+_AAP_PROXY_TAG = "Ansible Automation Platform Proxy"
 
 EXCLUSIONS_FILE = Path(__file__).parent / "list_compliance_exclusions.yaml"
 CRUD_EXCLUSIONS_FILE = Path(__file__).parent / "crud_compliance_exclusions.yaml"

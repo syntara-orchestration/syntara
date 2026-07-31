@@ -17,7 +17,7 @@ servers:
   - url: /api/v1
     description: API v1
 tags:
-  - name: Ansible Automation Platform
+  - name: Ansible Automation Platform Proxy
     description: Ansible Automation Platform resource proxy
   - name: Admin
     description: Administrative revocation operations
@@ -70,7 +70,7 @@ tags:
   - name: Webhooks
     description: Inbound webhook event receivers
 paths:
-  /aap/organizations:
+  /proxies/aap/organizations:
     get:
       summary: List organizations
       description: List Ansible Automation Platform organizations.
@@ -79,7 +79,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -231,7 +231,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/job_templates:
+  /proxies/aap/job_templates:
     get:
       summary: List job templates
       description: List Ansible Automation Platform job templates, optionally filtered by organization.
@@ -240,7 +240,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -401,7 +401,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/job_templates/{job_template_id}:
+  /proxies/aap/job_templates/{job_template_id}:
     get:
       summary: Get job template
       description: Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
@@ -410,7 +410,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: path
           name: job_template_id
@@ -569,7 +569,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/workflow_job_templates:
+  /proxies/aap/workflow_job_templates:
     get:
       summary: List workflow job templates
       description: List Ansible Automation Platform workflow job templates, optionally filtered by organization.
@@ -578,7 +578,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -739,7 +739,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/workflow_job_templates/{workflow_job_template_id}:
+  /proxies/aap/workflow_job_templates/{workflow_job_template_id}:
     get:
       summary: Get workflow job template
       description: Get Ansible Automation Platform workflow job template details including prompt-on-launch capabilities.
@@ -748,7 +748,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: path
           name: workflow_job_template_id
@@ -907,7 +907,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/inventories:
+  /proxies/aap/inventories:
     get:
       summary: List inventories
       description: List Ansible Automation Platform inventories, optionally filtered by organization.
@@ -916,7 +916,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1077,7 +1077,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/execution_environments:
+  /proxies/aap/execution_environments:
     get:
       summary: List execution environments
       description: List Ansible Automation Platform execution environments, optionally filtered by organization.
@@ -1086,7 +1086,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1247,7 +1247,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/credentials:
+  /proxies/aap/credentials:
     get:
       summary: List credentials
       description: List Ansible Automation Platform credentials (not organization-scoped).
@@ -1256,7 +1256,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1408,7 +1408,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/instance_groups:
+  /proxies/aap/instance_groups:
     get:
       summary: List instance groups
       description: List Ansible Automation Platform instance groups (not organization-scoped).
@@ -1417,7 +1417,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1569,10 +1569,10 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/labels:
+  /proxies/aap/labels:
     get:
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       summary: List labels
       description: List Ansible Automation Platform labels.
       operationId: list_aap_labels

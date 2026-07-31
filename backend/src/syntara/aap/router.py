@@ -1,4 +1,4 @@
-"""AAP proxy router — auto-discovered under /api/v1/aap.
+"""AAP proxy router — auto-discovered under /api/v1/proxies/aap.
 
 Thin layer that validates query params, resolves dependencies,
 and delegates to AAPProxyService.
@@ -53,7 +53,7 @@ from syntara.core.models import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
-router = APIRouter(prefix="/aap", tags=["Ansible Automation Platform"])
+router = APIRouter(prefix="/proxies/aap", tags=["Ansible Automation Platform Proxy"])
 
 _integration_scope = ProjectScopeFilter("integration", "read")
 
