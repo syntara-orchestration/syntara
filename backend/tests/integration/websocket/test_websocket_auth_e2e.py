@@ -43,7 +43,7 @@ from nexus.workflows.models.execution import Execution, ExecutionStatus
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Mapping
 
     from fastapi import FastAPI
     from sqlalchemy.ext.asyncio import AsyncEngine
@@ -65,7 +65,7 @@ _PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
 # ---------------------------------------------------------------------------
 
 
-def _assert_ws_accepted(first_event: dict[str, Any]) -> None:
+def _assert_ws_accepted(first_event: Mapping[str, Any]) -> None:
     """Require the connection to stay open — any close fails the allow path."""
     assert first_event["type"] != "websocket.close", (
         f"expected accepted WebSocket, got close code={first_event.get('code')}"
@@ -188,24 +188,25 @@ async def _seed_authz_for_ws(test_db_session: AsyncSession) -> None:
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _wire_regopy_evaluator_to_app_state(session_app: FastAPI) -> AsyncGenerator[None, None]:
+async def authz_evaluate_spy(session_app: FastAPI) -> AsyncGenerator[MagicMock, None]:
     """Replace session_app's mock evaluator with a live RegoEvaluator.
 
     The WebSocket authz path reads ``websocket.app.state.authz_evaluator``
-    directly (not via FastAPI ``Depends``).
+    directly (not via FastAPI ``Depends``). Yields a ``MagicMock`` spy around
+    ``evaluate`` so tests can assert the live evaluator ran.
     """
     previous = session_app.state.authz_evaluator
     evaluator = RegoEvaluator()
     evaluator.start()
     assert await evaluator.health() is True
-    # Wrap after health() so allow/deny tests can assert the live evaluator ran.
-    evaluator.evaluate = MagicMock(wraps=evaluator.evaluate)
     session_app.state.authz_evaluator = evaluator
-    try:
-        yield
-    finally:
-        session_app.state.authz_evaluator = previous
-        await evaluator.stop()
+    # Patch after health() so the spy starts at zero calls for each test.
+    with patch.object(evaluator, "evaluate", wraps=evaluator.evaluate) as spy:
+        try:
+            yield spy
+        finally:
+            session_app.state.authz_evaluator = previous
+            await evaluator.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -308,70 +309,60 @@ class TestWebSocketAuthorizationE2E:
     def test_admin_can_read_executions(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_admin_user: User,
         ws_seeded_execution: Execution,
     ) -> None:
         """Admin role grants execution:read:any — connection accepted."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_admin_user)),
-            sync_test_client.websocket_connect(
-                f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"
-            ) as ws,
+            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e") as ws,
         ):
             _assert_ws_accepted(ws.receive())
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
     def test_auditor_can_read_executions(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_auditor_user: User,
         ws_seeded_execution: Execution,
     ) -> None:
         """Auditor role grants execution:read:any — connection accepted."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_auditor_user)),
-            sync_test_client.websocket_connect(
-                f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"
-            ) as ws,
+            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e") as ws,
         ):
             _assert_ws_accepted(ws.receive())
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
     def test_admin_can_read_invocations(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_admin_user: User,
         ws_seeded_invocation: Invocation,
     ) -> None:
         """Admin role grants invocation:read:any — connection accepted."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_admin_user)),
-            sync_test_client.websocket_connect(
-                f"{INVOCATION_WS_PATH}/{ws_seeded_invocation.id}?ticket=e2e"
-            ) as ws,
+            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{ws_seeded_invocation.id}?ticket=e2e") as ws,
         ):
             _assert_ws_accepted(ws.receive())
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
     def test_auditor_cannot_read_invocations(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_auditor_user: User,
         ws_seeded_invocation: Invocation,
     ) -> None:
         """Auditor role has no invocation:read — rejected with 1008."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_auditor_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
@@ -379,18 +370,17 @@ class TestWebSocketAuthorizationE2E:
         ):
             pytest.fail("Connection should have been rejected — no invocation:read for auditor")
         assert exc_info.value.code == POLICY_VIOLATION
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
     def test_unprivileged_user_cannot_read_executions(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_unprivileged_user: User,
         ws_seeded_execution: Execution,
     ) -> None:
         """Authenticated-only user has no execution:read — rejected with 1008."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_unprivileged_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
@@ -398,18 +388,17 @@ class TestWebSocketAuthorizationE2E:
         ):
             pytest.fail("Connection should have been rejected — no execution:read for authenticated")
         assert exc_info.value.code == POLICY_VIOLATION
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
     def test_user_role_cannot_read_executions(
         self,
         sync_test_client: TestClient,
-        session_app: FastAPI,
+        authz_evaluate_spy: MagicMock,
         ws_user_role_user: User,
         ws_seeded_execution: Execution,
     ) -> None:
         """User role has no execution:read — rejected with 1008."""
-        evaluate = session_app.state.authz_evaluator.evaluate
-        evaluate.reset_mock()
+        authz_evaluate_spy.reset_mock()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_user_role_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
@@ -417,7 +406,7 @@ class TestWebSocketAuthorizationE2E:
         ):
             pytest.fail("Connection should have been rejected — no execution:read for user role")
         assert exc_info.value.code == POLICY_VIOLATION
-        assert evaluate.call_count >= 1
+        assert authz_evaluate_spy.call_count >= 1
 
 
 # ===========================================================================
