@@ -1,15 +1,14 @@
-"""E2E tests for WebSocket authentication, authorization, and revocation.
+"""E2E tests for WebSocket authentication and authorization.
 
-These tests exercise the full auth chain: real JWT tokens, real OPA rego
-policy evaluation (via CLI), and real DB-backed global revocation.
+These tests exercise the auth chain: real JWT identity (patched ticket
+exchange), real in-process regopy evaluation, and DB-backed resource lookup.
 
 Unlike ``test_websocket_auth.py`` (which patches individual guards), these
 tests prove that the end-to-end wiring is correct — the right claims flow
-through ``_authenticate_websocket``, the right policies are evaluated in
-OPA, and the right revocation logic applies.
+through ``_authenticate_websocket``, the right policies are evaluated by
+regopy, and missing resources fail closed.
 
 Requires:
-    - ``opa`` binary on PATH (skips otherwise)
     - Live test database (integration test infrastructure)
 
 Run with:
@@ -19,13 +18,9 @@ Run with:
 
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
+from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
@@ -34,17 +29,21 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
 from starlette.websockets import WebSocketDisconnect
 
+from nexus.agent_orchestrator.models.invocation import Invocation
 from nexus.auth.services.global_revocation import clear_global_revocation_cache
-from nexus.auth.services.token_service import TokenService
+from nexus.authz.evaluator import RegoEvaluator
 from nexus.authz.models import RoleAssignment
 from nexus.authz.seed import seed_authz_data
 from nexus.core.models.group import Group, user_groups
 from nexus.core.websocket.close_codes import POLICY_VIOLATION
 from nexus.core.websocket.connection import get_connection_manager
 from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from nexus.workflows.models import Workflow, WorkflowVersion
+from nexus.workflows.models.execution import Execution, ExecutionStatus
+from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Generator
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 
     from fastapi import FastAPI
     from sqlalchemy.ext.asyncio import AsyncEngine
@@ -56,40 +55,14 @@ if TYPE_CHECKING:
 EXECUTION_WS_PATH = "/ws/workflows/v1/executions"
 INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
 
-_REGO_POLICY_PATH = Path(__file__).resolve().parents[3] / "src" / "nexus" / "authz" / "rego" / "authz.rego"
-_OPA_RESULT_FIELDS = {"allow", "deny", "matched_policy", "denial_reason", "denied_by", "allowed_projects"}
+pytestmark = [pytest.mark.integration]
+
+_PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _opa_evaluate_cli(opa_input: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate authz using the OPA CLI against the real rego policy."""
-    result = subprocess.run(  # noqa: S603
-        [  # noqa: S607
-            "opa",
-            "eval",
-            "-d",
-            str(_REGO_POLICY_PATH),
-            "-I",
-            "--format",
-            "json",
-            "data.nexus.authz",
-        ],
-        input=json.dumps(opa_input),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        msg = f"opa eval failed (rc={result.returncode}): {result.stderr}"
-        raise RuntimeError(msg)
-
-    raw = json.loads(result.stdout)
-    value: dict[str, Any] = raw["result"][0]["expressions"][0]["value"]
-    return {k: v for k, v in value.items() if k in _OPA_RESULT_FIELDS}
 
 
 async def _make_role_assignment(
@@ -111,14 +84,65 @@ async def _make_role_assignment(
     await session.commit()
 
 
-# ---------------------------------------------------------------------------
-# Module-level skip
-# ---------------------------------------------------------------------------
+async def _create_execution(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    created_by: UUID,
+) -> Execution:
+    """Create a minimal Execution with all required FK rows."""
+    workflow = Workflow(
+        id=uuid4(),
+        name=f"test-workflow-{uuid4().hex[:8]}",
+        created_by=created_by,
+        project_id=project_id,
+    )
+    db.add(workflow)
+    await db.flush()
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(not shutil.which("opa"), reason="opa CLI not found on PATH"),
-]
+    version = WorkflowVersion(
+        id=uuid4(),
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=create_minimal_workflow_definition(name=workflow.name),
+        created_by=created_by,
+    )
+    db.add(version)
+    await db.flush()
+
+    execution = Execution(
+        id=uuid4(),
+        workflow_id=workflow.id,
+        workflow_version_id=version.id,
+        project_id=project_id,
+        temporal_workflow_id=f"temporal-{uuid4().hex[:12]}",
+        status=ExecutionStatus.RUNNING,
+        created_by=created_by,
+    )
+    db.add(execution)
+    await db.commit()
+    await db.refresh(execution)
+    return execution
+
+
+async def _create_invocation(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    created_by: UUID,
+) -> Invocation:
+    """Create a minimal Invocation with valid FK references."""
+    invocation = Invocation(
+        project_id=project_id,
+        prompt="test prompt",
+        session_id=f"test-session-{uuid4().hex[:8]}",
+        created_by=created_by,
+    )
+    db.add(invocation)
+    await db.commit()
+    await db.refresh(invocation)
+    return invocation
 
 
 # ---------------------------------------------------------------------------
@@ -156,19 +180,23 @@ async def _seed_authz_for_ws(test_db_session: AsyncSession) -> None:
     await seed_authz_data(test_db_session)
 
 
-@pytest.fixture(autouse=True)
-def _wire_opa_cli_to_app_state(session_app: FastAPI) -> Generator[None, None, None]:
-    """Point app.state.authz_evaluator.evaluate at the real OPA CLI.
+@pytest_asyncio.fixture(autouse=True)
+async def _wire_regopy_evaluator_to_app_state(session_app: FastAPI) -> AsyncGenerator[None, None]:
+    """Replace session_app's mock evaluator with a live RegoEvaluator.
 
     The WebSocket authz path reads ``websocket.app.state.authz_evaluator``
-    directly (not via FastAPI ``Depends``).  The session_app fixture creates
-    an ``AsyncMock`` for the OPA client; we set its ``evaluate`` side-effect
-    so ``authorize()`` evaluates the real rego policy via CLI.
+    directly (not via FastAPI ``Depends``).
     """
-    original_evaluate = session_app.state.authz_evaluator.evaluate
-    session_app.state.authz_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
-    yield
-    session_app.state.authz_evaluator.evaluate = original_evaluate
+    previous = session_app.state.authz_evaluator
+    evaluator = RegoEvaluator()
+    evaluator.start()
+    assert await evaluator.health() is True
+    session_app.state.authz_evaluator = evaluator
+    try:
+        yield
+    finally:
+        session_app.state.authz_evaluator = previous
+        await evaluator.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -182,9 +210,6 @@ def _patch_endpoint_factory_db(test_db_engine: AsyncEngine) -> Generator[None, N
     factory = async_sessionmaker(test_db_engine, class_=_AsyncSession, expire_on_commit=False)
     with patch("nexus.core.websocket.endpoint_factory.AsyncSessionLocal", factory):
         yield
-
-
-# -- User fixtures ---
 
 
 @pytest_asyncio.fixture
@@ -228,16 +253,32 @@ async def ws_unprivileged_user(
     return await user_factory(username="ws-unpriv", email="ws-unpriv@example.com")
 
 
-def _create_jwt(user: User) -> str:
-    """Create a real signed JWT for the given user."""
-    return TokenService().create_access_token(
-        subject_id=user.id,
-        username=user.username,
-        email=user.email or "",
+@pytest_asyncio.fixture
+async def ws_seeded_execution(
+    test_db_session: AsyncSession,
+    test_project_id: UUID,
+    ws_admin_user: User,
+) -> Execution:
+    """Persisted execution so authz resolves project instead of fail-closing."""
+    return await _create_execution(
+        test_db_session,
+        project_id=test_project_id,
+        created_by=ws_admin_user.id,
     )
 
 
-_PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
+@pytest_asyncio.fixture
+async def ws_seeded_invocation(
+    test_db_session: AsyncSession,
+    test_project_id: UUID,
+    ws_admin_user: User,
+) -> Invocation:
+    """Persisted invocation so authz resolves project instead of fail-closing."""
+    return await _create_invocation(
+        test_db_session,
+        project_id=test_project_id,
+        created_by=ws_admin_user.id,
+    )
 
 
 # ===========================================================================
@@ -246,25 +287,27 @@ _PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
 
 
 class TestWebSocketAuthorizationE2E:
-    """Verify minimum required OPA permissions for WebSocket endpoints.
+    """Verify minimum required authz permissions for WebSocket endpoints.
 
     Authentication is patched to return the test user directly (bypassing
     the Redis-backed ticket exchange which has event-loop conflicts inside
-    ``sync_test_client``).  The OPA authorization chain runs unpatched,
-    so these tests prove that the right rego policies accept or reject
-    each role.
+    ``sync_test_client``).  The regopy authorization chain runs unpatched
+    against seeded resources, so these tests prove role allow/deny — not
+    missing-row fail-closed.
     """
 
     def test_admin_can_read_executions(
         self,
         sync_test_client: TestClient,
         ws_admin_user: User,
+        ws_seeded_execution: Execution,
     ) -> None:
         """Admin role grants execution:read:any — connection accepted."""
-        execution_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_admin_user)),
-            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution_id}?ticket=e2e") as ws,
+            sync_test_client.websocket_connect(
+                f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"
+            ) as ws,
         ):
             first_event = ws.receive()
             assert first_event["type"] != "websocket.close" or first_event.get("code") != POLICY_VIOLATION
@@ -273,12 +316,14 @@ class TestWebSocketAuthorizationE2E:
         self,
         sync_test_client: TestClient,
         ws_auditor_user: User,
+        ws_seeded_execution: Execution,
     ) -> None:
         """Auditor role grants execution:read:any — connection accepted."""
-        execution_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_auditor_user)),
-            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution_id}?ticket=e2e") as ws,
+            sync_test_client.websocket_connect(
+                f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"
+            ) as ws,
         ):
             first_event = ws.receive()
             assert first_event["type"] != "websocket.close" or first_event.get("code") != POLICY_VIOLATION
@@ -287,12 +332,14 @@ class TestWebSocketAuthorizationE2E:
         self,
         sync_test_client: TestClient,
         ws_admin_user: User,
+        ws_seeded_invocation: Invocation,
     ) -> None:
         """Admin role grants invocation:read:any — connection accepted."""
-        invocation_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_admin_user)),
-            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{invocation_id}?ticket=e2e") as ws,
+            sync_test_client.websocket_connect(
+                f"{INVOCATION_WS_PATH}/{ws_seeded_invocation.id}?ticket=e2e"
+            ) as ws,
         ):
             first_event = ws.receive()
             assert first_event["type"] != "websocket.close" or first_event.get("code") != POLICY_VIOLATION
@@ -301,13 +348,13 @@ class TestWebSocketAuthorizationE2E:
         self,
         sync_test_client: TestClient,
         ws_auditor_user: User,
+        ws_seeded_invocation: Invocation,
     ) -> None:
         """Auditor role has no invocation:read — rejected with 1008."""
-        invocation_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_auditor_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
-            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{invocation_id}?ticket=e2e"),
+            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{ws_seeded_invocation.id}?ticket=e2e"),
         ):
             pytest.fail("Connection should have been rejected — no invocation:read for auditor")
         assert exc_info.value.code == POLICY_VIOLATION
@@ -316,13 +363,13 @@ class TestWebSocketAuthorizationE2E:
         self,
         sync_test_client: TestClient,
         ws_unprivileged_user: User,
+        ws_seeded_execution: Execution,
     ) -> None:
         """Authenticated-only user has no execution:read — rejected with 1008."""
-        execution_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_unprivileged_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
-            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution_id}?ticket=e2e"),
+            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"),
         ):
             pytest.fail("Connection should have been rejected — no execution:read for authenticated")
         assert exc_info.value.code == POLICY_VIOLATION
@@ -331,13 +378,13 @@ class TestWebSocketAuthorizationE2E:
         self,
         sync_test_client: TestClient,
         ws_user_role_user: User,
+        ws_seeded_execution: Execution,
     ) -> None:
         """User role has no execution:read — rejected with 1008."""
-        execution_id = uuid4()
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=ws_user_role_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
-            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution_id}?ticket=e2e"),
+            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{ws_seeded_execution.id}?ticket=e2e"),
         ):
             pytest.fail("Connection should have been rejected — no execution:read for user role")
         assert exc_info.value.code == POLICY_VIOLATION
