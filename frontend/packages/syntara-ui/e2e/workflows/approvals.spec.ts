@@ -11,8 +11,9 @@ import type { Page } from '@playwright/test'
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest, pollApprovalVisible, pollExecutionStatus } from '../utils/api'
+import { apiRequest, pollApprovalVisible } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -35,27 +36,11 @@ async function createPendingApproval(
   // Add approval node and save
   await addApprovalNodeWithBranch(app, approvalName)
   await app.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
+  await runWorkflowFromBuilder(app)
 
-  // Run the workflow
-  await app.getByRole('button', { name: 'Run', exact: true }).click()
-  await app.getByRole('button', { name: /Run now|Save and run/ }).click()
-
-  // Wait for navigation to execution detail
-  const didNavigate = await app
-    .waitForURL(/\/executions\//, { timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
-
-  // Extract execution ID from URL and poll API for "paused" status
-  const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
-  test.skip(!executionId, 'Could not extract execution ID from URL')
-
-  const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+  // Wait for execution to pause at the approval node (requires Temporal)
+  const reachedApproval = await waitForExecutionPaused(app)
+  expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
 
   // Wait for the approval record to be queryable in the listing API before returning.
   // There is a brief async gap between the execution reaching "paused" and the approval
@@ -346,9 +331,9 @@ test.describe('Approval Workflow Operations', () => {
       })
 
       // Step 1: Click on the pending approval to open side panel
-      const approvalBtn = table.getByRole('button', { name: approval.approvalName })
-      await approvalBtn.waitFor({ state: 'visible', timeout: 15_000 })
-      await approvalBtn.click()
+      const approvalLink = table.getByRole('link', { name: approval.approvalName })
+      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
+      await approvalLink.click()
 
       // Step 2: Verify navigation to execution detail with side panel
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/, { timeout: 15_000 })
@@ -404,9 +389,9 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
       // Click on the pending approval
-      const approvalBtn = table.getByRole('button', { name: approval.approvalName })
-      await approvalBtn.waitFor({ state: 'visible', timeout: 10_000 })
-      await approvalBtn.click()
+      const approvalLink = table.getByRole('link', { name: approval.approvalName })
+      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
+      await approvalLink.click()
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
       // Step 1: Click "Approve"
@@ -514,26 +499,11 @@ test.describe('Approval Workflow Operations', () => {
       // Add approval node with a unique name so we can find it in the approvals list
       await addApprovalNodeWithBranch(app, approvalNodeName)
       await app.getByRole('button', { name: 'Save', exact: true }).click()
-      await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
+      await runWorkflowFromBuilder(app)
 
-      // Run the workflow
-      await app.getByRole('button', { name: 'Run', exact: true }).click()
-      await app.getByRole('button', { name: /Run now|Save and run/ }).click()
-
-      const didNavigate = await app
-        .waitForURL(/\/executions\//, { timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
-
-      // Extract execution ID and poll API for "paused" status
-      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
-      test.skip(!executionId, 'Could not extract execution ID from URL')
-
-      const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+      // Wait for execution to pause at the approval node (requires Temporal)
+      const reachedApproval = await waitForExecutionPaused(app)
+      expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
 
       // Navigate to the approvals queue and find our approval
       await app.goto(toAppUrl('/approvals'))
@@ -546,11 +516,11 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(approvalNodeName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      const approvalBtn = approvalsTable.getByRole('button', { name: approvalNodeName })
-      await approvalBtn.waitFor({ state: 'visible', timeout: 15_000 })
+      const approvalLink = approvalsTable.getByRole('link', { name: approvalNodeName })
+      await approvalLink.waitFor({ state: 'visible', timeout: 15_000 })
 
       // Click approval — navigates to execution detail with side panel
-      await approvalBtn.click()
+      await approvalLink.click()
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
