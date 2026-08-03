@@ -1,7 +1,7 @@
 """Unit tests for WorkflowService credential:use permission checks.
 
 Covers _check_credential_use_permission and _validate_credential_project_scope:
-  - opa_client is None → AuthorizationDeniedError
+  - authz_evaluator is None → AuthorizationDeniedError
   - no new credentials → early return (no authz evaluator call)
   - new credential, authz allowed → no error
   - new credential, authz denied → AuthorizationDeniedError
@@ -25,7 +25,7 @@ def _make_service(
     with_authz_evaluator: bool = True,
     project_name: str = "test-project",
 ) -> tuple[WorkflowService, AsyncMock]:
-    """Build a WorkflowService with mocked session, user, and optional opa_client.
+    """Build a WorkflowService with mocked session, user, and optional authz_evaluator.
 
     Returns the service and the raw session mock so callers can reconfigure
     exec() return values without going through the typed svc.session attribute.
@@ -43,7 +43,7 @@ def _make_service(
     svc = WorkflowService.__new__(WorkflowService)
     svc.session = session
     svc.user = user
-    svc.opa_client = MagicMock(spec=AuthzEvaluator) if with_authz_evaluator else None
+    svc.authz_evaluator = MagicMock(spec=AuthzEvaluator) if with_authz_evaluator else None
     return svc, session
 
 
