@@ -220,17 +220,18 @@ class OpenAPIValidationSettings(BaseSettings):
 class APIDocsSettings(BaseSettings):
     """API documentation endpoint configuration.
 
-    Controls whether Swagger UI (/docs), ReDoc (/redoc), and the raw
-    OpenAPI JSON (/openapi.json) endpoints are served. Disabled by
-    default so production deployments do not expose the API schema.
+    Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
+    endpoints are served at /api_docs/v1/. A convenience redirect
+    from /docs is also registered. Disabled by default so production
+    deployments do not expose the API schema.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
         default=False,
-        description="Serve OpenAPI documentation endpoints (/docs, /redoc, /openapi.json). "
-        "Enable for development environments.",
+        description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
+        "(docs, redoc, openapi.json). Enable for development environments.",
     )
 
     enable_try_it_out: bool = Field(
