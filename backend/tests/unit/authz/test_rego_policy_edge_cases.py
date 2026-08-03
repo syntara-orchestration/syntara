@@ -6,13 +6,13 @@ conditions key, empty policy lists, and unknown effect/scope values.
 
 import pytest
 
-from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy, policies_for_role
+from tests.unit.authz.conftest import allow_policy, build_authz_input, deny_policy, policies_for_role
 
 
 class TestMultipleConditionsAND:
     """SEC-038: Multiple condition types combine with AND semantics."""
 
-    def test_all_conditions_met_allows(self, opa_evaluate):
+    def test_all_conditions_met_allows(self, evaluate_policy):
         """Allow when both resource_labels and user_labels match."""
         policies = [
             allow_policy(
@@ -24,8 +24,8 @@ class TestMultipleConditionsAND:
                 },
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"env": "production"},
@@ -35,7 +35,7 @@ class TestMultipleConditionsAND:
         )
         assert result["allow"] is True
 
-    def test_only_resource_label_met_denied(self, opa_evaluate):
+    def test_only_resource_label_met_denied(self, evaluate_policy):
         """Deny when resource_labels match but user_labels do not."""
         policies = [
             allow_policy(
@@ -47,8 +47,8 @@ class TestMultipleConditionsAND:
                 },
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"env": "production"},
@@ -58,7 +58,7 @@ class TestMultipleConditionsAND:
         )
         assert result["allow"] is False
 
-    def test_only_user_label_met_denied(self, opa_evaluate):
+    def test_only_user_label_met_denied(self, evaluate_policy):
         """Deny when user_labels match but resource_labels do not."""
         policies = [
             allow_policy(
@@ -70,8 +70,8 @@ class TestMultipleConditionsAND:
                 },
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"env": "staging"},
@@ -81,7 +81,7 @@ class TestMultipleConditionsAND:
         )
         assert result["allow"] is False
 
-    def test_neither_condition_met_denied(self, opa_evaluate):
+    def test_neither_condition_met_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "multi-cond",
@@ -92,8 +92,8 @@ class TestMultipleConditionsAND:
                 },
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"env": "staging"},
@@ -103,7 +103,7 @@ class TestMultipleConditionsAND:
         )
         assert result["allow"] is False
 
-    def test_three_condition_types_all_required(self, opa_evaluate):
+    def test_three_condition_types_all_required(self, evaluate_policy):
         """Resource labels + user labels + group labels must ALL match."""
         policies = [
             allow_policy(
@@ -117,8 +117,8 @@ class TestMultipleConditionsAND:
             ),
         ]
         # All match -> allow
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="run",
                 resource_type="execution",
                 resource_labels={"env": "prod"},
@@ -130,8 +130,8 @@ class TestMultipleConditionsAND:
         assert result["allow"] is True
 
         # Missing group label -> deny
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="run",
                 resource_type="execution",
                 resource_labels={"env": "prod"},
@@ -146,7 +146,7 @@ class TestMultipleConditionsAND:
 class TestNoConditionsKey:
     """SEC-039: Policy with no conditions key matches unconditionally."""
 
-    def test_policy_without_conditions_key_allows(self, opa_evaluate):
+    def test_policy_without_conditions_key_allows(self, evaluate_policy):
         policies = [
             {
                 "name": "no-conditions-policy",
@@ -155,8 +155,8 @@ class TestNoConditionsKey:
                 "scope": "any",
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -164,7 +164,7 @@ class TestNoConditionsKey:
         )
         assert result["allow"] is True
 
-    def test_policy_without_conditions_key_allows_with_any_labels(self, opa_evaluate):
+    def test_policy_without_conditions_key_allows_with_any_labels(self, evaluate_policy):
         """Should still allow even when resource has labels — policy just doesn't check them."""
         policies = [
             {
@@ -174,8 +174,8 @@ class TestNoConditionsKey:
                 "scope": "any",
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"env": "production", "team": "security"},
@@ -188,9 +188,9 @@ class TestNoConditionsKey:
 class TestNoPoliciesDeny:
     """SEC-040: No effective policies → default deny."""
 
-    def test_empty_policies_deny(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_empty_policies_deny(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=[],
@@ -199,10 +199,10 @@ class TestNoPoliciesDeny:
         assert result["allow"] is False
         assert result["deny"] is False  # no deny policy fired either
 
-    def test_none_policies_deny(self, opa_evaluate):
+    def test_none_policies_deny(self, evaluate_policy):
         """Omitted effective_policies (None -> []) also results in deny."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
             )
@@ -218,7 +218,7 @@ class TestUnknownEffectIgnored:
         ["maybe", "permit", "grant", "ALLOW", "Allow", ""],
         ids=["maybe", "permit", "grant", "ALLOW-caps", "Allow-mixed", "empty"],
     )
-    def test_unknown_effect_does_not_allow(self, opa_evaluate, effect: str):
+    def test_unknown_effect_does_not_allow(self, evaluate_policy, effect: str):
         policies = [
             {
                 "name": "weird-effect",
@@ -227,8 +227,8 @@ class TestUnknownEffectIgnored:
                 "scope": "any",
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -236,7 +236,7 @@ class TestUnknownEffectIgnored:
         )
         assert result["allow"] is False
 
-    def test_unknown_effect_does_not_deny(self, opa_evaluate):
+    def test_unknown_effect_does_not_deny(self, evaluate_policy):
         """Effect 'maybe' should not trigger the deny rule either."""
         policies = [
             {
@@ -246,8 +246,8 @@ class TestUnknownEffectIgnored:
                 "scope": "any",
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -264,7 +264,7 @@ class TestUnknownScopeIgnored:
         ["everywhere", "global", "ALL", "team", ""],
         ids=["everywhere", "global", "ALL-caps", "team", "empty"],
     )
-    def test_unknown_scope_does_not_allow(self, opa_evaluate, scope: str):
+    def test_unknown_scope_does_not_allow(self, evaluate_policy, scope: str):
         policies = [
             {
                 "name": "weird-scope",
@@ -273,8 +273,8 @@ class TestUnknownScopeIgnored:
                 "scope": scope,
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -287,7 +287,7 @@ class TestUnknownScopeIgnored:
         ["everywhere", "global", "ALL", ""],
         ids=["everywhere", "global", "ALL-caps", "empty"],
     )
-    def test_unknown_scope_deny_does_not_fire(self, opa_evaluate, scope: str):
+    def test_unknown_scope_deny_does_not_fire(self, evaluate_policy, scope: str):
         """Deny policy with unknown scope should not fire — scope doesn't match."""
         policies = [
             *policies_for_role("admin"),
@@ -298,8 +298,8 @@ class TestUnknownScopeIgnored:
                 "scope": scope,
             },
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -313,13 +313,13 @@ class TestUnknownScopeIgnored:
 class TestDeniedByAndMatchedPolicy:
     """Verify denied_by and matched_policy output fields."""
 
-    def test_denied_by_populated_on_deny(self, opa_evaluate):
+    def test_denied_by_populated_on_deny(self, evaluate_policy):
         policies = [
             *policies_for_role("admin"),
             deny_policy("explicit-block", ["workflow:delete"]),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -328,12 +328,12 @@ class TestDeniedByAndMatchedPolicy:
         assert result["deny"] is True
         assert result["denied_by"] == "explicit-block"
 
-    def test_matched_policy_populated_on_allow(self, opa_evaluate):
+    def test_matched_policy_populated_on_allow(self, evaluate_policy):
         policies = [
             allow_policy("test-allow-policy", ["workflow:read"]),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -342,13 +342,13 @@ class TestDeniedByAndMatchedPolicy:
         assert result["allow"] is True
         assert result["matched_policy"] == "test-allow-policy"
 
-    def test_matched_policy_empty_on_deny(self, opa_evaluate):
+    def test_matched_policy_empty_on_deny(self, evaluate_policy):
         policies = [
             deny_policy("block-all", ["workflow:read"]),
             allow_policy("allow-read", ["workflow:read"]),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -361,7 +361,7 @@ class TestDeniedByAndMatchedPolicy:
 class TestMetadataConditions:
     """Metadata-based conditions (resource_metadata, user_metadata)."""
 
-    def test_resource_metadata_match_allows(self, opa_evaluate):
+    def test_resource_metadata_match_allows(self, evaluate_policy):
         policies = [
             allow_policy(
                 "meta-match",
@@ -369,8 +369,8 @@ class TestMetadataConditions:
                 conditions={"resource_metadata": {"sensitivity": "public"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_metadata={"sensitivity": "public"},
@@ -379,7 +379,7 @@ class TestMetadataConditions:
         )
         assert result["allow"] is True
 
-    def test_resource_metadata_mismatch_denied(self, opa_evaluate):
+    def test_resource_metadata_mismatch_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "meta-match",
@@ -387,8 +387,8 @@ class TestMetadataConditions:
                 conditions={"resource_metadata": {"sensitivity": "public"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_metadata={"sensitivity": "classified"},
@@ -397,7 +397,7 @@ class TestMetadataConditions:
         )
         assert result["allow"] is False
 
-    def test_user_metadata_match_allows(self, opa_evaluate):
+    def test_user_metadata_match_allows(self, evaluate_policy):
         policies = [
             allow_policy(
                 "user-meta",
@@ -405,8 +405,8 @@ class TestMetadataConditions:
                 conditions={"user_metadata": {"department": "engineering"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 user_metadata={"department": "engineering"},
@@ -415,7 +415,7 @@ class TestMetadataConditions:
         )
         assert result["allow"] is True
 
-    def test_user_metadata_mismatch_denied(self, opa_evaluate):
+    def test_user_metadata_mismatch_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "user-meta",
@@ -423,8 +423,8 @@ class TestMetadataConditions:
                 conditions={"user_metadata": {"department": "engineering"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 user_metadata={"department": "marketing"},
@@ -437,10 +437,10 @@ class TestMetadataConditions:
 class TestAllowedProjects:
     """Verify the allowed_projects output set."""
 
-    def test_any_scope_returns_wildcard_project(self, opa_evaluate):
+    def test_any_scope_returns_wildcard_project(self, evaluate_policy):
         policies = [allow_policy("all-access", ["workflow:read"])]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -448,12 +448,12 @@ class TestAllowedProjects:
         )
         assert "*" in result["allowed_projects"]
 
-    def test_project_scope_returns_specific_project(self, opa_evaluate):
+    def test_project_scope_returns_specific_project(self, evaluate_policy):
         policies = [
             allow_policy("proj-a-read", ["workflow:read"], scope="project", project="proj-a"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-a",
@@ -462,13 +462,13 @@ class TestAllowedProjects:
         )
         assert "proj-a" in result["allowed_projects"]
 
-    def test_multiple_project_scopes_collected(self, opa_evaluate):
+    def test_multiple_project_scopes_collected(self, evaluate_policy):
         policies = [
             allow_policy("proj-a-read", ["workflow:read"], scope="project", project="proj-a"),
             allow_policy("proj-b-read", ["workflow:read"], scope="project", project="proj-b"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-a",
@@ -479,13 +479,13 @@ class TestAllowedProjects:
         # proj-b also collected even though resource_project is proj-a
         assert "proj-b" in result["allowed_projects"]
 
-    def test_denied_request_has_no_projects(self, opa_evaluate):
+    def test_denied_request_has_no_projects(self, evaluate_policy):
         policies = [
             allow_policy("proj-a-read", ["workflow:read"], scope="project", project="proj-a"),
             deny_policy("deny-all-read", ["workflow:read"]),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-a",

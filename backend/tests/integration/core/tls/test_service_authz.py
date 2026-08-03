@@ -1,7 +1,7 @@
-"""AUDIT-2: Service identity authorization — OPA bypass verification.
+"""AUDIT-2: Service identity authorization — authz evaluator bypass verification.
 
 Validates that mTLS-authenticated (cert-based) service requests bypass
-OPA authorization checks.  Per the current architecture, service principals
+authz evaluator checks.  Per the current architecture, service principals
 receive implicit full access — ``PermissionChecker``, ``ProjectScopeFilter``,
 and ``VisibilityFilter`` all short-circuit when ``request.state.is_cert_authenticated``
 is ``True``.
@@ -41,7 +41,7 @@ class TestAUDIT2PermissionCheckerBypass:
     """PermissionChecker short-circuits for cert-authenticated requests."""
 
     @pytest.mark.asyncio
-    async def test_cert_auth_skips_opa(self) -> None:
+    async def test_cert_auth_skips_authz_evaluator(self) -> None:
         checker = PermissionChecker(resource_type="workflow", action="read")
         request = _make_cert_request()
         mock_user = MagicMock()
@@ -53,8 +53,8 @@ class TestAUDIT2PermissionCheckerBypass:
         mock_evaluator.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_non_cert_calls_opa(self) -> None:
-        """Control: non-cert requests DO call OPA."""
+    async def test_non_cert_calls_authz_evaluator(self) -> None:
+        """Control: non-cert requests DO call the authz evaluator."""
         checker = PermissionChecker(resource_type="workflow", action="read")
         request = _make_unauthenticated_request()
         mock_user = MagicMock()

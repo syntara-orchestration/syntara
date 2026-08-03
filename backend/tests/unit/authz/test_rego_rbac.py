@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.unit.authz.conftest import build_opa_input, policies_for_role
+from tests.unit.authz.conftest import build_authz_input, policies_for_role
 
 
 class TestAdminFullAccess:
@@ -29,9 +29,9 @@ class TestAdminFullAccess:
             "project:delete",
         ],
     )
-    def test_admin_full_access(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_admin_full_access(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("admin"),
@@ -56,9 +56,9 @@ class TestUserRole:
             "group-directory:read",
         ],
     )
-    def test_user_role_allowed_actions(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_user_role_allowed_actions(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("user"),
@@ -89,9 +89,9 @@ class TestUserRole:
             "group:read",
         ],
     )
-    def test_user_role_denied_actions(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_user_role_denied_actions(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("user"),
@@ -120,9 +120,9 @@ class TestAuditorRole:
             "setting:read",
         ],
     )
-    def test_auditor_read_allowed(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_auditor_read_allowed(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("auditor"),
@@ -149,9 +149,9 @@ class TestAuditorRole:
             "setting:write",
         ],
     )
-    def test_auditor_write_denied(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_auditor_write_denied(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("auditor"),
@@ -163,10 +163,10 @@ class TestAuditorRole:
 class TestRoleBoundaries:
     """Cross-role boundary checks."""
 
-    def test_user_cannot_read_other_users(self, opa_evaluate):
+    def test_user_cannot_read_other_users(self, evaluate_policy):
         """User role no longer has user:read:any — reading another user is denied."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="other-user-id",
@@ -197,13 +197,13 @@ class TestAuthenticatedRole:
     )
     def test_authenticated_role_permissions(
         self,
-        opa_evaluate,
+        evaluate_policy,
         action: str,
         resource_type: str,
         expected: bool,  # noqa: FBT001
     ):
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("authenticated"),
@@ -211,11 +211,11 @@ class TestAuthenticatedRole:
         )
         assert result["allow"] is expected
 
-    def test_authenticated_role_self_read(self, opa_evaluate):
+    def test_authenticated_role_self_read(self, evaluate_policy):
         """Authenticated role allows user:read when resource_id matches user_id (self scope)."""
         user_id = "self-user-uuid"
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id=user_id,
@@ -225,11 +225,11 @@ class TestAuthenticatedRole:
         )
         assert result["allow"] is True
 
-    def test_authenticated_role_self_update(self, opa_evaluate):
+    def test_authenticated_role_self_update(self, evaluate_policy):
         """Authenticated role allows user:update when resource_id matches user_id (self scope)."""
         user_id = "self-user-uuid"
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="update",
                 resource_type="user",
                 resource_id=user_id,

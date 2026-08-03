@@ -2,9 +2,9 @@
 
 Covers _check_credential_use_permission and _validate_credential_project_scope:
   - opa_client is None → AuthorizationDeniedError
-  - no new credentials → early return (no OPA call)
-  - new credential, OPA allowed → no error
-  - new credential, OPA denied → AuthorizationDeniedError
+  - no new credentials → early return (no authz evaluator call)
+  - new credential, authz allowed → no error
+  - new credential, authz denied → AuthorizationDeniedError
   - no credential IDs → early return from _validate_credential_project_scope
   - missing / wrong-project credentials → SafeValueError
 """
@@ -22,7 +22,7 @@ from nexus.workflows.services.workflow_service import WorkflowService
 
 def _make_service(
     *,
-    with_opa: bool = True,
+    with_authz_evaluator: bool = True,
     project_name: str = "test-project",
 ) -> tuple[WorkflowService, AsyncMock]:
     """Build a WorkflowService with mocked session, user, and optional opa_client.
@@ -43,22 +43,22 @@ def _make_service(
     svc = WorkflowService.__new__(WorkflowService)
     svc.session = session
     svc.user = user
-    svc.opa_client = MagicMock(spec=AuthzEvaluator) if with_opa else None
+    svc.opa_client = MagicMock(spec=AuthzEvaluator) if with_authz_evaluator else None
     return svc, session
 
 
 class TestCheckCredentialUsePermission:  # noqa: D101
     @pytest.mark.asyncio
-    async def test_no_opa_client_raises(self) -> None:
-        svc, _ = _make_service(with_opa=False)
+    async def test_no_authz_evaluator_raises(self) -> None:
+        svc, _ = _make_service(with_authz_evaluator=False)
         cred_ids = {str(uuid4())}
         project_id = uuid4()
         with pytest.raises(AuthorizationDeniedError):
             await svc._check_credential_use_permission(cred_ids, previous_credential_ids=None, project_id=project_id)
 
     @pytest.mark.asyncio
-    async def test_no_new_credentials_skips_opa(self) -> None:
-        """All credentials already present in previous version — no OPA call."""
+    async def test_no_new_credentials_skips_authz(self) -> None:
+        """All credentials already present in previous version — no authz evaluator call."""
         cred_id = str(uuid4())
         project_id = uuid4()
         svc, _ = _make_service()

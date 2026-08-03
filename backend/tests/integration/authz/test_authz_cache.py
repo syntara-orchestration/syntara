@@ -32,7 +32,7 @@ class TestRegoCacheHitMiss:
     """Tests for Rego cache hit/miss behavior."""
 
     @pytest.mark.asyncio
-    async def test_second_call_uses_cached_opa_result(
+    async def test_second_call_uses_cached_authz_result(
         self,
         seeded_db: AsyncSession,
         test_user: User,
@@ -124,7 +124,7 @@ class TestRegoCacheDisabled:
         init_authz_cache(enabled=False)
 
     @pytest.mark.asyncio
-    async def test_every_call_hits_opa(
+    async def test_every_call_hits_evaluator(
         self,
         seeded_db: AsyncSession,
         test_user: User,
@@ -208,8 +208,8 @@ class TestHashRegoInput:
 
     def test_deterministic(self) -> None:
         """Same dict produces same hash."""
-        opa_input = {"user": {"id": "abc"}, "action": "read", "groups": []}
-        assert _hash_authz_input(opa_input) == _hash_authz_input(opa_input)
+        authz_input = {"user": {"id": "abc"}, "action": "read", "groups": []}
+        assert _hash_authz_input(authz_input) == _hash_authz_input(authz_input)
 
     def test_key_order_independent(self) -> None:
         """Dict key order doesn't affect hash."""

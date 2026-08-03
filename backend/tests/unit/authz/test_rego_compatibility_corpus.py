@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 import pytest
 
 from nexus.authz.evaluator import RegoEvaluator, evaluate_policy_input
-from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy
+from tests.unit.authz.conftest import allow_policy, build_authz_input, deny_policy
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ def _normalize_result(result: dict[str, Any]) -> dict[str, Any]:
 COMPATIBILITY_CASES = [
     CompatibilityCase(
         id="allow-picks-first-sorted-policy-name",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="workflow",
             effective_policies=[
@@ -75,7 +75,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="wildcard-action-matches-specific-request",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="delete",
             resource_type="workflow",
             effective_policies=[allow_policy("workflow-any", ["workflow:*"])],
@@ -89,7 +89,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="deny-wins-and-picks-first-sorted-deny-policy",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="workflow",
             resource_project="proj-a",
@@ -109,7 +109,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="project-scope-mismatch-still-reports-reachable-projects",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="workflow",
             resource_project="proj-b",
@@ -125,7 +125,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="self-scope-user-match-allows",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="user",
             resource_id="user-123",
@@ -140,7 +140,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="self-scope-empty-ids-known-quirk-still-allows",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="user",
             resource_id="",
@@ -155,7 +155,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="group-label-condition-matches-any-group",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="run",
             resource_type="execution",
             groups=[
@@ -179,7 +179,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="missing-user-label-satisfies-user-labels-not",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="workflow",
             user_labels={},
@@ -200,7 +200,7 @@ COMPATIBILITY_CASES = [
     ),
     CompatibilityCase(
         id="unknown-effect-is-ignored",
-        authz_input=build_opa_input(
+        authz_input=build_authz_input(
             action="read",
             resource_type="workflow",
             effective_policies=[

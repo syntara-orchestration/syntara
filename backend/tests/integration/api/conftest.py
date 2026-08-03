@@ -30,9 +30,9 @@ from nexus.core.models.group import Group, user_groups
 _TEST_GROUP_NAME = "test-users"
 
 
-def _opa_evaluate_cli(opa_input: dict[str, Any]) -> dict[str, Any]:
+def _evaluate_policy(authz_input: dict[str, Any]) -> dict[str, Any]:
     """Evaluate authz using regopy against the real rego policy."""
-    return evaluate_policy_input(opa_input)
+    return evaluate_policy_input(authz_input)
 
 
 @pytest.fixture(autouse=True)
@@ -218,7 +218,7 @@ async def test_project_id(test_db_session: AsyncSession) -> str:
 def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace the authz evaluator with one that uses regopy directly."""
     mock_evaluator = AsyncMock()
-    mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
+    mock_evaluator.evaluate = MagicMock(side_effect=_evaluate_policy)
 
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator

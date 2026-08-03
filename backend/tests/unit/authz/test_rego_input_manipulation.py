@@ -6,15 +6,15 @@ result in deny (never allow).
 
 import pytest
 
-from tests.unit.authz.conftest import allow_policy, build_opa_input, policies_for_role
+from tests.unit.authz.conftest import allow_policy, build_authz_input, policies_for_role
 
 
 class TestEmptyActionField:
     """SEC-014 / CHAOS-001: Empty action string must be denied."""
 
-    def test_empty_action_with_admin_policies(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_empty_action_with_admin_policies(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="",
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),
@@ -22,9 +22,9 @@ class TestEmptyActionField:
         )
         assert result["allow"] is False
 
-    def test_empty_action_with_user_policies(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_empty_action_with_user_policies(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="",
                 resource_type="workflow",
                 effective_policies=policies_for_role("user"),
@@ -36,9 +36,9 @@ class TestEmptyActionField:
 class TestEmptyResourceType:
     """SEC-015: Empty resource_type must be denied."""
 
-    def test_empty_resource_type_with_admin_policies(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_empty_resource_type_with_admin_policies(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="",
                 effective_policies=policies_for_role("admin"),
@@ -46,9 +46,9 @@ class TestEmptyResourceType:
         )
         assert result["allow"] is False
 
-    def test_empty_resource_type_with_user_policies(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_empty_resource_type_with_user_policies(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="",
                 effective_policies=policies_for_role("user"),
@@ -70,9 +70,9 @@ class TestUnknownResourceType:
         ],
         ids=["read:nonexistent", "create:secret", "delete:database", "admin:system"],
     )
-    def test_unknown_resource_denied_even_with_admin(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_unknown_resource_denied_even_with_admin(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("admin"),
@@ -84,10 +84,10 @@ class TestUnknownResourceType:
 class TestWildcardInRequest:
     """SEC-017 / CHAOS-024: Wildcards in action or resource_type fields do not grant access."""
 
-    def test_wildcard_action_denied(self, opa_evaluate):
+    def test_wildcard_action_denied(self, evaluate_policy):
         """Action field '*' should not match any policy."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="*",
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),
@@ -95,10 +95,10 @@ class TestWildcardInRequest:
         )
         assert result["allow"] is False
 
-    def test_wildcard_resource_type_denied(self, opa_evaluate):
+    def test_wildcard_resource_type_denied(self, evaluate_policy):
         """Resource type '*' should not match any policy."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="*",
                 effective_policies=policies_for_role("admin"),
@@ -106,10 +106,10 @@ class TestWildcardInRequest:
         )
         assert result["allow"] is False
 
-    def test_star_star_action_denied(self, opa_evaluate):
+    def test_star_star_action_denied(self, evaluate_policy):
         """CHAOS-024: '*:*' as action should not grant access."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="*:*",
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),
@@ -117,10 +117,10 @@ class TestWildcardInRequest:
         )
         assert result["allow"] is False
 
-    def test_wildcard_both_fields_denied(self, opa_evaluate):
+    def test_wildcard_both_fields_denied(self, evaluate_policy):
         """Both action='*' and resource_type='*' denied."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="*",
                 resource_type="*",
                 effective_policies=policies_for_role("admin"),
@@ -132,9 +132,9 @@ class TestWildcardInRequest:
 class TestLongStrings:
     """SEC-018: Extremely long strings do not cause Rego to crash or allow."""
 
-    def test_long_action_denied(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_long_action_denied(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="a" * 10000,
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),
@@ -142,9 +142,9 @@ class TestLongStrings:
         )
         assert result["allow"] is False
 
-    def test_long_resource_type_denied(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_long_resource_type_denied(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="x" * 10000,
                 effective_policies=policies_for_role("admin"),
@@ -152,14 +152,14 @@ class TestLongStrings:
         )
         assert result["allow"] is False
 
-    def test_long_user_id_denied(self, opa_evaluate):
+    def test_long_user_id_denied(self, evaluate_policy):
         """Long user_id should not break self-scope checks."""
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
         long_id = "u" * 10000
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="other",
@@ -169,14 +169,14 @@ class TestLongStrings:
         )
         assert result["allow"] is False
 
-    def test_long_matching_ids_allowed(self, opa_evaluate):
+    def test_long_matching_ids_allowed(self, evaluate_policy):
         """Long but matching IDs should still work for self-scope."""
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
         long_id = "u" * 10000
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id=long_id,
@@ -199,9 +199,9 @@ class TestUnicodeAndSpecialChars:
         ],
         ids=["null-prefix-action", "null-prefix-resource", "null-mid-action"],
     )
-    def test_null_bytes_denied(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_null_bytes_denied(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("admin"),
@@ -218,9 +218,9 @@ class TestUnicodeAndSpecialChars:
         ],
         ids=["zwsp-action", "zwsp-resource", "accent-action"],
     )
-    def test_unicode_injection_denied(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_unicode_injection_denied(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("admin"),
@@ -228,9 +228,9 @@ class TestUnicodeAndSpecialChars:
         )
         assert result["allow"] is False
 
-    def test_newline_in_action_denied(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_newline_in_action_denied(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read\ndelete",
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),
@@ -238,9 +238,9 @@ class TestUnicodeAndSpecialChars:
         )
         assert result["allow"] is False
 
-    def test_sql_injection_in_action_denied(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_sql_injection_in_action_denied(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read' OR '1'='1",
                 resource_type="workflow",
                 effective_policies=policies_for_role("admin"),

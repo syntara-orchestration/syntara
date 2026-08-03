@@ -59,7 +59,7 @@ def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_opa_cache() -> Generator[None, None, None]:
+def _reset_authz_cache() -> Generator[None, None, None]:
     """Disable Rego cache between unit tests to prevent cross-test pollution."""
     from nexus.authz.engine import clear_authz_cache, init_authz_cache
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.unit.authz.conftest import build_opa_input, deny_policy, policies_for_role
+from tests.unit.authz.conftest import build_authz_input, deny_policy, policies_for_role
 
 _DENY_PROD_DELETE = deny_policy(
     "deny-prod-delete",
@@ -25,14 +25,14 @@ class TestDenyOverridesAllow:
     )
     def test_deny_overrides_allow(
         self,
-        opa_evaluate,
+        evaluate_policy,
         action: str,
         resource_type: str,
         expected: bool,  # noqa: FBT001
     ):
         policies = [*policies_for_role("admin"), deny_policy("deny-wf-delete", ["workflow:delete"])]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies,
@@ -44,10 +44,10 @@ class TestDenyOverridesAllow:
 class TestDenyWithResourceLabels:
     """Deny workflow:delete only when env=production."""
 
-    def test_delete_production_denied(self, opa_evaluate):
+    def test_delete_production_denied(self, evaluate_policy):
         policies = [*policies_for_role("admin"), _DENY_PROD_DELETE]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 resource_labels={"env": "production"},
@@ -56,10 +56,10 @@ class TestDenyWithResourceLabels:
         )
         assert result["allow"] is False
 
-    def test_delete_staging_allowed(self, opa_evaluate):
+    def test_delete_staging_allowed(self, evaluate_policy):
         policies = [*policies_for_role("admin"), _DENY_PROD_DELETE]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 resource_labels={"env": "staging"},
@@ -68,10 +68,10 @@ class TestDenyWithResourceLabels:
         )
         assert result["allow"] is True
 
-    def test_delete_no_labels_allowed(self, opa_evaluate):
+    def test_delete_no_labels_allowed(self, evaluate_policy):
         policies = [*policies_for_role("admin"), _DENY_PROD_DELETE]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -100,14 +100,14 @@ class TestWildcardAllowSpecificDeny:
     )
     def test_wildcard_allow_specific_deny(
         self,
-        opa_evaluate,
+        evaluate_policy,
         action: str,
         resource_type: str,
         expected: bool,  # noqa: FBT001
     ):
         policies = [*policies_for_role("admin"), deny_policy("deny-wf-update", ["workflow:update"])]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies,

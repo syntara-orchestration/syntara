@@ -2,7 +2,7 @@
 
 Covers _has_direct_system_credential_use, resolve_credential_use_visibility
 fast path, and builtin_roles_with_system_grant — all pure-Python / mock-DB,
-no OPA evaluation needed.
+no authz evaluator call needed.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -93,7 +93,7 @@ class TestResolveCredentialUseVisibilityFastPath:  # noqa: D101
         result = await resolve_credential_use_visibility(db, evaluator, uuid4())
 
         assert result.unrestricted is True
-        # Evaluator must NOT be called — the fast path skips OPA entirely
+        # Evaluator must NOT be called — the fast path skips the authz evaluator entirely
         evaluator.evaluate.assert_not_called()
 
     @pytest.mark.asyncio

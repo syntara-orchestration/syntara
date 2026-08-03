@@ -215,7 +215,7 @@ async def _seed_integration_data(test_db_session: AsyncSession) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_opa_cache() -> Generator[None, None, None]:
+def _reset_authz_cache() -> Generator[None, None, None]:
     """Reset Rego cache between integration tests."""
     init_authz_cache(enabled=True, ttl_seconds=300)
     yield
