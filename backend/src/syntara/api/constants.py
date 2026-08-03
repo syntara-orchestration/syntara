@@ -7,6 +7,7 @@ For configurable values, use get_settings() from syntara.core.config.base.
 # API configuration
 
 API_V1_PATH_PREFIX = "/api/v1"
+API_DOCS_V1_PATH_PREFIX = "/api_docs/v1"
 API_V1_VERSION = "0.1.0"
 
 # Full path to the OIDC callback endpoint, used by the auth router and
@@ -24,12 +25,13 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
         "/healthz/ready",
         "/api",
         "/api/v1",
-        f"{API_V1_PATH_PREFIX}/docs",
-        f"{API_V1_PATH_PREFIX}/redoc",
-        f"{API_V1_PATH_PREFIX}/openapi.json",
+        "/docs",
+        f"{API_DOCS_V1_PATH_PREFIX}/docs",
+        f"{API_DOCS_V1_PATH_PREFIX}/redoc",
+        f"{API_DOCS_V1_PATH_PREFIX}/openapi.json",
     }
 )
 
 # Prefix for paths that should be excluded via startswith matching
 # (handles parameterised routes like /_internal/metrics/kpis/{component}).
-EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/",)
+EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/", "/api_docs/")

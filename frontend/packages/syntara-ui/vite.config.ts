@@ -13,19 +13,32 @@ export default defineConfig(({ mode }) => {
     title: env.VITE_APP_TITLE,
   })
 
+  const backendTarget = env.VITE_API_URL || 'http://localhost:3000'
+
   const proxyConfig = {
     '/api': {
-      target: env.VITE_API_URL || 'http://localhost:3000',
+      target: backendTarget,
+      changeOrigin: true,
+      secure: false,
+    },
+    // API docs live outside /api (Swagger/ReDoc/OpenAPI); keep UI proxy parity with nginx.
+    '/api_docs': {
+      target: backendTarget,
+      changeOrigin: true,
+      secure: false,
+    },
+    '/docs': {
+      target: backendTarget,
       changeOrigin: true,
       secure: false,
     },
     '/health': {
-      target: env.VITE_API_URL || 'http://localhost:3000',
+      target: backendTarget,
       changeOrigin: true,
       secure: false,
     },
     '/ws': {
-      target: env.VITE_WS_URL || env.VITE_API_URL || 'http://localhost:3000',
+      target: env.VITE_WS_URL || backendTarget,
       changeOrigin: true,
       secure: false,
       ws: true,
