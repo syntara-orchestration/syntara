@@ -1,27 +1,21 @@
 """Compatibility corpus for authz.rego decision semantics.
 
-These cases freeze the observable decision contract that callers relied on
-before the evaluator implementation changed from an external authz evaluator to the
-in-process regopy path. The goal is to catch semantic drift in the Rego rule or
+These cases freeze the observable decision contract for the in-process
+regopy evaluator. The goal is to catch semantic drift in the Rego rule or
 its result normalization, not just basic allow/deny regressions.
 """
 
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from pathlib import Path
 
 import pytest
 
-from nexus.authz.evaluator import RegoEvaluator, evaluate_policy_input, get_default_policy_path
+from nexus.authz.evaluator import RegoEvaluator, evaluate_policy_input
 from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy
 
 
@@ -59,56 +53,6 @@ def _normalize_result(result: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(result)
     normalized["allowed_projects"] = sorted(normalized.get("allowed_projects", []))
     return normalized
-
-
-def _evaluate_with_opa_cli(authz_input: dict[str, Any], *, policy_path: Path | None = None) -> dict[str, Any]:
-    """Evaluate the policy with the local Rego CLI for before/after parity checks."""
-    opa_binary = shutil.which("opa")
-    if opa_binary is None:
-        pytest.skip("Rego CLI is not available in PATH")
-
-    policy_file = policy_path or get_default_policy_path()
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as input_file:
-        json.dump(authz_input, input_file)
-        input_file.flush()
-        completed = subprocess.run(  # noqa: S603
-            [
-                opa_binary,
-                "eval",
-                "--format=json",
-                "-d",
-                str(policy_file),
-                "--input",
-                input_file.name,
-                "data.nexus.authz",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-    payload = json.loads(completed.stdout)
-    result: dict[str, Any] = payload["result"][0]["expressions"][0]["value"]
-    return result
-
-
-def _normalize_opa_public_result(raw_result: dict[str, Any]) -> dict[str, Any]:
-    """Normalize raw Rego output to the app's public authz response contract."""
-    matched_policies = sorted(raw_result.get("_matched_policies", []))
-    denied_policies = sorted(raw_result.get("_denied_by_policies", []))
-    normalized = {
-        "allow": raw_result.get("allow", False),
-        "deny": raw_result.get("deny", False),
-        "matched_policy": raw_result.get("matched_policy", ""),
-        "denial_reason": raw_result.get("denial_reason", ""),
-        "denied_by": raw_result.get("denied_by", ""),
-        "allowed_projects": raw_result.get("allowed_projects", []),
-    }
-    if not normalized["matched_policy"] and matched_policies:
-        normalized["matched_policy"] = matched_policies[0]
-    if not normalized["denied_by"] and denied_policies:
-        normalized["denied_by"] = denied_policies[0]
-    return _normalize_result(normalized)
 
 
 COMPATIBILITY_CASES = [
@@ -303,11 +247,3 @@ async def test_reusable_evaluator_matches_compatibility_corpus(
     """Ensure the long-lived runtime evaluator preserves the same semantics."""
     result = _normalize_result(rego_evaluator.evaluate(case.authz_input))
     assert result == case.expected
-
-
-@pytest.mark.parametrize("case", COMPATIBILITY_CASES, ids=lambda case: case.id)
-def test_regopy_matches_opa_for_compatibility_corpus(case: CompatibilityCase) -> None:
-    """Verify the in-process evaluator returns the same decision shape as Rego."""
-    regopy_result = _normalize_result(evaluate_policy_input(case.authz_input))
-    opa_result = _normalize_opa_public_result(_evaluate_with_opa_cli(case.authz_input))
-    assert regopy_result == opa_result
