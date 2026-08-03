@@ -1,12 +1,12 @@
 """E2E tests for WebSocket authentication and authorization.
 
-These tests exercise the auth chain: real JWT identity (patched ticket
-exchange), real in-process regopy evaluation, and DB-backed resource lookup.
+These tests exercise the authz chain with patched ticket authentication,
+live in-process regopy evaluation, and DB-backed resource lookup.
 
 Unlike ``test_websocket_auth.py`` (which patches individual guards), these
-tests prove that the end-to-end wiring is correct — the right claims flow
-through ``_authenticate_websocket``, the right policies are evaluated by
-regopy, and missing resources fail closed.
+tests prove role allow/deny through the real evaluator against seeded
+resources. Missing-resource fail-closed is covered separately in
+``test_websocket_project_scoped_auth.py``.
 
 Requires:
     - Live test database (integration test infrastructure)
