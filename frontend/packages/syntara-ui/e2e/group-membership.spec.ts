@@ -191,7 +191,7 @@ test.describe('User Detail — Group Membership', () => {
     await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
 
     // Click on a user
-    const userLink = app.getByRole('button', { name: 'admin', exact: true })
+    const userLink = app.getByRole('link', { name: 'admin', exact: true })
     const hasUser = await userLink
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)

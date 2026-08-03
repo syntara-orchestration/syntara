@@ -41,7 +41,7 @@ test.afterAll(async ({ browser }) => {
 // Real-backend only: credential seed requires auth token; not tagged @pr-check intentionally
 test.describe('Credential Username Links', () => {
   test('credential list shows created_by username as a link to user detail', async ({ app }) => {
-    test.skip(!seededCred, 'Credential seed not available')
+    expect(seededCred, 'Credential seed not available').toBeTruthy()
 
     await goToCredentialsList(app)
     await filterCredentialByName(app, credName)
@@ -58,7 +58,7 @@ test.describe('Credential Username Links', () => {
   })
 
   test('credential detail shows Created username as a link to user detail', async ({ app }) => {
-    test.skip(!seededCred, 'Credential seed not available')
+    expect(seededCred, 'Credential seed not available').toBeTruthy()
 
     await app.goto(toAppUrl(`/configuration/credentials/${seededCred!.id}`))
     await expect(app.getByRole('heading', { name: credName, level: 1 })).toBeVisible({ timeout: 15_000 })

@@ -20,8 +20,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: originalName, token: token ?? undefined })
-      expect(seeded).not.toBeNull()
-      integrationId = seeded!.id
+      integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -68,8 +67,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
-      expect(seeded).not.toBeNull()
-      integrationId = seeded!.id
+      integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -123,8 +121,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
-      expect(seeded).not.toBeNull()
-      integrationId = seeded!.id
+      integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()

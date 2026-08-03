@@ -48,7 +48,7 @@ test.describe('Workflow Filtering', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No workflows available for filtering tests')
+    expect(hasTable, 'No workflows available for filtering tests').toBeTruthy()
 
     // Act - Apply name filter
     const nameFilterInput = app.getByPlaceholder('Filter by name')
@@ -234,8 +234,7 @@ test.describe('Workflow Filtering', () => {
     await expect(nameChipGroup.getByText('test')).toBeVisible()
 
     // Act - Remove name filter chip
-    const nameLabel = nameChipGroup.locator('.pf-v6-c-label').filter({ hasText: 'test' })
-    await nameLabel.getByRole('button', { name: /close/i }).click()
+    await nameChipGroup.getByRole('button', { name: 'Close test' }).click()
 
     // Assert - Filter removed
     await expect(nameChipGroup).not.toBeVisible()

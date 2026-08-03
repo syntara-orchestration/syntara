@@ -70,7 +70,7 @@ test.beforeAll(async ({ browser }) => {
 
   for (let i = 1; i <= 2; i++) {
     const integration = await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token })
-    if (integration) seededIntegrations.push(integration)
+    seededIntegrations.push(integration)
   }
 
   for (let i = 1; i <= 16; i++) {
@@ -401,7 +401,7 @@ test.describe('Pagination Footer — Integrations', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)

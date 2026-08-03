@@ -166,7 +166,7 @@ test.describe('AI Agent Node @pr-check', () => {
     const mcpIntegrationName = buildUniqueName('e2e-mcp-integ')
     const workflowName = buildUniqueName('e2e-agent-tools-schema')
     let llmIntegration: SeededLlmIntegration | undefined
-    let mcpIntegration: SeededIntegration | null = null
+    let mcpIntegration: SeededIntegration | undefined
     try {
       llmIntegration = await createLlmIntegration(app, llmIntegrationName)
       // Tool selection requires an MCP integration (with tools). Without one the
@@ -177,7 +177,6 @@ test.describe('AI Agent Node @pr-check', () => {
         token: token ?? undefined,
         discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
       })
-      expect(mcpIntegration).not.toBeNull()
 
       const { name: credName } = await ensureLlmCredential(app)
 
@@ -337,7 +336,7 @@ test.describe('AI Agent Node @pr-check', () => {
     const mcpName = buildUniqueName('e2e-mcp-t16')
     let llmIntegrationId: string | undefined
     let llmCredentialId: string | undefined
-    let mcpIntegration: SeededIntegration | null = null
+    let mcpIntegration: SeededIntegration | undefined
     try {
       // Create an LLM integration with two enabled models (one default) and one disabled
       const project = await ensureProject(app)

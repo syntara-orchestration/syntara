@@ -81,7 +81,7 @@ test('user filters approvals by name and status', async ({ app }) => {
     .waitFor({ state: 'visible', timeout: 5000 })
     .then(() => true)
     .catch(() => false)
-  test.skip(!hasTable, 'No approval data available; seed data required')
+  expect(hasTable, 'No approval data available; seed data required').toBeTruthy()
 
   // Step 1: Apply name filter
   await app.getByPlaceholder('Filter by name').fill('Policy')

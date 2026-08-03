@@ -48,8 +48,8 @@ async function openAgentToolSelector(app: Page, projectName: string) {
 }
 
 test.describe('Integration project scope — selector visibility', () => {
-  let projectScopedIntegration: SeededIntegration | null = null
-  let globalIntegration: SeededIntegration | null = null
+  let projectScopedIntegration: SeededIntegration | undefined
+  let globalIntegration: SeededIntegration | undefined
   let projectAId: string | null = null
   let projectAName: string | null = null
   let projectBId: string | null = null
@@ -89,7 +89,7 @@ test.describe('Integration project scope — selector visibility', () => {
           patched &&
           projectAId &&
           (await assignIntegrationProjectViaApi(page, projectScopedIntegration.id, projectAId, token))
-        if (!assigned) projectScopedIntegration = null
+        if (!assigned) projectScopedIntegration = undefined
       }
     } finally {
       await page.close()

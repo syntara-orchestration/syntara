@@ -168,6 +168,6 @@ export async function selectLlmCredential(page: Page, credName: string, integrat
   await credDropdown.click()
 
   const credOption = page.getByRole('option', { name: credName })
-  await expect(credOption).toBeVisible({ timeout: 10_000 })
+  await expect(credOption).toBeVisible({ timeout: 30_000 })
   await credOption.click()
 }
