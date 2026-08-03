@@ -1,0 +1,9 @@
+# Legacy metric wire/enum mirrors until product rename (follow-up).
+# Matched against "path:line:content" from the Part A naming sweep.
+^backend/tests/unit/metrics/test_authz_metrics\.py:.*MetricType\.OPA_REQUEST_DURATION
+^backend/tests/unit/metrics/test_authz_metrics\.py:.*opa_request_duration_seconds
+^backend/tests/unit/metrics/test_authz_metrics\.py:.*nexus_opa_request_duration_seconds
+^backend/tests/unit/metrics/test_authz_metrics\.py:.*"opa_request_duration_ms"
+^backend/tests/unit/metrics/test_authz_metrics\.py:.*OPA_REQUEST_DURATION
+^backend/tests/unit/metrics/test_prometheus\.py:.*opa_request_duration_seconds
+^backend/tests/unit/metrics/test_types\.py:.*"OPA_REQUEST_DURATION"
