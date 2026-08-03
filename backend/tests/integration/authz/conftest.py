@@ -1,10 +1,9 @@
 """Shared fixtures for integration-level authz tests.
 
 Provides common fixtures for engine/cache tests that use a mocked authz
-evaluator, plus a temporary OPA-CLI skip gate (removed in Part B).
+evaluator.
 """
 
-import shutil
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -84,14 +83,3 @@ def mock_evaluator() -> AsyncMock:
         }
     )
     return evaluator
-
-
-@pytest.fixture(autouse=True)
-def _skip_if_no_opa() -> None:
-    """Skip tests when Rego CLI is not available.
-
-    Kept temporarily for Part B (critical unblock). Part A only removed the
-    unused CLI evaluation helpers that nothing consumed.
-    """
-    if not shutil.which("opa"):
-        pytest.skip("opa CLI not found on PATH")
