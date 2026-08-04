@@ -261,6 +261,24 @@ class TestOldDocsEndpointsRemoved:
 
         return TestClient(app, raise_server_exceptions=False)
 
+    def test_docs_redirect_404_when_disabled(self) -> None:
+        import importlib
+
+        import nexus.api.main as main_module
+        from nexus.core.config.base import get_settings
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        get_settings.cache_clear()
+        try:
+            importlib.reload(main_module)
+            client = TestClient(main_module.app, raise_server_exceptions=False)
+            assert client.get("/docs").status_code == 404
+        finally:
+            monkeypatch.delenv("APP_ENABLE_API_DOCS", raising=False)
+            get_settings.cache_clear()
+            importlib.reload(main_module)
+
     def test_old_redoc_404(self, client: TestClient) -> None:
         assert client.get("/redoc").status_code == 404
 

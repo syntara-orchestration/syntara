@@ -34,4 +34,5 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
 
 # Prefix for paths that should be excluded via startswith matching
 # (handles parameterised routes like /_internal/metrics/kpis/{component}).
+# Any path under these prefixes bypasses audit, metrics, cert, and rate-limit middleware.
 EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/", "/api_docs/")
