@@ -1,13 +1,41 @@
 """Test fixtures and helpers for execution factory."""
 
-from datetime import datetime
-from uuid import uuid4
+from __future__ import annotations
 
-from sqlmodel.ext.asyncio.session import AsyncSession
+from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
-from nexus.core.models import User
-from nexus.workflows.models import Workflow, WorkflowVersion
 from nexus.workflows.models.execution import Execution, ExecutionStatus
+from tests.integration.helpers.workflow import WorkflowFactory
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from nexus.core.models import User
+    from nexus.workflows.models import Workflow, WorkflowVersion
+
+
+async def create_test_execution(
+    session: AsyncSession,
+    user: User,
+    project_id: UUID,
+    *,
+    status: ExecutionStatus = ExecutionStatus.RUNNING,
+) -> Execution:
+    """Create a committed Execution with Workflow/WorkflowVersion FKs.
+
+    Composes ``WorkflowFactory`` + ``ExecutionFactory`` and commits so a
+    separate session (e.g. websocket ``endpoint_factory``) can see the row.
+    Pass fixture ``test_project_id`` — do not use the ``workflow_factory``
+    fixture that creates its own project.
+    """
+    wf, version = await WorkflowFactory(session, user, project_id).create(is_enabled=False)
+    execution = await ExecutionFactory(session, user).create(wf, version, status=status)
+    await session.commit()
+    await session.refresh(execution)
+    return execution
 
 
 class ExecutionFactory:

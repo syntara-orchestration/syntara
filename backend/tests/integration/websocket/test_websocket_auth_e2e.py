@@ -37,9 +37,7 @@ from nexus.core.models.group import Group, user_groups
 from nexus.core.websocket.close_codes import POLICY_VIOLATION
 from nexus.core.websocket.connection import get_connection_manager
 from nexus.core.websocket.manager import get_connection_lifecycle_manager
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from tests.helpers.workflow import create_minimal_workflow_definition
+from tests.integration.helpers.execution import create_test_execution
 from tests.integration.helpers.invocations import create_test_invocation
 
 if TYPE_CHECKING:
@@ -52,6 +50,7 @@ if TYPE_CHECKING:
 
     from nexus.agent_orchestrator.models.invocation import Invocation
     from nexus.core.models import User
+    from nexus.workflows.models.execution import Execution
 
 EXECUTION_WS_PATH = "/ws/workflows/v1/executions"
 INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
@@ -90,48 +89,6 @@ async def _make_role_assignment(
     )
     await session.exec(insert(user_groups).values(user_id=user.id, group_id=group.id))
     await session.commit()
-
-
-async def _create_execution(
-    db: AsyncSession,
-    *,
-    project_id: UUID,
-    created_by: UUID,
-) -> Execution:
-    """Create a minimal Execution with all required FK rows."""
-    workflow = Workflow(
-        id=uuid4(),
-        name=f"test-workflow-{uuid4().hex[:8]}",
-        created_by=created_by,
-        project_id=project_id,
-    )
-    db.add(workflow)
-    await db.flush()
-
-    version = WorkflowVersion(
-        id=uuid4(),
-        workflow_id=workflow.id,
-        version=1,
-        schema_version="2.0.0",
-        workflow_definition=create_minimal_workflow_definition(name=workflow.name),
-        created_by=created_by,
-    )
-    db.add(version)
-    await db.flush()
-
-    execution = Execution(
-        id=uuid4(),
-        workflow_id=workflow.id,
-        workflow_version_id=version.id,
-        project_id=project_id,
-        temporal_workflow_id=f"temporal-{uuid4().hex[:12]}",
-        status=ExecutionStatus.RUNNING,
-        created_by=created_by,
-    )
-    db.add(execution)
-    await db.commit()
-    await db.refresh(execution)
-    return execution
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +209,7 @@ async def ws_seeded_execution(
     ws_admin_user: User,
 ) -> Execution:
     """Persisted execution so authz resolves project instead of fail-closing."""
-    return await _create_execution(
-        test_db_session,
-        project_id=test_project_id,
-        created_by=ws_admin_user.id,
-    )
+    return await create_test_execution(test_db_session, ws_admin_user, test_project_id)
 
 
 @pytest_asyncio.fixture

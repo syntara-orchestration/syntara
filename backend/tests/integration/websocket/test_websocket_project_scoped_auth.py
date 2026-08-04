@@ -27,9 +27,7 @@ from nexus.core.models import User
 from nexus.core.websocket.close_codes import POLICY_VIOLATION
 from nexus.core.websocket.connection import get_connection_manager
 from nexus.core.websocket.manager import get_connection_lifecycle_manager
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from tests.helpers.workflow import create_minimal_workflow_definition
+from tests.integration.helpers.execution import create_test_execution
 from tests.integration.helpers.invocations import create_test_invocation
 
 if TYPE_CHECKING:
@@ -63,48 +61,6 @@ def _reset_connection_managers() -> Generator[None, None, None]:
 _PATCH_FACTORY_DB = "nexus.core.websocket.endpoint_factory.AsyncSessionLocal"
 
 
-async def _create_execution(
-    db: AsyncSession,
-    *,
-    project_id: UUID,
-    created_by: UUID,
-) -> Execution:
-    """Create a minimal Execution with all required FK rows (Workflow, WorkflowVersion)."""
-    workflow = Workflow(
-        id=uuid4(),
-        name=f"test-workflow-{uuid4().hex[:8]}",
-        created_by=created_by,
-        project_id=project_id,
-    )
-    db.add(workflow)
-    await db.flush()
-
-    version = WorkflowVersion(
-        id=uuid4(),
-        workflow_id=workflow.id,
-        version=1,
-        schema_version="2.0.0",
-        workflow_definition=create_minimal_workflow_definition(name=workflow.name),
-        created_by=created_by,
-    )
-    db.add(version)
-    await db.flush()
-
-    execution = Execution(
-        id=uuid4(),
-        workflow_id=workflow.id,
-        workflow_version_id=version.id,
-        project_id=project_id,
-        temporal_workflow_id=f"temporal-{uuid4().hex[:12]}",
-        status=ExecutionStatus.RUNNING,
-        created_by=created_by,
-    )
-    db.add(execution)
-    await db.commit()
-    await db.refresh(execution)
-    return execution
-
-
 class TestProjectScopedExecutionWebSocketAuthorization:
     """WebSocket authorization must include resource_project for project-scoped policies."""
 
@@ -126,7 +82,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         assert project is not None
         project_name = project.name
 
-        execution = await _create_execution(test_db_session, project_id=test_project_id, created_by=test_user.id)
+        execution = await create_test_execution(test_db_session, test_user, test_project_id)
 
         fake_user = User(
             id=uuid4(),
@@ -205,7 +161,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         This tests the edge case where execution.project_id points to a
         non-existent or soft-deleted project.
         """
-        execution = await _create_execution(test_db_session, project_id=test_project_id, created_by=test_user.id)
+        execution = await create_test_execution(test_db_session, test_user, test_project_id)
 
         # Soft-delete the project so the JOIN in resolve_resource_project returns no rows
         project = await test_db_session.get(Project, test_project_id)
