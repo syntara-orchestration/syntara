@@ -611,6 +611,24 @@ describe('ActionNodeForm', () => {
       expect(screen.getByRole('switch', { name: 'Override retry policy' })).toBeInTheDocument()
     })
 
+    it('hides follow redirects for script executor', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'script' }} />)
+
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+
+      expect(screen.queryByRole('switch', { name: /follow redirects/i })).not.toBeInTheDocument()
+    })
+
+    it('shows follow redirects for HTTP request executor', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
+
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+
+      expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeInTheDocument()
+    })
+
     it('strips retry_policy from submitted data when executor is script', async () => {
       renderWithHeader(
         <ActionNodeForm

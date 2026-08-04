@@ -1,5 +1,4 @@
 import {
-  Checkbox,
   FormGroup,
   FormSection,
   HelperText,
@@ -391,9 +390,9 @@ function FollowRedirectsSection({ control, isDisabled }: FollowRedirectsSectionP
           control={control}
           name="settings.follow_redirects"
           render={({ field }) => (
-            <Checkbox
+            <Switch
               id="node-settings-follow-redirects"
-              label="Automatically follow HTTP redirects (3xx responses)"
+              aria-label="Follow redirects"
               isChecked={field.value ?? false}
               onChange={(_event, checked) => field.onChange(checked)}
               isDisabled={isDisabled}

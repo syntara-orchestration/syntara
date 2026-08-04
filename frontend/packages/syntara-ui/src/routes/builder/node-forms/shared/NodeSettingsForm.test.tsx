@@ -263,30 +263,30 @@ describe('NodeSettingsForm', () => {
   describe('follow redirects', () => {
     it('does not render by default', () => {
       setup()
-      expect(screen.queryByRole('checkbox', { name: /follow/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('switch', { name: /follow redirects/i })).not.toBeInTheDocument()
     })
 
-    it('renders checkbox when supportsFollowRedirects is true', () => {
+    it('renders switch when supportsFollowRedirects is true', () => {
       setup({ supportsFollowRedirects: true })
-      expect(screen.getByRole('checkbox', { name: /automatically follow http redirects/i })).toBeInTheDocument()
+      expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeInTheDocument()
     })
 
     it('defaults to unchecked', () => {
       setup({ supportsFollowRedirects: true })
-      expect(screen.getByRole('checkbox', { name: /automatically follow http redirects/i })).not.toBeChecked()
+      expect(screen.getByRole('switch', { name: /follow redirects/i })).not.toBeChecked()
     })
 
     it('renders checked when default value is true', () => {
       setup({ supportsFollowRedirects: true }, { settings: { follow_redirects: true } })
-      expect(screen.getByRole('checkbox', { name: /automatically follow http redirects/i })).toBeChecked()
+      expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeChecked()
     })
 
     it('toggles when clicked', async () => {
       const { user } = setup({ supportsFollowRedirects: true })
-      const checkbox = screen.getByRole('checkbox', { name: /automatically follow http redirects/i })
-      expect(checkbox).not.toBeChecked()
-      await user.click(checkbox)
-      await waitFor(() => expect(checkbox).toBeChecked())
+      const toggle = screen.getByRole('switch', { name: /follow redirects/i })
+      expect(toggle).not.toBeChecked()
+      await user.click(toggle)
+      await waitFor(() => expect(toggle).toBeChecked())
     })
 
     it('has no accessibility violations', async () => {
