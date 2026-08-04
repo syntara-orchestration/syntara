@@ -328,7 +328,13 @@ type RetryPolicySectionProps = {
   isDisabled?: boolean
 }
 
-function RetryPolicySection({ control, register, setValue, retryDefaults, isDisabled }: RetryPolicySectionProps) {
+function RetryPolicySection({
+  control,
+  register,
+  setValue,
+  retryDefaults,
+  isDisabled,
+}: Readonly<RetryPolicySectionProps>) {
   const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
   const overrideRetry = retryPolicy !== undefined
 
@@ -378,7 +384,7 @@ type FollowRedirectsSectionProps = {
   isDisabled?: boolean
 }
 
-function FollowRedirectsSection({ control, isDisabled }: FollowRedirectsSectionProps) {
+function FollowRedirectsSection({ control, isDisabled }: Readonly<FollowRedirectsSectionProps>) {
   return (
     <FormSection title="Redirects">
       <FormGroup
