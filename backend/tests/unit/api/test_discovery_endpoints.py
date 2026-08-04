@@ -264,8 +264,8 @@ class TestOldDocsEndpointsRemoved:
     def test_docs_redirect_404_when_disabled(self) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.core.config.base import get_settings
+        import syntara.api.main as main_module
+        from syntara.core.config.base import get_settings
 
         monkeypatch = pytest.MonkeyPatch()
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
