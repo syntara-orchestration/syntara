@@ -22,12 +22,14 @@ with workflow.unsafe.imports_passed_through():
     from nexus.workflows.workflow_engine.activities.wait_activity import complete_wait
     from nexus.workflows.workflow_engine.constants import (
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
+        ENGINE_FOLLOW_REDIRECTS_KEY,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
     )
     from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
     from nexus.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
+        resolve_follow_redirects,
         resolve_max_iterations,
         resolve_max_output_bytes,
         resolve_retry_policy,
@@ -1410,6 +1412,8 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 parameters_with_timeout[ENGINE_MAX_OUTPUT_BYTES_KEY] = resolve_max_output_bytes(
                     node, self._runtime_settings
                 )
+            if node_type == NodeType.HTTP_REQUEST:
+                parameters_with_timeout[ENGINE_FOLLOW_REDIRECTS_KEY] = resolve_follow_redirects(node)
             temporal_timeout = (
                 timeout_seconds + self._TEMPORAL_MARGIN
                 if node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES

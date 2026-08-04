@@ -12,6 +12,7 @@ export const nodeSettingsSchema = z.object({
   continue_on_failure: z.boolean().optional(),
   timeout: z.number().int().positive().optional(),
   retry_policy: retryPolicySchema.optional(),
+  follow_redirects: z.boolean().optional(),
 })
 
 export type NodeSettingsFormData = z.infer<typeof nodeSettingsSchema>

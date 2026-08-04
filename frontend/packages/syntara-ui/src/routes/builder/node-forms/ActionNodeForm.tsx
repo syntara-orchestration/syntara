@@ -430,7 +430,13 @@ function ActionFormFields({
 
   const isHttpRequest = executor === ExecutorTypeEnum.HTTP_REQUEST
   const timeoutNodeType = isHttpRequest ? 'http_request' : 'script'
-  const settingsContent = <NodeSettingsForm timeoutNodeType={timeoutNodeType} supportsRetryPolicy={isHttpRequest} />
+  const settingsContent = (
+    <NodeSettingsForm
+      timeoutNodeType={timeoutNodeType}
+      supportsRetryPolicy={isHttpRequest}
+      supportsFollowRedirects={isHttpRequest}
+    />
+  )
 
   return <NodeFormTabsLayout parametersContent={parametersContent} settingsContent={settingsContent} />
 }

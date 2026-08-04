@@ -11,8 +11,10 @@ from nexus.workflows.workflow_engine.activities.common import ActivityExecutionE
 from nexus.workflows.workflow_engine.activities.http_request_activity import (
     _add_credential_auth_headers,
     _apply_authentication,
+    _validate_redirect_target,
     execute_http_request_activity,
 )
+from nexus.workflows.workflow_engine.constants import ENGINE_FOLLOW_REDIRECTS_KEY
 from nexus.workflows.workflow_engine.models.workflow_definition import APIExecutorParameters
 
 
@@ -496,3 +498,71 @@ class TestSecretUrlCredential:
         }
         with pytest.raises(ActivityExecutionError, match="http:// or https://"):
             await execute_http_request_activity(config, None)
+
+
+class TestFollowRedirects:
+    """Tests for the follow_redirects setting."""
+
+    @pytest.mark.asyncio
+    async def test_follow_redirects_disabled_by_default(self) -> None:
+        """Without the engine key, follow_redirects defaults to False."""
+        resp = _mock_response(200, json_body={"ok": True})
+        with (
+            patch("httpx.AsyncClient.__init__", return_value=None) as mock_init,
+            patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp),
+            patch("httpx.AsyncClient.__aenter__", return_value=MagicMock(request=AsyncMock(return_value=resp))),
+            patch("httpx.AsyncClient.__aexit__", return_value=None),
+        ):
+            mock_init.return_value = None
+            await execute_http_request_activity(VALID_CONFIG, None)
+        mock_init.assert_called_once()
+        assert mock_init.call_args.kwargs["follow_redirects"] is False
+
+    @pytest.mark.asyncio
+    async def test_follow_redirects_enabled(self) -> None:
+        """When the engine key is set, follow_redirects is True."""
+        resp = _mock_response(200, json_body={"ok": True})
+        config = {**VALID_CONFIG, ENGINE_FOLLOW_REDIRECTS_KEY: True}
+        with (
+            patch("httpx.AsyncClient.__init__", return_value=None) as mock_init,
+            patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp),
+            patch("httpx.AsyncClient.__aenter__", return_value=MagicMock(request=AsyncMock(return_value=resp))),
+            patch("httpx.AsyncClient.__aexit__", return_value=None),
+        ):
+            mock_init.return_value = None
+            await execute_http_request_activity(config, None)
+        mock_init.assert_called_once()
+        assert mock_init.call_args.kwargs["follow_redirects"] is True
+        assert len(mock_init.call_args.kwargs["event_hooks"]["response"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_redirect_to_private_ip_blocked(self) -> None:
+        """SSRF validation blocks redirects to private IPs."""
+        redirect_response = MagicMock()
+        redirect_response.is_redirect = True
+        redirect_response.next_request = MagicMock()
+        redirect_response.next_request.url = "http://10.0.0.1/internal"
+
+        with (
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.0.0.1")),
+            pytest.raises(ApplicationError, match="SSRF"),
+        ):
+            await _validate_redirect_target(redirect_response)
+
+    @pytest.mark.asyncio
+    async def test_redirect_to_public_ip_allowed(self) -> None:
+        """SSRF validation allows redirects to public IPs."""
+        redirect_response = MagicMock()
+        redirect_response.is_redirect = True
+        redirect_response.next_request = MagicMock()
+        redirect_response.next_request.url = "https://cdn.example.com/file.zip"
+
+        with patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("93.184.216.34")):
+            await _validate_redirect_target(redirect_response)
+
+    @pytest.mark.asyncio
+    async def test_non_redirect_response_is_noop(self) -> None:
+        """Non-redirect responses are not validated."""
+        response = MagicMock()
+        response.is_redirect = False
+        await _validate_redirect_target(response)

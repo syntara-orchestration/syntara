@@ -33,6 +33,7 @@ DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 # Must be popped by agentic_activity before forwarding config to the orchestrator.
 ENGINE_TIMEOUT_SECONDS_KEY = "_engine_timeout_seconds"
 ENGINE_MAX_OUTPUT_BYTES_KEY = "_engine_max_output_bytes"
+ENGINE_FOLLOW_REDIRECTS_KEY = "_engine_follow_redirects"
 DEFAULT_MAX_OUTPUT_BYTES = 1_048_576
 # Temporal's server-side limit.blobSize.error (must match development-sql.yaml).
 _TEMPORAL_BLOB_SIZE_ERROR = 2_097_152  # 2 MB

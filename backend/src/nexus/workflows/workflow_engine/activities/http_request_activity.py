@@ -15,7 +15,7 @@ from temporalio.exceptions import ApplicationError
 
 from nexus.core.lib.url_validation import validate_url_no_ssrf
 from nexus.credentials.lib.auth_types import AUTH_TYPE_API_KEY, AUTH_TYPE_BASIC, AUTH_TYPE_BEARER, AUTH_TYPE_URL
-from nexus.workflows.workflow_engine import constants
+from nexus.workflows.workflow_engine.constants import ENGINE_FOLLOW_REDIRECTS_KEY, ENGINE_TIMEOUT_SECONDS_KEY
 from nexus.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     APIExecutorParameters,
@@ -134,6 +134,22 @@ def _resolve_credentials_and_url(
     return request_url, url_from_credential
 
 
+async def _validate_redirect_target(response: httpx.Response) -> None:
+    """Validate redirect targets against SSRF rules.
+
+    Used as an httpx event_hook to intercept each redirect and ensure
+    the target URL does not point to private/internal IPs or cloud metadata endpoints.
+    """
+    if response.is_redirect and response.next_request is not None:
+        redirect_url = str(response.next_request.url)
+        try:
+            validate_url_no_ssrf(redirect_url)
+        except ValueError as exc:
+            safe_url = redirect_url.split("?")[0]
+            msg = f"Redirect to {safe_url} blocked by SSRF validation: {exc}"
+            raise ApplicationError(msg, type="SSRFValidationError", non_retryable=True) from None
+
+
 @activity.defn(name=ActivityName.HTTP_REQUEST)
 async def execute_http_request_activity(
     input_config: dict[str, Any],
@@ -181,12 +197,18 @@ async def execute_http_request_activity(
     except ValueError as exc:
         raise ApplicationError(str(exc), type="SSRFValidationError", non_retryable=True) from None
 
-    timeout_seconds = int(input_config.get(constants.ENGINE_TIMEOUT_SECONDS_KEY, 30))
+    timeout_seconds = int(input_config.get(ENGINE_TIMEOUT_SECONDS_KEY, 30))
+    follow_redirects = bool(input_config.get(ENGINE_FOLLOW_REDIRECTS_KEY, False))
 
     start_time = time.time()
 
     try:
-        async with httpx.AsyncClient(follow_redirects=False) as client:
+        event_hooks: dict[str, list] = {"response": [_validate_redirect_target]} if follow_redirects else {}
+        async with httpx.AsyncClient(
+            follow_redirects=follow_redirects,
+            max_redirects=10,
+            event_hooks=event_hooks,
+        ) as client:
             response = await client.request(
                 method=config.method.value,
                 url=request_url,

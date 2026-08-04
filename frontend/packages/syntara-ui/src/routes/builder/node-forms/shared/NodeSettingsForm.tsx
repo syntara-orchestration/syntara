@@ -1,4 +1,5 @@
 import {
+  Checkbox,
   FormGroup,
   FormSection,
   HelperText,
@@ -34,6 +35,8 @@ type NodeSettingsFormProps = {
   supportsContinueOnFailure?: boolean
   /** When false, the retry policy section is not rendered. Default: true. */
   supportsRetryPolicy?: boolean
+  /** When true, the follow redirects checkbox is rendered. Default: false. */
+  supportsFollowRedirects?: boolean
   /** Additional help text shown under the continue_on_failure dropdown. */
   continueOnFailureHelp?: string
   /** Node type used to select the matching system timeout default. */
@@ -313,34 +316,22 @@ function RetryPolicyFields({ register, retryDefaults, isDisabled }: RetryFieldsP
   )
 }
 
-function getCofDefaultLabel(cofDefault: boolean | null): string {
-  if (cofDefault === null) return ''
-  if (cofDefault) return ' (system default: continue on failure)'
-  return ' (system default: stop on failure)'
+type RetryPolicySectionProps = {
+  control: ReturnType<typeof useFormContext<FormWithSettings>>['control']
+  register: ReturnType<typeof useFormContext<FormWithSettings>>['register']
+  setValue: ReturnType<typeof useFormContext<FormWithSettings>>['setValue']
+  retryDefaults: {
+    maxRetries: number | null
+    initialInterval: number | null
+    maxInterval: number | null
+    backoffCoefficient: number | null
+  } | null
+  isDisabled?: boolean
 }
 
-export function NodeSettingsForm({
-  timeoutFormat = 'seconds',
-  supportsTimeout = true,
-  supportsContinueOnFailure = true,
-  supportsRetryPolicy = true,
-  continueOnFailureHelp,
-  timeoutNodeType,
-}: NodeSettingsFormProps) {
-  const isVersionView = useIsVersionView()
-  const { control, register, setValue } = useFormContext<FormWithSettings>()
+function RetryPolicySection({ control, register, setValue, retryDefaults, isDisabled }: RetryPolicySectionProps) {
   const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
-  const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
   const overrideRetry = retryPolicy !== undefined
-
-  const { defaults } = useWorkflowEngineDefaults()
-
-  const timeoutDefault = timeoutNodeType ? (defaults?.timeoutSeconds[timeoutNodeType] ?? null) : null
-  const cofDefault = defaults?.continueOnFailure ?? null
-  const retryDefaults = defaults?.retry ?? null
-
-  const cofDefaultLabel = getCofDefaultLabel(cofDefault)
-  const timeoutPlaceholder = timeoutDefault !== null ? `${String(timeoutDefault)} — system default` : 'System default'
 
   function handleRetryOverrideToggle(_event: React.FormEvent<HTMLInputElement>, checked: boolean) {
     if (checked) {
@@ -353,6 +344,94 @@ export function NodeSettingsForm({
   const retryHelp = retryDefaults
     ? `When disabled, the system default retry policy applies (${String(retryDefaults.maxRetries ?? '?')} retries, ${String(retryDefaults.initialInterval ?? '?')}s initial interval).`
     : 'When disabled, the system default retry policy applies.'
+
+  return (
+    <FormSection title="Retry policy">
+      <Stack hasGutter>
+        <StackItem>
+          <FormGroup
+            label="Override retry policy"
+            labelHelp={nodeHelp.retryToggle}
+            fieldId="node-settings-retry-override"
+          >
+            <Switch
+              id="node-settings-retry-override"
+              aria-label="Override retry policy"
+              isChecked={overrideRetry}
+              onChange={handleRetryOverrideToggle}
+              isDisabled={isDisabled}
+            />
+          </FormGroup>
+          <HelperText>
+            <HelperTextItem>{retryHelp}</HelperTextItem>
+          </HelperText>
+        </StackItem>
+        {overrideRetry && (
+          <RetryPolicyFields register={register} retryDefaults={retryDefaults} isDisabled={isDisabled} />
+        )}
+      </Stack>
+    </FormSection>
+  )
+}
+
+type FollowRedirectsSectionProps = {
+  control: ReturnType<typeof useFormContext<FormWithSettings>>['control']
+  isDisabled?: boolean
+}
+
+function FollowRedirectsSection({ control, isDisabled }: FollowRedirectsSectionProps) {
+  return (
+    <FormSection title="Redirects">
+      <FormGroup
+        label="Follow redirects"
+        labelHelp={nodeHelp.httpFollowRedirects}
+        fieldId="node-settings-follow-redirects"
+      >
+        <Controller
+          control={control}
+          name="settings.follow_redirects"
+          render={({ field }) => (
+            <Checkbox
+              id="node-settings-follow-redirects"
+              label="Automatically follow HTTP redirects (3xx responses)"
+              isChecked={field.value ?? false}
+              onChange={(_event, checked) => field.onChange(checked)}
+              isDisabled={isDisabled}
+            />
+          )}
+        />
+      </FormGroup>
+    </FormSection>
+  )
+}
+
+function getCofDefaultLabel(cofDefault: boolean | null): string {
+  if (cofDefault === null) return ''
+  if (cofDefault) return ' (system default: continue on failure)'
+  return ' (system default: stop on failure)'
+}
+
+export function NodeSettingsForm({
+  timeoutFormat = 'seconds',
+  supportsTimeout = true,
+  supportsContinueOnFailure = true,
+  supportsRetryPolicy = true,
+  supportsFollowRedirects = false,
+  continueOnFailureHelp,
+  timeoutNodeType,
+}: NodeSettingsFormProps) {
+  const isVersionView = useIsVersionView()
+  const { control, register, setValue } = useFormContext<FormWithSettings>()
+  const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
+
+  const { defaults } = useWorkflowEngineDefaults()
+
+  const timeoutDefault = timeoutNodeType ? (defaults?.timeoutSeconds[timeoutNodeType] ?? null) : null
+  const cofDefault = defaults?.continueOnFailure ?? null
+  const retryDefaults = defaults?.retry ?? null
+
+  const cofDefaultLabel = getCofDefaultLabel(cofDefault)
+  const timeoutPlaceholder = timeoutDefault !== null ? `${String(timeoutDefault)} — system default` : 'System default'
 
   return (
     <Stack hasGutter>
@@ -383,31 +462,19 @@ export function NodeSettingsForm({
 
       {supportsRetryPolicy && (
         <StackItem>
-          <FormSection title="Retry policy">
-            <Stack hasGutter>
-              <StackItem>
-                <FormGroup
-                  label="Override retry policy"
-                  labelHelp={nodeHelp.retryToggle}
-                  fieldId="node-settings-retry-override"
-                >
-                  <Switch
-                    id="node-settings-retry-override"
-                    aria-label="Override retry policy"
-                    isChecked={overrideRetry}
-                    onChange={handleRetryOverrideToggle}
-                    isDisabled={isVersionView}
-                  />
-                </FormGroup>
-                <HelperText>
-                  <HelperTextItem>{retryHelp}</HelperTextItem>
-                </HelperText>
-              </StackItem>
-              {overrideRetry && (
-                <RetryPolicyFields register={register} retryDefaults={retryDefaults} isDisabled={isVersionView} />
-              )}
-            </Stack>
-          </FormSection>
+          <RetryPolicySection
+            control={control}
+            register={register}
+            setValue={setValue}
+            retryDefaults={retryDefaults}
+            isDisabled={isVersionView}
+          />
+        </StackItem>
+      )}
+
+      {supportsFollowRedirects && (
+        <StackItem>
+          <FollowRedirectsSection control={control} isDisabled={isVersionView} />
         </StackItem>
       )}
     </Stack>

@@ -224,6 +224,8 @@ export interface NodeSettings {
   timeout?: number
   /** Per-node retry policy. Absent = use all global catalog defaults. */
   retry_policy?: RetryPolicyConfig
+  /** When true, HTTP requests follow 3xx redirects. Each redirect target is validated against SSRF rules. Default false. */
+  follow_redirects?: boolean
 }
 
 // ============================================================================
