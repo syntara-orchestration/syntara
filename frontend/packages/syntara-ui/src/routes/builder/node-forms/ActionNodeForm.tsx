@@ -429,10 +429,9 @@ function ActionFormFields({
   )
 
   const isHttpRequest = executor === ExecutorTypeEnum.HTTP_REQUEST
-  const timeoutNodeType = isHttpRequest ? 'http_request' : 'script'
   const settingsContent = (
     <NodeSettingsForm
-      timeoutNodeType={timeoutNodeType}
+      timeoutNodeType={isHttpRequest ? 'http_request' : 'script'}
       supportsRetryPolicy={isHttpRequest}
       supportsFollowRedirects={isHttpRequest}
     />
