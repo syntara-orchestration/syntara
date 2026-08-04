@@ -23,12 +23,15 @@ class NodeSettingsFull:
         disabled (bool | None | Unset):
         timeout (int | None | Unset):
         retry_policy (None | RetryPolicyParameters | Unset):
+        follow_redirects (bool | None | Unset): Whether to follow HTTP redirects (3xx). Each redirect target is
+            validated against SSRF rules. Default false.
     """
 
     continue_on_failure: bool | None | Unset = UNSET
     disabled: bool | None | Unset = UNSET
     timeout: int | None | Unset = UNSET
     retry_policy: None | RetryPolicyParameters | Unset = UNSET
+    follow_redirects: bool | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.retry_policy_parameters import RetryPolicyParameters
@@ -59,6 +62,12 @@ class NodeSettingsFull:
         else:
             retry_policy = self.retry_policy
 
+        follow_redirects: bool | None | Unset
+        if isinstance(self.follow_redirects, Unset):
+            follow_redirects = UNSET
+        else:
+            follow_redirects = self.follow_redirects
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update({})
@@ -70,6 +79,8 @@ class NodeSettingsFull:
             field_dict["timeout"] = timeout
         if retry_policy is not UNSET:
             field_dict["retry_policy"] = retry_policy
+        if follow_redirects is not UNSET:
+            field_dict["follow_redirects"] = follow_redirects
 
         return field_dict
 
@@ -123,11 +134,21 @@ class NodeSettingsFull:
 
         retry_policy = _parse_retry_policy(d.pop("retry_policy", UNSET))
 
+        def _parse_follow_redirects(data: object) -> bool | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(bool | None | Unset, data)
+
+        follow_redirects = _parse_follow_redirects(d.pop("follow_redirects", UNSET))
+
         node_settings_full = cls(
             continue_on_failure=continue_on_failure,
             disabled=disabled,
             timeout=timeout,
             retry_policy=retry_policy,
+            follow_redirects=follow_redirects,
         )
 
         return node_settings_full
