@@ -334,7 +334,13 @@ class NodeSettingsFull(NodeSettingsNoRetry):
     """Full settings with retry_policy (http_request, aap_job_template, aap_workflow_job_template)."""
 
     retry_policy: RetryPolicyParameters | None = None
-    follow_redirects: bool | None = None
+    follow_redirects: bool | None = Field(
+        default=None,
+        description=(
+            "Whether to follow HTTP redirects (3xx). Each redirect target"
+            " is validated against SSRF rules. Default false."
+        ),
+    )
 
 
 # Executor configuration models

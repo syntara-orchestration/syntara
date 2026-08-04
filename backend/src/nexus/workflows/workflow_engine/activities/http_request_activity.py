@@ -203,7 +203,7 @@ async def execute_http_request_activity(
     start_time = time.time()
 
     try:
-        event_hooks: dict[str, list] = {"response": [_validate_redirect_target]} if follow_redirects else {}
+        event_hooks: dict[str, list[Any]] = {"response": [_validate_redirect_target]} if follow_redirects else {}
         async with httpx.AsyncClient(
             follow_redirects=follow_redirects,
             max_redirects=10,
