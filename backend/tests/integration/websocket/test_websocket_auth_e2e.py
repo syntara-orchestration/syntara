@@ -29,7 +29,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
 from starlette.websockets import WebSocketDisconnect
 
-from nexus.agent_orchestrator.models.invocation import Invocation
 from nexus.auth.services.global_revocation import clear_global_revocation_cache
 from nexus.authz.evaluator import RegoEvaluator
 from nexus.authz.models import RoleAssignment
@@ -41,6 +40,7 @@ from nexus.core.websocket.manager import get_connection_lifecycle_manager
 from nexus.workflows.models import Workflow, WorkflowVersion
 from nexus.workflows.models.execution import Execution, ExecutionStatus
 from tests.helpers.workflow import create_minimal_workflow_definition
+from tests.integration.helpers.invocations import create_test_invocation
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Mapping
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
     from starlette.testclient import TestClient
 
+    from nexus.agent_orchestrator.models.invocation import Invocation
     from nexus.core.models import User
 
 EXECUTION_WS_PATH = "/ws/workflows/v1/executions"
@@ -131,25 +132,6 @@ async def _create_execution(
     await db.commit()
     await db.refresh(execution)
     return execution
-
-
-async def _create_invocation(
-    db: AsyncSession,
-    *,
-    project_id: UUID,
-    created_by: UUID,
-) -> Invocation:
-    """Create a minimal Invocation with valid FK references."""
-    invocation = Invocation(
-        project_id=project_id,
-        prompt="test prompt",
-        session_id=f"test-session-{uuid4().hex[:8]}",
-        created_by=created_by,
-    )
-    db.add(invocation)
-    await db.commit()
-    await db.refresh(invocation)
-    return invocation
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +266,7 @@ async def ws_seeded_invocation(
     ws_admin_user: User,
 ) -> Invocation:
     """Persisted invocation so authz resolves project instead of fail-closing."""
-    return await _create_invocation(
+    return await create_test_invocation(
         test_db_session,
         project_id=test_project_id,
         created_by=ws_admin_user.id,
