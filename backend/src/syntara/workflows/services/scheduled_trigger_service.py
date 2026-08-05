@@ -79,6 +79,20 @@ def _on_connect_task_done(task: asyncio.Task[Client | None]) -> None:
 # joined to the previous task.
 _CONNECT_TIMEOUT_SECONDS = 10.0
 
+# Trinary cache for search-attribute availability.
+#
+# ``True``  — server confirmed the OrchestratorWorkflowId attribute is registered.
+#             Cached indefinitely (stable server-side fact).
+# ``False`` — any RPC error (UNAVAILABLE, UNIMPLEMENTED, PERMISSION_DENIED …)
+#             or wrong attribute type.  Cached for the process lifetime —
+#             operator service availability is a cluster-level property.
+# ``None``  — never probed.  The first caller to reach
+#             ``_ensure_search_attribute`` will probe and transition to
+#             ``True`` or ``False``.
+#
+# This cache is intentionally *decoupled* from the connection cache in
+# ``syntara.core.temporal.client``.  Connection liveness is orthogonal to
+# whether the search attribute is registered on the cluster.
 _search_attr_available: bool | None = None
 
 _CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
@@ -139,9 +153,8 @@ def _invalidate_client_cache() -> None:
     strong reference; ``_get_shared_client`` starts a new task only after
     the current one is done or older than the waiter budget.
     """
-    global _cached_client, _search_attr_available  # noqa: PLW0603
+    global _cached_client  # noqa: PLW0603
     _cached_client = None
-    _search_attr_available = None
 
 
 async def _close_temporal_client(client: Client) -> None:
@@ -191,8 +204,7 @@ async def _ensure_search_attribute(client: Client) -> bool:
     """Ensure the OrchestratorWorkflowId search attribute is registered in Temporal.
 
     Returns True if the attribute is available for server-side filtering,
-    False if the Temporal server does not support it.  The result is cached
-    for the lifetime of the client connection.
+    False otherwise.  See ``_search_attr_available`` for the caching rules.
     """
     global _search_attr_available  # noqa: PLW0603
 
@@ -210,6 +222,7 @@ async def _ensure_search_attribute(client: Client) -> bool:
             logger.info("OrchestratorWorkflowId search attribute already registered")
             return True
         if attr_type is not None:
+            # Wrong type is a stable misconfiguration — cache permanently.
             logger.warning(
                 "OrchestratorWorkflowId has unexpected type, using prefix scan fallback",
                 type=attr_type,
@@ -236,6 +249,12 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return True
 
     except RPCError as e:
+        # The early-return guard above guarantees _search_attr_available is
+        # None here — we only enter the try block on an uncached probe.
+        # Cache False for all RPC errors (connection or otherwise) — the
+        # operator service availability is a cluster-level property that
+        # won't change within a process lifetime.  Process restarts (e.g.
+        # pod reschedules) will re-probe on a fresh None state.
         _search_attr_available = False
         logger.info(
             "Custom search attributes not available, using prefix scan fallback",
