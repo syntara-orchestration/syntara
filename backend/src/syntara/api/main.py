@@ -26,7 +26,13 @@ from temporalio.service import RPCError
 
 import syntara.auth.exceptions  # Side-effect import to trigger exception handler registration
 import syntara.identity_providers.exceptions
-from syntara.api.constants import API_DOCS_V1_PATH_PREFIX, API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.constants import (
+    API_DOCS_V1_DOCS_PATH,
+    API_DOCS_V1_OPENAPI_PATH,
+    API_DOCS_V1_REDOC_PATH,
+    API_V1_PATH_PREFIX,
+    API_V1_VERSION,
+)
 from syntara.audit.lifecycle import start_audit_subsystems, stop_audit_subsystems
 from syntara.audit.middleware import AuditMiddleware
 from syntara.audit.registration import discover_and_register_all_handlers
@@ -695,34 +701,33 @@ async def api_v1_version(
 
     if _settings.enable_api_docs:
         response["links"] = {
-            "docs": f"{API_DOCS_V1_PATH_PREFIX}/docs",
-            "redoc": f"{API_DOCS_V1_PATH_PREFIX}/redoc",
-            "openapi": f"{API_DOCS_V1_PATH_PREFIX}/openapi.json",
+            "docs": API_DOCS_V1_DOCS_PATH,
+            "redoc": API_DOCS_V1_REDOC_PATH,
+            "openapi": API_DOCS_V1_OPENAPI_PATH,
         }
 
     return response
 
 
 if _settings.enable_api_docs:
-    api_v1_openapi_path = f"{API_DOCS_V1_PATH_PREFIX}/openapi.json"
 
-    @app.get(f"{API_DOCS_V1_PATH_PREFIX}/docs", tags=["API Docs"], include_in_schema=False)
+    @app.get(API_DOCS_V1_DOCS_PATH, tags=["API Docs"], include_in_schema=False)
     async def api_v1_docs() -> HTMLResponse:
         """Serve the Swagger UI for API v1."""
         return get_swagger_ui_html(
-            openapi_url=api_v1_openapi_path,
+            openapi_url=API_DOCS_V1_OPENAPI_PATH,
             title=f"{app.title} V1 - Docs",
             swagger_ui_parameters=swagger_ui_parameters(
                 enable_try_it_out=_settings.enable_try_it_out,
             ),
         )
 
-    @app.get(f"{API_DOCS_V1_PATH_PREFIX}/redoc", tags=["API Docs"], include_in_schema=False)
+    @app.get(API_DOCS_V1_REDOC_PATH, tags=["API Docs"], include_in_schema=False)
     async def api_v1_redoc() -> HTMLResponse:
         """Serve the ReDoc UI for API v1."""
-        return get_redoc_html(openapi_url=api_v1_openapi_path, title=f"{app.title} V1 - ReDoc")
+        return get_redoc_html(openapi_url=API_DOCS_V1_OPENAPI_PATH, title=f"{app.title} V1 - ReDoc")
 
-    @app.get(api_v1_openapi_path, tags=["API Docs"], include_in_schema=False)
+    @app.get(API_DOCS_V1_OPENAPI_PATH, tags=["API Docs"], include_in_schema=False)
     async def api_v1_openapi() -> dict[str, Any]:
         """Return the OpenAPI spec for API v1."""
         return app.openapi()
@@ -730,7 +735,7 @@ if _settings.enable_api_docs:
     @app.get("/docs", tags=["API Docs"], include_in_schema=False)
     async def docs_redirect() -> RedirectResponse:
         """Redirect /docs to /api_docs/v1/docs for convenience."""
-        return RedirectResponse(url=f"{API_DOCS_V1_PATH_PREFIX}/docs")
+        return RedirectResponse(url=API_DOCS_V1_DOCS_PATH)
 
 
 # ---------------------------------------------------------------------------
