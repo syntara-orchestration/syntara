@@ -10,6 +10,12 @@ API_V1_PATH_PREFIX = "/api/v1"
 API_DOCS_V1_PATH_PREFIX = "/api_docs/v1"
 API_V1_VERSION = "0.1.0"
 
+# Full doc endpoint paths (concat avoids Sonar treating {PREFIX} in FastAPI
+# route decorators as path parameters).
+API_DOCS_V1_DOCS_PATH = API_DOCS_V1_PATH_PREFIX + "/docs"
+API_DOCS_V1_REDOC_PATH = API_DOCS_V1_PATH_PREFIX + "/redoc"
+API_DOCS_V1_OPENAPI_PATH = API_DOCS_V1_PATH_PREFIX + "/openapi.json"
+
 # Full path to the OIDC callback endpoint, used by the auth router and
 # referenced by the AAP setup service when registering redirect URIs.
 OIDC_CALLBACK_PATH = f"{API_V1_PATH_PREFIX}/auth/oidc/callback"
@@ -26,9 +32,9 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
         "/api",
         "/api/v1",
         "/docs",
-        f"{API_DOCS_V1_PATH_PREFIX}/docs",
-        f"{API_DOCS_V1_PATH_PREFIX}/redoc",
-        f"{API_DOCS_V1_PATH_PREFIX}/openapi.json",
+        API_DOCS_V1_DOCS_PATH,
+        API_DOCS_V1_REDOC_PATH,
+        API_DOCS_V1_OPENAPI_PATH,
     }
 )
 
