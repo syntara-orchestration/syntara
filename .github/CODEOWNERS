@@ -56,6 +56,7 @@
 # Repository governance
 /.github/CODEOWNERS @syntara-orchestration/syntara-leads
 /.github/AI_AGENT_POLICY.md @syntara-orchestration/syntara-leads
+/GOVERNANCE.md @syntara-orchestration/syntara-leads
 /LICENSE @syntara-orchestration/syntara-leads
 /backend/LICENSE @syntara-orchestration/syntara-leads
 /frontend/packages/syntara-ui/LICENSE @syntara-orchestration/syntara-leads
