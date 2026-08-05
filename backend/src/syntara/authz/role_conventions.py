@@ -174,10 +174,6 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     # admin revocation
     PolicyInfo("admin:revocation", "read", roles=("admin", "auditor")),
     PolicyInfo("admin:revocation", "execute", roles=("admin",)),
-    # invocations
-    PolicyInfo("invocation", "create", roles=("admin",)),
-    PolicyInfo("invocation", "read", roles=("admin",)),
-    PolicyInfo("invocation", "cancel", roles=("admin",)),
     # -- project-scoped --
     PolicyInfo("workflow", "create", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("workflow", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),

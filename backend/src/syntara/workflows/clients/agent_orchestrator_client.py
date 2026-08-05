@@ -102,7 +102,7 @@ class AgentOrchestratorClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8000/api/v1",
+        base_url: str = "http://localhost:8000",
         timeout: float = 30.0,
         max_retries: int = 3,
         retry_backoff_base: float = 1.0,
@@ -298,7 +298,7 @@ class AgentOrchestratorClient:
         logger.debug("Retry attempt", attempt=attempt, max_retries=self.max_retries)
 
         response = await self.http_client.post(
-            "/invocations",
+            "/_internal/invocations",
             json=payload,
             timeout=self.timeout,
         )

@@ -32,7 +32,7 @@ async def wait_for_invocation_execution(
 
     while elapsed_time < max_wait_time:
         # Check the current status of the invocation
-        status_response = await client.get(f"/api/v1/invocations/{invocation_id}")
+        status_response = await client.get(f"/_internal/invocations/{invocation_id}")
         if status_response.status_code == 200:
             status_data = status_response.json()
             if status_data["status"] in ["completed", "failed"]:
@@ -44,7 +44,7 @@ async def wait_for_invocation_execution(
 
     # If we didn't get execution state, get the current state for testing
     if final_data is None:
-        status_response = await client.get(f"/api/v1/invocations/{invocation_id}")
+        status_response = await client.get(f"/_internal/invocations/{invocation_id}")
         if status_response.status_code == 200:
             final_data = status_response.json()
 

@@ -14,8 +14,7 @@ Key design decisions:
   * Both file_ids AND uploads: validate file_ids, convert new files, execute with all
 """
 
-from collections.abc import AsyncGenerator, Callable, Iterable
-from datetime import UTC, datetime
+from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -29,14 +28,11 @@ if TYPE_CHECKING:
 from syntara.agent_orchestrator.models import (
     Invocation,
     InvocationContextData,
-    InvocationListResponse,
     InvocationMetadata,
     InvocationStatus,
 )
-from syntara.agent_orchestrator.models.request import CancellationResult
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
-from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.constants import CONTEXT_KEY_FILE_IDS
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -44,7 +40,6 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.models import FileMetadata
-from syntara.invocations.audit.invocation_cancelled import InvocationCancellationResult, InvocationCancelledEvent
 from syntara.invocations.audit.invocation_created import InvocationCreatedEvent
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -304,236 +299,3 @@ class InvocationService(BaseService):
         await self._start_builtin_workflows(invocation_id, file_ids=new_file_ids or None)
 
         return invocation
-
-    async def get_invocation(self, invocation_id: UUID) -> Invocation | None:
-        """Get invocation by ID including result.
-
-        NOTE: This method is primarily for TESTING and DEBUGGING purposes.
-        Use this to inspect the actual agent responses during development.
-
-        Args:
-            invocation_id: UUID of the invocation
-
-        Returns:
-            Invocation with result data if found, None otherwise
-
-        """
-        return await self.session.get(Invocation, invocation_id)
-
-    async def cancel_invocation(self, invocation_id: UUID, reason: str = "User cancelled") -> CancellationResult:
-        """Cancel a running invocation.
-
-        Args:
-            invocation_id: UUID of the invocation to cancel
-            reason: Reason for cancellation
-
-        Returns:
-            CancellationResult enum indicating the outcome of the cancellation attempt
-
-        """
-        invocation = await self.session.get(Invocation, invocation_id)
-
-        if not invocation:
-            logger.warning("Cancellation failed: Invocation not found", invocation_id=invocation_id)
-
-            # Dispatch NOT_FOUND audit event (no activity context available)
-            AuditEventDispatcher.dispatch(
-                InvocationCancelledEvent(
-                    invocation_id=invocation_id,
-                    result=InvocationCancellationResult.NOT_FOUND,
-                    reason=reason,
-                )
-            )
-            return CancellationResult.NOT_FOUND
-
-        # Extract activity context from invocation metadata for audit correlation
-        context_data = invocation.context_data or {}
-        activity_id: str | None = context_data.get("activity_id")  # type: ignore[assignment]
-        activity_name: str | None = context_data.get("activity_name")  # type: ignore[assignment]
-
-        # Check if invocation is in a cancellable state
-        if invocation.status not in (InvocationStatus.CREATED, InvocationStatus.RUNNING):
-            logger.warning(
-                "Cancellation failed: Invocation not in cancellable state",
-                invocation_id=invocation_id,
-                status=invocation.status.value,
-            )
-
-            # Dispatch NOT_CANCELLABLE audit event
-            AuditEventDispatcher.dispatch(
-                InvocationCancelledEvent(
-                    invocation_id=invocation_id,
-                    result=InvocationCancellationResult.NOT_CANCELLABLE,
-                    reason=reason,
-                    current_status=invocation.status,
-                    activity_id=activity_id,
-                    activity_name=activity_name,
-                )
-            )
-            return CancellationResult.NOT_CANCELLABLE
-
-        # Update invocation with cancellation details using existing fields
-        invocation.status = InvocationStatus.CANCELLED
-        invocation.error_message = f"User cancelled: {reason}"
-        invocation.completed_at = datetime.now(UTC)
-
-        # Store cancellation metadata in checkpoint_data for debugging
-        cancellation_data: dict[str, object] = {
-            "cancelled_at": invocation.completed_at.isoformat(),
-            "cancelled_by": str(self.user.id),
-            "reason": reason,
-        }
-
-        # Merge with existing checkpoint_data if it exists
-        if invocation.checkpoint_data:
-            invocation.checkpoint_data.update(cancellation_data)
-        else:
-            invocation.checkpoint_data = cancellation_data
-
-        # Clean up uploaded and converted files associated with this invocation
-        cleaned_file_ids = await self._cleanup_invocation_files(invocation)
-
-        # Note: Document conversion workflows will complete harmlessly even for
-        # cancelled invocations. Execution workflow cancellation is handled by Temporal.
-
-        try:
-            await self.session.commit()
-
-            logger.info("Invocation cancelled successfully", invocation_id=invocation_id, reason=reason)
-
-            # Dispatch success audit event
-            AuditEventDispatcher.dispatch(
-                InvocationCancelledEvent(
-                    invocation_id=invocation_id,
-                    result=InvocationCancellationResult.SUCCESS,
-                    reason=reason,
-                    files_cleaned=cleaned_file_ids,
-                    current_status=InvocationStatus.CANCELLED,
-                    activity_id=activity_id,
-                    activity_name=activity_name,
-                )
-            )
-            return CancellationResult.SUCCESS
-
-        except Exception as e:
-            # Dispatch failure audit event
-            AuditEventDispatcher.dispatch(
-                InvocationCancelledEvent(
-                    invocation_id=invocation_id,
-                    result=InvocationCancellationResult.SUCCESS,
-                    reason=reason,
-                    files_cleaned=cleaned_file_ids,
-                    error_type=type(e).__name__,
-                    activity_id=activity_id,
-                    activity_name=activity_name,
-                )
-            )
-            raise
-
-    async def _cleanup_files_from_paths(
-        self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""
-    ) -> None:
-        """Clean up files from storage via the retriever (best-effort)."""
-        if not files_to_cleanup:
-            return
-
-        logger.info(
-            "Cleaning up files for invocation",
-            file_count=len(files_to_cleanup),
-            invocation_id=invocation_id,
-            context=context,
-        )
-        try:
-            retriever = self.file_manager.get_retriever()
-            for file_path in files_to_cleanup:
-                try:
-                    await retriever.delete_file(file_path)
-                    logger.info("Cleaned up file", file_path=file_path, context=context)
-                except Exception:
-                    logger.exception(
-                        "Failed to cleanup file",
-                        file_path=file_path,
-                        invocation_id=invocation_id,
-                        context=context,
-                    )
-        except Exception:
-            logger.exception(
-                "File cleanup failed for invocation",
-                invocation_id=invocation_id,
-            )
-
-    async def _cleanup_invocation_files(self, invocation: Invocation) -> list[UUID]:
-        """Clean up uploaded and converted files associated with an invocation.
-
-        This method extracts file_ids from the invocation's context_data,
-        retrieves FileMetadata records from the database, and cleans up
-        both original uploaded files and converted files.
-
-        Args:
-            invocation: The invocation whose files should be cleaned up
-
-        Note:
-            This is a best-effort cleanup that won't raise exceptions if
-            file deletion fails. Errors are logged for debugging.
-
-        """
-        ctx = InvocationContextData.model_validate(invocation.context_data or {})
-        if not ctx.file_ids:
-            logger.debug("No files to clean up for invocation", invocation_id=invocation.id)
-            return []
-
-        # Convert strings to UUIDs at the boundary
-        file_ids = [UUID(fid) for fid in ctx.file_ids]
-
-        # Get file metadata from database via FileManager
-        file_metadata_records = await self.file_manager.get_files_metadata(file_ids, self.session)
-        if not file_metadata_records:
-            logger.debug("No FileMetadata records found for invocation", invocation_id=invocation.id)
-            return []
-
-        files_to_cleanup: list[str] = []
-        for metadata in file_metadata_records:
-            if metadata.file_path:
-                files_to_cleanup.append(metadata.file_path)
-            if metadata.converted_content_path:
-                files_to_cleanup.append(metadata.converted_content_path)
-
-        await self._cleanup_files_from_paths(files_to_cleanup, invocation.id, context="after invocation cancellation")
-
-        return file_ids
-
-    async def list_invocations(
-        self,
-        limit: int = 20,
-        cursor: str | None = None,
-        sort: str | None = None,
-        query_params_items: Iterable[tuple[str, str]] | None = None,
-        *,
-        include_total: bool = False,
-        allowed_projects: AllowedProjectsResult | None = None,
-    ) -> InvocationListResponse:
-        """List invocations with filtering, sorting, and pagination.
-
-        Args:
-            limit: Maximum number of invocations to return (default 20)
-            cursor: Cursor token for pagination
-            sort: Sort parameter (e.g., "created_at", "-started_at")
-            query_params_items: Raw query parameter items from request (for filtering)
-            include_total: Whether to include total count in response
-            allowed_projects: Optional project scope filter for authorization
-
-        Returns:
-            InvocationListResponse with invocations, pagination metadata, and optional total
-
-        """
-        # Use unified list_resources method (fields read from model automatically)
-        return await self.list_resources(
-            model=Invocation,
-            response_type=InvocationListResponse,
-            limit=limit,
-            cursor=cursor,
-            sort=sort or "-created_at",  # Default DESC sort if none provided
-            query_params_items=query_params_items,
-            include_total=include_total,
-            allowed_projects=allowed_projects,
-        )
