@@ -4,6 +4,7 @@ This service provides high-level operations for starting, monitoring, and managi
 workflow executions via Temporal.
 """
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -14,11 +15,15 @@ from temporalio.service import RPCError
 
 from syntara.core.config.base import TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE, get_settings
 from syntara.core.exceptions import SafeValueError
-from syntara.core.temporal.client import get_shared_client, invalidate_on_connection_error
+from syntara.core.temporal.client import (
+    CONNECT_TIMEOUT_SECONDS,
+    build_default_interceptors,
+    get_shared_client,
+    invalidate_on_connection_error,
+)
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
-from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models.responses import (
     WorkflowStartResponse,
@@ -355,11 +360,14 @@ async def create_temporal_execution_service(
             return TemporalExecutionService(shared, task_queue, background_task_queue=settings.background_task_queue)
         logger.warning("shared_temporal_client_unavailable", fallback="per-request connect")
 
-    client = await Client.connect(
-        temporal_address or settings.temporal_address,
-        namespace=namespace or settings.temporal_namespace,
-        tls=build_temporal_tls_config(),
-        interceptors=[WorkflowAuthClientInterceptor()],
+    client = await asyncio.wait_for(
+        Client.connect(
+            temporal_address or settings.temporal_address,
+            namespace=namespace or settings.temporal_namespace,
+            tls=build_temporal_tls_config(),
+            interceptors=build_default_interceptors(),
+        ),
+        timeout=CONNECT_TIMEOUT_SECONDS,
     )
     # TODO: Handle how TemporalExecutionService is dispatched/deployed  # noqa: TD002, TD003
     # via containerization. This will be addressed in a future Containerization & Deployment ticket.
