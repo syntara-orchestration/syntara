@@ -25,6 +25,13 @@ from syntara.workflows.services.scheduled_trigger_service import (
     ScheduledTriggerService,
 )
 
+_RPC_STATUS_TEST_CASES = [
+    RPCStatusCode.UNIMPLEMENTED,
+    RPCStatusCode.PERMISSION_DENIED,
+    RPCStatusCode.UNAVAILABLE,
+    RPCStatusCode.DEADLINE_EXCEEDED,
+]
+
 
 @pytest.fixture(autouse=True)
 def _reset_module_caches() -> Generator[None]:
@@ -366,23 +373,26 @@ class TestSyncScheduledTriggers:
         client.create_schedule.assert_not_called()
 
     @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
-    async def test_sync_connection_error_wraps_as_sync_error(self, status: RPCStatusCode) -> None:
-        """Connection RPCError should invalidate client cache and raise ScheduledTriggerSyncError."""
+    async def test_sync_connection_error_invalidates_and_reraises(
+        self, status: RPCStatusCode, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Connection RPCError should invalidate client cache and re-raise as ScheduledTriggerSyncError."""
         client = _make_mock_client()
         client.create_schedule = AsyncMock(side_effect=RPCError("conn error", status, b""))
+        monkeypatch.setattr(_mod, "_cached_client", client)
+        monkeypatch.setattr(_mod, "_search_attr_available", False)
 
         service = ScheduledTriggerService(temporal_client=client)
         definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
 
-        with pytest.raises(ScheduledTriggerSyncError) as exc_info:
+        with pytest.raises(ScheduledTriggerSyncError):
             await service.sync_scheduled_triggers(
                 workflow_id="wf-123",
                 workflow_definition=definition,
             )
 
-        assert exc_info.value.__cause__ is not None
         assert _mod._cached_client is None
-        assert _mod._search_attr_available is None
+        assert _mod._search_attr_available is False
 
     async def test_sync_unexpected_rpc_error_reraises(self) -> None:
         """RPCError that is not ALREADY_EXISTS or a connection error should propagate."""
@@ -525,7 +535,9 @@ class TestGracefulTemporalUnavailability:
         assert count == 0
 
     @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
-    async def test_delete_wraps_connection_error_as_sync_error(self, status: RPCStatusCode) -> None:
+    async def test_delete_wraps_connection_error_as_sync_error(
+        self, status: RPCStatusCode, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Connection RPCError during deletion should invalidate cache and wrap as ScheduledTriggerSyncError."""
         client = _make_mock_client()
         client.list_schedules = AsyncMock(
@@ -535,13 +547,15 @@ class TestGracefulTemporalUnavailability:
         handle.delete = AsyncMock(side_effect=RPCError("conn error", status, b""))
 
         service = ScheduledTriggerService(temporal_client=client)
+        monkeypatch.setattr(_mod, "_cached_client", client)
+        monkeypatch.setattr(_mod, "_search_attr_available", False)
 
         with pytest.raises(ScheduledTriggerSyncError) as exc_info:
             await service.delete_triggers_for_workflow(workflow_id="wf-123")
 
         assert exc_info.value.__cause__ is not None
         assert _mod._cached_client is None
-        assert _mod._search_attr_available is None
+        assert _mod._search_attr_available is False
 
     async def test_delete_skips_when_temporal_unavailable(self) -> None:
         """Should skip deletion gracefully when Temporal is unavailable."""
@@ -695,24 +709,12 @@ class TestSearchAttributeRegistration:
         assert result2 is True
         assert client.operator_service.list_search_attributes.call_count == 1
 
-    @pytest.mark.parametrize("status", [RPCStatusCode.UNIMPLEMENTED, RPCStatusCode.PERMISSION_DENIED])
-    async def test_falls_back_on_non_connection_rpc_error(self, status: RPCStatusCode) -> None:
-        """Should set _search_attr_available=False on non-connection RPC errors."""
+    @pytest.mark.parametrize("status", _RPC_STATUS_TEST_CASES)
+    async def test_list_rpc_error_caches_false(self, status: RPCStatusCode) -> None:
+        """Any RPC error from list_search_attributes caches False permanently."""
         client = _make_mock_client()
         client.operator_service = _make_mock_operator_service(
             list_raises=RPCError("error", status, b""),
-        )
-
-        result = await _mod._ensure_search_attribute(client)
-
-        assert result is False
-        assert _mod._search_attr_available is False
-
-    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
-    async def test_connection_errors_fall_back_to_prefix_scan(self, status: RPCStatusCode) -> None:
-        """Connection errors from operator service should fall back, not re-raise."""
-        client = _make_mock_client(
-            list_raises=RPCError("conn error", status, b""),
         )
 
         result = await _mod._ensure_search_attribute(client)
@@ -747,12 +749,13 @@ class TestSearchAttributeRegistration:
         assert result is True
         assert _mod._search_attr_available is True
 
-    async def test_add_non_connection_error_falls_back(self) -> None:
-        """Non-connection error from add_search_attributes should fall back to prefix scan."""
+    @pytest.mark.parametrize("status", _RPC_STATUS_TEST_CASES)
+    async def test_add_rpc_error_caches_false(self, status: RPCStatusCode) -> None:
+        """Any RPC error from add_search_attributes caches False permanently."""
         client = _make_mock_client(search_attr_available=False)
         client.operator_service = _make_mock_operator_service(
             attr_registered=False,
-            add_raises=RPCError("denied", RPCStatusCode.PERMISSION_DENIED, b""),
+            add_raises=RPCError("error", status, b""),
         )
 
         result = await _mod._ensure_search_attribute(client)
@@ -760,19 +763,22 @@ class TestSearchAttributeRegistration:
         assert result is False
         assert _mod._search_attr_available is False
 
-    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
-    async def test_add_connection_error_falls_back(self, status: RPCStatusCode) -> None:
-        """Connection error from add_search_attributes should fall back, not re-raise."""
-        client = _make_mock_client(search_attr_available=False)
+    async def test_cached_false_short_circuits_subsequent_calls(self) -> None:
+        """A cached False skips the operator service on subsequent calls."""
+        client = _make_mock_client()
         client.operator_service = _make_mock_operator_service(
-            attr_registered=False,
-            add_raises=RPCError("conn error", status, b""),
+            list_raises=RPCError("unimplemented", RPCStatusCode.UNIMPLEMENTED, b""),
         )
 
-        result = await _mod._ensure_search_attribute(client)
-
-        assert result is False
+        r1 = await _mod._ensure_search_attribute(client)
+        assert r1 is False
         assert _mod._search_attr_available is False
+        assert client.operator_service.list_search_attributes.call_count == 1
+
+        # Second call must short-circuit without another RPC.
+        r2 = await _mod._ensure_search_attribute(client)
+        assert r2 is False
+        assert client.operator_service.list_search_attributes.call_count == 1  # unchanged
 
 
 class TestListWorkflowSchedulesOptimized:
@@ -840,7 +846,7 @@ class TestListWorkflowSchedulesOptimized:
 
         assert result == {"orchestrator-sched-wf-123-trigger_1"}
 
-    async def test_connection_error_in_query_reraises(self) -> None:
+    async def test_connection_error_in_query_reraises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Connection errors during query should invalidate cache and re-raise."""
         client = _make_mock_client(search_attr_available=True)
         client.list_schedules = AsyncMock(
@@ -848,14 +854,14 @@ class TestListWorkflowSchedulesOptimized:
         )
 
         service = ScheduledTriggerService(temporal_client=client)
+        monkeypatch.setattr(_mod, "_cached_client", client)
+        monkeypatch.setattr(_mod, "_search_attr_available", True)
 
-        with (
-            patch("syntara.workflows.services.scheduled_trigger_service._invalidate_client_cache") as mock_invalidate,
-            pytest.raises(RPCError),
-        ):
+        with pytest.raises(RPCError):
             await service._list_workflow_schedules(client, "wf-123")
 
-        mock_invalidate.assert_called()
+        assert _mod._cached_client is None
+        assert _mod._search_attr_available is True
 
     async def test_list_schedules_returns_empty_set(self) -> None:
         """Empty schedule list should return empty set."""
