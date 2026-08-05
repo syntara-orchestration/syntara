@@ -14,6 +14,7 @@ from temporalio.service import RPCError
 
 from syntara.core.config.base import TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE, get_settings
 from syntara.core.exceptions import SafeValueError
+from syntara.core.temporal.client import get_shared_client, invalidate_on_connection_error
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -185,7 +186,8 @@ class TemporalExecutionService:
                 started_at=datetime.now(UTC).isoformat(),
             )
 
-        except Exception:
+        except Exception as exc:
+            invalidate_on_connection_error(exc)
             logger.exception("Failed to start workflow", workflow_name=workflow_name)
             raise
 
@@ -221,6 +223,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
+            invalidate_on_connection_error(e)
             logger.exception("Failed to cancel workflow", temporal_workflow_id=temporal_workflow_id)
             raise
 
@@ -260,6 +263,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
+            invalidate_on_connection_error(e)
             logger.exception(
                 "Failed to complete async activity",
                 activity_id=activity_id,
@@ -303,6 +307,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
+            invalidate_on_connection_error(e)
             logger.exception(
                 "Failed to fail async activity",
                 activity_id=activity_id,
@@ -316,7 +321,16 @@ async def create_temporal_execution_service(
     namespace: str | None = None,
     task_queue: str | None = None,
 ) -> TemporalExecutionService:
-    """Create a temporal execution service with a new Temporal client.
+    """Create a temporal execution service.
+
+    When called **without** explicit address/namespace overrides (the
+    normal FastAPI DI path), this uses :func:`get_shared_client` so all
+    API routes share a single gRPC connection instead of opening a new
+    one per request.  Falls back to a fresh ``Client.connect`` when the
+    shared client is unavailable.
+
+    When explicit overrides are provided (e.g. from tests or CLI tools),
+    a fresh ``Client.connect`` is used so the override takes effect.
 
     Args:
         temporal_address: Temporal server address (default from settings)
@@ -332,13 +346,18 @@ async def create_temporal_execution_service(
 
     """
     settings = get_settings()
-    temporal_address = temporal_address or settings.temporal_address
-    namespace = namespace or settings.temporal_namespace
     task_queue = task_queue or settings.task_queue
 
+    has_overrides = temporal_address is not None or namespace is not None
+    if not has_overrides:
+        shared = await get_shared_client()
+        if shared is not None:
+            return TemporalExecutionService(shared, task_queue, background_task_queue=settings.background_task_queue)
+        logger.warning("shared_temporal_client_unavailable", fallback="per-request connect")
+
     client = await Client.connect(
-        temporal_address,
-        namespace=namespace,
+        temporal_address or settings.temporal_address,
+        namespace=namespace or settings.temporal_namespace,
         tls=build_temporal_tls_config(),
         interceptors=[WorkflowAuthClientInterceptor()],
     )
