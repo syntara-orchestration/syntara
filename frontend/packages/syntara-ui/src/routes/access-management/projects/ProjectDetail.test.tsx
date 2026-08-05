@@ -83,10 +83,6 @@ vi.mock('../ProjectFormModal', () => ({
 
 vi.mock('../useProjectPermissions')
 
-vi.mock('../../../utils/dateUtils', () => ({
-  formatDateTime: (v: string | null | undefined) => v ?? 'N/A',
-}))
-
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })

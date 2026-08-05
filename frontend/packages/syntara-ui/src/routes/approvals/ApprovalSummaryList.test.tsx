@@ -6,7 +6,7 @@ import { ApprovalSummaryList } from './ApprovalSummaryList'
 describe('ApprovalSummaryList', () => {
   const defaultProps = {
     workflowName: 'Production Deployment',
-    approvalInitiated: 'Jan 15, 2026, 2:30 PM',
+    approvalInitiatedAt: '2026-01-15T14:30:00Z',
   }
 
   it('renders approval type, workflow name, and initiated time', () => {
@@ -17,7 +17,7 @@ describe('ApprovalSummaryList', () => {
     expect(screen.getByText('Workflow')).toBeInTheDocument()
     expect(screen.getByText('Production Deployment')).toBeInTheDocument()
     expect(screen.getByText('Approval initiated')).toBeInTheDocument()
-    expect(screen.getByText('Jan 15, 2026, 2:30 PM')).toBeInTheDocument()
+    expect(screen.getByText(/Jan.*15.*2026/i)).toBeInTheDocument()
   })
 
   // The approvals API does not yet return workflow_id, so the link cannot be constructed.

@@ -14,6 +14,7 @@ import { NxLabel } from '../../components/labels/NxLabel'
 import { NxLink } from '../../components/NxLink'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -21,7 +22,6 @@ import { useTableSort } from '../../hooks/useTableSort'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import type { FilterFieldDefinition } from '../../types/filters'
-import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { getUserIdFromToken } from '../../utils/jwtUtils'
 import { accessClient } from '../access/accessClient'
@@ -241,7 +241,9 @@ function UserTableRow({
           ))}
         </Flex>
       </Td>
-      <Td dataLabel="Last login">{formatDateTime(user.last_login)}</Td>
+      <Td dataLabel="Last login">
+        <DateCell dateString={user.last_login} />
+      </Td>
       <Td dataLabel="State" onClick={(e) => e.stopPropagation()}>
         <UserStateSwitch user={user} disabledReason={toggleDisabledReason} onToggle={onToggleEnabled} />
       </Td>

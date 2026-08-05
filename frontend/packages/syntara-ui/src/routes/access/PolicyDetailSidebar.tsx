@@ -23,7 +23,7 @@ import { useEffect } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxPanel } from '../../components/layout/NxPanel'
-import { formatDateTime } from '../../utils/dateUtils'
+import { DateCell } from '../../components/table/DateCell'
 import { detachPromise } from '../../utils/detachPromise'
 
 import { buildPolicyDefinitionJson } from './policyUtils'
@@ -143,11 +143,15 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
             )}
             <DescriptionListGroup>
               <DescriptionListTerm>Created</DescriptionListTerm>
-              <DescriptionListDescription>{formatDateTime(policy.created_at)}</DescriptionListDescription>
+              <DescriptionListDescription>
+                <DateCell dateString={policy.created_at} />
+              </DescriptionListDescription>
             </DescriptionListGroup>
             <DescriptionListGroup>
               <DescriptionListTerm>Updated</DescriptionListTerm>
-              <DescriptionListDescription>{formatDateTime(policy.updated_at)}</DescriptionListDescription>
+              <DescriptionListDescription>
+                <DateCell dateString={policy.updated_at} />
+              </DescriptionListDescription>
             </DescriptionListGroup>
             {hasLabels && (
               <DescriptionListGroup>

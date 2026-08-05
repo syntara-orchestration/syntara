@@ -238,6 +238,13 @@ describe('UserTimestamp', () => {
     })
   })
 
+  it('renders a semantic <time> element with a datetime attribute', () => {
+    render(<UserTimestamp user={userRef} timestamp={timestamp} />)
+    const timeEl = screen.getByText(/Jul.*1.*2026/i)
+    expect(timeEl.tagName).toBe('TIME')
+    expect(timeEl).toHaveAttribute('datetime', '2026-07-01T12:00:00.000Z')
+  })
+
   describe('accessibility', () => {
     it('has no a11y violations in stacked mode with link', async () => {
       const { container } = render(<UserTimestamp user={userRef} timestamp={timestamp} />)

@@ -29,7 +29,6 @@ import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxPanel } from '../../components/layout/NxPanel'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
-import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 import { useApprovalPermissions } from '../approvals/useApprovalPermissions'
@@ -197,10 +196,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
         </StackItem>
 
         <StackItem>
-          <ApprovalSummaryList
-            workflowName={workflowContext.workflow_name}
-            approvalInitiated={formatDateTime(approval.created_at)}
-          />
+          <ApprovalSummaryList workflowName={workflowContext.workflow_name} approvalInitiatedAt={approval.created_at} />
         </StackItem>
 
         <StackItem>

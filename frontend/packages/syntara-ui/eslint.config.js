@@ -288,7 +288,22 @@ export default tseslint.config(
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',
       'syntara/prefer-confirmation-dialog': 'error',
-      'syntara/no-locale-date-format': 'error',
+      'syntara/no-locale-date-format': [
+        'error',
+        {
+          // Canonical Timestamp wrapper components (own dateFormat/timeFormat) + dateUtils.ts
+          // (needs raw toLocaleTimeString for the same-day-collapse execution formatters).
+          allowedFiles: [
+            '**/utils/dateUtils.ts',
+            '**/components/table/DateCell.tsx',
+            '**/components/table/ExecutionTimestamp.tsx',
+            '**/components/table/UserTimestamp.tsx',
+            // Composes "Last saved <Timestamp>" inline inside a Tooltip's ReactNode content —
+            // no canonical wrapper fits a bare inline timestamp fragment like this.
+            '**/routes/builder/SaveWorkflowButton.tsx',
+          ],
+        },
+      ],
       // Catch unnecessary useEffect patterns. Aligns with https://react.dev/learn/you-might-not-need-an-effect
       'reactYouMightNotNeedAnEffect/no-derived-state': 'warn',
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',

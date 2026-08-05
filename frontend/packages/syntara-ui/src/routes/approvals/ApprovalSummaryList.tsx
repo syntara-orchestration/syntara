@@ -5,9 +5,11 @@ import {
   DescriptionListTerm,
 } from '@patternfly/react-core'
 
+import { DateCell } from '../../components/table/DateCell'
+
 type ApprovalSummaryListProps = {
   workflowName: string
-  approvalInitiated: string
+  approvalInitiatedAt: string | null | undefined
 }
 
 export function ApprovalSummaryList(props: ApprovalSummaryListProps) {
@@ -29,7 +31,9 @@ export function ApprovalSummaryList(props: ApprovalSummaryListProps) {
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Approval initiated</DescriptionListTerm>
-        <DescriptionListDescription>{props.approvalInitiated}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={props.approvalInitiatedAt} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>
   )
