@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from dataclasses import dataclass
+from datetime import timedelta
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from temporalio.client import OutboundInterceptor
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.temporal import client as client_mod
 from syntara.core.temporal.client import (
     CONNECTION_ERRORS,
+    _TimeoutInterceptor,
+    _TimeoutInterceptorFactory,
+    build_default_interceptors,
     get_shared_client,
     invalidate_client,
+    invalidate_on_connection_error,
 )
+from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
 
 
 @pytest.fixture(autouse=True)
@@ -131,3 +139,120 @@ class TestInvalidateClient:
         invalidate_client()
         invalidate_client()
         assert client_mod._cached_client is None
+
+
+class TestInvalidateOnConnectionError:
+    """Tests for invalidate_on_connection_error()."""
+
+    @pytest.mark.asyncio
+    async def test_invalidates_on_unavailable(self) -> None:
+        mock_client = object()
+        with patch(
+            "syntara.core.temporal.client.Client.connect",
+            new_callable=AsyncMock,
+            return_value=mock_client,
+        ):
+            await get_shared_client()
+
+        assert client_mod._cached_client is not None
+        invalidate_on_connection_error(RPCError("down", RPCStatusCode.UNAVAILABLE, b""))
+        assert client_mod._cached_client is None
+
+    @pytest.mark.asyncio
+    async def test_invalidates_on_deadline_exceeded(self) -> None:
+        mock_client = object()
+        with patch(
+            "syntara.core.temporal.client.Client.connect",
+            new_callable=AsyncMock,
+            return_value=mock_client,
+        ):
+            await get_shared_client()
+
+        assert client_mod._cached_client is not None
+        invalidate_on_connection_error(RPCError("timeout", RPCStatusCode.DEADLINE_EXCEEDED, b""))
+        assert client_mod._cached_client is None
+
+    @pytest.mark.asyncio
+    async def test_ignores_non_connection_rpc_error(self) -> None:
+        mock_client = object()
+        with patch(
+            "syntara.core.temporal.client.Client.connect",
+            new_callable=AsyncMock,
+            return_value=mock_client,
+        ):
+            await get_shared_client()
+
+        assert client_mod._cached_client is not None
+        invalidate_on_connection_error(RPCError("not found", RPCStatusCode.NOT_FOUND, b""))
+        assert client_mod._cached_client is not None
+
+    def test_ignores_non_rpc_exception(self) -> None:
+        client_mod._cached_client = object()  # type: ignore[assignment]
+        invalidate_on_connection_error(ValueError("something else"))
+        assert client_mod._cached_client is not None
+
+
+class TestTimeoutInterceptor:
+    """Tests for _TimeoutInterceptor and _TimeoutInterceptorFactory."""
+
+    @dataclass
+    class _FakeInput:
+        rpc_timeout: timedelta | None = None
+
+    @dataclass
+    class _NoTimeoutInput:
+        value: int = 0
+
+    def _make_interceptor(self, timeout_s: int = 10) -> _TimeoutInterceptor:
+        next_interceptor = Mock()
+        next_interceptor.start_workflow = AsyncMock(return_value="handle")
+        next_interceptor.cancel_workflow = AsyncMock(return_value=None)
+        next_interceptor.query_workflow = AsyncMock(return_value="result")
+        return _TimeoutInterceptor(next_interceptor, timedelta(seconds=timeout_s))
+
+    @pytest.mark.asyncio
+    async def test_sets_rpc_timeout_when_none(self) -> None:
+        interceptor = self._make_interceptor(timeout_s=5)
+        rpc_input = self._FakeInput(rpc_timeout=None)
+
+        await interceptor.start_workflow(rpc_input)  # type: ignore[arg-type]
+
+        assert rpc_input.rpc_timeout == timedelta(seconds=5)
+
+    @pytest.mark.asyncio
+    async def test_preserves_explicit_rpc_timeout(self) -> None:
+        interceptor = self._make_interceptor(timeout_s=5)
+        explicit = timedelta(seconds=30)
+        rpc_input = self._FakeInput(rpc_timeout=explicit)
+
+        await interceptor.cancel_workflow(rpc_input)  # type: ignore[arg-type]
+
+        assert rpc_input.rpc_timeout == explicit
+
+    @pytest.mark.asyncio
+    async def test_skips_input_without_rpc_timeout_attr(self) -> None:
+        interceptor = self._make_interceptor()
+        rpc_input = self._NoTimeoutInput(value=42)
+
+        await interceptor.query_workflow(rpc_input)  # type: ignore[arg-type]
+
+        assert not hasattr(rpc_input, "rpc_timeout")
+
+    def test_factory_creates_interceptor(self) -> None:
+        factory = _TimeoutInterceptorFactory(timedelta(seconds=10))
+        next_interceptor = Mock(spec=OutboundInterceptor)
+
+        result = factory.intercept_client(next_interceptor)
+
+        assert isinstance(result, _TimeoutInterceptor)
+
+
+class TestBuildDefaultInterceptors:
+    """Tests for build_default_interceptors()."""
+
+    def test_returns_timeout_and_auth_interceptors(self) -> None:
+        """Should return both the RPC timeout and HMAC auth interceptors."""
+        interceptors = build_default_interceptors()
+        assert len(interceptors) == 2
+        assert isinstance(interceptors[0], _TimeoutInterceptorFactory)
+        assert isinstance(interceptors[1], WorkflowAuthClientInterceptor)

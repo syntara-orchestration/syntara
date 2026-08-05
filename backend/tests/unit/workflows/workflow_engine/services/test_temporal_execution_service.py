@@ -372,7 +372,7 @@ class TestCreateTemporalExecutionService:
             assert call_args[0][0] == "temporal.example.com:7233"
             assert call_args[1]["namespace"] == "production"
             assert call_args[1]["tls"] is None
-            assert len(call_args[1]["interceptors"]) == 1
+            assert len(call_args[1]["interceptors"]) == 2
 
 
 class TestBuiltinWorkflowRouting:
