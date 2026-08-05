@@ -49,7 +49,7 @@ class TestContextQualityMetrics:
 
         # Create invocation via API
         response = await auth_client_with_mocked_llm.post(
-            "/api/v1/invocations",
+            "/_internal/invocations",
             json={
                 "prompt": prompt_empty_context,
                 "created_by": str(test_user.id),
@@ -95,7 +95,7 @@ class TestContextQualityMetrics:
 
             # Create context invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": prompt_with_context,
                     "created_by": str(test_user.id),
@@ -150,7 +150,7 @@ class TestContextQualityMetrics:
 
                 # Create invocation via API
                 response = await auth_client_with_mocked_llm.post(
-                    "/api/v1/invocations",
+                    "/_internal/invocations",
                     json={
                         "prompt": prompt,
                         "created_by": str(test_user.id),
@@ -203,7 +203,7 @@ class TestContextQualityMetrics:
 
             # Create invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": prompt,
                     "created_by": str(test_user.id),
@@ -265,7 +265,7 @@ class TestContextQualityMetrics:
         with patch.object(ContextManagerPlanner, "plan_request", return_value=mock_empty_context):
             # Create empty context invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": "Test empty context",
                     "created_by": str(test_user.id),
@@ -302,7 +302,7 @@ class TestContextQualityMetrics:
         with patch.object(ContextManagerPlanner, "plan_request", return_value=mock_populated_context):
             # Create populated context invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": "Test populated context",
                     "created_by": str(test_user.id),

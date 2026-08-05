@@ -20,7 +20,6 @@ class TestMalformedCursorHandling:
             "/api/v1/tools",
             "/api/v1/workflows",
             "/api/v1/executions",
-            "/api/v1/invocations",
         ],
     )
     async def test_malformed_cursor_returns_422_error(

@@ -30,7 +30,7 @@ class TestGenericQueryFlow:
         }
 
         # Act
-        response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=request_data)
+        response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=request_data)
 
         # Assert
         assert response.status_code == 202
@@ -61,7 +61,7 @@ class TestGenericQueryFlow:
         }
 
         # Act
-        response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=request_data)
+        response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=request_data)
 
         # Assert
         assert response.status_code == 202
@@ -82,7 +82,7 @@ class TestGenericQueryFlow:
         }
 
         # Act
-        response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=request_data)
+        response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=request_data)
 
         # Assert - invocation accepted means GenericAgent will process via mocked LLM
         assert response.status_code == 202
@@ -101,7 +101,7 @@ class TestGenericQueryFlow:
         }
 
         # Act
-        response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=request_data)
+        response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=request_data)
 
         # Assert
         assert response.status_code == 202
@@ -137,7 +137,7 @@ class TestGenericQueryErrorHandling:
             mock_get_llm.return_value = (mock_llm, None)
 
             # Act
-            response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=request_data)
+            response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=request_data)
 
             # Assert
             # Should still accept invocation (error handled in background)
@@ -158,7 +158,7 @@ class TestGenericQueryErrorHandling:
         }
 
         # Act
-        response = await auth_client_with_mocked_llm.post("/api/v1/invocations", json=invalid_request)
+        response = await auth_client_with_mocked_llm.post("/_internal/invocations", json=invalid_request)
 
         # Assert
         assert response.status_code == 422  # Unprocessable Entity (validation error)
