@@ -903,7 +903,10 @@ class WorkflowService(BaseService):
             WorkflowVersionNotFoundError: If version not found
 
         """
-        await self.get_workflow_by_id(workflow_id)
+        workflow = await self.get_workflow_by_id(workflow_id)
+        if workflow.is_builtin:
+            raise BuiltinWorkflowModifyError(workflow.name)
+
         version_record = await self._get_version_or_none(workflow_id, version)
         if not version_record:
             raise WorkflowVersionNotFoundError(workflow_id, version)
