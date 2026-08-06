@@ -25,9 +25,6 @@ exclusions:
   - operation_id: get_internal_metrics_records
     reason: "Internal metrics endpoint"
 
-  - operation_id: get_tool_metrics
-    reason: "Metrics aggregation endpoint, not paginated list"
-
   # Workflow validation endpoints (return validation results, not paginated lists)
   - operation_id: validate_workflow_definition
     reason: "Validation result not a paginated list (ValidationResult), returns findings/is_valid/error_count/warning_count"
@@ -88,9 +85,6 @@ exclusions:
 
   - operation_id: list_project_policies
     reason: "Uses simple value filters instead of operator-based pattern - name/scope need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_eligible need {eq}"
-
-  - operation_id: get_tool_executions
-    reason: "Uses simple value filters instead of operator-based pattern - namespaced_name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, status needs {eq}, start_time/end_time need {eq, gt, gte, lt, lte}"
 
   - operation_id: list_groups_directory
     reason: "Uses simple name filter instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}"

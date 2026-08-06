@@ -11,12 +11,7 @@ from syntara.tool_manager.models.tool import (
     ToolUpdate,
 )
 from syntara.tool_manager.models.tool_bulk_update import MAX_BULK_UPDATES, ToolBulkUpdate
-from syntara.tool_manager.models.tool_execution import ToolExecution, ToolExecutionStatus, ToolMetricsSummary
-from syntara.tool_manager.models.tool_metrics_response import (
-    ToolExecutionListParams,
-    ToolMetricsQuery,
-    ToolMetricsToolSummary,
-)
+from syntara.tool_manager.models.tool_execution import ToolExecution, ToolExecutionStatus
 from syntara.tool_manager.models.tool_provider_refresh_result import ToolProviderRefreshResult
 from syntara.tool_manager.models.tool_provider_validation_result import ToolProviderValidationResult
 from syntara.tool_manager.models.tool_schema import ToolSchema
@@ -31,13 +26,9 @@ __all__ = [
     "Tool",
     "ToolBulkUpdate",
     "ToolExecution",
-    "ToolExecutionListParams",
     "ToolExecutionStatus",
     "ToolListParams",
     "ToolListResponse",
-    "ToolMetricsQuery",
-    "ToolMetricsSummary",
-    "ToolMetricsToolSummary",
     "ToolParameter",
     "ToolParameterType",
     "ToolProviderRefreshResult",
