@@ -77,8 +77,8 @@ def test_resolve_follow_redirects_false_from_settings() -> None:
     assert resolve_follow_redirects(node) is False
 
 
-def test_resolve_follow_redirects_none_from_settings() -> None:
-    """When settings.follow_redirects is None, resolve returns False (default)."""
-    settings = NodeSettingsFull(follow_redirects=None)
+def test_resolve_follow_redirects_default_from_settings() -> None:
+    """When settings.follow_redirects is not set, resolve returns False (default)."""
+    settings = NodeSettingsFull()
     node = ActivityNode(node_id="n", node_type="http_request", parameters={}, settings=settings)
     assert resolve_follow_redirects(node) is False

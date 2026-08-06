@@ -765,8 +765,9 @@ export interface components {
       /**
        * Follow Redirects
        * @description Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false.
+       * @default false
        */
-      follow_redirects?: boolean | null
+      follow_redirects?: boolean
     }
     /**
      * AAPJobTemplateNode

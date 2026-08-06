@@ -132,7 +132,7 @@ def resolve_follow_redirects(node: ActivityNode) -> bool:
 
     Resolution: node.settings.follow_redirects → False.
     """
-    if isinstance(node.settings, NodeSettingsFull) and node.settings.follow_redirects is not None:
+    if isinstance(node.settings, NodeSettingsFull):
         return node.settings.follow_redirects
     return False
 

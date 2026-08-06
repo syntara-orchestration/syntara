@@ -2409,9 +2409,8 @@ components:
             - $ref: '#/components/schemas/RetryPolicyParameters'
             - type: 'null'
         follow_redirects:
-          anyOf:
-            - type: boolean
-            - type: 'null'
+          type: boolean
+          default: false
           title: Follow Redirects
           description: Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false.
       additionalProperties: false
