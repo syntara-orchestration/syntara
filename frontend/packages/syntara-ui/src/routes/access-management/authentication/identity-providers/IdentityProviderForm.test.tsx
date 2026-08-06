@@ -396,7 +396,9 @@ describe('IdentityProviderForm', () => {
           client_id: 'client-123',
           scopes: 'openid profile email',
           group_jmespath_expression: 'groups[*]',
-          group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' }],
+          group_mapping_entries: [
+            { idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' },
+          ],
         },
       }
       vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
@@ -430,7 +432,9 @@ describe('IdentityProviderForm', () => {
           client_id: 'client-123',
           scopes: 'openid profile email',
           group_jmespath_expression: 'groups[*]',
-          group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' }],
+          group_mapping_entries: [
+            { idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' },
+          ],
         },
       }
       mockUseParams.mockReturnValue({ providerId: 'provider-1' })
