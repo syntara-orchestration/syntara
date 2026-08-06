@@ -320,7 +320,7 @@ omit = [
     "tools/*",  # Manual utilities, not production code
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
-    "src/nexus/core/database/migrations/*",  # Alembic migrations, not unit-testable
+    "src/nexus/core/database/migrations/**",  # Alembic migrations, not unit-testable
 ]
 
 [tool.coverage.report]
