@@ -17,7 +17,13 @@ import { type Page } from '@playwright/test'
 
 import { expect } from '../fixtures'
 
-import { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential } from './llm-helpers'
+import {
+  ensureLlmCredential,
+  ensureAapIntegration,
+  createLlmIntegration,
+  deleteLlmIntegration,
+  selectLlmCredential,
+} from './llm-helpers'
 import { addNodePanel, closeNodeEditorPanel, fillCodeEditor } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
@@ -164,12 +170,56 @@ export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze
   await closeNodeEditorPanel(page)
 }
 
-/** Add an AAP job template node (v2 type: "aap_job_template"). */
-export async function addAapNode(page: Page, name: string, jobTemplateId = '123') {
+/**
+ * Add an AAP job template node (v2 type: "aap_job_template").
+ *
+ * Creates an AAP integration+credential via the API, then fills the
+ * Integration/Organization/Job template dropdowns in the node form.
+ */
+export async function addAapNode(page: Page, name: string) {
+  const { name: integrationName, credName } = await ensureAapIntegration(page)
+
   await openAddNodePanel(page)
   await selectDirectNodeType(page, /AAP/i)
+  const jobTemplateBtn = addNodePanel(page).getByRole('button', { name: 'Launch AAP job template' })
+  await expect(jobTemplateBtn).toBeVisible({ timeout: 5_000 })
+  await jobTemplateBtn.click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-  await page.getByLabel('Job template ID').fill(jobTemplateId)
+
+  // Select integration
+  const integrationToggle = page.getByRole('button', { name: 'Integration', exact: true })
+  await expect(integrationToggle).toBeEnabled({ timeout: 10_000 })
+  await integrationToggle.click()
+  const integrationOption = page.getByRole('option', { name: new RegExp(integrationName) })
+  await expect(integrationOption).toBeVisible({ timeout: 15_000 })
+  await integrationOption.click()
+
+  // Set up connection with AAP credential
+  const setupBtn = page.getByRole('button', { name: 'Set up connection' })
+  await expect(setupBtn).toBeVisible({ timeout: 5_000 })
+  await setupBtn.click()
+  const credDropdown = page.getByRole('button', { name: 'Select a credential' })
+  await expect(credDropdown).toBeEnabled({ timeout: 30_000 })
+  await credDropdown.click()
+  const credOption = page.getByRole('option', { name: credName })
+  await expect(credOption).toBeVisible({ timeout: 10_000 })
+  await credOption.click()
+
+  // Select organization (mock seed data: Default)
+  const orgInput = page.getByPlaceholder('Select an organization')
+  await expect(orgInput).toBeVisible({ timeout: 15_000 })
+  await orgInput.click()
+  await expect(page.getByRole('option', { name: 'Default' })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('option', { name: 'Default' }).click()
+
+  // Select job template (mock seed data: Deploy App under Default org)
+  const templateInput = page.getByPlaceholder('Select a job template')
+  await expect(templateInput).toBeVisible({ timeout: 15_000 })
+  await templateInput.click()
+  const deployOption = page.getByRole('option', { name: /Deploy App/i })
+  await expect(deployOption).toBeVisible({ timeout: 10_000 })
+  await deployOption.click()
+
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
 }

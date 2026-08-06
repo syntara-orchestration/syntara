@@ -14,8 +14,7 @@ import {
   verifyNodeVisible,
 } from '../helpers/workflows'
 
-// Skipped: AI agent node form depends on backend LLM/tool discovery endpoints that time out in CI
-test.skip('AI agent node configuration form renders with tools, output, and LLM', async ({ app }) => {
+test('AI agent node configuration form renders with tools, output, and LLM', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-ai-agent-node')
   await createWorkflowWithTrigger(app, workflowName)
   try {
