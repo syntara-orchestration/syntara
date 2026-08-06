@@ -487,6 +487,25 @@ def test_extract_group_mapping_entries_populated() -> None:
     assert entries_out[0].idp_group_value == "role-a"
 
 
+@pytest.mark.asyncio
+async def test_save_group_mapping_entries_stores_entry_rows() -> None:
+    """_save_group_mapping_entries validates group existence and inserts mapping rows."""
+    mock_session = _make_mock_session()
+    provider_id = uuid4()
+    group_id = uuid4()
+
+    mock_result = MagicMock()
+    mock_result.all.return_value = [group_id]
+    mock_session.exec = AsyncMock(return_value=mock_result)
+
+    service = _make_service(mock_session)
+    entries = [OIDCGroupMappingEntry(idp_group_value="admins", mapped_group_id=group_id)]
+
+    await service._save_group_mapping_entries(provider_id, entries)
+
+    mock_session.add.assert_called_once()
+
+
 def test_extract_group_mapping_entries_empty_list() -> None:
     """Extracting from config with empty list returns empty list."""
     config = _make_oidc_config(group_mapping_entries=[])

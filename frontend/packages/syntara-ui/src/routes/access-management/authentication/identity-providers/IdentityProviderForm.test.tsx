@@ -384,6 +384,38 @@ describe('IdentityProviderForm', () => {
       expect(screen.getByLabelText(/Disable TLS certificate verification/)).not.toBeChecked()
     })
 
+    it('defaults nexusGroupId to empty string when mapped_group_id is null in API response', () => {
+      const providerWithNullMapping = {
+        id: 'provider-1',
+        name: 'Azure AD',
+        enabled: true,
+        configuration: {
+          provider_type: 'oidc',
+          auto_discovery: true,
+          issuer_url: 'https://login.microsoftonline.com/tenant',
+          client_id: 'client-123',
+          scopes: 'openid profile email',
+          group_jmespath_expression: 'groups[*]',
+          group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: null as unknown as string }],
+        },
+      }
+      vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
+        data: providerWithNullMapping,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+      vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+      } as never)
+
+      // Should render without crashing — null mapped_group_id defaults to ''
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+      expect(screen.getByRole('heading', { name: 'Edit OIDC provider' })).toBeInTheDocument()
+    })
+
     it('populates group mapping form values from provider group_mapping_entries', () => {
       const providerWithMappings = {
         id: 'provider-1',
