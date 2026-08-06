@@ -179,6 +179,29 @@ export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze
 export async function addAapNode(page: Page, name: string) {
   const { name: integrationName, credName } = await ensureAapIntegration(page)
 
+  // Intercept AAP browse endpoints so the form works without a real AAP server.
+  // Against a real backend the proxy would fail because ensureAapIntegration
+  // creates an integration with a fake base_url.
+  const orgRoute = '**/aap/organizations*'
+  const jtRoute = '**/aap/job_templates*'
+  await page.route(orgRoute, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 1, results: [{ id: 1, name: 'Default' }] }),
+    })
+  )
+  await page.route(jtRoute, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count: 1,
+        results: [{ id: 10, name: 'Deploy App', description: 'Deploy the application', organization: 'Default' }],
+      }),
+    })
+  )
+
   await openAddNodePanel(page)
   await selectDirectNodeType(page, /AAP/i)
   const jobTemplateBtn = addNodePanel(page).getByRole('button', { name: 'Launch AAP job template' })
@@ -205,14 +228,14 @@ export async function addAapNode(page: Page, name: string) {
   await expect(credOption).toBeVisible({ timeout: 10_000 })
   await credOption.click()
 
-  // Select organization (mock seed data: Default)
+  // Select organization
   const orgInput = page.getByPlaceholder('Select an organization')
   await expect(orgInput).toBeVisible({ timeout: 15_000 })
   await orgInput.click()
   await expect(page.getByRole('option', { name: 'Default' })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('option', { name: 'Default' }).click()
 
-  // Select job template (mock seed data: Deploy App under Default org)
+  // Select job template
   const templateInput = page.getByPlaceholder('Select a job template')
   await expect(templateInput).toBeVisible({ timeout: 15_000 })
   await templateInput.click()
@@ -222,6 +245,9 @@ export async function addAapNode(page: Page, name: string) {
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+
+  await page.unroute(orgRoute)
+  await page.unroute(jtRoute)
 }
 
 /** Add an approval node (v2 type: "approval") without completing branches. */

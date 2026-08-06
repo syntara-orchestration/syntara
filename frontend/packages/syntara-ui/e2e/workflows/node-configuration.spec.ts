@@ -5,6 +5,7 @@
  * - AI Agent Node
  */
 import { expect, test } from '../fixtures'
+import { type SeededLlmIntegration, createLlmIntegration, deleteLlmIntegration } from '../helpers/llm-helpers'
 import { addAgenticNode } from '../helpers/v2-nodes'
 import {
   buildUniqueName,
@@ -16,8 +17,10 @@ import {
 
 test('AI agent node configuration form renders with tools, output, and LLM', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-ai-agent-node')
+  let integration: SeededLlmIntegration | undefined
   await createWorkflowWithTrigger(app, workflowName)
   try {
+    integration = await createLlmIntegration(app, buildUniqueName('e2e-llm-integration'))
     await addAgenticNode(app, 'AI Agent Node', 'Analyze the data')
     await verifyNodeVisible(app, 'AI Agent Node')
 
@@ -32,5 +35,6 @@ test('AI agent node configuration form renders with tools, output, and LLM', asy
     await verifyNodeVisible(app, 'AI Agent Node')
   } finally {
     await deleteWorkflow(app, workflowName)
+    if (integration) await deleteLlmIntegration(app, integration.id)
   }
 })

@@ -239,13 +239,13 @@ export async function selectLlmCredential(page: Page, credName: string, integrat
     const groupTitle = page.getByText(integrationName, { exact: true })
     await expect(groupTitle).toBeVisible({ timeout: 15_000 })
     const integrationGroup = groupTitle.locator('xpath=..')
-    const groupOptions = integrationGroup.getByRole('option').filter({ hasNot: page.locator('[aria-disabled="true"]') })
+    const groupOptions = integrationGroup.locator('[role="option"]:not([aria-disabled="true"])')
     await expect(groupOptions.first()).toBeVisible({ timeout: 5_000 })
     modelOption = groupOptions.first()
   } else {
     // No integration specified — wait for any models and pick the first enabled one
     await page.waitForTimeout(2000)
-    const enabledOptions = page.getByRole('option').filter({ hasNot: page.locator('[aria-disabled="true"]') })
+    const enabledOptions = page.locator('[role="option"]:not([aria-disabled="true"])')
     const enabledCount = await enabledOptions.count()
     if (enabledCount === 0) {
       await page.keyboard.press('Escape')
