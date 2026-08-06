@@ -480,7 +480,7 @@ def test_extract_group_mapping_entries_empty() -> None:
 def test_extract_group_mapping_entries_populated() -> None:
     """Extracting entries from config with entries returns them."""
     group_id = uuid4()
-    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", nexus_group_id=group_id)]
+    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", mapped_group_id=group_id)]
     config = _make_oidc_config(group_mapping_entries=entries_in)
     entries_out = IdentityProviderService._extract_group_mapping_entries(config)
     assert len(entries_out) == 1

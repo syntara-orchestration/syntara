@@ -145,11 +145,11 @@ export interface components {
        */
       idp_group_value: string
       /**
-       * Nexus Group Id
+       * Mapped Group Id
        * Format: uuid
-       * @description ID of the Nexus group to map to
+       * @description ID of the group to map to
        */
-      nexus_group_id: string
+      mapped_group_id: string
     }
     /**
      * OIDCConfiguration

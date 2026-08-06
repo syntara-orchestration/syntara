@@ -45,7 +45,7 @@ class OIDCGroupMappingEntry(SQLModel):
     """
 
     idp_group_value: str = Field(min_length=1, description="Group value from the IdP token (e.g. GUID or role name)")
-    nexus_group_id: UUID = Field(description="ID of the Nexus group to map to")
+    mapped_group_id: UUID = Field(description="ID of the group to map to")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 

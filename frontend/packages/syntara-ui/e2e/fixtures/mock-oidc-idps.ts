@@ -45,7 +45,7 @@ export const KEYCLOAK_OIDC_IDP: IdentityProvider = {
     group_mapping_entries: [
       {
         idp_group_value: 'keycloak-admins',
-        nexus_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+        mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
       },
     ],
     aap_role_mapping_enabled: false,

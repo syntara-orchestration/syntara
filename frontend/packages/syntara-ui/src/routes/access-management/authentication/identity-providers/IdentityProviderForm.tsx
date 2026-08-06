@@ -79,7 +79,7 @@ function groupMappingFields(formData: IdentityProviderFormData) {
     group_jmespath_expression: formData.groupMapping.jmespathExpression,
     group_mapping_entries: (formData.groupMapping.entries ?? []).map((e) => ({
       idp_group_value: e.idpGroupValue,
-      nexus_group_id: e.nexusGroupId,
+      mapped_group_id: e.nexusGroupId,
     })),
   }
 }
@@ -155,7 +155,7 @@ function toGroupMappingValues(config?: ProviderConfig): IdentityProviderFormData
     jmespathExpression: config?.group_jmespath_expression ?? 'groups[*]',
     entries: (entries ?? []).map((e) => ({
       idpGroupValue: e.idp_group_value ?? '',
-      nexusGroupId: e.nexus_group_id ?? '',
+      nexusGroupId: e.mapped_group_id ?? '',
     })),
   }
 }

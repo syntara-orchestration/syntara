@@ -31295,7 +31295,7 @@ components:
         ``idp_group_mapping_entries`` table.
       required:
         - idp_group_value
-        - nexus_group_id
+        - mapped_group_id
       additionalProperties: false
       properties:
         idp_group_value:
@@ -31303,11 +31303,11 @@ components:
           minLength: 1
           title: Idp Group Value
           description: Group value from the IdP token (e.g. GUID or role name)
-        nexus_group_id:
+        mapped_group_id:
           type: string
           format: uuid
-          title: Nexus Group Id
-          description: ID of the Nexus group to map to
+          title: Mapped Group Id
+          description: ID of the group to map to
     OIDCConfiguration:
       type: object
       title: OIDCConfiguration
