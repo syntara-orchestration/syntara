@@ -86,10 +86,6 @@
         },
         "retry_policy": {
           "$ref": "#/$defs/retry_policy"
-        },
-        "follow_redirects": {
-          "type": "boolean",
-          "description": "Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false."
         }
       },
       "additionalProperties": false
