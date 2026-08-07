@@ -321,6 +321,8 @@ omit = [
     "tools/*",  # Manual utilities, not production code
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
+    "src/nexus/workflows/worker.py",  # Entrypoint scripts, not unit-testable
+    "src/nexus/workflows/background_worker.py",
 ]
 
 [tool.coverage.report]
