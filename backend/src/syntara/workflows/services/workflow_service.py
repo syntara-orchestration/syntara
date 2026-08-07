@@ -900,6 +900,7 @@ class WorkflowService(BaseService):
 
         Raises:
             WorkflowNotFoundError: If workflow not found
+            BuiltinWorkflowModifyError: If workflow is builtin
             WorkflowVersionNotFoundError: If version not found
 
         """
