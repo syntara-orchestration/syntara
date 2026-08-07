@@ -27212,13 +27212,13 @@ components:
           detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
           code: RATE_LIMIT_EXCEEDED
           retryable: true
-          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          instance: /executions/550e8400-e29b-41d4-a716-446655440000
         - type: https://api.example.com/errors/timeout-error
           title: Streaming Timeout
           detail: LLM streaming timed out after 30 seconds
           code: STREAM_TIMEOUT
           retryable: true
-          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          instance: /executions/550e8400-e29b-41d4-a716-446655440000
       properties:
         type:
           type: string
@@ -27266,7 +27266,7 @@ components:
           title: Instance
           description: Optional URI reference identifying the specific occurrence
           examples:
-            - /invocations/550e8400-e29b-41d4-a716-446655440000
+            - /executions/550e8400-e29b-41d4-a716-446655440000
     AAPOrganization:
       type: object
       title: AAPOrganization
