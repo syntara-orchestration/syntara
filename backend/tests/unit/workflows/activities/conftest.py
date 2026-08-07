@@ -5,7 +5,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 
-from nexus.core.config.base import Settings
+from nexus.core.config.base import Settings, get_settings
 
 
 @pytest.fixture(autouse=True)
@@ -18,5 +18,10 @@ def _mock_service_identity() -> Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def _enable_script_nodes() -> Generator[None, None, None]:
     """Enable script nodes for activity unit tests."""
-    with patch.object(Settings, "script_nodes_enabled", new_callable=PropertyMock, return_value=True):
+    settings = get_settings()
+    original = settings.script_nodes_enabled
+    object.__setattr__(settings, "script_nodes_enabled", True)
+    try:
         yield
+    finally:
+        object.__setattr__(settings, "script_nodes_enabled", original)
