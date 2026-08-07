@@ -16,6 +16,7 @@ from typing import Any
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from nexus.core.config.base import get_settings
 from nexus.core.exceptions import SafeValueError
 from nexus.workflows.workflow_engine import constants
 from nexus.workflows.workflow_engine.models.workflow_definition import (
@@ -441,11 +442,17 @@ async def _execute_script_common(
 
 
 @activity.defn(name=ActivityName.SCRIPT)
-async def execute_script_activity(
+async def execute_script_activity(  # noqa: C901
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
 ) -> dict[str, Any]:
     """Execute a script for V2 workflows (unified bash/python activity).
+
+    SECURITY: Gated by APP_SCRIPT_NODES_ENABLED (default False). When disabled,
+    the activity fails immediately with a non-retryable error. Scripts currently
+    execute with NO sandboxing — enabling this setting grants arbitrary code
+    execution on the worker infrastructure to any user who can create and run
+    workflows. This setting will be removed when proper sandboxing is in place.
 
     This activity handles both bash and python scripts based on the 'language'
     field in config, delegating to the appropriate helper function.
@@ -473,6 +480,10 @@ async def execute_script_activity(
 
     """
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
+
+    if not get_settings().script_nodes_enabled:
+        msg = "Workflow contains Developer Preview Script node."
+        raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
 
     try:
         # Validate config via Pydantic model

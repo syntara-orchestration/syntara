@@ -1438,6 +1438,17 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
+    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
+    # directly in the Temporal worker process with NO sandboxing. Enabling this
+    # grants any user with workflow:create + execution:run permissions the ability
+    # to run arbitrary commands on the worker infrastructure, with access to all
+    # environment variables (database credentials, JWT signing keys, etc.).
+    # Do NOT enable in production until the sandbox backend is complete.
+    script_nodes_enabled: bool = Field(
+        default=False,
+        description="Enable Developer Preview Script node execution in workflows (UNSAFE — no sandboxing)",
+    )
+
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
         default="http://localhost:8000/api/v1",
         description="Base URL for Agent Orchestrator API",
