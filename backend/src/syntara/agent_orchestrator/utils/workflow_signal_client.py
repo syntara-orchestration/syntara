@@ -6,16 +6,87 @@ to send activity completion signals (both success and failure) to workflows.
 
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 import httpx
 import structlog
 
 from syntara.core.tls.http_client import build_internal_http_client
+from syntara.workflows.utils.url import generate_activity_signal_url, get_api_base_url
 
 logger = structlog.stdlib.get_logger(__name__)
 
 _SIGNAL_HTTP_TIMEOUT_SECONDS = 10.0
+
+
+def validate_signal_url(callback_url: str) -> None:
+    """Validate that callback_url points to an allowed internal signal endpoint.
+
+    Prevents the platform mTLS identity from being presented to arbitrary
+    destinations (SSRF mitigation).  Validation works by parsing the URL,
+    extracting the execution-id and activity-id, and round-tripping through
+    ``generate_activity_signal_url`` — so this stays in sync with the
+    canonical URL shape automatically.
+
+    Raises:
+        ValueError: If the URL does not match the expected signal endpoint.
+
+    """
+    base_url = get_api_base_url()
+    base_parsed = urlparse(base_url)
+    url_parsed = urlparse(callback_url)
+
+    if url_parsed.scheme != base_parsed.scheme or url_parsed.netloc != base_parsed.netloc:
+        logger.critical(
+            "SECURITY: signal callback URL host/scheme mismatch — potential SSRF",
+            callback_url=callback_url,
+            expected_base=base_url,
+        )
+        msg = "Signal callback URL host/scheme does not match configured API base"
+        raise ValueError(msg)
+
+    if url_parsed.query or url_parsed.fragment:
+        logger.critical(
+            "SECURITY: signal callback URL contains query string or fragment",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL must not contain query string or fragment"
+        raise ValueError(msg)
+
+    base_path = base_parsed.path.rstrip("/")
+    if not url_parsed.path.startswith(base_path + "/"):
+        logger.critical(
+            "SECURITY: signal callback URL path outside API base — potential SSRF",
+            callback_url=callback_url,
+            expected_base=base_url,
+        )
+        msg = "Signal callback URL path is outside the API base"
+        raise ValueError(msg)
+
+    path_suffix = url_parsed.path[len(base_path) :]
+    parts = path_suffix.strip("/").split("/")
+
+    try:
+        execution_id = UUID(parts[1])
+        activity_id = parts[3]
+    except (IndexError, ValueError):
+        logger.critical(
+            "SECURITY: signal callback URL path is not a valid signal endpoint — potential SSRF",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg) from None
+
+    expected = generate_activity_signal_url(execution_id, activity_id)
+    if callback_url != expected:
+        logger.critical(
+            "SECURITY: signal callback URL does not match expected pattern — potential SSRF",
+            callback_url=callback_url,
+            expected_url=expected,
+        )
+        msg = "Signal callback URL does not match expected signal endpoint"
+        raise ValueError(msg)
 
 
 async def _post_signal(callback_url: str, payload: dict[str, Any], invocation_id: UUID) -> None:
@@ -61,6 +132,8 @@ class WorkflowSignalClient:
             httpx.TimeoutException: If request times out
 
         """
+        validate_signal_url(callback_url)
+
         signal_payload = {
             "signal_data": {
                 "id": str(invocation_id),
@@ -118,6 +191,10 @@ class WorkflowSignalClient:
                 invocation_id=invocation_id,
             )
             return
+
+        # Validate URL before the best-effort block so security violations
+        # propagate instead of being silently swallowed.
+        validate_signal_url(callback_url)
 
         signal_payload = {
             "signal_data": {
