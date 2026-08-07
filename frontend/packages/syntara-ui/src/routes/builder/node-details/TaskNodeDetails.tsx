@@ -442,6 +442,7 @@ function buildExecutorInitialData(
       (config as { credentialId?: string; credential_id?: string }).credentialId ??
       (config as { credentialId?: string; credential_id?: string }).credential_id ??
       undefined,
+    follow_redirects: isHTTP ? ((config as { follow_redirects?: boolean }).follow_redirects ?? undefined) : undefined,
     settings: taskData.settings,
   }
 }

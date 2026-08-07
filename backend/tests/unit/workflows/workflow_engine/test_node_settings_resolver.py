@@ -3,9 +3,7 @@
 from nexus.settings.catalog import SETTINGS_CATALOG
 from nexus.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
 from nexus.workflows.workflow_engine.graph import ActivityNode
-from nexus.workflows.workflow_engine.models.workflow_definition import NodeSettingsFull
 from nexus.workflows.workflow_engine.node_settings_resolver import (
-    resolve_follow_redirects,
     resolve_max_output_bytes,
     resolve_retry_policy,
 )
@@ -55,30 +53,3 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
     node = ActivityNode(node_id="n", node_type="http_request", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
-
-
-def test_resolve_follow_redirects_defaults_false() -> None:
-    """Without settings, follow_redirects defaults to False."""
-    node = ActivityNode(node_id="n", node_type="http_request", parameters={})
-    assert resolve_follow_redirects(node) is False
-
-
-def test_resolve_follow_redirects_true_from_settings() -> None:
-    """When settings.follow_redirects is True, resolve returns True."""
-    settings = NodeSettingsFull(follow_redirects=True)
-    node = ActivityNode(node_id="n", node_type="http_request", parameters={}, settings=settings)
-    assert resolve_follow_redirects(node) is True
-
-
-def test_resolve_follow_redirects_false_from_settings() -> None:
-    """When settings.follow_redirects is explicitly False, resolve returns False."""
-    settings = NodeSettingsFull(follow_redirects=False)
-    node = ActivityNode(node_id="n", node_type="http_request", parameters={}, settings=settings)
-    assert resolve_follow_redirects(node) is False
-
-
-def test_resolve_follow_redirects_default_from_settings() -> None:
-    """When settings.follow_redirects is not set, resolve returns False (default)."""
-    settings = NodeSettingsFull()
-    node = ActivityNode(node_id="n", node_type="http_request", parameters={}, settings=settings)
-    assert resolve_follow_redirects(node) is False

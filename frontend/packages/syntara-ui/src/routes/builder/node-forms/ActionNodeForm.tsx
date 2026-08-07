@@ -12,6 +12,7 @@ import {
   SelectOption,
   Stack,
   StackItem,
+  Switch,
   TextArea,
 } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
@@ -343,6 +344,27 @@ function ActionParametersContent(props: ActionParametersContentProps) {
               </DroppableField>
             </FormGroup>
           </StackItem>
+          <StackItem>
+            <FormGroup
+              label="Follow redirects"
+              labelHelp={nodeHelp.httpFollowRedirects}
+              fieldId="action-follow-redirects"
+            >
+              <Controller
+                control={control}
+                name="follow_redirects"
+                render={({ field }) => (
+                  <Switch
+                    id="action-follow-redirects"
+                    aria-label="Follow redirects"
+                    isChecked={field.value ?? false}
+                    onChange={(_event, checked) => field.onChange(checked)}
+                    isDisabled={isVersionView}
+                  />
+                )}
+              />
+            </FormGroup>
+          </StackItem>
         </>
       )}
     </Stack>
@@ -430,11 +452,7 @@ function ActionFormFields({
 
   const isHttpRequest = executor === ExecutorTypeEnum.HTTP_REQUEST
   const settingsContent = (
-    <NodeSettingsForm
-      timeoutNodeType={isHttpRequest ? 'http_request' : 'script'}
-      supportsRetryPolicy={isHttpRequest}
-      supportsFollowRedirects={isHttpRequest}
-    />
+    <NodeSettingsForm timeoutNodeType={isHttpRequest ? 'http_request' : 'script'} supportsRetryPolicy={isHttpRequest} />
   )
 
   return <NodeFormTabsLayout parametersContent={parametersContent} settingsContent={settingsContent} />
@@ -468,6 +486,7 @@ export function ActionNodeForm(props: Readonly<ActionNodeFormProps>) {
       parameters: data.parameters ?? undefined,
       requiresApproval: props.initialData?.requiresApproval,
       credential_id: data.credential_id ?? undefined,
+      follow_redirects: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.follow_redirects : undefined,
       settings: {
         ...data.settings,
         retry_policy: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.settings?.retry_policy : undefined,

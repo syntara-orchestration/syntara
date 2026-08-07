@@ -54,6 +54,10 @@ export function buildRegistryActionInitialData(
       return typeof parameters.body === 'string' ? parameters.body : JSON.stringify(parameters.body, null, 2)
     })(),
     credential_id: (parameters as { credential_id?: string }).credential_id ?? undefined,
+    follow_redirects:
+      executor === ExecutorTypeEnum.HTTP_REQUEST
+        ? ((parameters as { follow_redirects?: boolean }).follow_redirects ?? undefined)
+        : undefined,
     parameters:
       executor === ExecutorTypeEnum.SCRIPT && parameters.environment
         ? JSON.stringify(parameters.environment, null, 2)
@@ -95,6 +99,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
               body: parseHttpBodyField(data.body),
             }),
             ...(data.credential_id && { credential_id: data.credential_id }),
+            ...(data.follow_redirects !== undefined && { follow_redirects: data.follow_redirects }),
           },
   } as Activity
 }

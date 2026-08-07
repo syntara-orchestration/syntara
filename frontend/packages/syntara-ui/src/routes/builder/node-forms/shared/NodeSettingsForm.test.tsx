@@ -260,42 +260,6 @@ describe('NodeSettingsForm', () => {
     })
   })
 
-  describe('follow redirects', () => {
-    it('does not render by default', () => {
-      setup()
-      expect(screen.queryByRole('switch', { name: /follow redirects/i })).not.toBeInTheDocument()
-    })
-
-    it('renders switch when supportsFollowRedirects is true', () => {
-      setup({ supportsFollowRedirects: true })
-      expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeInTheDocument()
-    })
-
-    it('defaults to unchecked', () => {
-      setup({ supportsFollowRedirects: true })
-      expect(screen.getByRole('switch', { name: /follow redirects/i })).not.toBeChecked()
-    })
-
-    it('renders checked when default value is true', () => {
-      setup({ supportsFollowRedirects: true }, { settings: { follow_redirects: true } })
-      expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeChecked()
-    })
-
-    it('toggles when clicked', async () => {
-      const { user } = setup({ supportsFollowRedirects: true })
-      const toggle = screen.getByRole('switch', { name: /follow redirects/i })
-      expect(toggle).not.toBeChecked()
-      await user.click(toggle)
-      await waitFor(() => expect(toggle).toBeChecked())
-    })
-
-    it('has no accessibility violations', async () => {
-      const { container } = setup({ supportsFollowRedirects: true })
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
-  })
-
   describe('all sections disabled', () => {
     it('renders empty form when all sections are disabled', () => {
       setup({ supportsContinueOnFailure: false, supportsTimeout: false, supportsRetryPolicy: false })

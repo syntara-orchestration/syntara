@@ -34,8 +34,6 @@ type NodeSettingsFormProps = {
   supportsContinueOnFailure?: boolean
   /** When false, the retry policy section is not rendered. Default: true. */
   supportsRetryPolicy?: boolean
-  /** When true, the follow redirects checkbox is rendered. Default: false. */
-  supportsFollowRedirects?: boolean
   /** Additional help text shown under the continue_on_failure dropdown. */
   continueOnFailureHelp?: string
   /** Node type used to select the matching system timeout default. */
@@ -379,37 +377,6 @@ function RetryPolicySection({
   )
 }
 
-type FollowRedirectsSectionProps = {
-  control: ReturnType<typeof useFormContext<FormWithSettings>>['control']
-  isDisabled?: boolean
-}
-
-function FollowRedirectsSection({ control, isDisabled }: Readonly<FollowRedirectsSectionProps>) {
-  return (
-    <FormSection title="Redirects">
-      <FormGroup
-        label="Follow redirects"
-        labelHelp={nodeHelp.httpFollowRedirects}
-        fieldId="node-settings-follow-redirects"
-      >
-        <Controller
-          control={control}
-          name="settings.follow_redirects"
-          render={({ field }) => (
-            <Switch
-              id="node-settings-follow-redirects"
-              aria-label="Follow redirects"
-              isChecked={field.value ?? false}
-              onChange={(_event, checked) => field.onChange(checked)}
-              isDisabled={isDisabled}
-            />
-          )}
-        />
-      </FormGroup>
-    </FormSection>
-  )
-}
-
 function getCofDefaultLabel(cofDefault: boolean | null): string {
   if (cofDefault === null) return ''
   if (cofDefault) return ' (system default: continue on failure)'
@@ -421,7 +388,6 @@ export function NodeSettingsForm({
   supportsTimeout = true,
   supportsContinueOnFailure = true,
   supportsRetryPolicy = true,
-  supportsFollowRedirects = false,
   continueOnFailureHelp,
   timeoutNodeType,
 }: NodeSettingsFormProps) {
@@ -474,12 +440,6 @@ export function NodeSettingsForm({
             retryDefaults={retryDefaults}
             isDisabled={isVersionView}
           />
-        </StackItem>
-      )}
-
-      {supportsFollowRedirects && (
-        <StackItem>
-          <FollowRedirectsSection control={control} isDisabled={isVersionView} />
         </StackItem>
       )}
     </Stack>

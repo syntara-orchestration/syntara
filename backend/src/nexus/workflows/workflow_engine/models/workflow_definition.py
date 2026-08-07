@@ -334,13 +334,6 @@ class NodeSettingsFull(NodeSettingsNoRetry):
     """Full settings with retry_policy (http_request, aap_job_template, aap_workflow_job_template)."""
 
     retry_policy: RetryPolicyParameters | None = None
-    follow_redirects: bool = Field(
-        default=False,
-        description=(
-            "Whether to follow HTTP redirects (3xx). Each redirect target"
-            " is validated against SSRF rules. Default false."
-        ),
-    )
 
 
 # Executor configuration models
@@ -389,6 +382,13 @@ class APIExecutorParameters(TemplateAwareBaseModel):
     credential_id: str | None = Field(
         default=None,
         description="Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.",
+    )
+    follow_redirects: bool = Field(
+        default=False,
+        description=(
+            "Whether to follow HTTP redirects (3xx). Each redirect target"
+            " is validated against SSRF rules. Default false."
+        ),
     )
 
     @field_validator("url")

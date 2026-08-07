@@ -14,7 +14,6 @@ from nexus.workflows.workflow_engine.activities.http_request_activity import (
     _validate_redirect_target,
     execute_http_request_activity,
 )
-from nexus.workflows.workflow_engine.constants import ENGINE_FOLLOW_REDIRECTS_KEY
 from nexus.workflows.workflow_engine.models.workflow_definition import APIExecutorParameters
 
 
@@ -520,9 +519,9 @@ class TestFollowRedirects:
 
     @pytest.mark.asyncio
     async def test_follow_redirects_enabled(self) -> None:
-        """When the engine key is set, follow_redirects is True."""
+        """When follow_redirects is set in parameters, it is True."""
         resp = _mock_response(200, json_body={"ok": True})
-        config = {**VALID_CONFIG, ENGINE_FOLLOW_REDIRECTS_KEY: True}
+        config = {**VALID_CONFIG, "follow_redirects": True}
         with (
             patch("httpx.AsyncClient.__init__", return_value=None) as mock_init,
             patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp),

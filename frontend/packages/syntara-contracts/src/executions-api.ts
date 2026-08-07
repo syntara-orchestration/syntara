@@ -762,12 +762,6 @@ export interface components {
       /** Timeout */
       timeout?: number | null
       retry_policy?: components['schemas']['RetryPolicyParameters'] | null
-      /**
-       * Follow Redirects
-       * @description Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false.
-       * @default false
-       */
-      follow_redirects?: boolean
     }
     /**
      * AAPJobTemplateNode
@@ -1314,6 +1308,12 @@ export interface components {
        * @description Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
        */
       credential_id?: string | null
+      /**
+       * Follow Redirects
+       * @description Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false.
+       * @default false
+       */
+      follow_redirects?: boolean
     }
     /**
      * HTTPRequestNode

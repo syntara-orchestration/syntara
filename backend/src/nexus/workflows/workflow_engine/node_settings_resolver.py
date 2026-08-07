@@ -127,16 +127,6 @@ def resolve_continue_on_failure(node: ActivityNode, runtime_settings: dict[str, 
     return bool(runtime_settings.get("workflow_engine.continue_on_failure", False))
 
 
-def resolve_follow_redirects(node: ActivityNode) -> bool:
-    """Return whether the HTTP request should follow redirects.
-
-    Resolution: node.settings.follow_redirects → False.
-    """
-    if isinstance(node.settings, NodeSettingsFull):
-        return node.settings.follow_redirects
-    return False
-
-
 def resolve_retry_policy(
     node: ActivityNode,
     runtime_settings: dict[str, Any],

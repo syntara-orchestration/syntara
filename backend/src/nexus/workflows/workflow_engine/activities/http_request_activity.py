@@ -15,7 +15,7 @@ from temporalio.exceptions import ApplicationError
 
 from nexus.core.lib.url_validation import validate_url_no_ssrf
 from nexus.credentials.lib.auth_types import AUTH_TYPE_API_KEY, AUTH_TYPE_BASIC, AUTH_TYPE_BEARER, AUTH_TYPE_URL
-from nexus.workflows.workflow_engine.constants import ENGINE_FOLLOW_REDIRECTS_KEY, ENGINE_TIMEOUT_SECONDS_KEY
+from nexus.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from nexus.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     APIExecutorParameters,
@@ -198,7 +198,7 @@ async def execute_http_request_activity(
         raise ApplicationError(str(exc), type="SSRFValidationError", non_retryable=True) from None
 
     timeout_seconds = int(input_config.get(ENGINE_TIMEOUT_SECONDS_KEY, 30))
-    follow_redirects = bool(input_config.get(ENGINE_FOLLOW_REDIRECTS_KEY, False))
+    follow_redirects = config.follow_redirects
 
     start_time = time.time()
 

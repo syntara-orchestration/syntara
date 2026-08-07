@@ -29,5 +29,6 @@ export type ActionFormData = {
   parameters?: string
   requiresApproval?: boolean
   credential_id?: string
+  follow_redirects?: boolean
   settings?: NodeSettings
 }
