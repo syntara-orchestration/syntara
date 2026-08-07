@@ -1249,7 +1249,7 @@ paths:
         - bearerAuth: []
   /proxies/aap/credentials:
     get:
-      summary: List credentials
+      summary: List AAP credentials
       description: List Ansible Automation Platform credentials (not organization-scoped).
       operationId: list_aap_credentials
       x-app-permission:
@@ -3363,7 +3363,7 @@ paths:
                 detail: Rate limit exceeded. Try again in 60 seconds.
                 code: RATE_LIMITED
                 retryable: true
-  /auth/ws-ticket:
+  /auth/ws_ticket:
     post:
       summary: Exchange JWT for a WebSocket connection ticket
       description: |
@@ -8992,7 +8992,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9117,7 +9117,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9221,9 +9221,9 @@ paths:
       security:
         - bearerAuth: []
     patch:
-      summary: Patch identity provider
-      description: Patch an identity provider.
-      operationId: patch_identity_provider
+      summary: Update identity provider
+      description: Update an identity provider.
+      operationId: update_identity_provider
       x-app-permission:
         resource: identity-provider
         action: update
@@ -9240,14 +9240,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IdentityProviderPatch'
+              $ref: '#/components/schemas/IdentityProviderUpdate'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9490,7 +9490,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -10201,7 +10201,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IntegrationPatch'
+              $ref: '#/components/schemas/IntegrationUpdate'
       responses:
         '200':
           description: Successful Response
@@ -19097,7 +19097,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Create credential
+      summary: Create service account credential
       description: Create a new credential for a service account; returns the one-time plaintext secret.
       operationId: create_service_account_credential
       security:
@@ -19115,14 +19115,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SACredentialCreate'
+              $ref: '#/components/schemas/ServiceAccountCredentialCreate'
       responses:
         '201':
           description: Credential created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialCreateResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialCreateResponse'
         '400':
           description: Bad Request
           content:
@@ -19227,7 +19227,7 @@ paths:
     get:
       tags:
         - Service Account Credentials
-      summary: List credentials
+      summary: List service account credentials
       description: List credentials for a service account with pagination.
       operationId: list_service_account_credentials
       security:
@@ -19307,7 +19307,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialListResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialListResponse'
         '400':
           description: Bad Request
           content:
@@ -19413,7 +19413,7 @@ paths:
     get:
       tags:
         - Service Account Credentials
-      summary: Get credential
+      summary: Get service account credential
       description: Get a credential by ID (secret is never included).
       operationId: get_service_account_credential
       security:
@@ -19439,7 +19439,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -19544,7 +19544,7 @@ paths:
     delete:
       tags:
         - Service Account Credentials
-      summary: Delete credential
+      summary: Delete service account credential
       description: Hard-delete a credential.
       operationId: delete_service_account_credential
       security:
@@ -19672,7 +19672,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Rotate credential
+      summary: Rotate service account credential
       description: Rotate a credential's secret; returns the new one-time plaintext secret.
       operationId: rotate_service_account_credential
       security:
@@ -19697,14 +19697,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SACredentialRotateRequest'
+              $ref: '#/components/schemas/ServiceAccountCredentialRotateRequest'
       responses:
         '200':
           description: Credential rotated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRotateResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialRotateResponse'
         '400':
           description: Bad Request
           content:
@@ -19810,7 +19810,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Disable credential
+      summary: Disable service account credential
       description: Set a credential's status to disabled.
       operationId: disable_service_account_credential
       security:
@@ -19836,7 +19836,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -19942,7 +19942,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Enable credential
+      summary: Enable service account credential
       description: Set a credential's status to active.
       operationId: enable_service_account_credential
       security:
@@ -19968,7 +19968,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -23021,7 +23021,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /users_directory:
+  /users/directory:
     get:
       summary: List users directory
       description: Return a lightweight directory of users (id + username only).
@@ -23190,7 +23190,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /groups_directory:
+  /groups/directory:
     get:
       summary: List groups directory
       description: Return a lightweight directory of groups (id + name only).
@@ -31570,10 +31570,10 @@ components:
           default: false
           title: Disable Tls Verify
           description: Disable TLS certificate verification for requests to this identity provider (insecure)
-    OIDCConfigurationPatch:
+    OIDCConfigurationUpdate:
       type: object
-      title: OIDCConfigurationPatch
-      description: Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted).
+      title: OIDCConfigurationUpdate
+      description: Update schema for OIDC configuration (client_secret optional — preserves existing if omitted).
       additionalProperties: false
       required:
         - issuer_url
@@ -31743,9 +31743,9 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
-    IdentityProviderPatch:
+    IdentityProviderUpdate:
       type: object
-      title: IdentityProviderPatch
+      title: IdentityProviderUpdate
       description: Schema for partially updating an identity provider.
       additionalProperties: false
       properties:
@@ -31771,9 +31771,9 @@ components:
             - discriminator:
                 propertyName: provider_type
                 mapping:
-                  oidc: '#/components/schemas/OIDCConfigurationPatch'
+                  oidc: '#/components/schemas/OIDCConfigurationUpdate'
               oneOf:
-                - $ref: '#/components/schemas/OIDCConfigurationPatch'
+                - $ref: '#/components/schemas/OIDCConfigurationUpdate'
             - type: 'null'
         enabled:
           title: Enabled
@@ -31781,8 +31781,8 @@ components:
           anyOf:
             - type: boolean
             - type: 'null'
-    IdentityProviderResponse:
-      title: IdentityProviderResponse
+    IdentityProviderRead:
+      title: IdentityProviderRead
       description: Schema for IdentityProvider response with configuration details (excludes secrets).
       additionalProperties: false
       properties:
@@ -31891,7 +31891,7 @@ components:
           description: Array of resources in current page
           maxItems: 100
           items:
-            $ref: '#/components/schemas/IdentityProviderResponse'
+            $ref: '#/components/schemas/IdentityProviderRead'
       required:
         - resources
       type: object
@@ -32288,7 +32288,7 @@ components:
         - name
       title: InitialModelSelection
       type: object
-    IntegrationPatch:
+    IntegrationUpdate:
       description: Schema for partially updating an integration (user-facing).
       additionalProperties: false
       properties:
@@ -32348,7 +32348,7 @@ components:
             - type: 'null'
           title: Labels
           description: Key-value labels
-      title: IntegrationPatch
+      title: IntegrationUpdate
       type: object
     IntegrationTestConnection:
       description: Schema for testing a connection without saving an integration.
@@ -34425,7 +34425,7 @@ components:
         - disabled
       title: ServiceAccountCredentialStatus
       description: Operational status of a service account credential.
-    SACredentialCreate:
+    ServiceAccountCredentialCreate:
       properties:
         credential_type:
           $ref: '#/components/schemas/ServiceAccountCredentialType'
@@ -34447,9 +34447,9 @@ components:
       type: object
       required:
         - credential_type
-      title: SACredentialCreate
+      title: ServiceAccountCredentialCreate
       description: Schema for creating a new service account credential.
-    SACredentialRead:
+    ServiceAccountCredentialRead:
       properties:
         id:
           type: string
@@ -34516,9 +34516,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialRead
+      title: ServiceAccountCredentialRead
       description: Schema for credential responses (excludes secrets).
-    SACredentialCreateResponse:
+    ServiceAccountCredentialCreateResponse:
       properties:
         id:
           type: string
@@ -34591,9 +34591,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialCreateResponse
+      title: ServiceAccountCredentialCreateResponse
       description: Schema for the create response — includes one-time plaintext secret(s).
-    SACredentialRotateRequest:
+    ServiceAccountCredentialRotateRequest:
       properties:
         grace_period_seconds:
           anyOf:
@@ -34604,9 +34604,9 @@ components:
           title: Grace Period Seconds
           description: Override grace period for this rotation (uses credential default if omitted)
       type: object
-      title: SACredentialRotateRequest
+      title: ServiceAccountCredentialRotateRequest
       description: Schema for rotating a credential's secret.
-    SACredentialRotateResponse:
+    ServiceAccountCredentialRotateResponse:
       properties:
         id:
           type: string
@@ -34679,9 +34679,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialRotateResponse
+      title: ServiceAccountCredentialRotateResponse
       description: Schema for the rotate response — same shape as create response.
-    SACredentialListResponse:
+    ServiceAccountCredentialListResponse:
       properties:
         next:
           anyOf:
@@ -34704,7 +34704,7 @@ components:
           description: Total count of resources (only when include_total=true)
         resources:
           items:
-            $ref: '#/components/schemas/SACredentialRead'
+            $ref: '#/components/schemas/ServiceAccountCredentialRead'
           type: array
           maxItems: 100
           title: Resources
@@ -34727,7 +34727,7 @@ components:
       type: object
       required:
         - resources
-      title: SACredentialListResponse
+      title: ServiceAccountCredentialListResponse
       description: Paginated list response for service account credentials.
       examples:
         - next: eyJpZCI6InV1aWQifQ

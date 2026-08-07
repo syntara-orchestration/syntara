@@ -35,7 +35,7 @@ import { identityProviderDetailBasePath, identityProviderGroupMappingTabPath } f
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 import { useTestSignIn } from './useTestSignIn'
 
-type IdentityProviderResponse = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProviderRead = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 export type GroupMappingEditPanelState = {
   signInAlert: { variant: 'success' | 'warning' | 'danger'; message: string } | null
@@ -66,7 +66,7 @@ export type UseGroupMappingFormMetadataResult = {
   isAddFlow: boolean
   openDiscoverOnMount: boolean
   providerId: string | undefined
-  providerData: IdentityProviderResponse | undefined
+  providerData: IdentityProviderRead | undefined
   config: OIDCConfigurationResponse | undefined
   defaultExpression: string | null
   idpType: string | null | undefined

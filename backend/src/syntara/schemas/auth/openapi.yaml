@@ -155,7 +155,7 @@ paths:
         '429':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
 
-  /auth/ws-ticket:
+  /auth/ws_ticket:
     post:
       summary: Exchange JWT for a WebSocket connection ticket
       description: |

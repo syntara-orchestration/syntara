@@ -32,14 +32,14 @@ from syntara.identity_providers.models.identity_provider import (
     IdentityProvider,
     IdentityProviderCreate,
     IdentityProviderListResponse,
-    IdentityProviderPatch,
-    IdentityProviderResponse,
+    IdentityProviderRead,
+    IdentityProviderUpdate,
 )
 from syntara.identity_providers.models.identity_provider_configuration import (
-    IdentityProviderConfigurationPatchTypes,
+    IdentityProviderConfigurationUpdateTypes,
     OIDCConfiguration,
-    OIDCConfigurationPatch,
     OIDCConfigurationResponse,
+    OIDCConfigurationUpdate,
     OIDCGroupMappingEntry,
     OIDCIdpType,
 )
@@ -111,7 +111,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
             include_total=include_total,
         )
 
-    async def get_provider(self, provider_id: UUID) -> IdentityProviderResponse:
+    async def get_provider(self, provider_id: UUID) -> IdentityProviderRead:
         """Get an identity provider by ID."""
         query = select(IdentityProvider).filter(
             IdentityProvider.id == provider_id,  # type: ignore[arg-type]
@@ -124,12 +124,12 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
             msg = f"Identity provider {provider_id} not found"
             raise IdentityProviderNotFoundError(msg)
 
-        response = IdentityProviderResponse.model_validate(provider)
+        response = IdentityProviderRead.model_validate(provider)
         return await self._populate_response_entries(response)
 
     @staticmethod
     def _extract_group_mapping_entries(
-        configuration: OIDCConfiguration | IdentityProviderConfigurationPatchTypes,
+        configuration: OIDCConfiguration | IdentityProviderConfigurationUpdateTypes,
     ) -> list[OIDCGroupMappingEntry]:
         """Extract mapping entries to be saved in the dedicated DB table."""
         entries = configuration.group_mapping_entries
@@ -195,15 +195,15 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
 
     async def _populate_response_entries(
         self,
-        response: IdentityProviderResponse,
-    ) -> IdentityProviderResponse:
+        response: IdentityProviderRead,
+    ) -> IdentityProviderRead:
         """Populate group_mapping_entries on a response from the DB table."""
         config = response.configuration
         if isinstance(config, (OIDCConfiguration, OIDCConfigurationResponse)):
             config.group_mapping_entries = await self._load_group_mapping_entries(response.id)
         return response
 
-    async def create_provider(self, provider_create: IdentityProviderCreate) -> IdentityProviderResponse:
+    async def create_provider(self, provider_create: IdentityProviderCreate) -> IdentityProviderRead:
         """Create a new identity provider."""
         # Extract entries for the dedicated table before splitting config
         entries: list[OIDCGroupMappingEntry] = []
@@ -239,7 +239,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
                     disable_tls_verify=getattr(provider_create.configuration, "disable_tls_verify", False),
                 ),
             )
-            response = IdentityProviderResponse.model_validate(provider)
+            response = IdentityProviderRead.model_validate(provider)
             return await self._populate_response_entries(response)
 
         except IntegrityError as e:
@@ -248,7 +248,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
     async def _apply_configuration_patch(
         self,
         provider: IdentityProvider,
-        patch_config: IdentityProviderConfigurationPatchTypes,
+        patch_config: IdentityProviderConfigurationUpdateTypes,
         *,
         group_mapping_provided: bool,
     ) -> list[OIDCGroupMappingEntry] | None:
@@ -274,7 +274,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
             patch_config.disable_tls_verify = provider.configuration.disable_tls_verify
 
         if (
-            isinstance(patch_config, OIDCConfigurationPatch)
+            isinstance(patch_config, OIDCConfigurationUpdate)
             and patch_config.aap_role_mapping_enabled
             and patch_config.idp_type != OIDCIdpType.AAP
         ):
@@ -293,9 +293,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
         provider.configuration = safe_config  # type: ignore[assignment]
         return patch_entries
 
-    async def patch_provider(
-        self, provider_id: UUID, provider_patch: IdentityProviderPatch
-    ) -> IdentityProviderResponse:
+    async def update_provider(self, provider_id: UUID, provider_patch: IdentityProviderUpdate) -> IdentityProviderRead:
         """Patch an identity provider."""
         query = select(IdentityProvider).filter(
             IdentityProvider.id == provider_id,  # type: ignore[arg-type]

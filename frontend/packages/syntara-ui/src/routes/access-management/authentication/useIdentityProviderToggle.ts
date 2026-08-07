@@ -3,7 +3,7 @@ import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { identityProvidersClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 export function useIdentityProviderToggle(onSuccess: () => void) {
   const handleMutationError = useMutationErrorHandler()

@@ -104,7 +104,7 @@ async function fetchWebSocketTicket(): Promise<string | null> {
     return null
   }
 
-  const { data, error } = await authFetchClient.POST('/auth/ws-ticket')
+  const { data, error } = await authFetchClient.POST('/auth/ws_ticket')
   if (error || !data) return null
   return data.ticket
 }

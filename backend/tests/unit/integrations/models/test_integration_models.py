@@ -10,11 +10,11 @@ from pydantic import ValidationError
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
-    IntegrationPatch,
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
     IntegrationType,
+    IntegrationUpdate,
 )
 from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
@@ -355,11 +355,11 @@ class TestIntegrationCreate:
             )
 
 
-class TestIntegrationPatch:
-    """Tests for IntegrationPatch schema validation."""
+class TestIntegrationUpdate:
+    """Tests for IntegrationUpdate schema validation."""
 
     def test_all_fields_optional(self) -> None:
-        patch = IntegrationPatch()
+        patch = IntegrationUpdate()
         assert patch.name is None
         assert patch.description is None
         assert patch.configuration is None
@@ -367,18 +367,18 @@ class TestIntegrationPatch:
         assert patch.scope is None
 
     def test_partial_update(self) -> None:
-        patch = IntegrationPatch(name="Updated Name", enabled=False)
+        patch = IntegrationUpdate(name="Updated Name", enabled=False)
         assert patch.name == "Updated Name"
         assert patch.enabled is False
         assert patch.configuration is None
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            IntegrationPatch(unknown_field="value")
+            IntegrationUpdate(unknown_field="value")
 
     def test_rejects_system_managed_fields(self) -> None:
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            IntegrationPatch(status="available")
+            IntegrationUpdate(status="available")
 
 
 class TestIntegrationSystemUpdate:

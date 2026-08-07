@@ -6,7 +6,7 @@ import { generateUUID } from '../../../../utils/generateUUID'
 const PROVIDER_TYPE_OIDC = 'oidc' as const
 
 export type OIDCConfigurationResponse = IdentityProvidersAPI.components['schemas']['OIDCConfigurationResponse']
-type IdentityProviderPatch = IdentityProvidersAPI.components['schemas']['IdentityProviderPatch']
+type IdentityProviderUpdate = IdentityProvidersAPI.components['schemas']['IdentityProviderUpdate']
 
 export type GroupMappingEntry = {
   key: string
@@ -84,7 +84,7 @@ export function buildSavePayload(
   providerConfig: OIDCConfigurationResponse,
   expression: string,
   entries: GroupMappingFormEntry[]
-): IdentityProviderPatch {
+): IdentityProviderUpdate {
   return {
     configuration: {
       ...providerConfig,

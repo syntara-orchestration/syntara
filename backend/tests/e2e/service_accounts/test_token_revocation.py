@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 from tests.e2e.service_accounts import (
@@ -154,7 +154,7 @@ class TestCredentialDisableTokenInvalidation:
         try:
             cred_b = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+                body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
 
             token_a = token_request(syntara_base_url, client_id_a, client_secret_a).parsed.access_token
