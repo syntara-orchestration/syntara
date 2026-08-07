@@ -146,6 +146,9 @@ COPY containers/nexus/scripts/start-worker /usr/local/bin/start-worker
 COPY containers/nexus/scripts/start-background-worker /usr/local/bin/start-background-worker
 COPY containers/nexus/scripts/run-seed /usr/local/bin/run-seed
 
+# Verify timezone data is available in the image (AAP-86297)
+RUN python3.12 -c "from zoneinfo import available_timezones; tzs = available_timezones(); assert len(tzs) > 100, f'Expected >100 timezones, got {len(tzs)}'"
+
 # Switch back to non-root user (UBI default user)
 USER 1001
 
