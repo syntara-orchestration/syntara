@@ -32,6 +32,8 @@ class APIExecutorParameters:
         authentication (Authentication | None | Unset):
         credential_id (None | str | Unset): Nexus credential UUID for authentication or Secret URL. Takes priority over
             authentication field.
+        follow_redirects (bool | Unset): Whether to follow HTTP redirects (3xx). Each redirect target is validated
+            against SSRF rules. Default false. Default: False.
     """
 
     method: HTTPMethod
@@ -41,6 +43,7 @@ class APIExecutorParameters:
     query_params: APIExecutorParametersQueryParams | Unset = UNSET
     authentication: Authentication | None | Unset = UNSET
     credential_id: None | str | Unset = UNSET
+    follow_redirects: bool | Unset = False
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -85,6 +88,8 @@ class APIExecutorParameters:
         else:
             credential_id = self.credential_id
 
+        follow_redirects = self.follow_redirects
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -104,6 +109,8 @@ class APIExecutorParameters:
             field_dict["authentication"] = authentication
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
+        if follow_redirects is not UNSET:
+            field_dict["follow_redirects"] = follow_redirects
 
         return field_dict
 
@@ -183,6 +190,8 @@ class APIExecutorParameters:
 
         credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
 
+        follow_redirects = d.pop("follow_redirects", UNSET)
+
         api_executor_parameters = cls(
             method=method,
             url=url,
@@ -191,6 +200,7 @@ class APIExecutorParameters:
             query_params=query_params,
             authentication=authentication,
             credential_id=credential_id,
+            follow_redirects=follow_redirects,
         )
 
         api_executor_parameters.additional_properties = d

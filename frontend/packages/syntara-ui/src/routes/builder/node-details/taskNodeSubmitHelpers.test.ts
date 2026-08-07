@@ -95,6 +95,24 @@ describe('taskNodeSubmitHelpers', () => {
       )
       expect(data.parameters).toBeUndefined()
     })
+
+    it('includes follow_redirects when present on http_request config', () => {
+      const data = buildRegistryActionInitialData(
+        ExecutorTypeEnum.HTTP_REQUEST,
+        { method: 'GET', url: 'https://x', follow_redirects: true },
+        baseTask
+      )
+      expect(data.follow_redirects).toBe(true)
+    })
+
+    it('omits follow_redirects for script executor', () => {
+      const data = buildRegistryActionInitialData(
+        ExecutorTypeEnum.SCRIPT,
+        { language: 'python', code: 'pass', follow_redirects: true },
+        baseTask
+      )
+      expect(data.follow_redirects).toBeUndefined()
+    })
   })
 
   describe('buildRegistryActivityUpdate', () => {
@@ -235,6 +253,29 @@ describe('taskNodeSubmitHelpers', () => {
       }
       const activity = buildRegistryActivityUpdate(baseTask, data)
       expect((activity.parameters as { environment?: unknown }).environment).toBeUndefined()
+    })
+
+    it('includes follow_redirects in http_request parameters when set', () => {
+      const data: ActionFormData = {
+        name: 'H',
+        executor: ExecutorTypeEnum.HTTP_REQUEST,
+        method: 'GET',
+        url: 'https://api',
+        follow_redirects: true,
+      }
+      const activity = buildRegistryActivityUpdate(baseTask, data)
+      expect((activity.parameters as { follow_redirects?: boolean }).follow_redirects).toBe(true)
+    })
+
+    it('omits follow_redirects when undefined', () => {
+      const data: ActionFormData = {
+        name: 'H',
+        executor: ExecutorTypeEnum.HTTP_REQUEST,
+        method: 'GET',
+        url: 'https://api',
+      }
+      const activity = buildRegistryActivityUpdate(baseTask, data)
+      expect((activity.parameters as { follow_redirects?: boolean }).follow_redirects).toBeUndefined()
     })
   })
 })

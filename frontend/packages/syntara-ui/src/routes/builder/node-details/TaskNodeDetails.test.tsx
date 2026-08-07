@@ -95,6 +95,20 @@ vi.mock('../node-forms/ActionNodeForm', () => ({
       >
         Submit API with Credential
       </button>
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'API with Follow Redirects',
+            executor: 'http_request',
+            method: 'GET',
+            url: 'https://api.test.com',
+            follow_redirects: true,
+          })
+        }
+        data-testid="submit-api-follow-redirects-button"
+      >
+        Submit API with Follow Redirects
+      </button>
       <button onClick={onCancel} data-testid="cancel-button">
         Cancel
       </button>
@@ -724,6 +738,50 @@ describe('TaskNodeDetails Component', () => {
     renderTaskNodeDetails(taskData, 'task-script-cred')
 
     expect(screen.getByTestId('action-node-form')).toBeInTheDocument()
+  })
+
+  it('loads follow_redirects from stored http_request config', () => {
+    const taskData = {
+      type: 'http_request' as const,
+      id: 'task-api-follow',
+      name: 'API with Follow Redirects',
+      parameters: {
+        method: 'GET' as const,
+        url: 'https://api.example.com',
+        follow_redirects: true,
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-api-follow')
+
+    expect(screen.getByTestId('action-node-form')).toBeInTheDocument()
+  })
+
+  it('includes follow_redirects in submitted activity config', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'http_request' as const,
+      id: 'task-api-fr',
+      name: 'API Task',
+      parameters: {
+        method: 'GET' as const,
+        url: 'https://api.example.com',
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-api-fr')
+
+    await user.click(screen.getByTestId('submit-api-follow-redirects-button'))
+
+    expect(mockUpdateActivity).toHaveBeenCalledWith(
+      'task-api-fr',
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        parameters: expect.objectContaining({
+          follow_redirects: true,
+        }),
+      })
+    )
   })
 
   it('handles AAP task with camelCase legacy fields', () => {
