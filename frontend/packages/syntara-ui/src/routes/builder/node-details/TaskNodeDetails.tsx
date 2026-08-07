@@ -119,11 +119,16 @@ function parseHeaders(entries: Array<{ key: string; value: string }> | undefined
 /**
  * Build activity config and validate form data for submission.
  */
-function buildActivityConfig(
-  data: RegistryActionFormData
-):
+function buildActivityConfig(data: RegistryActionFormData):
   | { language: string; code: string; credential_id?: string }
-  | { method: string; url: string; headers?: Record<string, string>; body?: unknown; credential_id?: string } {
+  | {
+      method: string
+      url: string
+      headers?: Record<string, string>
+      body?: unknown
+      credential_id?: string
+      follow_redirects?: boolean
+    } {
   const isScript = data.executor === ExecutorTypeEnum.SCRIPT
 
   if (isScript) {
@@ -153,7 +158,14 @@ function mergeAuthHeaders(
 function buildHTTPConfig(
   data: RegistryActionFormData,
   headers: Record<string, string> | undefined
-): { method: string; url: string; headers?: Record<string, string>; body?: unknown; credential_id?: string } {
+): {
+  method: string
+  url: string
+  headers?: Record<string, string>
+  body?: unknown
+  credential_id?: string
+  follow_redirects?: boolean
+} {
   const parsedBody = data.body
     ? (() => {
         try {
@@ -170,6 +182,7 @@ function buildHTTPConfig(
     headers?: Record<string, string>
     body?: unknown
     credential_id?: string
+    follow_redirects?: boolean
   } = {
     method: data.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: data.url!,
@@ -183,6 +196,9 @@ function buildHTTPConfig(
   }
   if (data.credential_id) {
     config.credential_id = data.credential_id
+  }
+  if (data.follow_redirects !== undefined) {
+    config.follow_redirects = data.follow_redirects
   }
 
   return config
