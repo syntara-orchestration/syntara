@@ -2,7 +2,7 @@
 
 ## Overview
 
-Redis is the key/value store for the Nexus platform. It serves as a cache system for event streaming and multi-client synchronization (see decision-records.md, 2026-01-28).
+Redis is the key/value store for the Syntara platform. It serves as a cache system for event streaming and multi-client synchronization (see decision-records.md, 2026-01-28).
 
 Redis is NOT the primary data store. PostgreSQL is the source of truth for persistent data. Redis is used exclusively for:
 

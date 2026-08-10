@@ -22,7 +22,7 @@ No standard for expected JSON field names, required fields per event type, or co
 
 ### Architecture principles (dependency injection, composition, SOLID)
 
-Constitution mandates dependency injection (constructor injection as primary pattern), composition over inheritance, separation of concerns between layers, and SOLID principles. No domain standard documents the Nexus-specific patterns, examples, or enforcement strategy for these.
+Constitution mandates dependency injection (constructor injection as primary pattern), composition over inheritance, separation of concerns between layers, and SOLID principles. No domain standard documents the Syntara-specific patterns, examples, or enforcement strategy for these.
 
 ### API security and schema management
 

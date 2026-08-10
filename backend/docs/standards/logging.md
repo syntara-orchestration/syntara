@@ -2,9 +2,9 @@
 
 ## Overview
 
-Nexus uses [structlog](https://www.structlog.org/en/stable/) for structured logging across all Python components. Structured logging ensures logs are machine-parsable, consistent, and enriched with context for debugging and observability.
+Syntara uses [structlog](https://www.structlog.org/en/stable/) for structured logging across all Python components. Structured logging ensures logs are machine-parsable, consistent, and enriched with context for debugging and observability.
 
-This document defines the required patterns for logging in the Nexus codebase. All code MUST comply with these standards.
+This document defines the required patterns for logging in the Syntara codebase. All code MUST comply with these standards.
 
 ## Core Principles
 
@@ -318,7 +318,7 @@ logger.exception(
 
 ## Testing with Structlog
 
-Nexus uses standard pytest logging fixtures to capture logs in tests.
+Syntara uses standard pytest logging fixtures to capture logs in tests.
 
 ### Reading Logs in Tests
 
@@ -384,7 +384,7 @@ def test_exception_logging(caplog):
 
 ## Adding Logging to a New Domain
 
-When adding a new domain or module to Nexus, follow these steps:
+When adding a new domain or module to Syntara, follow these steps:
 
 ### 1. Create Module Logger
 
@@ -520,7 +520,7 @@ if response.status_code != 200:
 
 ## Compliance
 
-All code merged into Nexus MUST:
+All code merged into Syntara MUST:
 1. Use module-level structlog loggers
 2. Pass context as keyword arguments (never string formatting)
 3. Use appropriate log levels
@@ -532,7 +532,7 @@ Violations of these standards will be flagged in code review and must be correct
 
 ## Output Formats
 
-Nexus supports two log output formats, controlled by `APP_LOG_OUTPUT_FORMAT`:
+Syntara supports two log output formats, controlled by `APP_LOG_OUTPUT_FORMAT`:
 
 ### Text Mode (`text`)
 

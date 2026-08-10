@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexus implements a two-system observability architecture:
+Syntara implements a two-system observability architecture:
 
 1. **Metrics** - Performance monitoring via Prometheus (technical operations)
 2. **Telemetry** - Product analytics via Segment.com (business intelligence)
