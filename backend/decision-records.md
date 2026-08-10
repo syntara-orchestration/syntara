@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-The following document details our architectural decisions made for the Nexus Platform.
+The following document details our architectural decisions made for the Syntara Platform.
 
 | Question                                              | Decision                                                                    | Decision Date | Details                                                                                                                                                               |
 |-------------------------------------------------------|-----------------------------------------------------------------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|

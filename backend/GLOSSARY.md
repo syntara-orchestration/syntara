@@ -1,10 +1,10 @@
-# Nexus System Glossary - Alphabetical
+# Syntara System Glossary - Alphabetical
 
 ## A
 
 **Activity** - Individual task within a workflow that can be agentic (AI-driven), non-agentic (traditional), or human-interactive.
 
-**Agent Orchestrator** - Central service that manages Nexus Agents, sub-agents, and automation workflows. Gathers context, guidance, applies policies, and decides actions.
+**Agent Orchestrator** - Central service that manages Syntara Agents, sub-agents, and automation workflows. Gathers context, guidance, applies policies, and decides actions.
 
 **Agent Registry** - Catalog of available agents with their capabilities, requirements, and metadata for discovery and selection.
 
@@ -42,7 +42,7 @@
 
 ## D
 
-**Database** - A store of relational data for the Nexus system.
+**Database** - A store of relational data for the Syntara system.
 
 ## E
 
@@ -92,11 +92,11 @@
 
 ## N
 
-**Nexus Automation System Boundary** - Software system boundary defining the scope and limits of the Nexus automation platform.
+**Syntara Automation System Boundary** - Software system boundary defining the scope and limits of the Syntara automation platform.
 
 ## O
 
-**Object Store** - Container that stores file object data for the Nexus system.
+**Object Store** - Container that stores file object data for the Syntara system.
 
 **Orchestration and Scheduling** - Backend workflow system executing workflows and providing feedback to the Agent Orchestrator.
 
@@ -112,7 +112,7 @@
 
 ## R
 
-**REST API** - Container that provides Nexus automation functionality via JSON/HTTPS API, including interfaces for external system configuration management, approval management, and system administration.
+**REST API** - Container that provides Syntara automation functionality via JSON/HTTPS API, including interfaces for external system configuration management, approval management, and system administration.
 
 ## S
 

@@ -1,4 +1,4 @@
-"""High-level metrics recording API for Nexus components.
+"""High-level metrics recording API for Syntara components.
 
 :class:`MetricsRecorder` is the primary entry-point that application code
 uses to record metrics.  It delegates storage to :class:`MetricsStore` and

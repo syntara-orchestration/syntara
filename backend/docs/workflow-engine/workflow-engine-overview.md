@@ -1,6 +1,6 @@
 # Workflow Engine Architecture
 
-Nexus compiles every user-defined workflow into the *same* Temporal workflow type. There is no per-workflow code generation — `NexusWorkflow` (`dynamic_workflow.py`) interprets a workflow's nodes and edges as data at runtime. This document explains the engine mechanics shared by every node type: how the graph is walked, why certain nodes complete asynchronously, how the three-tier live-status pipeline works, how data flows between nodes, and what's involved in adding a new node type.
+Syntara compiles every user-defined workflow into the *same* Temporal workflow type. There is no per-workflow code generation — `NexusWorkflow` (`dynamic_workflow.py`) interprets a workflow's nodes and edges as data at runtime. This document explains the engine mechanics shared by every node type: how the graph is walked, why certain nodes complete asynchronously, how the three-tier live-status pipeline works, how data flows between nodes, and what's involved in adding a new node type.
 
 Per-node-type detail lives in the companion docs linked at the bottom. Read this one first.
 

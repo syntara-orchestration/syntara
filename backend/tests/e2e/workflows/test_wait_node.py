@@ -1,6 +1,6 @@
 """End-to-end tests for the wait node.
 
-Tests the wait activity through the full Nexus stack (API, Temporal worker)
+Tests the wait activity through the full Syntara stack (API, Temporal worker)
 using short durations (1-2 seconds) to keep CI runtime practical.
 
 Run with:

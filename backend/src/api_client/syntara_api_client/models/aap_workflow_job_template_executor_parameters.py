@@ -25,7 +25,7 @@ class AAPWorkflowJobTemplateExecutorParameters:
     inventory, extra_vars, limit, tags, skip_tags, labels, timeout).
 
         Attributes:
-            credential_id (None | str | Unset): Nexus credential UUID for Ansible Automation Platform API authentication.
+            credential_id (None | str | Unset): Syntara credential UUID for Ansible Automation Platform API authentication.
                 Separate from legacy credentials list.
             integration_id (None | str | Unset): UUID of the Ansible Automation Platform Gateway integration for connection
                 URL resolution.

@@ -1,1 +1,1 @@
-"""Nexus Core Resources."""
+"""Syntara Core Resources."""

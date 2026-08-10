@@ -322,7 +322,7 @@ function useAAPBrowserResults(
 
 /**
  * Hook to browse AAP resources (organizations, job/workflow templates, inventories,
- * execution environments, credentials, instance groups) via the Nexus backend proxy.
+ * execution environments, credentials, instance groups) via the Syntara backend proxy.
  *
  * @param credentialId - AAP credential ID to use for authentication
  * @param initialState - Initial organization and template selection

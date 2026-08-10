@@ -410,7 +410,7 @@ describe('useGroupMappingEditForm', () => {
     expect(result.current.panel.rawClaims).toContain('"groups"')
   })
 
-  it('reports matched group count after discovery when groups align with Nexus names', () => {
+  it('reports matched group count after discovery when groups align with Syntara names', () => {
     vi.mocked(useAllGroups).mockReturnValue({
       groups: [
         { id: MOCK_GROUP_ID, name: 'admin', is_builtin: false, created_at: '2026-01-01', updated_at: '2026-01-01' },

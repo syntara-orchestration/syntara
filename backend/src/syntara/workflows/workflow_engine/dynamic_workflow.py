@@ -1275,7 +1275,7 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
     ) -> None:
-        """Resolve and inject Nexus credentials for a task node.
+        """Resolve and inject Syntara credentials for a task node.
 
         If the node's parameters has a credential_id, calls the credential resolution
         activity to decrypt and inject resolved credentials into the parameters.

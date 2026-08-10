@@ -1,7 +1,7 @@
-"""Base exceptions for the Nexus application.
+"""Base exceptions for the Syntara application.
 
 This module contains the root exception hierarchy for all internal exceptions
-within the Nexus system. Exception boundaries stop at the FastAPI routers.
+within the Syntara system. Exception boundaries stop at the FastAPI routers.
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 
 
 class NexusError(Exception):
-    """Base exception for all Nexus internal errors.
+    """Base exception for all Syntara internal errors.
 
     This is the root of the exception hierarchy for all domain-specific
-    exceptions within the Nexus system. It provides a common interface
+    exceptions within the Syntara system. It provides a common interface
     and ensures all internal exceptions accept a message parameter.
     """
 

@@ -1,4 +1,4 @@
-"""Admin CLI entry point for Nexus administrative operations.
+"""Admin CLI entry point for Syntara administrative operations.
 
 Usage::
 

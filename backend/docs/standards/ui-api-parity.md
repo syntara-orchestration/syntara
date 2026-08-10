@@ -4,7 +4,7 @@ Standards for maintaining functional parity between the backend REST API and the
 
 ## Overview
 
-Nexus ensures UI-API parity by design: the frontend communicates exclusively through typed API clients generated from the backend's OpenAPI spec. Every UI capability has a corresponding REST endpoint — if the UI can do it, the API can do it. This document codifies the conventions that maintain that property as the codebase evolves.
+Syntara ensures UI-API parity by design: the frontend communicates exclusively through typed API clients generated from the backend's OpenAPI spec. Every UI capability has a corresponding REST endpoint — if the UI can do it, the API can do it. This document codifies the conventions that maintain that property as the codebase evolves.
 
 ## Typed API Clients
 

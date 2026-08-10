@@ -1,7 +1,7 @@
 """SQLModel base classes for shared API resources.
 
 This module contains the core SQLModel classes that define the foundation
-for all API resources in the Nexus platform.
+for all API resources in the Syntara platform.
 """
 
 from syntara.core.models.group import Group, user_groups
