@@ -481,6 +481,8 @@ async def execute_script_activity(  # noqa: C901
     """
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
+    # SECURITY: Error is intentionally opaque — must NOT name the setting or hint
+    # at how to enable. See docs/SECURITY.md for rationale.
     if not get_settings().script_nodes_enabled:
         msg = "Workflow contains Developer Preview Script node."
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
