@@ -367,7 +367,7 @@ components:
         - authz_duration_ms
         - opa_request_duration_ms
       title: MetricType
-      description: "Categories of metrics recorded by Nexus.\n\nEach value corresponds to a specific measurable quantity exposed via the\nmetrics REST API and (where applicable) Prometheus endpoint."
+      description: "Categories of metrics recorded by Syntara.\n\nEach value corresponds to a specific measurable quantity exposed via the\nmetrics REST API and (where applicable) Prometheus endpoint."
     MetricsCategoryType:
       type: string
       enum:

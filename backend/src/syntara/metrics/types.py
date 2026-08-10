@@ -1,7 +1,7 @@
 """Metric types, models, and query parameters for the metrics subsystem.
 
 This module defines:
-- MetricType: Enum categorizing all metric types recorded by Nexus
+- MetricType: Enum categorizing all metric types recorded by Syntara
 - MetricRecord: Lightweight in-memory metric data point (dataclass with slots)
 - MetricsQuery: Query parameters for the metrics REST API
 - MetricsSummary: Summary response model for quick health checks
@@ -23,7 +23,7 @@ from syntara.core.models.base.query_params import BaseListParams
 
 
 class MetricType(StrEnum):
-    """Categories of metrics recorded by Nexus.
+    """Categories of metrics recorded by Syntara.
 
     Each value corresponds to a specific measurable quantity exposed via the
     metrics REST API and (where applicable) Prometheus endpoint.
