@@ -183,7 +183,6 @@ class ServiceAccountCredentialService(BaseService):
 
         _, plaintext_secret, hashed = self._generate_credential(credential.credential_type)
         credential.hashed_secret = hashed
-        credential.expires_at = self._resolve_expires_at(None)
 
         credential.update_by_user(self.user.id)
 

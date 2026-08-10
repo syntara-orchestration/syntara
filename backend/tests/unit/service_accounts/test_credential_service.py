@@ -450,7 +450,7 @@ class TestCredentialMaxLifetime:
         assert cred.expires_at == requested
 
     @pytest.mark.asyncio
-    async def test_rotate_refreshes_expires_at(
+    async def test_rotate_preserves_expires_at(
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
@@ -468,16 +468,12 @@ class TestCredentialMaxLifetime:
         mock_session.exec.return_value = mock_result
 
         with override_settings(sa_credential_max_lifetime_days=90):
-            before = datetime.now(tz=UTC)
             await service.rotate_credential(uuid4(), service_account_id=uuid4())
-            after = datetime.now(tz=UTC)
 
-        assert mock_cred.expires_at != old_expiry
-        assert mock_cred.expires_at is not None
-        assert before + timedelta(days=90) <= mock_cred.expires_at <= after + timedelta(days=90)
+        assert mock_cred.expires_at == old_expiry
 
     @pytest.mark.asyncio
-    async def test_rotate_unlimited_clears_expires_at(
+    async def test_rotate_preserves_none_expires_at(
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
@@ -487,6 +483,7 @@ class TestCredentialMaxLifetime:
         mock_cred.credential_type = ServiceAccountCredentialType.CLIENT_CREDENTIALS
         mock_cred.grace_period_seconds = 3600
         mock_cred.hashed_secret = "$argon2id$old"  # noqa: S105
+        mock_cred.expires_at = None
         mock_cred.update_by_user = MagicMock()
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = mock_cred
