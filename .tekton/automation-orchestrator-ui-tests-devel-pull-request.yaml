@@ -37,16 +37,22 @@ spec:
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
   pipelineRef:
+    resolver: git
     params:
-      - name: name
-        value: ao-ui-tests
-      - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:946bc72c83a3d831f3e45ccabd81bc4395fc65a08a7e50e7182ca7c4ef84cd7f
-      - name: kind
-        value: pipeline
-      - name: secret
-        value: quay-aap-ci-viewer
-    resolver: bundles
+      - name: org
+        value: ansible-automation-platform
+      - name: repo
+        value: aap-konflux-pipelines
+      - name: revision
+        value: fix/deploy-ao-symlink-syntara-ui
+      - name: pathInRepo
+        value: pipelines/test/ao-ui-tests/0.1/pipeline.yaml
+      - name: token
+        value: github-aap-org-secret
+      - name: tokenKey
+        value: password
+      - name: scmType
+        value: github
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
