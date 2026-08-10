@@ -1,6 +1,6 @@
-# Nexus Monorepo — Claude Agent Instructions
+# Syntara Monorepo — Claude Agent Instructions
 
-Nexus is a distributed multi-agent automation system. This monorepo contains the Python/FastAPI backend and the React/TypeScript frontend.
+Syntara is a distributed multi-agent automation system. This monorepo contains the Python/FastAPI backend and the React/TypeScript frontend.
 
 ## Repository Structure
 

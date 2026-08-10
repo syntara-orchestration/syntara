@@ -123,5 +123,5 @@ run-standards-checks-all: run-standards-checks-frontend run-standards-checks-bac
 
 # --- Upstream sync (transition period) ---
 
-sync: ## Pull latest changes from upstream nexus and nexus-ui repos
+sync: ## Pull latest changes from upstream syntara repos
 	bash scripts/sync-from-upstream.sh

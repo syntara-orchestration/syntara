@@ -758,14 +758,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
-			--fallback-spec-path backend/src/nexus/schemas/openapi.yaml \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
 			--pr-body "$$PR_BODY_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
-			--fallback-spec-path backend/src/nexus/schemas/openapi.yaml; \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
 	fi
 	@echo "OpenAPI breaking changes check complete"
 
