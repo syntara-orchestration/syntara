@@ -1,6 +1,5 @@
 """E2E tests for client secret rotation with grace period (API-19, API-20).
 
-
 Covers:
   API-19: Secret rotation — grace period (both old and new secrets valid during grace window)
   API-20: Secret rotation — old secret rejected after grace period expires

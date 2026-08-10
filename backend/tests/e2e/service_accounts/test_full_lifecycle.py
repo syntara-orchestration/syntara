@@ -1,6 +1,5 @@
 """E2E tests for full service account lifecycle flows (API-24, API-35).
 
-
 Covers:
   API-24: Cross-project delegation — full flow
           (create in Project A, grant to Project B admin, authenticate,

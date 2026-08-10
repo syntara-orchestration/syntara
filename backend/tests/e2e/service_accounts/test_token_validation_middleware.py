@@ -1,6 +1,5 @@
 """E2E tests for service account token validation via auth middleware (API-16,17,18,32,37,38).
 
-
 Covers:
   API-16: Token validation — authorized API access (Bearer token grants access)
   API-17: Token validation — unauthorized returns 403 (insufficient permissions)

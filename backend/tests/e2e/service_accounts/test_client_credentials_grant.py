@@ -1,6 +1,5 @@
 """E2E tests for the OAuth 2.0 client credentials grant token endpoint (API-9 through API-15, API-33, API-39).
 
-
 Covers:
   API-9:  Client credentials grant — happy path (JWT issuance, ES256, claims)
   API-10: Client credentials grant — HTTP Basic auth header

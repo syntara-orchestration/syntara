@@ -1,6 +1,5 @@
 """E2E tests for service account token revocation on disable/delete (API-21,22,23).
 
-
 Covers:
   API-21: Disable — immediate token invalidation (outstanding tokens rejected)
   API-22: Delete — immediate token invalidation (outstanding tokens rejected)
