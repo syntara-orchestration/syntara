@@ -71,7 +71,7 @@
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-no-only-tests": "^3.3.0",
     "jsdom": "^29.1.1",
-    "mermaid": "^11.16.0",
+    "mermaid": "^11.16.1",
     "prettier": "3.8.4",
     "vitest": "^4.1.10"
   },
