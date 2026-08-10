@@ -12,7 +12,7 @@ import type { ActionFormValues } from './actionFormSchema'
 import { credentialHelpText } from './credentialSelectorHelpText'
 import { nodeHelp } from './shared/nodeFieldHelp'
 
-const CREDENTIAL_TYPE_SECRET_URL = 'Secret URL'
+const CREDENTIAL_TYPE_URL = 'Secret URL'
 
 // Matches CredentialSelector's query key structure for TanStack Query cache reuse
 type CredentialQueryParams = CredentialsAPI.operations['list_credentials']['parameters']['query'] & {
@@ -117,7 +117,7 @@ export function HttpCredentialSection({
     // when the form opens with a pre-existing Secret URL credential_id.
     if (credentialId && (isCredsPending || isTypesPending)) return true
     const cred = credsData?.resources?.find((c) => c.id === credentialId)
-    return typesData?.resources?.find((t) => t.id === cred?.credential_type_id)?.name === CREDENTIAL_TYPE_SECRET_URL
+    return typesData?.resources?.find((t) => t.id === cred?.credential_type_id)?.name === CREDENTIAL_TYPE_URL
   }, [credentialId, credsData, typesData, isCredsPending, isTypesPending])
 
   return (
@@ -135,9 +135,9 @@ export function HttpCredentialSection({
                 // placeholder shows correctly instead of any previously typed value.
                 const cred = credsData?.resources?.find((c) => c.id === newId)
                 const typeName = typesData?.resources?.find((t) => t.id === cred?.credential_type_id)?.name
-                if (typeName === CREDENTIAL_TYPE_SECRET_URL) setValue('url', '')
+                if (typeName === CREDENTIAL_TYPE_URL) setValue('url', '')
               }}
-              compatibleTypeNames={['HTTP Bearer Token', 'HTTP Basic Auth', CREDENTIAL_TYPE_SECRET_URL]}
+              compatibleTypeNames={['HTTP Bearer Token', 'HTTP Basic Auth', CREDENTIAL_TYPE_URL]}
               label="Authentication credential"
               fieldId="action-credential"
               placeholder="Select credential"
