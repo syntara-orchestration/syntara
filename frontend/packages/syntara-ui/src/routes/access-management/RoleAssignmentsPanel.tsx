@@ -29,7 +29,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
 import { getProjectDetailPath } from './accessManagementPaths'
-import { AssignRoleModal } from './AssignRoleModal'
+import { AssignRoleModal, type AssignedRolesByScope } from './AssignRoleModal'
 import type { RoleAssignmentColumnKey, ColumnDefinition } from './roleAssignmentColumns'
 import {
   allFilterFieldDefinitions,
@@ -323,6 +323,24 @@ export function RoleAssignmentsPanel({
     principalId
   )
 
+  const assignedRoles = useMemo((): AssignedRolesByScope => {
+    const system = new Set<string>()
+    const byProject = new Map<string, Set<string>>()
+    for (const row of rows) {
+      if (row.scopeType === 'system') {
+        system.add(row.roleName)
+      } else if (row.projectId) {
+        let projectSet = byProject.get(row.projectId)
+        if (!projectSet) {
+          projectSet = new Set<string>()
+          byProject.set(row.projectId, projectSet)
+        }
+        projectSet.add(row.roleName)
+      }
+    }
+    return { system, byProject }
+  }, [rows])
+
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
     refetch()
@@ -405,6 +423,7 @@ export function RoleAssignmentsPanel({
           isOpen={assignModalOpen}
           onClose={() => setAssignModalOpen(false)}
           onSuccess={refetchAndInvalidateAuthz}
+          assignedRoles={assignedRoles}
         />
       </>
     )

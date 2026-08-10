@@ -26,6 +26,11 @@ import { useSelectableProjects } from '../access/useAllProjects'
 import { MultiRoleSelect, type RoleOption } from './MultiRoleSelect'
 import { buildAssignmentBody, RolePrincipalType } from './RoleAssignmentTypes'
 
+export type AssignedRolesByScope = {
+  system: Set<string>
+  byProject: Map<string, Set<string>>
+}
+
 const assignRoleSchema = z.discriminatedUnion('scope', [
   z.object({
     scope: z.literal('system'),
@@ -49,6 +54,7 @@ type AssignRoleModalProps = {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  assignedRoles: AssignedRolesByScope
 }
 
 function SingleSelect({
@@ -113,6 +119,7 @@ export function AssignRoleModal({
   isOpen,
   onClose,
   onSuccess,
+  assignedRoles,
 }: Readonly<AssignRoleModalProps>) {
   const [isPending, setIsPending] = useState(false)
   const { showAlert } = useAlerts()
@@ -137,6 +144,8 @@ export function AssignRoleModal({
   const [roleSearch, setRoleSearch] = useState('')
   const debouncedRoleSearch = useDebouncedValue(roleSearch)
 
+  const projectId = useWatch({ control, name: 'projectId' })
+
   const rolesQuery = accessClient.useQuery('get', '/roles', {
     params: {
       query: {
@@ -148,10 +157,18 @@ export function AssignRoleModal({
     },
   })
 
+  const alreadyAssigned = useMemo((): Set<string> => {
+    if (scope === 'system') return assignedRoles.system
+    if (projectId) return assignedRoles.byProject.get(projectId) ?? new Set()
+    return new Set()
+  }, [scope, projectId, assignedRoles])
+
   const roleOptions = useMemo((): RoleOption[] => {
     const roles = rolesQuery.data?.resources ?? []
-    return roles.map((r) => ({ id: r.name, name: r.name, description: r.description ?? null }))
-  }, [rolesQuery.data])
+    return roles
+      .filter((r) => !alreadyAssigned.has(r.name))
+      .map((r) => ({ id: r.name, name: r.name, description: r.description ?? null }))
+  }, [rolesQuery.data, alreadyAssigned])
 
   const hasMoreRoles = !!rolesQuery.data?.next
   const isRolesLoading = rolesQuery.isFetching
