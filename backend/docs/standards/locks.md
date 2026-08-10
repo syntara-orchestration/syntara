@@ -453,11 +453,11 @@ def get_value() -> int:
 
 ## References
 
-- **Audit lifecycle:** `src/nexus/audit/lifecycle.py` - State machine with lock
-- **OTEL logging:** `src/nexus/audit/otel_logging.py` - State machine with lock  
-- **Metrics emission:** `src/nexus/metrics/emission.py` - Protected counters and dedup set
-- **Metrics store:** `src/nexus/metrics/store.py` - Thread-safe collection wrapper
-- **Auth dependencies:** `src/nexus/auth/dependencies.py` - Thread-safe singleton
+- **Audit lifecycle:** `src/syntara/audit/lifecycle.py` - State machine with lock
+- **OTEL logging:** `src/syntara/audit/otel_logging.py` - State machine with lock  
+- **Metrics emission:** `src/syntara/metrics/emission.py` - Protected counters and dedup set
+- **Metrics store:** `src/syntara/metrics/store.py` - Thread-safe collection wrapper
+- **Auth dependencies:** `src/syntara/auth/dependencies.py` - Thread-safe singleton
 
 ## See Also
 

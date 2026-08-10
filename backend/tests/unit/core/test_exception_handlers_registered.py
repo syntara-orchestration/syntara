@@ -6,12 +6,12 @@ Regression test: ensure all the exception handlers are registered.
 import ast
 from pathlib import Path
 
-from nexus.core.exception_registry import _exception_registry
+from syntara.core.exception_registry import _exception_registry
 
 
 def _find_decorated_modules() -> set[str]:
     """Find all source modules that use @fastapi_exception as a class decorator."""
-    src = Path(__file__).resolve().parents[3] / "src" / "nexus"
+    src = Path(__file__).resolve().parents[3] / "src" / "syntara"
     modules = set()
     for py_file in src.rglob("*.py"):
         try:
@@ -36,7 +36,7 @@ def _find_decorated_modules() -> set[str]:
 def test_all_exception_modules_populate_registry() -> None:
     """Every module with @fastapi_exception must be imported by main.py."""
     # Importing main triggers all the side-effect imports
-    import nexus.api.main  # noqa: F401
+    import syntara.api.main  # noqa: F401
 
     decorated_modules = _find_decorated_modules()
     registered_module_names = {cls.__module__ for cls in _exception_registry}

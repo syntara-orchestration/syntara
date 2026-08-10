@@ -7,7 +7,7 @@ while literal values are validated with full constraints.
 import pytest
 from pydantic import Field, ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     AgenticExecutorParameters,
     ScriptExecutorParameters,
     ScriptLanguage,

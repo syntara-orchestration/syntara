@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlmodel import select
 
-from nexus.integrations.models.integration import Integration
-from nexus.integrations.services import health_check
+from syntara.integrations.models.integration import Integration
+from syntara.integrations.services import health_check
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker

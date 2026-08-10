@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.credentials.models.query_params import CredentialListParams
+from syntara.credentials.models.query_params import CredentialListParams
 
 
 class TestCredentialListParams:  # noqa: D101

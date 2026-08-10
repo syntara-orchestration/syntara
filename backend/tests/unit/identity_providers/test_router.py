@@ -11,16 +11,16 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.identity_providers import router as idp_router
-from nexus.identity_providers.models.identity_provider_configuration import (
+from syntara.identity_providers import router as idp_router
+from syntara.identity_providers.models.identity_provider_configuration import (
     OIDCConfiguration,
 )
-from nexus.identity_providers.router import (
+from syntara.identity_providers.router import (
     OIDCTestRequest,
     delete_identity_provider,
     get_identity_provider_service,
 )
-from nexus.identity_providers.services.oidc_discovery import OIDCTestResult
+from syntara.identity_providers.services.oidc_discovery import OIDCTestResult
 
 # ============================================================================
 # get_identity_provider_service
@@ -33,7 +33,7 @@ def test_get_identity_provider_service_returns_service() -> None:
     mock_user = MagicMock()
     mock_user.id = uuid4()
 
-    with patch("nexus.identity_providers.router.create_secret_service") as mock_create_ss:
+    with patch("syntara.identity_providers.router.create_secret_service") as mock_create_ss:
         mock_create_ss.return_value = MagicMock()
         service = get_identity_provider_service(mock_db, mock_user)
 
@@ -66,7 +66,7 @@ async def test_oidc_test_endpoint_calls_discovery() -> None:
     )
 
     with patch(
-        "nexus.identity_providers.router.test_oidc_connection",
+        "syntara.identity_providers.router.test_oidc_connection",
         new_callable=AsyncMock,
         return_value=expected_result,
     ) as mock_test:
@@ -96,7 +96,7 @@ async def test_oidc_test_endpoint_returns_failure() -> None:
     )
 
     with patch(
-        "nexus.identity_providers.router.test_oidc_connection",
+        "syntara.identity_providers.router.test_oidc_connection",
         new_callable=AsyncMock,
         return_value=expected_result,
     ):
@@ -126,7 +126,7 @@ async def test_delete_provider_invalidates_affected_user_tokens() -> None:
     mock_service = AsyncMock()
     mock_service.delete_provider = AsyncMock()
 
-    with patch("nexus.identity_providers.router.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.router.create_session_store") as mock_store_cls:
         mock_store = AsyncMock()
         mock_store.increment_token_version = AsyncMock()
         mock_store_cls.return_value = mock_store
@@ -152,7 +152,7 @@ async def test_delete_provider_no_affected_users_skips_token_invalidation() -> N
     mock_service = AsyncMock()
     mock_service.delete_provider = AsyncMock()
 
-    with patch("nexus.identity_providers.router.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.router.create_session_store") as mock_store_cls:
         await delete_identity_provider(provider_id, mock_service, mock_db)
 
     mock_service.delete_provider.assert_called_once_with(provider_id)
@@ -187,7 +187,7 @@ async def test_delete_provider_queries_affected_users_before_delete() -> None:
 
     mock_db.exec = AsyncMock(side_effect=track_exec)
 
-    with patch("nexus.identity_providers.router.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.router.create_session_store") as mock_store_cls:
         mock_store = AsyncMock()
         mock_store.increment_token_version = AsyncMock()
         mock_store_cls.return_value = mock_store

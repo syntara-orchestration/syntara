@@ -13,9 +13,9 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.utils.labels import apply_label_filters, parse_label_filter
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.utils.labels import apply_label_filters, parse_label_filter
 
 
 @pytest.mark.asyncio

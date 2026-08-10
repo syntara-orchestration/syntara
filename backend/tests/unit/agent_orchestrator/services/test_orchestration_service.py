@@ -10,10 +10,10 @@ from uuid import uuid4
 import pytest
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.context_manager.models import ContextPackage
-from nexus.agent_orchestrator.models import InvocationContextData
-from nexus.agent_orchestrator.services.orchestration_service import OrchestrationService
-from nexus.audit.emitter import AuditActorContext
+from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.agent_orchestrator.models import InvocationContextData
+from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.audit.emitter import AuditActorContext
 
 
 def create_mock_streaming_event(event_type: str, content: str | None = None) -> dict[str, Any]:
@@ -95,7 +95,7 @@ class TestOrchestrationServiceStreamingExecution:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -150,7 +150,7 @@ class TestOrchestrationServiceStreamingExecution:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -193,7 +193,7 @@ class TestOrchestrationServiceStreamingExecution:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -246,7 +246,7 @@ class TestOrchestrationServiceErrorHandling:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -294,7 +294,7 @@ class TestOrchestrationServiceErrorHandling:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -345,7 +345,7 @@ class TestOrchestrationServiceSessionManagement:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -407,8 +407,8 @@ class TestOrchestrationServiceLogging:
 
         with (
             patch.object(service, "_setup_graph", return_value=mock_graph),
-            patch("nexus.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
-            patch("nexus.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch("syntara.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
         ):
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
@@ -440,7 +440,7 @@ class TestToolEventDataModels:
 
     def test_tool_call_event_data_serialization(self) -> None:
         """Test that ToolCallEventData serializes correctly with model_dump()."""
-        from nexus.agent_orchestrator.models.streaming_events import ToolCallEventData
+        from syntara.agent_orchestrator.models.streaming_events import ToolCallEventData
 
         # Arrange
         tool_call = ToolCallEventData(
@@ -458,7 +458,7 @@ class TestToolEventDataModels:
 
     def test_tool_result_event_data_serialization(self) -> None:
         """Test that ToolResultEventData serializes correctly with model_dump()."""
-        from nexus.agent_orchestrator.models.streaming_events import ToolResultEventData
+        from syntara.agent_orchestrator.models.streaming_events import ToolResultEventData
 
         # Arrange
         tool_result = ToolResultEventData(

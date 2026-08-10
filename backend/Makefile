@@ -86,7 +86,7 @@ _check-uv:
 
 _check-dependency-binaries: _check-uv
 	@if ! uv run python -c "import src" 2>/dev/null; then \
-		echo "❌ nexus package not installed. Run 'make install' first"; \
+		echo "❌ syntara package not installed. Run 'make install' first"; \
 		exit 1; \
 	fi
 
@@ -242,7 +242,7 @@ endif
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
-	@uv run python -m nexus.seed
+	@uv run python -m syntara.seed
 	@echo "✅ Seeding complete"
 
 .PHONY: admin-password
@@ -254,7 +254,7 @@ admin-password: check-deps _ensure-secrets ## Sync bootstrap admin password from
 .PHONY: db-seed-all
 db-seed-all: check-deps ## Run all database seeders including dev samples
 	@echo "🌱 Seeding database (including samples)..."
-	@uv run python -m nexus.seed --all
+	@uv run python -m syntara.seed --all
 	@echo "✅ Seeding complete"
 
 .PHONY: dev
@@ -293,7 +293,7 @@ dev: check-deps _ensure-secrets _ensure-certs ## Run development server with aut
 	APP_S3_SECRET_ACCESS_KEY=$${APP_S3_SECRET_ACCESS_KEY:-testing} \
 	APP_S3_VERIFY_SSL=$${APP_S3_VERIFY_SSL:-false} \
 	APP_S3_USE_PATH_STYLE=$${APP_S3_USE_PATH_STYLE:-true} \
-	uv run python -m nexus.api.main
+	uv run python -m syntara.api.main
 
 
 .PHONY: worker-run
@@ -309,7 +309,7 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m nexus.workflows.worker
+	uv run python -m syntara.workflows.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -324,7 +324,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m nexus.workflows.background_worker
+	uv run python -m syntara.workflows.background_worker
 
 
 # Database
@@ -550,7 +550,7 @@ services-clean: ## Stop all services and remove all data (destructive)
 
 # API spec governance
 # ========================================================
-OPENAPI_SPEC ?= src/nexus/schemas/openapi.yaml
+OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -726,7 +726,7 @@ check-api-paths: ## Check API endpoint paths use snake_case (no hyphens)
 .PHONY: check-dead-code
 check-dead-code: ## Check for dead code with vulture
 	@echo "🔍 Checking for dead code..."
-	uv run vulture src/nexus/
+	uv run vulture src/syntara/
 	@echo "✅ No dead code detected"
 
 .PHONY: check-cycles
@@ -734,7 +734,7 @@ check-cycles: ## Check for new import cycles with pyan3
 	@echo "🔍 Checking for import cycles..."
 	uv run pyan3 --module-level --cycles \
 		--exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
-		--root src src/nexus/**/*.py 2>/dev/null | \
+		--root src src/syntara/**/*.py 2>/dev/null | \
 		uv run python tools/ci/check_import_cycles.py
 	@echo "✅ No new import cycles detected"
 
@@ -758,12 +758,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
+			--fallback-spec-path backend/src/nexus/schemas/openapi.yaml \
 			--pr-body "$$PR_BODY_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
-			--format text; \
+			--format text \
+			--fallback-spec-path backend/src/nexus/schemas/openapi.yaml; \
 	fi
 	@echo "OpenAPI breaking changes check complete"
 

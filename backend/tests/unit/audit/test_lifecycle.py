@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.audit.lifecycle import (
+from syntara.audit.lifecycle import (
     AuditLifecycleState,
     start_audit_outbox_worker,
     stop_audit_outbox_worker,
@@ -26,7 +26,7 @@ from nexus.audit.lifecycle import (
 
 def _reset_lifecycle_state() -> None:
     """Reset module-level lifecycle state to STOPPED (for test isolation)."""
-    import nexus.audit.lifecycle as lifecycle_module
+    import syntara.audit.lifecycle as lifecycle_module
 
     with lifecycle_module._state_lock:
         lifecycle_module._state = AuditLifecycleState.STOPPED
@@ -48,7 +48,7 @@ class TestStartAuditOutboxWorker:
         """Test that start initializes and starts the outbox worker."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
         mock_worker.start.assert_called_once()
@@ -57,10 +57,10 @@ class TestStartAuditOutboxWorker:
         """Test that start transitions state to RUNNING."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
-        import nexus.audit.lifecycle as lifecycle_module
+        import syntara.audit.lifecycle as lifecycle_module
 
         assert lifecycle_module._state == AuditLifecycleState.RUNNING
 
@@ -68,7 +68,7 @@ class TestStartAuditOutboxWorker:
         """Test that calling start when already running is a no-op."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             # First call starts the worker
             start_audit_outbox_worker()
             mock_worker.start.assert_called_once()
@@ -82,8 +82,8 @@ class TestStartAuditOutboxWorker:
         mock_worker = MagicMock()
 
         with (
-            patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker),
-            patch("nexus.audit.lifecycle.logger") as mock_logger,
+            patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker),
+            patch("syntara.audit.lifecycle.logger") as mock_logger,
         ):
             # First call
             start_audit_outbox_worker()
@@ -102,7 +102,7 @@ class TestStartAuditOutboxWorker:
             barrier.wait()  # Synchronize threads
             start_audit_outbox_worker()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             thread1 = threading.Thread(target=concurrent_start)
             thread2 = threading.Thread(target=concurrent_start)
 
@@ -134,7 +134,7 @@ class TestStopAuditOutboxWorker:
         mock_worker = AsyncMock()
 
         # Start first so we have RUNNING state
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
             await stop_audit_outbox_worker()
@@ -147,12 +147,12 @@ class TestStopAuditOutboxWorker:
         """Test that stop transitions state to STOPPED."""
         mock_worker = AsyncMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
             await stop_audit_outbox_worker()
 
-        import nexus.audit.lifecycle as lifecycle_module
+        import syntara.audit.lifecycle as lifecycle_module
 
         assert lifecycle_module._state == AuditLifecycleState.STOPPED
 
@@ -161,7 +161,7 @@ class TestStopAuditOutboxWorker:
         """Test that calling stop when already stopped is a no-op."""
         mock_worker = AsyncMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             # First call stops the worker (even though it was never started)
             await stop_audit_outbox_worker()
 
@@ -175,8 +175,8 @@ class TestStopAuditOutboxWorker:
         mock_worker = AsyncMock()
 
         with (
-            patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker),
-            patch("nexus.audit.lifecycle.logger") as mock_logger,
+            patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker),
+            patch("syntara.audit.lifecycle.logger") as mock_logger,
         ):
             # Call stop when already stopped
             await stop_audit_outbox_worker()
@@ -188,16 +188,16 @@ class TestStopAuditOutboxWorker:
         """Test that stop handles None worker gracefully (no-op)."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
         # Now patch to return None for stop
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=None):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=None):
             # Should not raise when worker is None
             await stop_audit_outbox_worker()
 
         # Verify state is STOPPED
-        import nexus.audit.lifecycle as lifecycle_module
+        import syntara.audit.lifecycle as lifecycle_module
 
         assert lifecycle_module._state == AuditLifecycleState.STOPPED
 
@@ -216,7 +216,7 @@ class TestStopAuditOutboxWorker:
         mock_worker.drain = AsyncMock(side_effect=track_drain)
         mock_worker.stop = AsyncMock(side_effect=track_stop)
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
             await stop_audit_outbox_worker()
 
@@ -240,7 +240,7 @@ class TestRestartAuditOutboxWorker:
         """Test that worker can be restarted after being stopped."""
         mock_worker = AsyncMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             # Start -> Stop -> Start cycle
             start_audit_outbox_worker()
             assert mock_worker.start.call_count == 1
@@ -258,7 +258,7 @@ class TestRestartAuditOutboxWorker:
         """Test multiple start/stop cycles work correctly."""
         mock_worker = AsyncMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             for i in range(3):
                 start_audit_outbox_worker()
                 assert mock_worker.start.call_count == i + 1
@@ -267,7 +267,7 @@ class TestRestartAuditOutboxWorker:
                 assert mock_worker.drain.call_count == i + 1
                 assert mock_worker.stop.call_count == i + 1
 
-                import nexus.audit.lifecycle as lifecycle_module
+                import syntara.audit.lifecycle as lifecycle_module
 
                 assert lifecycle_module._state == AuditLifecycleState.STOPPED
 
@@ -288,7 +288,7 @@ class TestThreadSafety:
         """Test that state transitions under lock prevent race conditions."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             # Rapidly call start from multiple threads
             threads = [threading.Thread(target=start_audit_outbox_worker) for _ in range(10)]
 
@@ -301,7 +301,7 @@ class TestThreadSafety:
         # Despite 10 concurrent calls, worker should only start once
         mock_worker.start.assert_called_once()
 
-        import nexus.audit.lifecycle as lifecycle_module
+        import syntara.audit.lifecycle as lifecycle_module
 
         assert lifecycle_module._state == AuditLifecycleState.RUNNING
 
@@ -310,14 +310,14 @@ class TestThreadSafety:
         """Test that stop waits for lock even if start holds it."""
         mock_worker = AsyncMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             # Start the worker
             start_audit_outbox_worker()
 
             # Stop should acquire lock and complete
             await stop_audit_outbox_worker()
 
-            import nexus.audit.lifecycle as lifecycle_module
+            import syntara.audit.lifecycle as lifecycle_module
 
             assert lifecycle_module._state == AuditLifecycleState.STOPPED
 
@@ -338,7 +338,7 @@ class TestWorkerIntegration:
         """Test that get_outbox_worker is called to retrieve worker instance."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker) as mock_get:
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker) as mock_get:
             start_audit_outbox_worker()
 
             mock_get.assert_called_once()
@@ -350,7 +350,7 @@ class TestWorkerIntegration:
         mock_worker = AsyncMock()
 
         with (
-            patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker) as mock_get,
+            patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker) as mock_get,
         ):
             start_audit_outbox_worker()
             await stop_audit_outbox_worker()
@@ -363,15 +363,15 @@ class TestWorkerIntegration:
         """Test that stop gracefully handles None worker (started with worker, stopped with None)."""
         mock_worker = MagicMock()
 
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=mock_worker):
             start_audit_outbox_worker()
 
         # Worker becomes None during stop (edge case: worker uninitialized during shutdown)
-        with patch("nexus.audit.lifecycle.get_outbox_worker", return_value=None):
+        with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=None):
             # Should not raise
             await stop_audit_outbox_worker()
 
-        import nexus.audit.lifecycle as lifecycle_module
+        import syntara.audit.lifecycle as lifecycle_module
 
         # State should still transition to STOPPED
         assert lifecycle_module._state == AuditLifecycleState.STOPPED

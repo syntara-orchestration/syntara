@@ -1,0 +1,592 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Shared API Resources
+  version: 1.0.0
+  description: |
+    Shared OpenAPI schemas, Pydantic models, and utility functions for all Syntara API resources.
+
+    This specification defines:
+    - Base resource schemas (BaseResource, NamedResource, SoftDeletableResource, UserOwnedResource, Resource)
+    - Standardized filtering conventions with bracket notation operators
+    - Pagination patterns with optional total counts
+    - Shared query parameters and error responses
+    - Label filtering with key-value pairs
+
+    ## Naming Conventions
+    - **Schema properties**: snake_case (e.g., `created_at`, `user_name`)
+    - **Query parameters**: snake_case (e.g., `created_at`, `user_name`)
+    - **Python code**: snake_case (PEP 8)
+
+    ## Filtering Conventions
+    - **Direct equality**: `?parameter=value` (shorthand for `parameter[eq]=value`)
+    - **Operators**: `?parameter[operator]=value` where operator ∈ {eq, in, contains, starts_with, gt, gte, lt, lte}
+    - **Multiple values (OR)**: `?parameter[in]=val1,val2` or `?parameter=val1,val2` or `?parameter=val1&parameter=val2`
+    - **Multiple parameters (AND)**: `?name=example&status=active`
+    - **Label filtering**: `?labels[environment]=production`
+
+components:
+  schemas:
+    BaseResource:
+      type: object
+      title: Base Resource
+      description: Foundational schema for all API resources with system-managed metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          title: Resource ID
+          description: Unique identifier for the resource
+          example: 550e8400-e29b-41d4-a716-446655440000
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Created At
+          description: Timestamp when resource was created
+          example: '2025-10-09T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Updated At
+          description: Timestamp when resource was last updated
+          example: '2025-10-09T12:30:00Z'
+        labels:
+          type: object
+          default: {}
+          title: Labels
+          description: Key-value pairs for resource labeling and filtering
+          additionalProperties:
+            type: string
+          example:
+            environment: production
+            region: us-east-1
+            team: platform
+
+    NamedResource:
+      allOf:
+        - $ref: '#/components/schemas/BaseResource'
+        - type: object
+          title: Named Resource
+          description: Extension of BaseResource adding user-provided identification
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 255
+              title: Name
+              description: Human-readable name for the resource
+              example: Authentication Service
+            description:
+              anyOf:
+                - type: string
+                  maxLength: 2000
+                - type: 'null'
+              title: Description
+              description: Detailed description of the resource
+              example: Handles user authentication and authorization workflows
+
+    SoftDeletableResource:
+      allOf:
+        - $ref: '#/components/schemas/BaseResource'
+        - type: object
+          title: Soft Deletable Resource
+          description: Extension of BaseResource supporting soft deletion tracking
+          properties:
+            deleted_at:
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: 'null'
+              readOnly: true
+              title: Deleted At
+              description: Timestamp when resource was soft deleted
+              example: '2025-10-09T14:00:00Z'
+            deleted_by:
+              anyOf:
+                - type: string
+                  format: uuid
+                - type: 'null'
+              readOnly: true
+              title: Deleted By
+              description: User who performed the soft delete
+              example: 660e8400-e29b-41d4-a716-446655440000
+
+    UserOwnedResource:
+      allOf:
+        - $ref: '#/components/schemas/BaseResource'
+        - type: object
+          title: User Owned Resource
+          description: Extension of BaseResource tracking resource ownership and modifications
+          required:
+            - created_by
+          properties:
+            created_by:
+              type: string
+              format: uuid
+              readOnly: true
+              title: Created By
+              description: User (or automation) that created the resource
+              example: 770e8400-e29b-41d4-a716-446655440000
+            updated_by:
+              anyOf:
+                - type: string
+                  format: uuid
+                - type: 'null'
+              readOnly: true
+              title: Updated By
+              description: User (or automation) that last updated the resource
+              example: 880e8400-e29b-41d4-a716-446655440000
+
+    UserReference:
+      type: object
+      title: UserReference
+      description: |-
+        Minimal user identification for embedding in other resources.
+        This model captures user identity at the time of an action, providing
+        a snapshot that doesn't change even if the user's details are updated later.
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User's unique identifier
+        name:
+          type: string
+          description: User's display name at time of action
+
+    Resource:
+      allOf:
+        - $ref: '#/components/schemas/UserOwnedResource'
+        - $ref: '#/components/schemas/SoftDeletableResource'
+        - $ref: '#/components/schemas/NamedResource'
+      title: Resource
+      description: Composite resource combining named, soft-deletable, and user-owned capabilities
+
+    ErrorData:
+      type: object
+      title: ErrorData
+      description: >
+        RFC 9457 Problem Details format for error event data.
+
+        This model is used for streaming error events and follows the RFC 9457
+        Problem Details specification. It provides machine-readable and human-readable
+        error information with consistent structure.
+
+        Attributes:
+            type: URI reference identifying the problem type
+            title: Short, human-readable summary of the problem
+            detail: Human-readable explanation specific to this occurrence
+            code: Machine-readable error code for programmatic handling
+            retryable: Whether this error can be retried by creating a new invocation
+            instance: Optional URI reference identifying the specific occurrence
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+      examples:
+        - type: https://api.example.com/errors/llm-error
+          title: LLM Rate Limit Exceeded
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          code: RATE_LIMIT_EXCEEDED
+          retryable: true
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+        - type: https://api.example.com/errors/timeout-error
+          title: Streaming Timeout
+          detail: LLM streaming timed out after 30 seconds
+          code: STREAM_TIMEOUT
+          retryable: true
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+      properties:
+        type:
+          type: string
+          minLength: 1
+          maxLength: 500
+          title: Type
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          title: Title
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+        detail:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          title: Detail
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+        code:
+          type: string
+          minLength: 1
+          maxLength: 100
+          title: Code
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+        retryable:
+          type: boolean
+          title: Retryable
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+        instance:
+          anyOf:
+            - type: string
+              maxLength: 2048
+            - type: 'null'
+          title: Instance
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+
+    ResourcesResponseBase:
+      type: object
+      title: Paginated Response Base
+      description: Pagination metadata structure for list responses
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - minimum: 0.0
+              type: integer
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          type: array
+          title: Resources
+          description: Array of resources in current page
+          maxItems: 100
+
+  parameters:
+    limitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        exclusiveMinimum: 0
+        maximum: 100
+        default: 20
+        description: Maximum number of results per page
+        title: Limit
+      description: Maximum number of results per page
+
+    sortParam:
+      name: sort
+      in: query
+      required: false
+      schema:
+        anyOf:
+          - type: string
+            pattern: "^-?[a-z][a-z0-9_]*$"
+          - type: "null"
+        description: Sort parameter (e.g., 'name', '-created_at')
+        title: Sort
+      description: Sort parameter (e.g., 'name', '-created_at')
+
+    nameFilterParam:
+      name: name
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      schema:
+        allOf:
+          - type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          - type: object
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+      description: |
+        Filter resources by name.
+        - Exact match: `name=value`
+        - Contains: `name[contains]=value`
+      example: auth
+
+    createdAtFilterParam:
+      name: created_at
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      schema:
+        allOf:
+          - type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+          - type: object
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+
+    updatedAtFilterParam:
+      name: updated_at
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      schema:
+        allOf:
+          - type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+          - type: object
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+
+    cursorParam:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        anyOf:
+          - type: string
+          - type: "null"
+        description: Pagination cursor from previous response
+        title: Cursor
+      description: Pagination cursor from previous response
+
+    labelsFilterParam:
+      name: labels
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      schema:
+        type: object
+        additionalProperties:
+          type: string
+      description: |
+        Filter resources by label key-value pairs.
+        - Single label: `labels[environment]=production`
+        - Multiple labels: `labels[environment]=production&labels[region]=us-east-1`
+        All specified labels must match (AND logic).
+      example:
+        environment: production
+        region: us-east-1
+
+    includeTotalParam:
+      name: include_total
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+        description: Include total count in response (expensive)
+        title: Include Total
+      description: Include total count in response (expensive)
+
+  responses:
+    ValidationError:
+      description: Validation Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/validation-error
+            title: Validation Error
+            detail: Field 'name' must be between 1 and 255 characters
+            code: VALIDATION_ERROR
+            retryable: false
+            instance: /api/v1/workflows
+
+    NotFoundError:
+      description: Not Found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/not-found
+            title: Resource Not Found
+            detail: No resource exists with the provided identifier
+            code: NOT_FOUND
+            retryable: false
+            instance: /api/v1/workflows
+
+    BadRequestError:
+      description: Bad Request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/bad-request
+            title: Bad Request
+            detail: The request was malformed or contained invalid parameters
+            code: BAD_REQUEST
+            retryable: false
+
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/unauthorized
+            title: Unauthorized
+            detail: Authentication is required to access this resource
+            code: UNAUTHORIZED
+            retryable: false
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/forbidden
+            title: Forbidden
+            detail: You do not have permission to access this resource
+            code: FORBIDDEN
+            retryable: false
+
+    ConflictError:
+      description: Conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/conflict
+            title: Conflict
+            detail: The request conflicts with the current state of the resource
+            code: CONFLICT
+            retryable: false
+
+    RateLimitError:
+      description: Too Many Requests
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/rate-limited
+            title: Too Many Requests
+            detail: Rate limit exceeded. Try again in 60 seconds.
+            code: RATE_LIMITED
+            retryable: true
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ErrorData'
+          example:
+            type: https://api.example.com/errors/internal-error
+            title: Internal Server Error
+            detail: An unexpected error occurred
+            code: INTERNAL_ERROR
+            retryable: true
+
+paths: {} # No endpoints defined - this is a shared schema specification

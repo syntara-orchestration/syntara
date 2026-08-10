@@ -15,12 +15,12 @@ import pytest_asyncio
 from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.integrations.exceptions import LLMModelNotFoundError
-from nexus.integrations.models.integration import Integration, IntegrationType
-from nexus.integrations.models.llm_model import LLMModel, LLMModelUpdate
-from nexus.integrations.services.llm_model_service import LLMModelService
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.integrations.exceptions import LLMModelNotFoundError
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.llm_model import LLMModel, LLMModelUpdate
+from syntara.integrations.services.llm_model_service import LLMModelService
 
 
 @pytest.fixture

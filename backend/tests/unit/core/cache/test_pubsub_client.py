@@ -8,8 +8,8 @@ import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
-from nexus.core.cache.base import BaseRedisClient
-from nexus.core.cache.pubsub_client import PubSubMixin
+from syntara.core.cache.base import BaseRedisClient
+from syntara.core.cache.pubsub_client import PubSubMixin
 
 
 class _TestPubSubClient(BaseRedisClient, PubSubMixin):
@@ -28,7 +28,7 @@ def _mock_settings() -> MagicMock:
 
 def _make_client() -> tuple[_TestPubSubClient, AsyncMock]:
     """Return a client with a mock Redis instance injected."""
-    with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+    with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
         client = _TestPubSubClient()
     mock_redis = AsyncMock()
     client._client = mock_redis

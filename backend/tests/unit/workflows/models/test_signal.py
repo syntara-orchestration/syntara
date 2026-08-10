@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.signal import ActivitySignalPayload, SignalResponse
+from syntara.workflows.models.signal import ActivitySignalPayload, SignalResponse
 
 
 class TestActivitySignalPayload:

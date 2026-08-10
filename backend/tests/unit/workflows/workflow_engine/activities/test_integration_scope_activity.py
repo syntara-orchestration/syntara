@@ -13,17 +13,17 @@ import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import (
+from syntara.core.models import User
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationType,
 )
-from nexus.integrations.models.llm_model import LLMModel
-from nexus.tool_manager.models.tool import Tool, ToolStatus
-from nexus.workflows.workflow_engine.activities import integration_scope_activity
-from nexus.workflows.workflow_engine.activities.integration_scope_activity import (
+from syntara.integrations.models.llm_model import LLMModel
+from syntara.tool_manager.models.tool import Tool, ToolStatus
+from syntara.workflows.workflow_engine.activities import integration_scope_activity
+from syntara.workflows.workflow_engine.activities.integration_scope_activity import (
     _validate_node,
     validate_node_references,
 )
@@ -104,7 +104,7 @@ async def _create_tool(
 
 
 async def _create_project(session: AsyncSession, user: User) -> UUID:
-    from nexus.authz.models import Project
+    from syntara.authz.models import Project
 
     project = Project(name=f"project-{uuid4().hex[:8]}", created_by=user.id)
     session.add(project)

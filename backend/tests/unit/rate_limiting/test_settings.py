@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nexus.rate_limiting.settings import (
+from syntara.rate_limiting.settings import (
     RATE_LIMIT_REQUESTS_PER_WINDOW,
     RATE_LIMIT_WINDOW_DURATION_SECONDS,
     get_rate_limit_config,

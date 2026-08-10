@@ -12,9 +12,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.agent_orchestrator.models.context_data import InvocationContextData
-from nexus.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.agent_orchestrator.models.context_data import InvocationContextData
+from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ class TestSendCompletionCallback:
         )
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id)
@@ -80,7 +80,7 @@ class TestSendCompletionCallback:
         ctx = InvocationContextData.model_validate({"callback_url": callback_url})
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id, ctx)
@@ -97,7 +97,7 @@ class TestSendCompletionCallback:
         ctx = InvocationContextData.model_validate({"callback_url": "http://from-original"})
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id, ctx)
@@ -110,7 +110,7 @@ class TestSendCompletionCallback:
         final_state = _make_final_state(metadata=None, result={"content": "done"})
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id)
@@ -126,7 +126,7 @@ class TestSendCompletionCallback:
         )
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id)
@@ -144,7 +144,7 @@ class TestSendCompletionCallback:
         ctx = InvocationContextData.model_validate({"callback_url": callback_url})
 
         with patch(
-            "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+            "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
             new_callable=AsyncMock,
         ) as mock_signal:
             await orchestration_service._send_completion_callback(final_state, invocation_id, ctx)
@@ -165,11 +165,11 @@ class TestSendCompletionCallback:
 
         with (
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.aggregate_used_tools",
+                "syntara.agent_orchestrator.services.orchestration_service.aggregate_used_tools",
                 return_value=[{"name": "search", "count": 2}, {"name": "fetch", "count": 1}],
             ),
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
                 new_callable=AsyncMock,
             ) as mock_signal,
         ):
@@ -202,10 +202,10 @@ class TestCallbackUrlRedaction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
                 new_callable=AsyncMock,
             ) as mock_signal,
-            patch("nexus.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
+            patch("syntara.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
         ):
             await orchestration_service._send_completion_callback(final_state, invocation_id)
 
@@ -230,10 +230,10 @@ class TestCallbackUrlRedaction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
                 new_callable=AsyncMock,
             ) as mock_signal,
-            patch("nexus.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
+            patch("syntara.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
         ):
             await orchestration_service._send_completion_callback(final_state, invocation_id)
 
@@ -256,10 +256,10 @@ class TestCallbackUrlRedaction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
                 new_callable=AsyncMock,
             ) as mock_signal,
-            patch("nexus.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
+            patch("syntara.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
         ):
             await orchestration_service._send_completion_callback(final_state, invocation_id)
 
@@ -283,10 +283,10 @@ class TestCallbackUrlRedaction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
                 new_callable=AsyncMock,
             ),
-            patch("nexus.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
+            patch("syntara.agent_orchestrator.services.orchestration_service.logger") as mock_logger,
         ):
             await orchestration_service._send_completion_callback(final_state, invocation_id)
 

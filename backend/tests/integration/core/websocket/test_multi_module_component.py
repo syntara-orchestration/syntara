@@ -13,8 +13,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from nexus.core.websocket.endpoint_factory import _HANDLER_MODULE_CACHE, scan_handler_specs
-from nexus.core.websocket.interceptor import ValidationInterceptor
+from syntara.core.websocket.endpoint_factory import _HANDLER_MODULE_CACHE, scan_handler_specs
+from syntara.core.websocket.interceptor import ValidationInterceptor
 
 
 class TestMultiModuleComponent:

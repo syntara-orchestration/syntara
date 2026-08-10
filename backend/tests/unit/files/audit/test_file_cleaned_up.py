@@ -1,7 +1,7 @@
 """Unit tests for FileCleanedUpEvent audit handler."""
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.files.audit.file_cleaned_up import FileCleanedUpEvent, FileCleanedUpHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.files.audit.file_cleaned_up import FileCleanedUpEvent, FileCleanedUpHandler
 
 
 class TestFileCleanedUpHandler:

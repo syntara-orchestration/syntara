@@ -1,7 +1,7 @@
 """Unit tests for AuditOutboxRecord model."""
 
-from nexus.audit.outbox.models import AuditEventSource, AuditOutboxRecord
-from nexus.core.models.base.base_resource import AuditLevel
+from syntara.audit.outbox.models import AuditEventSource, AuditOutboxRecord
+from syntara.core.models.base.base_resource import AuditLevel
 
 
 class TestAuditEventSource:

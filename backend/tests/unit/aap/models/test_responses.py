@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.aap.models.responses import (
+from syntara.aap.models.responses import (
     AAP_SUMMARY_FIELDS_KEY,
     AAPJobTemplateDetail,
     AAPLabel,
@@ -328,7 +328,7 @@ class TestAAPJobTemplateDetailSummaryFieldsExtraction:
         # This tests the validator's defensive check at the beginning
         # The validator checks isinstance(data, dict) and returns data unchanged if not
         # We can test this by passing a non-dict directly to the validator
-        from nexus.aap.models.responses import AAPJobTemplateDetail
+        from syntara.aap.models.responses import AAPJobTemplateDetail
 
         # Call the validator directly with non-dict data
         result = AAPJobTemplateDetail.extract_summary_fields("not a dict")
@@ -1020,7 +1020,7 @@ class TestAAPWorkflowJobTemplateDetailValidation:
         # This tests the validator's defensive check at the beginning
         # The validator checks isinstance(data, dict) and returns data unchanged if not
         # We can test this by passing a non-dict directly to the validator
-        from nexus.aap.models.responses import AAPWorkflowJobTemplateDetail
+        from syntara.aap.models.responses import AAPWorkflowJobTemplateDetail
 
         # Call the validator directly with non-dict data
         result = AAPWorkflowJobTemplateDetail.extract_summary_fields("not a dict")

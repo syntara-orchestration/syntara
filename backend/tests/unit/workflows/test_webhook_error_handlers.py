@@ -7,8 +7,8 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import (
     payload_too_large_handler,
     trigger_validation_handler,
     webhook_auth_required_handler,
@@ -16,7 +16,7 @@ from nexus.workflows.error_handlers import (
     webhook_trigger_not_found_handler,
     webhook_trigger_path_conflict_handler,
 )
-from nexus.workflows.exceptions import (
+from syntara.workflows.exceptions import (
     PayloadTooLargeError,
     TriggerValidationError,
     WebhookAuthenticationRequiredError,
@@ -197,7 +197,7 @@ class TestWebhookAuthRequiredHandler:
 
         exc = WebhookAuthenticationRequiredError()
 
-        with patch("nexus.workflows.error_handlers.AuditEventDispatcher"):
+        with patch("syntara.workflows.error_handlers.AuditEventDispatcher"):
             response = webhook_auth_required_handler(request, exc)
 
         assert isinstance(response, JSONResponse)
@@ -219,7 +219,7 @@ class TestWebhookAuthRequiredHandler:
 
         exc = WebhookAuthenticationRequiredError()
 
-        with patch("nexus.workflows.error_handlers.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.workflows.error_handlers.AuditEventDispatcher") as mock_dispatcher:
             webhook_auth_required_handler(request, exc)
 
         mock_dispatcher.dispatch.assert_called_once()
@@ -240,7 +240,7 @@ class TestWebhookSaNotAuthorizedHandler:
         sa_id = uuid4()
         exc = WebhookServiceAccountNotAuthorizedError("my-hook", "webhook_trigger", service_account_id=sa_id)
 
-        with patch("nexus.workflows.error_handlers.AuditEventDispatcher"):
+        with patch("syntara.workflows.error_handlers.AuditEventDispatcher"):
             response = webhook_sa_not_authorized_handler(request, exc)
 
         assert isinstance(response, JSONResponse)
@@ -260,7 +260,7 @@ class TestWebhookSaNotAuthorizedHandler:
         sa_id = uuid4()
         exc = WebhookServiceAccountNotAuthorizedError("my-hook", "webhook_trigger", service_account_id=sa_id)
 
-        with patch("nexus.workflows.error_handlers.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.workflows.error_handlers.AuditEventDispatcher") as mock_dispatcher:
             webhook_sa_not_authorized_handler(request, exc)
 
         mock_dispatcher.dispatch.assert_called_once()

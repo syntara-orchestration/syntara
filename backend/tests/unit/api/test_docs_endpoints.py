@@ -26,10 +26,10 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
-from nexus.api.main import swagger_ui_parameters
-from nexus.core.config.base import get_settings
-from nexus.core.router_discovery import iter_api_routes
+from syntara.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.main import swagger_ui_parameters
+from syntara.core.config.base import get_settings
+from syntara.core.router_discovery import iter_api_routes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -127,7 +127,7 @@ class TestAPIDocsSettings:
     """The enable_api_docs setting defaults to False and is toggleable."""
 
     def test_default_is_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         # Override local .env so this asserts the production default.
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
@@ -138,7 +138,7 @@ class TestAPIDocsSettings:
             get_settings.cache_clear()
 
     def test_env_var_enables(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
@@ -151,13 +151,13 @@ class TestAPIDocsSettings:
         self,
         override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         with override_settings(enable_api_docs=True):
             assert get_settings().enable_api_docs is True
 
     def test_field_default_on_class(self) -> None:
-        from nexus.core.config.base import APIDocsSettings
+        from syntara.core.config.base import APIDocsSettings
 
         settings = APIDocsSettings()
         assert settings.enable_api_docs is False
@@ -190,7 +190,7 @@ class TestTryItOutSettings:
             assert get_settings().enable_try_it_out is True
 
     def test_field_default_on_class(self) -> None:
-        from nexus.core.config.base import APIDocsSettings
+        from syntara.core.config.base import APIDocsSettings
 
         settings = APIDocsSettings()
         assert settings.enable_try_it_out is False
@@ -253,9 +253,9 @@ class TestDocsEnabledWiring:
     """Cover True branches of enable_api_docs conditionals in main.py."""
 
     def test_version_includes_docs_links_when_enabled(self) -> None:
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -275,8 +275,8 @@ class TestDocsEnabledWiring:
     def test_docs_routes_registered_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.core.config.base import get_settings
+        import syntara.api.main as main_module
+        from syntara.core.config.base import get_settings
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
@@ -296,9 +296,9 @@ class TestDocsEnabledWiring:
     def test_custom_docs_try_it_out_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -324,9 +324,9 @@ class TestDocsEnabledWiring:
     def test_custom_docs_try_it_out_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -354,29 +354,29 @@ class TestProductionAppWiring:
     """Verify the real app has correct doc endpoint wiring for coverage."""
 
     def test_builtin_docs_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.docs_url is None
 
     def test_builtin_redoc_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.redoc_url is None
 
     def test_builtin_openapi_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.openapi_url is None
 
     def test_builtin_swagger_ui_params_none(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.swagger_ui_parameters is None
 
     def test_version_omits_docs_links_when_disabled(self) -> None:
-        from nexus.api.main import app as real_app
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        from syntara.api.main import app as real_app
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")

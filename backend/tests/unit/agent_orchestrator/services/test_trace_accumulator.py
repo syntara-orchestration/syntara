@@ -3,7 +3,7 @@
 from typing import Any
 from unittest.mock import MagicMock
 
-from nexus.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
 
 
 def _make_chat_stream_event(content: str, output_tokens: int = 0) -> dict[str, Any]:

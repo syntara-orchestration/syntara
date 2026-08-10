@@ -23,11 +23,11 @@ import pytest
 import yaml
 from fastapi import FastAPI
 
-from nexus.api.constants import API_V1_PATH_PREFIX
-from nexus.auth.dependencies import get_current_user, get_token_payload
-from nexus.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
-from nexus.authz.resource_actions import _get_dep_instance, _iter_route_deps
-from nexus.core.router_discovery import discover_and_register_routers, iter_api_routes
+from syntara.api.constants import API_V1_PATH_PREFIX
+from syntara.auth.dependencies import get_current_user, get_token_payload
+from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+from syntara.authz.resource_actions import _get_dep_instance, _iter_route_deps
+from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
 
 # ---------------------------------------------------------------------------
 # Classification helpers

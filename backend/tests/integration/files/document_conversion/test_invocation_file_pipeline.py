@@ -21,10 +21,10 @@ from uuid import UUID
 import pytest
 from langchain_core.messages import HumanMessage
 
-from nexus.core.constants import CONTEXT_KEY_FILE_IDS
-from nexus.files.document_conversion.converters.pdf_converter import PDFConverter
-from nexus.files.document_conversion.models.conversion_result import ConversionResult
-from nexus.files.models import FileStatus
+from syntara.core.constants import CONTEXT_KEY_FILE_IDS
+from syntara.files.document_conversion.converters.pdf_converter import PDFConverter
+from syntara.files.document_conversion.models.conversion_result import ConversionResult
+from syntara.files.models import FileStatus
 from tests.fixtures.files import get_fixtures_dir
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 

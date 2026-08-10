@@ -20,7 +20,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession

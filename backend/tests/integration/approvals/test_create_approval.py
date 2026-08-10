@@ -15,8 +15,8 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.approvals.models import ApprovalRequestStatus
-from nexus.workflows.models import Workflow
+from syntara.approvals.models import ApprovalRequestStatus
+from syntara.workflows.models import Workflow
 from tests.integration.helpers.error_data import assert_error_data
 from tests.integration.helpers.workflow import ExecutionsFactory
 

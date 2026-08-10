@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.authz.role_assignment_router import RoleAssignmentListParams
+from syntara.authz.role_assignment_router import RoleAssignmentListParams
 
 
 class TestPrincipalTypeParam:

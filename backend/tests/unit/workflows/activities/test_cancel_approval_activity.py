@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.approval_activity import (
+from syntara.workflows.workflow_engine.activities.approval_activity import (
     cancel_approval_requests_activity,
 )
 
@@ -41,7 +41,7 @@ def _mock_client(pending: list[dict[str, Any]], cancel_result: dict[str, Any] | 
 
 def _patch_client(mock_client: AsyncMock) -> AbstractContextManager[MagicMock]:
     return patch(
-        "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+        "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
         return_value=mock_client,
     )
 
@@ -75,7 +75,7 @@ async def test_cancel_no_pending(execution_id: str) -> None:
 @pytest.mark.asyncio
 async def test_cancel_api_error(execution_id: str) -> None:
     """API errors return gracefully, not raised."""
-    from nexus.workflows.clients.approvals_client import ApprovalsApiClientError
+    from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
 
     client = AsyncMock()
     client.list_approvals_by_execution = AsyncMock(

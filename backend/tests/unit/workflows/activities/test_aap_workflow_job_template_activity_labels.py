@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from nexus.workflows.workflow_engine.activities.aap_common import (
+from syntara.workflows.workflow_engine.activities.aap_common import (
     resolve_label_ids,
 )
-from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
+from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
     AAPWorkflowJobExecutionError,
 )
 

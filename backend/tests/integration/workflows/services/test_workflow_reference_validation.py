@@ -10,17 +10,17 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.integrations.models.integration import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationType,
 )
-from nexus.integrations.models.llm_model import LLMModel
-from nexus.tool_manager.models.tool import Tool, ToolStatus
-from nexus.workflows.validators.workflow_integrations import (
+from syntara.integrations.models.llm_model import LLMModel
+from syntara.tool_manager.models.tool import Tool, ToolStatus
+from syntara.workflows.validators.workflow_integrations import (
     validate_workflow_references,
 )
 
@@ -146,7 +146,7 @@ async def _create_tool(
 
 
 async def _create_project(session: AsyncSession, user: User) -> UUID:
-    from nexus.authz.models import Project
+    from syntara.authz.models import Project
 
     project = Project(name=f"project-{uuid4().hex[:8]}", created_by=user.id)
     session.add(project)

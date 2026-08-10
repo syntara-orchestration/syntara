@@ -5,15 +5,15 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.agents.base_agent import BaseAgent
-from nexus.agent_orchestrator.exceptions import (
+from syntara.agent_orchestrator.agents.base_agent import BaseAgent
+from syntara.agent_orchestrator.exceptions import (
     AgentConfigurationError,
     AgentOrchestratorError,
     AgentRateLimitError,
     AgentTimeoutError,
 )
-from nexus.agent_orchestrator.models.agent_response import GenericAgentResponse
-from nexus.agent_orchestrator.models.agent_state import AgentState
+from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
+from syntara.agent_orchestrator.models.agent_state import AgentState
 
 
 class ConcreteAgent(BaseAgent):

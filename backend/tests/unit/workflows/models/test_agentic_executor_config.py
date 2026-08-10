@@ -15,7 +15,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     TEMPLATE_PATTERN,
     AgenticExecutorParameters,
 )

@@ -19,17 +19,17 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-import nexus.settings.cache.settings_cache as _settings_mod
-from nexus.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from nexus.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from nexus.workflows.workflow_engine.activities.wait_activity import complete_wait
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
-from nexus.workflows.workflow_engine.services.activity_sync_registry import (
+import syntara.settings.cache.settings_cache as _settings_mod
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
+from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.services.activity_sync_registry import (
     get_activity_sync_service,
     set_activity_sync_service,
 )
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.fixtures.settings import FakeSettingsCache
 
 

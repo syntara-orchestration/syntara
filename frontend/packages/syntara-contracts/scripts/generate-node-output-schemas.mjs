@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node generate-node-output-schemas.mjs
- *   node generate-node-output-schemas.mjs --schemas-dir ../../../backend/src/nexus/schemas/workflows/v2
+ *   node generate-node-output-schemas.mjs --schemas-dir ../../../backend/src/syntara/schemas/workflows/v2
  */
 
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ function parseSchemasDir() {
     return resolve(process.argv[idx + 1])
   }
   // Default: monorepo backend path (three levels up from syntara-contracts)
-  return resolve('../../../backend/src/nexus/schemas/workflows/v2')
+  return resolve('../../../backend/src/syntara/schemas/workflows/v2')
 }
 
 const schemasDir = parseSchemasDir()

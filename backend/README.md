@@ -55,13 +55,13 @@ Each domain represents a set of related functionality and follows a consistent s
 - **workflows** - Temporal workflow definitions and execution
 
 ```
-src/nexus/{domain}/
+src/syntara/{domain}/
 ├── router.py              # FastAPI routes (auto-discovered)
 ├── models/                # SQLModel classes
 └── services/              # Business logic
 ```
 
-**Router Discovery**: Routers in `src/nexus/{domain}/router.py` or `src/nexus/api/v1/{module}.py` are automatically discovered and registered.
+**Router Discovery**: Routers in `src/syntara/{domain}/router.py` or `src/syntara/api/v1/{module}.py` are automatically discovered and registered.
 
 ## Developer Workflow
 
@@ -150,7 +150,7 @@ make test-all
 make lint
 ```
 
-> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/nexus/authz/rego/authz.rego`.
+> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
 
 ### Database Setup
 
@@ -201,7 +201,7 @@ export APP_DATABASE_URL="postgresql+asyncpg://user:pass@host:port/dbname?sslmode
 Most domain models should extend the `Resource` base class:
 
 ```python
-from nexus.core.models import Resource
+from syntara.core.models import Resource
 
 class ToolProvider(Resource, table=True):
     """Extends Resource with provider-specific fields."""
@@ -232,7 +232,7 @@ make services-run
 
 **Run Temporal worker separately** (for development without containers):
 ```bash
-uv run python -m nexus.workflows.worker
+uv run python -m syntara.workflows.worker
 # Or use: make worker-run
 ```
 

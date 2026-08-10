@@ -1,6 +1,6 @@
 """Tests for InjectorResolver — {{field_id}} template resolution."""
 
-from nexus.credentials.lib.injector_resolver import InjectorResolver, ResolvedInjectors
+from syntara.credentials.lib.injector_resolver import InjectorResolver, ResolvedInjectors
 
 
 class TestResolveTemplates:

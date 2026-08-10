@@ -14,7 +14,7 @@ def _ensure_runtime_settings() -> Generator[None, None, None]:
     Activities like ``execute_script_activity`` call ``get_runtime_settings()``
     which raises ``RuntimeError`` if the singleton has not been set.
     """
-    import nexus.settings.cache.settings_cache as _settings_mod
+    import syntara.settings.cache.settings_cache as _settings_mod
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]

@@ -8,7 +8,7 @@ Tests cover:
 
 import pytest
 
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 
 # ---------------------------------------------------------------------------
 # Helpers

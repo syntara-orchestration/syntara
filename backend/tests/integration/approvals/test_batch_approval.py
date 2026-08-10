@@ -15,8 +15,8 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.approvals.models import ApprovalRequestStatus
-from nexus.core.models import User
+from syntara.approvals.models import ApprovalRequestStatus
+from syntara.core.models import User
 from tests.integration.helpers.approval import ApprovalsFactory
 from tests.integration.helpers.error_data import assert_error_data
 from tests.integration.helpers.workflow import ExecutionsFactory
@@ -57,7 +57,7 @@ class TestBatchApprovalContract:
             ]
         }
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -176,7 +176,7 @@ class TestBatchApprovalContract:
             ]
         }
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -283,7 +283,7 @@ class TestBatchApprovalContract:
             "decisions": [{"approval_id": str(approvals[0].id), "status": "approved", "notes": "Single decision test"}]
         }
         # Test single valid decision with mocked workflow client
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -321,7 +321,7 @@ class TestBatchApprovalContract:
         assert num_decisions_made == 100
 
         # Test max batch size with mocked workflow client
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -423,7 +423,7 @@ class TestBatchApprovalContract:
         )
 
         # Test valid decision without notes (should succeed) with mocked workflow client
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -475,7 +475,7 @@ class TestBatchApprovalContract:
         }
 
         # Test all valid statuses with mocked workflow client
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()

@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES, http_exception_handler
+from syntara.core.error_handlers import PROBLEM_TYPES, http_exception_handler
 
 
 class TestHttpExceptionHandler:

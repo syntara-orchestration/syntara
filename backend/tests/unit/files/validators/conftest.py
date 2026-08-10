@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nexus.files.file_manager import FileManager
+from syntara.files.file_manager import FileManager
 
 
 @pytest.fixture(autouse=True)

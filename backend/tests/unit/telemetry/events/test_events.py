@@ -3,16 +3,16 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.telemetry.events.base import BaseTelemetryEvent, _build_context
-from nexus.telemetry.events.node_execution import (
+from syntara.telemetry.events.base import BaseTelemetryEvent, _build_context
+from syntara.telemetry.events.node_execution import (
     NodeExecutionEvent,
     NodeExecutionEventBuilder,
 )
-from nexus.telemetry.events.workflow_execution import (
+from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 # Import shared test data from conftest
 from tests.unit.telemetry.conftest import (

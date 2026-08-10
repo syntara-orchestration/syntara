@@ -9,16 +9,16 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory
-from nexus.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.models import User
-from nexus.core.models.group import Group
-from nexus.users.services.user_service import UsersService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory
+from syntara.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.models import User
+from syntara.core.models.group import Group
+from syntara.users.services.user_service import UsersService
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestCreateUserMembershipAuditEvents:
@@ -28,8 +28,8 @@ class TestCreateUserMembershipAuditEvents:
         AuditEventDispatcher.register({GroupMembershipEvent: GroupMembershipHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
-    @patch("nexus.users.services.user_service.hash_password", return_value="hashed")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
+    @patch("syntara.users.services.user_service.hash_password", return_value="hashed")
     async def test_create_user_with_group_names_emits_group_member_added_events(
         self,
         mock_hash: Mock,

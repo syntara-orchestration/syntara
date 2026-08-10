@@ -11,7 +11,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models.policy import Policy
+from syntara.authz.models.policy import Policy
 
 
 @pytest.fixture

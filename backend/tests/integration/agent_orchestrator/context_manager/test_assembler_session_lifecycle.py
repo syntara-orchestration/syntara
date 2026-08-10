@@ -13,12 +13,12 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.assembler_service import AssemblerService
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
+from syntara.agent_orchestrator.context_manager.assembler_service import AssemblerService
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
     RelevantDocument,
 )
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.files.models import FileMetadata
 
 
 class SessionLifecycleTracker:

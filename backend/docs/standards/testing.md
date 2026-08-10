@@ -95,8 +95,8 @@ tests/
 
 **Organization Rules:**
 
-- Test directory structure mirrors `src/nexus/` hierarchy within each test category
-  - Example: `tests/unit/agent_orchestrator/` maps to `src/nexus/agent_orchestrator/`
+- Test directory structure mirrors `src/syntara/` hierarchy within each test category
+  - Example: `tests/unit/agent_orchestrator/` maps to `src/syntara/agent_orchestrator/`
 - Domain-specific conftest files provide domain-specific fixtures at appropriate hierarchy levels
 - Sample test files (PDFs, images, documents) live in `tests/fixtures/files/` and are accessed via `get_fixtures_dir()` from `tests.fixtures.files`
 - Shared unit/integration fixtures live in `tests/fixtures/` (settings, files, encryption, tls, temporal helpers)
@@ -583,16 +583,16 @@ This project uses structlog with `cache_logger_on_first_use=True`. Under pytest-
 
 ```python
 import structlog
-from nexus.some_module import target_module
+from syntara.some_module import target_module
 
-@patch("nexus.some_module.emitter._do_emit")
+@patch("syntara.some_module.emitter._do_emit")
 async def test_logs_warning(self, mock_emit: Mock) -> None:
     old_logger = target_module.logger
     try:
         with structlog.testing.capture_logs() as captured:
             # Create fresh logger INSIDE capture_logs() context
             # so it binds to the capture processor chain
-            target_module.logger = structlog.get_logger("nexus.some_module")
+            target_module.logger = structlog.get_logger("syntara.some_module")
             do_something_that_logs()
     finally:
         target_module.logger = old_logger
@@ -726,7 +726,7 @@ All HTML coverage reports are gitignored via the `htmlcov-*/` pattern:
 
 ## Adding Tests for a New Domain
 
-When adding a new domain (e.g., `src/nexus/new_domain/`):
+When adding a new domain (e.g., `src/syntara/new_domain/`):
 
 **Step 1: Create Test Directory Structure**
 
@@ -746,7 +746,7 @@ Only add if domain needs specific fixtures:
 """Domain-specific test fixtures."""
 
 import pytest
-from nexus.new_domain.models import DomainModel
+from syntara.new_domain.models import DomainModel
 
 @pytest.fixture
 def domain_model_data() -> dict[str, Any]:

@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from nexus.files.document_conversion.converters.document_converter import (
+from syntara.files.document_conversion.converters.document_converter import (
     DocumentConverter,
 )
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
 
@@ -111,7 +111,7 @@ class TestDocumentConverterTimingBehavior:
         assert result.error_message == "Unexpected error during document conversion."
         assert result.metadata["exception_type"] == "ValueError"
 
-    @patch("nexus.files.document_conversion.models.conversion_config.ConversionConfig.from_settings")
+    @patch("syntara.files.document_conversion.models.conversion_config.ConversionConfig.from_settings")
     @pytest.mark.asyncio
     async def test_convert_with_timeout_allows_fast_conversions(self, mock_from_settings: AsyncMock) -> None:
         """Test convert_with_timeout allows conversions that complete within timeout."""
@@ -149,7 +149,7 @@ class ThreadedBlockingConverter(DocumentConverter):
 class TestDocumentConverterTimeoutWithBlockingConverter:
     """Test that timeout works when a converter offloads blocking work to a thread."""
 
-    @patch("nexus.files.document_conversion.models.conversion_config.ConversionConfig.from_settings")
+    @patch("syntara.files.document_conversion.models.conversion_config.ConversionConfig.from_settings")
     @pytest.mark.asyncio
     async def test_timeout_fires_for_threaded_blocking_conversion(self, mock_from_settings: AsyncMock) -> None:
         """Test that asyncio.wait_for can cancel a blocking conversion running in a thread."""

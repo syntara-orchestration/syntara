@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from nexus.settings.catalog import SETTINGS_CATALOG
-from nexus.settings.models.runtime_setting import SettingCategory, SettingValueType
+from syntara.settings.catalog import SETTINGS_CATALOG
+from syntara.settings.models.runtime_setting import SettingCategory, SettingValueType
 
 # ---------------------------------------------------------------------------
 # Helpers

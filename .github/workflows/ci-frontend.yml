@@ -58,7 +58,7 @@ jobs:
           else
             echo "backend=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^backend/src/nexus/schemas/' <<< "$FILES"; then
+          if grep -qE '^backend/src/syntara/schemas/' <<< "$FILES"; then
             echo "contracts=true" >> "$GITHUB_OUTPUT"
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"

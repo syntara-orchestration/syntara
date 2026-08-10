@@ -16,8 +16,8 @@ from uuid import uuid4
 import pytest
 from orchestrator_test_sdk.e2e import async_poll_for
 
-from nexus.core.constants import WebSocketConfig
-from nexus.core.websocket.manager import (
+from syntara.core.constants import WebSocketConfig
+from syntara.core.websocket.manager import (
     WebSocketConnectionInfo,
     WebSocketConnectionLifecycleManager,
 )

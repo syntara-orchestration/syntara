@@ -92,20 +92,20 @@ def _patch_setting(api: SyntaraApiRegistry, key: str, *, value: int | bool) -> N
 
 @pytest.mark.e2e
 def test_script_timeout_setting_affects_execution(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
 ) -> None:
     """Changing script_timeout_seconds causes a slow script to time out."""
     key = "workflow_engine.script_timeout_seconds"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
         # Set timeout to 2 seconds
-        _patch_setting(nexus_api, key, value=2)
+        _patch_setting(syntara_api, key, value=2)
 
         # Run a script that sleeps for 10 seconds — should be killed by timeout
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-settings-script-timeout",
             {
                 "name": "runtime_setting",
@@ -126,7 +126,7 @@ def test_script_timeout_setting_affects_execution(
 
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED (timeout), got {result.status}"
     finally:
-        _patch_setting(nexus_api, key, value=original["effective_value"])
+        _patch_setting(syntara_api, key, value=original["effective_value"])
 
 
 # ---------------------------------------------------------------------------
@@ -136,20 +136,20 @@ def test_script_timeout_setting_affects_execution(
 
 @pytest.mark.e2e
 def test_max_loop_iterations_setting_affects_execution(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
 ) -> None:
     """Changing max_loop_iterations causes an infinite loop to fail with MaxIterationsError."""
     key = "workflow_engine.max_loop_iterations"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
         # Set max iterations to 3
-        _patch_setting(nexus_api, key, value=3)
+        _patch_setting(syntara_api, key, value=3)
 
         # Run a do_while loop with always-true condition (no max_iterations in config)
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-settings-max-loop",
             {
                 "name": "runtime_setting",
@@ -184,4 +184,4 @@ def test_max_loop_iterations_setting_affects_execution(
         # Exceeding max_iterations raises MaxIterationsError → execution fails
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED (max iterations), got {result.status}"
     finally:
-        _patch_setting(nexus_api, key, value=original["effective_value"])
+        _patch_setting(syntara_api, key, value=original["effective_value"])

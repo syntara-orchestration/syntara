@@ -18,8 +18,8 @@ import openai
 import pytest
 from fastapi import HTTPException
 
-from nexus.core.config.base import AdapterRetrySettings
-from nexus.core.utils.retry import (
+from syntara.core.config.base import AdapterRetrySettings
+from syntara.core.utils.retry import (
     calculate_backoff,
     is_retryable_error,
     retry_with_backoff,
@@ -204,7 +204,7 @@ class TestErrorClassification:
 
     def test_retryable_error_marker_is_retryable(self) -> None:
         """Test that exceptions inheriting RetryableError are classified as retryable."""
-        from nexus.agent_orchestrator.exceptions import EmptyLLMResponseError
+        from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
 
         error = EmptyLLMResponseError(invocation_id="test-id")
         assert is_retryable_error(error) is True
@@ -411,7 +411,7 @@ class TestRetryDecorator:
         override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         """Test that RetryableError subclasses are retried by the decorator."""
-        from nexus.agent_orchestrator.exceptions import EmptyLLMResponseError
+        from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
 
         call_count = 0
 
@@ -490,7 +490,7 @@ class TestRetryDecorator:
                 adapter_initial_backoff_seconds=0.1,
                 adapter_backoff_growth_factor=2.0,
             ),
-            patch("nexus.core.utils.retry.asyncio.sleep", side_effect=mock_sleep),
+            patch("syntara.core.utils.retry.asyncio.sleep", side_effect=mock_sleep),
             pytest.raises(openai.APIStatusError),
         ):
             await mock_llm_call(invocation_id=uuid4())

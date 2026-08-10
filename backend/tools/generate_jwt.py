@@ -51,11 +51,11 @@ from uuid import UUID
 import structlog
 from sqlmodel import select
 
-from nexus.auth.services.token_service import KeyManager, TokenService
-from nexus.auth.session import create_session_store
-from nexus.core.config.base import get_settings
-from nexus.core.database.session import AsyncSessionLocal
-from nexus.core.models import User
+from syntara.auth.services.token_service import KeyManager, TokenService
+from syntara.auth.session import create_session_store
+from syntara.core.config.base import get_settings
+from syntara.core.database.session import AsyncSessionLocal
+from syntara.core.models import User
 
 # Valid --key choices; paths are resolved at runtime from settings/environment.
 _KEY_CHOICES = ("primary", "backup")
@@ -229,8 +229,8 @@ async def main() -> int:
     # ``podman-compose exec -T`` (no TTY) so stderr stays separate, but we
     # still silence logs here as a safeguard.
     # We check for ``--json`` early (before argparse) so that logging is
-    # silenced before any nexus code runs.
-    # nexus/__init__.py configures structlog with stdlib processors
+    # silenced before any syntara code runs.
+    # syntara/__init__.py configures structlog with stdlib processors
     # (including filter_by_level) at import time. We must override the full
     # processor chain here, not just the factory, because PrintLogger lacks
     # the .disabled attribute that filter_by_level requires.

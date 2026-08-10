@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.tool_manager.models import Tool, ToolStatus
+from syntara.tool_manager.models import Tool, ToolStatus
 
 
 class TestToolsUpdateContract:

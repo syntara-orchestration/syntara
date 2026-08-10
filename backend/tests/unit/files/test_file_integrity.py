@@ -6,9 +6,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.files.exceptions import FileContentNotFoundError, FileIntegrityError
-from nexus.files.file_manager import FileManager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.exceptions import FileContentNotFoundError, FileIntegrityError
+from syntara.files.file_manager import FileManager
+from syntara.files.models import FileMetadata, FileStatus
 
 
 class TestLoadFileWithIntegrityCheck:

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.telemetry.events.workflow_error import WorkflowErrorEvent
+from syntara.telemetry.events.workflow_error import WorkflowErrorEvent
 from tests.unit.telemetry.conftest import VALID_WORKFLOW_EXECUTION_ID
 
 

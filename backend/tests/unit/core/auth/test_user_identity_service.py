@@ -6,16 +6,16 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.auth.exceptions import (
+from syntara.auth.exceptions import (
     IdentityOnBuiltinUserError,
     LastSignInMethodError,
     UserIdentityNotFoundError,
     UserNotFoundError,
 )
-from nexus.core.models.user import AuthType
-from nexus.users.services.user_identity_service import UserIdentityService
+from syntara.core.models.user import AuthType
+from syntara.users.services.user_identity_service import UserIdentityService
 
-_PATCH_SESSION_STORE = "nexus.users.services.user_identity_service.create_session_store"
+_PATCH_SESSION_STORE = "syntara.users.services.user_identity_service.create_session_store"
 
 
 def _make_identity(*, user_id: UUID | None = None, identity_id: UUID | None = None) -> MagicMock:

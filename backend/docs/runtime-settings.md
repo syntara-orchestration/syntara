@@ -4,9 +4,9 @@
 
 Runtime settings are database-backed configuration values that can be changed without redeploying the application. Settings are stored in PostgreSQL and accessible to other backend code via `SettingsCache`, and manageable by administrators through the REST API and Settings UI page.
 
-Like `nexus.core.config`, Runtime settings are accessed by a short key, have default values, and enforce validation criteria.
+Like `syntara.core.config`, Runtime settings are accessed by a short key, have default values, and enforce validation criteria.
 
-Unlike `nexus.core.config`, Runtime settings are not configurable by environment variables. They are user-controlled and should not be used for install-time configuration settings that require deployment changes (such as database connection details or HTTP server configuration). Those configuration settings should remain in `nexus.core.config` and configurable by environment variable.
+Unlike `syntara.core.config`, Runtime settings are not configurable by environment variables. They are user-controlled and should not be used for install-time configuration settings that require deployment changes (such as database connection details or HTTP server configuration). Those configuration settings should remain in `syntara.core.config` and configurable by environment variable.
 
 Since Runtime settings may be written by multiple clients, they employ a version number to guarantee consistency using optimistic locking.
 
@@ -24,7 +24,7 @@ Key design points:
 Access settings through the `SettingsCache` singleton via `get_runtime_settings()`. All reads are `async`:
 
 ```python
-from nexus.settings.cache.settings_cache import get_runtime_settings
+from syntara.settings.cache.settings_cache import get_runtime_settings
 
 class MyService:
     def __init__(self) -> None:
@@ -68,11 +68,11 @@ priority_order = await self.settings.get("context_manager.priority_order")
 
 ## Defining a New Setting
 
-Add a `SettingDefinition` entry to `SETTINGS_CATALOG` in `src/nexus/settings/catalog.py`:
+Add a `SettingDefinition` entry to `SETTINGS_CATALOG` in `src/syntara/settings/catalog.py`:
 
 ```python
-from nexus.settings.catalog import SettingDefinition
-from nexus.settings.models.runtime_setting import SettingCategory, SettingValueType
+from syntara.settings.catalog import SettingDefinition
+from syntara.settings.models.runtime_setting import SettingCategory, SettingValueType
 
 SettingDefinition(
     key="system.max_retries",                  # dot-namespaced key
@@ -92,7 +92,7 @@ That's it. After running migrations and the seeder, the definition is upserted i
 
 ```bash
 uv run alembic upgrade head
-uv run python -m nexus.seed --only settings
+uv run python -m syntara.seed --only settings
 ```
 
 If no row matching the setting exists, a row will be inserted. If a row does exist, the user-controlled `value` and `version` will be preserved but the other metadata fields (including `default_value`) will be updated. The seeder does not run at app startup — it runs as a post-migration step.
@@ -215,7 +215,7 @@ Most settings are read on demand via `get_runtime_settings()` and don't need any
 Some settings, however, require an immediate action when their value changes. For example, changing the log level needs to reconfigure the Python logging subsystem. For these cases, use the `@watch_setting` decorator to register a change handler:
 
 ```python
-from nexus.settings.watch import watch_setting
+from syntara.settings.watch import watch_setting
 
 @watch_setting("logging.log_level")
 def _on_log_level_changed(_key: str, new_value: Any) -> None:
@@ -241,7 +241,7 @@ The application lifecycle handles the rest -- no additional wiring is needed. Th
 - Handlers can be sync or async. Async handlers are awaited.
 - **Handlers must return quickly.** Callbacks run sequentially -- a slow or blocking handler will delay change detection for all other watched settings. Keep handlers limited to fast, in-process operations (e.g. reconfiguring a logger, updating a module-level variable). Do not make network requests or database calls from a watcher callback.
 
-## Migrating from `nexus.core.config`
+## Migrating from `syntara.core.config`
 
 ### Pattern 1: Cache read (most settings)
 
@@ -344,13 +344,13 @@ SETTINGS_CATALOG (Python)
 ## Adding a New Category
 
 Categories are stored in the `setting_categories` database table and seeded
-from `CATEGORY_CATALOG` in `src/nexus/settings/catalog.py`. To add a new
+from `CATEGORY_CATALOG` in `src/syntara/settings/catalog.py`. To add a new
 category:
 
 1. Add a `CategoryDefinition` entry to `CATEGORY_CATALOG` with a unique slug,
    display name, description, and display order.
 2. Add the slug to the `SettingCategory` enum in
-   `src/nexus/settings/models/runtime_setting.py` (used for type-safe
+   `src/syntara/settings/models/runtime_setting.py` (used for type-safe
    references in `SETTINGS_CATALOG`).
-3. Run the seeder (`make dev` or `uv run python -m nexus.seed --only settings`) —
+3. Run the seeder (`make dev` or `uv run python -m syntara.seed --only settings`) —
    no migration is needed.

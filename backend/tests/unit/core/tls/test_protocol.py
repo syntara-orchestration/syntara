@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 import pytest
 
-from nexus.core.tls.protocol import TLSH11Protocol, _extract_peercert, _inject_peercert_into_scope
+from syntara.core.tls.protocol import TLSH11Protocol, _extract_peercert, _inject_peercert_into_scope
 
 
 def _make_peercert(cn: str = "worker.ao.svc") -> dict[str, Any]:
@@ -157,7 +157,7 @@ class TestTLSH11Protocol:
 
 
 try:
-    from nexus.core.tls.protocol import TLSHttpToolsProtocol
+    from syntara.core.tls.protocol import TLSHttpToolsProtocol
 
     class TestTLSHttpToolsProtocol:
         """Tests for the httptools-based TLS protocol subclass."""

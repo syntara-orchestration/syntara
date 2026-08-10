@@ -5,13 +5,13 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.token_manager.exceptions import (
+from syntara.agent_orchestrator.token_manager.exceptions import (
     TokenLimitExceededError,
     UserTokenConfigNotFoundError,
 )
-from nexus.agent_orchestrator.token_manager.models import UserTokenConfig
-from nexus.agent_orchestrator.token_manager.repository import TokenUsageRepository
-from nexus.agent_orchestrator.token_manager.services import (
+from syntara.agent_orchestrator.token_manager.models import UserTokenConfig
+from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.token_manager.services import (
     TokenCalculator,
     TokenValidationService,
 )

@@ -7,11 +7,11 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.audit.websocket_connection import (
+from syntara.workflows.audit.websocket_connection import (
     WebSocketConnectionAction,
     WebSocketConnectionEvent,
 )
-from nexus.workflows.services.execution_streaming_service import ExecutionStreamingService
+from syntara.workflows.services.execution_streaming_service import ExecutionStreamingService
 
 EXECUTION_ID = uuid4()
 WORKFLOW_ID = uuid4()
@@ -40,7 +40,7 @@ class TestExecutionStreamingAudit:
     """Verify audit events are dispatched during WebSocket streaming lifecycle."""
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_dispatches_connected_and_disconnected_on_success(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         ws = _make_websocket()
@@ -84,7 +84,7 @@ class TestExecutionStreamingAudit:
         assert call_kwargs["execution_status"] == "running"
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_dispatches_connected_and_error_on_exception(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         ws = _make_websocket()
@@ -110,7 +110,7 @@ class TestExecutionStreamingAudit:
         assert error_event.duration_ms is not None
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_uses_execution_id_prefix_when_no_connection_id(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         ws = _make_websocket()
@@ -124,7 +124,7 @@ class TestExecutionStreamingAudit:
         assert connected_event.connection_id == str(EXECUTION_ID)[:8]
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_handles_missing_websocket_client(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         ws = MagicMock()
@@ -140,7 +140,7 @@ class TestExecutionStreamingAudit:
         assert connected_event.client_ip == "unknown"
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_handles_missing_workflow_context(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         service._resolve_workflow_context = AsyncMock(return_value=(None, "", None))
@@ -157,7 +157,7 @@ class TestExecutionStreamingAudit:
         assert connected_event.workflow_name == ""
 
     @pytest.mark.asyncio
-    @patch("nexus.workflows.services.execution_streaming_service.AuditEventDispatcher")
+    @patch("syntara.workflows.services.execution_streaming_service.AuditEventDispatcher")
     async def test_dispatches_events_when_workflow_context_raises(self, mock_dispatcher: MagicMock) -> None:
         service = _make_service()
         service._resolve_workflow_context = AsyncMock(side_effect=RuntimeError("db down"))

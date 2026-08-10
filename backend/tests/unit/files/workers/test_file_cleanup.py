@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.core.workers.periodic import PeriodicWorker
-from nexus.files.audit.file_cleaned_up import FileCleanedUpEvent
-from nexus.files.retrievers.s3 import S3FileRetriever
-from nexus.files.workers.file_cleanup import cleanup_stale_multipart_uploads, get_multipart_cleanup_worker
+from syntara.core.workers.periodic import PeriodicWorker
+from syntara.files.audit.file_cleaned_up import FileCleanedUpEvent
+from syntara.files.retrievers.s3 import S3FileRetriever
+from syntara.files.workers.file_cleanup import cleanup_stale_multipart_uploads, get_multipart_cleanup_worker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -33,8 +33,8 @@ class TestCleanupStaleMultipartUploads:
 
         with (
             override_settings(file_multipart_cleanup_threshold_hours=48),
-            patch("nexus.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
         ):
             await cleanup_stale_multipart_uploads(MagicMock())
 
@@ -50,8 +50,8 @@ class TestCleanupStaleMultipartUploads:
         mock_fm.s3_configured = False
 
         with (
-            patch("nexus.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
         ):
             await cleanup_stale_multipart_uploads(MagicMock())
 
@@ -70,8 +70,8 @@ class TestCleanupStaleMultipartUploads:
 
         with (
             override_settings(file_multipart_cleanup_threshold_hours=24),
-            patch("nexus.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.files.workers.file_cleanup.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.workers.file_cleanup.AuditEventDispatcher") as mock_dispatcher,
         ):
             await cleanup_stale_multipart_uploads(MagicMock())
 
@@ -82,7 +82,7 @@ class TestGetMultipartCleanupWorker:
     """Tests for the get_multipart_cleanup_worker factory."""
 
     def test_creates_worker_with_correct_config(self) -> None:
-        with patch("nexus.files.workers.file_cleanup.AsyncSessionLocal", new_callable=MagicMock):
+        with patch("syntara.files.workers.file_cleanup.AsyncSessionLocal", new_callable=MagicMock):
             get_multipart_cleanup_worker.cache_clear()
             worker = get_multipart_cleanup_worker()
 
@@ -91,7 +91,7 @@ class TestGetMultipartCleanupWorker:
         assert worker._coordinate is True
 
     def test_returns_cached_singleton(self) -> None:
-        with patch("nexus.files.workers.file_cleanup.AsyncSessionLocal", new_callable=MagicMock):
+        with patch("syntara.files.workers.file_cleanup.AsyncSessionLocal", new_callable=MagicMock):
             get_multipart_cleanup_worker.cache_clear()
             w1 = get_multipart_cleanup_worker()
             w2 = get_multipart_cleanup_worker()

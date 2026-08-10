@@ -2,14 +2,14 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.disabled_user_rejection import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.disabled_user_rejection import (
     DisabledUserRejectionEvent,
     DisabledUserRejectionHandler,
     RejectionContext,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestDisabledUserRejectionHandler:
@@ -31,7 +31,7 @@ class TestDisabledUserRejectionHandler:
         assert result.event_severity == EventSeverity.WARNING
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "disabled_user_rejected"
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "middleware" in result.event_message
         assert result.actor_type == PrincipalType.USER
 
@@ -44,7 +44,7 @@ class TestDisabledUserRejectionHandler:
         handler = DisabledUserRejectionHandler()
         result = handler.handle(event)
 
-        assert result.source_component == "nexus.auth.token_refresh"
+        assert result.source_component == "syntara.auth.token_refresh"
         assert "token_refresh" in result.event_message
 
     def test_resource_fields(self) -> None:

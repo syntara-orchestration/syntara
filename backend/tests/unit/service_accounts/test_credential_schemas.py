@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.service_accounts.credential_schemas import (
+from syntara.service_accounts.credential_schemas import (
     SACredentialCreate,
     SACredentialCreateResponse,
     SACredentialListParams,
@@ -15,7 +15,7 @@ from nexus.service_accounts.credential_schemas import (
     SACredentialRotateRequest,
     SACredentialRotateResponse,
 )
-from nexus.service_accounts.models.service_account_credential import (
+from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredentialStatus,
     ServiceAccountCredentialType,
 )

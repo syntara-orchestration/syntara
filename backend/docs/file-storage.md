@@ -48,13 +48,13 @@ graph TD
 
 | Component | Purpose | Location |
 |-----------|---------|----------|
-| **Router** | HTTP endpoints for upload, download, list, delete | `src/nexus/files/router.py` |
-| **FileManager** | Lazy singleton; validates files, delegates to S3FileRetriever, generates FileMetadata | `src/nexus/files/file_manager.py` |
-| **S3FileRetriever** | boto3 client wrapper; save, load, delete, health check, multipart upload | `src/nexus/files/retrievers/s3.py` |
-| **BaseRetriever** | Abstract base class defining the retriever interface | `src/nexus/files/retrievers/base.py` |
-| **FileMetadata** | SQLModel for file metadata (id, filename, path, size, mime_type, content_hash, status) | `src/nexus/files/models/file_metadata.py` |
-| **FileStorageSettings** | Pydantic settings for S3 env vars | `src/nexus/core/config/base.py` |
-| **Health** | Startup validation and runtime health probes | `src/nexus/files/health.py` |
+| **Router** | HTTP endpoints for upload, download, list, delete | `src/syntara/files/router.py` |
+| **FileManager** | Lazy singleton; validates files, delegates to S3FileRetriever, generates FileMetadata | `src/syntara/files/file_manager.py` |
+| **S3FileRetriever** | boto3 client wrapper; save, load, delete, health check, multipart upload | `src/syntara/files/retrievers/s3.py` |
+| **BaseRetriever** | Abstract base class defining the retriever interface | `src/syntara/files/retrievers/base.py` |
+| **FileMetadata** | SQLModel for file metadata (id, filename, path, size, mime_type, content_hash, status) | `src/syntara/files/models/file_metadata.py` |
+| **FileStorageSettings** | Pydantic settings for S3 env vars | `src/syntara/core/config/base.py` |
+| **Health** | Startup validation and runtime health probes | `src/syntara/files/health.py` |
 | **useFileStorageStatus** | React hook; queries `/files/storage_status`, returns `isConfigured` boolean | `frontend/.../hooks/useFileStorageStatus.ts` |
 
 ## Configuration
@@ -142,7 +142,7 @@ Steps:
 
 Uploaded files (PDF, DOCX, etc.) are converted to markdown for use as agent context. Conversion runs **asynchronously** — the POST `/files` response returns before any conversion activity begins.
 
-After upload, the router dispatches conversion by starting a `BUILTIN_WORKFLOW_DOCUMENT_CONVERSION` Temporal workflow via `exec_service.create_execution_by_name()`. If Temporal is unavailable, the dispatch is skipped with a logged warning and the file stays in `pending_conversion` indefinitely (source: `src/nexus/files/router.py:182-203`).
+After upload, the router dispatches conversion by starting a `BUILTIN_WORKFLOW_DOCUMENT_CONVERSION` Temporal workflow via `exec_service.create_execution_by_name()`. If Temporal is unavailable, the dispatch is skipped with a logged warning and the file stays in `pending_conversion` indefinitely (source: `src/syntara/files/router.py:182-203`).
 
 **Status state machine:**
 
@@ -180,7 +180,7 @@ Every file upload computes a SHA-256 hash of the content and stores it in `FileM
 | `FileConvertedEvent` | After document conversion | file_id, filename, mime_type, size_bytes, conversion_state, conversion_time_ms |
 | `FileCleanedUpEvent` | After multipart cleanup | files_deleted, multipart_uploads_aborted (summary-level event) |
 
-Audit events are dispatched via `AuditEventDispatcher.dispatch()` and flow through the audit framework (`src/nexus/files/audit/`).
+Audit events are dispatched via `AuditEventDispatcher.dispatch()` and flow through the audit framework (`src/syntara/files/audit/`).
 
 ## Health and Observability
 
@@ -246,7 +246,7 @@ The router prefix is `/files` (auto-discovered under `/api/v1`). `project_id` is
 
 ## Error Reference
 
-Exception-to-HTTP-status mapping (source: `src/nexus/files/error_handlers.py`, `src/nexus/files/exceptions.py`):
+Exception-to-HTTP-status mapping (source: `src/syntara/files/error_handlers.py`, `src/syntara/files/exceptions.py`):
 
 | Exception | HTTP Status | Meaning |
 |-----------|-------------|---------|

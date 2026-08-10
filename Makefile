@@ -102,7 +102,7 @@ run-standards-checks-frontend: ## Run frontend standards checks (contract genera
 run-standards-checks-backend: ## Run backend standards checks (API specs, code quality)
 	$(MAKE) -C backend api-spec-validation
 	$(MAKE) -C backend api-spec-bundle
-	@git diff --exit-code backend/src/nexus/schemas/openapi.yaml || { \
+	@git diff --exit-code backend/src/syntara/schemas/openapi.yaml || { \
 		echo "Bundled OpenAPI spec has uncommitted changes. Commit them."; \
 		exit 1; \
 	}

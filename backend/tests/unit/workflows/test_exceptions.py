@@ -9,8 +9,8 @@ from uuid import uuid4
 
 import pytest
 
-import nexus.workflows.exceptions
-from nexus.workflows.exceptions import (
+import syntara.workflows.exceptions
+from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowMissingError,
     BuiltinWorkflowModifyError,
@@ -36,7 +36,7 @@ from nexus.workflows.exceptions import (
     WorkflowVersionConflictError,
     WorkflowVersionNotFoundError,
 )
-from nexus.workflows.models.validation_finding import (
+from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
     ValidationResult,
@@ -65,7 +65,7 @@ class TestModuleLevelCoverage:
     """
 
     def test_module_reload_covers_class_definitions(self) -> None:
-        importlib.reload(nexus.workflows.exceptions)
+        importlib.reload(syntara.workflows.exceptions)
 
 
 class TestWorkflowErrorHierarchy:

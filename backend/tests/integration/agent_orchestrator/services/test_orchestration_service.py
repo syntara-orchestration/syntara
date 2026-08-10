@@ -16,12 +16,12 @@ from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.planner import ContextManagerPlanner
-from nexus.agent_orchestrator.services.orchestration_service import OrchestrationService
-from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
-from nexus.integrations.models.integration import Integration, IntegrationStatus, IntegrationType
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
-from nexus.tool_manager.models.tool import Tool, ToolStatus
+from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
+from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+from syntara.integrations.models.integration import Integration, IntegrationStatus, IntegrationType
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.tool_manager.models.tool import Tool, ToolStatus
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +145,10 @@ class TestOrchestrationServiceGetTools:
 
         with (
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
+                "syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
                 create_test_tool_manager_client(jwt_client),
             ),
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             mock_mcp_instance = Mock()
             mock_mcp_client_class.return_value = mock_mcp_instance
@@ -199,10 +199,10 @@ class TestOrchestrationServiceGetTools:
 
         with (
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
+                "syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
                 create_test_tool_manager_client(jwt_client),
             ),
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             mock_mcp_instance = Mock()
             mock_mcp_client_class.return_value = mock_mcp_instance
@@ -268,10 +268,10 @@ class TestOrchestrationServiceGetTools:
 
         with (
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
+                "syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient",
                 create_test_tool_manager_client(jwt_client),
             ),
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             mock_mcp_instance = Mock()
             mock_mcp_client_class.return_value = mock_mcp_instance

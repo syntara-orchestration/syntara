@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import httpx
 import pytest
 
-from nexus.core.config.base import Settings
-from nexus.core.tls.http_client import build_internal_http_client, build_internal_ssl_context
+from syntara.core.config.base import Settings
+from syntara.core.tls.http_client import build_internal_http_client, build_internal_ssl_context
 
 if TYPE_CHECKING:
     from collections.abc import Callable

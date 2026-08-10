@@ -22,9 +22,9 @@ from httpx import HTTPStatusError, Request, Response
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
-from nexus.tool_manager.exceptions import ToolNotFoundError
-from nexus.tool_manager.lib.providers.mcp.mcp_provider import MCPProvider
-from nexus.tool_manager.models import (
+from syntara.tool_manager.exceptions import ToolNotFoundError
+from syntara.tool_manager.lib.providers.mcp.mcp_provider import MCPProvider
+from syntara.tool_manager.models import (
     Tool,
     ToolParameterType,
     ToolProviderValidationResult,
@@ -91,7 +91,7 @@ class TestMCPProvider:
         assert provider._tools_cache == {}
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_client_success(self, mock_client_class: Mock) -> None:
         """Test successful MCP client initialization."""
         # Setup
@@ -120,7 +120,7 @@ class TestMCPProvider:
         assert call_args == expected_config
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_client_without_api_key(self, mock_client_class: Mock) -> None:
         """Test MCP client initialization without API key (empty string)."""
         # Setup
@@ -140,7 +140,7 @@ class TestMCPProvider:
         assert "headers" not in call_args["mcp-integration"]
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_client_with_none_api_key(self, mock_client_class: Mock) -> None:
         """Test MCP client initialization with None API key."""
         # Setup
@@ -160,7 +160,7 @@ class TestMCPProvider:
         assert "headers" not in call_args["mcp-integration"]
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_client_cached(self, mock_client_class: Mock) -> None:
         """Test that client is cached and not recreated."""
         # Setup
@@ -179,7 +179,7 @@ class TestMCPProvider:
         mock_client_class.assert_called_once()  # Should only be called once
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_client_initialization_error(self, mock_client_class: Mock) -> None:
         """Test MCP client initialization error handling."""
         # Setup
@@ -192,7 +192,7 @@ class TestMCPProvider:
             await provider._get_client()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_success(self, mock_client_class: Mock) -> None:
         """Test successful connection validation."""
         # Setup
@@ -216,7 +216,7 @@ class TestMCPProvider:
         mock_client.get_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_timeout(self, mock_client_class: Mock) -> None:
         """Test connection validation timeout handling with retries."""
         # Setup
@@ -242,7 +242,7 @@ class TestMCPProvider:
         assert mock_client.get_tools.call_count == 3
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_connection_error(self, mock_client_class: Mock) -> None:
         """Test connection validation with connection error."""
         # Setup
@@ -267,7 +267,7 @@ class TestMCPProvider:
         mock_client.get_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_nested_exception_groups(self, mock_client_class: Mock) -> None:
         """Test connection validation with nested ExceptionGroups."""
         # Setup
@@ -315,7 +315,7 @@ class TestMCPProvider:
         mock_client.get_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_session_terminated(self, mock_client_class: Mock) -> None:
         """Test connection validation with session termination error."""
         # Setup
@@ -330,7 +330,7 @@ class TestMCPProvider:
             await provider.validate_connection()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_connection_general_error(self, mock_client_class: Mock) -> None:
         """Test connection validation with general error returning validation result."""
         # Setup
@@ -345,7 +345,7 @@ class TestMCPProvider:
             await provider.validate_connection()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_success(self, mock_client_class: Mock) -> None:
         """Test successful tool refresh."""
         # Setup
@@ -382,7 +382,7 @@ class TestMCPProvider:
         assert "get_greeting" in provider._tools_cache
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_with_conversion_error(self, mock_client_class: Mock) -> None:
         """Test tool refresh with tool conversion errors."""
         # Setup
@@ -405,7 +405,7 @@ class TestMCPProvider:
         assert tools[0].name == "good_tool"
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_timeout(self, mock_client_class: Mock) -> None:
         """Test tool refresh timeout handling."""
         # Setup
@@ -420,7 +420,7 @@ class TestMCPProvider:
             await provider.refresh_tools()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_connection_error(self, mock_client_class: Mock) -> None:
         """Test tool refresh connection error handling."""
         # Setup
@@ -435,7 +435,7 @@ class TestMCPProvider:
             await provider.refresh_tools()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_base_tools_success(self, mock_client_class: Mock) -> None:
         """Test successful retrieval of base tools."""
         # Setup
@@ -459,7 +459,7 @@ class TestMCPProvider:
         mock_client.get_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_base_tools_timeout(self, mock_client_class: Mock) -> None:
         """Test base tools retrieval timeout handling."""
         # Setup
@@ -474,7 +474,7 @@ class TestMCPProvider:
             await provider.get_base_tools()
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_get_base_tools_connection_error(self, mock_client_class: Mock) -> None:
         """Test base tools retrieval connection error handling."""
         # Setup
@@ -538,7 +538,7 @@ class TestMCPProvider:
             await provider.get_tool_schema("error_tool")
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_tool_success(self, mock_client_class: Mock) -> None:
         """Test successful tool validation."""
         # Setup
@@ -572,7 +572,7 @@ class TestMCPProvider:
             await provider.validate_tool("nonexistent")
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_tool_schema_validation_error(self, mock_client_class: Mock) -> None:
         """Test tool validation with schema validation error."""
         # Setup
@@ -600,7 +600,7 @@ class TestMCPProvider:
         assert "Schema validation failed" in result.message
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_tool_connectivity_error(self, mock_client_class: Mock) -> None:
         """Test tool validation with connectivity error."""
         # Setup
@@ -623,7 +623,7 @@ class TestMCPProvider:
         assert "Connectivity check failed" in result.message
 
     @pytest.mark.asyncio
-    @patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_validate_tool_connectivity_timeout(self, mock_client_class: Mock) -> None:
         """Test tool validation with connectivity timeout (returns error result)."""
         # Setup

@@ -2,8 +2,8 @@
 
 from typing import ClassVar
 
-from nexus.workflows.seed_builtin import _BUILTIN_DEFINITIONS
-from nexus.workflows.workflow_engine.activities.registry import (
+from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
+from syntara.workflows.workflow_engine.activities.registry import (
     ACTIVITY_REGISTRY,
     BACKGROUND_ACTIVITY_REGISTRY,
 )

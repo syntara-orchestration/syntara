@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.sanitization import (
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.sanitization import (
     REDACTED,
     EventSanitizer,
     PIIDetector,
@@ -15,7 +15,7 @@ from nexus.audit.sanitization import (
     redact_by_partial_key,
     redact_email,
 )
-from nexus.audit.sanitization import (
+from syntara.audit.sanitization import (
     sanitizer as default_sanitizer,
 )
 
@@ -702,7 +702,7 @@ class TestBooleanPreservation:
 
     def test_sanitizer_preserves_credential_used_boolean(self) -> None:
         """Full sanitizer should preserve credential_used boolean in AuditContextData."""
-        from nexus.audit.sanitization import sanitizer
+        from syntara.audit.sanitization import sanitizer
 
         data = AuditContextData(data_type="aap-resource-access")
         data.credential_used = True
@@ -712,7 +712,7 @@ class TestBooleanPreservation:
 
     def test_sanitizer_preserves_credential_used_false(self) -> None:
         """Full sanitizer should preserve credential_used=False."""
-        from nexus.audit.sanitization import sanitizer
+        from syntara.audit.sanitization import sanitizer
 
         data = AuditContextData(data_type="aap-resource-access")
         data.credential_used = False
@@ -722,7 +722,7 @@ class TestBooleanPreservation:
 
     def test_sanitizer_preserves_nested_booleans_with_sensitive_keys(self) -> None:
         """Nested booleans in dicts with credential-pattern keys should be preserved."""
-        from nexus.audit.sanitization import sanitizer
+        from syntara.audit.sanitization import sanitizer
 
         data = AuditContextData(
             data_type="test",

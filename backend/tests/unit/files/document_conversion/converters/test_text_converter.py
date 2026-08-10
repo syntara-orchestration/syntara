@@ -5,10 +5,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nexus.files.document_conversion.converters.text_converter import (
+from syntara.files.document_conversion.converters.text_converter import (
     TextConverter,
 )
-from nexus.files.models import FileMetadata
+from syntara.files.models import FileMetadata
 
 
 class TestTextConverterMimeTypeSupport:
@@ -385,7 +385,7 @@ class TestTextConverterErrorHandling:
     """Test error handling in TextConverter."""
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.text_converter.TextConverter._decode_text_content")
+    @patch("syntara.files.document_conversion.converters.text_converter.TextConverter._decode_text_content")
     async def test_memory_error_handling(self, mock_decode) -> None:
         """Test handling of MemoryError during conversion."""
         file_metadata = Mock()
@@ -403,7 +403,7 @@ class TestTextConverterErrorHandling:
         assert "File too large to process" in result.error_message
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.text_converter.TextConverter._convert_to_markdown")
+    @patch("syntara.files.document_conversion.converters.text_converter.TextConverter._convert_to_markdown")
     async def test_os_error_handling(self, mock_convert) -> None:
         """Test handling of OSError during conversion."""
         file_metadata = Mock()
@@ -422,7 +422,7 @@ class TestTextConverterErrorHandling:
         assert result.metadata["exception_type"] == "OSError"
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.text_converter.TextConverter._convert_to_markdown")
+    @patch("syntara.files.document_conversion.converters.text_converter.TextConverter._convert_to_markdown")
     async def test_value_error_handling(self, mock_convert) -> None:
         """Test handling of ValueError during conversion."""
         file_metadata = Mock()

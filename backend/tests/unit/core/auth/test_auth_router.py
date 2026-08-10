@@ -7,10 +7,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.auth.dependencies import get_refresh_token
-from nexus.auth.exceptions import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.auth.dependencies import get_refresh_token
+from syntara.auth.exceptions import (
     AuthenticationRequiredError,
     CSRFErrorCode,
     CSRFValidationError,
@@ -20,7 +20,7 @@ from nexus.auth.exceptions import (
     RefreshTokenRevokedError,
     SessionStoreUnavailableError,
 )
-from nexus.auth.router import (
+from syntara.auth.router import (
     get_csrf_token,
     login,
     logout,
@@ -28,25 +28,25 @@ from nexus.auth.router import (
     oidc_callback,
     refresh_token,
 )
-from nexus.auth.schemas import CsrfTokenResponse, LoginRequest
-from nexus.auth.services.oidc_service import OIDCError
-from nexus.auth.services.token_service import TokenPayload
-from nexus.auth.session.session_store import SessionInfo
-from nexus.core.models import User
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.auth.schemas import CsrfTokenResponse, LoginRequest
+from syntara.auth.services.oidc_service import OIDCError
+from syntara.auth.services.token_service import TokenPayload
+from syntara.auth.session.session_store import SessionInfo
+from syntara.core.models import User
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
 
 @pytest.fixture
 def _mock_audit_dispatcher() -> Generator[MagicMock, None, None]:
     """Prevent AuditEventDispatcher.dispatch from having side effects during tests."""
-    with patch("nexus.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch:
+    with patch("syntara.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch:
         yield mock_dispatch
 
 
 @pytest.fixture
 def _mock_audit_emission() -> Generator[None, None, None]:
     """Prevent @audit emission side effects in unit tests."""
-    with patch("nexus.audit.emitter.emit_audit_event"):
+    with patch("syntara.audit.emitter.emit_audit_event"):
         yield
 
 
@@ -166,13 +166,13 @@ class TestLoginEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.verify_password", return_value=True),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie") as mock_set_cookie,
-            patch("nexus.auth.router.set_csrf_cookie") as mock_set_csrf,
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie") as mock_set_cookie,
+            patch("syntara.auth.router.set_csrf_cookie") as mock_set_csrf,
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
         ):
             result = await login(body, request, response, db)
 
@@ -184,7 +184,7 @@ class TestLoginEndpoint:
     @pytest.mark.asyncio
     async def test_login_sets_actor_context_for_last_login_audit(self) -> None:
         """Password login must attribute last_login CRUD to the user (AAP-83651)."""
-        from nexus.audit.emitter import actor_context_var
+        from syntara.audit.emitter import actor_context_var
 
         user = _make_user()
         request = _make_request()
@@ -215,13 +215,13 @@ class TestLoginEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.verify_password", return_value=True),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(AsyncMock())),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
-            patch("nexus.auth.router.set_csrf_cookie"),
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(AsyncMock())),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
         ):
             await login(body, request, response, db)
 
@@ -251,12 +251,12 @@ class TestLoginEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.verify_password", return_value=True),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
         ):
             result = await login(body, request, response, db)
 
@@ -282,8 +282,8 @@ class TestLoginEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
-            patch("nexus.auth.router.verify_password", return_value=False),
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router.verify_password", return_value=False),
             pytest.raises(AuthenticationRequiredError),
         ):
             await login(body, request, response, db)
@@ -317,8 +317,8 @@ class TestLoginEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
-            patch("nexus.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router.verify_password", return_value=True),
             pytest.raises(AuthenticationRequiredError),
         ):
             await login(body, request, response, db)
@@ -353,8 +353,8 @@ class TestLoginEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.verify_password") as mock_verify,
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings(local_login_enabled=False)),
+            patch("syntara.auth.router.verify_password") as mock_verify,
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings(local_login_enabled=False)),
             pytest.raises(AuthenticationRequiredError),
         ):
             await login(body, request, response, db)
@@ -386,13 +386,13 @@ class TestLoginEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.verify_password", return_value=True),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
             patch(
-                "nexus.auth.router.get_runtime_settings",
+                "syntara.auth.router.get_runtime_settings",
                 _mock_runtime_settings(local_login_enabled=local_login_enabled),
             ),
         ):
@@ -403,7 +403,7 @@ class TestLoginEndpoint:
     @pytest.mark.asyncio
     async def test_login_dispatches_local_login_disabled_audit_event(self) -> None:
         """Audit event with LOCAL_LOGIN_DISABLED reason is dispatched when setting denies login."""
-        from nexus.auth.audit.login_attempt import LoginAttemptEvent, LoginErrorReason
+        from syntara.auth.audit.login_attempt import LoginAttemptEvent, LoginErrorReason
 
         user = _make_user()
         request = _make_request()
@@ -416,8 +416,8 @@ class TestLoginEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings(local_login_enabled=False)),
-            patch("nexus.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings(local_login_enabled=False)),
+            patch("syntara.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch,
             pytest.raises(AuthenticationRequiredError),
         ):
             await login(body, request, response, db)
@@ -456,11 +456,11 @@ class TestLoginEndpoint:
         mock_store.create = AsyncMock(side_effect=SQLAlchemyError("DB connection failed"))
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.verify_password", return_value=True),
-            patch("nexus.auth.router._get_user_group_names", return_value=["authenticated"]),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings()),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.verify_password", return_value=True),
+            patch("syntara.auth.router._get_user_group_names", return_value=["authenticated"]),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings()),
             pytest.raises(SessionStoreUnavailableError),
         ):
             await login(body, request, response, db)
@@ -482,7 +482,7 @@ class TestGetRefreshTokenDependency:
         """Should raise AuthenticationRequiredError when cookie is missing."""
         request = _make_request(cookie_value=None)
 
-        with patch("nexus.auth.csrf.validate_csrf"), pytest.raises(AuthenticationRequiredError):
+        with patch("syntara.auth.csrf.validate_csrf"), pytest.raises(AuthenticationRequiredError):
             await get_refresh_token(request, db=AsyncMock())
 
     @pytest.mark.asyncio
@@ -495,9 +495,9 @@ class TestGetRefreshTokenDependency:
         mock_token_service.decode_token.return_value = payload
 
         with (
-            patch("nexus.auth.csrf.validate_csrf"),
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
+            patch("syntara.auth.csrf.validate_csrf"),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
         ):
             result = await get_refresh_token(request, db=AsyncMock())
 
@@ -513,8 +513,8 @@ class TestGetRefreshTokenDependency:
         mock_token_service.decode_token.side_effect = InvalidTokenError
 
         with (
-            patch("nexus.auth.csrf.validate_csrf"),
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.csrf.validate_csrf"),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
             pytest.raises(InvalidTokenError),
         ):
             await get_refresh_token(request, db=AsyncMock())
@@ -528,8 +528,8 @@ class TestGetRefreshTokenDependency:
         mock_token_service.decode_token.side_effect = RuntimeError("unexpected")
 
         with (
-            patch("nexus.auth.csrf.validate_csrf"),
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.csrf.validate_csrf"),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
             pytest.raises(AuthenticationRequiredError),
         ):
             await get_refresh_token(request, db=AsyncMock())
@@ -537,7 +537,7 @@ class TestGetRefreshTokenDependency:
     @pytest.mark.asyncio
     async def test_raises_on_globally_revoked_token(self) -> None:
         """Should raise TokenGloballyRevokedError when token was issued before revocation timestamp."""
-        from nexus.auth.exceptions import TokenGloballyRevokedError
+        from syntara.auth.exceptions import TokenGloballyRevokedError
 
         request = _make_request(cookie_value="the-refresh-jwt")
         payload = _make_payload()
@@ -546,10 +546,10 @@ class TestGetRefreshTokenDependency:
         mock_token_service.decode_token.return_value = payload
 
         with (
-            patch("nexus.auth.csrf.validate_csrf"),
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.csrf.validate_csrf"),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
             patch(
-                "nexus.auth.services.global_revocation.is_token_globally_revoked",
+                "syntara.auth.services.global_revocation.is_token_globally_revoked",
                 return_value=datetime.now(UTC),
             ),
             pytest.raises(TokenGloballyRevokedError),
@@ -571,7 +571,7 @@ class TestGetCsrfTokenEndpoint:
         request = _make_request()
         request.cookies = {"ao_csrf_token": "the-seed"}
 
-        with patch("nexus.auth.router.derive_csrf_form_token", return_value="derived-token"):
+        with patch("syntara.auth.router.derive_csrf_form_token", return_value="derived-token"):
             result = await get_csrf_token(request)
 
         assert result == CsrfTokenResponse(csrf_token="derived-token")  # noqa: S106
@@ -611,7 +611,7 @@ class TestRefreshEndpoint:
         mock_store.get_with_token_version.return_value = None
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
             pytest.raises(RefreshTokenRevokedError),
         ):
             await refresh_token(MagicMock(), MagicMock(), payload, db)
@@ -630,7 +630,7 @@ class TestRefreshEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
             pytest.raises(AuthenticationRequiredError),
         ):
             await refresh_token(MagicMock(), MagicMock(), payload, db)
@@ -650,7 +650,7 @@ class TestRefreshEndpoint:
         db.exec.return_value = mock_result
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
             pytest.raises(AuthenticationRequiredError),
         ):
             await refresh_token(MagicMock(), MagicMock(), payload, db)
@@ -677,9 +677,9 @@ class TestRefreshEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
         ):
             result = await refresh_token(MagicMock(), MagicMock(), payload, db)
 
@@ -699,7 +699,7 @@ class TestRefreshEndpoint:
         mock_store.get_with_token_version.side_effect = SQLAlchemyError("DB connection failed")
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
             pytest.raises(SessionStoreUnavailableError),
         ):
             await refresh_token(MagicMock(), MagicMock(), payload, db)
@@ -728,9 +728,9 @@ class TestRefreshEndpoint:
         mock_settings.jwt_access_token_lifetime_minutes = 15
 
         with (
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
         ):
             await refresh_token(MagicMock(), MagicMock(), payload, db)
 
@@ -765,7 +765,7 @@ class TestLogoutEndpoint:
         payload.jti = None
 
         with (
-            patch("nexus.auth.router.clear_refresh_cookie") as mock_clear,
+            patch("syntara.auth.router.clear_refresh_cookie") as mock_clear,
             pytest.raises(AuthenticationRequiredError),
         ):
             await logout(payload, request, response, db)
@@ -786,9 +786,9 @@ class TestLogoutEndpoint:
         mock_store.revoke.return_value = True
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie") as mock_clear,
-            patch("nexus.auth.router.clear_csrf_cookie") as mock_clear_csrf,
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie") as mock_clear,
+            patch("syntara.auth.router.clear_csrf_cookie") as mock_clear_csrf,
         ):
             result = await logout(payload, request, response, db)
 
@@ -810,7 +810,7 @@ class TestLogoutEndpoint:
         mock_store.get.side_effect = SQLAlchemyError("DB connection failed")
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
             pytest.raises(SessionStoreUnavailableError),
         ):
             await logout(payload, _make_request(), response, AsyncMock())
@@ -829,8 +829,8 @@ class TestLogoutEndpoint:
         mock_store.revoke.return_value = False  # already expired
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie") as mock_clear,
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie") as mock_clear,
         ):
             result = await logout(payload, request, response, db)
 
@@ -854,8 +854,8 @@ class TestLogoutEndpoint:
         mock_store.increment_token_version.return_value = 1
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie"),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie"),
         ):
             await logout(payload, request, response, db)
 
@@ -868,7 +868,7 @@ class TestLogoutEndpoint:
         Refresh-cookie logout has no Bearer JWT for audit middleware; without an
         explicit actor_context, CRUD audit for token_version stays null-actor.
         """
-        from nexus.audit.emitter import actor_context_var
+        from syntara.audit.emitter import actor_context_var
 
         request = _make_request()
         response = _make_response()
@@ -893,8 +893,8 @@ class TestLogoutEndpoint:
         mock_store.increment_token_version.side_effect = _capture_increment
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie"),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie"),
         ):
             await logout(payload, request, response, db)
 
@@ -926,9 +926,9 @@ class TestLogoutEndpoint:
         rp_info = {"auth_error": "Logged out of Nexus, but could not log out of Test IdP."}
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie"),
-            patch("nexus.auth.router._maybe_rp_logout", return_value=rp_info),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie"),
+            patch("syntara.auth.router._maybe_rp_logout", return_value=rp_info),
         ):
             result = await logout(payload, request, response, db)
 
@@ -962,9 +962,9 @@ class TestLogoutEndpoint:
         }
 
         with (
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.clear_refresh_cookie"),
-            patch("nexus.auth.router._maybe_rp_logout", return_value=rp_info),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.clear_refresh_cookie"),
+            patch("syntara.auth.router._maybe_rp_logout", return_value=rp_info),
         ):
             result = await logout(payload, request, response, db)
 
@@ -987,7 +987,7 @@ class TestMaybeRpLogout:
     @pytest.mark.asyncio
     async def test_returns_none_for_local_session(self) -> None:
         """Should return None when session has no idp_id (local session)."""
-        from nexus.auth.router import _maybe_rp_logout
+        from syntara.auth.router import _maybe_rp_logout
 
         session_info = SessionInfo(
             jti="jti-local",
@@ -1005,7 +1005,7 @@ class TestMaybeRpLogout:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_session(self) -> None:
         """Should return None when session_info is None."""
-        from nexus.auth.router import _maybe_rp_logout
+        from syntara.auth.router import _maybe_rp_logout
 
         db = AsyncMock()
         result = await _maybe_rp_logout(db, None, "https://app.example.com")
@@ -1014,9 +1014,9 @@ class TestMaybeRpLogout:
     @pytest.mark.asyncio
     async def test_returns_auth_error_when_endpoint_unresolvable(self) -> None:
         """Should return dict with auth_error error code when end_session_endpoint can't be resolved."""
-        from nexus.auth.router import _maybe_rp_logout
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _maybe_rp_logout
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         idp_id = uuid4()
         config = OIDCConfiguration(
@@ -1062,9 +1062,9 @@ class TestMaybeRpLogout:
     @pytest.mark.asyncio
     async def test_returns_redirect_url_when_endpoint_available(self) -> None:
         """Should return dict with redirect_url when end_session_endpoint is available."""
-        from nexus.auth.router import _maybe_rp_logout
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _maybe_rp_logout
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         idp_id = uuid4()
         config = OIDCConfiguration(
@@ -1123,7 +1123,7 @@ class TestGetMeEndpoint:
     @pytest.mark.asyncio
     async def test_returns_user_info_from_payload(self) -> None:
         """get_me should return UserInfo populated from token claims."""
-        from nexus.auth.router import get_me
+        from syntara.auth.router import get_me
 
         user_id = str(uuid4())
         payload = _make_payload(sub=user_id, preferred_username="alice")
@@ -1144,7 +1144,7 @@ class TestGetMeEndpoint:
     @pytest.mark.asyncio
     async def test_handles_none_optional_fields(self) -> None:
         """get_me should handle None optional claims gracefully."""
-        from nexus.auth.router import get_me
+        from syntara.auth.router import get_me
 
         payload = _make_payload()
         payload.preferred_username = None
@@ -1161,16 +1161,16 @@ class TestGetMeEndpoint:
         assert result.rp_logout_enabled is False  # No refresh token
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.create_session_store")
-    @patch("nexus.auth.router._get_token_service")
+    @patch("syntara.auth.router.create_session_store")
+    @patch("syntara.auth.router._get_token_service")
     async def test_rp_logout_enabled_true(
         self,
         mock_token_svc: MagicMock,
         mock_session_store_cls: MagicMock,
     ) -> None:
         """get_me should return rp_logout_enabled=True when session has it set."""
-        from nexus.auth.router import get_me
-        from nexus.auth.session.session_store import SessionInfo
+        from syntara.auth.router import get_me
+        from syntara.auth.session.session_store import SessionInfo
 
         user_id = str(uuid4())
         payload = _make_payload(sub=user_id, preferred_username="alice")
@@ -1208,9 +1208,9 @@ class TestVerifyIdpTestPermission:
     """Tests for _verify_idp_test_permission session revocation check."""
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.create_session_store")
-    @patch("nexus.auth.router._get_token_service")
-    @patch("nexus.auth.router.get_refresh_token_from_cookie")
+    @patch("syntara.auth.router.create_session_store")
+    @patch("syntara.auth.router._get_token_service")
+    @patch("syntara.auth.router.get_refresh_token_from_cookie")
     async def test_raises_when_session_revoked(
         self,
         mock_cookie: MagicMock,
@@ -1218,7 +1218,7 @@ class TestVerifyIdpTestPermission:
         mock_session_store_cls: MagicMock,
     ) -> None:
         """Should raise OIDCError when the refresh token session has been revoked."""
-        from nexus.auth.router import _verify_idp_test_permission
+        from syntara.auth.router import _verify_idp_test_permission
 
         mock_cookie.return_value = "fake-refresh-token"
         payload = _make_payload(jti="revoked-jti")
@@ -1235,12 +1235,12 @@ class TestVerifyIdpTestPermission:
             await _verify_idp_test_permission(request, db)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.get_authz_evaluator")
-    @patch("nexus.auth.router.authorize", new_callable=AsyncMock)
-    @patch("nexus.auth.router._find_non_deleted_user", new_callable=AsyncMock)
-    @patch("nexus.auth.router.create_session_store")
-    @patch("nexus.auth.router._get_token_service")
-    @patch("nexus.auth.router.get_refresh_token_from_cookie")
+    @patch("syntara.auth.router.get_authz_evaluator")
+    @patch("syntara.auth.router.authorize", new_callable=AsyncMock)
+    @patch("syntara.auth.router._find_non_deleted_user", new_callable=AsyncMock)
+    @patch("syntara.auth.router.create_session_store")
+    @patch("syntara.auth.router._get_token_service")
+    @patch("syntara.auth.router.get_refresh_token_from_cookie")
     async def test_proceeds_when_session_active(
         self,
         mock_cookie: MagicMock,
@@ -1251,7 +1251,7 @@ class TestVerifyIdpTestPermission:
         mock_evaluator: MagicMock,
     ) -> None:
         """Should not raise when session is active and user has permission."""
-        from nexus.auth.router import _verify_idp_test_permission
+        from syntara.auth.router import _verify_idp_test_permission
 
         mock_cookie.return_value = "fake-refresh-token"
         user_id = str(uuid4())
@@ -1291,16 +1291,16 @@ class TestResolveAndLoginUserRollback:
     """Tests for rollback behavior when group matching denies login."""
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.sync_idp_groups", new_callable=AsyncMock)
-    @patch("nexus.auth.router._resolve_oidc_user", new_callable=AsyncMock)
+    @patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock)
+    @patch("syntara.auth.router._resolve_oidc_user", new_callable=AsyncMock)
     async def test_rollback_on_no_group_match(
         self,
         mock_resolve: AsyncMock,
         mock_sync: AsyncMock,
     ) -> None:
         """Should call db.rollback() when no groups matched and user has no other groups."""
-        from nexus.auth.router import _resolve_and_login_user
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.auth.router import _resolve_and_login_user
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
 
         user = User(id=uuid4(), username="testuser", email="t@t.com", first_name="Test", is_enabled=True)
         identity = MagicMock()
@@ -1338,11 +1338,11 @@ class TestLoginAuditEvents:
     """
 
     def setup_method(self) -> None:
-        from nexus.auth.audit.login_attempt import (
+        from syntara.auth.audit.login_attempt import (
             LoginAttemptEvent,
             LoginAttemptHandler,
         )
-        from nexus.auth.audit.session_lifecycle import (
+        from syntara.auth.audit.session_lifecycle import (
             SessionLifecycleEvent,
             SessionLifecycleHandler,
         )
@@ -1356,11 +1356,11 @@ class TestLoginAuditEvents:
         )
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.get_runtime_settings", _mock_runtime_settings())
-    @patch("nexus.auth.router._get_token_service")
-    @patch("nexus.auth.router.create_session_store")
-    @patch("nexus.auth.router._get_user_group_names", new_callable=AsyncMock)
-    @patch("nexus.auth.router.verify_password", return_value=True)
+    @patch("syntara.auth.router.get_runtime_settings", _mock_runtime_settings())
+    @patch("syntara.auth.router._get_token_service")
+    @patch("syntara.auth.router.create_session_store")
+    @patch("syntara.auth.router._get_user_group_names", new_callable=AsyncMock)
+    @patch("syntara.auth.router.verify_password", return_value=True)
     async def test_successful_login_emits_all_events_in_order(
         self,
         mock_verify: MagicMock,
@@ -1378,8 +1378,8 @@ class TestLoginAuditEvents:
         Note: UserLoginEvent is also dispatched but its handler may not be
         registered in all test contexts, so it is not counted here.
         """
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         user = _make_user()
         mock_db = AsyncMock()
@@ -1401,9 +1401,9 @@ class TestLoginAuditEvents:
         response = _make_response()
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.auth.router.set_csrf_cookie"),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="seed"),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="seed"),
         ):
             await login(
                 body=LoginRequest(username="testuser", password="password123"),  # noqa: S106
@@ -1476,10 +1476,10 @@ class TestOIDCAuditEvents:
     """
 
     def setup_method(self) -> None:
-        from nexus.auth.audit.login_attempt import LoginAttemptEvent, LoginAttemptHandler
-        from nexus.auth.audit.oidc_flow import OIDCFlowEvent, OIDCFlowHandler
-        from nexus.auth.audit.session_lifecycle import SessionLifecycleEvent, SessionLifecycleHandler
-        from nexus.auth.audit.user_login import UserLoginEvent, UserLoginHandler
+        from syntara.auth.audit.login_attempt import LoginAttemptEvent, LoginAttemptHandler
+        from syntara.auth.audit.oidc_flow import OIDCFlowEvent, OIDCFlowHandler
+        from syntara.auth.audit.session_lifecycle import SessionLifecycleEvent, SessionLifecycleHandler
+        from syntara.auth.audit.user_login import UserLoginEvent, UserLoginHandler
 
         AuditEventDispatcher.register(
             {
@@ -1494,13 +1494,13 @@ class TestOIDCAuditEvents:
     @pytest.mark.asyncio
     async def test_authorize_oidc_error_emits_event_with_error_type(self) -> None:
         """oidc_authorize with OIDCError emits audit event with error_type and provider_id."""
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         provider_id = uuid4()
 
         # Mock the underlying function to raise OIDCError
-        with patch("nexus.auth.router._build_oidc_authorize_redirect") as mock_build:
+        with patch("syntara.auth.router._build_oidc_authorize_redirect") as mock_build:
             mock_build.side_effect = OIDCError("Provider not available")
 
             # Mock request and db
@@ -1509,7 +1509,7 @@ class TestOIDCAuditEvents:
             db = AsyncMock()
 
             # Capture emitted events
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
                 # Call oidc_authorize - should redirect to login with error
                 response = await oidc_authorize(provider_id=provider_id, request=request, db=db)
                 assert response.status_code == 302
@@ -1533,13 +1533,13 @@ class TestOIDCAuditEvents:
     @pytest.mark.asyncio
     async def test_authorize_callback_error_emits_event_with_error_type(self) -> None:
         """oidc_authorize with OIDCCallbackError emits audit event with error_type and provider_id."""
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         provider_id = uuid4()
 
         # Mock the underlying function to raise OIDCCallbackError
-        with patch("nexus.auth.router._build_oidc_authorize_redirect") as mock_build:
+        with patch("syntara.auth.router._build_oidc_authorize_redirect") as mock_build:
             mock_build.side_effect = OIDCCallbackError(
                 "Invalid state", error_code=OIDCErrorCode.AUTH_FAILED, origin="http://localhost:3000"
             )
@@ -1550,7 +1550,7 @@ class TestOIDCAuditEvents:
             db = AsyncMock()
 
             # Capture emitted events
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
                 # Call oidc_authorize - should redirect to login with error
                 response = await oidc_authorize(provider_id=provider_id, request=request, db=db)
                 assert response.status_code == 302
@@ -1573,13 +1573,13 @@ class TestOIDCAuditEvents:
     @pytest.mark.asyncio
     async def test_authorize_generic_exception_emits_event_with_error_type(self) -> None:
         """oidc_authorize with generic Exception emits audit event with error_type and provider_id."""
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         provider_id = uuid4()
 
         # Mock the underlying function to raise RuntimeError
-        with patch("nexus.auth.router._build_oidc_authorize_redirect") as mock_build:
+        with patch("syntara.auth.router._build_oidc_authorize_redirect") as mock_build:
             mock_build.side_effect = RuntimeError("Unexpected error")
 
             # Mock request and db
@@ -1588,7 +1588,7 @@ class TestOIDCAuditEvents:
             db = AsyncMock()
 
             # Capture emitted events
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
                 # Call oidc_authorize - should redirect to login with error
                 response = await oidc_authorize(provider_id=provider_id, request=request, db=db)
                 assert response.status_code == 302
@@ -1611,11 +1611,11 @@ class TestOIDCAuditEvents:
     @pytest.mark.asyncio
     async def test_callback_error_emits_event_with_none_provider_id(self) -> None:
         """oidc_callback with OIDCCallbackError emits audit event with provider_id=None."""
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         # Mock the underlying function to raise OIDCCallbackError
-        with patch("nexus.auth.router._process_oidc_callback") as mock_process:
+        with patch("syntara.auth.router._process_oidc_callback") as mock_process:
             mock_process.side_effect = OIDCCallbackError(
                 "Invalid code", error_code=OIDCErrorCode.AUTH_FAILED, origin="http://localhost:3000"
             )
@@ -1628,7 +1628,7 @@ class TestOIDCAuditEvents:
             db = AsyncMock()
 
             # Capture emitted events
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
                 # Call oidc_callback - should redirect to login with error
                 response = await oidc_callback(state="test-state", request=request, db=db, code="test-code")
                 assert response.status_code == 302
@@ -1660,8 +1660,8 @@ class TestOIDCAuditEvents:
         4. LoginAttemptEvent -> "login" (USER_ACTION, SUCCESS, method=OIDC)
         5. @audit "oidc_callback" (SECURITY_EVENT, SUCCESS)
         """
-        from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-        from nexus.audit.models.structured_data import AuditContextData
+        from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+        from syntara.audit.models.structured_data import AuditContextData
 
         provider = MagicMock()
         provider.id, provider.name = uuid4(), "TestProvider"
@@ -1675,14 +1675,14 @@ class TestOIDCAuditEvents:
         identity.subject = "sub-123"
 
         with (
-            patch("nexus.auth.router._process_oidc_callback") as mock_process,
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", mock_session_store),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
-            patch("nexus.auth.router.set_csrf_cookie"),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="seed"),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.auth.router._process_oidc_callback") as mock_process,
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", mock_session_store),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="seed"),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
         ):
             mock_process.return_value = (user, provider, state_data, identity, {}, "id-token-raw", False)
 
@@ -1770,7 +1770,7 @@ class TestGetUserGroupNames:
     @pytest.mark.asyncio
     async def test_returns_groups_sorted(self) -> None:
         """Should return groups from the DB query sorted by name."""
-        from nexus.auth.router import _get_user_group_names
+        from syntara.auth.router import _get_user_group_names
 
         user_id = uuid4()
         mock_result = MagicMock()
@@ -1785,7 +1785,7 @@ class TestGetUserGroupNames:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_groups(self) -> None:
         """Should return empty list when user has no group memberships."""
-        from nexus.auth.router import _get_user_group_names
+        from syntara.auth.router import _get_user_group_names
 
         user_id = uuid4()
         mock_result = MagicMock()
@@ -1808,7 +1808,7 @@ class TestBuildRpLogoutUrl:
 
     def test_all_params(self) -> None:
         """Should build URL with both id_token_hint and post_logout_redirect_uri."""
-        from nexus.auth.router import _build_rp_logout_url
+        from syntara.auth.router import _build_rp_logout_url
 
         url = _build_rp_logout_url(
             end_session_endpoint="https://idp.example.com/logout",
@@ -1822,7 +1822,7 @@ class TestBuildRpLogoutUrl:
 
     def test_only_post_logout_redirect_uri(self) -> None:
         """Should build URL with only post_logout_redirect_uri when no id_token_hint."""
-        from nexus.auth.router import _build_rp_logout_url
+        from syntara.auth.router import _build_rp_logout_url
 
         url = _build_rp_logout_url(
             end_session_endpoint="https://idp.example.com/logout",
@@ -1835,7 +1835,7 @@ class TestBuildRpLogoutUrl:
 
     def test_no_params_returns_bare_endpoint(self) -> None:
         """Should return bare endpoint when both optional params are empty."""
-        from nexus.auth.router import _build_rp_logout_url
+        from syntara.auth.router import _build_rp_logout_url
 
         url = _build_rp_logout_url(
             end_session_endpoint="https://idp.example.com/logout",
@@ -1847,7 +1847,7 @@ class TestBuildRpLogoutUrl:
 
     def test_only_id_token_hint(self) -> None:
         """Should build URL with only id_token_hint when post_logout_redirect_uri is empty."""
-        from nexus.auth.router import _build_rp_logout_url
+        from syntara.auth.router import _build_rp_logout_url
 
         url = _build_rp_logout_url(
             end_session_endpoint="https://idp.example.com/logout",
@@ -1870,8 +1870,8 @@ class TestResolveEndSessionEndpoint:
     @pytest.mark.asyncio
     async def test_returns_static_endpoint(self) -> None:
         """Should prefer static end_session_endpoint from config."""
-        from nexus.auth.router import _resolve_end_session_endpoint
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _resolve_end_session_endpoint
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         config = OIDCConfiguration(
             issuer_url="https://idp.example.com",
@@ -1888,8 +1888,8 @@ class TestResolveEndSessionEndpoint:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_static_and_no_auto_discovery(self) -> None:
         """Should return None when no static endpoint and auto_discovery is False."""
-        from nexus.auth.router import _resolve_end_session_endpoint
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _resolve_end_session_endpoint
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         config = OIDCConfiguration(
             issuer_url="https://idp.example.com",
@@ -1910,8 +1910,8 @@ class TestResolveEndSessionEndpoint:
     @pytest.mark.asyncio
     async def test_discovers_endpoint_via_oidc_service(self) -> None:
         """Should fall back to OIDC discovery when auto_discovery is True."""
-        from nexus.auth.router import _resolve_end_session_endpoint
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _resolve_end_session_endpoint
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         config = OIDCConfiguration(
             issuer_url="https://idp.example.com",
@@ -1927,7 +1927,7 @@ class TestResolveEndSessionEndpoint:
             return_value={"end_session_endpoint": "https://idp.example.com/discovered-logout"}
         )
 
-        with patch("nexus.auth.router.OIDCService", return_value=mock_service):
+        with patch("syntara.auth.router.OIDCService", return_value=mock_service):
             result = await _resolve_end_session_endpoint(config)
 
         assert result == "https://idp.example.com/discovered-logout"
@@ -1935,8 +1935,8 @@ class TestResolveEndSessionEndpoint:
     @pytest.mark.asyncio
     async def test_returns_none_on_discovery_failure(self) -> None:
         """Should return None when OIDC discovery fails."""
-        from nexus.auth.router import _resolve_end_session_endpoint
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _resolve_end_session_endpoint
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         config = OIDCConfiguration(
             issuer_url="https://idp.example.com",
@@ -1950,7 +1950,7 @@ class TestResolveEndSessionEndpoint:
         mock_service = AsyncMock()
         mock_service.fetch_discovery_config = AsyncMock(side_effect=OIDCError("Discovery failed"))
 
-        with patch("nexus.auth.router.OIDCService", return_value=mock_service):
+        with patch("syntara.auth.router.OIDCService", return_value=mock_service):
             result = await _resolve_end_session_endpoint(config)
 
         assert result is None
@@ -1967,9 +1967,9 @@ class TestMaybeRpLogoutEdgeCases:
     @pytest.mark.asyncio
     async def test_returns_redirect_url_when_decryption_fails(self) -> None:
         """Should still return redirect_url (without hint) when decrypt fails."""
-        from nexus.auth.router import _maybe_rp_logout
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _maybe_rp_logout
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         idp_id = uuid4()
         config = OIDCConfiguration(
@@ -2009,9 +2009,9 @@ class TestMaybeRpLogoutEdgeCases:
         db = AsyncMock()
         db.exec.return_value = mock_result
 
-        with patch("nexus.auth.router.get_settings") as mock_settings:
+        with patch("syntara.auth.router.get_settings") as mock_settings:
             mock_settings.return_value.secret_encryption_key.get_secret_value.return_value = "bad-key"
-            with patch("nexus.auth.router.key_from_string", side_effect=ValueError("bad key")):
+            with patch("syntara.auth.router.key_from_string", side_effect=ValueError("bad key")):
                 result = await _maybe_rp_logout(db, session_info, "https://app.example.com")
 
         assert result is not None
@@ -2023,7 +2023,7 @@ class TestMaybeRpLogoutEdgeCases:
     @pytest.mark.asyncio
     async def test_returns_none_when_provider_not_found(self) -> None:
         """Should return None when IdP does not exist in DB."""
-        from nexus.auth.router import _maybe_rp_logout
+        from syntara.auth.router import _maybe_rp_logout
 
         session_info = SessionInfo(
             jti="jti-rp",
@@ -2049,9 +2049,9 @@ class TestMaybeRpLogoutEdgeCases:
     @pytest.mark.asyncio
     async def test_returns_none_when_rp_logout_disabled(self) -> None:
         """Should return None when enable_rp_initiated_logout is False."""
-        from nexus.auth.router import _maybe_rp_logout
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
-        from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+        from syntara.auth.router import _maybe_rp_logout
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
         idp_id = uuid4()
         config = OIDCConfiguration(
@@ -2100,7 +2100,7 @@ class TestBuildCallbackErrorRedirect:
 
     def test_redirect_to_uses_link_error_param(self) -> None:
         """Should redirect to redirect_to URL with link_error param when redirect_to is set."""
-        from nexus.auth.router import _build_callback_error_redirect
+        from syntara.auth.router import _build_callback_error_redirect
 
         err = OIDCCallbackError(
             "Link failed",
@@ -2109,7 +2109,7 @@ class TestBuildCallbackErrorRedirect:
             redirect_to="/settings/identities",
         )
 
-        with patch("nexus.auth.router.get_settings") as mock_settings:
+        with patch("syntara.auth.router.get_settings") as mock_settings:
             mock_settings.return_value.cors_allow_origins = ["http://localhost:3000"]
             mock_settings.return_value.jwt_issuer = "http://localhost:8000"
             response = _build_callback_error_redirect(err)
@@ -2120,7 +2120,7 @@ class TestBuildCallbackErrorRedirect:
 
     def test_no_redirect_to_uses_auth_error_param(self) -> None:
         """Should redirect to base URL with auth_error param when no redirect_to."""
-        from nexus.auth.router import _build_callback_error_redirect
+        from syntara.auth.router import _build_callback_error_redirect
 
         err = OIDCCallbackError(
             "Auth failed",
@@ -2128,7 +2128,7 @@ class TestBuildCallbackErrorRedirect:
             origin="http://localhost:3000",
         )
 
-        with patch("nexus.auth.router.get_settings") as mock_settings:
+        with patch("syntara.auth.router.get_settings") as mock_settings:
             mock_settings.return_value.cors_allow_origins = ["http://localhost:3000"]
             mock_settings.return_value.jwt_issuer = "http://localhost:8000"
             response = _build_callback_error_redirect(err)
@@ -2148,9 +2148,9 @@ class TestBuildAuthorizeErrorRedirect:
 
     def test_link_flow_redirects_with_link_error(self) -> None:
         """Should redirect to redirect_to with link_error for link flow errors."""
-        from nexus.auth.router import _build_authorize_error_redirect
+        from syntara.auth.router import _build_authorize_error_redirect
 
-        with patch("nexus.auth.router.get_settings") as mock_settings:
+        with patch("syntara.auth.router.get_settings") as mock_settings:
             mock_settings.return_value.cors_allow_origins = ["http://localhost:3000"]
             mock_settings.return_value.jwt_issuer = "http://localhost:8000"
             response = _build_authorize_error_redirect(
@@ -2166,9 +2166,9 @@ class TestBuildAuthorizeErrorRedirect:
 
     def test_non_link_flow_redirects_with_auth_error(self) -> None:
         """Should redirect to base URL with auth_error for non-link flows."""
-        from nexus.auth.router import _build_authorize_error_redirect
+        from syntara.auth.router import _build_authorize_error_redirect
 
-        with patch("nexus.auth.router.get_settings") as mock_settings:
+        with patch("syntara.auth.router.get_settings") as mock_settings:
             mock_settings.return_value.cors_allow_origins = ["http://localhost:3000"]
             mock_settings.return_value.jwt_issuer = "http://localhost:8000"
             response = _build_authorize_error_redirect(
@@ -2194,11 +2194,11 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_idp_error_response(self) -> None:
         """Should raise OIDCCallbackError with auth_failed and origin when IdP returns error."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._revalidate_origin", return_value="http://localhost:3000"),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._revalidate_origin", return_value="http://localhost:3000"),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(uuid4()),
@@ -2222,11 +2222,11 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_missing_code(self) -> None:
         """Should raise OIDCCallbackError with missing_code and origin when no code is provided."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._revalidate_origin", return_value="http://localhost:3000"),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._revalidate_origin", return_value="http://localhost:3000"),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(uuid4()),
@@ -2250,9 +2250,9 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_invalid_state(self) -> None:
         """Should raise OIDCCallbackError with state_expired when state is invalid."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
-        with patch("nexus.auth.router.OIDCService") as mock_oidc_cls:
+        with patch("syntara.auth.router.OIDCService") as mock_oidc_cls:
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = None
 
             with pytest.raises(OIDCCallbackError) as exc_info:
@@ -2269,9 +2269,9 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_state_expired_when_idp_error_and_state_invalid(self) -> None:
         """When IdP returns error but state is also invalid, state_expired takes precedence."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
-        with patch("nexus.auth.router.OIDCService") as mock_oidc_cls:
+        with patch("syntara.auth.router.OIDCService") as mock_oidc_cls:
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = None
 
             with pytest.raises(OIDCCallbackError) as exc_info:
@@ -2289,12 +2289,12 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_provider_unavailable(self) -> None:
         """Should raise OIDCCallbackError with provider_unavailable when provider not found."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._load_enabled_provider", side_effect=OIDCError("Not found")),
-            patch("nexus.auth.router._revalidate_origin", return_value=None),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._load_enabled_provider", side_effect=OIDCError("Not found")),
+            patch("syntara.auth.router._revalidate_origin", return_value=None),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(uuid4()),
@@ -2317,19 +2317,19 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_discovery_failure(self) -> None:
         """Should raise OIDCCallbackError with discovery_failed when endpoint resolution fails."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         provider = MagicMock()
         provider.id = uuid4()
         provider.name = "TestIdP"
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._load_enabled_provider", return_value=provider),
-            patch("nexus.auth.router._load_provider_config", return_value=MagicMock()),
-            patch("nexus.auth.router._get_oidc_endpoints", side_effect=OIDCError("Discovery failed")),
-            patch("nexus.auth.router._revalidate_origin", return_value=None),
-            patch("nexus.auth.router._is_ssl_verification_error", return_value=False),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._load_enabled_provider", return_value=provider),
+            patch("syntara.auth.router._load_provider_config", return_value=MagicMock()),
+            patch("syntara.auth.router._get_oidc_endpoints", side_effect=OIDCError("Discovery failed")),
+            patch("syntara.auth.router._revalidate_origin", return_value=None),
+            patch("syntara.auth.router._is_ssl_verification_error", return_value=False),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(provider.id),
@@ -2352,23 +2352,23 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_on_token_exchange_failure(self) -> None:
         """Should raise OIDCCallbackError with auth_failed when token exchange fails."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         provider = MagicMock()
         provider.id = uuid4()
         provider.name = "TestIdP"
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._load_enabled_provider", return_value=provider),
-            patch("nexus.auth.router._load_provider_config", return_value=MagicMock()),
-            patch("nexus.auth.router._get_oidc_endpoints", return_value={"token_endpoint": "https://idp/token"}),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._load_enabled_provider", return_value=provider),
+            patch("syntara.auth.router._load_provider_config", return_value=MagicMock()),
+            patch("syntara.auth.router._get_oidc_endpoints", return_value={"token_endpoint": "https://idp/token"}),
             patch(
-                "nexus.auth.router._exchange_and_validate_tokens",
+                "syntara.auth.router._exchange_and_validate_tokens",
                 side_effect=OIDCError("Token exchange failed"),
             ),
-            patch("nexus.auth.router._revalidate_origin", return_value=None),
-            patch("nexus.auth.router._is_ssl_verification_error", return_value=False),
+            patch("syntara.auth.router._revalidate_origin", return_value=None),
+            patch("syntara.auth.router._is_ssl_verification_error", return_value=False),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(provider.id),
@@ -2391,19 +2391,19 @@ class TestProcessOidcCallbackErrors:
     @pytest.mark.asyncio
     async def test_raises_tls_error_code_on_ssl_failure(self) -> None:
         """Should raise OIDCCallbackError with tls_verify_failed on SSL verification error."""
-        from nexus.auth.router import _process_oidc_callback
+        from syntara.auth.router import _process_oidc_callback
 
         provider = MagicMock()
         provider.id = uuid4()
         provider.name = "TestIdP"
 
         with (
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
-            patch("nexus.auth.router._load_enabled_provider", return_value=provider),
-            patch("nexus.auth.router._load_provider_config", return_value=MagicMock()),
-            patch("nexus.auth.router._get_oidc_endpoints", side_effect=OIDCError("SSL error")),
-            patch("nexus.auth.router._revalidate_origin", return_value=None),
-            patch("nexus.auth.router._is_ssl_verification_error", return_value=True),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router._load_enabled_provider", return_value=provider),
+            patch("syntara.auth.router._load_provider_config", return_value=MagicMock()),
+            patch("syntara.auth.router._get_oidc_endpoints", side_effect=OIDCError("SSL error")),
+            patch("syntara.auth.router._revalidate_origin", return_value=None),
+            patch("syntara.auth.router._is_ssl_verification_error", return_value=True),
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(provider.id),
@@ -2435,7 +2435,7 @@ class TestProcessLinkCallback:
     @pytest.mark.asyncio
     async def test_wraps_oidc_error_with_error_code(self) -> None:
         """Should wrap OIDCError with error_code from the original or fallback to link_failed."""
-        from nexus.auth.router import _process_link_callback
+        from syntara.auth.router import _process_link_callback
 
         provider = MagicMock()
         provider.name = "TestIdP"
@@ -2444,7 +2444,7 @@ class TestProcessLinkCallback:
 
         with (
             patch(
-                "nexus.auth.router._handle_link_flow",
+                "syntara.auth.router._handle_link_flow",
                 side_effect=OIDCError("Already linked", error_code=OIDCErrorCode.IDENTITY_ALREADY_LINKED),
             ),
             pytest.raises(OIDCCallbackError) as exc_info,
@@ -2463,7 +2463,7 @@ class TestProcessLinkCallback:
     @pytest.mark.asyncio
     async def test_wraps_generic_exception_with_link_failed(self) -> None:
         """Should wrap unexpected Exception with link_failed error code."""
-        from nexus.auth.router import _process_link_callback
+        from syntara.auth.router import _process_link_callback
 
         provider = MagicMock()
         provider.name = "TestIdP"
@@ -2472,7 +2472,7 @@ class TestProcessLinkCallback:
 
         with (
             patch(
-                "nexus.auth.router._handle_link_flow",
+                "syntara.auth.router._handle_link_flow",
                 side_effect=RuntimeError("Unexpected"),
             ),
             pytest.raises(OIDCCallbackError) as exc_info,

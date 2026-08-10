@@ -1,4 +1,4 @@
-"""Unit tests for nexus.metrics.queue_depth_poller."""
+"""Unit tests for syntara.metrics.queue_depth_poller."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from contextlib import AbstractContextManager
 
-from nexus.metrics.queue_depth_poller import (
+from syntara.metrics.queue_depth_poller import (
     _ensure_client,
     _make_poll_callback,
     _query_queue_depth,
@@ -25,7 +25,7 @@ class TestEnsureClient:
     @pytest.fixture(autouse=True)
     def _reset_module_client(self) -> None:
         """Reset the module-level cached client before each test."""
-        import nexus.metrics.queue_depth_poller as mod
+        import syntara.metrics.queue_depth_poller as mod
 
         mod._temporal_client = None
 
@@ -34,7 +34,7 @@ class TestEnsureClient:
         """First call should attempt to connect and return the client."""
         mock_client = MagicMock()
         with patch(
-            "nexus.metrics.queue_depth_poller.Client.connect",
+            "syntara.metrics.queue_depth_poller.Client.connect",
             new_callable=AsyncMock,
             return_value=mock_client,
         ):
@@ -47,7 +47,7 @@ class TestEnsureClient:
         """Second call should return the cached client without reconnecting."""
         mock_client = MagicMock()
         with patch(
-            "nexus.metrics.queue_depth_poller.Client.connect",
+            "syntara.metrics.queue_depth_poller.Client.connect",
             new_callable=AsyncMock,
             return_value=mock_client,
         ) as mock_connect:
@@ -61,7 +61,7 @@ class TestEnsureClient:
     async def test_returns_none_on_connection_failure(self) -> None:
         """Connection failures should return None without raising."""
         with patch(
-            "nexus.metrics.queue_depth_poller.Client.connect",
+            "syntara.metrics.queue_depth_poller.Client.connect",
             new_callable=AsyncMock,
             side_effect=OSError("connection refused"),
         ):
@@ -75,7 +75,7 @@ class TestEnsureClient:
         from temporalio.service import RPCError, RPCStatusCode
 
         with patch(
-            "nexus.metrics.queue_depth_poller.Client.connect",
+            "syntara.metrics.queue_depth_poller.Client.connect",
             new_callable=AsyncMock,
             side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
         ):
@@ -132,7 +132,7 @@ class TestPollCallback:
 
     @pytest.fixture(autouse=True)
     def _reset_module_client(self) -> None:
-        import nexus.metrics.queue_depth_poller as mod
+        import syntara.metrics.queue_depth_poller as mod
 
         mod._temporal_client = None
 
@@ -149,19 +149,19 @@ class TestPollCallback:
 
         with (
             patch(
-                "nexus.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.Client.connect",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
             patch(
-                "nexus.metrics.queue_depth_poller.get_metrics_recorder",
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
         ):
             callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
             await callback(None)
 
-        from nexus.metrics.types import ComponentLabel, MetricType
+        from syntara.metrics.types import ComponentLabel, MetricType
 
         mock_recorder.record.assert_called_once_with(
             MetricType.TEMPORAL_QUEUE_DEPTH,
@@ -185,19 +185,19 @@ class TestPollCallback:
 
         with (
             patch(
-                "nexus.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.Client.connect",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
             patch(
-                "nexus.metrics.queue_depth_poller.get_metrics_recorder",
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
         ):
             callback = _make_poll_callback("localhost:7233", "default", queues)
             await callback(None)
 
-        from nexus.metrics.types import ComponentLabel, MetricType
+        from syntara.metrics.types import ComponentLabel, MetricType
 
         assert mock_recorder.record.call_count == 2
         calls = mock_recorder.record.call_args_list
@@ -214,12 +214,12 @@ class TestPollCallback:
 
         with (
             patch(
-                "nexus.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.Client.connect",
                 new_callable=AsyncMock,
                 side_effect=OSError("refused"),
             ),
             patch(
-                "nexus.metrics.queue_depth_poller.get_metrics_recorder",
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
         ):
@@ -249,12 +249,12 @@ class TestPollCallback:
 
         with (
             patch(
-                "nexus.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.Client.connect",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
             patch(
-                "nexus.metrics.queue_depth_poller.get_metrics_recorder",
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
         ):
@@ -263,7 +263,7 @@ class TestPollCallback:
             )
             await callback(None)
 
-        from nexus.metrics.types import ComponentLabel, MetricType
+        from syntara.metrics.types import ComponentLabel, MetricType
 
         mock_recorder.record.assert_called_once_with(
             MetricType.TEMPORAL_QUEUE_DEPTH,
@@ -278,7 +278,7 @@ class TestGetQueueDepthPoller:
 
     def test_returns_periodic_worker(self) -> None:
         """Factory should return a PeriodicWorker with coordinate=False."""
-        from nexus.core.workers.periodic import PeriodicWorker
+        from syntara.core.workers.periodic import PeriodicWorker
 
         poller = get_queue_depth_poller()
 
@@ -299,7 +299,7 @@ class TestGetQueueDepthPoller:
                 task_queue="orchestrator-workflow-queue",
                 background_task_queue="orchestrator-background-queue",
             ),
-            patch("nexus.metrics.queue_depth_poller._make_poll_callback", mock_factory),
+            patch("syntara.metrics.queue_depth_poller._make_poll_callback", mock_factory),
         ):
             get_queue_depth_poller()
 
@@ -320,7 +320,7 @@ class TestGetQueueDepthPoller:
                 task_queue="same-queue",
                 background_task_queue="same-queue",
             ),
-            patch("nexus.metrics.queue_depth_poller._make_poll_callback", mock_factory),
+            patch("syntara.metrics.queue_depth_poller._make_poll_callback", mock_factory),
         ):
             get_queue_depth_poller()
 
@@ -332,7 +332,7 @@ class TestPeriodicWorkerOptionalSessionFactory:
 
     def test_raises_when_coordinate_true_and_no_session_factory(self) -> None:
         """coordinate=True without session_factory must raise ValueError."""
-        from nexus.core.workers.periodic import PeriodicWorker
+        from syntara.core.workers.periodic import PeriodicWorker
 
         async def noop(_sf: object) -> None:
             pass
@@ -347,7 +347,7 @@ class TestPeriodicWorkerOptionalSessionFactory:
 
     def test_accepts_none_session_factory_when_uncoordinated(self) -> None:
         """coordinate=False should accept session_factory=None."""
-        from nexus.core.workers.periodic import PeriodicWorker
+        from syntara.core.workers.periodic import PeriodicWorker
 
         async def noop(_sf: object) -> None:
             pass

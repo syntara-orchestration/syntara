@@ -17,8 +17,8 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from nexus.core.tls.http_client import build_internal_ssl_context
-from nexus.core.tls.temporal import build_temporal_tls_config
+from syntara.core.tls.http_client import build_internal_ssl_context
+from syntara.core.tls.temporal import build_temporal_tls_config
 from tests.fixtures.tls import generate_ca, generate_service_cert
 
 if TYPE_CHECKING:

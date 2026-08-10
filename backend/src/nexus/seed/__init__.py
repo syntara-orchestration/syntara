@@ -1,1 +1,1 @@
-"""Unified database seeder CLI package."""
+"""Compatibility shim — see syntara.seed."""
