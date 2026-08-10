@@ -436,6 +436,7 @@ jobs:
           APP_COLLECTION_INTERVAL_SECONDS: "10"
         run: |
           ulimit -n 65535
+          export PODMAN_BUILD_ARGS="--ulimit nofile=65535:65535"
           uvx podman-compose -p nexus-ci --profile telemetry-e2e up --build -d \
             database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment syntara-ui
 
