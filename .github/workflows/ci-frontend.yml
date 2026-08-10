@@ -433,15 +433,23 @@ jobs:
         run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
 
       - name: Start services with podman-compose
+        uses: nick-fields/retry@7152eba30c6575329ac0576536151aca5a72780e # v3
         timeout-minutes: 20
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: |
+            ulimit -n 65535
+            export PODMAN_BUILD_ARGS="--ulimit nofile=65535:65535"
+            uvx podman-compose -p nexus-ci --profile telemetry-e2e up --build -d \
+              database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment syntara-ui
+          on_retry_command: |
+            uvx podman-compose -p nexus-ci --profile telemetry-e2e down -v || true
         env:
           APP_SEGMENT_WRITE_KEY: test-e2e-write-key
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"
-        run: |
-          ulimit -n 65535
-          uvx podman-compose -p nexus-ci --profile telemetry-e2e up --build -d \
-            database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment syntara-ui
 
       - name: Wait for backend services to be healthy
         timeout-minutes: 5
