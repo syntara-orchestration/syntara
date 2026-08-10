@@ -496,7 +496,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend/packages/syntara-ui
-        run: npx pwc --key ${{ secrets.CURRENTS_RECORD_KEY }} --project-id ${{ secrets.CURRENTS_PROJECT_ID }} --ci-build-id ${{ github.run_id }}-${{ github.run_attempt }} --shard ${{ matrix.shard }}/4 -- --timeout 120000
+        run: npx pwc --ci-build-id ${{ github.run_id }}-${{ github.run_attempt }} --shard ${{ matrix.shard }}/4 -- --timeout 120000
         env:
           NEXUS_E2E_SKIP_WEB_SERVER: '1'
           NEXUS_E2E_BASE_URL: http://localhost:8080
