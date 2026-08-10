@@ -376,7 +376,7 @@ jobs:
     name: (Frontend) Test Podman Compose E2E
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-24.04-8-cores
     timeout-minutes: 120
     steps:
       - name: Free disk space
