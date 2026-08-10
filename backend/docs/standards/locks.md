@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines best practices for thread-safe programming and lock usage in Nexus. Python's Global Interpreter Lock (GIL) does not protect application-level data structures from race conditions, so explicit synchronization is required when shared state is accessed from multiple threads.
+This document defines best practices for thread-safe programming and lock usage in Syntara. Python's Global Interpreter Lock (GIL) does not protect application-level data structures from race conditions, so explicit synchronization is required when shared state is accessed from multiple threads.
 
 ## When to Use Locks
 

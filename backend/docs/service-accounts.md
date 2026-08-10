@@ -1,6 +1,6 @@
 # Service Accounts
 
-This document describes the OAuth 2.0 service accounts feature for machine-to-machine authentication in Nexus. It is intended for developers working on the project and is updated as each piece of the feature lands.
+This document describes the OAuth 2.0 service accounts feature for machine-to-machine authentication in Syntara. It is intended for developers working on the project and is updated as each piece of the feature lands.
 
 For human-user authentication (login, OIDC, sessions, CSRF), see [authentication.md](authentication.md).
 

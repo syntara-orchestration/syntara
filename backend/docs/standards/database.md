@@ -77,7 +77,7 @@ and seed:
 # From repo root — destroy the Postgres volume and bring the stack back up
 podman compose -f podman-compose.yml down -v
 # then start services as usual (e.g. make run-all from backend/)
-# nexus startup runs: alembic upgrade head && python -m nexus.seed --all
+# syntara startup runs: alembic upgrade head && python -m syntara.seed --all
 ```
 
 For a database outside Compose, if it is a dedicated local/dev AO database
@@ -87,7 +87,7 @@ migration history.
 
 ```bash
 uv run alembic upgrade head
-uv run python -m nexus.seed --all
+uv run python -m syntara.seed --all
 ```
 
 ### Alembic Workflow

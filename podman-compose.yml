@@ -11,12 +11,12 @@ services:
     environment:
       POSTGRESQL_USER: ${APP_DB_USER:-admin}
       POSTGRESQL_PASSWORD: ${APP_DB_PASSWORD:-admin}
-      POSTGRESQL_DATABASE: ${APP_DB_NAME:-nexus_api}
+      POSTGRESQL_DATABASE: ${APP_DB_NAME:-syntara_api}
       POSTGRESQL_ADMIN_PASSWORD: ${APP_DB_PASSWORD:-admin}
     volumes:
       - syntara_postgres_data:/var/lib/pgsql/data
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U $${POSTGRESQL_USER:-admin} -d $${POSTGRESQL_DATABASE:-nexus_api}']
+      test: [CMD-SHELL, 'pg_isready -U $${POSTGRESQL_USER:-admin} -d $${POSTGRESQL_DATABASE:-syntara_api}']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -136,7 +136,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -216,7 +216,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -299,7 +299,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_SERVER_SCHEME=${APP_SERVER_SCHEME:-https}
       - APP_SERVER_HOST=${APP_SERVER_HOST:-0.0.0.0}

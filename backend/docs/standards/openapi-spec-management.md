@@ -175,7 +175,7 @@ The Nexus Python API client (generated from the OpenAPI spec) provides type-safe
 from syntara_api_client import build_filters
 
 # Instead of manual dictionary construction:
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params={
         "name[contains]": "auth",
         "created_at[gte]": "2025-01-01"
@@ -183,7 +183,7 @@ workflows = nexus_api.workflows.list(
 )
 
 # Use the filter builder:
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(
         name__contains="auth",
         created_at__gte="2025-01-01"
@@ -249,7 +249,7 @@ if environment:
     filters.update(build_filters(labels__environment=environment))
 
 # Use the combined filters
-workflows = nexus_api.workflows.list(additional_params=filters)
+workflows = syntara_api.workflows.list(additional_params=filters)
 ```
 
 ### Error Handling
@@ -279,12 +279,12 @@ Check the endpoint's method signature - if it has `additional_params`, you can u
 
 ```python
 # Find workflows containing "deploy" in the name
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(name__contains="deploy")
 )
 
 # Find enabled workflows in production
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(
         is_enabled=True,
         labels__environment="production"
@@ -299,7 +299,7 @@ from datetime import UTC, datetime, timedelta
 
 # Find recent executions
 yesterday = datetime.now(UTC) - timedelta(days=1)
-executions = nexus_api.workflows.executions.list(
+executions = syntara_api.workflows.executions.list(
     workflow_id=workflow_id,
     additional_params=build_filters(
         created_at__gte=yesterday,
@@ -320,7 +320,7 @@ filters = build_filters(
     labels__priority="high"
 )
 
-workflows = nexus_api.workflows.list(additional_params=filters)
+workflows = syntara_api.workflows.list(additional_params=filters)
 ```
 
 ### Implementation Details

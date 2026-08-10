@@ -1,6 +1,6 @@
 # WebSocket Standards
 
-Standards for implementing WebSocket endpoints in Nexus.
+Standards for implementing WebSocket endpoints in Syntara.
 
 ## When to Use WebSocket vs REST
 

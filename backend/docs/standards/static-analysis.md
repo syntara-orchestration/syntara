@@ -85,7 +85,7 @@ Two patterns exist in the codebase for wiring exceptions to error handlers:
 
 | Pattern | How | Cycle? | Used By |
 |---------|-----|--------|---------|
-| **B** — string path | `@fastapi_exception(handler="nexus.X.error_handlers.handler_func")` | No | all domains |
+| **B** — string path | `@fastapi_exception(handler="syntara.X.error_handlers.handler_func")` | No | all domains |
 | **C** — embedded | Handler functions defined in exceptions.py itself | No | authz |
 
 Pattern B is the standard approach. String paths are resolved via `importlib` at registration time. See `src/syntara/core/exception_registry.py` line 59.

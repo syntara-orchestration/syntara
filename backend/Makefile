@@ -332,7 +332,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 .PHONY: db-run
 db-run: ## Start PostgreSQL database container (foreground, Ctrl+C to stop)
 	@echo "🚀 Starting PostgreSQL database..."
-	@echo "📍 Connection: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Connection: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "Press Ctrl+C to stop"
 	@echo ""
 	$(COMPOSE_FINAL_CMD) up database
@@ -451,7 +451,7 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	@echo "🚀 Starting all services..."
 	@echo "📍 Syntara API: http://localhost:$${APP_API_PORT:-8000}"
 	@echo "📍 Syntara UI: http://localhost:$${APP_UI_PORT:-8080}"
-	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
@@ -463,7 +463,7 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 .PHONY: services-run
 services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
 	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
-	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"

@@ -179,7 +179,7 @@ The application uses these environment variables (with defaults):
 - `APP_DB_PASSWORD` (default: `admin`)
 - `APP_DB_HOST` (default: `localhost`)
 - `APP_DB_PORT` (default: `5432`)
-- `APP_DB_NAME` (default: `nexus_api`)
+- `APP_DB_NAME` (default: `syntara_api`)
 - `APP_DB_POOL_SIZE` (default: `10`)
 - `APP_DB_MAX_OVERFLOW` (default: `20`)
 - `APP_DB_POOL_TIMEOUT_SECONDS` (default: `30`)
@@ -298,7 +298,7 @@ make run-all
 # - API: http://localhost:8000
 # - UI: http://localhost:8080
 # - Temporal UI: http://localhost:8081
-# - Database: postgresql://admin:admin@localhost:5432/nexus_api
+# - Database: postgresql://admin:admin@localhost:5432/syntara_api
 ```
 
 **Start all services** (background):
@@ -372,7 +372,7 @@ APP_DB_HOST=localhost
 APP_DB_PORT=5432
 APP_DB_USER=admin
 APP_DB_PASSWORD=admin
-APP_DB_NAME=nexus_api
+APP_DB_NAME=syntara_api
 APP_DB_POOL_SIZE=10
 APP_DB_MAX_OVERFLOW=20
 APP_DB_POOL_TIMEOUT_SECONDS=30

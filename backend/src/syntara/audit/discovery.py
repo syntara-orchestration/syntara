@@ -50,7 +50,7 @@ def get_event_type(handler_cls: type[AuditEventHandler[Any]]) -> type | None:
 
 
 def _validate_package_scope(package: ModuleType) -> bool:
-    """Validate that package is within the nexus.* hierarchy.
+    """Validate that package is within the syntara.* hierarchy.
 
     Returns True if valid, False otherwise. Logs error on validation failure.
     """

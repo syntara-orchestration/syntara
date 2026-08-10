@@ -1,4 +1,4 @@
-"""Main FastAPI application module for Nexus."""
+"""Main FastAPI application module for Syntara."""
 
 import asyncio
 import json

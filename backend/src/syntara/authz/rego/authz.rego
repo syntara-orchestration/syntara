@@ -1,4 +1,4 @@
-package nexus.authz
+package syntara.authz
 import rego.v1
 
 default allow := false

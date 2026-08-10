@@ -1,10 +1,10 @@
 # Authentication
 
-This document describes how authentication works in Nexus. It is intended for developers working on the project and is updated as the auth system evolves.
+This document describes how authentication works in Syntara. It is intended for developers working on the project and is updated as the auth system evolves.
 
 ## Overview
 
-Nexus supports two authentication methods for human users:
+Syntara supports two authentication methods for human users:
 
 - **Local authentication** — username/password with JWT tokens
 - **Federated authentication** — OIDC (OpenID Connect) via external identity providers (Azure AD, Google, Okta, AAP, etc.)

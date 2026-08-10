@@ -7,7 +7,7 @@
 #
 # Usage:
 #   ansible-playbook eda-trigger-webhook.yml \
-#     -e webhook_base_url=https://nexus.example.com \
+#     -e webhook_base_url=https://syntara.example.com \
 #     -e webhook_path=my-eda-trigger \
 #     -e webhook_client_id=nx_sa_abc123 \
 #     -e webhook_client_secret=<secret> \
