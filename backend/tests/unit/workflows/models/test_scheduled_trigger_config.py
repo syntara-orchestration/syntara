@@ -289,7 +289,7 @@ class TestTimezoneValidation:
 
     async def test_valid_timezones_is_nonempty(self) -> None:
         """Regression: available timezone set must never be empty (AAP-86297)."""
-        from nexus.workflows.workflow_engine.models.workflow_definition import (
+        from syntara.workflows.workflow_engine.models.workflow_definition import (
             _get_valid_timezones,
         )
 
@@ -303,7 +303,7 @@ class TestTimezoneValidation:
         """Runtime guard should raise if timezone data is missing (AAP-86297)."""
         from unittest.mock import patch
 
-        import nexus.workflows.workflow_engine.models.workflow_definition as wd
+        import syntara.workflows.workflow_engine.models.workflow_definition as wd
 
         original = wd._VALID_TIMEZONES
         try:
