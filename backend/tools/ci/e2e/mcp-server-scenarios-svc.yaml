@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-scenarios
+spec:
+  selector:
+    app: mcp-server-scenarios
+  ports:
+    - name: auth
+      port: 8766
+      targetPort: 8766
+    - name: forbidden
+      port: 8767
+      targetPort: 8767

@@ -583,7 +583,7 @@ jobs:
           # On Podman 5.x (events_logger=file), healthcheck timers are never created,
           # so compose would hang waiting for depends_on service_healthy conditions.
           uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d --no-deps \
-            database redis moto mcp-server mock-segment \
+            database redis moto mcp-server mcp-server-scenarios mock-segment \
             temporal syntara temporal-worker temporal-background-worker
 
       - name: Verify services are healthy
@@ -608,7 +608,7 @@ jobs:
           }
 
           # Wave 1: infrastructure (no upstream dependencies)
-          for svc in database redis moto mcp-server mock-segment; do
+          for svc in database redis moto mcp-server mcp-server-scenarios mock-segment; do
             wait_healthy "syntara-ci_${svc}_1" 120
           done
 
@@ -647,7 +647,7 @@ jobs:
         if: failure()
         run: |
           echo "=== Compose logs ==="
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs database temporal syntara temporal-worker temporal-background-worker mcp-server mcp-server-scenarios mock-segment
 
       - name: Cleanup
         if: always()
