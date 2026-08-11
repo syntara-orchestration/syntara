@@ -30,9 +30,9 @@ def mock_db_session_factory(handler: WebSocketStreamingHandler, scalar_result: A
     """
     # Create mock session and result
     mock_session = AsyncMock()
-    mock_result = MagicMock()  # Not AsyncMock - one_or_none is not async
-    mock_result.one_or_none.return_value = scalar_result
-    mock_session.exec.return_value = mock_result
+    mock_result = MagicMock()  # Not AsyncMock - scalar_one_or_none is not async
+    mock_result.scalar_one_or_none.return_value = scalar_result
+    mock_session.execute.return_value = mock_result
 
     # Create async context manager mock
     mock_cm = AsyncMock()
@@ -198,6 +198,29 @@ class TestWebSocketStreamingHandlerWaitForStreamReady:
 
 class TestWebSocketStreamingHandlerCheckInvocationExists:
     """Test _check_invocation_exists method."""
+
+    async def test_check_invocation_exists_uses_scalar_result_not_row_aap_86853(
+        self, handler: WebSocketStreamingHandler
+    ) -> None:
+        """Regression AAP-86853: sqlalchemy select + exec().one_or_none() returns Row."""
+        invocation_id = uuid4()
+        mock_invocation = MagicMock()
+        mock_invocation.status = InvocationStatus.RUNNING
+
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_invocation
+        mock_session.execute.return_value = mock_result
+
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__.return_value = mock_session
+        mock_cm.__aexit__.return_value = None
+        handler._session_factory = MagicMock(return_value=mock_cm)
+
+        status = await handler._check_invocation_exists(invocation_id)
+        assert status == InvocationStatus.RUNNING
+        mock_session.execute.assert_awaited_once()
+        mock_result.scalar_one_or_none.assert_called_once()
 
     async def test_check_invocation_exists_returns_status(self, handler: WebSocketStreamingHandler) -> None:
         """Test that _check_invocation_exists returns invocation status."""
