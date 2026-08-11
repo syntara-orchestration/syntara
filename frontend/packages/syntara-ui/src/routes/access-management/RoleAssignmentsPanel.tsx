@@ -302,13 +302,18 @@ function computeAssignedRoles(rows: RoleAssignmentRow[]): AssignedRolesByScope {
   for (const row of rows) {
     if (row.scopeType === 'system') {
       system.add(row.roleName)
-    } else if (row.scopeType === 'project' && row.projectId) {
-      let projectSet = byProject.get(row.projectId)
-      if (!projectSet) {
-        projectSet = new Set<string>()
-        byProject.set(row.projectId, projectSet)
+    } else if (row.scopeType === 'project') {
+      if (row.projectId) {
+        let projectSet = byProject.get(row.projectId)
+        if (!projectSet) {
+          projectSet = new Set<string>()
+          byProject.set(row.projectId, projectSet)
+        }
+        projectSet.add(row.roleName)
+      } else {
+        // Defensive: project-scoped role missing projectId (data inconsistency). Hide from all scopes.
+        system.add(row.roleName)
       }
-      projectSet.add(row.roleName)
     }
   }
   return { system, byProject }
