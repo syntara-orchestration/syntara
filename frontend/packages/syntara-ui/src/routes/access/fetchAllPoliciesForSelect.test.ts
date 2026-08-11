@@ -37,7 +37,7 @@ describe('fetchAllPoliciesForSelect', () => {
     } as never)
     vi.mocked(fetchAllPages).mockImplementation(async (fetchPage): Promise<PolicySelectListItem[]> => {
       const page = (await fetchPage(undefined)) as FetchPageResult<PolicySelectListItem>
-      if (page.error) throw page.error
+      if (page.error) throw new Error(JSON.stringify(page.error))
       if (!page.data) throw new Error('Empty response')
       return [...(page.data.resources ?? [])]
     })

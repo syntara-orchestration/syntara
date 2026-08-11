@@ -78,7 +78,7 @@ describe('usePolicySelectAll', () => {
     expect(fetchPolicies).toHaveBeenCalledTimes(1)
     expect(result.current.isSelectingAll).toBe(true)
 
-    await act(async () => {
+    act(() => {
       resolveFetch([{ name: 'policy-a', is_project_eligible: false }])
     })
 
