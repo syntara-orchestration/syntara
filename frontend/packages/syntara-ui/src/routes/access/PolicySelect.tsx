@@ -1,21 +1,16 @@
-import {
-  Button,
-  Label,
-  LabelGroup,
-  MenuToggle,
-  SelectList,
-  SelectOption,
-  Spinner,
-  TextInputGroup,
-  TextInputGroupMain,
-  TextInputGroupUtilities,
-} from '@patternfly/react-core'
-import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../components/longSelectMenu'
+import longSelectMenuStyles from '../../components/longSelectMenu.module.css'
 import { NxSelect } from '../../components/NxSelect'
+import { useAlerts } from '../../providers/alerts'
 
 import { accessClient } from './accessClient'
+import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
+import { filterPoliciesForRoleSelect, SELECT_ALL_VALUE } from './policySelectConstants'
+import { PolicySelectOptionsList } from './PolicySelectOptionsList'
+import { PolicySelectToggle } from './PolicySelectToggle'
+import { usePolicySelectAll } from './usePolicySelectAll'
 
 type PolicySelectProps = {
   selected: string[]
@@ -45,8 +40,8 @@ export function PolicySelect({
   const [debouncedFilter, setDebouncedFilter] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const { showError } = useAlerts()
 
-  // Debounce filter value for API calls
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
       setDebouncedFilter(filterValue)
@@ -71,21 +66,21 @@ export function PolicySelect({
     { enabled: isOpen }
   )
 
-  const policies = policiesQuery.data?.resources
+  const scopedPolicies = useMemo(
+    () => filterPoliciesForRoleSelect(policiesQuery.data?.resources ?? [], { scopeProjectId, projectEligible }),
+    [policiesQuery.data?.resources, scopeProjectId, projectEligible]
+  )
 
-  // Merge fetched policies with selected names so selected items always appear
   const policyOptions = useMemo(() => {
-    const fetched = policies ?? []
-    const fetchedNames = new Set(fetched.map((p) => p.name))
+    const fetchedNames = new Set(scopedPolicies.map((p) => p.name))
     const selectedOnly = selected.filter((name) => !fetchedNames.has(name))
     return [
-      ...fetched.map((p) => ({ name: p.name, description: p.description })),
+      ...scopedPolicies.map((p) => ({ name: p.name, description: p.description ?? null })),
       ...selectedOnly.map((name) => ({ name, description: null })),
     ]
-  }, [policies, selected])
+  }, [scopedPolicies, selected])
 
   const filteredOptions = useMemo(() => {
-    // Client-side filter for instant feedback while debounce hasn't fired yet
     if (filterValue && filterValue !== debouncedFilter) {
       const term = filterValue.toLowerCase()
       return policyOptions.filter((p) => p.name.toLowerCase().includes(term))
@@ -93,8 +88,34 @@ export function PolicySelect({
     return policyOptions
   }, [policyOptions, filterValue, debouncedFilter])
 
+  const fetchAllMatchingPolicies = useCallback(
+    () =>
+      fetchAllPoliciesForSelect({
+        scopeProjectId,
+        projectEligible,
+        nameContains: filterValue || debouncedFilter || undefined,
+      }),
+    [scopeProjectId, projectEligible, filterValue, debouncedFilter]
+  )
+
+  const { isSelectingAll, runSelectAll } = usePolicySelectAll({
+    selected,
+    onChange,
+    fetchPolicies: fetchAllMatchingPolicies,
+    showError,
+    onAfterSelect: () => {
+      setFilterValue('')
+      inputRef.current?.focus()
+    },
+  })
+
   const onSelect = useCallback(
     (_event: React.MouseEvent<Element, MouseEvent> | undefined, value: string | number | undefined) => {
+      if (value === SELECT_ALL_VALUE) {
+        runSelectAll()
+        return
+      }
+
       const policyName = value as string
       if (selected.includes(policyName)) {
         onChange(selected.filter((p) => p !== policyName))
@@ -104,7 +125,7 @@ export function PolicySelect({
       setFilterValue('')
       inputRef.current?.focus()
     },
-    [selected, onChange]
+    [selected, onChange, runSelectAll]
   )
 
   const removePolicy = useCallback(
@@ -121,69 +142,34 @@ export function PolicySelect({
 
   const isLoading = policiesQuery.isLoading || policiesQuery.isFetching
 
-  const toggle = (toggleRef: Ref<HTMLButtonElement>) => (
-    <MenuToggle
-      ref={toggleRef}
-      variant="typeahead"
-      onClick={() => setIsOpen(!isOpen)}
-      isExpanded={isOpen}
-      isFullWidth
-      isDisabled={isDisabled}
-      status={hasError ? 'danger' : undefined}
-    >
-      <TextInputGroup isPlain isDisabled={isDisabled}>
-        <TextInputGroupMain
-          value={filterValue}
-          onChange={(_e, val) => {
-            setFilterValue(val)
-            if (!isOpen) setIsOpen(true)
-          }}
-          onClick={() => {
-            if (!isOpen) setIsOpen(true)
-          }}
-          placeholder={selected.length === 0 ? 'Select policies...' : ''}
-          autoComplete="off"
-          innerRef={inputRef}
-        >
-          {selected.length > 0 && (
-            <LabelGroup>
-              {selected.map((name) => (
-                <Label
-                  key={name}
-                  color="blue"
-                  onClose={(e) => {
-                    e.stopPropagation()
-                    removePolicy(name)
-                  }}
-                >
-                  {name}
-                </Label>
-              ))}
-            </LabelGroup>
-          )}
-        </TextInputGroupMain>
-        {selected.length > 0 && (
-          <TextInputGroupUtilities>
-            <Button
-              variant="plain"
-              onClick={(e) => {
-                e.stopPropagation()
-                clearAll()
-              }}
-              aria-label="Clear all selected policies"
-            >
-              <RhUiCloseIcon />
-            </Button>
-          </TextInputGroupUtilities>
-        )}
-      </TextInputGroup>
-    </MenuToggle>
-  )
-
   const handleOpenChange = useCallback((open: boolean) => {
     setIsOpen(open)
     if (!open) setFilterValue('')
   }, [])
+
+  const openDropdown = useCallback(() => {
+    if (!isOpen) setIsOpen(true)
+  }, [isOpen])
+
+  const toggle = (toggleRef: Ref<HTMLButtonElement>) => (
+    <PolicySelectToggle
+      toggleRef={toggleRef}
+      isOpen={isOpen}
+      onToggle={() => setIsOpen(!isOpen)}
+      filterValue={filterValue}
+      onFilterChange={(val) => {
+        setFilterValue(val)
+        openDropdown()
+      }}
+      onFilterFocus={openDropdown}
+      selected={selected}
+      onRemovePolicy={removePolicy}
+      onClearAll={clearAll}
+      inputRef={inputRef}
+      isDisabled={isDisabled}
+      hasError={hasError}
+    />
+  )
 
   return (
     <NxSelect
@@ -194,31 +180,18 @@ export function PolicySelect({
       onSelect={onSelect}
       selected={selected}
       toggle={toggle}
+      isScrollable
+      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
+      popperProps={longSelectMenuPopperProps}
+      className={longSelectMenuStyles.containScroll}
     >
-      <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {isLoading && (
-          <SelectOption isDisabled>
-            <Spinner size="sm" /> Loading policies...
-          </SelectOption>
-        )}
-        {!isLoading && filteredOptions.length === 0 && (
-          <SelectOption isDisabled>
-            {filterValue ? `No policies match "${filterValue}"` : 'No policies available'}
-          </SelectOption>
-        )}
-        {!isLoading &&
-          filteredOptions.map((policy) => (
-            <SelectOption
-              key={policy.name}
-              value={policy.name}
-              hasCheckbox
-              isSelected={selected.includes(policy.name)}
-              description={policy.description ?? undefined}
-            >
-              {policy.name}
-            </SelectOption>
-          ))}
-      </SelectList>
+      <PolicySelectOptionsList
+        isLoading={isLoading}
+        filterValue={filterValue}
+        filteredOptions={filteredOptions}
+        selected={selected}
+        isSelectingAll={isSelectingAll}
+      />
     </NxSelect>
   )
 }
