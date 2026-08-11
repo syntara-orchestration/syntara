@@ -1,7 +1,7 @@
 """App-level test infrastructure: env setup and live fixtures.
 
 SDK fixtures (e2e + performance — require a live deployment):
-  - live.py        nexus_base_url, nexus_client, nexus_api, auth_headers
+  - live.py        nexus_base_url, nexus_client, syntara_api, auth_headers
 
 Pytest hooks (global infrastructure for all test types):
   - _hooks.py      worker_id, --run-performance flag, collection filtering, cleanup

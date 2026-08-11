@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.lib.encryption import SecretEncryptor
-from nexus.credentials.cli.rotate_keys import (
+from syntara.core.lib.encryption import SecretEncryptor
+from syntara.credentials.cli.rotate_keys import (
     EXIT_FATAL,
     EXIT_PARTIAL_FAILURE,
     EXIT_SUCCESS,
@@ -170,7 +170,7 @@ class TestRotateKeys:
     """Tests for the main rotate_keys async function."""
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_happy_path(self, mock_session_local: MagicMock) -> None:
         """All rows rotated successfully."""
         old_enc = SecretEncryptor(OLD_KEY)
@@ -186,7 +186,7 @@ class TestRotateKeys:
         mock_commit.assert_called()
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_dry_run_no_commits(self, mock_session_local: MagicMock) -> None:
         """Dry run verifies round-trip without committing."""
         old_enc = SecretEncryptor(OLD_KEY)
@@ -202,7 +202,7 @@ class TestRotateKeys:
         mock_commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_empty_db(self, mock_session_local: MagicMock) -> None:
         """No rows to process returns success."""
         mock_session, _ = _mock_paginated_session([])
@@ -223,7 +223,7 @@ class TestRotateKeys:
         assert exit_code == EXIT_FATAL
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_partial_failure(self, mock_session_local: MagicMock) -> None:
         """Some rows fail, others succeed — returns partial failure."""
         old_enc = SecretEncryptor(OLD_KEY)
@@ -243,7 +243,7 @@ class TestRotateKeys:
         assert exit_code == EXIT_PARTIAL_FAILURE
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_batch_commits(self, mock_session_local: MagicMock) -> None:
         """Pagination: each batch fetched and committed separately."""
         old_enc = SecretEncryptor(OLD_KEY)
@@ -273,7 +273,7 @@ class TestIdempotentReRun:
     """Tests for idempotent re-run behavior (already-rotated credentials)."""
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_all_already_rotated_returns_success(self, mock_session_local: MagicMock) -> None:
         """Re-running rotation when all rows are already on new key returns success."""
         new_enc = SecretEncryptor(NEW_KEY)
@@ -299,7 +299,7 @@ class TestIdempotentReRun:
         assert exit_code == EXIT_SUCCESS
 
     @pytest.mark.asyncio
-    @patch("nexus.credentials.cli.rotate_keys._session_factory")
+    @patch("syntara.credentials.cli.rotate_keys._session_factory")
     async def test_mixed_rotated_and_pending_returns_success(self, mock_session_local: MagicMock) -> None:
         """Interrupted rotation recovery: mix of old-key and new-key rows returns success."""
         old_enc = SecretEncryptor(OLD_KEY)

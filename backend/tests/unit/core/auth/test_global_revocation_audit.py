@@ -2,18 +2,18 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import (
+from syntara.audit.models.audit_event import (
     EventCategory,
     EventSeverity,
     EventStatus,
 )
-from nexus.auth.audit.global_revocation import (
+from syntara.auth.audit.global_revocation import (
     GlobalRevocationEvent,
     GlobalRevocationHandler,
     GlobalRevocationRejectEvent,
     GlobalRevocationRejectHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestGlobalRevocationHandler:

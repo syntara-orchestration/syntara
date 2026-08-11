@@ -6,15 +6,15 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.exceptions import (
+from syntara.core.models import User
+from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
     TemporalUnavailableError,
 )
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.services.execution_service import ExecutionService
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.services.execution_service import ExecutionService
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _make_execution(status: ExecutionStatus) -> Execution:

@@ -4,10 +4,10 @@ This document defines the service layer patterns for the Nexus project — how s
 
 ## BaseService
 
-All services MUST inherit from `BaseService` in `src/nexus/core/services/base.py`. This ensures consistent filtering, sorting, pagination, and label handling across the system.
+All services MUST inherit from `BaseService` in `src/syntara/core/services/base.py`. This ensures consistent filtering, sorting, pagination, and label handling across the system.
 
 ```python
-from nexus.core.services.base import BaseService
+from syntara.core.services.base import BaseService
 
 class WorkflowService(BaseService):
     def __init__(self, db: AsyncSession, current_user: User) -> None:
@@ -28,7 +28,7 @@ All services use this method for collection endpoints. Do not implement custom p
 
 ## Extension Protocols
 
-Services customize behavior by implementing `@runtime_checkable` Protocol mixins defined in `src/nexus/core/services/extensions.py`:
+Services customize behavior by implementing `@runtime_checkable` Protocol mixins defined in `src/syntara/core/services/extensions.py`:
 
 ### EnrichQueryMixin
 
@@ -95,7 +95,7 @@ This pattern centralizes service creation and ensures every endpoint gets a fres
 
 ### Lifespan Context Manager
 
-Application startup and shutdown are managed via an `@asynccontextmanager` lifespan in `src/nexus/api/main.py`:
+Application startup and shutdown are managed via an `@asynccontextmanager` lifespan in `src/syntara/api/main.py`:
 
 **Startup (before yield):**
 1. Router auto-discovery and registration
@@ -127,7 +127,7 @@ Middleware registration order and execution order are **reversed** in FastAPI (l
 
 ## Periodic Workers
 
-Background tasks use `PeriodicWorker` from `src/nexus/core/workers/periodic.py`.
+Background tasks use `PeriodicWorker` from `src/syntara/core/workers/periodic.py`.
 
 ### Pattern
 
@@ -161,9 +161,9 @@ Set `coordinate=False` for tasks that must run in every process (e.g., per-proce
 
 | Worker | Location | Interval | Coordinate | Purpose |
 |---|---|---|---|---|
-| `PeriodicCollector` | `src/nexus/telemetry/periodic_collector.py` | configurable | yes | Flush telemetry events to Segment |
-| `CompletionPoller` | `src/nexus/metrics/completion_poller.py` | configurable | yes | Poll for workflow completion status |
-| `MetricsCleanupWorker` | `src/nexus/metrics/cleanup.py` | configurable | yes | Clean up old metrics records |
+| `PeriodicCollector` | `src/syntara/telemetry/periodic_collector.py` | configurable | yes | Flush telemetry events to Segment |
+| `CompletionPoller` | `src/syntara/metrics/completion_poller.py` | configurable | yes | Poll for workflow completion status |
+| `MetricsCleanupWorker` | `src/syntara/metrics/cleanup.py` | configurable | yes | Clean up old metrics records |
 
 ## Tooling vs Convention
 
@@ -186,10 +186,10 @@ Set `coordinate=False` for tasks that must run in every process (e.g., per-proce
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/services/base.py` | `BaseService` with `list_resources()` |
-| `src/nexus/core/services/extensions.py` | Protocol mixins and default implementations |
-| `src/nexus/core/workers/periodic.py` | `PeriodicWorker` base class |
-| `src/nexus/api/main.py` | Lifespan context manager, middleware stack |
-| `src/nexus/telemetry/periodic_collector.py` | Telemetry flush worker |
-| `src/nexus/metrics/completion_poller.py` | Completion polling worker |
-| `src/nexus/metrics/cleanup.py` | Metrics cleanup worker |
+| `src/syntara/core/services/base.py` | `BaseService` with `list_resources()` |
+| `src/syntara/core/services/extensions.py` | Protocol mixins and default implementations |
+| `src/syntara/core/workers/periodic.py` | `PeriodicWorker` base class |
+| `src/syntara/api/main.py` | Lifespan context manager, middleware stack |
+| `src/syntara/telemetry/periodic_collector.py` | Telemetry flush worker |
+| `src/syntara/metrics/completion_poller.py` | Completion polling worker |
+| `src/syntara/metrics/cleanup.py` | Metrics cleanup worker |

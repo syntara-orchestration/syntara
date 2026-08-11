@@ -247,7 +247,7 @@ def _validate_openapi_router(spec_path: Path, rel_path: Path, src_dir: Path, err
             errors.append(
                 f"  - {rel_path}\n"
                 f"    No router module found for component '{schema_domain}'\n"
-                f"    Expected: src/nexus/{python_domain}/{schema_domain}_router.py"
+                f"    Expected: src/syntara/{python_domain}/{schema_domain}_router.py"
             )
         return
 
@@ -257,7 +257,7 @@ def _validate_openapi_router(spec_path: Path, rel_path: Path, src_dir: Path, err
         errors.append(
             f"  - {rel_path}\n"
             f"    No router module found for component '{python_domain}'\n"
-            f"    Expected: src/nexus/{python_domain}/router.py"
+            f"    Expected: src/syntara/{python_domain}/router.py"
         )
 
 
@@ -299,7 +299,7 @@ def validate_openapi_specs(specs: list[Path], schemas_dir: Path, src_dir: Path) 
 def spec_to_handler_path(spec_path: Path, src_dir: Path) -> Path:
     """Map spec path to expected handler path.
 
-    websocket-{name}.yaml -> src/nexus/{component}/ws/{name}.py
+    websocket-{name}.yaml -> src/syntara/{component}/ws/{name}.py
     """
     component_name = spec_path.parent.name
     handler_stem = spec_path.stem[len("websocket-") :]
@@ -437,7 +437,7 @@ def validate_handler_spec_pairs(
         if not found:
             rel_handler = handler_path.relative_to(project_root)
             expected_spec = f"schemas/{component}/websocket-{handler_stem}.yaml"
-            missing_errors.append(f"  - Handler: {rel_handler}\n    Expected spec: src/nexus/{expected_spec}")
+            missing_errors.append(f"  - Handler: {rel_handler}\n    Expected spec: src/syntara/{expected_spec}")
 
     return orphan_errors, missing_errors
 
@@ -483,7 +483,7 @@ def format_error_block(title: str, items: Sequence[str], fix_options: Sequence[s
 def main() -> int:
     """Run all API spec validations. Returns exit code."""
     project_root = find_project_root()
-    src_dir = project_root / "src" / "nexus"
+    src_dir = project_root / "src" / "syntara"
     schemas_dir = src_dir / "schemas"
 
     if not schemas_dir.exists():

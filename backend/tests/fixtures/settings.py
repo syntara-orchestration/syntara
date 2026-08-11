@@ -19,7 +19,7 @@ os.environ.setdefault(
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
-    from nexus.core.config.base import Settings
+    from syntara.core.config.base import Settings
 
 
 class FakeSettingsCache:
@@ -30,7 +30,7 @@ class FakeSettingsCache:
 
     def __init__(self, overrides: dict[str, object] | None = None) -> None:
         """Seed from catalog defaults and apply overrides."""
-        from nexus.settings.catalog import SETTINGS_CATALOG
+        from syntara.settings.catalog import SETTINGS_CATALOG
 
         self._store: dict[str, object] = {entry.key: entry.default_value for entry in SETTINGS_CATALOG}
         if overrides:
@@ -54,7 +54,7 @@ class FakeSettingsCache:
         reject_bool: bool = False,
     ) -> Any:  # noqa: ANN401
         """Fetch a setting and validate its runtime type."""
-        from nexus.settings.exceptions import SettingTypeError
+        from syntara.settings.exceptions import SettingTypeError
 
         value = await self.get(key)
         if value is None:
@@ -74,9 +74,9 @@ class FakeSettingsCache:
         default: Any,  # noqa: ANN401
     ) -> Any:  # noqa: ANN401
         """Mirror SettingsCache._validate_against_catalog for test parity."""
-        from nexus.settings.catalog import SETTINGS_CATALOG
-        from nexus.settings.exceptions import SettingValidationError
-        from nexus.settings.validators import validate_setting_value
+        from syntara.settings.catalog import SETTINGS_CATALOG
+        from syntara.settings.exceptions import SettingValidationError
+        from syntara.settings.validators import validate_setting_value
 
         defn = next((d for d in SETTINGS_CATALOG if d.key == key), None)
         if defn is None or defn.validation_schema is None:
@@ -142,7 +142,7 @@ def override_settings() -> Callable[..., AbstractContextManager[object]]:
     from contextlib import ExitStack
     from unittest.mock import patch
 
-    from nexus.core.config.base import get_settings
+    from syntara.core.config.base import get_settings
 
     @contextmanager
     def _override(**overrides: object) -> Generator[Settings, None, None]:
@@ -177,7 +177,7 @@ def override_runtime_settings() -> Callable[..., AbstractContextManager[FakeSett
         overrides: dict[str, object] | None = None,
         /,
     ) -> Generator[FakeSettingsCache, None, None]:
-        import nexus.settings.cache.settings_cache as _mod
+        import syntara.settings.cache.settings_cache as _mod
 
         original = _mod._runtime_settings
         fake = FakeSettingsCache(overrides)

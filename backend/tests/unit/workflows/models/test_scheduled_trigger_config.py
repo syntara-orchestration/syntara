@@ -12,7 +12,7 @@ Covers:
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     MissedSchedulePolicy,
     ScheduledTriggerConfig,
     ScheduleType,
@@ -93,7 +93,7 @@ class TestMissedSchedulePolicy:
         """Every policy string must round-trip through the StrEnum."""
         import importlib
 
-        import nexus.workflows.workflow_engine.models.workflow_definition as mod
+        import syntara.workflows.workflow_engine.models.workflow_definition as mod
 
         importlib.reload(mod)
         reloaded = mod.MissedSchedulePolicy(value)

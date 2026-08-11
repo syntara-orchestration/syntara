@@ -1,4 +1,4 @@
-"""Unit tests for who_can helper functions in nexus.authz.router."""
+"""Unit tests for who_can helper functions in syntara.authz.router."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import Select
 from sqlmodel import select
 
-from nexus.authz.router import (
+from syntara.authz.router import (
     WhoCanRequest,
     WhoCanUser,
     _apply_who_can_cursor_filter,
@@ -16,8 +16,8 @@ from nexus.authz.router import (
     _check_user_authorized,
     _count_batch_authorized,
 )
-from nexus.core.models.user import User
-from nexus.core.utils.cursor import PaginationDirection, SortDirection
+from syntara.core.models.user import User
+from syntara.core.utils.cursor import PaginationDirection, SortDirection
 
 # ---------------------------------------------------------------------------
 # _apply_who_can_cursor_filter
@@ -260,7 +260,7 @@ class TestCheckUserAuthorized:
         mock_result = MagicMock()
         mock_result.allowed = True
 
-        with patch("nexus.authz.router.authorize", return_value=mock_result) as mock_auth:
+        with patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth:
             result = await _check_user_authorized(db, evaluator, user, body, "proj")
             assert result is True
             mock_auth.assert_awaited_once()
@@ -278,7 +278,7 @@ class TestCheckUserAuthorized:
         mock_result = MagicMock()
         mock_result.allowed = False
 
-        with patch("nexus.authz.router.authorize", return_value=mock_result):
+        with patch("syntara.authz.router.authorize", return_value=mock_result):
             result = await _check_user_authorized(db, evaluator, user, body, "")
             assert result is False
 
@@ -309,7 +309,7 @@ class TestCheckBatchAuthorization:
         authorized: list[WhoCanUser] = []
         checked: set[UUID] = set()
 
-        with patch("nexus.authz.router._check_user_authorized", side_effect=[True, False]):
+        with patch("syntara.authz.router._check_user_authorized", side_effect=[True, False]):
             await _check_batch_authorization(db, evaluator, [u1, u2], body, "", authorized, checked, 10)
 
         assert len(authorized) == 1
@@ -328,7 +328,7 @@ class TestCheckBatchAuthorization:
         authorized: list[WhoCanUser] = []
         checked: set[UUID] = set()
 
-        with patch("nexus.authz.router._check_user_authorized", return_value=True):
+        with patch("syntara.authz.router._check_user_authorized", return_value=True):
             await _check_batch_authorization(db, evaluator, [u1, u2, u3], body, "", authorized, checked, 2)
 
         assert len(authorized) == 2
@@ -358,7 +358,7 @@ class TestCountBatchAuthorized:
         u2 = self._make_user()
         body = WhoCanRequest(action="read", resource_type="workflow")
 
-        with patch("nexus.authz.router._check_user_authorized", side_effect=[True, False]):
+        with patch("syntara.authz.router._check_user_authorized", side_effect=[True, False]):
             count, scanned, cap_exceeded = await _count_batch_authorized(
                 db, evaluator, [u1, u2], body, "proj", set(), 0, 0
             )
@@ -376,7 +376,7 @@ class TestCountBatchAuthorized:
         body = WhoCanRequest(action="read", resource_type="workflow")
         already_checked = {u1.id}
 
-        with patch("nexus.authz.router._check_user_authorized", return_value=True) as mock_check:
+        with patch("syntara.authz.router._check_user_authorized", return_value=True) as mock_check:
             count, scanned, cap_exceeded = await _count_batch_authorized(
                 db, evaluator, [u1, u2], body, "proj", already_checked, 0, 0
             )
@@ -393,7 +393,7 @@ class TestCountBatchAuthorized:
         u1 = self._make_user()
         body = WhoCanRequest(action="read", resource_type="workflow")
 
-        with patch("nexus.authz.router._check_user_authorized", return_value=True):
+        with patch("syntara.authz.router._check_user_authorized", return_value=True):
             count, _scanned, cap_exceeded = await _count_batch_authorized(
                 db, evaluator, [u1], body, "proj", set(), 5, 0
             )
@@ -408,7 +408,7 @@ class TestCountBatchAuthorized:
         u1 = self._make_user()
         body = WhoCanRequest(action="read", resource_type="workflow")
 
-        with patch("nexus.authz.router._log_scan_cap_exceeded") as mock_log:
+        with patch("syntara.authz.router._log_scan_cap_exceeded") as mock_log:
             count, _scanned, cap_exceeded = await _count_batch_authorized(
                 db, evaluator, [u1], body, "proj", set(), 3, 10_000
             )

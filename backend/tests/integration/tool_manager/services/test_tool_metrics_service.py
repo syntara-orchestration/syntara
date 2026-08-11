@@ -15,13 +15,13 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration
-from nexus.tool_manager.models.tool import Tool
-from nexus.tool_manager.models.tool_execution import ToolExecutionStatus
-from nexus.tool_manager.models.tool_metrics_response import ToolMetricsQuery
-from nexus.tool_manager.models.usage_counter import CounterType, UsageCounter
-from nexus.tool_manager.services.tool_metrics_service import ToolMetricsService
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration
+from syntara.tool_manager.models.tool import Tool
+from syntara.tool_manager.models.tool_execution import ToolExecutionStatus
+from syntara.tool_manager.models.tool_metrics_response import ToolMetricsQuery
+from syntara.tool_manager.models.usage_counter import CounterType, UsageCounter
+from syntara.tool_manager.services.tool_metrics_service import ToolMetricsService
 
 # ============================================================================
 # T005: record_tool_execution tests
@@ -211,7 +211,7 @@ async def test_summary_empty_returns_empty_list(test_db_session: AsyncSession, t
 @pytest.mark.asyncio
 async def test_list_executions_returns_records(test_db_session: AsyncSession, test_tool: Tool, test_user: User) -> None:
     """Test returns paginated ToolExecution records."""
-    from nexus.tool_manager.models.tool_metrics_response import ToolExecutionListParams
+    from syntara.tool_manager.models.tool_metrics_response import ToolExecutionListParams
 
     service = ToolMetricsService(test_db_session, test_user)
     await service.record_tool_execution(test_tool.namespaced_name, 100, ToolExecutionStatus.SUCCESS)
@@ -229,7 +229,7 @@ async def test_list_executions_filter_by_status(
     test_db_session: AsyncSession, test_tool: Tool, test_user: User
 ) -> None:
     """Test filtering by status."""
-    from nexus.tool_manager.models.tool_metrics_response import ToolExecutionListParams
+    from syntara.tool_manager.models.tool_metrics_response import ToolExecutionListParams
 
     service = ToolMetricsService(test_db_session, test_user)
     await service.record_tool_execution(test_tool.namespaced_name, 100, ToolExecutionStatus.SUCCESS)
@@ -251,7 +251,7 @@ async def test_list_executions_filter_by_namespaced_name(
     test_user: User,
 ) -> None:
     """Test filtering by namespaced_name."""
-    from nexus.tool_manager.models.tool_metrics_response import ToolExecutionListParams
+    from syntara.tool_manager.models.tool_metrics_response import ToolExecutionListParams
 
     tool2 = Tool(
         name="other-tool",
@@ -277,7 +277,7 @@ async def test_list_executions_filter_by_namespaced_name(
 @pytest.mark.asyncio
 async def test_list_executions_pagination(test_db_session: AsyncSession, test_tool: Tool, test_user: User) -> None:
     """Test cursor-based pagination."""
-    from nexus.tool_manager.models.tool_metrics_response import ToolExecutionListParams
+    from syntara.tool_manager.models.tool_metrics_response import ToolExecutionListParams
 
     service = ToolMetricsService(test_db_session, test_user)
     for _ in range(5):

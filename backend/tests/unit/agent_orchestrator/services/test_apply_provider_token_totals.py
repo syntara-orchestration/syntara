@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nexus.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 
 
 class TestApplyProviderTokenTotals:

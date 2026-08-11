@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from nexus.files.document_conversion.converters.pdf_converter import (
+from syntara.files.document_conversion.converters.pdf_converter import (
     PDFConverter,
 )
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
-from nexus.files.models import FileMetadata
+from syntara.files.models import FileMetadata
 
 
 class TestPDFConverterMimeTypeSupport:
@@ -52,7 +52,7 @@ class TestPDFConverterThreadOffloading:
     """Test that PDFConverter offloads blocking work to a thread pool."""
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.pdf_converter.asyncio.to_thread")
+    @patch("syntara.files.document_conversion.converters.pdf_converter.asyncio.to_thread")
     async def test_convert_runs_in_thread_pool(self, mock_to_thread: AsyncMock) -> None:
         """Test that convert() offloads sync work via asyncio.to_thread."""
         file_metadata = Mock()

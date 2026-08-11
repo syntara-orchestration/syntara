@@ -21,16 +21,16 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 
-from nexus.api.constants import EXCLUDED_PATHS
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import VERIFIED_ACTOR_STATE_KEY, AuditActorContext, actor_context_var
-from nexus.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
-from nexus.audit.middleware import AuditMiddleware
-from nexus.audit.models.audit_event import AuditEvent, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
+from syntara.api.constants import EXCLUDED_PATHS
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import VERIFIED_ACTOR_STATE_KEY, AuditActorContext, actor_context_var
+from syntara.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
+from syntara.audit.middleware import AuditMiddleware
+from syntara.audit.models.audit_event import AuditEvent, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
 
-_EMIT_PATCH = "nexus.audit.emitter._do_emit_audit_event"
+_EMIT_PATCH = "syntara.audit.emitter._do_emit_audit_event"
 
 
 def _make_scope(
@@ -906,7 +906,7 @@ class TestAuditMiddlewareSourceComponent:
             await middleware(_make_scope(), AsyncMock(), AsyncMock())
 
         events = _get_audit_events(mock_emit, "request_completed")
-        assert events[0].source_component == "nexus.audit.middleware"
+        assert events[0].source_component == "syntara.audit.middleware"
 
     @pytest.mark.asyncio
     async def test_source_component_on_exception(self) -> None:
@@ -999,7 +999,7 @@ class TestAuditMiddlewareContextIds:
             receive: Any,  # noqa: ANN401
             send: Any,  # noqa: ANN401
         ) -> None:
-            from nexus.audit.emitter import workflow_id_context_var
+            from syntara.audit.emitter import workflow_id_context_var
 
             workflow_id_context_var.set(wf_id)
             await send({"type": "http.response.start", "status": 200, "headers": []})
@@ -1023,7 +1023,7 @@ class TestAuditMiddlewareContextIds:
             receive: Any,  # noqa: ANN401
             send: Any,  # noqa: ANN401
         ) -> None:
-            from nexus.audit.emitter import workflow_id_context_var
+            from syntara.audit.emitter import workflow_id_context_var
 
             # Handler overwrites the context variable set from path params
             workflow_id_context_var.set(ctx_wf_id)
@@ -1319,7 +1319,7 @@ class TestAuditMiddlewareErrorResilience:
         async def capture_send(message: MutableMapping[str, Any]) -> None:
             sent_messages.append(message)
 
-        dispatch_patch = "nexus.audit.middleware.AuditEventDispatcher.dispatch"
+        dispatch_patch = "syntara.audit.middleware.AuditEventDispatcher.dispatch"
         with patch(dispatch_patch, side_effect=RuntimeError("dispatch broken")):
             await middleware(_make_scope(), AsyncMock(), capture_send)
 
@@ -1332,10 +1332,10 @@ class TestAuditMiddlewareErrorResilience:
         app = _make_app(status_code=200)
         middleware = AuditMiddleware(app, _make_fastapi_app())
 
-        dispatch_patch = "nexus.audit.middleware.AuditEventDispatcher.dispatch"
+        dispatch_patch = "syntara.audit.middleware.AuditEventDispatcher.dispatch"
         with (
             patch(dispatch_patch, side_effect=RuntimeError("dispatch broken")),
-            patch("nexus.audit.middleware.logger") as mock_logger,
+            patch("syntara.audit.middleware.logger") as mock_logger,
         ):
             await middleware(_make_scope(), AsyncMock(), AsyncMock())
             assert mock_logger.warning.call_count >= 1
@@ -1363,7 +1363,7 @@ class TestAuditMiddlewareRequestId:
         scope = _make_scope(headers=[(b"x-request-id", str(rid).encode())])
         captured: list[UUID | None] = []
 
-        from nexus.audit.emitter import request_id_context_var
+        from syntara.audit.emitter import request_id_context_var
 
         async def capturing_app(scope: Any, receive: Any, send: Any) -> None:  # noqa: ANN401
             captured.append(request_id_context_var.get())
@@ -1382,7 +1382,7 @@ class TestAuditMiddlewareRequestId:
         scope = _make_scope()
         captured: list[UUID | None] = []
 
-        from nexus.audit.emitter import request_id_context_var
+        from syntara.audit.emitter import request_id_context_var
 
         async def capturing_app(scope: Any, receive: Any, send: Any) -> None:  # noqa: ANN401
             captured.append(request_id_context_var.get())
@@ -1401,7 +1401,7 @@ class TestAuditMiddlewareRequestId:
         scope = _make_scope(headers=[(b"x-request-id", b"not-a-uuid")])
         captured: list[UUID | None] = []
 
-        from nexus.audit.emitter import request_id_context_var
+        from syntara.audit.emitter import request_id_context_var
 
         async def capturing_app(scope: Any, receive: Any, send: Any) -> None:  # noqa: ANN401
             captured.append(request_id_context_var.get())
@@ -1417,7 +1417,7 @@ class TestAuditMiddlewareRequestId:
     @pytest.mark.asyncio
     async def test_context_var_is_reset_after_request(self) -> None:
         """ContextVar is reset to its previous value after the request completes."""
-        from nexus.audit.emitter import request_id_context_var
+        from syntara.audit.emitter import request_id_context_var
 
         rid = uuid4()
         scope = _make_scope(headers=[(b"x-request-id", str(rid).encode())])
@@ -1437,7 +1437,7 @@ class TestAuditMiddlewareRequestId:
         scope = _make_scope(headers=[(b"X-Request-Id", str(rid).encode())])
         captured: list[UUID | None] = []
 
-        from nexus.audit.emitter import request_id_context_var
+        from syntara.audit.emitter import request_id_context_var
 
         async def capturing_app(scope: Any, receive: Any, send: Any) -> None:  # noqa: ANN401
             captured.append(request_id_context_var.get())
@@ -1593,7 +1593,7 @@ class TestAuditMiddlewareContentLength:
 # AuditMiddleware - interface and endpoint_template
 # =============================================================================
 
-_DISPATCH_PATCH = "nexus.audit.dispatcher.AuditEventDispatcher.dispatch"
+_DISPATCH_PATCH = "syntara.audit.dispatcher.AuditEventDispatcher.dispatch"
 
 
 def _capture_http_events(mock_dispatch: MagicMock) -> list[HTTPRequestEvent]:
@@ -1638,7 +1638,7 @@ class TestAuditMiddlewareInterfaceAndEndpointTemplate:
     @pytest.mark.asyncio
     async def test_ui_header_sets_interface_ui(self) -> None:
         """Interface is 'ui' when the interface context var is set."""
-        from nexus.metrics.interface_tag import INTERFACE_UI, interface_context_var
+        from syntara.metrics.interface_tag import INTERFACE_UI, interface_context_var
 
         app = _make_app(status_code=200)
         middleware = AuditMiddleware(app, _make_fastapi_app())

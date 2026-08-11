@@ -8,8 +8,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.audit.dispatcher import AuditEventDispatcher
+from syntara.api.main import app
+from syntara.audit.dispatcher import AuditEventDispatcher
 
 
 @asynccontextmanager
@@ -33,15 +33,15 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
     # Patch all database connections to use the test database
     # This ensures _check_settings_catalog() and other startup code use the migrated test DB
     with (
-        patch("nexus.core.database.session.engine", test_db_engine),
-        patch("nexus.core.database.session.AsyncSessionLocal", test_session_factory),
-        patch("nexus.api.main.engine", test_db_engine),
-        patch("nexus.api.main.AsyncSessionLocal", test_session_factory),
-        patch("nexus.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
-        patch("nexus.api.main.RegoEvaluator", return_value=mock_evaluator),
+        patch("syntara.core.database.session.engine", test_db_engine),
+        patch("syntara.core.database.session.AsyncSessionLocal", test_session_factory),
+        patch("syntara.api.main.engine", test_db_engine),
+        patch("syntara.api.main.AsyncSessionLocal", test_session_factory),
+        patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
+        patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
     ):
         # Seed required data before app startup
-        from nexus.core.seed import run_seeders
+        from syntara.core.seed import run_seeders
 
         await run_seeders(test_session_factory)
 
@@ -55,7 +55,7 @@ async def test_audit_dispatcher_registers_handlers_on_startup(test_db_engine: As
     """Verify that audit handlers are discovered and registered during app startup (I0).
 
     This test ensures that the dispatcher bootstrap in main.py successfully:
-    1. Discovers handlers from nexus.auth.audit
+    1. Discovers handlers from syntara.auth.audit
     2. Registers them with AuditEventDispatcher
     3. Results in a non-empty registry after startup
     """

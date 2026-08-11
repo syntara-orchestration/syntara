@@ -3,7 +3,7 @@
 alembic==1.18.5 \
     --hash=sha256:06d8ba9d04558022f5395e9317de03d270f3dced49cee01f89fe7a13c26f14bc \
     --hash=sha256:1554982221dd17e9a749b53902407578eb305e453f71999e8c7f0a48389fff8e
-    # via nexus
+    # via syntara
 annotated-doc==0.0.5 \
     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101 \
     --hash=sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb
@@ -34,7 +34,7 @@ anyio==4.14.2 \
 argon2-cffi==25.1.0 \
     --hash=sha256:694ae5cc8a42f4c4e2bf2ca0e64e51e23a040c6a517a85074683d3959e1346c1 \
     --hash=sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
-    # via nexus
+    # via syntara
 argon2-cffi-bindings==25.1.0 \
     --hash=sha256:b957f3e6ea4d55d820e40ff76f450952807013d361a65d7f28acc0acbf29229d
     # via argon2-cffi
@@ -48,7 +48,7 @@ asyncpg==0.31.0 \
     --hash=sha256:bef056aa502ee34204c161c72ca1f3c274917596877f825968368b2c33f585f4 \
     --hash=sha256:c0e0822b1038dc7253b337b0f3f676cadc4ac31b126c5d42691c39691962e403 \
     --hash=sha256:c989386c83940bfbd787180f2b1519415e2d3d6277a70d9d0f0145ac73500735 \
-    # via nexus
+    # via syntara
 attrs==25.4.0 \
     --hash=sha256:16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11 \
     --hash=sha256:adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373
@@ -73,7 +73,7 @@ blis==1.3.3 \
 boto3==1.43.63 \
     --hash=sha256:647c0f0b59710ce12a49323382bb5ece1b4e02199c736d19d555330dca7e947f \
     --hash=sha256:859a8d1c50505a5cefb8629790dd34602ddb85bfd7ea5d34a362ab1793513636
-    # via nexus
+    # via syntara
 botocore==1.43.63 \
     --hash=sha256:854e45247f00b0732496ea1f0c5d0cf3c31d58b48eb052c31c27ab1087dfddf1 \
     --hash=sha256:8deed86feacc8f8d2491f1d170562af191f8b33924052d834f4217d5d797e5a9
@@ -83,7 +83,7 @@ botocore==1.43.63 \
 cachetools==7.1.7 \
     --hash=sha256:a3e2a00b14d8f8a6b70c1dae7b4685e7ad3bc965c5b42124a2d6ce895da6cf50 \
     --hash=sha256:ef98ef375ad188819ef2f9b3645e3987f4b8c5b7550e436ad998c2de78296df0
-    # via nexus
+    # via syntara
 catalogue==2.0.10 \
     --hash=sha256:4f56daa940913d3f09d589c191c74e5a6d51762b3a9e37dd53b7437afd6cda15 \
     --hash=sha256:58c2de0020aa90f4a2da7dfad161bf7b3b054c86a5f09fcedc0b2b740c109a9f
@@ -143,8 +143,8 @@ cryptography==50.0.0 \
     --hash=sha256:eeac2acb5a20ed25e0ad6d1df9891a520b78b404266b6d11778f25d5d691a6c9
     # via
     #   google-auth
-    #   nexus
     #   pyjwt
+    #   syntara
 cymem==2.0.13 \
     --hash=sha256:1c91a92ae8c7104275ac26bd4d29b08ccd3e7faff5893d3858cb6fadf1bc1588 \
     --hash=sha256:45dcaba0f48bef9cc3d8b0b92058640244a95a9f12542210b51318da97c2cf28 \
@@ -182,11 +182,11 @@ email-validator==2.3.0 \
 fastapi==0.141.1 \
     --hash=sha256:bfb91aa2d334c61cb35ba9a116fc123b3d3df31640b801cf57a7a78ec3f603b3 \
     --hash=sha256:e8822fc40db1e1858054d7a949a888695bc9bdce70139178e33bd2871a453ca1
-    # via nexus
+    # via syntara
 filelock==3.32.2 \
     --hash=sha256:87dd94cf281e586d135fa51132b8e3d9a598b316e90377a288663c9321036c82 \
     --hash=sha256:c33351e1f49cae33414acbc6d56784e6ecee82514ec90795da1161fc4836b5b8
-    # via nexus
+    # via syntara
 filetype==1.2.0 \
     --hash=sha256:66b56cd6474bf41d8c54660347d37afcc3f7d1970648de365c102ef77548aadb \
     --hash=sha256:7ce71b6880181241cf7ac8697a2f1eb6a8bd9b429f7ad6d27b8db9ba5f1c2d25
@@ -244,14 +244,14 @@ httpx==0.28.1 \
     #   langgraph-sdk
     #   langsmith
     #   mcp
-    #   nexus
     #   openai
+    #   syntara
 httpx-sse==0.4.3 \
     --hash=sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc \
     --hash=sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d
     # via
     #   mcp
-    #   nexus
+    #   syntara
 idna==3.18 \
     --hash=sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2 \
     --hash=sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848
@@ -259,8 +259,8 @@ idna==3.18 \
     #   anyio
     #   email-validator
     #   httpx
-    #   nexus
     #   requests
+    #   syntara
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
@@ -284,7 +284,7 @@ jmespath==1.1.0 \
     # via
     #   boto3
     #   botocore
-    #   nexus
+    #   syntara
 joblib==1.5.3 \
     --hash=sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713 \
     --hash=sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3
@@ -302,7 +302,7 @@ jsonschema==4.26.0 \
     --hash=sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce
     # via
     #   mcp
-    #   nexus
+    #   syntara
 jsonschema-specifications==2025.9.1 \
     --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe \
     --hash=sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d
@@ -310,11 +310,11 @@ jsonschema-specifications==2025.9.1 \
 langchain==1.3.14 \
     --hash=sha256:1b6696c72ba3bbbce54d745e0180742c9f6ece8bbc59ed5a46c3e20b9a435929 \
     --hash=sha256:4d10dbe91005952cddd56d0dc77aa108964da6bae90ab20063653957e901f782
-    # via nexus
+    # via syntara
 langchain-anthropic==1.4.8 \
     --hash=sha256:778e9301b6fd517824f76ec1776975ce8add97a1f6a36c50ae3c2f4b03a66f7f \
     --hash=sha256:c76891b2044d56105ff13c106ed12650637b53bd598a4bdf15b4796eefa2a4ec
-    # via nexus
+    # via syntara
 langchain-core==1.5.3 \
     --hash=sha256:48b56fa580277209594dd7baf837f5b9a2a3651613f34ff9fb1728b429df015f \
     --hash=sha256:a56457ac444fef41e9404443c187f0ecea708d36e816ea4ba9573c027f7d1a2d
@@ -328,19 +328,19 @@ langchain-core==1.5.3 \
     #   langgraph-checkpoint
     #   langgraph-prebuilt
     #   langgraph-sdk
-    #   nexus
+    #   syntara
 langchain-google-genai==4.3.2 \
     --hash=sha256:6471769a4463fedb10d2d19a9b56c31de1cde505edf7fffd8cdbf98af8c1d7da \
     --hash=sha256:f3b1c09b264612fd1735a9590987bfa0cccca0bc0111691543decb5a03b8667d
-    # via nexus
+    # via syntara
 langchain-mcp-adapters==0.1.14 \
     --hash=sha256:36f8131d0b3b5ca28df03440be4dc2a3636e2f73e3e4a0a266d606ffaa12adda \
     --hash=sha256:b900d37d1a82261e408e663b7176a1a74cf0072e17ae9e4241c068093912394a
-    # via nexus
+    # via syntara
 langchain-openai==1.4.1 \
     --hash=sha256:6d16be615d997db80294731b8e768783f1fb8e0313668e64acd50cd68acbad20 \
     --hash=sha256:8528bb34cc78fdfd2d895573c7917f9441cbb82db5f18ae0e6b3b75d95bdefb3
-    # via nexus
+    # via syntara
 langchain-protocol==0.0.18 \
     --hash=sha256:70b53a86fbf9cedc863555effe44da192ab02d556ddbf2cf95b8873adcf41b5a \
     --hash=sha256:ec3e11782f1ed0c9db38e5a9ed01b0e7a0d3fba406faa8aef6594b73c56a63e6
@@ -352,7 +352,7 @@ langgraph==1.2.10 \
     --hash=sha256:52c48bd42fa31a1de0e1c0f0ebfe342e11ca2957b8b3563f83dbd60d8e30f921
     # via
     #   langchain
-    #   nexus
+    #   syntara
 langgraph-checkpoint==4.1.1 \
     --hash=sha256:25d29144b082827218e7bc3f1e9b0566a4bb007895cd6cc26f66a8428739f56e \
     --hash=sha256:6c2bdb530c91f91d7d9c1bd100925d0fc4f498d418c17f3587d1526279482a25
@@ -372,7 +372,7 @@ langsmith==0.10.15 \
     --hash=sha256:eefc562b29eb642a635b459e5bb44ca574380d7f32fe840acf28cd603c168647
     # via
     #   langchain-core
-    #   nexus
+    #   syntara
 mako==1.3.12 \
     --hash=sha256:8f61569480282dbf557145ce441e4ba888be453c30989f879f0d652e39f53ea9 \
     --hash=sha256:9f778e93289bd410bb35daadeb4fc66d95a746f0b75777b942088b7fd7af550a
@@ -448,10 +448,10 @@ opentelemetry-api==1.44.0 \
     --hash=sha256:67647e5e9566edcf421166fdf022b3537f818635daa852b289e34604dc6fb33a \
     --hash=sha256:94b98c893a91b88657eaac1e3ba89618cdb85be6918196705354f34728b2cdef
     # via
-    #   nexus
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   syntara
 opentelemetry-exporter-otlp-proto-common==1.44.0 \
     --hash=sha256:9a9fe61bba73d802904bc989f1d6b4a7b1ee40f06c40e98d6f85af65aaebb694 \
     --hash=sha256:dc87a5a5bc58f149a56d1547e4691588fa12994cdc3bc039a694ccb3375862ac
@@ -459,7 +459,7 @@ opentelemetry-exporter-otlp-proto-common==1.44.0 \
 opentelemetry-exporter-otlp-proto-http==1.44.0 \
     --hash=sha256:838592fce774c1c8bb7b9a0a7facbfa82e17be5a8a4e94cef10cb84ae026bae3 \
     --hash=sha256:c633d7270ad6b57cd4cfbe8b0007a9e2e7c0cb50bd6c50fe2a7b245f721a09d8
-    # via nexus
+    # via syntara
 opentelemetry-proto==1.44.0 \
     --hash=sha256:898b155a0e1557afd867478fb6158e8122a46329ca0bb8dc53cc55e98f017f56 \
     --hash=sha256:c547a79c2f8c0c515d31509154682e5921c7cfd5ca67b70e1f9266e2c3e103f3
@@ -470,8 +470,8 @@ opentelemetry-sdk==1.44.0 \
     --hash=sha256:cebe7f65dc12f26ead75c6064de12fd2a9052e5060c0272d402cfa203aae123b \
     --hash=sha256:df081c4c6bcfdb1211e3e86140376792643128a25f8d72d1d27675936e7e96ad
     # via
-    #   nexus
     #   opentelemetry-exporter-otlp-proto-http
+    #   syntara
 opentelemetry-semantic-conventions==0.65b0 \
     --hash=sha256:1cacde7b0ad306f84c5ef08c3dbe1bbaf20165bba6f8bff43b670e555a086bcb \
     --hash=sha256:f9b2b81e9d5b64f11bc952075e7e9c7fb0aab075c7fd1c46d597f1b919852d60
@@ -525,7 +525,7 @@ preshed==3.0.13 \
 prometheus-client==0.26.0 \
     --hash=sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b \
     --hash=sha256:fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6
-    # via nexus
+    # via syntara
 protobuf==6.33.6 \
     --hash=sha256:77179e006c476e69bf8e8ce866640091ec42e1beb80b213c3900006ecfba6901 \
     --hash=sha256:a6768d25248312c297558af96a9f9c929e8c4cee0659cb07e780731095f38135 \
@@ -560,11 +560,11 @@ pydantic==2.13.4 \
     #   langgraph
     #   langsmith
     #   mcp
-    #   nexus
     #   openai
     #   pydantic-settings
     #   spacy
     #   sqlmodel
+    #   syntara
     #   thinc
     #   weasel
 pydantic-core==2.46.4 \
@@ -583,7 +583,7 @@ pydantic-settings==2.14.2 \
     --hash=sha256:c19dd64b19097f1de80184f0cc7b0272a13ae6e170cbf240a3e27e381ed14a5f
     # via
     #   mcp
-    #   nexus
+    #   syntara
 pygments==2.20.0 \
     --hash=sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f \
     --hash=sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176
@@ -593,16 +593,16 @@ pyjwt==2.13.0 \
     --hash=sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728
     # via
     #   mcp
-    #   nexus
     #   segment-analytics-python
+    #   syntara
 pypandoc==1.17 \
     --hash=sha256:01fdbffa61edb9f8e82e8faad6954efcb7b6f8f0634aead4d89e322a00225a67 \
     --hash=sha256:51179abfd6e582a25ed03477541b48836b5bba5a4c3b282a547630793934d799
-    # via nexus
+    # via syntara
 pypdf==6.14.2 \
     --hash=sha256:3f07891af76dc002657e04993ab9b4de81de29f9013b9761d0b7968bff12e946 \
     --hash=sha256:7873f502fe4385e79539b21d872392dc0c4e3714327c15881cbc7fbfd1f95b25
-    # via nexus
+    # via syntara
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
@@ -618,13 +618,13 @@ python-dotenv==1.2.2 \
 python-magic==0.4.27 \
     --hash=sha256:c1ba14b08e4a5f5c31a302b7721239695b2f0f058d125bd5ce1ee36b9d9d3c3b \
     --hash=sha256:c212960ad306f700aa0d01e5d7a325d20548ff97eb9920dcd29513174f0294d3
-    # via nexus
+    # via syntara
 python-multipart==0.0.32 \
     --hash=sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e \
     --hash=sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23
     # via
     #   mcp
-    #   nexus
+    #   syntara
 pyyaml==6.0.3 \
     --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6 \
     --hash=sha256:41715c910c881bc081f1e8872880d3c650acf13dfa8214bad49ed4cede7c34ea \
@@ -637,7 +637,7 @@ pyyaml==6.0.3 \
     --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6 \
     # via
     #   langchain-core
-    #   nexus
+    #   syntara
     #   uvicorn
 rapidfuzz==3.14.5 \
     --hash=sha256:01550fe5f60fd176aa66b7611289d46dc4aa4b1b904874c7b6d1d54e581c5ec1 \
@@ -649,11 +649,11 @@ rapidfuzz==3.14.5 \
     --hash=sha256:a2ae6f53f99c9a0eca7a0afc5b4e45fc73bc1dd4ac74c00509031d76df80ed98 \
     --hash=sha256:b002c7994cc9f2bc9d9856f0fbaee6e8072c983873846c92f25cefba5b2a925f \
     --hash=sha256:ba10ac57884ce82112f7ed910b67e7fb6072d8ef2c06e30dc63c0f604a112e0e \
-    # via nexus
+    # via syntara
 redis==7.4.1 \
     --hash=sha256:1a1df5067062cf7cbe677994e391f8ee0840f499d370f1a71266e0dd3aa9308e \
     --hash=sha256:1fa4647af1c5e93a2c685aa248ee44cce092691146d41390518dabe9a99839b0
-    # via nexus
+    # via syntara
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
     --hash=sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8
@@ -681,7 +681,7 @@ regopy==1.5.2 \
     --hash=sha256:7e2c6226b1891d0907c4cd34f394a46b5a959023ebbbb7eeb550d0bb658fd0e7 \
     --hash=sha256:886016ce3064efbfcb5bf0fd8cb737629928be2c8dbd13621edf8ef9e23ca022 \
     --hash=sha256:b7e06cb8ba4afb306fb5057a1b84b34deb190252d2f7dae6b1ac2d30213d1a26 \
-    # via nexus
+    # via syntara
 requests==2.34.2 \
     --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0 \
     --hash=sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed
@@ -726,7 +726,7 @@ scikit-learn==1.9.0 \
     --hash=sha256:5e50ed4da51974e86e940690e9a3d82e729b62b5a49f7c9bac534d515d39d86f \
     --hash=sha256:8833266989d3a5110178a9fae30783675460724d0e1efb13b14901d2c660c557 \
     --hash=sha256:da76d09304a4706db7cc1e3ebaa3b6b98a67365cc11d2996c4f1e58ba47df714
-    # via nexus
+    # via syntara
 scipy==1.18.0 \
     --hash=sha256:0d13bca67c096d89fb95ced0d8921807300fce0275643aef9533cc63a0773468 \
     --hash=sha256:1f55797419e16e7f30cf88ffb3113ce0467f00cfe3f70d5c281730b21769bfc2 \
@@ -741,7 +741,7 @@ scipy==1.18.0 \
 segment-analytics-python==2.3.6 \
     --hash=sha256:a8c5c0f542be3be39aa57cd77e7e6b85b2a3c348174bc1192a296aeb81626594 \
     --hash=sha256:b07779d90432399fdd08f8cbeb483139cab862b5dca1bb3f0711f415def776a8
-    # via nexus
+    # via syntara
 setuptools==82.0.1 \
     --hash=sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9 \
     --hash=sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb
@@ -778,7 +778,7 @@ spacy==3.8.11 \
     --hash=sha256:a5a449ed3f2d03399481870b776f3ec61f2b831812d63dc1acedf6da70e5ab03 \
     --hash=sha256:a6c35c2cb93bade9b7360d1f9db608a066246a41301bb579309efb50764ba55b \
     --hash=sha256:aeca6cf34009d48cda9fb1bbfb532469e3d643817241a73e367b34ab99a5806f \
-    # via nexus
+    # via syntara
 spacy-legacy==3.0.12 \
     --hash=sha256:476e3bd0d05f8c339ed60f40986c07387c0a71479245d6d0f4298dbd52cda55f \
     --hash=sha256:b37d6e0c9b6e1d7ca1cf5bc7152ab64a4c4671f59c85adaf7a3fcb870357a774
@@ -800,12 +800,12 @@ sqlalchemy==2.0.44 \
     --hash=sha256:b87e7b91a5d5973dda5f00cd61ef72ad75a1db73a386b62877d4875a8840959c \
     # via
     #   alembic
-    #   nexus
     #   sqlmodel
+    #   syntara
 sqlmodel==0.0.27 \
     --hash=sha256:667fe10aa8ff5438134668228dc7d7a08306f4c5c4c7e6ad3ad68defa0e7aa49 \
     --hash=sha256:ad1227f2014a03905aef32e21428640848ac09ff793047744a73dfdd077ff620
-    # via nexus
+    # via syntara
 srsly==2.5.3 \
     --hash=sha256:07d682679e639eb46ff7e6da4a92714f4d5ffe351d088ee66f221e9b1f8865bb \
     --hash=sha256:08f98dbecbff3a31466c4ae7c833131f59d3655a0ad8ac749e6e2c149e2b0680 \
@@ -835,10 +835,10 @@ starlette==1.3.1 \
 structlog==25.5.0 \
     --hash=sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98 \
     --hash=sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f
-    # via nexus
+    # via syntara
 temporalio==1.31.0 \
     --hash=sha256:2993f4b880170825414116dec7d7159a5d199efc279f29570be6b5c4a9f6edd5
-    # via nexus
+    # via syntara
 tenacity==9.1.4 \
     --hash=sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55 \
     --hash=sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a
@@ -872,7 +872,7 @@ tiktoken==0.13.0 \
     --hash=sha256:c9435714c3a84c2319499de9a300c0e604449dd0799ff246458b3bb6a7f433c1 \
     # via
     #   langchain-openai
-    #   nexus
+    #   syntara
 tqdm==4.70.0 \
     --hash=sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220 \
     --hash=sha256:7f585706bfddbdebf89daac705b2dfcc16890130727d3197ca62c732b4310953
@@ -883,7 +883,7 @@ typer==0.25.1 \
     --hash=sha256:75caa44ed46a03fb2dab8808753ffacdbfea88495e74c85a28c5eefcf5f39c89 \
     --hash=sha256:9616eb8853a09ffeabab1698952f33c6f29ffdbceb4eaeecf571880e8d7664cc
     # via
-    #   nexus
+    #   syntara
     #   typer-slim
 typer-slim==0.24.0 \
     --hash=sha256:d5d7ee1ee2834d5020c7c616ed5e0d0f29b9a4b1dd283bdebae198ec09778d0e \
@@ -949,13 +949,13 @@ uuid-utils==0.17.0 \
     # via
     #   langchain-core
     #   langsmith
-    #   nexus
+    #   syntara
 uvicorn==0.52.1 \
     --hash=sha256:112ec661814189acbccd3f7b86460147cc065fc92c0821afa78918780e4354dd \
     --hash=sha256:e4403f9d93188cf9d1088e9f40e3acd12630e2df8675316704379a7fc20fff6a
     # via
     #   mcp
-    #   nexus
+    #   syntara
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32' \
     --hash=sha256:0530a5fbad9c9e4ee3f2b33b148c6a64d47bbad8000ea63704fa8260f4cf728e \
     --hash=sha256:1f38ec5e3f18c8a10ded09742f7fb8de0108796eb673f30ce7762ce1b8550cad \
@@ -1017,8 +1017,8 @@ wrapt==2.3.0 \
     --hash=sha256:d8c7ed08477429752b8c44991f40ad7838b18332a160698740a6bfbc10d998a2 \
     --hash=sha256:e3f3d7ec0a51fbfe00d3aef047641ff2c58b25565b4717fc1f90e050be01cba8 \
     # via
-    #   nexus
     #   smart-open
+    #   syntara
 xxhash==3.8.1 \
     --hash=sha256:00de40f3b42240db23a82a5c682b55d7263d84a26a953240c1aee463409660e3 \
     --hash=sha256:095e1323fa108be1292c54c86da3ef3c7a7dc015b105a52133973bc07a6ad11a \

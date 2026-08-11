@@ -12,16 +12,16 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.exceptions import (
+from syntara.core.models import User
+from syntara.workflows.exceptions import (
     TriggerValidationError,
     WebhookServiceAccountNotAuthorizedError,
     WebhookTriggerNotFoundError,
     WebhookTriggerPathConflictError,
 )
-from nexus.workflows.models.webhook_trigger import WebhookTrigger, WebhookTriggerRead
-from nexus.workflows.services.webhook_trigger_service import WebhookTriggerService
-from nexus.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.models.webhook_trigger import WebhookTrigger, WebhookTriggerRead
+from syntara.workflows.services.webhook_trigger_service import WebhookTriggerService
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 # ============================================================================
 # Helpers
@@ -882,7 +882,7 @@ class TestSyncTriggerSaBindings:
     @pytest.mark.asyncio
     async def test_no_op_when_desired_and_existing_match(self) -> None:
         """No DB changes when desired SA IDs equal existing bindings."""
-        from nexus.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
+        from syntara.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
 
         sa_id = uuid4()
         trigger_id = uuid4()
@@ -932,7 +932,7 @@ class TestSyncTriggerSaBindings:
     @pytest.mark.asyncio
     async def test_removes_stale_binding(self) -> None:
         """Stale SA binding is deleted when no longer in desired set."""
-        from nexus.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
+        from syntara.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
 
         stale_sa_id = uuid4()
         trigger_id = uuid4()

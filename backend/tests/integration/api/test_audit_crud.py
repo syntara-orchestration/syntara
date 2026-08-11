@@ -19,11 +19,11 @@ from fastapi import FastAPI
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.context_managers import actor_context
-from nexus.audit.models.audit_event import AuditEvent
-from nexus.audit.outbox.worker import get_outbox_worker
-from nexus.core.models.user import User
-from nexus.tool_manager.models.tool import Tool, ToolStatus
+from syntara.audit.context_managers import actor_context
+from syntara.audit.models.audit_event import AuditEvent
+from syntara.audit.outbox.worker import get_outbox_worker
+from syntara.core.models.user import User
+from syntara.tool_manager.models.tool import Tool, ToolStatus
 
 TOOL_NAME: str = str(uuid4())
 
@@ -120,7 +120,7 @@ async def test_tool_for_audit(
 
 
 @pytest.mark.asyncio
-@patch("nexus.audit.outbox.worker._build_otel_log_record")
+@patch("syntara.audit.outbox.worker._build_otel_log_record")
 async def test_create_generates_audit_event(
     mock_build_otel_log_record: MagicMock,
     test_tool_for_audit: Tool,
@@ -164,7 +164,7 @@ async def test_create_generates_audit_event(
 
 
 @pytest.mark.asyncio
-@patch("nexus.audit.outbox.worker._build_otel_log_record")
+@patch("syntara.audit.outbox.worker._build_otel_log_record")
 async def test_update_generates_audit_event(
     mock_build_otel_log_record: MagicMock,
     test_tool_for_audit: Tool,
@@ -205,7 +205,7 @@ async def test_update_generates_audit_event(
 
 
 @pytest.mark.asyncio
-@patch("nexus.audit.outbox.worker._build_otel_log_record")
+@patch("syntara.audit.outbox.worker._build_otel_log_record")
 async def test_delete_generates_audit_event(
     mock_build_otel_log_record: MagicMock,
     test_tool_for_audit: Tool,

@@ -15,9 +15,9 @@ import openai
 import pytest
 from langchain_core.messages import HumanMessage
 
-from nexus.agent_orchestrator.agents.generic_agent import GenericAgent
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.audit.emitter import AuditActorContext
+from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.audit.emitter import AuditActorContext
 
 
 @pytest.fixture

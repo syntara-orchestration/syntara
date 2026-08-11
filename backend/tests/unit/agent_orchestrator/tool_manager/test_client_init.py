@@ -3,8 +3,8 @@
 import httpx
 import pytest
 
-from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
-from nexus.core.exceptions import SafeValueError
+from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+from syntara.core.exceptions import SafeValueError
 
 
 class TestToolManagerClientInit:

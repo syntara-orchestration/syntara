@@ -8,8 +8,8 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.agent_orchestrator.models import InvocationStatus
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.models import InvocationStatus
 
 
 class TestInvocationExecutorCancellationRaceCondition:
@@ -49,11 +49,11 @@ class TestInvocationExecutorCancellationRaceCondition:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
             patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
             patch.object(
                 executor, "_complete_invocation_if_not_cancelled", return_value=False
@@ -102,11 +102,11 @@ class TestInvocationExecutorCancellationRaceCondition:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
             patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
             patch.object(
                 executor, "_complete_invocation_if_not_cancelled", return_value=True
@@ -151,7 +151,7 @@ class TestInvocationExecutorCancellationRaceCondition:
 
         mock_session.get.return_value = mock_invocation
 
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm") as mock_llm:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm") as mock_llm:
             # Act
             await executor.execute_invocation(invocation_id)
 
@@ -192,15 +192,15 @@ class TestInvocationExecutorCancellationRaceCondition:
         mock_exec_result.rowcount = 1  # Simulate successful status update to RUNNING
         mock_session.exec.return_value = mock_exec_result
 
-        from nexus.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
         ):
             # Simulate InvocationCancelledError being raised during execution
             mock_orchestration.return_value.execute.side_effect = InvocationCancelledError(
@@ -245,11 +245,11 @@ class TestInvocationExecutorCancellationRaceCondition:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
             patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
             patch.object(
                 executor, "_complete_invocation_if_not_cancelled", return_value=True

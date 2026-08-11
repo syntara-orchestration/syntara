@@ -12,8 +12,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from nexus.auth import get_current_user
-from nexus.core.database.session import get_db
+from syntara.auth import get_current_user
+from syntara.core.database.session import get_db
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture
@@ -60,8 +60,8 @@ async def admin_settings_client(
             return mock_evaluator
 
         with (
-            patch("nexus.authz.dependencies.get_authz_evaluator", _mock_getter),
-            patch("nexus.authz.dependencies.get_authz_evaluator", _mock_getter),
+            patch("syntara.authz.dependencies.get_authz_evaluator", _mock_getter),
+            patch("syntara.authz.dependencies.get_authz_evaluator", _mock_getter),
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=session_app),

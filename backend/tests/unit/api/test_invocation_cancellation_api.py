@@ -6,12 +6,12 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, status
 
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
-from nexus.agent_orchestrator.models.request import (
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.agent_orchestrator.models.request import (
     CancellationResult,
     InvocationCancelRequest,
 )
-from nexus.invocations.router import cancel_invocation
+from syntara.invocations.router import cancel_invocation
 
 
 class TestInvocationCancellationAPI:
@@ -23,7 +23,7 @@ class TestInvocationCancellationAPI:
         invocation_id = uuid4()
         request = InvocationCancelRequest(reason="Test cancellation")
 
-        with patch("nexus.invocations.router.InvocationService") as mock_service_class:
+        with patch("syntara.invocations.router.InvocationService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.cancel_invocation.return_value = CancellationResult.SUCCESS
             mock_service_class.return_value = mock_service
@@ -43,7 +43,7 @@ class TestInvocationCancellationAPI:
         invocation_id = uuid4()
         request = InvocationCancelRequest(reason="Test cancellation")
 
-        with patch("nexus.invocations.router.InvocationService") as mock_service_class:
+        with patch("syntara.invocations.router.InvocationService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.cancel_invocation.return_value = CancellationResult.NOT_FOUND
             mock_service_class.return_value = mock_service
@@ -63,7 +63,7 @@ class TestInvocationCancellationAPI:
         invocation_id = uuid4()
         request = InvocationCancelRequest(reason="Test cancellation")
 
-        with patch("nexus.invocations.router.InvocationService") as mock_service_class:
+        with patch("syntara.invocations.router.InvocationService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.cancel_invocation.return_value = CancellationResult.NOT_CANCELLABLE
             mock_service_class.return_value = mock_service

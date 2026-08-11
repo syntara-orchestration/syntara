@@ -12,12 +12,12 @@ import pytest
 import respx
 from httpx import Response
 
-from nexus.integrations.adapters.aap import AAPAdapter
-from nexus.integrations.adapters.protocol import (
+from syntara.integrations.adapters.aap import AAPAdapter
+from syntara.integrations.adapters.protocol import (
     HealthCheckErrorType,
     IntegrationAdapter,
 )
-from nexus.integrations.models.integration_configuration import AAPConfiguration
+from syntara.integrations.models.integration_configuration import AAPConfiguration
 
 _GATEWAY_URL = "https://aap.example.com"
 _HEALTH_URL = f"{_GATEWAY_URL}/api/gateway/v1/me/"
@@ -376,7 +376,7 @@ class TestAAPValidateConnectionErrors:
         respx.get(_HEALTH_URL).mock(side_effect=RuntimeError("something bizarre"))
 
         adapter = AAPAdapter(aap_config)
-        with caplog.at_level(logging.ERROR, logger="nexus.integrations.adapters.aap"):
+        with caplog.at_level(logging.ERROR, logger="syntara.integrations.adapters.aap"):
             result = await adapter.validate(resolved_credential, timeout_seconds=10)
 
         assert result.success is False
@@ -399,7 +399,7 @@ class TestAAPValidateTLSConfig:
         respx.get(_HEALTH_URL).mock(return_value=Response(200, json={}))
 
         with unittest.mock.patch(
-            "nexus.integrations.adapters.aap.httpx.AsyncClient", wraps=httpx.AsyncClient
+            "syntara.integrations.adapters.aap.httpx.AsyncClient", wraps=httpx.AsyncClient
         ) as mock_client:
             adapter = AAPAdapter(config)
             result = await adapter.validate(resolved_credential, timeout_seconds=10)
@@ -420,7 +420,7 @@ class TestAAPValidateTLSConfig:
         respx.get(_HEALTH_URL).mock(return_value=Response(200, json={}))
 
         with unittest.mock.patch(
-            "nexus.integrations.adapters.aap.httpx.AsyncClient", wraps=httpx.AsyncClient
+            "syntara.integrations.adapters.aap.httpx.AsyncClient", wraps=httpx.AsyncClient
         ) as mock_client:
             adapter = AAPAdapter(config)
             result = await adapter.validate(resolved_credential, timeout_seconds=10)
@@ -462,7 +462,7 @@ class TestAAPValidateSanitization:
         respx.get(_HEALTH_URL).mock(side_effect=httpx.ConnectError("Connection refused"))
 
         adapter = AAPAdapter(aap_config)
-        with caplog.at_level(logging.DEBUG, logger="nexus.integrations.adapters.aap"):
+        with caplog.at_level(logging.DEBUG, logger="syntara.integrations.adapters.aap"):
             await adapter.validate(credential, timeout_seconds=10)
 
         assert secret_token not in caplog.text

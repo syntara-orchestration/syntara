@@ -9,8 +9,8 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth import get_current_user
-from nexus.core.models import User
+from syntara.auth import get_current_user
+from syntara.core.models import User
 from tests.integration.api.conftest import make_admin, make_user_role
 
 USERS_URL = "/api/v1/users"
@@ -207,7 +207,7 @@ class TestUsersPatchSelfScope:
         user_factory: Callable[..., Awaitable[User]],
     ) -> None:
         """A non-admin user with user:update:self can update their own profile."""
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         regular_user = await user_factory(
             username="selfpatch-user",
@@ -238,7 +238,7 @@ class TestUsersPatchSelfScope:
         user_factory: Callable[..., Awaitable[User]],
     ) -> None:
         """A non-admin user cannot update someone else's profile."""
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         acting_user = await user_factory(username="actor-user", email="actor@example.com")
         target_user = await user_factory(username="target-user", email="target@example.com")
@@ -284,7 +284,7 @@ class TestUsersPatchAdminRestrictions:
         Creates a dedicated limited-role user (with only 'user' role) and
         verifies they get 403 from PermissionChecker (no user:update permission).
         """
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         limited_user = await user_factory(username="limited-patch", email="limited-patch@test.com")
         await make_user_role(test_db_session, limited_user)
@@ -308,7 +308,7 @@ class TestUsersPatchAdminRestrictions:
         test_db_session: AsyncSession,
     ) -> None:
         """Test non-builtin admin can update their own non-is_enabled fields."""
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         # Create a non-builtin admin user (is_builtin=False allows field updates)
         non_builtin_admin = await user_factory(

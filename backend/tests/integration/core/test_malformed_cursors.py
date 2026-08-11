@@ -7,7 +7,7 @@ through various HTTP API endpoints, ensuring proper error responses.
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.error_handlers import PROBLEM_TYPES
+from syntara.core.error_handlers import PROBLEM_TYPES
 
 
 class TestMalformedCursorHandling:

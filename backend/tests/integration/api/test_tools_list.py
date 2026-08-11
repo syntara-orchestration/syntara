@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from nexus.tool_manager.models import Tool
+from syntara.tool_manager.models import Tool
 from tests.integration.helpers.error_data import assert_error_data
 
 if TYPE_CHECKING:

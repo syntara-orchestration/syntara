@@ -44,7 +44,7 @@ SERVICE_CERTS = [
 ]
 
 # Validate against the canonical list in principal.py
-from nexus.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
+from syntara.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
 
 _cert_cns = {cn for _, cn, _ in SERVICE_CERTS}
 _expected = set(KNOWN_SERVICE_CNS)

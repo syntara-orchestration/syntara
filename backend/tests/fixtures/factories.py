@@ -11,8 +11,8 @@ from tests.integration.helpers.workflow import ExecutionsFactory
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.workflows.models import Workflow
+    from syntara.core.models import User
+    from syntara.workflows.models import Workflow
 
 
 @pytest_asyncio.fixture

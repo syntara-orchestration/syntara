@@ -1,6 +1,6 @@
 # Syntara Monorepo
 
-Monorepo combining the Nexus backend (Python/FastAPI) and frontend (React/TypeScript) into a single development and deployment environment.
+Monorepo combining the Syntara backend (Python/FastAPI) and frontend (React/TypeScript) into a single development and deployment environment.
 
 ## Repository Structure
 
@@ -56,11 +56,11 @@ TypeScript API types are generated from the backend's OpenAPI specifications. In
 make gen-contracts
 ```
 
-This reads specs from `backend/src/nexus/schemas/` and generates types in `frontend/packages/syntara-contracts/src/`.
+This reads specs from `backend/src/syntara/schemas/` and generates types in `frontend/packages/syntara-contracts/src/`.
 
 ## Container Development
 
-The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Temporal, the Nexus API, and the UI. The UI service builds from `frontend/` instead of pulling a pre-built image.
+The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Temporal, the Syntara API, and the UI. The UI service builds from `frontend/` instead of pulling a pre-built image.
 
 ```bash
 # Start all services

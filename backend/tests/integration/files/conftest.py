@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
+from syntara.authz.models import Project
 from tests.fixtures.files import get_fixtures_dir
 
 

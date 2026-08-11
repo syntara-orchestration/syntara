@@ -57,53 +57,53 @@ class TestSecretFieldMasking:
     """Verify the API never returns plaintext secret values."""
 
     def test_create_response_masks_secrets(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """POST /credentials response must contain $encrypted$, not plaintext."""
         _, _, cred, secret = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-create")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-create")
         )
         assert cred["inputs"]["token"] == ENCRYPTED_SENTINEL
         assert secret not in str(cred)
 
     def test_get_response_masks_secrets(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """GET /credentials/{id} must contain $encrypted$, not plaintext."""
         cred_id, _, _, secret = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-get")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-get")
         )
-        credential = nexus_api.credentials.get(credential_id=cred_id).assert_and_get()
+        credential = syntara_api.credentials.get(credential_id=cred_id).assert_and_get()
         data = credential.to_dict()
         assert data["inputs"]["token"] == ENCRYPTED_SENTINEL
         assert secret not in str(data)
 
     def test_list_response_masks_secrets(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """GET /credentials list must not leak plaintext secrets."""
         _, _, _, secret = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-list")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-list")
         )
-        credentials_list = nexus_api.credentials.list().assert_and_get()
+        credentials_list = syntara_api.credentials.list().assert_and_get()
         raw = str(credentials_list)
         assert secret not in raw
 
     def test_update_with_sentinel_returns_encrypted(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """PATCH with $encrypted$ inputs still returns $encrypted$ on GET."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-update")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-secret-mask-update")
         )
-        nexus_api.credentials.update(
+        syntara_api.credentials.update(
             credential_id=cred_id,
             body=CredentialUpdate(
                 description="updated description",
                 inputs=CredentialUpdateInputsType0.from_dict({"token": ENCRYPTED_SENTINEL}),
             ),
         ).assert_and_get()
-        credential = nexus_api.credentials.get(credential_id=cred_id).assert_and_get()
+        credential = syntara_api.credentials.get(credential_id=cred_id).assert_and_get()
         assert credential.to_dict()["inputs"]["token"] == ENCRYPTED_SENTINEL
 
 
@@ -154,13 +154,13 @@ class TestWorkflowWithValidCredential:
 
     def test_bearer_token_credential_resolves(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """HTTP request with Bearer Token credential hits httpbin /bearer — expect 200."""
         cred_id, *_ = create_credential(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=unique_name("e2e-cred-bearer"),
         )
@@ -173,7 +173,7 @@ class TestWorkflowWithValidCredential:
             credential_id=str(cred_id),
         )
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
         assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status: {execution.status}"
@@ -184,16 +184,16 @@ class TestWorkflowWithValidCredential:
 
     def test_basic_auth_credential_resolves(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """HTTP request with Basic Auth credential hits httpbin /basic-auth — expect 200."""
         cred_id, *_ = create_credential(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=unique_name("e2e-cred-basic"),
-            type_id=get_basic_auth_type_id(nexus_api),
+            type_id=get_basic_auth_type_id(syntara_api),
             inputs={"username": "admin", "password": "secret123"},
         )
 
@@ -205,7 +205,7 @@ class TestWorkflowWithValidCredential:
             credential_id=str(cred_id),
         )
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
         assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status: {execution.status}"
@@ -217,7 +217,7 @@ class TestWorkflowWithValidCredential:
 
     def test_no_credential_returns_401(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
     ) -> None:
         """HTTP request to a protected endpoint without credential — expect workflow failure with 401."""
@@ -239,7 +239,7 @@ class TestWorkflowWithValidCredential:
             "edges": [{"from": "trigger", "to": "api_call"}],
         }
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
         assert execution.status == ExecutionStatus.FAILED
@@ -258,18 +258,18 @@ class TestWorkflowWithDisabledCredential:
 
     def test_disabled_credential_fails_then_recovers(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """Disable → fail, re-enable → succeed. Confirms no stale disabled state."""
         cred_id, *_ = create_credential(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=unique_name("e2e-cred-disabled"),
         )
 
-        nexus_api.credentials.update(
+        syntara_api.credentials.update(
             credential_id=cred_id,
             body=CredentialUpdate(enabled=False),
         ).assert_and_get()
@@ -282,7 +282,7 @@ class TestWorkflowWithDisabledCredential:
             credential_id=str(cred_id),
         )
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
         assert execution.status == ExecutionStatus.FAILED
@@ -292,13 +292,13 @@ class TestWorkflowWithDisabledCredential:
         error_str = str(api_activity.to_dict()).lower()
         assert "disabled" in error_str, f"Expected 'disabled' in error details, got: {error_str[:500]}"
 
-        nexus_api.credentials.update(
+        syntara_api.credentials.update(
             credential_id=cred_id,
             body=CredentialUpdate(enabled=True),
         ).assert_and_get()
 
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
         assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status after re-enable: {execution.status}"
@@ -317,14 +317,14 @@ class TestWorkflowWithDeletedCredential:
 
     def test_deleted_credential_fails_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
         cleanup_workflows: list[UUID],
     ) -> None:
         """Delete a credential, execute its workflow — expect failure mentioning 'not found'."""
         cred_id, *_ = create_credential(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=unique_name("e2e-cred-deleted"),
         )
@@ -336,7 +336,7 @@ class TestWorkflowWithDeletedCredential:
             url=f"{HTTPBIN_URL}/bearer",
             credential_id=str(cred_id),
         )
-        workflow = nexus_api.workflows.create(
+        workflow = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=workflow_name,
                 description="E2E: deleted credential test",
@@ -346,12 +346,12 @@ class TestWorkflowWithDeletedCredential:
         ).assert_and_get()
         cleanup_workflows.append(workflow.id)
 
-        nexus_api.credentials.delete(credential_id=cred_id)
+        syntara_api.credentials.delete(credential_id=cred_id)
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
-        execution = poll_execution(nexus_api, str(execution.id), timeout=30)
+        execution = poll_execution(syntara_api, str(execution.id), timeout=30)
 
         assert execution.status == ExecutionStatus.FAILED
         activities = {a.activity_id: a for a in (execution.activities or [])}
@@ -373,14 +373,14 @@ class TestCredentialScrubbing:
 
     def test_script_stdout_secret_is_scrubbed(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """Script node prints credential value to stdout — must be [REDACTED] in execution history."""
         from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow
 
-        cred_id, *_ = create_credential(api=nexus_api, project_id=first_project_id, name="e2e-scrub-stdout")
+        cred_id, *_ = create_credential(api=syntara_api, project_id=first_project_id, name="e2e-scrub-stdout")
 
         workflow_name = unique_name("e2e-scrub-stdout-test")
 
@@ -405,7 +405,7 @@ class TestCredentialScrubbing:
         }
 
         execution = create_and_run_workflow(
-            nexus_api, workflow_name, definition, timeout=30, project_id=first_project_id
+            syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
         status_str = str(execution.status)
         assert status_str in {"completed", "completed_with_errors"}, f"Unexpected status: {status_str}"
@@ -432,22 +432,24 @@ class TestRbacAdminFullCrud:
     """Admin role has full create, read, update, delete access."""
 
     def test_admin_crud_lifecycle(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """Admin creates, reads, updates, and deletes a credential."""
-        cred_id, *_ = create_credential(api=nexus_api, project_id=first_project_id, name=unique_name("e2e-rbac-admin"))
+        cred_id, *_ = create_credential(
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-rbac-admin")
+        )
 
         # Read
-        nexus_api.credentials.get(credential_id=cred_id).assert_and_get()
+        syntara_api.credentials.get(credential_id=cred_id).assert_and_get()
 
         # Update
-        nexus_api.credentials.update(
+        syntara_api.credentials.update(
             credential_id=cred_id,
             body=CredentialUpdate(description="admin updated"),
         ).assert_and_get()
 
         # Delete
-        del_resp = nexus_api.credentials.delete(credential_id=cred_id)
+        del_resp = syntara_api.credentials.delete(credential_id=cred_id)
         assert del_resp.status_code == HTTPStatus.NO_CONTENT
 
 
@@ -460,7 +462,7 @@ class TestRbacUserCannotDelete:
     """User role can create/read/update but NOT delete credentials."""
 
     def test_user_create_read_update_succeeds(
-        self, nexus_api: SyntaraApiRegistry, viewer_api: SyntaraApiRegistry
+        self, syntara_api: SyntaraApiRegistry, viewer_api: SyntaraApiRegistry
     ) -> None:
         """User role can create, read, and update credentials."""
         # ANSTRAT-1901: needs user-role client fixture (viewer has no roles)
@@ -472,13 +474,13 @@ class TestRbacUserCannotDelete:
     def test_user_delete_returns_403(
         self,
         viewer_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """User role attempting DELETE gets 403 Forbidden."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-rbac-user-del")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-rbac-user-del")
         )
         resp = viewer_api.credentials.delete(credential_id=cred_id)
         assert resp.status_code == HTTPStatus.FORBIDDEN
@@ -500,13 +502,13 @@ class TestRbacAuditorReadOnly:
     def test_auditor_can_read(
         self,
         auditor_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """Auditor can GET /credentials/{id}."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-read")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-read")
         )
         resp = auditor_api.credentials.get(credential_id=cred_id)
         assert resp.status_code == HTTPStatus.OK
@@ -514,7 +516,7 @@ class TestRbacAuditorReadOnly:
     def test_auditor_cannot_create(
         self,
         auditor_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
     ) -> None:
         """Auditor POST /credentials gets 403."""
@@ -522,7 +524,7 @@ class TestRbacAuditorReadOnly:
         resp = auditor_api.credentials.create(
             body=CredentialCreate(
                 name="should-fail",
-                credential_type_id=get_bearer_token_type_id(nexus_api),
+                credential_type_id=get_bearer_token_type_id(syntara_api),
                 project_id=first_project_id,
                 inputs=CredentialCreateInputs.from_dict({"token": "test"}),
             )
@@ -532,13 +534,13 @@ class TestRbacAuditorReadOnly:
     def test_auditor_cannot_update(
         self,
         auditor_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """Auditor PATCH /credentials/{id} gets 403."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-patch")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-patch")
         )
         resp = auditor_api.credentials.update(
             credential_id=cred_id,
@@ -549,13 +551,13 @@ class TestRbacAuditorReadOnly:
     def test_auditor_cannot_delete(
         self,
         auditor_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
         """Auditor DELETE /credentials/{id} gets 403."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-del")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-rbac-auditor-del")
         )
         resp = auditor_api.credentials.delete(credential_id=cred_id)
         assert resp.status_code == HTTPStatus.FORBIDDEN
@@ -570,7 +572,7 @@ class TestRbacAuditorReadOnly:
 class TestRbacProjectScopedVisibility:
     """Credentials with project_id are only visible to users with project access."""
 
-    def test_org_level_credential_visible_to_all(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_org_level_credential_visible_to_all(self, syntara_api: SyntaraApiRegistry) -> None:
         """Credential with project_id=NULL is visible to all authorized users."""
         # ANSTRAT-1901: implement when workflow+credential wiring is available
         # 1. Create org-level credential (project_id=NULL — if supported)
@@ -578,7 +580,7 @@ class TestRbacProjectScopedVisibility:
         # 3. List as user B (without project access) — assert visible
         # 4. Cleanup
 
-    def test_project_scoped_credential_hidden_from_unauthorized(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_project_scoped_credential_hidden_from_unauthorized(self, syntara_api: SyntaraApiRegistry) -> None:
         """Credential scoped to project X is invisible to users without project X access."""
         # ANSTRAT-1901: implement when workflow+credential wiring is available
         # 1. Create project-scoped credential
@@ -599,7 +601,7 @@ class TestRbacPermissionDeniedResponse:
     def test_403_response_format(
         self,
         auditor_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
     ) -> None:
         """403 body follows RFC 9457 problem format without leaking policy names."""
@@ -607,7 +609,7 @@ class TestRbacPermissionDeniedResponse:
         resp = auditor_api.credentials.create(
             body=CredentialCreate(
                 name="forbidden-test",
-                credential_type_id=get_bearer_token_type_id(nexus_api),
+                credential_type_id=get_bearer_token_type_id(syntara_api),
                 project_id=first_project_id,
                 inputs=CredentialCreateInputs.from_dict({"token": "test"}),
             )
@@ -632,14 +634,16 @@ class TestProjectIdImmutability:
     """Verify project_id cannot be changed after creation."""
 
     def test_update_credential_rejects_project_id_change(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """PATCH with a different project_id must return 422."""
         from syntara_api_client.models.project_create import ProjectCreate
 
-        cred_id, *_ = create_credential(api=nexus_api, project_id=first_project_id, name=unique_name("e2e-immut-cred"))
+        cred_id, *_ = create_credential(
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-immut-cred")
+        )
 
-        other_project = nexus_api.projects.create(
+        other_project = syntara_api.projects.create(
             body=ProjectCreate(
                 name=unique_name("e2e-immut-dst-proj"),
                 description="Destination project for immutability test",
@@ -648,19 +652,19 @@ class TestProjectIdImmutability:
 
         body = CredentialUpdate(description="attempt project move")
         body["project_id"] = str(other_project.id)
-        response = nexus_api.credentials.update(credential_id=cred_id, body=body)
+        response = syntara_api.credentials.update(credential_id=cred_id, body=body)
         assert not response.is_success
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
 
     def test_update_credential_accepts_same_project_id(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, create_credential: CredentialFactory
     ) -> None:
         """PATCH with the same project_id must succeed (no-op)."""
         cred_id, *_ = create_credential(
-            api=nexus_api, project_id=first_project_id, name=unique_name("e2e-same-proj-cred")
+            api=syntara_api, project_id=first_project_id, name=unique_name("e2e-same-proj-cred")
         )
 
         body = CredentialUpdate(description="same project ok")
         body["project_id"] = str(first_project_id)
-        updated = nexus_api.credentials.update(credential_id=cred_id, body=body).assert_and_get()
+        updated = syntara_api.credentials.update(credential_id=cred_id, body=body).assert_and_get()
         assert str(updated.project_id) == str(first_project_id)

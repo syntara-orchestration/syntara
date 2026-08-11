@@ -6,14 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.telemetry.events.workflow_emitters import (
+from syntara.telemetry.events.workflow_emitters import (
     _map_execution_status_to_telemetry,
     emit_activities,
 )
-from nexus.workflows.audit.node_execution import NodeExecutedEvent
-from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from nexus.workflows.models.execution import ExecutionStatus
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import ExecutionStatus
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     WorkflowTerminalStatus,
 )
@@ -39,7 +39,7 @@ class TestEmitActivities:
         activity.completed_at = completed_at
         return activity
 
-    @patch("nexus.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_dispatches_for_terminal_transition(self, mock_dispatcher: MagicMock) -> None:
         now = datetime.now(tz=UTC)
         activity = self._make_activity(
@@ -68,7 +68,7 @@ class TestEmitActivities:
         assert event.error_type is None
         assert event.request_id == request_id
 
-    @patch("nexus.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_dispatches_failed_with_error_type(self, mock_dispatcher: MagicMock) -> None:
         activity = self._make_activity(status=ActivityStatus.FAILED)
         old_values = {"status": ActivityStatus.RUNNING}
@@ -83,7 +83,7 @@ class TestEmitActivities:
         assert event.status == ActivityTerminalStatus.FAILED
         assert event.error_type == "ActivityExecutionError"
 
-    @patch("nexus.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_skips_non_terminal_activity(self, mock_dispatcher: MagicMock) -> None:
         activity = self._make_activity(status=ActivityStatus.RUNNING)
         old_values = {"status": ActivityStatus.PENDING}
@@ -96,7 +96,7 @@ class TestEmitActivities:
 
         mock_dispatcher.dispatch.assert_not_called()
 
-    @patch("nexus.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_skips_already_terminal_activity(self, mock_dispatcher: MagicMock) -> None:
         activity = self._make_activity(status=ActivityStatus.COMPLETED)
         old_values = {"status": ActivityStatus.COMPLETED}
@@ -109,7 +109,7 @@ class TestEmitActivities:
 
         mock_dispatcher.dispatch.assert_not_called()
 
-    @patch("nexus.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_does_not_raise_on_exception(self, mock_dispatcher: MagicMock) -> None:
         mock_dispatcher.dispatch.side_effect = RuntimeError("boom")
         activity = self._make_activity(status=ActivityStatus.COMPLETED)

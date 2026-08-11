@@ -9,8 +9,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -404,7 +404,7 @@ class TestInvocationExecutorTokenUpdateIntegration:
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
             patch.object(executor, "_init_orchestration", return_value=(mock_orchestration, None)),
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
                 new_callable=AsyncMock,
             ),
         ):

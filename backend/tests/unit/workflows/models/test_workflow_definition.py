@@ -9,7 +9,7 @@ Tests cover:
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.workflow_definition import WorkflowDefinition
+from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 MINIMAL_KWARGS = {
     "schema_version": "2.0.0",

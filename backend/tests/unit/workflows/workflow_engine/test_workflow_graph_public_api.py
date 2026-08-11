@@ -7,8 +7,8 @@ Also verifies dynamic_workflow.py no longer accesses graph._backend.
 
 import inspect
 
-from nexus.workflows.workflow_engine.graph import WorkflowGraph
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.graph import WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 
 
 def _make_graph() -> WorkflowGraph:
@@ -98,7 +98,7 @@ class TestNoDynamicWorkflowBackendAccess:
 
     def test_no_backend_access_in_dynamic_workflow_source(self) -> None:
         """The source file must contain zero references to _backend."""
-        from nexus.workflows.workflow_engine import dynamic_workflow
+        from syntara.workflows.workflow_engine import dynamic_workflow
 
         source = inspect.getsource(dynamic_workflow)
         occurrences = source.count("._backend")

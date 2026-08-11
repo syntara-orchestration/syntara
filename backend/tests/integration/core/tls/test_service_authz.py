@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
 
 pytestmark = [pytest.mark.integration]
 
@@ -47,7 +47,7 @@ class TestAUDIT2PermissionCheckerBypass:
         mock_user = MagicMock()
         mock_db = AsyncMock()
 
-        with patch("nexus.authz.dependencies.get_authz_evaluator") as mock_evaluator:
+        with patch("syntara.authz.dependencies.get_authz_evaluator") as mock_evaluator:
             await checker(request=request, current_user=mock_user, db=mock_db)
 
         mock_evaluator.assert_not_called()
@@ -61,8 +61,8 @@ class TestAUDIT2PermissionCheckerBypass:
         mock_db = AsyncMock()
 
         with (
-            patch("nexus.authz.dependencies.get_authz_evaluator") as mock_evaluator,
-            patch("nexus.authz.dependencies.authorize", new_callable=AsyncMock) as mock_authorize,
+            patch("syntara.authz.dependencies.get_authz_evaluator") as mock_evaluator,
+            patch("syntara.authz.dependencies.authorize", new_callable=AsyncMock) as mock_authorize,
         ):
             mock_authorize.return_value = MagicMock(allowed=True)
             await checker(request=request, current_user=mock_user, db=mock_db)
@@ -80,7 +80,7 @@ class TestAUDIT2ProjectScopeFilterBypass:
         mock_user = MagicMock()
         mock_db = AsyncMock()
 
-        with patch("nexus.authz.dependencies.get_authz_evaluator") as mock_evaluator:
+        with patch("syntara.authz.dependencies.get_authz_evaluator") as mock_evaluator:
             result = await scope_filter(request=request, current_user=mock_user, db=mock_db)
 
         mock_evaluator.assert_not_called()
@@ -97,7 +97,7 @@ class TestAUDIT2VisibilityFilterBypass:
         mock_user = MagicMock()
         mock_db = AsyncMock()
 
-        with patch("nexus.authz.dependencies.get_authz_evaluator") as mock_evaluator:
+        with patch("syntara.authz.dependencies.get_authz_evaluator") as mock_evaluator:
             result = await vis_filter(request=request, current_user=mock_user, db=mock_db)
 
         mock_evaluator.assert_not_called()

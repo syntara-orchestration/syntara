@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 
 import pytest
 
-from nexus.workflows.models.workflow import WorkflowRead
-from nexus.workflows.router import _populate_published_version_number
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.models.workflow import WorkflowRead
+from syntara.workflows.router import _populate_published_version_number
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 @pytest.fixture

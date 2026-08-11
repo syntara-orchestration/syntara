@@ -145,7 +145,7 @@ The pre-commit configuration file is located at `.pre-commit-config.yaml` in the
 
 ### OpenAPI Spec Changes
 
-**If your PR modifies `src/nexus/schemas/openapi.yaml`**, two automated checks apply:
+**If your PR modifies `src/syntara/schemas/openapi.yaml`**, two automated checks apply:
 
 #### Local Validation (Before Pushing)
 

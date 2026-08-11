@@ -1,7 +1,7 @@
 """Tests for workflow definition schema validation gaps (AAP-75721).
 
 Each test sends a payload that violates the JSON schema at
-``src/nexus/schemas/workflows/v2/workflow_definition.schema.json``
+``src/syntara/schemas/workflows/v2/workflow_definition.schema.json``
 and asserts the server returns 422.
 """
 

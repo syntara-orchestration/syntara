@@ -137,7 +137,7 @@ class TestWorkflowUnauthorizedAccess:
     def test_delete_workflow_without_auth(
         self,
         unauth_api: SyntaraApiRegistry,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -170,7 +170,7 @@ class TestWorkflowUnauthorizedAccess:
         )
 
         # Verify the workflow was not deleted despite the attempt
-        nexus_api.workflows.get(workflow_id=workflow.id).assert_successful()
+        syntara_api.workflows.get(workflow_id=workflow.id).assert_successful()
 
     def test_execute_workflow_without_auth(
         self,

@@ -20,8 +20,8 @@ import pytest
 from sqlalchemy import delete
 from sqlmodel import col
 
-from nexus.approvals.exceptions import ApprovalAlreadyDecidedError
-from nexus.approvals.models import (
+from syntara.approvals.exceptions import ApprovalAlreadyDecidedError
+from syntara.approvals.models import (
     ApprovalDecisionRequest,
     ApprovalRequest,
     ApprovalRequestRead,
@@ -30,11 +30,11 @@ from nexus.approvals.models import (
     BatchApprovalRequest,
     BatchApprovalResponse,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.auth.passwords import hash_password
-from nexus.authz.engine import AuthzResult
-from nexus.authz.models.project import Project
-from nexus.core.models import User
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.auth.passwords import hash_password
+from syntara.authz.engine import AuthzResult
+from syntara.authz.models.project import Project
+from syntara.core.models import User
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -66,7 +66,7 @@ def _mock_evaluator_for_concurrency_tests(monkeypatch: pytest.MonkeyPatch) -> No
         )
 
     monkeypatch.setattr(
-        "nexus.authz.engine.authorize",
+        "syntara.authz.engine.authorize",
         mock_authorize,
     )
 
@@ -214,7 +214,7 @@ async def _batch_decide_with_own_session(
 @pytest.fixture
 def mock_workflow_client():
     """Mock the workflow client to avoid HTTP calls in unit tests."""
-    with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_cls:
+    with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.send_approval_signal = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)

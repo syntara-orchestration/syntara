@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import redis.asyncio as redis
 
-from nexus.core.cache.base import BaseRedisClient
-from nexus.core.cache.settings_client import SettingsRedisClient
+from syntara.core.cache.base import BaseRedisClient
+from syntara.core.cache.settings_client import SettingsRedisClient
 
 
 def _mock_settings() -> MagicMock:
@@ -28,7 +28,7 @@ class TestBaseRedisClient:
         """connect() creates a redis.asyncio.Redis instance from settings."""
         with (
             patch.object(BaseRedisClient, "__init_subclass__", lambda **_kw: None),
-            patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()),
+            patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()),
         ):
             client = BaseRedisClient()
             client.connect()
@@ -36,7 +36,7 @@ class TestBaseRedisClient:
 
     def test_connect_is_idempotent(self) -> None:
         """Calling connect() twice does not create a second client."""
-        with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+        with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
             client = BaseRedisClient()
             client.connect()
             first = client._client
@@ -48,13 +48,13 @@ class TestSettingsRedisClient:
     """Tests for SettingsRedisClient composed class."""
 
     def test_has_correct_client_name(self) -> None:
-        with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+        with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
             client = SettingsRedisClient()
             assert client._client_name == "settings"
 
     def test_has_cache_and_pubsub_methods(self) -> None:
         """SettingsRedisClient has methods from both mixins."""
-        with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+        with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
             client = SettingsRedisClient()
             assert hasattr(client, "cache_get")
             assert hasattr(client, "cache_setex")

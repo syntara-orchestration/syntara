@@ -8,8 +8,8 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import (
     build_validation_problem_response,
     definition_invalid_handler,
     execution_not_found_handler,
@@ -20,7 +20,7 @@ from nexus.workflows.error_handlers import (
     workflow_version_conflict_handler,
     workflow_version_not_found_handler,
 )
-from nexus.workflows.exceptions import (
+from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     WorkflowDefinitionInvalidError,
     WorkflowNameConflictError,
@@ -30,7 +30,7 @@ from nexus.workflows.exceptions import (
     WorkflowVersionConflictError,
     WorkflowVersionNotFoundError,
 )
-from nexus.workflows.models.validation_finding import (
+from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
     ValidationResult,

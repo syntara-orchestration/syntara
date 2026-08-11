@@ -7,12 +7,12 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import (
     execution_not_retryable_handler,
     execution_terminal_state_handler,
 )
-from nexus.workflows.exceptions import (
+from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotRetryableError,
 )

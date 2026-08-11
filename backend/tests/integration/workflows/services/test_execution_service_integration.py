@@ -16,11 +16,11 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from nexus.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from nexus.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from nexus.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
+from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 @pytest_asyncio.fixture
@@ -185,7 +185,7 @@ edges:
         self, execution_service: TemporalExecutionService
     ) -> None:
         """Test that invalid workflow definition raises an error."""
-        from nexus.core.exceptions import SafeValueError
+        from syntara.core.exceptions import SafeValueError
 
         # Valid YAML but missing required 'triggers' field
         invalid_workflow_yaml = """

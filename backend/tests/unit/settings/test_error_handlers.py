@@ -6,14 +6,14 @@ from unittest.mock import Mock, patch
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.settings.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.settings.error_handlers import (
     optimistic_lock_error_handler,
     setting_not_found_handler,
     setting_type_error_handler,
     setting_validation_error_handler,
 )
-from nexus.settings.exceptions import (
+from syntara.settings.exceptions import (
     OptimisticLockError,
     SettingNotFoundError,
     SettingTypeError,
@@ -86,7 +86,7 @@ class TestSettingValidationErrorHandler:
 
     def test_logs_error_with_key_and_detail(self) -> None:
         """Handler logs the setting key and detail message."""
-        with patch("nexus.settings.error_handlers.logger") as mock_logger:
+        with patch("syntara.settings.error_handlers.logger") as mock_logger:
             _call_handler(key="ai.model_name", detail="unknown model")
             mock_logger.warning.assert_called_once_with(
                 "Setting validation error",

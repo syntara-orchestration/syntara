@@ -1,27 +1,27 @@
 """Unit tests for integrations audit handler auto-discovery."""
 
-from nexus.audit.discovery import discover_handlers
-from nexus.integrations.audit.integration_create import (
+from syntara.audit.discovery import discover_handlers
+from syntara.integrations.audit.integration_create import (
     IntegrationCreateEvent,
     IntegrationCreateHandler,
 )
-from nexus.integrations.audit.integration_delete import (
+from syntara.integrations.audit.integration_delete import (
     IntegrationDeleteEvent,
     IntegrationDeleteHandler,
 )
-from nexus.integrations.audit.integration_discover import (
+from syntara.integrations.audit.integration_discover import (
     IntegrationDiscoverEvent,
     IntegrationDiscoverHandler,
 )
-from nexus.integrations.audit.integration_refresh import (
+from syntara.integrations.audit.integration_refresh import (
     IntegrationRefreshEvent,
     IntegrationRefreshHandler,
 )
-from nexus.integrations.audit.integration_update import (
+from syntara.integrations.audit.integration_update import (
     IntegrationUpdateEvent,
     IntegrationUpdateHandler,
 )
-from nexus.integrations.audit.integration_validate import (
+from syntara.integrations.audit.integration_validate import (
     IntegrationValidateEvent,
     IntegrationValidateHandler,
 )
@@ -32,9 +32,9 @@ class TestIntegrationsAuditDiscovery:
 
     def test_discovers_all_handlers(self) -> None:
         """Should discover all 6 integrations audit handlers."""
-        import nexus.integrations.audit
+        import syntara.integrations.audit
 
-        registry = discover_handlers(nexus.integrations.audit)
+        registry = discover_handlers(syntara.integrations.audit)
 
         assert len(registry) == 6
         assert IntegrationCreateEvent in registry
@@ -46,9 +46,9 @@ class TestIntegrationsAuditDiscovery:
 
     def test_discovered_handler_types(self) -> None:
         """Should discover correct handler types for each event."""
-        import nexus.integrations.audit
+        import syntara.integrations.audit
 
-        registry = discover_handlers(nexus.integrations.audit)
+        registry = discover_handlers(syntara.integrations.audit)
 
         assert isinstance(registry[IntegrationCreateEvent], IntegrationCreateHandler)
         assert isinstance(registry[IntegrationUpdateEvent], IntegrationUpdateHandler)

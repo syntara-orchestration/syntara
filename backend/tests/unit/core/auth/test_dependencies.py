@@ -7,16 +7,16 @@ from uuid import uuid4
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
-from nexus.auth.cookies import CSRF_COOKIE_NAME
-from nexus.auth.dependencies import (
+from syntara.auth.cookies import CSRF_COOKIE_NAME
+from syntara.auth.dependencies import (
     _user_from_payload,
     get_current_user,
     get_refresh_token,
     get_token_payload,
 )
-from nexus.auth.exceptions import AuthenticationRequiredError, CSRFErrorCode, CSRFValidationError, InvalidTokenError
-from nexus.auth.services.token_service import TokenPayload
-from nexus.core.models.principal import service_principal_id
+from syntara.auth.exceptions import AuthenticationRequiredError, CSRFErrorCode, CSRFValidationError, InvalidTokenError
+from syntara.auth.services.token_service import TokenPayload
+from syntara.core.models.principal import service_principal_id
 
 
 def _make_payload(
@@ -173,8 +173,8 @@ class TestGetCurrentUser:
         request.headers = {}
 
         with (
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
         ):
             user = await get_current_user(request, db=AsyncMock(), credentials=credentials)
 
@@ -193,7 +193,7 @@ class TestGetCurrentUser:
         request.headers = {}
 
         with (
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
             pytest.raises(InvalidTokenError),
         ):
             await get_current_user(request, db=AsyncMock(), credentials=credentials)
@@ -222,8 +222,8 @@ class TestGetTokenPayload:
         request = MagicMock()
 
         with (
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.dependencies._check_global_revocation", new_callable=AsyncMock),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.dependencies._check_global_revocation", new_callable=AsyncMock),
         ):
             result = await get_token_payload(request, db=AsyncMock(), credentials=credentials)
 
@@ -269,7 +269,7 @@ class TestGetRefreshTokenCSRF:
         request.headers.get = MagicMock(return_value=None)
 
         with (
-            patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_csrf_encryption_key()),
+            patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_csrf_encryption_key()),
             pytest.raises(CSRFValidationError, match="CSRF token header missing") as exc_info,
         ):
             await get_refresh_token(request, db=AsyncMock())
@@ -287,7 +287,7 @@ class TestGetRefreshTokenCSRF:
         request.headers.get = MagicMock(return_value="wrong-token")
 
         with (
-            patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_csrf_encryption_key()),
+            patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_csrf_encryption_key()),
             pytest.raises(CSRFValidationError, match="CSRF token mismatch") as exc_info,
         ):
             await get_refresh_token(request, db=AsyncMock())
@@ -296,11 +296,11 @@ class TestGetRefreshTokenCSRF:
     @pytest.mark.asyncio
     async def test_passes_csrf_and_returns_payload(self) -> None:
         """Should pass CSRF validation and return the decoded payload."""
-        from nexus.auth.csrf import derive_csrf_form_token
+        from syntara.auth.csrf import derive_csrf_form_token
 
         seed = "good-seed"
         settings = _mock_csrf_encryption_key()
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=settings):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=settings):
             valid_token = derive_csrf_form_token(seed)
 
         payload = MagicMock()
@@ -316,9 +316,9 @@ class TestGetRefreshTokenCSRF:
         request.headers.get = MagicMock(return_value=valid_token)
 
         with (
-            patch("nexus.auth.csrf.get_encryption_key", return_value=settings),
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
+            patch("syntara.auth.csrf.get_encryption_key", return_value=settings),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.services.global_revocation.is_token_globally_revoked", return_value=None),
         ):
             result = await get_refresh_token(request, db=AsyncMock())
 
@@ -333,7 +333,7 @@ class TestGetRefreshTokenCSRF:
         request.headers.get = MagicMock(return_value="token")
 
         with (
-            patch("nexus.auth.csrf.validate_csrf"),
+            patch("syntara.auth.csrf.validate_csrf"),
             pytest.raises(AuthenticationRequiredError),
         ):
             await get_refresh_token(request, db=AsyncMock())

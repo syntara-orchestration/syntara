@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.models.invocation import InvocationStatus, InvocationTraceRead
+from syntara.agent_orchestrator.models.invocation import InvocationStatus, InvocationTraceRead
 
 
 def _build_invocation(

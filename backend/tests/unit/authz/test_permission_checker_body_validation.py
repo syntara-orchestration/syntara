@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.exceptions import RequestValidationError
 
-from nexus.authz.dependencies import PermissionChecker
+from syntara.authz.dependencies import PermissionChecker
 
 
 def _make_request(body_value: object) -> MagicMock:

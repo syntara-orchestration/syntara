@@ -4,10 +4,10 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.workflows.audit.execution_lifecycle import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.workflows.audit.execution_lifecycle import (
     ExecutionAction,
     ExecutionLifecycleEvent,
     ExecutionLifecycleHandler,
@@ -38,7 +38,7 @@ class TestExecutionLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "execution_started"
         assert result.event_message == "Execution started: Deploy to Production"
-        assert result.source_component == "nexus.workflows"
+        assert result.source_component == "syntara.workflows"
         assert result.execution_id == EXECUTION_ID
         assert result.workflow_id == WORKFLOW_ID
         assert result.resource_urn == f"urn:syntara:workflow:{WORKFLOW_ID}"

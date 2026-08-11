@@ -84,7 +84,7 @@ Both resolve to the same data. Use `${trigger.*}` for single-trigger workflows. 
 
 **Output mapping** in the trigger node's `outputs` block reshapes the raw trigger data before namespace registration. Expressions like `${result.field_name}` reference fields from the raw activity output.
 
-For details on the resolver, see `NamespaceResolver` in `src/nexus/workflows/utils/namespace_resolver.py`. For output mapping, see `apply_output_mapping()` in `src/nexus/workflows/utils/output_mapping.py`.
+For details on the resolver, see `NamespaceResolver` in `src/syntara/workflows/utils/namespace_resolver.py`. For output mapping, see `apply_output_mapping()` in `src/syntara/workflows/utils/output_mapping.py`.
 
 ## Multi-Trigger Workflows
 
@@ -100,7 +100,7 @@ Trigger selection is handled by `resolve_trigger_node()` in `workflow_definition
 
 To add a new trigger type, you need to touch these areas:
 
-1. **Activity** — Create a new file in `src/nexus/workflows/workflow_engine/activities/` following the pass-through pattern (receive input, call `apply_output_mapping`, return `{"output": ...}`). Register it with `@activity.defn(name=ActivityName.YOUR_TRIGGER)`.
+1. **Activity** — Create a new file in `src/syntara/workflows/workflow_engine/activities/` following the pass-through pattern (receive input, call `apply_output_mapping`, return `{"output": ...}`). Register it with `@activity.defn(name=ActivityName.YOUR_TRIGGER)`.
 
 2. **Registration** — Add the new type to:
    - `ActivityName` enum in `workflow_definition.py`
@@ -109,7 +109,7 @@ To add a new trigger type, you need to touch these areas:
 
 3. **Config model** (if the trigger has parameters beyond `input_schema`) — Add a config class in `workflow_definition.py` extending `TemplateAwareBaseModel`.
 
-4. **JSON Schema** — Add a schema file in `src/nexus/schemas/workflows/v2/triggers/`.
+4. **JSON Schema** — Add a schema file in `src/syntara/schemas/workflows/v2/triggers/`.
 
 5. **Service and DB model** (if the trigger needs external state) — Only needed if the trigger requires a lookup table (like webhook triggers) or external system registration (like scheduled triggers). Manual triggers need neither.
 

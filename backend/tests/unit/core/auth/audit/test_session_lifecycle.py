@@ -2,15 +2,15 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.auth.audit.session_lifecycle import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.auth.audit.session_lifecycle import (
     SessionAction,
     SessionLifecycleEvent,
     SessionLifecycleHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestSessionLifecycleEvent:
@@ -58,7 +58,7 @@ class TestSessionLifecycleHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == uid
         assert result.actor_username == "testuser"
-        assert result.source_component == "nexus.auth.session"
+        assert result.source_component == "syntara.auth.session"
 
     def test_successful_revoke(self) -> None:
         """Successful revoke → action='session_revoked'."""

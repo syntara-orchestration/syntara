@@ -12,9 +12,9 @@ from uuid import uuid4
 import pytest
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 
-from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.services.activity_update_publisher import ActivityUpdatePublisher
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ class TestPublishSnapshot:
         mock_stream_client.publish.return_value = expected_event_id
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             # Act
             event_id = await publisher.publish_snapshot(execution_with_activities, snapshot_type=snapshot_type)  # type: ignore[arg-type]
@@ -156,7 +156,7 @@ class TestPublishSnapshot:
         execution.activities = []
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             # Act
             event_id = await publisher.publish_snapshot(execution, snapshot_type="initial_snapshot")
@@ -214,7 +214,7 @@ class TestPublishActivityPatch:
         mock_stream_client.publish.return_value = expected_event_id
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             # Act
             event_id = await publisher.publish_activity_patch(execution_id, [patch])
@@ -250,7 +250,7 @@ class TestPublishActivityPatch:
         patch = JsonPatch([patch_dict])
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             # Act
             event_id = await publisher.publish_activity_patch(execution_id, [patch])
@@ -274,7 +274,7 @@ class TestPublishActivityPatch:
         execution_id = uuid4()
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             # Act
             event_id = await publisher.publish_activity_patch(execution_id, [])
@@ -294,14 +294,14 @@ class TestPublishExecutionPatch:
     @pytest.mark.asyncio
     async def test_publishes_status_patch(self, mock_stream_client: AsyncMock) -> None:
         """Test publishing execution status change as JSON Patch."""
-        from nexus.workflows.models.visualization import JsonPatchOperation
+        from syntara.workflows.models.visualization import JsonPatchOperation
 
         publisher = ActivityUpdatePublisher()
         execution_id = uuid4()
         ops = [JsonPatchOperation(op="replace", path="/status", value="running")]
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             event_id = await publisher.publish_execution_patch(execution_id, ops)
 
@@ -324,7 +324,7 @@ class TestPublishExecutionPatch:
     @pytest.mark.asyncio
     async def test_publishes_multiple_ops(self, mock_stream_client: AsyncMock) -> None:
         """Test publishing multiple execution-level patch operations."""
-        from nexus.workflows.models.visualization import JsonPatchOperation
+        from syntara.workflows.models.visualization import JsonPatchOperation
 
         publisher = ActivityUpdatePublisher()
         execution_id = uuid4()
@@ -334,7 +334,7 @@ class TestPublishExecutionPatch:
         ]
 
         with mock_patch(
-            "nexus.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
         ):
             event_id = await publisher.publish_execution_patch(execution_id, ops)
 

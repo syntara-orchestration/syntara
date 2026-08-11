@@ -13,16 +13,16 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.exceptions import (
+from syntara.authz.exceptions import (
     BuiltinProtectionError,
     InvalidResourceActionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
 )
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.role import Role
-from nexus.authz.services.policy_service import PolicyService
-from nexus.core.models import User
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.role import Role
+from syntara.authz.services.policy_service import PolicyService
+from syntara.core.models import User
 
 
 @pytest.mark.asyncio
@@ -239,7 +239,7 @@ async def test_delete_builtin_policy_rejected(test_db_session: AsyncSession, tes
 @pytest.mark.asyncio
 async def test_name_conflict_scoped_to_project(test_db_session: AsyncSession, test_user: User) -> None:
     """Same name in different project scopes is allowed."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="scope-test-proj", labels={})
     test_db_session.add(project)
@@ -274,7 +274,7 @@ def _ensure_project_eligible() -> None:
     ordering in CI can leave _project_eligible under-populated.  Patch it
     once for the module so project-validation tests are deterministic.
     """
-    import nexus.authz.resource_actions as ra
+    import syntara.authz.resource_actions as ra
 
     needed = {"workflow", "execution", "project"}
     if not needed.issubset(ra._project_eligible):
@@ -284,7 +284,7 @@ def _ensure_project_eligible() -> None:
 @pytest.mark.asyncio
 async def test_create_project_policy_rejects_scope_any(test_db_session: AsyncSession, test_user: User) -> None:
     """scope=any is invalid at project scope — must be 'project'."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-1", labels={})
     test_db_session.add(project)
@@ -303,7 +303,7 @@ async def test_create_project_policy_rejects_scope_any(test_db_session: AsyncSes
 @pytest.mark.asyncio
 async def test_create_project_policy_rejects_scope_self(test_db_session: AsyncSession, test_user: User) -> None:
     """scope=self for non-user resources is invalid at project scope."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-2", labels={})
     test_db_session.add(project)
@@ -322,7 +322,7 @@ async def test_create_project_policy_rejects_scope_self(test_db_session: AsyncSe
 @pytest.mark.asyncio
 async def test_create_project_policy_rejects_system_resource(test_db_session: AsyncSession, test_user: User) -> None:
     """System-only resource types (user, setting, group) are invalid at project scope."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-3", labels={})
     test_db_session.add(project)
@@ -342,7 +342,7 @@ async def test_create_project_policy_rejects_system_resource(test_db_session: As
 @pytest.mark.asyncio
 async def test_create_project_policy_accepts_valid(test_db_session: AsyncSession, test_user: User) -> None:
     """Valid project policy with scope=project and eligible resource types succeeds."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-4", labels={})
     test_db_session.add(project)
@@ -364,7 +364,7 @@ async def test_create_project_policy_accepts_valid(test_db_session: AsyncSession
 @pytest.mark.asyncio
 async def test_update_project_policy_rejects_invalid_scope(test_db_session: AsyncSession, test_user: User) -> None:
     """Updating a project policy with scope=any is rejected."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-5", labels={})
     test_db_session.add(project)
@@ -388,7 +388,7 @@ async def test_update_project_policy_rejects_invalid_scope(test_db_session: Asyn
 @pytest.mark.asyncio
 async def test_create_project_policy_wildcard_eligible(test_db_session: AsyncSession, test_user: User) -> None:
     """Wildcard actions like workflow:* are validated against eligible resource types."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="val-proj-6", labels={})
     test_db_session.add(project)
@@ -422,7 +422,7 @@ async def test_create_project_policy_wildcard_eligible(test_db_session: AsyncSes
 @pytest.mark.asyncio
 async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
     """Deny-effect policies are not supported and must be rejected."""
-    from nexus.authz.exceptions import DenyEffectNotSupportedError
+    from syntara.authz.exceptions import DenyEffectNotSupportedError
 
     svc = PolicyService(test_db_session, test_user)
     with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
@@ -435,8 +435,8 @@ async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_u
 @pytest.mark.asyncio
 async def test_create_deny_policy_rejected_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
     """Project-scoped deny-effect policies are also rejected."""
-    from nexus.authz.exceptions import DenyEffectNotSupportedError
-    from nexus.authz.models.project import Project
+    from syntara.authz.exceptions import DenyEffectNotSupportedError
+    from syntara.authz.models.project import Project
 
     project = Project(name="deny-proj-1", labels={})
     test_db_session.add(project)
@@ -455,7 +455,7 @@ async def test_create_deny_policy_rejected_project_scoped(test_db_session: Async
 @pytest.mark.asyncio
 async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, test_user: User) -> None:
     """Updating a policy to add deny-effect statements is rejected."""
-    from nexus.authz.exceptions import DenyEffectNotSupportedError
+    from syntara.authz.exceptions import DenyEffectNotSupportedError
 
     svc = PolicyService(test_db_session, test_user)
     policy = await svc.create_policy(

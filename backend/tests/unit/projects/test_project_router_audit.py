@@ -3,7 +3,7 @@
 import pytest
 from fastapi.routing import APIRoute
 
-from nexus.projects.router import router
+from syntara.projects.router import router
 
 MUTATING_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 

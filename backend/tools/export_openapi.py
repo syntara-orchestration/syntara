@@ -19,11 +19,11 @@ from typing import Any
 import yaml
 from fastapi import FastAPI
 
-from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
-from nexus.core.error_handlers import apply_rfc9457_media_types, problem_details_response_map
-from nexus.core.logging.logging import configure_app_logging
-from nexus.core.router_discovery import discover_and_register_routers
-from nexus.metrics.internal_api import (
+from syntara.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.core.error_handlers import apply_rfc9457_media_types, problem_details_response_map
+from syntara.core.logging.logging import configure_app_logging
+from syntara.core.router_discovery import discover_and_register_routers
+from syntara.metrics.internal_api import (
     metrics_store_component_kpis,
     metrics_store_kpis,
     metrics_store_records,
@@ -34,8 +34,8 @@ from nexus.metrics.internal_api import (
 
 def _extract_route_permission(route: object) -> dict[str, object] | None:
     """Extract x-app-permission dict from a route's dependencies, or None."""
-    from nexus.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
-    from nexus.authz.resource_actions import _get_dep_instance, _iter_route_deps
+    from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+    from syntara.authz.resource_actions import _get_dep_instance, _iter_route_deps
 
     for dep in _iter_route_deps(route):
         inner = _get_dep_instance(dep)
@@ -53,7 +53,7 @@ def _inject_permission_metadata(app: FastAPI, spec: dict[str, Any]) -> None:
     permission metadata derived from runtime code, enabling the drift
     checker to catch mismatches between code and hand-written sub-specs.
     """
-    from nexus.core.router_discovery import iter_api_routes
+    from syntara.core.router_discovery import iter_api_routes
 
     paths = spec.get("paths", {})
     for route in iter_api_routes(app):
@@ -136,13 +136,13 @@ def _consolidate_identical_input_output_schemas(spec: dict[str, Any]) -> None:
 
 def build_spec_app() -> FastAPI:
     """Build a minimal FastAPI app with all routers for spec generation."""
-    from nexus.authz.resource_actions import build_resource_actions
+    from syntara.authz.resource_actions import build_resource_actions
 
     # Configure logging to stderr before router discovery (prevents log output from contaminating stdout YAML)
     configure_app_logging()
 
     app = FastAPI(
-        title="Nexus API",
+        title="Syntara API",
         description="A distributed multi-agent workflow orchestration system",
         version=API_V1_VERSION,
         servers=[{"url": API_V1_PATH_PREFIX, "description": "API v1"}],

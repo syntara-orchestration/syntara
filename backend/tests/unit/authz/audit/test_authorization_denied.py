@@ -2,13 +2,13 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.authz.audit.authorization_denied import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.authz.audit.authorization_denied import (
     AuthorizationDeniedEvent,
     AuthorizationDeniedHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestAuthorizationDeniedHandler:
@@ -38,7 +38,7 @@ class TestAuthorizationDeniedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == user_id
         assert result.actor_username == "alice"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert "execute" in result.event_message
         assert "workflow" in result.event_message
         assert result.resource_urn == "urn:syntara:workflow:123"

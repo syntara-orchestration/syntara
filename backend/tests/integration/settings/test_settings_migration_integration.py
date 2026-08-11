@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 from sqlalchemy import text
 
-from nexus.settings.cache.settings_cache import SettingsCache, set_runtime_settings
+from syntara.settings.cache.settings_cache import SettingsCache, set_runtime_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Generator
@@ -66,7 +66,7 @@ async def _set_int_setting(
 def _scoped_runtime_cache(
     test_session_factory: Callable[[], object],
 ) -> Generator[None, None, None]:
-    import nexus.settings.cache.settings_cache as _sc
+    import syntara.settings.cache.settings_cache as _sc
 
     prev = _sc._runtime_settings
     cache = SettingsCache(session_factory=test_session_factory)
@@ -106,7 +106,7 @@ async def test_loop_activity_routes_on_condition_not_max_iterations(
     so that it can raise ApplicationError before the activity is called. The activity itself
     now only cares about condition_result.
     """
-    from nexus.workflows.workflow_engine.activities.loop import loop
+    from syntara.workflows.workflow_engine.activities.loop import loop
 
     await _set_int_setting(
         test_db_session,
@@ -143,7 +143,7 @@ async def test_conversion_config_reads_live_timeout(
     test_db_session: AsyncSession,
 ) -> None:
     """ConversionConfig.from_settings() reads timeout from DB via cache."""
-    from nexus.files.document_conversion.models.conversion_config import ConversionConfig
+    from syntara.files.document_conversion.models.conversion_config import ConversionConfig
 
     await _set_int_setting(
         test_db_session,
@@ -177,7 +177,7 @@ async def test_script_timeout_propagates_through_cache(
     test_db_session: AsyncSession,
 ) -> None:
     """Script timeout setting propagates from DB through cache."""
-    from nexus.settings.cache.settings_cache import get_runtime_settings
+    from syntara.settings.cache.settings_cache import get_runtime_settings
 
     await _set_int_setting(
         test_db_session,
@@ -207,7 +207,7 @@ async def test_agentic_activity_reads_live_timeout(
     )
 
     # Verify the cache returns the DB value
-    from nexus.settings.cache.settings_cache import get_runtime_settings
+    from syntara.settings.cache.settings_cache import get_runtime_settings
 
     cache = get_runtime_settings()
     value = await cache.get_int(_AGENTIC_TIMEOUT_KEY)
@@ -220,7 +220,7 @@ async def test_conversion_overwrite_setting_propagates(
     test_db_session: AsyncSession,
 ) -> None:
     """ConversionConfig.from_settings() reads overwrite_existing from DB."""
-    from nexus.files.document_conversion.models.conversion_config import ConversionConfig
+    from syntara.files.document_conversion.models.conversion_config import ConversionConfig
 
     # Seed both conversion settings
     await _set_int_setting(
@@ -254,7 +254,7 @@ async def test_setting_round_trip_via_cache(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify all migrated integer settings round-trip through the cache."""
-    from nexus.settings.cache.settings_cache import get_runtime_settings
+    from syntara.settings.cache.settings_cache import get_runtime_settings
 
     keys_and_values = [
         (_MAX_LOOP_KEY, 500, 10000, "workflow_execution"),

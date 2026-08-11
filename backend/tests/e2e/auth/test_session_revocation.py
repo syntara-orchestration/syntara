@@ -35,7 +35,7 @@ class TestAPIUserScopedSessionRevocation:
 
     def test_disable_user_revokes_all_sessions(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
@@ -50,7 +50,7 @@ class TestAPIUserScopedSessionRevocation:
         assert_refresh_succeeds(nexus_base_url, cookies_a1)
         assert_refresh_succeeds(nexus_base_url, cookies_a2)
 
-        nexus_api.users.update(
+        syntara_api.users.update(
             user_id=user.id,
             body=UserUpdate(is_enabled=False),
         ).assert_and_get()
@@ -61,7 +61,7 @@ class TestAPIUserScopedSessionRevocation:
 
     def test_password_change_revokes_all_sessions(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
@@ -72,7 +72,7 @@ class TestAPIUserScopedSessionRevocation:
         _, cookies_before = local_login_session(nexus_base_url, user.username, password)
         assert_refresh_succeeds(nexus_base_url, cookies_before)
 
-        nexus_api.users.update(
+        syntara_api.users.update(
             user_id=user.id,
             body=UserUpdate(password=new_password),
         ).assert_and_get()

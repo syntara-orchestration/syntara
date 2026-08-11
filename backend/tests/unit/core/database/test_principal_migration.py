@@ -8,8 +8,8 @@ models (``created_by`` / ``updated_by`` → ``principals.id``).
 
 from typing import Any
 
-from nexus.core.database.migrations.models import ALL_MODELS  # noqa: F401
-from nexus.core.models.base.user_owned import UserOwnedResource
+from syntara.core.database.migrations.models import ALL_MODELS  # noqa: F401
+from syntara.core.models.base.user_owned import UserOwnedResource
 
 
 def _concrete_user_owned_subclasses() -> list[type[Any]]:

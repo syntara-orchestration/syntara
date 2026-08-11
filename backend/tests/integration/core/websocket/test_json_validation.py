@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 from websockets import connect as websocket_connect
 
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
 
 
 class TestWebSocketJsonValidation:

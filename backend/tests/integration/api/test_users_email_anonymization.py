@@ -10,7 +10,7 @@ email reuse attacks where an attacker could:
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.models import User
+from syntara.core.models import User
 
 USERS_URL = "/api/v1/users"
 

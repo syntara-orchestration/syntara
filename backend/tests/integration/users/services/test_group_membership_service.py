@@ -17,23 +17,23 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.exceptions import (
+from syntara.auth.exceptions import (
     GroupNameConflictError,
     GroupNotFoundError,
     UserAlreadyInGroupError,
     UserNotFoundError,
     UserNotInGroupError,
 )
-from nexus.auth.passwords import hash_password
-from nexus.auth.services.idp_group_sync import sync_idp_groups
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User, UserIdentity
-from nexus.core.models.group import Group, user_groups, user_idp_groups
-from nexus.identity_providers.models.identity_provider import IdentityProvider
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
-from nexus.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
-from nexus.users.services.group_service import GroupsService
+from syntara.auth.passwords import hash_password
+from syntara.auth.services.idp_group_sync import sync_idp_groups
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User, UserIdentity
+from syntara.core.models.group import Group, user_groups, user_idp_groups
+from syntara.identity_providers.models.identity_provider import IdentityProvider
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
+from syntara.users.services.group_service import GroupsService
 
 TEST_PASSWORD = "securepassword123"  # noqa: S105
 

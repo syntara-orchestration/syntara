@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 
 
 class TestManualTriggerPassThrough:

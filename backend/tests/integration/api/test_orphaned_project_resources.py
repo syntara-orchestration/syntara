@@ -11,14 +11,14 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.credentials.models.credential_type import CredentialType
+from syntara.credentials.models.credential_type import CredentialType
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest.fixture

@@ -199,7 +199,7 @@ Help text includes parameter descriptions, default values, and enum choices wher
 
 The CLI is built dynamically at runtime from the OpenAPI specification — there are no generated CLI source files to maintain. When you run any `orchestrator` command:
 
-1. The CLI locates the schema sources under `src/nexus/schemas/`
+1. The CLI locates the schema sources under `src/syntara/schemas/`
 2. It hashes all source files and compares against a saved manifest in `~/.orchestrator/spec-hashes.json`
 3. If anything changed (or no cache exists), the spec is re-bundled and cached to `~/.orchestrator/openapi.json`
 4. Commands, arguments, and options are constructed from the cached spec at runtime

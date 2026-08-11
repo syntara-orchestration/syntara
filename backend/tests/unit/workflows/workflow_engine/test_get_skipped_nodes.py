@@ -9,7 +9,7 @@ import inspect
 
 import pytest
 
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
 
 
 class TestGetSkippedNodesUniqueness:

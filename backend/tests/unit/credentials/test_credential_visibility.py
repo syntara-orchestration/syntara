@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.engine import VisibilityResult
-from nexus.credentials.router import _CredentialVisibility
+from syntara.authz.engine import VisibilityResult
+from syntara.credentials.router import _CredentialVisibility
 
 
 def _make_request(*, cert_auth: bool = False, for_action: str | None = None) -> MagicMock:
@@ -49,7 +49,7 @@ class TestCredentialVisibilityForActionUse:  # noqa: D101
         evaluator = MagicMock()
         expected = VisibilityResult(unrestricted=False, allowed_project_ids=[uuid4()])
 
-        with patch("nexus.credentials.router.resolve_credential_use_visibility", return_value=expected) as mock_use:
+        with patch("syntara.credentials.router.resolve_credential_use_visibility", return_value=expected) as mock_use:
             result = await visibility(
                 request=_make_request(for_action="use"),
                 current_user=user,
@@ -77,7 +77,7 @@ class TestCredentialVisibilityDefault:  # noqa: D101
         evaluator = MagicMock()
         expected = VisibilityResult(unrestricted=True)
 
-        with patch("nexus.credentials.router.resolve_visibility", return_value=expected) as mock_vis:
+        with patch("syntara.credentials.router.resolve_visibility", return_value=expected) as mock_vis:
             result = await visibility(
                 request=_make_request(),
                 current_user=user,

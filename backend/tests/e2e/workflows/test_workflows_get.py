@@ -30,7 +30,7 @@ pytestmark = [pytest.mark.e2e]
 class TestWorkflowListing:
     """E2E tests for listing workflows."""
 
-    def test_list_workflows_empty(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_list_workflows_empty(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test listing workflows with filter that matches nothing.
 
         Uses a unique name filter that won't match any workflow to guarantee
@@ -40,14 +40,14 @@ class TestWorkflowListing:
         """
         # Use a random UUID in name filter that won't match any workflow
         non_existent_name = f"nonexistent-{uuid4().hex}"
-        result = nexus_api.workflows.list(additional_params={"name[contains]": non_existent_name}).assert_and_get()
+        result = syntara_api.workflows.list(additional_params={"name[contains]": non_existent_name}).assert_and_get()
 
         assert result.resources is not None
         assert len(result.resources) == 0
 
     def test_list_all_workflows(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -79,7 +79,7 @@ class TestWorkflowListing:
         created_workflow_ids = [wf.id for wf in created_workflows]
 
         # List workflows filtered by test_id to isolate our test workflows
-        result = nexus_api.workflows.list(additional_params={"name[contains]": test_id}).assert_and_get()
+        result = syntara_api.workflows.list(additional_params={"name[contains]": test_id}).assert_and_get()
 
         # Verify exactly our 3 created workflows are in the list
         returned_ids = {wf.id for wf in result.resources}
@@ -88,7 +88,7 @@ class TestWorkflowListing:
 
     def test_filter_workflows_by_created_by(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -133,7 +133,7 @@ class TestWorkflowListing:
         creator_id = workflow1.created_by
 
         # Filter by creator using additional_params
-        result = nexus_api.workflows.list(
+        result = syntara_api.workflows.list(
             include_total=True, additional_params={"created_by": str(creator_id)}
         ).assert_and_get()
 
@@ -144,7 +144,7 @@ class TestWorkflowListing:
         # Can't assert exact total in E2E as other tests may have created workflows by same user
         assert result.total >= 2
 
-    def test_filter_workflows_by_enabled_status(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_filter_workflows_by_enabled_status(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test filtering workflows by enabled status.
 
         Note: Uses additional_params to pass is_enabled filter since it's not
@@ -152,7 +152,7 @@ class TestWorkflowListing:
 
         Expected: 200 OK with filtered workflows
         """
-        result = nexus_api.workflows.list(additional_params={"is_enabled": "true"}).assert_and_get()
+        result = syntara_api.workflows.list(additional_params={"is_enabled": "true"}).assert_and_get()
 
         # Verify all returned workflows are enabled (if any)
         for workflow in result.resources:
@@ -160,7 +160,7 @@ class TestWorkflowListing:
 
     def test_workflows_pagination(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -189,7 +189,7 @@ class TestWorkflowListing:
             )
 
         # Get first page filtered by our test workflows
-        page1 = nexus_api.workflows.list(
+        page1 = syntara_api.workflows.list(
             limit=5, include_total=True, additional_params={"name[contains]": test_id}
         ).assert_and_get()
 
@@ -200,7 +200,7 @@ class TestWorkflowListing:
 
         # Get second page using cursor
         next_cursor = page1.next_
-        page2 = nexus_api.workflows.list(
+        page2 = syntara_api.workflows.list(
             limit=5, cursor=next_cursor, additional_params={"name[contains]": test_id}
         ).assert_and_get()
 
@@ -209,7 +209,7 @@ class TestWorkflowListing:
 
     def test_list_excludes_soft_deleted_workflows(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -237,17 +237,17 @@ class TestWorkflowListing:
         )
 
         # Delete workflow
-        delete_response = nexus_api.workflows.delete(workflow_id=workflow.id)
+        delete_response = syntara_api.workflows.delete(workflow_id=workflow.id)
         assert delete_response.status_code == HTTPStatus.NO_CONTENT
 
         # List workflows filtered by test_id - should not include deleted one
-        workflows_list = nexus_api.workflows.list(additional_params={"name[contains]": test_id}).assert_and_get()
+        workflows_list = syntara_api.workflows.list(additional_params={"name[contains]": test_id}).assert_and_get()
 
         assert len(workflows_list.resources) == 0  # No workflows with this name (deleted)
 
     def test_filter_workflows_by_labels(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -298,7 +298,9 @@ class TestWorkflowListing:
         )
 
         # Filter by unique label value using additional_params (bracket notation)
-        result = nexus_api.workflows.list(additional_params={"labels[environment]": prod_label_value}).assert_and_get()
+        result = syntara_api.workflows.list(
+            additional_params={"labels[environment]": prod_label_value}
+        ).assert_and_get()
 
         # Verify only the production workflow is in the results
         returned_ids = {wf.id for wf in result.resources}
@@ -307,7 +309,7 @@ class TestWorkflowListing:
 
     def test_list_default_page_size(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -336,7 +338,7 @@ class TestWorkflowListing:
             )
 
         # Get workflows without limit parameter (should default to 20) filtered by our test workflows
-        result = nexus_api.workflows.list(
+        result = syntara_api.workflows.list(
             include_total=True, additional_params={"name[contains]": test_id}
         ).assert_and_get()
 

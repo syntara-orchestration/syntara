@@ -13,15 +13,15 @@ import pytest
 import yaml
 from fastapi import Depends
 
-from nexus.authz.resource_actions import (
+from syntara.authz.resource_actions import (
     build_resource_actions,
     get_all_resource_action_pairs,
     get_resource_actions,
     validate_statements,
 )
-from nexus.authz.role_conventions import BUILTIN_POLICIES
+from syntara.authz.role_conventions import BUILTIN_POLICIES
 
-_SRC_ROOT = Path(__file__).resolve().parents[3] / "src" / "nexus"
+_SRC_ROOT = Path(__file__).resolve().parents[3] / "src" / "syntara"
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ class TestBuildResourceActions:
     def test_discovers_permission_checker_from_route(self) -> None:
         from fastapi import FastAPI
 
-        from nexus.authz.dependencies import PermissionChecker
+        from syntara.authz.dependencies import PermissionChecker
 
         app = FastAPI()
         checker = PermissionChecker("test-resource", "test-action")
@@ -264,8 +264,8 @@ class TestBuildResourceActions:
 
         from fastapi import FastAPI
 
-        from nexus.authz.dependencies import ProjectScopeFilter
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.dependencies import ProjectScopeFilter
+        from syntara.authz.engine import AllowedProjectsResult
 
         app = FastAPI()
 
@@ -304,7 +304,7 @@ class TestBuildResourceActions:
             assert actions == sorted(actions)
 
     def test_raises_before_initialization(self) -> None:
-        import nexus.authz.resource_actions as mod
+        import syntara.authz.resource_actions as mod
 
         old_registry = mod._registry
         old_pairs = mod._all_pairs

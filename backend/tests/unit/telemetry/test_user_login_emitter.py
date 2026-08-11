@@ -5,15 +5,15 @@ import hmac
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.auth.audit.user_login import AMR, UserLoginEvent
-from nexus.telemetry.events.new_user import NewUserEvent
-from nexus.telemetry.events.user_login import UserLoginEvent as UserLoginTelemetryEvent
-from nexus.telemetry.handlers.user_login import UserLoginTelemetryHandler
+from syntara.auth.audit.user_login import AMR, UserLoginEvent
+from syntara.telemetry.events.new_user import NewUserEvent
+from syntara.telemetry.events.user_login import UserLoginEvent as UserLoginTelemetryEvent
+from syntara.telemetry.handlers.user_login import UserLoginTelemetryHandler
 
 TEST_SALT = "12345678-1234-5678-1234-567812345678"
 
-_SETTINGS_PATH = "nexus.telemetry.handlers.user_login.get_settings"
-_REGISTRY_PATH = "nexus.telemetry.handlers.user_login.get_telemetry_registry"
+_SETTINGS_PATH = "syntara.telemetry.handlers.user_login.get_settings"
+_REGISTRY_PATH = "syntara.telemetry.handlers.user_login.get_telemetry_registry"
 
 
 def _make_settings_mock(*, enabled: bool = True) -> MagicMock:

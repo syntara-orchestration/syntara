@@ -13,18 +13,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.database import (
+from syntara.metrics.database import (
     _after_cursor_execute,
     _before_cursor_execute,
     _classify_statement,
     _on_commit,
     install_database_metrics,
 )
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 _EXECUTEMANY = False
-_PATCH_RECORDER = "nexus.metrics.dependencies.get_metrics_recorder"
+_PATCH_RECORDER = "syntara.metrics.dependencies.get_metrics_recorder"
 
 
 @pytest.fixture

@@ -55,13 +55,13 @@ class TestWorkflowVersionRestore:
     """E2E tests for workflow version restore."""
 
     def test_restore_creates_new_draft_with_original_definition(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Restoring v1 after updating to v2 creates v3 as a draft with v1's definition."""
         defn_v1 = _simple_definition(activity_id="task1", description="v1")
         defn_v2 = _simple_definition(activity_id="task2", description="v2")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-restore-{uuid4().hex[:8]}",
                 workflow_definition=defn_v1,
@@ -73,12 +73,12 @@ class TestWorkflowVersionRestore:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        nexus_api.workflows.update(
+        syntara_api.workflows.update(
             workflow_id=wf_id,
             body=WorkflowUpdate(workflow_definition=defn_v2),
         )
 
-        restore_resp = nexus_api.workflows.restore_version(workflow_id=wf_id, version=1)
+        restore_resp = syntara_api.workflows.restore_version(workflow_id=wf_id, version=1)
         assert restore_resp.status_code == HTTPStatus.OK
         assert restore_resp.parsed is not None
 
@@ -88,7 +88,7 @@ class TestWorkflowVersionRestore:
         assert data.version.version == 3
         assert data.version.status == "draft"
 
-        versions_resp = nexus_api.workflows.list_versions(workflow_id=wf_id)
+        versions_resp = syntara_api.workflows.list_versions(workflow_id=wf_id)
         assert versions_resp.status_code == HTTPStatus.OK
         assert versions_resp.parsed is not None
         assert len(versions_resp.parsed.resources) == 3
@@ -99,7 +99,7 @@ class TestWorkflowVersionRestore:
         assert by_ver[3].status == "draft"
 
     def test_restore_published_version_keeps_publish_status(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Restoring a published version creates a draft; published pointer stays.
 
@@ -112,7 +112,7 @@ class TestWorkflowVersionRestore:
         defn_v1 = _simple_definition(activity_id="pub_task1", description="published-v1")
         defn_v2 = _simple_definition(activity_id="pub_task2", description="draft-v2")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-restore-pub-{uuid4().hex[:8]}",
                 workflow_definition=defn_v1,
@@ -124,21 +124,21 @@ class TestWorkflowVersionRestore:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        pub_resp = nexus_api.workflows.publish_version(workflow_id=wf_id, version=1, body=PublishVersionRequest())
+        pub_resp = syntara_api.workflows.publish_version(workflow_id=wf_id, version=1, body=PublishVersionRequest())
         assert pub_resp.status_code == HTTPStatus.OK
 
-        nexus_api.workflows.update(
+        syntara_api.workflows.update(
             workflow_id=wf_id,
             body=WorkflowUpdate(workflow_definition=defn_v2),
         )
 
-        restore_resp = nexus_api.workflows.restore_version(workflow_id=wf_id, version=1)
+        restore_resp = syntara_api.workflows.restore_version(workflow_id=wf_id, version=1)
         assert restore_resp.status_code == HTTPStatus.OK
         assert restore_resp.parsed is not None
         assert restore_resp.parsed.current_version == 3
         assert restore_resp.parsed.published_version_id is not None
 
-        versions_resp = nexus_api.workflows.list_versions(workflow_id=wf_id)
+        versions_resp = syntara_api.workflows.list_versions(workflow_id=wf_id)
         assert versions_resp.status_code == HTTPStatus.OK
         assert versions_resp.parsed is not None
         by_ver = {v.version: v for v in versions_resp.parsed.resources}
@@ -147,7 +147,7 @@ class TestWorkflowVersionRestore:
         assert by_ver[3].status == "draft"
 
     def test_version_list_status_after_republish(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """After publishing a different version, the pointer switches.
 
@@ -160,7 +160,7 @@ class TestWorkflowVersionRestore:
         defn_v1 = _simple_definition(activity_id="repub_task1", description="v1")
         defn_v2 = _simple_definition(activity_id="repub_task2", description="v2")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-republish-{uuid4().hex[:8]}",
                 workflow_definition=defn_v1,
@@ -172,16 +172,16 @@ class TestWorkflowVersionRestore:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        nexus_api.workflows.publish_version(workflow_id=wf_id, version=1, body=PublishVersionRequest())
+        syntara_api.workflows.publish_version(workflow_id=wf_id, version=1, body=PublishVersionRequest())
 
-        nexus_api.workflows.update(
+        syntara_api.workflows.update(
             workflow_id=wf_id,
             body=WorkflowUpdate(workflow_definition=defn_v2),
         )
 
-        nexus_api.workflows.publish_version(workflow_id=wf_id, version=2, body=PublishVersionRequest())
+        syntara_api.workflows.publish_version(workflow_id=wf_id, version=2, body=PublishVersionRequest())
 
-        versions_resp = nexus_api.workflows.list_versions(workflow_id=wf_id)
+        versions_resp = syntara_api.workflows.list_versions(workflow_id=wf_id)
         assert versions_resp.status_code == HTTPStatus.OK
         assert versions_resp.parsed is not None
         by_ver = {v.version: v for v in versions_resp.parsed.resources}
@@ -193,7 +193,7 @@ class TestPublishWithUnsavedChanges:
     """E2E tests for publishing with unsaved canvas changes (dirty-publish)."""
 
     def test_publish_with_workflow_definition_uses_provided_definition(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Publishing with workflow_definition in request uses that definition, not the saved draft's.
 
@@ -205,7 +205,7 @@ class TestPublishWithUnsavedChanges:
         defn_saved = _simple_definition(activity_id="saved_task", description="saved on server")
         defn_unsaved = _simple_definition(activity_id="unsaved_canvas_task", description="unsaved canvas state")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-dirty-pub-{uuid4().hex[:8]}",
                 workflow_definition=defn_saved,
@@ -217,7 +217,7 @@ class TestPublishWithUnsavedChanges:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=wf_id,
             version=1,
             body=PublishVersionRequest.from_dict({"workflow_definition": defn_unsaved.to_dict()}),
@@ -232,14 +232,14 @@ class TestPublishWithUnsavedChanges:
         assert published_defn is not None
         assert published_defn["nodes"][0]["id"] == "unsaved_canvas_task"
 
-        v1_resp = nexus_api.workflows.get_version(workflow_id=wf_id, version=1)
+        v1_resp = syntara_api.workflows.get_version(workflow_id=wf_id, version=1)
         assert v1_resp.status_code == HTTPStatus.OK
         assert v1_resp.parsed is not None
         assert v1_resp.parsed.workflow_definition["nodes"][0]["id"] == "saved_task"
         assert v1_resp.parsed.status == "draft"
 
     def test_publish_without_workflow_definition_uses_saved_definition(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Normal publish (no workflow_definition) uses the saved draft's definition.
 
@@ -249,7 +249,7 @@ class TestPublishWithUnsavedChanges:
         """
         defn = _simple_definition(activity_id="original_task", description="saved definition")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-clean-pub-{uuid4().hex[:8]}",
                 workflow_definition=defn,
@@ -261,7 +261,7 @@ class TestPublishWithUnsavedChanges:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=wf_id,
             version=1,
             body=PublishVersionRequest(),
@@ -275,7 +275,7 @@ class TestPublishWithUnsavedChanges:
         assert published_defn["nodes"][0]["id"] == "original_task"
 
     def test_publish_with_invalid_workflow_definition_returns_error(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Publishing with an invalid workflow_definition rejects the request.
 
@@ -285,7 +285,7 @@ class TestPublishWithUnsavedChanges:
         """
         defn = _simple_definition(activity_id="valid_task", description="valid")
 
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-invalid-pub-{uuid4().hex[:8]}",
                 workflow_definition=defn,
@@ -297,7 +297,7 @@ class TestPublishWithUnsavedChanges:
         wf_id = create_resp.parsed.id
         cleanup_workflows.append(wf_id)
 
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=wf_id,
             version=1,
             body=PublishVersionRequest.from_dict(
@@ -310,12 +310,12 @@ class TestPublishWithUnsavedChanges:
             HTTPStatus.UNPROCESSABLE_ENTITY,
         )
 
-        wf_resp = nexus_api.workflows.get(workflow_id=wf_id)
+        wf_resp = syntara_api.workflows.get(workflow_id=wf_id)
         assert wf_resp.parsed is not None
         assert wf_resp.parsed.published_version_id is None
 
     def test_incremental_build_publish_includes_unsaved_step(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Simulates the real user flow: build incrementally, publish with unsaved changes.
 
@@ -355,7 +355,7 @@ class TestPublishWithUnsavedChanges:
         defn_unsaved = _build_definition(["step1", "step2", "step3"])
 
         # Step 1: create with trigger + step1
-        create_resp = nexus_api.workflows.create(
+        create_resp = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=f"e2e-incremental-{uuid4().hex[:8]}",
                 workflow_definition=defn_v1,
@@ -369,7 +369,7 @@ class TestPublishWithUnsavedChanges:
         assert create_resp.parsed.current_version == 1
 
         # Step 2: add step2 → save
-        update_resp = nexus_api.workflows.update(
+        update_resp = syntara_api.workflows.update(
             workflow_id=wf_id,
             body=WorkflowUpdate(workflow_definition=defn_v2),
         )
@@ -378,7 +378,7 @@ class TestPublishWithUnsavedChanges:
         assert update_resp.parsed.current_version == 2
 
         # Step 3: add step3 → publish directly (don't save) with title and description
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=wf_id,
             version=2,
             body=PublishVersionRequest.from_dict(
@@ -405,14 +405,14 @@ class TestPublishWithUnsavedChanges:
         assert published_node_ids == ["step1", "step2", "step3"]
 
         # Last saved draft (v2) must still only have step1 + step2
-        v2_resp = nexus_api.workflows.get_version(workflow_id=wf_id, version=2)
+        v2_resp = syntara_api.workflows.get_version(workflow_id=wf_id, version=2)
         assert v2_resp.status_code == HTTPStatus.OK
         assert v2_resp.parsed is not None
         v2_node_ids = [n["id"] for n in v2_resp.parsed.workflow_definition["nodes"]]
         assert v2_node_ids == ["step1", "step2"]
 
         # Original v1 still has only step1
-        v1_resp = nexus_api.workflows.get_version(workflow_id=wf_id, version=1)
+        v1_resp = syntara_api.workflows.get_version(workflow_id=wf_id, version=1)
         assert v1_resp.status_code == HTTPStatus.OK
         assert v1_resp.parsed is not None
         v1_node_ids = [n["id"] for n in v1_resp.parsed.workflow_definition["nodes"]]
@@ -424,7 +424,7 @@ class TestWorkflowVersionExport:
 
     def test_export_workflow_version_as_json(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -442,7 +442,7 @@ class TestWorkflowVersionExport:
         assert created_wf.id is not None
         wf_id = created_wf.id
 
-        exported_wf = nexus_api.workflows.export_version(workflow_id=wf_id, version=created_wf.current_version)
+        exported_wf = syntara_api.workflows.export_version(workflow_id=wf_id, version=created_wf.current_version)
         assert exported_wf.status_code == HTTPStatus.OK
         assert exported_wf.content is not None
         exported = json.loads(exported_wf.content)

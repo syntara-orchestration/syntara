@@ -4,14 +4,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexus.auth.cookies import CSRF_COOKIE_NAME, CSRF_COOKIE_PATH, clear_csrf_cookie, set_csrf_cookie
-from nexus.auth.csrf import (
+from syntara.auth.cookies import CSRF_COOKIE_NAME, CSRF_COOKIE_PATH, clear_csrf_cookie, set_csrf_cookie
+from syntara.auth.csrf import (
     CSRF_HEADER_NAME,
     derive_csrf_form_token,
     generate_csrf_seed,
     validate_csrf,
 )
-from nexus.auth.exceptions import CSRFErrorCode, CSRFValidationError
+from syntara.auth.exceptions import CSRFErrorCode, CSRFValidationError
 
 
 def _mock_encryption_key(value: str = "test-server-secret-key") -> MagicMock:
@@ -57,7 +57,7 @@ class TestDeriveCsrfFormToken:
     """Tests for derive_csrf_form_token."""
 
     def test_returns_hex_string(self) -> None:
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
             token = derive_csrf_form_token("test-seed")
 
         # SHA-256 hex digest is 64 characters
@@ -65,24 +65,24 @@ class TestDeriveCsrfFormToken:
         assert all(c in "0123456789abcdef" for c in token)
 
     def test_deterministic_for_same_seed(self) -> None:
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
             token1 = derive_csrf_form_token("same-seed")
             token2 = derive_csrf_form_token("same-seed")
 
         assert token1 == token2
 
     def test_different_seeds_produce_different_tokens(self) -> None:
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()):
             token1 = derive_csrf_form_token("seed-one")
             token2 = derive_csrf_form_token("seed-two")
 
         assert token1 != token2
 
     def test_different_secrets_produce_different_tokens(self) -> None:
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key("secret-a")):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key("secret-a")):
             token_a = derive_csrf_form_token("same-seed")
 
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key("secret-b")):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key("secret-b")):
             token_b = derive_csrf_form_token("same-seed")
 
         assert token_a != token_b
@@ -98,7 +98,7 @@ class TestSetCsrfCookie:
 
     def test_sets_cookie_with_correct_attributes(self) -> None:
         response = MagicMock()
-        with patch("nexus.auth.cookies.get_settings", return_value=_mock_settings()):
+        with patch("syntara.auth.cookies.get_settings", return_value=_mock_settings()):
             set_csrf_cookie(response, "my-seed", max_age=28800)
 
         response.set_cookie.assert_called_once_with(
@@ -115,7 +115,7 @@ class TestSetCsrfCookie:
     def test_uses_configurable_settings(self) -> None:
         response = MagicMock()
         settings = _mock_settings(cookie_secure=False, cookie_domain=".example.com")
-        with patch("nexus.auth.cookies.get_settings", return_value=settings):
+        with patch("syntara.auth.cookies.get_settings", return_value=settings):
             set_csrf_cookie(response, "seed", max_age=3600)
 
         response.set_cookie.assert_called_once_with(
@@ -140,7 +140,7 @@ class TestClearCsrfCookie:
 
     def test_deletes_cookie_with_correct_attributes(self) -> None:
         response = MagicMock()
-        with patch("nexus.auth.cookies.get_settings", return_value=_mock_settings()):
+        with patch("syntara.auth.cookies.get_settings", return_value=_mock_settings()):
             clear_csrf_cookie(response)
 
         response.delete_cookie.assert_called_once_with(
@@ -177,7 +177,7 @@ class TestValidateCsrf:
         request.headers.get = MagicMock(return_value=None)
 
         with (
-            patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()),
+            patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()),
             pytest.raises(CSRFValidationError, match="CSRF token header missing") as exc_info,
         ):
             validate_csrf(request)
@@ -190,7 +190,7 @@ class TestValidateCsrf:
         request.headers.get = MagicMock(return_value="wrong-token-value")
 
         with (
-            patch("nexus.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()),
+            patch("syntara.auth.csrf.get_encryption_key", return_value=_mock_encryption_key()),
             pytest.raises(CSRFValidationError, match="CSRF token mismatch") as exc_info,
         ):
             validate_csrf(request)
@@ -199,7 +199,7 @@ class TestValidateCsrf:
     def test_passes_when_token_matches(self) -> None:
         seed = "valid-seed"
         mock_key = _mock_encryption_key()
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=mock_key):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=mock_key):
             expected_token = derive_csrf_form_token(seed)
 
         request = MagicMock()
@@ -207,7 +207,7 @@ class TestValidateCsrf:
         request.headers = MagicMock()
         request.headers.get = MagicMock(return_value=expected_token)
 
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=mock_key):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=mock_key):
             # Should not raise
             validate_csrf(request)
 
@@ -215,7 +215,7 @@ class TestValidateCsrf:
         """Verify validate_csrf reads the X-CSRF-Token header specifically."""
         seed = "seed-for-header-check"
         mock_key = _mock_encryption_key()
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=mock_key):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=mock_key):
             expected_token = derive_csrf_form_token(seed)
 
         request = MagicMock()
@@ -223,7 +223,7 @@ class TestValidateCsrf:
         request.headers = MagicMock()
         request.headers.get = MagicMock(return_value=expected_token)
 
-        with patch("nexus.auth.csrf.get_encryption_key", return_value=mock_key):
+        with patch("syntara.auth.csrf.get_encryption_key", return_value=mock_key):
             validate_csrf(request)
 
         request.headers.get.assert_called_with(CSRF_HEADER_NAME)

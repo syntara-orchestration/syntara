@@ -12,7 +12,7 @@ from unittest.mock import Mock
 
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.utils.keyword_association import (
+from syntara.agent_orchestrator.utils.keyword_association import (
     HINT_HIGH,
     HINT_LOW,
     annotate_tools_with_relevance,

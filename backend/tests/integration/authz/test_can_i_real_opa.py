@@ -12,13 +12,13 @@ import pytest
 from sqlalchemy import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import AuthzRequest, authorize
-from nexus.authz.evaluator import RegoEvaluator
-from nexus.authz.models import RoleAssignment
-from nexus.authz.resolver import resolve_effective_policies
-from nexus.authz.seed import seed_authz_data
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.authz.engine import AuthzRequest, authorize
+from syntara.authz.evaluator import RegoEvaluator
+from syntara.authz.models import RoleAssignment
+from syntara.authz.resolver import resolve_effective_policies
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 
 # ---------------------------------------------------------------------------
 # Fixtures

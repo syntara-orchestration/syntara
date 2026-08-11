@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.settings.services.settings_service import _invalidate_and_publish
+from syntara.settings.services.settings_service import _invalidate_and_publish
 
 
 class TestInvalidateAndPublish:
@@ -20,7 +20,7 @@ class TestInvalidateAndPublish:
         mock_cache.publish_change = AsyncMock()
 
         with patch(
-            "nexus.settings.services.settings_service.get_runtime_settings",
+            "syntara.settings.services.settings_service.get_runtime_settings",
             return_value=mock_cache,
         ):
             await _invalidate_and_publish("test.key")
@@ -32,7 +32,7 @@ class TestInvalidateAndPublish:
     async def test_suppresses_runtime_error(self) -> None:
         """Does not raise when cache is not initialized."""
         with patch(
-            "nexus.settings.services.settings_service.get_runtime_settings",
+            "syntara.settings.services.settings_service.get_runtime_settings",
             side_effect=RuntimeError("not initialized"),
         ):
             # Should not raise

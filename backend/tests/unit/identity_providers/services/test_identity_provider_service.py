@@ -16,23 +16,23 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from nexus.identity_providers.exceptions import (
+from syntara.identity_providers.exceptions import (
     IdentityProviderNameConflictError,
     IdentityProviderNotFoundError,
 )
-from nexus.identity_providers.models.identity_provider import (
+from syntara.identity_providers.models.identity_provider import (
     IdentityProvider,
     IdentityProviderCreate,
     IdentityProviderPatch,
 )
-from nexus.identity_providers.models.identity_provider_configuration import (
+from syntara.identity_providers.models.identity_provider_configuration import (
     OIDCClaimMapping,
     OIDCConfiguration,
     OIDCConfigurationPatch,
     OIDCConfigurationResponse,
     OIDCGroupMappingEntry,
 )
-from nexus.identity_providers.services.identity_provider_service import (
+from syntara.identity_providers.services.identity_provider_service import (
     IdentityProviderService,
 )
 
@@ -358,7 +358,7 @@ async def test_delete_provider_success() -> None:
 
     service = _make_service(mock_session, secret_service=mock_secret)
 
-    with patch("nexus.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
         mock_store = AsyncMock()
         mock_store.revoke_by_idp = AsyncMock(return_value=0)
         mock_store_cls.return_value = mock_store
@@ -418,7 +418,7 @@ async def test_delete_provider_revokes_sessions_and_deletes_identities() -> None
 
     service = _make_service(mock_session, secret_service=mock_secret)
 
-    with patch("nexus.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
         mock_store = AsyncMock()
         mock_store.revoke_by_idp = AsyncMock(return_value=5)
         mock_store_cls.return_value = mock_store
@@ -454,7 +454,7 @@ async def test_delete_provider_without_secret_skips_secret_deletion() -> None:
 
     service = _make_service(mock_session, secret_service=mock_secret)
 
-    with patch("nexus.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
+    with patch("syntara.identity_providers.services.identity_provider_service.create_session_store") as mock_store_cls:
         mock_store = AsyncMock()
         mock_store.revoke_by_idp = AsyncMock(return_value=0)
         mock_store_cls.return_value = mock_store

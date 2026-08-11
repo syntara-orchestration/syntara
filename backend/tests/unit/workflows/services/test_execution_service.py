@@ -11,21 +11,21 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.models.pagination import ResourcesResponseBase
-from nexus.metrics.interface_tag import interface_context_var
-from nexus.workflows.exceptions import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.models.pagination import ResourcesResponseBase
+from syntara.metrics.interface_tag import interface_context_var
+from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     TriggerValidationError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
-from nexus.workflows.models.execution import Execution, ExecutionRead, ExecutionStatus
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_version import WorkflowVersion
-from nexus.workflows.services.execution_service import ExecutionService
-from nexus.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.models.execution import Execution, ExecutionRead, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.execution_service import ExecutionService
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
 class TestExecutionServiceBase:
@@ -518,7 +518,7 @@ class TestCreateExecution:
 
         with (
             patch(
-                "nexus.workflows.services.execution_service.resolve_user_display_name",
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
                 new_callable=AsyncMock,
                 return_value="Author",
             ),
@@ -1358,7 +1358,7 @@ class TestListExecutionActivities(TestExecutionServiceBase):
     @pytest.mark.asyncio
     async def test_list_execution_activities_field_mapping(self) -> None:
         """Test that activity field mapping returns correct values for activity_name, status, and retry_count."""
-        from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+        from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 
         mock_session = Mock(spec=AsyncSession)
         mock_user = Mock(spec=User)
@@ -1436,7 +1436,7 @@ class TestListExecutionActivities(TestExecutionServiceBase):
     @pytest.mark.asyncio
     async def test_list_execution_activities_multiple_activities(self) -> None:
         """Test that multiple activities are returned correctly with proper field values."""
-        from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+        from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 
         mock_session = Mock(spec=AsyncSession)
         mock_user = Mock(spec=User)
@@ -1642,7 +1642,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
     @pytest.mark.asyncio
     async def test_raises_temporal_unavailable_when_no_service(self) -> None:
         """Test that TemporalUnavailableError is raised when temporal_service is None."""
-        from nexus.workflows.exceptions import TemporalUnavailableError
+        from syntara.workflows.exceptions import TemporalUnavailableError
 
         mock_session = AsyncMock(spec=AsyncSession)
         mock_user = Mock(spec=User)

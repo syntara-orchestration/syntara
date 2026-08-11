@@ -1,7 +1,7 @@
 """Integration tests for the authorization query endpoints.
 
 Covers the can-i, who-can, and what-can-i endpoints defined in
-``src/nexus/authz/router.py``.  These endpoints provide authorization
+``src/syntara/authz/router.py``.  These endpoints provide authorization
 evaluation with full explainability (matched policy, denial reason, etc.).
 """
 
@@ -16,16 +16,16 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.dependencies import get_authz_evaluator
-from nexus.authz.evaluator import evaluate_policy_input
-from nexus.authz.models import RoleAssignment
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.project import Project
-from nexus.authz.models.role import Role
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.dependencies import get_authz_evaluator
+from syntara.authz.evaluator import evaluate_policy_input
+from syntara.authz.models import RoleAssignment
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 from tests.integration.api.conftest import (
     make_admin,
     make_auditor,

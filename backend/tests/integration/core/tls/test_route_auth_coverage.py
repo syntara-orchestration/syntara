@@ -18,9 +18,9 @@ import inspect
 import pytest
 from fastapi import FastAPI
 
-from nexus.api.constants import API_V1_PATH_PREFIX, EXCLUDED_PATH_PREFIXES, EXCLUDED_PATHS
-from nexus.auth.dependencies import get_current_user
-from nexus.core.router_discovery import discover_and_register_routers, iter_api_routes
+from syntara.api.constants import API_V1_PATH_PREFIX, EXCLUDED_PATH_PREFIXES, EXCLUDED_PATHS
+from syntara.auth.dependencies import get_current_user
+from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
 
 pytestmark = [pytest.mark.integration]
 

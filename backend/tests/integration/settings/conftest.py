@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 import sqlalchemy
 
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.core.models import User
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 

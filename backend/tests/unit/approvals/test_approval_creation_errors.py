@@ -11,10 +11,10 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.exceptions import ApprovalAlreadyRequestedError
-from nexus.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.core.models import User
+from syntara.approvals.exceptions import ApprovalAlreadyRequestedError
+from syntara.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.core.models import User
 
 
 def _create_test_approval_request(

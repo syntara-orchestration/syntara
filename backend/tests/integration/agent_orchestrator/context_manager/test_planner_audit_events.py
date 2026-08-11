@@ -13,21 +13,21 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.audit.context_planning import (
+from syntara.agent_orchestrator.audit.context_planning import (
     CancellationEvent,
     CancellationHandler,
     ContextPlanningEvent,
     ContextPlanningHandler,
 )
-from nexus.agent_orchestrator.context_manager import (
+from syntara.agent_orchestrator.context_manager import (
     ContextManagerPlanner,
     ContextPackage,
 )
-from nexus.agent_orchestrator.exceptions import InvocationCancelledError
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-from nexus.core.models import User
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.core.models import User
 from tests.fixtures.settings import FakeSettingsCache
 
 
@@ -107,9 +107,9 @@ class TestContextPlanningEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ),
@@ -207,9 +207,9 @@ class TestContextPlanningEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ),
@@ -294,9 +294,9 @@ class TestContextPlanningEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ),
@@ -379,9 +379,9 @@ class TestContextPlanningEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 side_effect=mock_assemble_failure,
             ),
@@ -465,9 +465,9 @@ class TestContextPlanningEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ),
@@ -549,7 +549,7 @@ class TestCancellationEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             pytest.raises(InvocationCancelledError),
         ):
             await planner.plan_request(
@@ -622,7 +622,7 @@ class TestCancellationEventDispatch:
         )
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             pytest.raises(InvocationCancelledError),
         ):
             await planner.plan_request(

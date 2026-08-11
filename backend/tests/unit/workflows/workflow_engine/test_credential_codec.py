@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from temporalio.api.common.v1 import Payload
 
-from nexus.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
+from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
 
 # 32-byte test key for AES-256-GCM
 _TEST_KEY = os.urandom(32)
