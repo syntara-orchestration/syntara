@@ -22,6 +22,7 @@ export const nodeHelp = {
   httpUrl: createFieldHelp('URL', T.HTTP_URL_HELP),
   httpHeaders: createFieldHelp('Headers', T.HTTP_HEADERS_HELP),
   httpBody: createFieldHelp('Body', T.HTTP_BODY_HELP),
+  httpFollowRedirects: createFieldHelp('Follow redirects', T.HTTP_FOLLOW_REDIRECTS_HELP),
 
   // AI agent
   aiModel: createFieldHelp('Model', T.AI_MODEL_HELP),

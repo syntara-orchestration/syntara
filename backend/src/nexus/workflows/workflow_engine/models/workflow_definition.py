@@ -383,6 +383,13 @@ class APIExecutorParameters(TemplateAwareBaseModel):
         default=None,
         description="Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.",
     )
+    follow_redirects: bool = Field(
+        default=False,
+        description=(
+            "Whether to follow HTTP redirects (3xx). Each redirect target"
+            " is validated against SSRF rules. Default false."
+        ),
+    )
 
     @field_validator("url")
     @classmethod

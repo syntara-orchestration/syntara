@@ -40,6 +40,9 @@ export const HTTP_HEADERS_HELP =
 export const HTTP_BODY_HELP =
   'Enter the request body as JSON or text. Used with POST, PUT, and PATCH methods. You can include expressions to insert dynamic values from previous steps.'
 
+export const HTTP_FOLLOW_REDIRECTS_HELP =
+  'When enabled, the request automatically follows HTTP redirects (3xx responses). Each redirect target is validated against security rules.'
+
 export const AI_MODEL_HELP =
   'Select the large language model (LLM) to use for this task agent step. Models are provided by integrations configured by your administrator.'
 

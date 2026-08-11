@@ -313,6 +313,70 @@ function RetryPolicyFields({ register, retryDefaults, isDisabled }: RetryFieldsP
   )
 }
 
+type RetryPolicySectionProps = {
+  control: ReturnType<typeof useFormContext<FormWithSettings>>['control']
+  register: ReturnType<typeof useFormContext<FormWithSettings>>['register']
+  setValue: ReturnType<typeof useFormContext<FormWithSettings>>['setValue']
+  retryDefaults: {
+    maxRetries: number | null
+    initialInterval: number | null
+    maxInterval: number | null
+    backoffCoefficient: number | null
+  } | null
+  isDisabled?: boolean
+}
+
+function RetryPolicySection({
+  control,
+  register,
+  setValue,
+  retryDefaults,
+  isDisabled,
+}: Readonly<RetryPolicySectionProps>) {
+  const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
+  const overrideRetry = retryPolicy !== undefined
+
+  function handleRetryOverrideToggle(_event: React.FormEvent<HTMLInputElement>, checked: boolean) {
+    if (checked) {
+      setValue('settings.retry_policy', {})
+    } else {
+      setValue('settings.retry_policy', undefined)
+    }
+  }
+
+  const retryHelp = retryDefaults
+    ? `When disabled, the system default retry policy applies (${String(retryDefaults.maxRetries ?? '?')} retries, ${String(retryDefaults.initialInterval ?? '?')}s initial interval).`
+    : 'When disabled, the system default retry policy applies.'
+
+  return (
+    <FormSection title="Retry policy">
+      <Stack hasGutter>
+        <StackItem>
+          <FormGroup
+            label="Override retry policy"
+            labelHelp={nodeHelp.retryToggle}
+            fieldId="node-settings-retry-override"
+          >
+            <Switch
+              id="node-settings-retry-override"
+              aria-label="Override retry policy"
+              isChecked={overrideRetry}
+              onChange={handleRetryOverrideToggle}
+              isDisabled={isDisabled}
+            />
+          </FormGroup>
+          <HelperText>
+            <HelperTextItem>{retryHelp}</HelperTextItem>
+          </HelperText>
+        </StackItem>
+        {overrideRetry && (
+          <RetryPolicyFields register={register} retryDefaults={retryDefaults} isDisabled={isDisabled} />
+        )}
+      </Stack>
+    </FormSection>
+  )
+}
+
 function getCofDefaultLabel(cofDefault: boolean | null): string {
   if (cofDefault === null) return ''
   if (cofDefault) return ' (system default: continue on failure)'
@@ -329,9 +393,7 @@ export function NodeSettingsForm({
 }: NodeSettingsFormProps) {
   const isVersionView = useIsVersionView()
   const { control, register, setValue } = useFormContext<FormWithSettings>()
-  const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
   const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
-  const overrideRetry = retryPolicy !== undefined
 
   const { defaults } = useWorkflowEngineDefaults()
 
@@ -341,18 +403,6 @@ export function NodeSettingsForm({
 
   const cofDefaultLabel = getCofDefaultLabel(cofDefault)
   const timeoutPlaceholder = timeoutDefault !== null ? `${String(timeoutDefault)} — system default` : 'System default'
-
-  function handleRetryOverrideToggle(_event: React.FormEvent<HTMLInputElement>, checked: boolean) {
-    if (checked) {
-      setValue('settings.retry_policy', {})
-    } else {
-      setValue('settings.retry_policy', undefined)
-    }
-  }
-
-  const retryHelp = retryDefaults
-    ? `When disabled, the system default retry policy applies (${String(retryDefaults.maxRetries ?? '?')} retries, ${String(retryDefaults.initialInterval ?? '?')}s initial interval).`
-    : 'When disabled, the system default retry policy applies.'
 
   return (
     <Stack hasGutter>
@@ -383,31 +433,13 @@ export function NodeSettingsForm({
 
       {supportsRetryPolicy && (
         <StackItem>
-          <FormSection title="Retry policy">
-            <Stack hasGutter>
-              <StackItem>
-                <FormGroup
-                  label="Override retry policy"
-                  labelHelp={nodeHelp.retryToggle}
-                  fieldId="node-settings-retry-override"
-                >
-                  <Switch
-                    id="node-settings-retry-override"
-                    aria-label="Override retry policy"
-                    isChecked={overrideRetry}
-                    onChange={handleRetryOverrideToggle}
-                    isDisabled={isVersionView}
-                  />
-                </FormGroup>
-                <HelperText>
-                  <HelperTextItem>{retryHelp}</HelperTextItem>
-                </HelperText>
-              </StackItem>
-              {overrideRetry && (
-                <RetryPolicyFields register={register} retryDefaults={retryDefaults} isDisabled={isVersionView} />
-              )}
-            </Stack>
-          </FormSection>
+          <RetryPolicySection
+            control={control}
+            register={register}
+            setValue={setValue}
+            retryDefaults={retryDefaults}
+            isDisabled={isVersionView}
+          />
         </StackItem>
       )}
     </Stack>

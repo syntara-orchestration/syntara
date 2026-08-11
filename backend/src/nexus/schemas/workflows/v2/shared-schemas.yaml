@@ -2011,6 +2011,11 @@ components:
             - type: 'null'
           title: Credential Id
           description: Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+        follow_redirects:
+          type: boolean
+          default: false
+          title: Follow Redirects
+          description: Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false.
       type: object
       required:
         - method

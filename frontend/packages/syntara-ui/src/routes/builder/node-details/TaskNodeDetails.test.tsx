@@ -1,4 +1,4 @@
-import type { TaskActivity } from '@syntara/contracts'
+import type { Activity, TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -94,6 +94,20 @@ vi.mock('../node-forms/ActionNodeForm', () => ({
         data-testid="submit-api-credential-button"
       >
         Submit API with Credential
+      </button>
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'API with Follow Redirects',
+            executor: 'http_request',
+            method: 'GET',
+            url: 'https://api.test.com',
+            follow_redirects: true,
+          })
+        }
+        data-testid="submit-api-follow-redirects-button"
+      >
+        Submit API with Follow Redirects
       </button>
       <button onClick={onCancel} data-testid="cancel-button">
         Cancel
@@ -724,6 +738,27 @@ describe('TaskNodeDetails Component', () => {
     renderTaskNodeDetails(taskData, 'task-script-cred')
 
     expect(screen.getByTestId('action-node-form')).toBeInTheDocument()
+  })
+
+  it('includes follow_redirects in submitted activity config', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'http_request' as const,
+      id: 'task-api-fr',
+      name: 'API Task',
+      parameters: {
+        method: 'GET' as const,
+        url: 'https://api.example.com',
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-api-fr')
+
+    await user.click(screen.getByTestId('submit-api-follow-redirects-button'))
+
+    const call = mockUpdateActivity.mock.calls[0] as [string, Activity]
+    expect(call[0]).toBe('task-api-fr')
+    expect(call[1].parameters.follow_redirects).toBe(true)
   })
 
   it('handles AAP task with camelCase legacy fields', () => {

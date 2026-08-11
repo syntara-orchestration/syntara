@@ -68,6 +68,7 @@ export type CreateApiActivityOptions = {
   inputs?: string
   authentication?: string
   credentialId?: string
+  followRedirects?: boolean
   settings?: NodeSettings
 }
 
@@ -80,7 +81,7 @@ function headersEntriesToRecord(entries: Array<{ key: string; value: string }> |
 
 /** Create an HTTP request node (v2). */
 export function createApiActivity(options: CreateApiActivityOptions): Activity {
-  const { id, name, method, url, headers, body, authentication, credentialId, settings } = options
+  const { id, name, method, url, headers, body, authentication, credentialId, followRedirects, settings } = options
   const config: Record<string, unknown> = {
     ...(method !== undefined && { method }),
     ...(url !== undefined && { url }),
@@ -115,6 +116,7 @@ export function createApiActivity(options: CreateApiActivityOptions): Activity {
     parameters: {
       ...config,
       ...(credentialId && { credential_id: credentialId }),
+      ...(followRedirects !== undefined && { follow_redirects: followRedirects }),
     },
     ...(settings && { settings }),
   }

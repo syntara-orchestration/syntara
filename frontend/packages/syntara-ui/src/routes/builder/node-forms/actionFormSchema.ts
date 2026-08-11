@@ -55,6 +55,7 @@ const apiActionSchema = z.object({
   body: z.string().optional(),
   parameters: z.string().optional(),
   credential_id: z.string().optional(),
+  follow_redirects: z.boolean().optional(),
   settings: nodeSettingsSchema.optional(),
 })
 

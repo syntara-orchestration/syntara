@@ -432,6 +432,29 @@ describe('workflowFactories', () => {
 
         expect(activity.parameters.credential_id).toBe('cred-abc')
       })
+
+      it('includes follow_redirects when provided', () => {
+        const activity = createApiActivity({
+          id: 'api-1',
+          name: 'API Call',
+          method: 'GET',
+          url: 'https://api.example.com',
+          followRedirects: true,
+        })
+
+        expect(activity.parameters.follow_redirects).toBe(true)
+      })
+
+      it('omits follow_redirects when not provided', () => {
+        const activity = createApiActivity({
+          id: 'api-1',
+          name: 'API Call',
+          method: 'GET',
+          url: 'https://api.example.com',
+        })
+
+        expect(activity.parameters).not.toHaveProperty('follow_redirects')
+      })
     })
 
     describe('createAgenticActivity', () => {

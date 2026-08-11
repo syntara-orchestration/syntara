@@ -64,6 +64,8 @@ export default function registerActionNode() {
                 inputs: data.parameters,
                 authentication: data.authentication,
                 credentialId: data.credential_id,
+                followRedirects: data.follow_redirects,
+                settings: data.settings,
               })
             }
             return createScriptActivity({

@@ -101,6 +101,11 @@
           }
         },
         "additionalProperties": true
+      },
+      "follow_redirects": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether to follow HTTP redirects (3xx). Each redirect target is validated against SSRF rules. Default false."
       }
     },
     "additionalProperties": false
