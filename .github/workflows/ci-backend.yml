@@ -387,6 +387,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -428,6 +429,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -474,6 +476,7 @@ jobs:
       AUDIT_DRAIN_CYCLE_BASELINE_MS: "2000"
       TOKEN_CONCURRENT_P95_THRESHOLD_MS: "15000"
       TOKEN_CONCURRENT_CAPACITY_P95_THRESHOLD_MS: "20000"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -519,6 +522,8 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
     steps:
       - name: Free disk space
         run: |

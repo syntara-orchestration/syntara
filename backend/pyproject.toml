@@ -306,6 +306,7 @@ markers = [
     "compliance: marks tests as compliance tests (auth coverage, API contract enforcement)",
     "destructive: marks tests that mutate live cluster state (e.g. HPA autoscaling) — excluded from routine runs",
     "k8s_required: marks tests that need KUBECONFIG + PERF_K8S_NAMESPACE to reach a Kubernetes cluster",
+    "xfail_from_url: dynamically applied by --xfail-from-url from a remote URL",
 ]
 
 # Coverage configuration
