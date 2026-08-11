@@ -85,7 +85,7 @@ class WebSocketConnectionHandler(AuditEventHandler[WebSocketConnectionEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=f"websocket_{event.action}",
             event_message=f"WebSocket {event.action}: {display_name}",
-            source_component="nexus.workflows.ws",
+            source_component="syntara.workflows.ws",
             structured_data=data,
             execution_id=event.execution_id,
             workflow_id=event.workflow_id,

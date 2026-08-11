@@ -3,7 +3,7 @@
  *
  * Creates integrations, workflows, executions, credentials, and identity
  * providers via API. Falls back to mock credentials (password: "mock") when
- * NEXUS_E2E_PASSWORD is not set.
+ * SYNTARA_E2E_PASSWORD is not set.
  *
  * Each spec file should use a unique prefix (via buildUniqueName) to avoid
  * conflicts with parallel Playwright workers.

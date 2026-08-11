@@ -94,7 +94,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.integrations.integration"
+        assert event.source_component == "syntara.integrations.integration"
         assert event.event_message == "Integration created: Slack MCP"
         assert isinstance(event.structured_data, AuditContextData)
         assert event.structured_data.integration_name == "Slack MCP"  # type: ignore[attr-defined]

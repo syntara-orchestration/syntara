@@ -904,7 +904,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         assert audit_event.event_action == "authorization_denied"
         assert audit_event.event_severity == EventSeverity.WARNING
         assert audit_event.event_status == EventStatus.ERROR
-        assert audit_event.source_component == "nexus.approvals"
+        assert audit_event.source_component == "syntara.approvals"
         assert audit_event.actor_id == user.id
         assert audit_event.actor_username == user.username
         assert audit_event.resource_urn == f"urn:syntara:approval:{approval_read.id}"
@@ -966,7 +966,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         assert audit_event.event_category == EventCategory.SECURITY_EVENT
         assert audit_event.event_severity == EventSeverity.WARNING
         assert audit_event.event_status == EventStatus.ERROR
-        assert audit_event.source_component == "nexus.approvals"
+        assert audit_event.source_component == "syntara.approvals"
         assert audit_event.actor_id == user.id
         assert audit_event.resource_urn == f"urn:syntara:approval:{approval2.id}"
 

@@ -30,7 +30,7 @@ class HTTPRequestEvent:
     path: str
     status_code: int
     actor_context: AuditActorContext
-    source_component: str = field(default="nexus.audit.middleware")
+    source_component: str = field(default="syntara.audit.middleware")
     query_params: dict[str, str | list[str]] | None = field(default=None)
     workflow_id: UUID | None = field(default=None)
     execution_id: UUID | None = field(default=None)

@@ -13,7 +13,7 @@ from nexus.audit.models.audit_event import (
 from nexus.audit.models.structured_data import AuditContextData
 from nexus.core.models.principal import PrincipalType
 
-_SOURCE_COMPONENT = "nexus.auth.middleware"
+_SOURCE_COMPONENT = "syntara.auth.middleware"
 
 
 @dataclass

@@ -161,7 +161,7 @@ npm run e2e:ui                     # Run Playwright UI mode
 # E2E environment
 # Tests run against the mock backend by default.
 # UI runs on port 4173 and mock API on port 3300.
-# Override ports with NEXUS_E2E_PORT and NEXUS_E2E_API_PORT.
+# Override ports with SYNTARA_E2E_PORT and SYNTARA_E2E_API_PORT.
 # Real backend mode: see packages/syntara-ui/TESTING.md for setup.
 
 

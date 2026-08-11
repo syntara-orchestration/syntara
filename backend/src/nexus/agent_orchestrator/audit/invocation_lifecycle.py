@@ -96,7 +96,7 @@ class InvocationLifecycleHandler(AuditEventHandler[InvocationLifecycleEvent]):
             event_status=status,
             event_action=f"invocation_{event.status.lower()}",
             event_message=f"Invocation {_STATUS_MESSAGE.get(event.status, 'succeeded')}",
-            source_component="nexus.agent_orchestrator.executor",
+            source_component="syntara.agent_orchestrator.executor",
             structured_data=structured_data,
             actor_id=actor_id,
             actor_username=actor_username,

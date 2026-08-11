@@ -96,7 +96,7 @@ class SessionLifecycleHandler(AuditEventHandler[SessionLifecycleEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.auth.session",
+            source_component="syntara.auth.session",
             structured_data=data,
             actor_id=event.user_id,
             actor_type=PrincipalType.USER,

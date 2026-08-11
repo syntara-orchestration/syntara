@@ -50,7 +50,7 @@ class TestAgentExecutionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "agent_started"
         assert result.event_message == "Agent orchestrator started"
-        assert result.source_component == "nexus.agent_orchestrator.agents.orchestrator"
+        assert result.source_component == "syntara.agent_orchestrator.agents.orchestrator"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -90,7 +90,7 @@ class TestAgentExecutionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "agent_failed"
         assert result.event_message == "Agent orchestrator failed"
-        assert result.source_component == "nexus.agent_orchestrator.agents.orchestrator"
+        assert result.source_component == "syntara.agent_orchestrator.agents.orchestrator"
         assert result.actor_id == test_user.id
         assert result.actor_username == test_user.username
 
@@ -198,7 +198,7 @@ class TestAgentExecutionHandler:
         handler = AgentExecutionHandler()
         result = handler.handle(event)
 
-        assert result.source_component == "nexus.agent_orchestrator.agents.custom_agent"
+        assert result.source_component == "syntara.agent_orchestrator.agents.custom_agent"
 
     def test_failed_without_error_type(self) -> None:
         """Failed status without explicit error_type still produces error event."""

@@ -69,7 +69,7 @@ class SessionRevocationHandler(AuditEventHandler[SessionRevocationEvent]):
                 f"{event.target_type} '{event.target_identifier}' "
                 f"by {event.actor_username} via {event.actor_source}"
             ),
-            source_component="nexus.auth.revocation",
+            source_component="syntara.auth.revocation",
             structured_data=data,
             actor_type=PrincipalType.USER,
             actor_username=event.actor_username,

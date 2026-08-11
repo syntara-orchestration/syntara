@@ -55,7 +55,7 @@ class TestPolicyLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "policy_created"
         assert result.event_message == "Policy created: custom-policy"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "policy-lifecycle"
         assert result.structured_data.action == "created"

@@ -39,7 +39,7 @@ class TestUserPasswordChangedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == actor_id
         assert result.actor_username == "admin"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "alice" in result.event_message
         assert result.resource_urn == "urn:syntara:user:alice"
         assert result.resource_name == "alice"
@@ -88,7 +88,7 @@ class TestUserAccountStatusChangedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == actor_id
         assert result.actor_username == "admin"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "alice" in result.event_message
         assert "disabled" in result.event_message
         assert result.resource_urn == "urn:syntara:user:alice"

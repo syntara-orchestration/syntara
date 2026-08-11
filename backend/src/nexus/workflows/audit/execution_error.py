@@ -67,7 +67,7 @@ class WorkflowExecutionErrorHandler(AuditEventHandler[WorkflowExecutionErrorEven
             event_status=EventStatus.ERROR,
             event_action="workflow_execution_error",
             event_message=message,
-            source_component="nexus.workflows.engine",
+            source_component="syntara.workflows.engine",
             structured_data=data,
             execution_id=event.execution_id,
             workflow_id=event.workflow_id,

@@ -42,7 +42,7 @@ class TestOIDCFlowHandler:
         assert result.actor_type == PrincipalType.SYSTEM
         assert result.actor_id is None
         assert result.actor_username is None
-        assert result.source_component == "nexus.auth.oidc"
+        assert result.source_component == "syntara.auth.oidc"
 
     def test_successful_callback_with_user(self) -> None:
         """Successful callback with user → actor_id=user_id, actor_name=username, actor_type=USER, 'oidc_callback'."""

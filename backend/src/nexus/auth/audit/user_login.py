@@ -66,7 +66,7 @@ class UserLoginHandler(AuditEventHandler[UserLoginEvent]):
             event_status=EventStatus.SUCCESS,
             event_action=action,
             event_message=message,
-            source_component="nexus.auth.login",
+            source_component="syntara.auth.login",
             structured_data=data,
             actor_id=event.user_id,
             actor_type=PrincipalType.USER,

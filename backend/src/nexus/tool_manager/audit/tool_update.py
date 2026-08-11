@@ -77,7 +77,7 @@ class ToolUpdateHandler(AuditEventHandler[ToolUpdateEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.tool_manager.tool",
+            source_component="syntara.tool_manager.tool",
             structured_data=data,
             resource_urn=f"urn:syntara:tool:{event.tool_id}",
             resource_name=event.tool_name,

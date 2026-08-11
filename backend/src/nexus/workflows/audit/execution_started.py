@@ -55,7 +55,7 @@ class WorkflowStartHandler(AuditEventHandler[WorkflowStartEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="workflow_execution_started",
             event_message=f"Workflow execution started: {event.workflow_name}",
-            source_component="nexus.workflows",
+            source_component="syntara.workflows",
             structured_data=data,
             workflow_id=event.workflow_id,
             execution_id=event.execution_id,

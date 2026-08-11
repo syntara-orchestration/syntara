@@ -72,7 +72,7 @@ class TestRoleServiceCreateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Role created: test-editor"
         assert event.resource_urn == f"urn:syntara:role:{role_id}"
         assert event.structured_data.data_type == "role-lifecycle"
@@ -166,7 +166,7 @@ class TestRoleServiceUpdateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:role:{role_id}"
 
 

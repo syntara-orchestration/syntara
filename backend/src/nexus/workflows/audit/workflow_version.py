@@ -79,6 +79,8 @@ class WorkflowVersionRestoredEvent:
     error_type: str | None = field(default=None)
 
 
+_SOURCE_COMPONENT = "syntara.workflows"
+
 # ---------------------------------------------------------------------------
 # Audit handlers
 # ---------------------------------------------------------------------------
@@ -102,7 +104,7 @@ class WorkflowVersionCreatedHandler(AuditEventHandler[WorkflowVersionCreatedEven
             event_status=EventStatus.SUCCESS,
             event_action="workflow_version_created",
             event_message=f"Workflow version {event.version} created",
-            source_component="nexus.workflows",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             workflow_id=event.workflow_id,
             resource_urn=f"urn:syntara:workflow:{event.workflow_id}",
@@ -133,7 +135,7 @@ class WorkflowVersionPublishedHandler(AuditEventHandler[WorkflowVersionPublished
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action="workflow_version_published",
             event_message=f"Workflow version {event.version} published",
-            source_component="nexus.workflows",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             workflow_id=event.workflow_id,
             resource_urn=f"urn:syntara:workflow:{event.workflow_id}",
@@ -164,7 +166,7 @@ class WorkflowVersionUnpublishedHandler(AuditEventHandler[WorkflowVersionUnpubli
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action="workflow_version_unpublished",
             event_message=f"Workflow version {event.version} unpublished",
-            source_component="nexus.workflows",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             workflow_id=event.workflow_id,
             resource_urn=f"urn:syntara:workflow:{event.workflow_id}",
@@ -198,7 +200,7 @@ class WorkflowVersionRestoredHandler(AuditEventHandler[WorkflowVersionRestoredEv
             event_message=(
                 f"Workflow restored from version {event.restored_from_version} as version {event.new_version}"
             ),
-            source_component="nexus.workflows",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             workflow_id=event.workflow_id,
             resource_urn=f"urn:syntara:workflow:{event.workflow_id}",
@@ -217,7 +219,7 @@ class WorkflowVersionExportedHandler(AuditEventHandler[WorkflowVersionExportedEv
             event_status=EventStatus.SUCCESS,
             event_action="workflow_version_exported",
             event_message=f"Workflow version {event.version} exported",
-            source_component="nexus.workflows",
+            source_component=_SOURCE_COMPONENT,
             structured_data=AuditContextData(
                 data_type="workflow-version-exported",
                 version=event.version,

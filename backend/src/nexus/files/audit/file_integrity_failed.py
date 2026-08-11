@@ -49,7 +49,7 @@ class FileIntegrityFailedHandler(AuditEventHandler[FileIntegrityFailedEvent]):
             event_status=EventStatus.ERROR,
             event_action="file_integrity_failed",
             event_message=f"File integrity check failed: content hash mismatch for {event.filename}",
-            source_component="nexus.files.file_manager",
+            source_component="syntara.files.file_manager",
             structured_data=data,
             resource_urn=f"urn:syntara:file:{event.file_id}",
             resource_name=event.filename,

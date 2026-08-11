@@ -31,7 +31,7 @@ class TestStaleTokenDetectionHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "stale_token_detected"
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert result.actor_type == PrincipalType.USER
 
     def test_resource_fields(self) -> None:

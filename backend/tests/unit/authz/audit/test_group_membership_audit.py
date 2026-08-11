@@ -57,7 +57,7 @@ class TestGroupMembershipHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "group_member_added"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert result.event_message == "Group member added: alice -> group developers"
         assert result.resource_urn == f"urn:syntara:group-membership:{group_id}:{user_id}"
         assert result.resource_name == "developers"

@@ -426,7 +426,7 @@ class OrchestrationService:
     @audit(
         EventCategory.AGENT_INTERACTION,
         event_action="orchestrate",
-        source_component="nexus.agent_orchestrator.orchestration",
+        source_component="syntara.agent_orchestrator.orchestration",
         event_severity=EventSeverity.INFO,
         capture_args={"session_id", "invocation_id", "execution_id"},
     )

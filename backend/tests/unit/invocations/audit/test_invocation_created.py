@@ -76,7 +76,7 @@ class TestInvocationCreatedHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "invocation_created"
-        assert result.source_component == "nexus.invocations.create"
+        assert result.source_component == "syntara.invocations.create"
         assert result.event_message == "Invocation created for session session-123"
         assert result.resource_urn == f"urn:syntara:invocation:{invocation_id}"
         # Without activity context, resource_name should be None

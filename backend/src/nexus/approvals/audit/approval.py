@@ -84,6 +84,8 @@ class ApprovalExpiredEvent:
     approval_node_id: str
 
 
+_SOURCE_COMPONENT = "syntara.approvals"
+
 # ---------------------------------------------------------------------------
 # Audit handlers (produce AuditEvent for persistence)
 # ---------------------------------------------------------------------------
@@ -105,7 +107,7 @@ class ApprovalRequestedHandler(AuditEventHandler[ApprovalRequestedEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="approval_requested",
             event_message=f"Approval requested: {event.name}",
-            source_component="nexus.approvals",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             execution_id=event.execution_id,
             activity_id=event.approval_node_id,
@@ -129,7 +131,7 @@ class ApprovalExpiredHandler(AuditEventHandler[ApprovalExpiredEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="approval_expired",
             event_message="Approval request expired due to decision window timeout",
-            source_component="nexus.approvals",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             actor_type=PrincipalType.SYSTEM,
             execution_id=event.execution_id,
@@ -156,7 +158,7 @@ class ApprovalDecisionDeniedHandler(AuditEventHandler[ApprovalDecisionDeniedEven
             event_status=EventStatus.ERROR,
             event_action="authorization_denied",
             event_message=f"Authorization denied: {event.action} on approval",
-            source_component="nexus.approvals",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             actor_id=event.user_id,
             actor_type=resolve_actor_type(actor_id=event.user_id, principal_type=event.principal_type),
@@ -185,7 +187,7 @@ class ApprovalDecidedHandler(AuditEventHandler[ApprovalDecidedEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="approval_decided",
             event_message=f"Approval {event.decision}",
-            source_component="nexus.approvals",
+            source_component=_SOURCE_COMPONENT,
             structured_data=data,
             actor_id=event.decided_by,
             actor_type=resolve_actor_type(actor_id=event.decided_by, principal_type=event.principal_type),

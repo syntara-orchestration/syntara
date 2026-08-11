@@ -108,22 +108,22 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "nexus": {
+            "syntara": {
                 "()": "nexus.core.logging.logging.build_nexus_formatter",
             },
         },
         "handlers": {
-            "nexus": {
-                "formatter": "nexus",
+            "syntara": {
+                "formatter": "syntara",
                 "class": "logging.StreamHandler",
                 "stream": "ext://sys.stdout",
             },
         },
         "loggers": {
-            name: {"handlers": ["nexus"], "level": log_level, "propagate": False} for name in _UVICORN_LOGGER_NAMES
+            name: {"handlers": ["syntara"], "level": log_level, "propagate": False} for name in _UVICORN_LOGGER_NAMES
         },
         "root": {
-            "handlers": ["nexus"],
+            "handlers": ["syntara"],
             "level": log_level,
         },
     }

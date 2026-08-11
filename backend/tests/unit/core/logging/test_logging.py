@@ -346,7 +346,7 @@ class TestConfigureAppLogging:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             fallback_log_level="INFO",
             log_output_format="json",
         ):
@@ -388,7 +388,7 @@ class TestConfigureAppLogging:
         # Mock settings
         mock_settings.otel_enabled = True
         mock_settings.otel_endpoint = "https://otlp.example.com/v1/logs"
-        mock_settings.otel_service_name = "nexus-test"
+        mock_settings.otel_service_name = "syntara-test"
         mock_settings.fallback_log_level = LogLevel.INFO
         mock_settings.log_output_format = "json"
 
@@ -399,7 +399,7 @@ class TestConfigureAppLogging:
         assert len(info_calls) >= 1
         log_call = info_calls[0]
         assert log_call[1]["extra"]["endpoint"] == "https://otlp.example.com/v1/logs"
-        assert log_call[1]["extra"]["service_name"] == "nexus-test"
+        assert log_call[1]["extra"]["service_name"] == "syntara-test"
 
     @patch("nexus.core.logging.logging.create_otel_handler")
     def test_does_not_add_otel_handler_when_disabled(self, mock_create_otel: MagicMock, override_settings) -> None:
@@ -441,7 +441,7 @@ class TestConfigureAppLogging:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             fallback_log_level="INFO",
             log_output_format="json",
         ):
@@ -461,7 +461,7 @@ class TestConfigureAppLogging:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_api_key=SecretStr(api_key),
             otel_auth_header_name="X-API-Key",
             otel_ca_cert_file=None,
@@ -488,7 +488,7 @@ class TestConfigureAppLogging:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_ca_cert_file="/etc/ssl/ca.crt",
             otel_client_cert_file="/etc/ssl/client.crt",
             otel_client_key_file="/etc/ssl/client.key",

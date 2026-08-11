@@ -34,7 +34,7 @@ class TestFileIntegrityFailedHandler:
         assert "tampered.pdf" in audit_event.event_message
         assert audit_event.resource_urn == f"urn:syntara:file:{file_id}"
         assert audit_event.resource_name == "tampered.pdf"
-        assert audit_event.source_component == "nexus.files.file_manager"
+        assert audit_event.source_component == "syntara.files.file_manager"
 
     def test_structured_data_contains_hash_details(self) -> None:
         """Test that structured_data includes expected and actual hashes."""

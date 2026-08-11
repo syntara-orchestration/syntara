@@ -55,7 +55,7 @@ class TestRoleLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "role_created"
         assert result.event_message == "Role created: CustomRole"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "role-lifecycle"
         assert result.structured_data.action == "created"

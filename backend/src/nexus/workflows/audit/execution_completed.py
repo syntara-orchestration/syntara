@@ -69,7 +69,7 @@ class WorkflowCompletedHandler(AuditEventHandler[WorkflowCompletedEvent]):
             event_status=EventStatus.ERROR if is_failure else EventStatus.SUCCESS,
             event_action="workflow_execution_completed",
             event_message=_STATUS_MESSAGE.get(event.status, "Workflow execution completed"),
-            source_component="nexus.workflows",
+            source_component="syntara.workflows",
             structured_data=data,
             execution_id=event.execution_id,
             workflow_id=event.workflow_id,

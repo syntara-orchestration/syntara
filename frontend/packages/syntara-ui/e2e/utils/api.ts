@@ -26,7 +26,7 @@ const AUTH_RETRY_DELAY = 500
  * immediately rather than burning the delay three times over.
  */
 export async function getAuthToken(app: Page): Promise<string | null> {
-  const password = process.env.NEXUS_E2E_PASSWORD
+  const password = process.env.SYNTARA_E2E_PASSWORD
 
   for (let attempt = 1; attempt <= AUTH_ATTEMPTS; attempt++) {
     try {

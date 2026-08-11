@@ -33,7 +33,7 @@ class TestAccountEnableHandler:
         assert result.event_action == "account_enable"
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == "ops@corp.com"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "alice" in result.event_message
         assert "ops@corp.com" in result.event_message
         assert result.resource_urn == "urn:syntara:user:alice"
@@ -78,7 +78,7 @@ class TestPasswordResetHandler:
         assert result.event_action == "password_reset"
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == "security-team@corp.com"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "charlie" in result.event_message
         assert "security-team@corp.com" in result.event_message
         assert result.resource_urn == "urn:syntara:user:charlie"

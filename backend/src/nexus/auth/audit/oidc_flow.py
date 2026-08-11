@@ -98,7 +98,7 @@ class OIDCFlowHandler(AuditEventHandler[OIDCFlowEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.auth.oidc",
+            source_component="syntara.auth.oidc",
             structured_data=data,
             actor_id=event.user_id,
             actor_type=actor_type,

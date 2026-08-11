@@ -65,7 +65,7 @@ class TestIdentityProviderLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "identity_provider_created"
         assert result.event_message == "Identity provider created: corp-sso"
-        assert result.source_component == "nexus.identity_providers"
+        assert result.source_component == "syntara.identity_providers"
         assert result.resource_urn == f"urn:syntara:identity_provider:{provider_id}"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "identity-provider-lifecycle"

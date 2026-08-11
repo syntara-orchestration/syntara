@@ -78,6 +78,6 @@ class IntegrationDiscoverHandler(AuditEventHandler[IntegrationDiscoverEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.integrations.integration",
+            source_component="syntara.integrations.integration",
             structured_data=data,
         )

@@ -35,7 +35,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Clean up lock files after test session completes."""
     temp_dir = Path(tempfile.gettempdir())
-    lock_pattern = "nexus_router_discovery_gw*.lock"
+    lock_pattern = "syntara_router_discovery_gw*.lock"
 
     for lock_file in temp_dir.glob(lock_pattern):
         try:

@@ -90,7 +90,7 @@ class TestAddMemberRouteAuditEvents:
         domain = by_action["group_member_added"]
         assert domain.event_category == EventCategory.SECURITY_EVENT
         assert domain.structured_data.user_id == str(user_id)
-        assert domain.source_component == "nexus.authz"
+        assert domain.source_component == "syntara.authz"
 
         decorator = by_action["group_member_add"]
         assert decorator.event_category == EventCategory.SECURITY_EVENT

@@ -63,7 +63,7 @@ class AccountEnableHandler(AuditEventHandler[AccountEnableEvent]):
             event_message=(
                 f"Re-enabled account '{event.target_username}' by {event.actor_username} via {event.actor_source}"
             ),
-            source_component="nexus.auth.account_management",
+            source_component="syntara.auth.account_management",
             structured_data=data,
             actor_type=PrincipalType.USER,
             actor_username=event.actor_username,
@@ -92,7 +92,7 @@ class PasswordResetHandler(AuditEventHandler[PasswordResetEvent]):
             event_message=(
                 f"Reset password for '{event.target_username}' by {event.actor_username} via {event.actor_source}"
             ),
-            source_component="nexus.auth.account_management",
+            source_component="syntara.auth.account_management",
             structured_data=data,
             actor_type=PrincipalType.USER,
             actor_username=event.actor_username,

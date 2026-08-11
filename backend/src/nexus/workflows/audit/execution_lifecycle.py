@@ -67,7 +67,7 @@ class ExecutionLifecycleHandler(AuditEventHandler[ExecutionLifecycleEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=f"execution_{event.action}",
             event_message=f"Execution {event.action}: {event.workflow_name}",
-            source_component="nexus.workflows",
+            source_component="syntara.workflows",
             structured_data=data,
             workflow_id=event.workflow_id,
             execution_id=event.execution_id,

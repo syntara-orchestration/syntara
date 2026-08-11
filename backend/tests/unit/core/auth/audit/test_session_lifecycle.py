@@ -58,7 +58,7 @@ class TestSessionLifecycleHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == uid
         assert result.actor_username == "testuser"
-        assert result.source_component == "nexus.auth.session"
+        assert result.source_component == "syntara.auth.session"
 
     def test_successful_revoke(self) -> None:
         """Successful revoke → action='session_revoked'."""

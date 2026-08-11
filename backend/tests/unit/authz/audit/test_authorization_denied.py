@@ -38,7 +38,7 @@ class TestAuthorizationDeniedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == user_id
         assert result.actor_username == "alice"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert "execute" in result.event_message
         assert "workflow" in result.event_message
         assert result.resource_urn == "urn:syntara:workflow:123"

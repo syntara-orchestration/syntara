@@ -51,7 +51,7 @@ class TestContextIntegrationHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "context_integration"
         assert result.event_message == "Context integration succeeded"
-        assert result.source_component == "nexus.agent_orchestrator.agents.orchestrator"
+        assert result.source_component == "syntara.agent_orchestrator.agents.orchestrator"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username

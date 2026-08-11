@@ -36,7 +36,7 @@ class TestWorkflowStartHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "workflow_execution_started"
         assert result.event_message == "Workflow execution started: Deploy to Production"
-        assert result.source_component == "nexus.workflows"
+        assert result.source_component == "syntara.workflows"
         assert result.execution_id == EXECUTION_ID
         assert result.workflow_id == WORKFLOW_ID
         assert result.resource_urn == f"urn:syntara:workflow:{WORKFLOW_ID}"

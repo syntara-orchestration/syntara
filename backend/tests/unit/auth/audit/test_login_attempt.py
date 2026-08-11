@@ -65,7 +65,7 @@ class TestLoginAttemptHandler:
         assert result.actor_id == uid
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == "alice"
-        assert result.source_component == "nexus.auth.login"
+        assert result.source_component == "syntara.auth.login"
         assert result.resource_urn == "urn:syntara:user:alice"
         assert result.resource_name == "alice"
 

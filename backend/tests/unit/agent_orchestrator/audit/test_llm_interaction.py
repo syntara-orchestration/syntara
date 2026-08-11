@@ -52,7 +52,7 @@ class TestLLMInteractionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "llm_call"
         assert result.event_message == "LLM interaction completed (standard)"
-        assert result.source_component == "nexus.agent_orchestrator.agents.generic"
+        assert result.source_component == "syntara.agent_orchestrator.agents.generic"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username

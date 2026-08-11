@@ -49,7 +49,7 @@ class TestInvocationLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "invocation_running"
         assert result.event_message == "Invocation running"
-        assert result.source_component == "nexus.agent_orchestrator.executor"
+        assert result.source_component == "syntara.agent_orchestrator.executor"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -85,7 +85,7 @@ class TestInvocationLifecycleHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "invocation_failed"
         assert result.event_message == "Invocation failed"
-        assert result.source_component == "nexus.agent_orchestrator.executor"
+        assert result.source_component == "syntara.agent_orchestrator.executor"
 
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.error_type == "LLMConnectionError"

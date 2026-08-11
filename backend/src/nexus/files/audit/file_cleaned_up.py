@@ -44,6 +44,6 @@ class FileCleanedUpHandler(AuditEventHandler[FileCleanedUpEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="file_cleaned_up",
             event_message=message,
-            source_component="nexus.files.workers.file_cleanup",
+            source_component="syntara.files.workers.file_cleanup",
             structured_data=data,
         )

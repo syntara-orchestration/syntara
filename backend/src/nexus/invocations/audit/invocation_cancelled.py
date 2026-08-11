@@ -114,7 +114,7 @@ class InvocationCancelledHandler(AuditEventHandler[InvocationCancelledEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.invocations.cancel",
+            source_component="syntara.invocations.cancel",
             structured_data=data,
             activity_id=event.activity_id,
             resource_urn=f"urn:syntara:invocation:{event.invocation_id}",

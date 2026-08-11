@@ -121,7 +121,7 @@ class AAPResourceAccessHandler(AuditEventHandler[AAPResourceAccessEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=action_name,
             event_message=message,
-            source_component="nexus.aap",
+            source_component="syntara.aap",
             structured_data=data,
             resource_urn=resource_urn,
             resource_name=event.resource_name,

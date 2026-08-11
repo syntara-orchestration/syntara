@@ -36,7 +36,7 @@ class TestWorkflowExecutionErrorHandler:
         assert audit_event.event_severity == EventSeverity.ERROR
         assert audit_event.event_status == EventStatus.ERROR
         assert audit_event.event_action == "workflow_execution_error"
-        assert audit_event.source_component == "nexus.workflows.engine"
+        assert audit_event.source_component == "syntara.workflows.engine"
         assert audit_event.execution_id == EXECUTION_ID
         assert audit_event.workflow_id == WORKFLOW_ID
         assert audit_event.activity_id is None

@@ -46,7 +46,7 @@ class TestWebSocketConnectionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "websocket_connected"
         assert result.event_message == f"WebSocket connected: {WORKFLOW_NAME}"
-        assert result.source_component == "nexus.workflows.ws"
+        assert result.source_component == "syntara.workflows.ws"
         assert result.execution_id == EXECUTION_ID
         assert result.workflow_id == WORKFLOW_ID
         assert result.resource_urn == f"urn:syntara:workflow:{WORKFLOW_ID}"

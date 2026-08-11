@@ -52,7 +52,7 @@ class StaleTokenDetectionHandler(AuditEventHandler[StaleTokenDetectionEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="stale_token_detected",
             event_message="Stale access token detected",
-            source_component="nexus.auth.middleware",
+            source_component="syntara.auth.middleware",
             structured_data=data,
             actor_id=actor_id,
             actor_type=PrincipalType.USER,

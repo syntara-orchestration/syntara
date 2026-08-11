@@ -58,7 +58,7 @@ class FileDownloadedHandler(AuditEventHandler[FileDownloadedEvent]):
             event_status=event_status,
             event_action="file_downloaded",
             event_message=message,
-            source_component="nexus.files.router",
+            source_component="syntara.files.router",
             structured_data=data,
             resource_urn=f"urn:syntara:file:{event.file_id}",
             resource_name=event.filename,

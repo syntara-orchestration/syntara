@@ -48,7 +48,7 @@ class AuthorizationDeniedHandler(AuditEventHandler[AuthorizationDeniedEvent]):
             event_status=EventStatus.ERROR,
             event_action="authorization_denied",
             event_message=f"Authorization denied: {event.action} on {event.resource_type}",
-            source_component="nexus.authz",
+            source_component="syntara.authz",
             structured_data=data,
             actor_id=event.user_id,
             actor_type=resolve_actor_type(actor_id=event.user_id, principal_type=event.principal_type),

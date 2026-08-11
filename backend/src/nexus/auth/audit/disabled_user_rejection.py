@@ -41,8 +41,8 @@ class DisabledUserRejectionHandler(AuditEventHandler[DisabledUserRejectionEvent]
     """Maps a DisabledUserRejectionEvent to a normalized AuditEvent."""
 
     _SOURCE: ClassVar[dict[str, str]] = {
-        "middleware": "nexus.auth.middleware",
-        "token_refresh": "nexus.auth.token_refresh",
+        "middleware": "syntara.auth.middleware",
+        "token_refresh": "syntara.auth.token_refresh",
     }
 
     def handle(self, event: DisabledUserRejectionEvent) -> AuditEvent:
@@ -64,7 +64,7 @@ class DisabledUserRejectionHandler(AuditEventHandler[DisabledUserRejectionEvent]
             event_status=EventStatus.ERROR,
             event_action="disabled_user_rejected",
             event_message=f"Rejected request from disabled user ({event.context})",
-            source_component=self._SOURCE.get(event.context, "nexus.auth"),
+            source_component=self._SOURCE.get(event.context, "syntara.auth"),
             structured_data=data,
             actor_id=actor_id,
             actor_type=PrincipalType.USER,

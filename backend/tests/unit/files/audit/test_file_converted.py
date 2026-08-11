@@ -42,7 +42,7 @@ class TestFileConvertedHandler:
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
         assert audit_event.event_message == "File converted."
-        assert audit_event.source_component == "nexus.files.document_conversion"
+        assert audit_event.source_component == "syntara.files.document_conversion"
         assert audit_event.resource_urn == f"urn:syntara:file:{test_file_id}"
         assert audit_event.resource_name == "document.pdf"
 

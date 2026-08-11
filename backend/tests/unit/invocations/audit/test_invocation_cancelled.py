@@ -84,7 +84,7 @@ class TestInvocationCancelledHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "invocation_cancelled"
-        assert result.source_component == "nexus.invocations.cancel"
+        assert result.source_component == "syntara.invocations.cancel"
         assert result.event_message == "Invocation cancelled: User requested cancellation"
         assert result.resource_urn == f"urn:syntara:invocation:{invocation_id}"
         # Without activity context, resource_name should be None

@@ -74,7 +74,7 @@ class RoleLifecycleHandler(AuditEventHandler[RoleLifecycleEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=f"role_{event.action}",
             event_message=f"Role {event.action}: {event.role_name}",
-            source_component="nexus.authz",
+            source_component="syntara.authz",
             structured_data=data,
             resource_urn=f"urn:syntara:role:{event.role_id}",
             resource_name=event.role_name,

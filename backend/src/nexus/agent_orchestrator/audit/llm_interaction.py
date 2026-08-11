@@ -122,7 +122,7 @@ class LLMInteractionHandler(AuditEventHandler[LLMInteractionEvent]):
             event_status=status,
             event_action="llm_call",
             event_message=message,
-            source_component="nexus.agent_orchestrator.agents.generic",
+            source_component="syntara.agent_orchestrator.agents.generic",
             structured_data=structured_data,
             actor_id=actor_id,
             actor_username=actor_username,

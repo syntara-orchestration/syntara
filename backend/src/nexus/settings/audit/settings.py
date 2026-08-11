@@ -83,7 +83,7 @@ class SettingChangeHandler(AuditEventHandler[SettingChangeEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action="setting_changed",
             event_message=f"Setting '{event.setting}' updated",
-            source_component="nexus.settings",
+            source_component="syntara.settings",
             structured_data=data,
             resource_urn=resource_urn,
             resource_name=event.resource_name,
@@ -111,6 +111,6 @@ class SettingBulkChangeHandler(AuditEventHandler[SettingBulkChangeEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action="setting_bulk_changed",
             event_message=f"Bulk update: {event.change_count} setting(s) changed",
-            source_component="nexus.settings",
+            source_component="syntara.settings",
             structured_data=data,
         )

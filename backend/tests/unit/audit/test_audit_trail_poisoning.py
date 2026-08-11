@@ -318,7 +318,7 @@ class TestAuditTrailPoisoningCookieAuth:
                 event_message="Token refreshed",
                 event_status=EventStatus.SUCCESS,
                 event_severity=EventSeverity.INFO,
-                source_component="nexus.auth.router",
+                source_component="syntara.auth.router",
                 structured_data=AuditContextData(data_type="session_lifecycle"),
             )
             # emit_audit_event will inject actor from context var

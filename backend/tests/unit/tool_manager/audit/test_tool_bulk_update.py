@@ -35,7 +35,7 @@ class TestToolBulkUpdateHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.tool_manager.tool"
+        assert audit_event.source_component == "syntara.tool_manager.tool"
         assert "3 tools enabled" in audit_event.event_message
         assert "completed" in audit_event.event_message
 

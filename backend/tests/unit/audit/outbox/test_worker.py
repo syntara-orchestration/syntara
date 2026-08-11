@@ -1227,7 +1227,7 @@ class TestBuildOtelLogRecordSerialization:
             ),
         )
 
-        with override_settings(otel_service_name="nexus-test"):
+        with override_settings(otel_service_name="syntara-test"):
             record = _build_otel_log_record(event, datetime.now(UTC), AuditEventSource.BUSINESS_EVENT)
 
         attrs = record.log_record.attributes
@@ -1252,7 +1252,7 @@ class TestBuildOtelLogRecordSerialization:
             ),
         )
 
-        with override_settings(otel_service_name="nexus-test"):
+        with override_settings(otel_service_name="syntara-test"):
             record = _build_otel_log_record(event, datetime.now(UTC), AuditEventSource.CRUD_EVENT)
 
         attrs = record.log_record.attributes

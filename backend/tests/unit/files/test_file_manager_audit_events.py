@@ -73,7 +73,7 @@ class TestFileManagerAuditEvents:
         assert event.event_action == "files_uploaded"
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.files.file_manager"
+        assert event.source_component == "syntara.files.file_manager"
         assert "1 files uploaded and stored for conversion" in event.event_message
         assert event.resource_urn is None  # Bulk operation
         assert event.resource_name is None
@@ -244,7 +244,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
         assert event.event_message == "File converted."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "document.pdf"
 
@@ -306,7 +306,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.ERROR
         assert event.event_status == EventStatus.ERROR
         assert event.event_message == "File conversion failed."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "broken.pdf"
 
@@ -346,7 +346,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.WARNING
         assert event.event_status == EventStatus.SUCCESS
         assert event.event_message == "File conversion skipped."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "already_converted.txt"
 

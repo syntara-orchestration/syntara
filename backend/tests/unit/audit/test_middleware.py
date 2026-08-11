@@ -906,7 +906,7 @@ class TestAuditMiddlewareSourceComponent:
             await middleware(_make_scope(), AsyncMock(), AsyncMock())
 
         events = _get_audit_events(mock_emit, "request_completed")
-        assert events[0].source_component == "nexus.audit.middleware"
+        assert events[0].source_component == "syntara.audit.middleware"
 
     @pytest.mark.asyncio
     async def test_source_component_on_exception(self) -> None:

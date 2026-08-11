@@ -70,7 +70,7 @@ class FilesUploadedHandler(AuditEventHandler[FilesUploadedEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.files.file_manager",
+            source_component="syntara.files.file_manager",
             structured_data=data,
             resource_urn=None,  # Bulk operation
             resource_name=None,  # Bulk operation

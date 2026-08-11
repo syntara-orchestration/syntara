@@ -119,7 +119,7 @@ class GroupMembershipHandler(AuditEventHandler[GroupMembershipEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=f"group_member_{event.action}",
             event_message=f"Group member {event.action}: {event.username} -> group {event.group_name}",
-            source_component="nexus.authz",
+            source_component="syntara.authz",
             structured_data=data,
             resource_urn=f"urn:syntara:group-membership:{event.group_id}:{event.user_id}",
             resource_name=event.group_name,

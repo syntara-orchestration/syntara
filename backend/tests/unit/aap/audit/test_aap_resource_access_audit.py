@@ -78,7 +78,7 @@ class TestAAPResourceAccessHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "aap_organizations_listed"
-        assert result.source_component == "nexus.aap"
+        assert result.source_component == "syntara.aap"
         assert result.resource_urn == "urn:syntara:aap:organizations"
         assert result.actor_id == user_id
         assert result.actor_type == PrincipalType.USER

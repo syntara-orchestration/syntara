@@ -27,7 +27,7 @@ class TestUserLoginHandler:
         assert audit.actor_id == user_id
         assert audit.actor_type == PrincipalType.USER
         assert audit.actor_username == "alice"
-        assert audit.source_component == "nexus.auth.login"
+        assert audit.source_component == "syntara.auth.login"
         assert "local" in audit.event_message
         assert audit.resource_urn == "urn:syntara:user:alice"
         assert audit.resource_name == "alice"

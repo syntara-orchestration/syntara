@@ -70,7 +70,7 @@ class TestInvocationServiceCreateAuditEvents:
         assert event.event_category == EventCategory.USER_ACTION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.invocations.create"
+        assert event.source_component == "syntara.invocations.create"
         assert event.event_message == "Invocation created for session session-123"
         assert event.resource_urn == f"urn:syntara:invocation:{invocation.id}"
 
@@ -273,7 +273,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert event.event_category == EventCategory.USER_ACTION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.invocations.cancel"
+        assert event.source_component == "syntara.invocations.cancel"
         assert event.event_message == "Invocation cancelled: User requested"
         assert event.resource_urn == f"urn:syntara:invocation:{invocation_id}"
 

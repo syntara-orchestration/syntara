@@ -87,7 +87,7 @@ class FileConvertedHandler(AuditEventHandler[FileConvertedEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.files.document_conversion",
+            source_component="syntara.files.document_conversion",
             structured_data=data,
             resource_urn=f"urn:syntara:file:{event.file_id}",
             resource_name=event.filename,

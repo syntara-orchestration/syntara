@@ -82,7 +82,7 @@ class ToolBulkUpdateHandler(AuditEventHandler[ToolBulkUpdateEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.tool_manager.tool",
+            source_component="syntara.tool_manager.tool",
             structured_data=data,
             resource_urn=None,  # Bulk operation has no single resource
             resource_name=None,

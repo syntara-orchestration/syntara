@@ -80,7 +80,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Role assigned: editor -> user alice"
         assert event.resource_urn == f"urn:syntara:role-assignment:{assignment_id}"
 
@@ -227,7 +227,7 @@ class TestRoleAssignmentServiceRevokeAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:role-assignment:{assignment_id}"
         assert event.event_message == "Role revoked: editor -> user alice"
         assert event.structured_data.action == "revoked"

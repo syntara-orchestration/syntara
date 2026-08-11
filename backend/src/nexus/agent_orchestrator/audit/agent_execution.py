@@ -101,7 +101,7 @@ class AgentExecutionHandler(AuditEventHandler[AgentExecutionEvent]):
             event_status=status,
             event_action=f"agent_{event.status.value}",
             event_message=message,
-            source_component=f"nexus.agent_orchestrator.agents.{event.agent_type}",
+            source_component=f"syntara.agent_orchestrator.agents.{event.agent_type}",
             structured_data=structured_data,
             actor_id=actor_id,
             actor_username=actor_username,

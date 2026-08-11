@@ -106,7 +106,7 @@ class TestSessionRevocationHandler:
         handler = SessionRevocationHandler()
         audit_event = handler.handle(event)
 
-        assert audit_event.source_component == "nexus.auth.revocation"
+        assert audit_event.source_component == "syntara.auth.revocation"
 
     def test_resource_fields_for_user_target(self) -> None:
         """Resource fields should use user URN pattern for user targets."""

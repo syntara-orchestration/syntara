@@ -51,7 +51,7 @@ class TestSettingChangeHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.settings"
+        assert audit_event.source_component == "syntara.settings"
         assert "ai.model_name" in audit_event.event_message
 
     def test_resource_fields(self) -> None:
@@ -128,7 +128,7 @@ class TestSettingBulkChangeHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.settings"
+        assert audit_event.source_component == "syntara.settings"
         assert "2 setting(s)" in audit_event.event_message
 
     def test_structured_data_fields(self) -> None:

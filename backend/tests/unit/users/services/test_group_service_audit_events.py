@@ -70,7 +70,7 @@ class TestGroupsServiceAddMemberAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Group member added: alice -> group developers"
         assert event.resource_urn == f"urn:syntara:group-membership:{group_id}:{user_id}"
         assert event.structured_data.data_type == "group-membership"
@@ -126,7 +126,7 @@ class TestGroupsServiceRemoveMemberAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Group member removed: alice -> group developers"
         assert event.structured_data.action == "removed"
         assert event.structured_data.user_id == str(user_id)
@@ -169,7 +169,7 @@ class TestGroupsServiceSetUserGroupsAuditEvents:
         for call in mock_do_emit.call_args_list:
             event: AuditEvent = call.args[0]
             assert event.event_category == EventCategory.SECURITY_EVENT
-            assert event.source_component == "nexus.authz"
+            assert event.source_component == "syntara.authz"
             assert event.structured_data.username == "alice"
             assert event.structured_data.user_id == str(user_id)
 

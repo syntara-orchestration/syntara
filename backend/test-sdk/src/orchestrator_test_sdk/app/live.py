@@ -39,18 +39,18 @@ def _generate_live_token(base_url: str) -> str:
     """Obtain a JWT access token for tests that hit a live Nexus deployment.
 
     Resolution order:
-    1. NEXUS_API_TOKEN env var (pre-generated token for remote deployments)
+    1. SYNTARA_API_TOKEN env var (pre-generated token for remote deployments)
     2. POST /auth/login using admin password from APP_ADMIN_PASSWORD_PATH
 
     Retries transient connection errors with exponential backoff.
     """
-    env_token = os.environ.get("NEXUS_API_TOKEN")
+    env_token = os.environ.get("SYNTARA_API_TOKEN")
     if env_token:
         return env_token
 
     password_path = Path(os.environ.get("APP_ADMIN_PASSWORD_PATH", ".secrets/admin-password"))
     if not password_path.exists():
-        msg = f"Admin password file not found: {password_path}. Set NEXUS_API_TOKEN or run 'make secrets-generate'."
+        msg = f"Admin password file not found: {password_path}. Set SYNTARA_API_TOKEN or run 'make secrets-generate'."
         raise RuntimeError(msg)
 
     password = password_path.read_text().strip()

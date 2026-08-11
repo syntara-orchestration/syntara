@@ -8,8 +8,8 @@ import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
 ).env
-export const appBaseUrl: string = processEnv['NEXUS_E2E_BASE_URL'] ?? 'http://localhost:4173'
-const e2ePassword: string | undefined = processEnv['NEXUS_E2E_PASSWORD']
+export const appBaseUrl: string = processEnv['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
+const e2ePassword: string | undefined = processEnv['SYNTARA_E2E_PASSWORD']
 const isRealBackend: boolean = isSkipWebServerForPlaywrightTests()
 
 export const toAppUrl = (path: string): string => new URL(path, appBaseUrl).toString()

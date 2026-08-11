@@ -65,7 +65,7 @@ class GlobalRevocationHandler(AuditEventHandler[GlobalRevocationEvent]):
                 f"Global token revocation set by {event.actor_username} "
                 f"via {event.actor_source} at {event.revocation_timestamp}"
             ),
-            source_component="nexus.auth.revocation",
+            source_component="syntara.auth.revocation",
             structured_data=data,
             actor_type=PrincipalType.USER,
             actor_username=event.actor_username,
@@ -93,7 +93,7 @@ class GlobalRevocationRejectHandler(AuditEventHandler[GlobalRevocationRejectEven
                 f"Rejected {event.token_type} token for {event.username or 'unknown'}: "
                 f"issued at {event.token_issued_at}, revoked at {event.revocation_timestamp}"
             ),
-            source_component="nexus.auth.revocation",
+            source_component="syntara.auth.revocation",
             structured_data=data,
             actor_id=event.user_id,
             actor_type=resolve_actor_type(actor_id=event.user_id, principal_type=event.principal_type),

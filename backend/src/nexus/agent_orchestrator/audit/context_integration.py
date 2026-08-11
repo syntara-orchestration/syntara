@@ -96,7 +96,7 @@ class ContextIntegrationHandler(AuditEventHandler[ContextIntegrationEvent]):
             event_status=status,
             event_action="context_integration",
             event_message=f"Context integration {_STATUS_MESSAGE.get(event.status, 'succeeded')}",
-            source_component="nexus.agent_orchestrator.agents.orchestrator",
+            source_component="syntara.agent_orchestrator.agents.orchestrator",
             structured_data=structured_data,
             actor_id=actor_id,
             actor_username=actor_username,

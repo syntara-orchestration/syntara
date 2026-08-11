@@ -62,7 +62,7 @@ class ContextIds(NamedTuple):
     activity_id: str | None
 
 
-_SOURCE_COMPONENT = "nexus.audit.middleware"
+_SOURCE_COMPONENT = "syntara.audit.middleware"
 _MAX_PATH_LENGTH = 2048
 _REQUEST_ID_HEADER: bytes = b"x-request-id"
 

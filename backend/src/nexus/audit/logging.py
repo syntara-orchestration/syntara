@@ -1,6 +1,6 @@
 """Dedicated stdout logging for audit events.
 
-Configures a Python logger ("nexus.audit") that writes audit events to stdout
+Configures a Python logger ("syntara.audit") that writes audit events to stdout
 unconditionally — independent of the application log level. This ensures audit
 events are always visible in operational logs even when OTEL export is disabled
 or unavailable.
@@ -22,7 +22,7 @@ import structlog
 from nexus.core.logging.logging import build_nexus_formatter
 
 # Logger name for audit event stdout output
-AUDIT_LOGGER_NAME = "nexus.audit"
+AUDIT_LOGGER_NAME = "syntara.audit"
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -30,7 +30,7 @@ logger = structlog.stdlib.get_logger(__name__)
 def configure_audit_logging() -> None:
     """Configure the dedicated audit stdout logger.
 
-    Sets up the "nexus.audit" logger with a stdout handler at NOTSET level and
+    Sets up the "syntara.audit" logger with a stdout handler at NOTSET level and
     propagate=False, ensuring audit events are always written to stdout regardless
     of the application's configured log level and without duplicating to the root
     logger.

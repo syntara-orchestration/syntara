@@ -80,7 +80,7 @@ class TestRoleAssignmentHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "role_assigned"
-        assert result.source_component == "nexus.authz"
+        assert result.source_component == "syntara.authz"
         assert result.event_message == "Role assigned: Admin -> user alice"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "role-assignment"

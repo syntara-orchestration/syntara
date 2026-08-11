@@ -78,7 +78,7 @@ class IntegrationCreateHandler(AuditEventHandler[IntegrationCreateEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.integrations.integration",
+            source_component="syntara.integrations.integration",
             structured_data=data,
             resource_urn=f"urn:syntara:integration:{event.integration_id}",
             resource_name=event.integration_name,

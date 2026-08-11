@@ -50,11 +50,11 @@ def _get_lock_file_path() -> Path:
     lock files per worker, eliminating lock contention between workers.
 
     Returns:
-        Path to worker-specific lock file (e.g., /tmp/nexus_router_discovery_gw0.lock)
+        Path to worker-specific lock file (e.g., /tmp/syntara_router_discovery_gw0.lock)
 
     """
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-    lock_filename = f"nexus_router_discovery_{worker_id}.lock"
+    lock_filename = f"syntara_router_discovery_{worker_id}.lock"
     return Path(tempfile.gettempdir()) / lock_filename
 
 

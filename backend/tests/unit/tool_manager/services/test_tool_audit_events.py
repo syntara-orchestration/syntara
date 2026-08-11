@@ -64,7 +64,7 @@ class TestToolServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.tool_manager.tool"
+        assert event.source_component == "syntara.tool_manager.tool"
         assert f"Tool updated: {test_tool.name}" in event.event_message
         assert "enabled" in event.event_message
         assert isinstance(event.structured_data, AuditContextData)
@@ -141,7 +141,7 @@ class TestToolServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.tool_manager.tool"
+        assert event.source_component == "syntara.tool_manager.tool"
         assert "disabled" in event.event_message
         assert isinstance(event.structured_data, AuditContextData)
         assert event.structured_data.enabled is False  # type: ignore[attr-defined]

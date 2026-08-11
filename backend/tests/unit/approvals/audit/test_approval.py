@@ -38,7 +38,7 @@ class TestApprovalRequestedHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "approval_requested"
-        assert result.source_component == "nexus.approvals"
+        assert result.source_component == "syntara.approvals"
         assert "Deploy to Production" in result.event_message
         assert result.execution_id == execution_id
         assert result.activity_id == "approve_deployment"
@@ -97,7 +97,7 @@ class TestApprovalDecisionDeniedHandler:
         assert result.event_severity == EventSeverity.WARNING
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "authorization_denied"
-        assert result.source_component == "nexus.approvals"
+        assert result.source_component == "syntara.approvals"
         assert "authorization denied" in result.event_message.lower()
         assert result.execution_id == execution_id
         assert result.activity_id == "approve_deployment"
@@ -181,7 +181,7 @@ class TestApprovalDecidedHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "approval_decided"
-        assert result.source_component == "nexus.approvals"
+        assert result.source_component == "syntara.approvals"
         assert "approved" in result.event_message
         assert result.execution_id == execution_id
         assert result.activity_id == "approve_deployment"

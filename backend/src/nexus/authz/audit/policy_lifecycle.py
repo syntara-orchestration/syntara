@@ -74,7 +74,7 @@ class PolicyLifecycleHandler(AuditEventHandler[PolicyLifecycleEvent]):
             event_status=EventStatus.ERROR if is_error else EventStatus.SUCCESS,
             event_action=f"policy_{event.action}",
             event_message=f"Policy {event.action}: {event.policy_name}",
-            source_component="nexus.authz",
+            source_component="syntara.authz",
             structured_data=data,
             resource_urn=f"urn:syntara:policy:{event.policy_id}",
             resource_name=event.policy_name,

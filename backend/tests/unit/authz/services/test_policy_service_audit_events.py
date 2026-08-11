@@ -76,7 +76,7 @@ class TestPolicyServiceCreateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Policy created: test-policy"
         assert event.resource_urn == f"urn:syntara:policy:{policy_id}"
         assert event.structured_data.data_type == "policy-lifecycle"
@@ -174,7 +174,7 @@ class TestPolicyServiceUpdateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:policy:{policy_id}"
 
 

@@ -70,7 +70,7 @@ class TestToolDiscoveryHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "tool_discovery"
         assert result.event_message == "Tool discovery and synchronization started"
-        assert result.source_component == "nexus.agent_orchestrator.tool_manager"
+        assert result.source_component == "syntara.agent_orchestrator.tool_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -283,7 +283,7 @@ class TestToolInvocationHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "tool_invocation"
         assert result.event_message == "Tool invocation started: read_file"
-        assert result.source_component == "nexus.agent_orchestrator.tool_manager"
+        assert result.source_component == "syntara.agent_orchestrator.tool_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
