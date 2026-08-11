@@ -27,10 +27,10 @@ from nexus.agent_orchestrator.models import GenericAgentResponse
 from nexus.agent_orchestrator.models.agent_state import AgentState
 from nexus.agent_orchestrator.utils.keyword_association import annotate_tools_with_relevance
 from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.core.config.base import get_settings
 from nexus.core.utils.retry import retry_with_backoff
 from nexus.metrics.dependencies import get_metrics_recorder
 from nexus.metrics.instrumentation import record_llm_call
+from nexus.settings.cache.settings_cache import get_runtime_settings
 
 if TYPE_CHECKING:
     from langchain.messages import AnyMessage
@@ -186,12 +186,9 @@ class GenericAgent(BaseAgent):
         # Use state["prompt"] which contains the context-enhanced prompt
         # (with retrieved documents) from the orchestrator, rather than
         # state["messages"] which only has the original user input.
+        system_prompt = await get_runtime_settings().get_str("agentic.task_agent_system_prompt")
         messages: list[AnyMessage] = [
-            SystemMessage(
-                content=f"You are an information assistant for the {get_settings().product_name} automation system. "
-                "Answer user questions concisely and accurately. "
-                "Focus on providing helpful, direct answers about tools, services, and capabilities."
-            ),
+            SystemMessage(content=system_prompt),
             HumanMessage(content=state["prompt"]),
         ]
         # On re-entry after tool execution, carry forward tool-call history
@@ -274,10 +271,10 @@ class GenericAgent(BaseAgent):
             # include_raw=True so we can read provider usage from the AIMessage
             structured_llm = self.llm.with_structured_output(response_schema, method="json_mode", include_raw=True)
             schema_str = _json.dumps(response_schema, indent=2)
-            product = get_settings().product_name
+            system_prompt = await get_runtime_settings().get_str("agentic.task_agent_system_prompt")
             messages = [
                 SystemMessage(
-                    content=f"You are an information assistant for the {product} automation system. "
+                    content=f"{system_prompt}\n\n"
                     "You MUST respond with ONLY a valid JSON object matching this exact schema:\n\n"
                     f"```json\n{schema_str}\n```\n\n"
                     "Use exactly the property names from the schema. "

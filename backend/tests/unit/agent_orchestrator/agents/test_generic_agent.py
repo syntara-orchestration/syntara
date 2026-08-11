@@ -3,6 +3,8 @@
 Tests the GenericAgent implementation using LangGraph node execution.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
@@ -20,7 +22,11 @@ from nexus.agent_orchestrator.exceptions import (
 from nexus.audit.emitter import AuditActorContext
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
+
     from nexus.agent_orchestrator.models.agent_state import AgentState
+    from tests.fixtures.settings import FakeSettingsCache
 
 
 class TestGenericAgentLLMIntegration:
@@ -394,6 +400,45 @@ class TestGenericAgentPromptEngineering:
         mock_llm_with_tools.ainvoke.assert_called_once()
         call_args = mock_llm_with_tools.ainvoke.call_args
         assert call_args is not None
+
+    @pytest.mark.asyncio
+    async def test_custom_system_prompt_sent_to_llm(
+        self,
+        override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]],
+    ) -> None:
+        """Test that a custom system prompt from runtime settings is sent to the LLM."""
+        from langchain_core.messages import SystemMessage
+
+        custom_prompt = "You are a task execution agent. Invoke tools to complete requests."
+
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(content="Done", response_metadata={})
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "test-model"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "deploy the app",
+            "original_prompt": "deploy the app",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("deploy the app")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        with override_runtime_settings({"agentic.task_agent_system_prompt": custom_prompt}):
+            await agent.execute_as_node(state)
+
+        messages_sent = mock_llm_with_tools.ainvoke.call_args[0][0]
+        system_messages = [m for m in messages_sent if isinstance(m, SystemMessage)]
+        assert len(system_messages) == 1
+        assert system_messages[0].content == custom_prompt
 
     @pytest.mark.asyncio
     async def test_generic_agent_raises_on_empty_llm_response(self) -> None:
