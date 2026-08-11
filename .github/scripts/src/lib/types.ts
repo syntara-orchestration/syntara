@@ -46,11 +46,15 @@ export const MergeQueueResponseSchema = z.object({
  * Used to check when the last commit was merged to a branch.
  */
 export const CommitSchema = z.object({
+  sha: z.string(),
   commit: z.object({
+    message: z.string(),
     committer: z.object({
+      name: z.string(),
       date: z.string(),
     }),
   }),
+  html_url: z.string(),
 });
 
 /**
