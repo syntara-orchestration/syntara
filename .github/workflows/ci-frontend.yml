@@ -207,8 +207,6 @@ jobs:
       needs.changes.outputs.code == 'true'
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    # SonarCloud may fail due to LOC limits. Allow failure to not block PRs.
-    continue-on-error: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -242,8 +240,6 @@ jobs:
       needs.changes.outputs.code == 'true'
       && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # SonarCloud may fail due to LOC limits. Allow failure to not block merges.
-    continue-on-error: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
