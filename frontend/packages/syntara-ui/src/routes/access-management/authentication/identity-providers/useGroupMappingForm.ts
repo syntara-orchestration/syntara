@@ -15,7 +15,7 @@ import { getErrorStatus } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { isValidUUID } from '../../../../utils/generateUUID'
 import { useAllGroups } from '../../../access/useAllGroups'
-import { BUILTIN_AUTHENTICATED_GROUP_NAME } from '../../adminConstants'
+import { excludeAuthenticatedGroup } from '../../adminConstants'
 
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
@@ -196,10 +196,7 @@ export function useGroupMappingEditForm({
   )
 
   const { groups: allGroupsRaw, refetch: refetchGroups } = useAllGroups()
-  const nexusGroups = useMemo(
-    () => allGroupsRaw.filter((g) => g.name !== BUILTIN_AUTHENTICATED_GROUP_NAME),
-    [allGroupsRaw]
-  )
+  const nexusGroups = useMemo(() => excludeAuthenticatedGroup(allGroupsRaw), [allGroupsRaw])
 
   const handleTestResult = useCallback(
     (claims: Record<string, unknown>) => {
