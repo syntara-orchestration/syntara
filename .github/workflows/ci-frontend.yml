@@ -490,6 +490,9 @@ jobs:
           NEXUS_E2E_SKIP_WEB_SERVER: '1'
           NEXUS_E2E_BASE_URL: http://localhost:8080
           NEXUS_E2E_PASSWORD: ${{ env.NEXUS_E2E_PASSWORD }}
+          CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
+          CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
 
       - name: Upload Playwright report
         if: always()
