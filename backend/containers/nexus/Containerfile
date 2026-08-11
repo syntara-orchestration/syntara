@@ -2,10 +2,11 @@
 # Defaults to scratch (empty, built-in) so builds without --build-arg succeed.
 ARG DOWNSTREAM_OVERRIDE=scratch
 ARG BRANDING=false
+ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
 
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
-FROM registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a AS builder
+FROM ${BUILDER_IMAGE} AS builder
 
 ARG BRANDING
 
@@ -24,8 +25,15 @@ ENV PYTHON=python3.12 \
 
 WORKDIR /opt/app-root/src
 
-# regopy links against libatomic at build time
-RUN dnf install --setopt=install_weak_deps=0 --nodocs -y libatomic && dnf clean all
+# Build tools required by regopy (C/C++ compiler, cmake, ninja) and its
+# setup.py (git).  uv is the project's package manager.
+# When BUILDER_IMAGE is overridden to uv-builder-rhel9, these are already
+# present and the installs are no-ops.
+RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
+        gcc gcc-c++ cmake ninja-build git libatomic \
+    && dnf clean all \
+    && pip3.12 install --no-cache-dir uv \
+    && [ -f /usr/local/bin/uv ] || ln -s "$(command -v uv)" /usr/local/bin/uv
 
 # Copy dependency files first (for layer caching)
 COPY pyproject.toml uv.lock LICENSE README.md alembic.ini ./
