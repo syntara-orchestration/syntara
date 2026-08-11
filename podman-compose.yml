@@ -182,8 +182,8 @@ services:
       - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
       - APP_S2S_TLS_CN_ALLOWLIST=["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc"]
       - APP_BACKGROUND_TASK_QUEUE=orchestrator-background-queue
-      # Docs off by default; enable for DAST / local container debugging.
-      - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-false}
+      # Docs on by default; set to false to disable in locked-down environments.
+      - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-true}
     volumes:
       - ./backend/src:/opt/app-root/src/src:z
       - syntara_audit_exports:/data/audit-exports:z

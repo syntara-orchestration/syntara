@@ -222,16 +222,16 @@ class APIDocsSettings(BaseSettings):
 
     Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
     endpoints are served at /api_docs/v1/. A convenience redirect
-    from /docs is also registered. Disabled by default so production
-    deployments do not expose the API schema.
+    from /docs is also registered. Enabled by default so customers
+    can access API docs without extra configuration.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
-        default=False,
+        default=True,
         description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
-        "(docs, redoc, openapi.json). Enable for development environments.",
+        "(docs, redoc, openapi.json). Set to false to disable in locked-down environments.",
     )
 
     enable_try_it_out: bool = Field(
