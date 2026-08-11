@@ -74,14 +74,29 @@ podman-compose up database redis temporal nexus
 
 Code quality and coverage are tracked via SonarCloud:
 
-- **Backend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-orchestration_syntara-backend)
-- **Frontend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-orchestration_syntara-frontend)
+- **Backend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-backend)
+- **Frontend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-frontend)
 
-SonarCloud analysis runs automatically on all PRs. Quality gate results are **informational only** — pass/fail status is visible in the PR checks list but does not block merges. The required status checks for merge are `(Backend) Required Checks` and `(Frontend) Required Checks`, which cover linting, tests, type-checking, and builds.
+SonarCloud analysis runs automatically on all PRs. Quality gate results are **informational only**, pass/fail status is visible in the PR checks list but does not block merges. The required status checks for merge are `(Backend) Required Checks` and `(Frontend) Required Checks`, which cover linting, tests, type-checking, and builds.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Component-specific details are in [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md) and [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
+* [Project wide guidelines](CONTRIBUTING.md)
+* [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md)
+* [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
+
+## AI Contributions
+
+The use of AI tools MUST be explicitly disclosed by the author when a significant part of the contribution is taken from the AI tools output without significant changes. Grammar, spelling, and stylistic corrections do not need disclosure.
+
+We recommend using the following statement as a disclosure: `Assisted-by:` followed by any information about the contributor’s use of AI tools that they consider relevant, for example:
+
+      i. `Assisted-by: gpt-5.4`
+      ii. `Assisted-by: Opus 4.6`
+      iii. `Assisted-by: locally trained model`
+
+
+See [AI_POLICY.md](.github/AI_POLICY.md) for more details.
 
 ## License
 
