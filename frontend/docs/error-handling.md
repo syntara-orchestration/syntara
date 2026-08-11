@@ -322,13 +322,13 @@ The backend returns HTTP 503 when the OpenRouter API key is not configured:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ User Action: Submit prompt to /api/v1/invocations           │
+│ User Action: Submit prompt via AI agent task                 │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Backend: Check OPENROUTER_API_KEY                           │
-│ ├─ Key exists → 202 Accepted (create invocation)            │
+│ ├─ Key exists → 202 Accepted (start task)                    │
 │ └─ Key missing → 503 Service Unavailable                    │
 └─────────────────────────────────────────────────────────────┘
                               │

@@ -39,9 +39,9 @@ export type MutationErrorHandlerOptions = {
  * @example
  * // Basic usage
  * const handleError = useMutationErrorHandler()
- * const { mutate } = workflowClient.useMutation('post', '/invocations')
+ * const { mutate } = workflowClient.useMutation('post', '/workflows')
  * mutate(data, {
- *   onError: handleError({ title: 'Failed to create invocation' })
+ *   onError: handleError({ title: 'Failed to create workflow' })
  * })
  *
  * @example
