@@ -19,6 +19,7 @@ REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
+XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
 ifeq ($(shell uname -s),Darwin)
 # macOS: try podman machine inspect first (works for any machine name),
 # then the standard symlink, then Homebrew's common location
@@ -100,7 +101,7 @@ define run-tests
 @PODMAN_SOCK="$(PODMAN_SOCK)" POSTGRES_IMAGE="$(POSTGRES_IMAGE)" REDIS_IMAGE="$(REDIS_IMAGE)" \
 	APP_JWT_PRIVATE_KEY_PATH=.secrets/jwt-primary.pem \
 	./tools/scripts/run-with-testcontainers.sh --label "🧪 Running tests" -- \
-	uv run --no-sync pytest $(1)
+	uv run --no-sync pytest $(XFAIL_ARGS) $(1)
 endef
 
 
@@ -130,7 +131,16 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/ -v -m "mcp")
 else
 	@echo "🧪 Running MCP tests..."
-	uv run --no-sync pytest tests/ -v -m "mcp"
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/ -v -m "mcp"
+endif
+
+.PHONY: test-performance
+test-performance: check-deps ## Run performance tests only (excluded from default test runs)
+ifndef APP_BASE_URL
+	$(call _e2e-run,tests/performance/ -v --run-performance)
+else
+	@echo "🧪 Running performance tests..."
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/performance/ -v --run-performance
 endif
 
 
@@ -180,7 +190,7 @@ test-all: check-deps ## Run all tests (unit + integration; E2E runs separately v
 # Usage: $(call _e2e-run,<pytest-args>)
 define _e2e-run
 @COMPOSE_CMD="$(COMPOSE_FINAL_CMD)" \
-	./tools/scripts/e2e-run.sh $(1)
+	./tools/scripts/e2e-run.sh $(XFAIL_ARGS) $(1)
 endef
 
 # Default to empty so it runs all tests if not provided
@@ -194,7 +204,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS))
 else
 	@echo "🧪 Running E2E tests $(if $(PHASE),for phase $(PHASE),$(if $(EXCLUDE),excluding phase $(EXCLUDE),))..."
-	uv run --no-sync pytest tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS)
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS)
 endif
 
 .PHONY: test-e2e-global-revocation
@@ -203,7 +213,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/e2e/ -v -m global_revocation)
 else
 	@echo "🧪 Running global revocation E2E tests..."
-	uv run --no-sync pytest tests/e2e/ -v -m global_revocation; \
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/ -v -m global_revocation; \
 	exitcode=$$?; \
 	if [ $$exitcode -eq 5 ]; then echo "⚠️  No global revocation tests found — all migrated downstream"; exit 0; fi; \
 	exit $$exitcode
@@ -221,11 +231,11 @@ test-e2e-exclude-pr-check: ## Run E2E tests excluding PR checks (alias for: make
 .PHONY: test-e2e-telemetry
 test-e2e-telemetry: check-deps ## Run telemetry E2E tests only
 ifndef APP_BASE_URL
-	$(call _e2e-run,tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && APP_BASE_URL=$${APP_BASE_URL:-http://localhost:8000} uv run --no-sync pytest tests/e2e/telemetry/test_performance_and_resilience.py -v)
+	$(call _e2e-run,tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && APP_BASE_URL=$${APP_BASE_URL:-http://localhost:8000} uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/test_performance_and_resilience.py -v)
 else
 	@echo "🧪 Running telemetry E2E tests..."
-	uv run --no-sync pytest tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && \
-	uv run --no-sync pytest tests/e2e/telemetry/test_performance_and_resilience.py -v
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && \
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/test_performance_and_resilience.py -v
 endif
 
 # Development workflow
