@@ -75,6 +75,9 @@ frontend/.eslintcache
 # Shared
 # ==============================================================================
 
+# Documentation build output
+site/
+
 # File upload storage (container bind mount)
 data/uploads/
 
