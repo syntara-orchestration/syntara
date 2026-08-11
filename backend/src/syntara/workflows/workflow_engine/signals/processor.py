@@ -16,6 +16,47 @@ from syntara.workflows.workflow_engine.activities.common import (
     extract_error_code,
 )
 
+_USER_FRIENDLY_MESSAGES: dict[str, str] = {
+    "AuthenticationError": (
+        "Authentication failed. Check that your credentials are valid and have not expired."
+    ),
+    "AuthError": (
+        "Authentication failed. Check that your credentials are valid and have not expired."
+    ),
+    "RateLimitError": "The request was rate-limited. The workflow will retry automatically.",
+    "NetworkError": (
+        "A network error occurred. Check your connection and verify"
+        " the service endpoint is reachable."
+    ),
+    "TimeoutError": "The request timed out. The service may be under heavy load or unreachable.",
+    "ServerError": "The service encountered an internal error. This is usually temporary.",
+    "ValidationError": "The request was invalid. Check the step configuration and input values.",
+    "LLMConfigurationError": (
+        "The AI model configuration is invalid. Check the model name and parameters."
+    ),
+}
+
+_ERROR_TYPE_CATEGORIES: dict[str, str] = {
+    "AuthenticationError": "AuthenticationFailure",
+    "AuthError": "AuthenticationFailure",
+    "RateLimitError": "RateLimitExceeded",
+    "NetworkError": "NetworkFailure",
+    "TimeoutError": "Timeout",
+    "ServerError": "ServiceError",
+    "ValidationError": "InvalidRequest",
+    "LLMConfigurationError": "ConfigurationError",
+}
+
+
+def _format_user_message(error_type: str, error_message: str) -> str:
+    if error_type in _USER_FRIENDLY_MESSAGES:
+        return _USER_FRIENDLY_MESSAGES[error_type]
+    return f"An unexpected error occurred: {error_message}"
+
+
+def _get_error_category(error_type: str) -> str:
+    return _ERROR_TYPE_CATEGORIES.get(error_type, "UnexpectedError")
+
 
 class WorkflowSignalProcessor:
     """Processor for workflow activity signals.
@@ -76,7 +117,7 @@ class WorkflowSignalProcessor:
                     },
                 )
 
-            msg = f"{error_type}: {error_message}"
+            msg = _format_user_message(error_type, error_message)
 
             # Extract error code from message (works for HTTP status codes AND exit codes)
             error_code = extract_error_code(error_message)
@@ -99,7 +140,7 @@ class WorkflowSignalProcessor:
                 # Non-retryable error - raise ApplicationError to tell Temporal not to retry
                 raise ApplicationError(
                     msg,
-                    type=f"ErrorCode{error_code}" if error_code else error_type,
+                    type=f"ErrorCode{error_code}" if error_code else _get_error_category(error_type),
                     non_retryable=True,
                 )
             # Retryable error - raise normal exception so workflow may retry
