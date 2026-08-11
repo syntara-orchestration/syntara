@@ -3,12 +3,14 @@ import type { FetchPageResult } from '../../utils/fetchAllPages'
 import type { PolicySelectListItem } from './policySelectConstants'
 
 type PolicyListPayload = {
-  resources?: readonly {
-    name: string
-    description?: string | null
-    project_id?: string | null
-    is_project_eligible: boolean
-  }[] | null
+  resources?:
+    | readonly {
+        name: string
+        description?: string | null
+        project_id?: string | null
+        is_project_eligible: boolean
+      }[]
+    | null
   next?: string | null
 }
 

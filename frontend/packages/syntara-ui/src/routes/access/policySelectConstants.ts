@@ -10,7 +10,7 @@ export type PolicySelectListItem = {
 export const SELECT_ALL_VALUE = '__select_all__'
 
 /** Label for the select-all menu action (matches MultiSelectFilter). */
-export const SELECT_ALL_LABEL = 'Select All'
+export const SELECT_ALL_LABEL = 'Select all'
 
 export const SELECT_ALL_LOAD_ERROR = {
   title: 'Failed to load policies',

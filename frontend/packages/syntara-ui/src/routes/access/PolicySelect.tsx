@@ -1,16 +1,10 @@
-import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../components/longSelectMenu'
-import longSelectMenuStyles from '../../components/longSelectMenu.module.css'
-import { NxSelect } from '../../components/NxSelect'
-import { useAlerts } from '../../providers/alerts'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { accessClient } from './accessClient'
 import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
-import { filterPoliciesForRoleSelect, SELECT_ALL_VALUE } from './policySelectConstants'
-import { PolicySelectOptionsList } from './PolicySelectOptionsList'
-import { PolicySelectToggle } from './PolicySelectToggle'
-import { usePolicySelectAll } from './usePolicySelectAll'
+import { filterPoliciesForRoleSelect } from './policySelectConstants'
+import { PolicySelectField } from './PolicySelectDropdown'
+import { buildPolicyOptionList, filterPolicyOptionsByTerm, usePolicySelectField } from './policySelectShared'
 
 type PolicySelectProps = {
   selected: string[]
@@ -35,19 +29,41 @@ export function PolicySelect({
   projectEligible,
   isDisabled,
 }: Readonly<PolicySelectProps>) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [filterValue, setFilterValue] = useState('')
   const [debouncedFilter, setDebouncedFilter] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const { showError } = useAlerts()
+  const filterValueRef = useRef('')
+  const debouncedFilterRef = useRef('')
+
+  const fetchAllMatchingPolicies = useCallback(
+    () =>
+      fetchAllPoliciesForSelect({
+        scopeProjectId,
+        projectEligible,
+        nameContains: filterValueRef.current || debouncedFilterRef.current || undefined,
+      }),
+    [scopeProjectId, projectEligible]
+  )
+
+  const field = usePolicySelectField({
+    selected,
+    onChange,
+    fetchPolicies: fetchAllMatchingPolicies,
+  })
+
+  useEffect(() => {
+    filterValueRef.current = field.filterValue
+  }, [field.filterValue])
+
+  useEffect(() => {
+    debouncedFilterRef.current = debouncedFilter
+  }, [debouncedFilter])
 
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
-      setDebouncedFilter(filterValue)
+      setDebouncedFilter(field.filterValue)
     }, DEBOUNCE_MS)
     return () => clearTimeout(debounceRef.current)
-  }, [filterValue])
+  }, [field.filterValue])
 
   const policiesQuery = accessClient.useQuery(
     'get',
@@ -63,7 +79,7 @@ export function PolicySelect({
         },
       },
     },
-    { enabled: isOpen }
+    { enabled: field.isOpen }
   )
 
   const scopedPolicies = useMemo(
@@ -71,127 +87,39 @@ export function PolicySelect({
     [policiesQuery.data?.resources, scopeProjectId, projectEligible]
   )
 
-  const policyOptions = useMemo(() => {
-    const fetchedNames = new Set(scopedPolicies.map((p) => p.name))
-    const selectedOnly = selected.filter((name) => !fetchedNames.has(name))
-    return [
-      ...scopedPolicies.map((p) => ({ name: p.name, description: p.description ?? null })),
-      ...selectedOnly.map((name) => ({ name, description: null })),
-    ]
-  }, [scopedPolicies, selected])
+  const policyOptions = useMemo(() => buildPolicyOptionList(scopedPolicies, selected), [scopedPolicies, selected])
 
   const filteredOptions = useMemo(() => {
-    if (filterValue && filterValue !== debouncedFilter) {
-      const term = filterValue.toLowerCase()
-      return policyOptions.filter((p) => p.name.toLowerCase().includes(term))
+    if (field.filterValue && field.filterValue !== debouncedFilter) {
+      return filterPolicyOptionsByTerm(policyOptions, field.filterValue)
     }
     return policyOptions
-  }, [policyOptions, filterValue, debouncedFilter])
-
-  const fetchAllMatchingPolicies = useCallback(
-    () =>
-      fetchAllPoliciesForSelect({
-        scopeProjectId,
-        projectEligible,
-        nameContains: filterValue || debouncedFilter || undefined,
-      }),
-    [scopeProjectId, projectEligible, filterValue, debouncedFilter]
-  )
-
-  const { isSelectingAll, runSelectAll } = usePolicySelectAll({
-    selected,
-    onChange,
-    fetchPolicies: fetchAllMatchingPolicies,
-    showError,
-    onAfterSelect: () => {
-      setFilterValue('')
-      inputRef.current?.focus()
-    },
-  })
-
-  const onSelect = useCallback(
-    (_event: React.MouseEvent<Element, MouseEvent> | undefined, value: string | number | undefined) => {
-      if (value === SELECT_ALL_VALUE) {
-        runSelectAll()
-        return
-      }
-
-      const policyName = value as string
-      if (selected.includes(policyName)) {
-        onChange(selected.filter((p) => p !== policyName))
-      } else {
-        onChange([...selected, policyName])
-      }
-      setFilterValue('')
-      inputRef.current?.focus()
-    },
-    [selected, onChange, runSelectAll]
-  )
-
-  const removePolicy = useCallback(
-    (policyName: string) => {
-      onChange(selected.filter((p) => p !== policyName))
-    },
-    [selected, onChange]
-  )
-
-  const clearAll = useCallback(() => {
-    onChange([])
-    setFilterValue('')
-  }, [onChange])
+  }, [policyOptions, field.filterValue, debouncedFilter])
 
   const isLoading = policiesQuery.isLoading || policiesQuery.isFetching
 
-  const handleOpenChange = useCallback((open: boolean) => {
-    setIsOpen(open)
-    if (!open) setFilterValue('')
-  }, [])
-
-  const openDropdown = useCallback(() => {
-    if (!isOpen) setIsOpen(true)
-  }, [isOpen])
-
-  const toggle = (toggleRef: Ref<HTMLButtonElement>) => (
-    <PolicySelectToggle
-      toggleRef={toggleRef}
-      isOpen={isOpen}
-      onToggle={() => setIsOpen(!isOpen)}
-      filterValue={filterValue}
-      onFilterChange={(val) => {
-        setFilterValue(val)
-        openDropdown()
-      }}
-      onFilterFocus={openDropdown}
-      selected={selected}
-      onRemovePolicy={removePolicy}
-      onClearAll={clearAll}
-      inputRef={inputRef}
-      isDisabled={isDisabled}
-      hasError={hasError}
-    />
-  )
-
   return (
-    <NxSelect
+    <PolicySelectField
       id="role-policies"
-      aria-label="Policies"
-      isOpen={isOpen}
-      onOpenChange={handleOpenChange}
-      onSelect={onSelect}
       selected={selected}
-      toggle={toggle}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
-    >
-      <PolicySelectOptionsList
-        isLoading={isLoading}
-        filterValue={filterValue}
-        filteredOptions={filteredOptions}
-        selected={selected}
-        isSelectingAll={isSelectingAll}
-      />
-    </NxSelect>
+      filteredOptions={filteredOptions}
+      filterValue={field.filterValue}
+      isOpen={field.isOpen}
+      isLoading={isLoading}
+      isSelectingAll={field.isSelectingAll}
+      hasError={hasError}
+      isDisabled={isDisabled}
+      inputRef={field.inputRef}
+      onOpenChange={field.handleOpenChange}
+      onSelect={field.onSelect}
+      onFilterChange={(value: string) => {
+        field.setFilterValue(value)
+        field.openDropdown()
+      }}
+      onFilterFocus={field.openDropdown}
+      onRemovePolicy={field.removePolicy}
+      onClearAll={field.clearAll}
+      onToggle={() => field.handleOpenChange(!field.isOpen)}
+    />
   )
 }

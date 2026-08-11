@@ -1,11 +1,7 @@
 import { Divider, SelectList, SelectOption, Spinner } from '@patternfly/react-core'
 
 import { SELECT_ALL_LABEL, SELECT_ALL_VALUE } from './policySelectConstants'
-
-type PolicySelectOption = {
-  name: string
-  description: string | null
-}
+import type { PolicySelectOption } from './policySelectShared'
 
 type PolicySelectOptionsListProps = {
   isLoading: boolean
@@ -37,7 +33,13 @@ export function PolicySelectOptionsList({
       {!isLoading && filteredOptions.length > 0 && (
         <>
           <SelectOption value={SELECT_ALL_VALUE} isDisabled={isSelectingAll}>
-            {SELECT_ALL_LABEL}
+            {isSelectingAll ? (
+              <>
+                <Spinner size="sm" /> Selecting all...
+              </>
+            ) : (
+              SELECT_ALL_LABEL
+            )}
           </SelectOption>
           <Divider component="li" />
         </>

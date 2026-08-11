@@ -26,13 +26,7 @@ describe('PolicySelectOptionsList', () => {
 
   it('has no accessibility violations while loading', async () => {
     const { container } = render(
-      <PolicySelectOptionsList
-        isLoading
-        filterValue=""
-        filteredOptions={[]}
-        selected={[]}
-        isSelectingAll={false}
-      />
+      <PolicySelectOptionsList isLoading filterValue="" filteredOptions={[]} selected={[]} isSelectingAll={false} />
     )
     const results = await axe(container)
     expect(results).toHaveNoViolations()
@@ -49,10 +43,10 @@ describe('PolicySelectOptionsList', () => {
       />
     )
 
-    expect(screen.getByRole('menuitem', { name: 'Select All' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Select all' })).toBeInTheDocument()
   })
 
-  it('disables Select All while selection is in progress', () => {
+  it('disables Select All and shows progress while selection is in progress', () => {
     render(
       <PolicySelectOptionsList
         isLoading={false}
@@ -63,6 +57,6 @@ describe('PolicySelectOptionsList', () => {
       />
     )
 
-    expect(screen.getByRole('menuitem', { name: 'Select All' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /Selecting all/i })).toBeDisabled()
   })
 })

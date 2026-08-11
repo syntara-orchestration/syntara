@@ -86,4 +86,43 @@ describe('usePolicySelectAll', () => {
       expect(result.current.isSelectingAll).toBe(false)
     })
   })
+
+  it('merges against the latest selection when chips change during fetch', async () => {
+    let resolveFetch: (value: { name: string; is_project_eligible: boolean }[]) => void = () => undefined
+    const fetchPolicies = vi.fn(
+      () =>
+        new Promise<{ name: string; is_project_eligible: boolean }[]>((resolve) => {
+          resolveFetch = resolve
+        })
+    )
+    const onChange = vi.fn()
+
+    const { result, rerender } = renderHook(
+      ({ selected }: { selected: string[] }) =>
+        usePolicySelectAll({
+          selected,
+          onChange,
+          fetchPolicies,
+          showError: vi.fn(),
+        }),
+      { initialProps: { selected: ['policy-a'] } }
+    )
+
+    act(() => {
+      result.current.runSelectAll()
+    })
+
+    rerender({ selected: ['policy-c'] })
+
+    act(() => {
+      resolveFetch([
+        { name: 'policy-a', is_project_eligible: false },
+        { name: 'policy-b', is_project_eligible: false },
+      ])
+    })
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(['policy-c', 'policy-a', 'policy-b'])
+    })
+  })
 })

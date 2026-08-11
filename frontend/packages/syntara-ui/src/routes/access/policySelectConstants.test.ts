@@ -20,9 +20,9 @@ const projectCustomPolicy: PolicySelectListItem = {
 
 describe('filterPoliciesForRoleSelect', () => {
   it('returns only non-project-eligible policies for global roles', () => {
-    expect(
-      filterPoliciesForRoleSelect([globalPolicy, projectBuiltinPolicy, projectCustomPolicy], {})
-    ).toEqual([globalPolicy])
+    expect(filterPoliciesForRoleSelect([globalPolicy, projectBuiltinPolicy, projectCustomPolicy], {})).toEqual([
+      globalPolicy,
+    ])
   })
 
   it('returns only project-eligible policies when projectEligible is true', () => {

@@ -262,7 +262,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
 
-      expect(screen.getByRole('option', { name: 'Select All' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'Select all' })).toBeInTheDocument()
     })
 
     it('fetches all policies when Select All is clicked', async () => {
@@ -270,7 +270,7 @@ describe('PolicySelect', () => {
       const { onChange } = renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
       await waitFor(() => {
         expect(fetchAllPoliciesForSelect).toHaveBeenCalledWith({
@@ -294,15 +294,10 @@ describe('PolicySelect', () => {
       const { onChange } = renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
       await waitFor(() => {
-        expect(onChange).toHaveBeenCalledWith([
-          'workflow-admin',
-          'project-viewer',
-          'execution-runner',
-          'extra-policy',
-        ])
+        expect(onChange).toHaveBeenCalledWith(['workflow-admin', 'project-viewer', 'execution-runner', 'extra-policy'])
       })
     })
 
@@ -311,7 +306,7 @@ describe('PolicySelect', () => {
       const { onChange } = renderPolicySelect({ selected: ['workflow-admin'] })
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
       await waitFor(() => {
         expect(onChange).toHaveBeenCalledWith(['workflow-admin', 'project-viewer', 'execution-runner'])
@@ -325,7 +320,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
       await user.type(getInput(), 'workflow')
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
       await waitFor(() => {
         expect(fetchAllPoliciesForSelect).toHaveBeenCalledWith({
@@ -355,7 +350,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
 
-      expect(screen.queryByRole('option', { name: 'Select All' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: 'Select all' })).not.toBeInTheDocument()
     })
 
     it('does not show project-only policies in the dropdown for global roles', async () => {
@@ -395,9 +390,9 @@ describe('PolicySelect', () => {
       renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
-      expect(screen.getByRole('option', { name: 'Select All' })).toBeDisabled()
+      expect(screen.getByRole('option', { name: /Selecting all/i })).toBeDisabled()
     })
 
     it('shows an error alert when Select All fetch fails', async () => {
@@ -407,7 +402,7 @@ describe('PolicySelect', () => {
       renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select All' }))
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith(SELECT_ALL_LOAD_ERROR)

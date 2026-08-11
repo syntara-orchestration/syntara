@@ -23,6 +23,8 @@ export function usePolicySelectAll({
 }: UsePolicySelectAllParams) {
   const [isSelectingAll, setIsSelectingAll] = useState(false)
   const isSelectingAllRef = useRef(false)
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
 
   const runSelectAll = useCallback(() => {
     if (isSelectingAllRef.current) return
@@ -32,7 +34,12 @@ export function usePolicySelectAll({
     detachPromise(
       fetchPolicies()
         .then((policies) => {
-          onChange(mergeSelectAll(selected, policies.map((policy) => policy.name)))
+          onChange(
+            mergeSelectAll(
+              selectedRef.current,
+              policies.map((policy) => policy.name)
+            )
+          )
           onAfterSelect?.()
         })
         .catch(() => {
@@ -43,7 +50,7 @@ export function usePolicySelectAll({
           setIsSelectingAll(false)
         })
     )
-  }, [fetchPolicies, onAfterSelect, onChange, selected, showError])
+  }, [fetchPolicies, onAfterSelect, onChange, showError])
 
   return { isSelectingAll, runSelectAll }
 }
