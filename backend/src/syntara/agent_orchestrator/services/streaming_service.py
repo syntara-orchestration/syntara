@@ -205,7 +205,7 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
             raise RuntimeError(msg)
 
         async with self._session_factory() as db_session:
-            stmt = select(Invocation).where(Invocation.id == invocation_id)  # type: ignore[arg-type]
+            stmt = select(Invocation).where(Invocation.id == invocation_id)
             result = await db_session.execute(stmt)
             invocation = result.scalar_one_or_none()
 
