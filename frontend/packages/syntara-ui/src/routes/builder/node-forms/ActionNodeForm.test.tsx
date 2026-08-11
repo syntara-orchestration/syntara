@@ -623,6 +623,25 @@ describe('ActionNodeForm', () => {
       expect(screen.getByRole('switch', { name: /follow redirects/i })).toBeInTheDocument()
     })
 
+    it('submits follow_redirects as true when toggled on', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(
+        <ActionNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{ executor: 'http_request', method: 'GET', url: 'https://example.com' }}
+        />
+      )
+
+      await user.click(screen.getByRole('switch', { name: /follow redirects/i }))
+      fireEvent.submit(screen.getByTestId('action-node-form'))
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ follow_redirects: true }) as unknown
+        )
+      })
+    })
+
     it('strips retry_policy from submitted data when executor is script', async () => {
       renderWithHeader(
         <ActionNodeForm

@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum, type Activity, type TaskActivity } from '@syntara/contracts'
+import { ExecutorTypeEnum, type Activity, type HttpRequestConfig, type TaskActivity } from '@syntara/contracts'
 
 import { generateUUID } from '../../../utils/generateUUID'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../../../utils/jsonSafeParse'
@@ -56,7 +56,7 @@ export function buildRegistryActionInitialData(
     credential_id: (parameters as { credential_id?: string }).credential_id ?? undefined,
     follow_redirects:
       executor === ExecutorTypeEnum.HTTP_REQUEST
-        ? ((parameters as { follow_redirects?: boolean }).follow_redirects ?? undefined)
+        ? ((parameters as HttpRequestConfig).follow_redirects ?? undefined)
         : undefined,
     parameters:
       executor === ExecutorTypeEnum.SCRIPT && parameters.environment

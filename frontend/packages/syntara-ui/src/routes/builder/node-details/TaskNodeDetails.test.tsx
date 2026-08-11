@@ -1,4 +1,4 @@
-import type { TaskActivity } from '@syntara/contracts'
+import type { Activity, TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -740,23 +740,6 @@ describe('TaskNodeDetails Component', () => {
     expect(screen.getByTestId('action-node-form')).toBeInTheDocument()
   })
 
-  it('loads follow_redirects from stored http_request config', () => {
-    const taskData = {
-      type: 'http_request' as const,
-      id: 'task-api-follow',
-      name: 'API with Follow Redirects',
-      parameters: {
-        method: 'GET' as const,
-        url: 'https://api.example.com',
-        follow_redirects: true,
-      },
-    }
-
-    renderTaskNodeDetails(taskData, 'task-api-follow')
-
-    expect(screen.getByTestId('action-node-form')).toBeInTheDocument()
-  })
-
   it('includes follow_redirects in submitted activity config', async () => {
     const user = userEvent.setup()
     const taskData = {
@@ -773,15 +756,9 @@ describe('TaskNodeDetails Component', () => {
 
     await user.click(screen.getByTestId('submit-api-follow-redirects-button'))
 
-    expect(mockUpdateActivity).toHaveBeenCalledWith(
-      'task-api-fr',
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        parameters: expect.objectContaining({
-          follow_redirects: true,
-        }),
-      })
-    )
+    const call = mockUpdateActivity.mock.calls[0] as [string, Activity]
+    expect(call[0]).toBe('task-api-fr')
+    expect(call[1].parameters.follow_redirects).toBe(true)
   })
 
   it('handles AAP task with camelCase legacy fields', () => {
