@@ -9,9 +9,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.engine import VisibilityResult, resolve_readable_project_ids
-from nexus.authz.role_assignment_router import _redact_project_names
-from nexus.authz.router import _ids_to_names
+from syntara.authz.engine import VisibilityResult, resolve_readable_project_ids
+from syntara.authz.role_assignment_router import _redact_project_names
+from syntara.authz.router import _ids_to_names
 
 # ---------------------------------------------------------------------------
 # _redact_project_names (pure function)

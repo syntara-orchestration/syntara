@@ -6,7 +6,7 @@ Tests user retrieval, 404 handling, and response format.
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.models import User
+from syntara.core.models import User
 from tests.integration.helpers.error_data import assert_error_data
 
 USERS_URL = "/api/v1/users"

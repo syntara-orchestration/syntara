@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from nexus.rate_limiting.redis_client import RateLimitRedisClient
+from syntara.rate_limiting.redis_client import RateLimitRedisClient
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def mock_settings() -> MagicMock:
 @pytest.fixture
 def client(mock_settings: MagicMock) -> RateLimitRedisClient:
     """Rate limit Redis client with mocked settings."""
-    with patch("nexus.core.cache.base.get_settings", return_value=mock_settings):
+    with patch("syntara.core.cache.base.get_settings", return_value=mock_settings):
         return RateLimitRedisClient()
 
 

@@ -1,6 +1,6 @@
 """Pytest plugin entry point — registers E2E fixtures via pytest11 entry point.
 
-App-level fixtures (database, client, temporal, etc.) that import from nexus.*
+App-level fixtures (database, client, temporal, etc.) that import from syntara.*
 are registered via pytest_plugins in the repo's tests/conftest.py instead.
 This keeps nexus.* out of the entry-point import chain, which runs before
 pytest-cov can start its tracer.

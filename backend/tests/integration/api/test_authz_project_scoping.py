@@ -12,9 +12,9 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project, RoleAssignment
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.authz.models import Project, RoleAssignment
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 from tests.integration.api.conftest import make_admin, make_project_admin, make_project_user
 
 

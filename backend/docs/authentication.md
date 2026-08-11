@@ -1,10 +1,10 @@
 # Authentication
 
-This document describes how authentication works in Nexus. It is intended for developers working on the project and is updated as the auth system evolves.
+This document describes how authentication works in Syntara. It is intended for developers working on the project and is updated as the auth system evolves.
 
 ## Overview
 
-Nexus supports two authentication methods for human users:
+Syntara supports two authentication methods for human users:
 
 - **Local authentication** — username/password with JWT tokens
 - **Federated authentication** — OIDC (OpenID Connect) via external identity providers (Azure AD, Google, Okta, AAP, etc.)
@@ -163,10 +163,10 @@ In an emergency (e.g., suspected key compromise, bulk account takeover, or compl
 
 ```bash
 # Interactive — prompts for confirmation
-uv run python -m nexus.admin revoke-all-sessions
+uv run python -m syntara.admin revoke-all-sessions
 
 # Non-interactive (CI/scripts)
-uv run python -m nexus.admin revoke-all-sessions --yes
+uv run python -m syntara.admin revoke-all-sessions --yes
 ```
 
 #### API Usage
@@ -236,10 +236,10 @@ An administrator can revoke all active sessions for a specific user without affe
 
 ```bash
 # Interactive — prompts for confirmation
-uv run python -m nexus.admin revoke-user-sessions --username alice
+uv run python -m syntara.admin revoke-user-sessions --username alice
 
 # Non-interactive (CI/scripts)
-uv run python -m nexus.admin revoke-user-sessions --username alice --yes
+uv run python -m syntara.admin revoke-user-sessions --username alice --yes
 ```
 
 #### API Usage
@@ -273,10 +273,10 @@ An administrator can revoke all active sessions that were authenticated via a sp
 
 ```bash
 # Interactive — prompts for confirmation
-uv run python -m nexus.admin revoke-idp-sessions --idp-name "Corporate Okta"
+uv run python -m syntara.admin revoke-idp-sessions --idp-name "Corporate Okta"
 
 # Non-interactive (CI/scripts)
-uv run python -m nexus.admin revoke-idp-sessions --idp-name "Corporate Okta" --yes
+uv run python -m syntara.admin revoke-idp-sessions --idp-name "Corporate Okta" --yes
 ```
 
 #### API Usage
@@ -315,7 +315,7 @@ All revocation operations (CLI and API) emit audit events. The `actor_source` fi
 
 ### Account Management (`orchestrator-admin`)
 
-The `orchestrator-admin` CLI provides production account management operations, designed to be run inside the application pod. It is a separate CLI from the developer `python -m nexus.admin` utility.
+The `orchestrator-admin` CLI provides production account management operations, designed to be run inside the application pod. It is a separate CLI from the developer `python -m syntara.admin` utility.
 
 #### Account Re-enablement
 
@@ -486,8 +486,8 @@ The `KeyManager` and `TokenService` are cached as singletons per process for per
 Both caches expose `clear_*` functions for programmatic invalidation without a full restart:
 
 ```python
-from nexus.auth.services.token_service import clear_key_manager_cache
-from nexus.auth.dependencies import clear_token_service_cache
+from syntara.auth.services.token_service import clear_key_manager_cache
+from syntara.auth.dependencies import clear_token_service_cache
 
 # Clear both caches — new keys will be loaded on the next request
 clear_key_manager_cache()
@@ -829,7 +829,7 @@ Sanitization is applied in two places:
 1. **`OIDCService.extract_user_claims()`** — processes `sub`, `email`, `name`, and `preferred_username` from the ID token / userinfo response. Identity claims trigger rejection; display claims are escaped.
 2. **`extract_idp_group_values()`** — processes group values extracted by JMESPath from the raw merged claims. Control characters are escaped before group matching.
 
-The sanitization utilities (`has_control_chars`, `escape_control_chars`) are in `nexus.core.lib.sanitization`.
+The sanitization utilities (`has_control_chars`, `escape_control_chars`) are in `syntara.core.lib.sanitization`.
 
 ### Test Sign-In Flow
 

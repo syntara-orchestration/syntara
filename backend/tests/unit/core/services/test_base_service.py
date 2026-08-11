@@ -8,18 +8,18 @@ import pytest
 from sqlalchemy import String, TypeDecorator, column
 from sqlmodel import select
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.services.base import BaseService
-from nexus.core.utils.cursor import (
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.services.base import BaseService
+from syntara.core.utils.cursor import (
     PaginationDirection,
     SortDirection,
     create_cursor_data,
     encode_cursor,
     serialize_sort_value,
 )
-from nexus.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow import Workflow
 
 
 class TestApplyAccessFilters:

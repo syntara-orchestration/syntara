@@ -4,7 +4,7 @@ from types import ModuleType
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from nexus.core.websocket.interceptor import (
+from syntara.core.websocket.interceptor import (
     InterceptorRegistry,
     ValidationInterceptor,
     WebSocketInterceptor,
@@ -200,7 +200,7 @@ class TestValidationInterceptor:
 
         # Mock _HANDLER_MODULE_CACHE to have the example component with multiple modules
         with patch(
-            "nexus.core.websocket.interceptor._HANDLER_MODULE_CACHE",
+            "syntara.core.websocket.interceptor._HANDLER_MODULE_CACHE",
             {"example": {"chat": mock_module1, "coffee": mock_module2}},
         ):
             # Call with different channels

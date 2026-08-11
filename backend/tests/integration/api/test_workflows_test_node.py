@@ -1,7 +1,7 @@
 """Integration tests for POST /api/v1/workflows/{workflow_id}/test endpoint.
 
 Uses auth_client + test_db_session pattern for:
-- Testing invalid UUID format validation (nexus_api expects UUID type)
+- Testing invalid UUID format validation (syntara_api expects UUID type)
 - Creating test data via DB fixtures for speed
 - Direct DB state verification where needed
 """
@@ -14,15 +14,15 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import pytest_asyncio
 
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
-from nexus.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.models.workflow_version import WorkflowVersion
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture
@@ -50,7 +50,7 @@ async def multi_node_workflow(test_db_session: AsyncSession, test_user: User) ->
             {"from": "predecessor_node", "to": "test_activity"},
         ],
     }
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name=f"test-node-project-{uuid.uuid4().hex[:8]}")
     test_db_session.add(project)
@@ -245,7 +245,7 @@ async def test_test_workflow_node_invalid_workflow_id(
 ) -> None:
     """Test execution with invalid UUID format returns 422.
 
-    NOTE: This test requires auth_client (not nexus_api) because the generated
+    NOTE: This test requires auth_client (not syntara_api) because the generated
     client's test_node() method expects a UUID type parameter and cannot accept
     invalid string formats like "not-a-uuid" for validation testing.
     """

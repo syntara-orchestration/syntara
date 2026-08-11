@@ -4,17 +4,17 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.audit.agent_execution import (
+from syntara.agent_orchestrator.audit.agent_execution import (
     AgentExecutionEvent,
     AgentExecutionHandler,
     AgentExecutionStatus,
 )
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestAgentExecutionHandler:
@@ -50,7 +50,7 @@ class TestAgentExecutionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "agent_started"
         assert result.event_message == "Agent orchestrator started"
-        assert result.source_component == "nexus.agent_orchestrator.agents.orchestrator"
+        assert result.source_component == "syntara.agent_orchestrator.agents.orchestrator"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -90,7 +90,7 @@ class TestAgentExecutionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "agent_failed"
         assert result.event_message == "Agent orchestrator failed"
-        assert result.source_component == "nexus.agent_orchestrator.agents.orchestrator"
+        assert result.source_component == "syntara.agent_orchestrator.agents.orchestrator"
         assert result.actor_id == test_user.id
         assert result.actor_username == test_user.username
 
@@ -198,7 +198,7 @@ class TestAgentExecutionHandler:
         handler = AgentExecutionHandler()
         result = handler.handle(event)
 
-        assert result.source_component == "nexus.agent_orchestrator.agents.custom_agent"
+        assert result.source_component == "syntara.agent_orchestrator.agents.custom_agent"
 
     def test_failed_without_error_type(self) -> None:
         """Failed status without explicit error_type still produces error event."""

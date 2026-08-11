@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from nexus.workflows.workflow_engine.activities.aap_common import resolve_label_ids
-from nexus.workflows.workflow_engine.activities.aap_job_template_activity import AAPJobExecutionError
+from syntara.workflows.workflow_engine.activities.aap_common import resolve_label_ids
+from syntara.workflows.workflow_engine.activities.aap_job_template_activity import AAPJobExecutionError
 
 TEST_AAP_URL = "http://test.aap"
 TEST_ORG_NAME = "Engineering"

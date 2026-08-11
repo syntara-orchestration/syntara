@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from nexus.agent_orchestrator.utils.workflow_signal_client import WorkflowSignalClient
+from syntara.agent_orchestrator.utils.workflow_signal_client import WorkflowSignalClient
 
 
 class TestWorkflowSignalClientSendSuccessSignal:

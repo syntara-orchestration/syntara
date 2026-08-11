@@ -2,7 +2,7 @@
 """Verify test directory structure matches source code domains.
 
 This pre-commit hook ensures:
-1. Test directories in tests/unit/ and tests/integration/ match src/nexus/ domains
+1. Test directories in tests/unit/ and tests/integration/ match src/syntara/ domains
 2. No orphaned test directories (tests without corresponding source domain)
 3. Enforces domain-driven structure documented in docs/standards/testing.md
 
@@ -182,7 +182,7 @@ def verify_test_structure(repo_root: Path) -> tuple[bool, list[str], list[str]]:
     errors = []
     warnings = []
 
-    src_dir = repo_root / "src" / "nexus"
+    src_dir = repo_root / "src" / "syntara"
     source_domains = get_domains(src_dir)
 
     # Test directories configuration: name -> (path, skip_validation)
@@ -280,7 +280,7 @@ def main() -> int:
         "Test Structure Validation Failed",
         errors,
         fix_options=[
-            "Move orphaned test directories to match a domain in src/nexus/",
+            "Move orphaned test directories to match a domain in src/syntara/",
             "Consult docs/standards/testing.md for domain organization rules",
         ],
     )

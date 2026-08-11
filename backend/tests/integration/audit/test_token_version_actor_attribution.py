@@ -13,9 +13,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-from nexus.audit.context_managers import actor_context
-from nexus.auth.session.session_store import SessionStore
-from nexus.core.models.user import User
+from syntara.audit.context_managers import actor_context
+from syntara.auth.session.session_store import SessionStore
+from syntara.core.models.user import User
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession

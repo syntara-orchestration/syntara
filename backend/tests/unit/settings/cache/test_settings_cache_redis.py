@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.settings.cache.settings_cache import (
+from syntara.settings.cache.settings_cache import (
     REDIS_CHANNEL,
     REDIS_KEY_PREFIX,
     SettingsCache,
@@ -152,7 +152,7 @@ class TestRedisL2Cache:
 
         cache._catalog_by_key = None
         with (
-            patch("nexus.settings.catalog.SETTINGS_CATALOG", [fake_defn]),
+            patch("syntara.settings.catalog.SETTINGS_CATALOG", [fake_defn]),
             patch.object(cache, "_fetch_from_db", return_value="immutable"),
         ):
             await cache.get("test.restart")
@@ -379,7 +379,7 @@ class TestHandleChangeNotification:
         cache._watch_values["logging.log_level"] = "INFO"
 
         # Pre-populate L1 cache with the existing value
-        from nexus.settings.cache.settings_cache import CachedValue
+        from syntara.settings.cache.settings_cache import CachedValue
 
         cache._cache["logging.log_level"] = CachedValue(value="INFO", fetched_at=0.0, ttl_seconds=60.0)
 
@@ -450,7 +450,7 @@ class TestStartWatchingAsync:
 
         cache = _make_redis_cache(redis_client=rc)
 
-        with patch("nexus.core.workers.periodic.PeriodicWorker") as mock_pw:
+        with patch("syntara.core.workers.periodic.PeriodicWorker") as mock_pw:
             mock_worker = AsyncMock()
             mock_pw.return_value = mock_worker
             await cache._start_watching_async()
@@ -469,7 +469,7 @@ class TestStartWatchingAsync:
 
         cache = _make_redis_cache(redis_client=rc)
 
-        with patch("nexus.core.workers.periodic.PeriodicWorker") as mock_pw:
+        with patch("syntara.core.workers.periodic.PeriodicWorker") as mock_pw:
             mock_worker = MagicMock()
             mock_pw.return_value = mock_worker
             await cache._start_watching_async()
@@ -485,7 +485,7 @@ class TestStartWatchingAsync:
 
         cache = _make_redis_cache(redis_client=rc)
 
-        with patch("nexus.core.workers.periodic.PeriodicWorker") as mock_pw:
+        with patch("syntara.core.workers.periodic.PeriodicWorker") as mock_pw:
             mock_worker = MagicMock()
             mock_pw.return_value = mock_worker
             await cache._start_watching_async()
@@ -503,7 +503,7 @@ class TestStartWatchingAsync:
             redis_enabled=False,
         )
 
-        with patch("nexus.core.workers.periodic.PeriodicWorker") as mock_pw:
+        with patch("syntara.core.workers.periodic.PeriodicWorker") as mock_pw:
             mock_worker = MagicMock()
             mock_pw.return_value = mock_worker
             await cache._start_watching_async()
@@ -575,7 +575,7 @@ class TestMaybeReconnectPubsub:
 
         mock_client = _make_redis_client()
         with patch(
-            "nexus.core.cache.settings_client.SettingsRedisClient",
+            "syntara.core.cache.settings_client.SettingsRedisClient",
             return_value=mock_client,
         ):
             # After acquiring, it should also try to start pubsub
@@ -601,7 +601,7 @@ class TestMaybeReconnectPubsub:
         mock_client = _make_redis_client()
         mock_client.ping = AsyncMock(side_effect=ConnectionError("still down"))
         with patch(
-            "nexus.core.cache.settings_client.SettingsRedisClient",
+            "syntara.core.cache.settings_client.SettingsRedisClient",
             return_value=mock_client,
         ):
             await cache._maybe_reconnect_pubsub()

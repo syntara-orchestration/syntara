@@ -12,11 +12,11 @@ from httpx import AsyncClient
 from sqlalchemy import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import RoleAssignment
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.role import Role
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.authz.models import RoleAssignment
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.role import Role
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 from tests.integration.api.conftest import make_admin, make_auditor, make_user_role
 
 

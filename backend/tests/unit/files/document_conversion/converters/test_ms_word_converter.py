@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from nexus.files.document_conversion.converters.ms_word_converter import (
+from syntara.files.document_conversion.converters.ms_word_converter import (
     MSWordConverter,
 )
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
-from nexus.files.models import FileMetadata
+from syntara.files.models import FileMetadata
 
 
 class TestMSWordConverterMimeTypeSupport:
@@ -68,7 +68,7 @@ class TestMSWordConverterThreadOffloading:
     """Test that MSWordConverter offloads blocking work to a thread pool."""
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.asyncio.to_thread")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.asyncio.to_thread")
     async def test_convert_runs_in_thread_pool(self, mock_to_thread: AsyncMock) -> None:
         """Test that convert() offloads sync work via asyncio.to_thread."""
         file_metadata = Mock()
@@ -90,8 +90,8 @@ class TestMSWordConverterConversion:
     """Test conversion functionality in MSWordConverter."""
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_successful_docx_conversion(self, mock_tempfile, mock_convert_file) -> None:
         """Test successful DOCX to markdown conversion."""
         file_metadata = Mock()
@@ -130,8 +130,8 @@ class TestMSWordConverterConversion:
         assert "Unsupported MIME type: image/jpeg" in result.error_message
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_runtime_error_handling(self, mock_tempfile, mock_convert_file) -> None:
         """Test handling of pypandoc RuntimeError exceptions."""
         file_metadata = Mock()
@@ -156,8 +156,8 @@ class TestMSWordConverterConversion:
         assert "The file appears to be corrupted" in result.error_message
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_memory_error_handling(self, mock_tempfile, mock_convert_file) -> None:
         """Test handling of MemoryError exceptions."""
         file_metadata = Mock()
@@ -182,8 +182,8 @@ class TestMSWordConverterConversion:
         assert "Insufficient memory to process document" in result.error_message
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_os_error_handling(self, mock_tempfile, mock_convert_file) -> None:
         """Test handling of OSError exceptions."""
         file_metadata = Mock()
@@ -209,10 +209,10 @@ class TestMSWordConverterConversion:
         assert result.metadata["exception_type"] == "OSError"
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.Path.unlink")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.Path.exists")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.Path.unlink")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.Path.exists")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_temporary_file_cleanup(self, mock_tempfile, mock_convert_file, mock_exists, mock_unlink) -> None:
         """Test that temporary files are cleaned up after conversion."""
         file_metadata = Mock()
@@ -234,10 +234,10 @@ class TestMSWordConverterConversion:
         mock_unlink.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.Path.unlink")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.Path.exists")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.Path.unlink")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.Path.exists")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_cleanup_handles_missing_temp_file_gracefully(
         self, mock_tempfile, mock_convert_file, mock_exists, mock_unlink
     ) -> None:
@@ -288,8 +288,8 @@ class TestMSWordConverterDocumentFormatHandling:
         assert converter.supports_mime_type(docx_mime) is True
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_password_protected_document_handling(self, mock_tempfile, mock_convert_file) -> None:
         """Test handling of password-protected documents."""
         file_metadata = Mock()
@@ -314,8 +314,8 @@ class TestMSWordConverterDocumentFormatHandling:
         assert "password protected" in result.error_message.lower()
 
     @pytest.mark.asyncio
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
-    @patch("nexus.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.pypandoc.convert_file")
+    @patch("syntara.files.document_conversion.converters.ms_word_converter.tempfile.NamedTemporaryFile")
     async def test_pandoc_not_installed_handling(self, mock_tempfile, mock_convert_file) -> None:
         """Test handling when pandoc is not installed."""
         file_metadata = Mock()

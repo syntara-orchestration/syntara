@@ -1,0 +1,1413 @@
+---
+openapi: 3.1.0
+info:
+  title: Workflow Engine API (v2)
+  description: |
+    API for managing graph-based (DAG) workflows with agentic and non-agentic tasks.
+
+    ## V2 Workflow Model
+
+    V2 workflows use a directed acyclic graph (DAG) structure with explicit nodes and edges,
+    replacing the V1 tree-based activity model. Key concepts:
+
+    - **Triggers**: Entry points that initiate workflow execution (e.g., manual_trigger)
+    - **Nodes**: Execution units (script, http_request, agentic, aap_job_template, approval)
+      and control flow (condition, loop, converge)
+    - **Edges**: Directed connections between nodes with optional port-based routing
+      (e.g., condition true/false, loop iterate/complete)
+    - **Implicit parallelism**: Multiple edges from the same node execute concurrently
+      (no dedicated parallel node needed)
+
+    ## Schema Composition
+
+    This API uses schema composition to reduce duplication:
+
+    ```
+    BaseResource (id, labels, created_at, updated_at)
+    +-- NamedResource (+ name, description)
+        +-- Workflow (+ SoftDeletableResource + UserOwnedResource)
+            +-- WorkflowWithVersion (+ version details)
+
+    SoftDeletableResource (deleted_at, deleted_by)
+    UserOwnedResource (created_by)
+    ```
+
+    Note: Approval resources are in a separate API. See `/api/v1/approvals`.
+
+    ## Labels
+
+    All resources support key-value labels for categorization and filtering:
+    - Format: `{"key": "value"}` (both key and value must be strings)
+    - Use cases: environment tags, team ownership, priority levels, cost centers
+    - Queryable: Filter resources by label selectors in list endpoints
+
+    ## Node Type Catalog
+
+    Available node types and their configuration schemas are defined in the
+    [Node Type Catalog](./catalog/node_type_catalog.json). Individual node schemas
+    (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
+  version: 2.0.0
+  contact:
+    name: Syntara Team
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+tags:
+  - name: Workflows
+    description: Workflow CRUD, versioning, and publishing
+  - name: Webhooks
+    description: Inbound webhook event receivers
+
+paths:
+  /workflows:
+    get:
+      summary: List workflows
+      description: "List workflows the current user has read access to.\n\nSupports filtering using query parameters with standard operators:\n- created_by: Filter by creator user ID (created_by=uuid)\n- is_enabled: Filter by enabled status (is_enabled=true|false)\n- labels: Filter by labels using bracket notation (labels[environment]=production)\n\nUses cursor-based pagination for scalability and consistency."
+      operationId: list_workflows
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+      responses:
+        '200':
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowListResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+    post:
+      summary: Create workflow
+      description: Create a new workflow with initial version.
+      operationId: create_workflow
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowCreate'
+      responses:
+        '201':
+          description: Workflow created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/validate:
+    post:
+      summary: Validate workflow definition
+      description: Validate a workflow definition without saving it.
+      operationId: validate_workflow_definition
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowValidateRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/DetailedValidationProblemDetail'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}:
+    get:
+      summary: Get workflow
+      description: Get a workflow by ID including its current active version.
+      operationId: get_workflow
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      responses:
+        '200':
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowReadWithVersion'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+    patch:
+      summary: Update workflow
+      description: "Update workflow.\n\nSupports both metadata-only updates and workflow definition updates:\n- Metadata only (name, description, labels): Updates without creating new version\n- With workflow_definition: Validates definition, compares with current version, creates new WorkflowVersion\n  only if definition differs (change detection optimization)"
+      operationId: update_workflow
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: update
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowUpdate'
+      responses:
+        '200':
+          description: Updated workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowReadWithVersion'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+    delete:
+      summary: Delete workflow
+      description: Soft delete a workflow.
+      operationId: delete_workflow
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: delete
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      responses:
+        '204':
+          description: Workflow deleted
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/test:
+    post:
+      summary: Test a single node in a workflow
+      description: Test a single node in a workflow with mocked predecessor outputs.
+      operationId: test_workflow_node
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: update
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestExecutionCreate'
+      responses:
+        '201':
+          description: Test execution created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/versions:
+    get:
+      summary: List workflow versions
+      description: List versions for a workflow with cursor-based pagination.
+      operationId: list_workflow_versions
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            exclusiveMinimum: 0
+            maximum: 100
+            title: Limit
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            title: Sort
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Include Total
+      responses:
+        '200':
+          description: Workflow version history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersionListResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/versions/{version}:
+    get:
+      summary: Get workflow version
+      description: Get a specific workflow version.
+      operationId: get_workflow_version
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+          description: Version number to retrieve
+      responses:
+        '200':
+          description: Workflow version details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+    patch:
+      summary: Update workflow version metadata
+      description: Update a workflow version's metadata (name, change_description).
+      operationId: update_workflow_version_metadata
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowVersionUpdate'
+      responses:
+        '200':
+          description: Updated workflow version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          description: Workflow not found
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/versions/{version}/publish:
+    post:
+      summary: Publish workflow version
+      description: Publish a specific workflow version.
+      operationId: publish_workflow_version
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: update
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+          description: Version number to publish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishVersionRequest'
+      responses:
+        '200':
+          description: Published workflow version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishWorkflowVersionResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/unpublish:
+    post:
+      summary: Unpublish workflow
+      description: Unpublish the currently published workflow version.
+      operationId: unpublish_workflow
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: update
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      responses:
+        '200':
+          description: Unpublished workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/versions/{version}/restore:
+    post:
+      summary: Restore workflow version
+      description: Restore a previous workflow version as a new draft.
+      operationId: restore_workflow_version
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: update
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+          description: Version number to restore
+      responses:
+        '200':
+          description: Restored workflow version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowReadWithVersion'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /workflows/{workflow_id}/versions/{version}/export:
+    get:
+      summary: Export workflow version
+      description: Export a workflow version definition as a downloadable JSON file.
+      operationId: export_workflow_version
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+          description: Version number to export
+      responses:
+        '200':
+          description: Workflow version definition as JSON file
+          content:
+            application/json: {}
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          description: Workflow not found
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  # Note: Approval endpoints are in a separate API
+  # See: src/syntara/schemas/approvals/openapi.yaml
+
+  /webhooks/{webhook_path}:
+    post:
+      summary: Receive webhook event
+      description: >-
+        Receive a webhook event from an external system and trigger the matching
+        workflow. Requires a service account Bearer token. Only POST method is
+        supported; other methods receive 405 Method Not Allowed.
+      operationId: receive_webhook
+      tags: [Webhooks]
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: null
+        action: null
+      parameters:
+        - name: webhook_path
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+            pattern: ^[a-z0-9]([a-z0-9\-_]*[a-z0-9])?$
+            title: Webhook Path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              title: Payload
+      responses:
+        '202':
+          description: Webhook accepted and workflow execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          description: Missing or invalid service account Bearer token
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+        '403':
+          description: Service account is not authorized for this trigger
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '413':
+          description: Payload exceeds the 1 MB size limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+
+  /webhooks/eda/{webhook_path}:
+    post:
+      summary: Receive EDA webhook event
+      description: >-
+        Receive a webhook event from Event-Driven Ansible and trigger the
+        matching workflow. Requires a service account Bearer token. Each EDA
+        trigger node has its own unique webhook path. The payload can be any
+        JSON structure.
+      operationId: receive_eda_webhook
+      tags: [Webhooks]
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: null
+        action: null
+      parameters:
+        - name: webhook_path
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+            pattern: ^[a-z0-9]([a-z0-9\-_]*[a-z0-9])?$
+            title: Webhook Path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              title: Payload
+      responses:
+        '202':
+          description: Webhook accepted and workflow execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          description: Missing or invalid service account Bearer token
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+        '403':
+          description: Service account is not authorized for this trigger
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '413':
+          description: Payload exceeds the 1 MB size limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+
+components:
+  schemas:
+    # Import workflow-specific schemas
+    WorkflowRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
+
+    WorkflowReadWithVersion:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
+
+    PublishWorkflowVersionResponse:
+      $ref: ./shared-schemas.yaml#/components/schemas/PublishWorkflowVersionResponse
+
+    WorkflowVersionRead:
+      type: object
+      title: WorkflowVersionRead
+      description: |-
+        Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+        WorkflowVersion entities are read-only and managed automatically by the system.
+
+        Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
+      required:
+        - id
+        - workflow_id
+        - version
+        - schema_version
+        - workflow_definition
+        - created_by
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        version:
+          type: integer
+          title: Version
+        schema_version:
+          type: string
+          title: Schema Version
+        workflow_definition:
+          additionalProperties: true
+          type: object
+          title: Workflow Definition
+        change_description:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Change Description
+        status:
+          type: string
+          default: draft
+          enum:
+            - draft
+            - published
+            - previously_published
+          title: Status
+        last_published_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Published At
+        last_unpublished_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Unpublished At
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Name
+        created_by:
+          type: string
+          format: uuid
+          title: Created By
+        created_by_username:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created By Username
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        deleted_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Deleted At
+        deleted_by:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Deleted By
+
+
+    PublishVersionRequest:
+      type: object
+      title: PublishVersionRequest
+      description: Request body for publishing a workflow version.
+      properties:
+        name:
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
+          title: Name
+          description: Optional name for this version
+        change_description:
+          anyOf:
+            - type: string
+              maxLength: 1024
+            - type: 'null'
+          title: Change Description
+          description: Description of changes in this version
+        workflow_definition:
+          anyOf:
+            - $ref: '#/components/schemas/WorkflowDefinition'
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Workflow Definition
+          description: Optional workflow definition to publish directly (skips separate save step)
+        expected_version:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Expected Version
+          description: >-
+            Version the client was editing. If the server's current_version is
+            higher, returns 409 Conflict.
+
+    WorkflowVersionUpdate:
+      type: object
+      title: WorkflowVersionUpdate
+      description: Request body for updating version metadata (PATCH /workflows/{id}/versions/{version}).
+      properties:
+        name:
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
+          title: Name
+          description: Version name
+        change_description:
+          anyOf:
+            - type: string
+              maxLength: 1024
+            - type: 'null'
+          title: Change Description
+          description: Description of changes
+
+    WorkflowVersionListResponse:
+      type: object
+      title: WorkflowVersionListResponse
+      description: Schema for workflow version list response.
+      required:
+        - resources
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowVersionRead'
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+
+    WorkflowListResponse:
+      type: object
+      required:
+        - resources
+      title: WorkflowListResponse
+      description: Paginated list response for workflows.
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowRead'
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+
+    # Note: Approval schemas are in src/syntara/schemas/approvals/openapi.yaml
+
+    WorkflowCreate:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowCreate
+
+    WorkflowUpdate:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowUpdate
+
+    TestExecutionCreate:
+      $ref: ./shared-schemas.yaml#/components/schemas/TestExecutionCreate
+
+    PreResolvedNodeOutput:
+      $ref: ./shared-schemas.yaml#/components/schemas/PreResolvedNodeOutput
+
+    ExecutionMode:
+      $ref: ./shared-schemas.yaml#/components/schemas/ExecutionMode
+
+    ExecutionRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/ExecutionRead
+
+    WorkflowDefinition:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDefinition
+
+    # Node type schemas (referenced by WorkflowDefinition.nodes oneOf)
+    AAPJobTemplateNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateNode
+    AAPWorkflowJobTemplateNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateNode
+    HTTPRequestNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/HTTPRequestNode
+    AgenticNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/AgenticNode
+    ScriptNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/ScriptNode
+    ApprovalNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNode
+    ConditionNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/ConditionNode
+    SwitchNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/SwitchNode
+    LoopNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/LoopNode
+    ConvergeNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNode
+    WaitNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/WaitNode
+
+    # Node parameter and settings schemas
+    AAPJobTemplateExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateExecutorParameters
+    AAPWorkflowJobTemplateExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateExecutorParameters
+    APIExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/APIExecutorParameters
+    AgenticExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/AgenticExecutorParameters
+    IntegrationConnectionConfig:
+      $ref: ./shared-schemas.yaml#/components/schemas/IntegrationConnectionConfig
+    ScriptExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/ScriptExecutorParameters
+    ApprovalNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
+    ConditionNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/ConditionNodeParameters
+    SwitchNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/SwitchNodeParameters
+    SwitchCase:
+      $ref: ./shared-schemas.yaml#/components/schemas/SwitchCase
+    ConvergeNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNodeParameters
+    ForEachLoopParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/ForEachLoopParameters
+    DoWhileLoopParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/DoWhileLoopParameters
+    WaitNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/WaitNodeParameters
+    NodePosition:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodePosition
+    NodeSettingsBase:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsBase
+    NodeSettingsCof:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsCof
+    NodeSettingsCofDisabled:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsCofDisabled
+    NodeSettingsNoRetry:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsNoRetry
+    NodeSettingsFull:
+      $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsFull
+    RetryPolicyParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryPolicyParameters
+    Authentication:
+      $ref: ./shared-schemas.yaml#/components/schemas/Authentication
+    AuthenticationType:
+      $ref: ./shared-schemas.yaml#/components/schemas/AuthenticationType
+    HTTPMethod:
+      $ref: ./shared-schemas.yaml#/components/schemas/HTTPMethod
+    ScriptLanguage:
+      $ref: ./shared-schemas.yaml#/components/schemas/ScriptLanguage
+    ConvergeStrategy:
+      $ref: ./shared-schemas.yaml#/components/schemas/ConvergeStrategy
+    AAPVerbosity:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPVerbosity
+    AAPJobType:
+      $ref: ./shared-schemas.yaml#/components/schemas/AAPJobType
+
+    WebhookResponse:
+      type: object
+      title: WebhookResponse
+      description: Response from webhook reception endpoint.
+      required:
+        - execution_id
+        - message
+      properties:
+        execution_id:
+          type: string
+          format: uuid
+          title: Execution Id
+          description: ID of the triggered workflow execution
+        message:
+          type: string
+          title: Message
+          description: Human-readable status message
+
+    WorkflowValidateRequest:
+      type: object
+      title: WorkflowValidateRequest
+      description: |-
+        Request body for the workflow validation endpoint.
+
+        The definition is accepted as a raw dict so that structurally invalid
+        definitions reach the application-level validator for richer error
+        reporting with node-level attribution.
+      required:
+        - workflow_definition
+      additionalProperties: false
+      properties:
+        workflow_definition:
+          additionalProperties: true
+          type: object
+          title: Workflow Definition
+          description: Workflow definition to validate
+
+    ValidationSeverity:
+      type: string
+      title: ValidationSeverity
+      description: Severity level for a validation finding.
+      enum:
+        - error
+        - warning
+
+    ValidationCategory:
+      type: string
+      title: ValidationCategory
+      description: Machine-readable classification for a validation finding.
+      enum:
+        - schema_version
+        - missing_field
+        - schema_violation
+        - invalid_reference
+        - cycle_detected
+        - orphaned_node
+        - converge_configuration
+        - approval_configuration
+
+    ValidationFinding:
+      type: object
+      title: ValidationFinding
+      description: |-
+        A single structured validation finding.
+
+        Attributes:
+            severity: error or warning
+            category: Machine-readable classification
+            message: Human-readable description
+            node_id: Related node ID, null for workflow-level issues
+            field_path: Path within node config (e.g., ``config.url``)
+      required:
+        - severity
+        - category
+        - message
+      additionalProperties: false
+      properties:
+        severity:
+          $ref: '#/components/schemas/ValidationSeverity'
+        category:
+          $ref: '#/components/schemas/ValidationCategory'
+        message:
+          type: string
+          title: Message
+        node_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Node Id
+        field_path:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Field Path
+
+    ValidationResult:
+      type: object
+      title: ValidationResult
+      description: |-
+        Structured validation result with flat findings list and computed counts.
+
+        Attributes:
+            is_valid: True when error_count == 0
+            error_count: Count of error-severity findings
+            warning_count: Count of warning-severity findings
+            findings: All findings, errors first
+      required:
+        - is_valid
+        - error_count
+        - warning_count
+      additionalProperties: false
+      properties:
+        is_valid:
+          type: boolean
+          title: Is Valid
+        error_count:
+          type: integer
+          title: Error Count
+        warning_count:
+          type: integer
+          title: Warning Count
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationFinding'
+          title: Findings
+
+    DetailedValidationProblemDetail:
+      type: object
+      title: DetailedValidationProblemDetail
+      description: |-
+        RFC 9457 Problem Details with a ``ValidationResult`` extension.
+
+        Attributes:
+            type: URI reference identifying the problem type
+            title: Short, human-readable summary
+            detail: Human-readable explanation specific to this occurrence
+            code: Machine-readable error code
+            instance: Optional URI reference identifying the specific occurrence
+            validation_result: Structured validation findings
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - validation_result
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          title: Type
+        title:
+          type: string
+          title: Title
+        detail:
+          type: string
+          title: Detail
+        code:
+          type: string
+          title: Code
+        instance:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Instance
+        validation_result:
+          $ref: '#/components/schemas/ValidationResult'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

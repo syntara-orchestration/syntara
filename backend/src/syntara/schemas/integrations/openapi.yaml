@@ -1,0 +1,2072 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Integrations API
+  description: |
+    REST API for managing Integrations.
+
+    Integrations are named, managed connections to external services -
+    MCP servers, LLM providers, and Ansible Automation Platform - that workflows use
+    as building blocks.
+
+    ## Key Features
+    - CRUD operations for Integrations with discriminated configuration per type
+    - Project-scoped visibility via integration-project assignments
+    - Soft-delete support
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: Integrations
+    description: Integration management
+
+paths:
+  /integrations:
+    get:
+      summary: List integrations
+      description: |-
+        List integrations with filtering and pagination.
+      operationId: list_integrations
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: read
+      parameters:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: integration_type
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/IntegrationType'
+              - type: "null"
+            title: Integration Type
+          description: Filter by integration type
+        - name: validation_status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/IntegrationStatus'
+              - type: "null"
+            title: Validation Status
+          description: Filter by validation status
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: "null"
+            description: Filter by enabled status
+            title: Enabled
+          description: Filter by enabled status
+        - name: scope
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/IntegrationScope'
+              - type: "null"
+            title: Scope
+          description: Filter by visibility scope
+        - name: management_credential_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: "null"
+            title: Management Credential Id
+          description: Filter by management credential ID (credential used for admin operations like validation and tool/model discovery)
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: "null"
+            title: Project Id
+          description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    post:
+      summary: Create integration
+      description: |-
+        Create a new integration.
+      operationId: create_integration
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationCreate"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /integrations/{integration_id}:
+    get:
+      summary: Get integration
+      description: |-
+        Get an integration by ID.
+      operationId: get_integration
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update integration
+      description: |-
+        Update an integration.
+      operationId: update_integration
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationPatch"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete integration
+      description: Delete an integration.
+      operationId: delete_integration
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: delete
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  /integrations/discover:
+    post:
+      summary: Discover integration connection
+      description: |-
+        Test a connection and discover resources without saving an integration.
+
+        Accepts integration configuration and a credential ID, resolves the
+        credential, runs the adapter's discover() method, and returns the result
+        including discovered tools (with parameters) or models. No integration
+        is persisted.
+      operationId: discover_integration_connection
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: discover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationTestConnection"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverResult"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+
+      security:
+        - bearerAuth: []
+
+  /integrations/{integration_id}/validate:
+    post:
+      summary: Validate integration
+      description: |-
+        Validate a saved integration with a lightweight connectivity ping.
+
+        Resolves the management credential, dispatches to the type-specific
+        adapter's validate() method, updates the integration's status fields,
+        and returns the result. No tool sync is performed.
+      operationId: validate_integration
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: validate
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateResult"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  /integrations/{integration_id}/refresh:
+    post:
+      summary: Refresh resources
+      description: |-
+        Sync resources (tools) for a saved integration from the external service.
+
+        Connects to the MCP server, fetches the current tool list, and upserts
+        Tool records in the database. Updates refresh_status and last_refreshed_at
+        on the integration. Only supported for mcp_server integration types.
+      operationId: refresh_resources
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: refresh
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResult"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+
+      security:
+        - bearerAuth: []
+
+  /integrations/{integration_id}/projects:
+    get:
+      summary: List integration projects
+      description: List project assignments for an integration.
+      operationId: list_integration_projects
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationProjectAssignmentListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+
+  /integrations/{integration_id}/projects/{project_id}:
+    post:
+      summary: Assign integration project
+      description: Assign a project to a project-scoped integration.
+      operationId: assign_integration_project
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Project Id
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationProjectAssignmentRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Unassign integration project
+      description: Remove a project assignment from an integration.
+      operationId: unassign_integration_project
+      tags:
+        - Integrations
+      x-app-permission:
+        resource: integration
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Project Id
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+
+  /integrations/{integration_id}/models:
+    get:
+      summary: List integration models
+      description: List LLM models for an integration with filtering, sorting, and pagination.
+      operationId: list_integration_models
+      x-app-permission:
+        resource: llm_model
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: "^-?[a-z][a-z0-9_]*$"
+              - type: "null"
+            description: "Sort parameter (e.g., 'name', '-created_at')"
+            title: Sort
+          description: "Sort parameter (e.g., 'name', '-created_at')"
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMModelListResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+  /integrations/{integration_id}/models/{model_id}:
+    get:
+      summary: Get integration model
+      description: Get an LLM model by ID.
+      operationId: get_integration_model
+      x-app-permission:
+        resource: llm_model
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: model_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Model Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMModelRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+    patch:
+      summary: Update integration model
+      description: Update an LLM model (enable/disable).
+      operationId: update_integration_model
+      x-app-permission:
+        resource: llm_model
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: model_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Model Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LLMModelUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMModelRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+  /integrations/{integration_id}/models/bulk_update:
+    patch:
+      summary: Bulk update integration models
+      description: Bulk enable/disable LLM models.
+      operationId: bulk_update_integration_models
+      x-app-permission:
+        resource: llm_model
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LLMModelBulkUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMModelBulkUpdateResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+  /integrations/{integration_id}/tools:
+    get:
+      summary: List Integration Tools
+      description: List tools for an integration with filtering, sorting, and pagination.
+      operationId: list_integration_tools
+      x-app-permission:
+        resource: tool
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolListResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+  /integrations/{integration_id}/tools/{tool_id}:
+    get:
+      summary: Get Integration Tool
+      description: Get a tool by ID, scoped to an integration.
+      operationId: get_integration_tool
+      x-app-permission:
+        resource: tool
+        action: read
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Tool Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolWithParameters'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+    patch:
+      summary: Update Integration Tool
+      description: Update a tool (enable/disable), scoped to an integration.
+      operationId: update_integration_tool
+      x-app-permission:
+        resource: tool
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Tool Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolWithParameters'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+  /integrations/{integration_id}/tools/bulk_update:
+    patch:
+      summary: Bulk Update Integration Tools
+      description: Bulk enable/disable tools for an integration.
+      operationId: bulk_update_integration_tools
+      x-app-permission:
+        resource: tool
+        action: update
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolBulkUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolBulkUpdateResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
+      tags:
+        - Integrations
+
+components:
+  schemas:
+    IntegrationType:
+      type: string
+      enum:
+        - mcp_server
+        - llm_provider
+        - ansible_automation_platform
+      title: IntegrationType
+      description: Type of external integration.
+
+    IntegrationStatus:
+      type: string
+      enum:
+        - unknown
+        - validating
+        - available
+        - error
+      title: IntegrationStatus
+      description: Validation status of an integration.
+
+    IntegrationScope:
+      type: string
+      enum:
+        - global
+        - project
+      title: IntegrationScope
+      description: Visibility scope of an integration.
+
+    IntegrationProjectAssignmentRead:
+      type: object
+      title: IntegrationProjectAssignmentRead
+      description: Read schema for a single project assignment.
+      required:
+        - project_id
+        - project_name
+        - created_at
+      properties:
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+        project_name:
+          type: string
+          title: Project Name
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+
+    IntegrationProjectAssignmentListResponse:
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          title: IntegrationProjectAssignmentListResponse
+          description: Paginated response for listing project assignments.
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: "#/components/schemas/IntegrationProjectAssignmentRead"
+              title: Resources
+
+    IntegrationListResponse:
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/IntegrationRead'
+              title: Resources
+              description: Array of resources in current page
+      title: IntegrationListResponse
+      description: Paginated list response for integrations.
+
+    IntegrationCreate:
+      description: Schema for creating a new integration.
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Human-readable name for the integration
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          title: Description
+          description: Detailed description of the integration
+        integration_type:
+          $ref: '#/components/schemas/IntegrationType'
+          description: Type of external integration
+        configuration:
+          oneOf:
+            - $ref: '#/components/schemas/MCPServerConfigurationInput'
+            - $ref: '#/components/schemas/LLMProviderConfiguration'
+            - $ref: '#/components/schemas/AAPConfiguration'
+          title: Configuration
+          description: Integration-specific configuration
+          discriminator:
+            propertyName: integration_type
+            mapping:
+              ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+              llm_provider: '#/components/schemas/LLMProviderConfiguration'
+              mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+        management_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          title: Management Credential Id
+          description: Optional credential for admin operations
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Whether the integration is active
+          default: true
+        scope:
+          $ref: '#/components/schemas/IntegrationScope'
+          description: "Visibility scope: global or project"
+          default: global
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: Key-value labels
+        discovered_tools:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/InitialToolSelection'
+              maxItems: 200
+            - type: "null"
+          title: Discovered Tools
+          description: Tools discovered during setup with enabled/disabled selections
+        discovered_models:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/InitialModelSelection'
+            - type: "null"
+          title: Discovered Models
+          description: Models discovered during setup with enabled/disabled selections
+      required:
+        - name
+        - integration_type
+        - configuration
+      title: IntegrationCreate
+      type: object
+
+    InitialToolSelection:
+      description: A tool from the discover step with the user's enabled/disabled choice.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Tool name as returned by the discover endpoint
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          title: Description
+          description: Tool description
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Whether the user enabled this tool
+          default: true
+        parameters:
+          anyOf:
+            - type: array
+              items:
+                additionalProperties: true
+                type: object
+              maxItems: 50
+            - type: "null"
+          title: Parameters
+          description: Tool parameters from discovery
+      required:
+        - name
+      title: InitialToolSelection
+      type: object
+
+    InitialModelSelection:
+      description: A model from the discover step with the user's enabled/disabled choice.
+      properties:
+        model_id:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Model Id
+          description: Provider model identifier from discover
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Human-readable display name
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          title: Description
+          description: Model description
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Whether the user enabled this model
+          default: true
+        is_default:
+          type: boolean
+          title: Is Default
+          description: Whether this is the default model
+          default: false
+      required:
+        - model_id
+        - name
+      title: InitialModelSelection
+      type: object
+
+    IntegrationPatch:
+      description: "Schema for partially updating an integration (user-facing)."
+      additionalProperties: false
+      properties:
+        name:
+          anyOf:
+            - type: string
+              maxLength: 255
+              minLength: 1
+            - type: "null"
+          title: Name
+          description: Human-readable name for the integration
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          title: Description
+          description: Detailed description of the integration
+        configuration:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/MCPServerConfigurationInput'
+                - $ref: '#/components/schemas/LLMProviderConfiguration'
+                - $ref: '#/components/schemas/AAPConfiguration'
+              discriminator:
+                propertyName: integration_type
+                mapping:
+                  ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+                  llm_provider: '#/components/schemas/LLMProviderConfiguration'
+                  mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+            - type: "null"
+          title: Configuration
+          description: Integration-specific configuration
+        management_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          title: Management Credential Id
+          description: Optional credential for admin operations
+        enabled:
+          anyOf:
+            - type: boolean
+            - type: "null"
+          title: Enabled
+          description: Whether the integration is active
+        scope:
+          anyOf:
+            - $ref: '#/components/schemas/IntegrationScope'
+            - type: "null"
+          description: "Visibility scope: global or project"
+        labels:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: "null"
+          title: Labels
+          description: Key-value labels
+      title: IntegrationPatch
+      type: object
+
+    IntegrationTestConnection:
+      description: Schema for testing a connection without saving an integration.
+      additionalProperties: false
+      properties:
+        integration_type:
+          $ref: "#/components/schemas/IntegrationType"
+          description: Type of external integration
+        configuration:
+          description: Integration-specific configuration
+          discriminator:
+            propertyName: integration_type
+            mapping:
+              mcp_server: "#/components/schemas/MCPServerConfigurationInput"
+              llm_provider: "#/components/schemas/LLMProviderConfiguration"
+              ansible_automation_platform: "#/components/schemas/AAPConfiguration"
+          oneOf:
+            - $ref: "#/components/schemas/MCPServerConfigurationInput"
+            - $ref: "#/components/schemas/LLMProviderConfiguration"
+            - $ref: "#/components/schemas/AAPConfiguration"
+          title: Configuration
+        credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          title: Credential Id
+          description: Credential to use for the connection test
+      required:
+        - integration_type
+        - configuration
+      title: IntegrationTestConnection
+      type: object
+
+    IntegrationRead:
+      description: Schema for integration API responses.
+      additionalProperties: false
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
+        - type: object
+          title: IntegrationRead
+          required:
+            - integration_type
+            - configuration
+          properties:
+            created_by:
+              anyOf:
+                - type: string
+                - type: string
+                  format: uuid
+                - type: "null"
+              description: Username or UUID of the creator
+              title: Created By
+            updated_by:
+              anyOf:
+                - type: string
+                - type: string
+                  format: uuid
+                - type: "null"
+              description: Username or UUID of the last modifier
+              title: Updated By
+            integration_type:
+              $ref: '#/components/schemas/IntegrationType'
+            enabled:
+              type: boolean
+              title: Enabled
+              default: true
+            validation_status:
+              $ref: '#/components/schemas/IntegrationStatus'
+              default: unknown
+            scope:
+              $ref: '#/components/schemas/IntegrationScope'
+              default: global
+            configuration:
+              oneOf:
+                - $ref: '#/components/schemas/MCPServerConfigurationInput'
+                - $ref: '#/components/schemas/LLMProviderConfiguration'
+                - $ref: '#/components/schemas/AAPConfiguration'
+              title: Configuration
+              description: Integration-specific configuration
+              discriminator:
+                propertyName: integration_type
+                mapping:
+                  ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+                  llm_provider: '#/components/schemas/LLMProviderConfiguration'
+                  mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+            last_validated_at:
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: "null"
+              title: Last Validated At
+            management_credential_id:
+              anyOf:
+                - type: string
+                  format: uuid
+                - type: "null"
+              title: Management Credential Id
+            validation_error:
+              anyOf:
+                - type: string
+                - type: "null"
+              title: Validation Error
+            refresh_status:
+              anyOf:
+                - $ref: '#/components/schemas/IntegrationRefreshStatus'
+                - type: "null"
+            last_refreshed_at:
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: "null"
+              title: Last Refreshed At
+            last_successful_refresh_at:
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: "null"
+              title: Last Successful Refresh At
+            refresh_error:
+              anyOf:
+                - type: string
+                - type: "null"
+              title: Refresh Error
+            project_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+              title: Project Ids
+              description: IDs of projects this integration is assigned to (empty for global scope)
+            total_tool_count:
+              type: integer
+              default: 0
+              title: Total Tool Count
+              description: Total number of tools linked to this integration
+            enabled_tool_count:
+              type: integer
+              default: 0
+              title: Enabled Tool Count
+              description: Number of enabled tools linked to this integration
+            total_model_count:
+              type: integer
+              default: 0
+              title: Total Model Count
+              description: Total number of models linked to this integration
+            enabled_model_count:
+              type: integer
+              default: 0
+              title: Enabled Model Count
+              description: Number of enabled models linked to this integration
+
+    MCPServerConfigurationInput:
+      description: Admin-provided fields for MCP server integrations (used by create/patch).
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: mcp_server
+          default: mcp_server
+          title: Integration Type
+        base_url:
+          type: string
+          format: uri
+          title: Base Url
+          description: Base URL for the MCP server
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - base_url
+      title: MCPServerConfigurationInput
+      type: object
+
+    LLMProviderHint:
+      type: string
+      title: LLMProviderHint
+      description: LLM provider backend type.
+      enum:
+        - red_hat_ai
+        - openai
+        - anthropic
+        - gemini
+        - custom
+
+    LLMProviderConfiguration:
+      description: Configuration for LLM provider integrations.
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: llm_provider
+          default: llm_provider
+          title: Integration Type
+        provider_hint:
+          $ref: '#/components/schemas/LLMProviderHint'
+          description: LLM provider backend type
+        base_url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          format: uri
+          title: Base Url
+          description: Base URL for the LLM provider API. Required for red_hat_ai and custom providers.
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - provider_hint
+      title: LLMProviderConfiguration
+      type: object
+
+    AAPConfiguration:
+      description: Configuration for Ansible Automation Platform integrations.
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: ansible_automation_platform
+          default: ansible_automation_platform
+          title: Integration Type
+        base_url:
+          type: string
+          format: uri
+          title: AAP URL
+          description: URL of the Ansible Automation Platform
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - base_url
+      title: AAPConfiguration
+      type: object
+
+    DiscoveredLLMModel:
+      description: A model discovered from an LLM provider.
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+      required:
+        - id
+        - name
+      title: DiscoveredLLMModel
+      type: object
+
+    DiscoveredToolParameter:
+      description: A parameter belonging to a discovered tool.
+      properties:
+        name:
+          type: string
+          title: Name
+        type:
+          type: string
+          title: Type
+          default: string
+        description:
+          type: string
+          title: Description
+          default: ""
+        required:
+          type: boolean
+          title: Required
+          default: false
+      required:
+        - name
+      title: DiscoveredToolParameter
+      type: object
+
+    DiscoveredTool:
+      description: |-
+        A tool discovered from an MCP server.
+
+        Carries parameter information so that _sync_mcp_tools() can do a full
+        upsert without re-fetching from MCP.
+      properties:
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        parameters:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/DiscoveredToolParameter'
+            - type: "null"
+          title: Parameters
+      required:
+        - name
+      title: DiscoveredTool
+      type: object
+
+    HealthCheckErrorType:
+      description: Classification of health check failures.
+      type: string
+      enum:
+        - auth_failure
+        - connection_error
+        - rate_limit
+        - ssl_error
+        - timeout
+      title: HealthCheckErrorType
+
+    ValidateResult:
+      description: |-
+        Result of a lightweight connectivity ping (validate endpoint).
+
+        Contains only connection-health fields. No resource discovery fields.
+      properties:
+        success:
+          type: boolean
+          title: Success
+        checked_at:
+          type: string
+          format: date-time
+          title: Checked At
+        error:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Error
+        error_type:
+          anyOf:
+            - $ref: '#/components/schemas/HealthCheckErrorType'
+            - type: "null"
+      required:
+        - success
+        - checked_at
+      title: ValidateResult
+      type: object
+
+    DiscoverResult:
+      description: |-
+        Result of a resource-discovery operation (discover endpoint).
+
+        Returned by the unsaved-connection test (POST /integrations/discover)
+        and used internally by refresh_resources() to drive tool sync.
+      properties:
+        success:
+          type: boolean
+          title: Success
+        checked_at:
+          type: string
+          format: date-time
+          title: Checked At
+        error:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Error
+        error_type:
+          anyOf:
+            - $ref: '#/components/schemas/HealthCheckErrorType'
+            - type: "null"
+        discovered_tools:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/DiscoveredTool'
+            - type: "null"
+          title: Discovered Tools
+        discovered_models:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/DiscoveredLLMModel'
+            - type: "null"
+          title: Discovered Models
+      required:
+        - success
+        - checked_at
+      title: DiscoverResult
+      type: object
+
+    IntegrationRefreshStatus:
+      type: string
+      enum:
+        - refreshing
+        - available
+        - warning
+        - error
+      title: IntegrationRefreshStatus
+      description: Status of the last resource-refresh operation for an integration.
+
+    RefreshResult:
+      description: |-
+        Result returned by POST /integrations/{id}/refresh.
+
+        Covers both MCP tool and LLM model refreshes. ``missing_count``
+        reflects resources no longer offered by the provider: MCP tools are
+        marked MISSING and LLM models are counted as missing. Rows are
+        preserved and ``enabled`` is never changed by discovery (it is
+        admin-controlled).
+      properties:
+        synced_count:
+          type: integer
+          title: Synced Count
+          description: Number of new resource records created
+        updated_count:
+          type: integer
+          title: Updated Count
+          description: Number of existing resource records updated
+        missing_count:
+          type: integer
+          title: Missing Count
+          description: Number of resources no longer offered by the provider
+        refreshed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Refreshed At
+          description: Timestamp when the refresh completed
+      required:
+        - synced_count
+        - updated_count
+        - missing_count
+      title: RefreshResult
+      type: object
+
+    LLMModelListResponse:
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/LLMModelRead'
+              description: Array of resources in current page
+              title: Resources
+      title: LLMModelListResponse
+      description: Paginated response for LLM models.
+
+    LLMModelRead:
+      type: object
+      title: LLMModelRead
+      description: Schema for LLM model API responses.
+      required:
+        - id
+        - integration_id
+        - model_id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        integration_id:
+          type: string
+          format: uuid
+          title: Integration Id
+        model_id:
+          type: string
+          title: Model Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Description
+        enabled:
+          type: boolean
+          default: true
+          title: Enabled
+        is_default:
+          type: boolean
+          default: false
+          title: Is Default
+        last_refreshed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Refreshed At
+        profile:
+          anyOf:
+            - $ref: '#/components/schemas/ModelCapabilityProfile'
+            - type: 'null'
+          description: Model capability profile
+        created_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Updated At
+
+    ModelCapabilityProfile:
+      type: object
+      title: ModelCapabilityProfile
+      description: Typed view of an LLM model's capability profile.
+      properties:
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Name
+        status:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Status
+        release_date:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Release Date
+        last_updated:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Last Updated
+        open_weights:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Open Weights
+        max_input_tokens:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Max Input Tokens
+        text_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Text Inputs
+        image_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Image Inputs
+        image_url_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Image Url Inputs
+        pdf_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Pdf Inputs
+        audio_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Audio Inputs
+        video_inputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Video Inputs
+        image_tool_message:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Image Tool Message
+        pdf_tool_message:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Pdf Tool Message
+        max_output_tokens:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Max Output Tokens
+        reasoning_output:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Reasoning Output
+        text_outputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Text Outputs
+        image_outputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Image Outputs
+        audio_outputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Audio Outputs
+        video_outputs:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Video Outputs
+        tool_calling:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Tool Calling
+        tool_choice:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Tool Choice
+        tool_call_streaming:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Tool Call Streaming
+        structured_output:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Structured Output
+        attachment:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Attachment
+        temperature:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Temperature
+
+    LLMModelUpdate:
+      type: object
+      title: LLMModelUpdate
+      description: Schema for updating an LLM model (enable/disable, set as default).
+      properties:
+        enabled:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Enabled
+        is_default:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Is Default
+
+    LLMModelBulkUpdate:
+      type: object
+      title: LLMModelBulkUpdate
+      description: Schema for bulk-updating LLM models.
+      required:
+        - model_ids
+        - enabled
+      properties:
+        model_ids:
+          type: array
+          title: Model Ids
+          items:
+            type: string
+            format: uuid
+          description: Model IDs to update
+        enabled:
+          type: boolean
+          title: Enabled
+          description: New enabled state
+    LLMModelBulkUpdateResponse:
+      type: object
+      title: LLMModelBulkUpdateResponse
+      description: Response for bulk LLM model update.
+      required:
+        - updated_count
+        - skipped_count
+        - updated_at
+      properties:
+        updated_count:
+          type: integer
+          title: Updated Count
+          description: Number of models updated
+        skipped_count:
+          type: integer
+          title: Skipped Count
+          description: Number of model IDs not found in integration
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+          description: Timestamp of the update
+
+    ToolListResponse:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolListResponse'
+    ToolWithParameters:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolWithParameters'
+    ToolUpdate:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolUpdate'
+    ToolBulkUpdate:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdate'
+    ToolBulkUpdateResponse:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdateResponse'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.identity_providers.services.oidc_discovery import CLAIM_ALIASES, OIDCTestResult
-from nexus.identity_providers.services.oidc_discovery import test_oidc_connection as run_oidc_connection_test
+from syntara.identity_providers.services.oidc_discovery import CLAIM_ALIASES, OIDCTestResult
+from syntara.identity_providers.services.oidc_discovery import test_oidc_connection as run_oidc_connection_test
 
 
 class TestOIDCTestResult:
@@ -47,7 +47,7 @@ class TestTestOIDCConnection:
             "end_session_endpoint": "https://idp.example.com/logout",
         }
 
-        with patch("nexus.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
+        with patch("syntara.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
             mock_svc = mock_cls.return_value
             mock_svc.fetch_discovery_config = AsyncMock(return_value=discovery_data)
 
@@ -68,7 +68,7 @@ class TestTestOIDCConnection:
             "jwks_uri": "https://idp.example.com/jwks",
         }
 
-        with patch("nexus.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
+        with patch("syntara.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
             mock_svc = mock_cls.return_value
             mock_svc.fetch_discovery_config = AsyncMock(return_value=discovery_data)
 
@@ -89,7 +89,7 @@ class TestTestOIDCConnection:
             "jwks_uri": "https://idp.example.com/jwks",
         }
 
-        with patch("nexus.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
+        with patch("syntara.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
             mock_svc = mock_cls.return_value
             mock_svc.fetch_discovery_config = AsyncMock(return_value=discovery_data)
 
@@ -100,9 +100,9 @@ class TestTestOIDCConnection:
     @pytest.mark.asyncio
     async def test_failure_has_no_claims_data(self) -> None:
         """Test that failed connection has no claims_supported or claim_aliases."""
-        from nexus.auth.services.oidc_service import OIDCError
+        from syntara.auth.services.oidc_service import OIDCError
 
-        with patch("nexus.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
+        with patch("syntara.identity_providers.services.oidc_discovery.OIDCService") as mock_cls:
             mock_svc = mock_cls.return_value
             mock_svc.fetch_discovery_config = AsyncMock(side_effect=OIDCError("Connection refused"))
 

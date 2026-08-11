@@ -14,19 +14,19 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.adapters.protocol import DiscoveredTool, DiscoveredToolParameter, DiscoverResult
-from nexus.integrations.models.integration import (
+from syntara.core.models import User
+from syntara.integrations.adapters.protocol import DiscoveredTool, DiscoveredToolParameter, DiscoverResult
+from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationRefreshStatus,
     IntegrationType,
 )
-from nexus.integrations.services.integration_service import IntegrationService
-from nexus.tool_manager.models.tool import Tool, ToolStatus
+from syntara.integrations.services.integration_service import IntegrationService
+from syntara.tool_manager.models.tool import Tool, ToolStatus
 
 BASE_URL = "/api/v1/integrations"
 
-MCP_DISCOVER_PATCH = "nexus.integrations.adapters.mcp_server.MCPServerAdapter.discover"
+MCP_DISCOVER_PATCH = "syntara.integrations.adapters.mcp_server.MCPServerAdapter.discover"
 
 
 def _fake_discovered_tool(name: str, *, with_params: bool = False) -> DiscoveredTool:

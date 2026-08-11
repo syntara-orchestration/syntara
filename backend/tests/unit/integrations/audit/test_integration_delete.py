@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_delete import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_delete import (
     IntegrationDeleteEvent,
     IntegrationDeleteHandler,
 )
@@ -32,7 +32,7 @@ class TestIntegrationDeleteHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.integrations.integration"
+        assert audit_event.source_component == "syntara.integrations.integration"
         assert audit_event.event_message == "Integration deleted: GitHub MCP"
 
     def test_error_event(self) -> None:

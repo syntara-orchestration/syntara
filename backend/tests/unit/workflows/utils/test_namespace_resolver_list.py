@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 
 
 @pytest.fixture

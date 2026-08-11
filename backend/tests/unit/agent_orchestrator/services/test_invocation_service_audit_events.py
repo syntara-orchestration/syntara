@@ -11,16 +11,16 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
-from nexus.agent_orchestrator.services.invocation_service import InvocationService
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.sanitization import REDACTED
-from nexus.core.models import User
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.sanitization import REDACTED
+from syntara.core.models import User
+from syntara.files.models import FileMetadata
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestInvocationServiceCreateAuditEvents:
@@ -28,7 +28,7 @@ class TestInvocationServiceCreateAuditEvents:
 
     def setup_method(self) -> None:
         """Register invocations audit handlers before each test."""
-        from nexus.invocations.audit.invocation_created import (
+        from syntara.invocations.audit.invocation_created import (
             InvocationCreatedEvent,
             InvocationCreatedHandler,
         )
@@ -36,7 +36,7 @@ class TestInvocationServiceCreateAuditEvents:
         AuditEventDispatcher.register({InvocationCreatedEvent: InvocationCreatedHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_invocation_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -70,7 +70,7 @@ class TestInvocationServiceCreateAuditEvents:
         assert event.event_category == EventCategory.USER_ACTION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.invocations.create"
+        assert event.source_component == "syntara.invocations.create"
         assert event.event_message == "Invocation created for session session-123"
         assert event.resource_urn == f"urn:syntara:invocation:{invocation.id}"
 
@@ -83,7 +83,7 @@ class TestInvocationServiceCreateAuditEvents:
         assert event.structured_data.error_message is None
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_invocation_with_context_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -131,7 +131,7 @@ class TestInvocationServiceCreateAuditEvents:
         assert "response_schema" not in metadata
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_invocation_with_files_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -176,7 +176,7 @@ class TestInvocationServiceCreateAuditEvents:
         assert event.structured_data.file_ids == [str(file_id_1), str(file_id_2)]  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_invocation_db_error_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -222,7 +222,7 @@ class TestInvocationServiceCancelAuditEvents:
 
     def setup_method(self) -> None:
         """Register invocations audit handlers before each test."""
-        from nexus.invocations.audit.invocation_cancelled import (
+        from syntara.invocations.audit.invocation_cancelled import (
             InvocationCancelledEvent,
             InvocationCancelledHandler,
         )
@@ -230,7 +230,7 @@ class TestInvocationServiceCancelAuditEvents:
         AuditEventDispatcher.register({InvocationCancelledEvent: InvocationCancelledHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_cancel_invocation_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -263,7 +263,7 @@ class TestInvocationServiceCancelAuditEvents:
         result = await service.cancel_invocation(invocation_id, reason="User requested")
 
         # Assert
-        from nexus.agent_orchestrator.models.request import CancellationResult
+        from syntara.agent_orchestrator.models.request import CancellationResult
 
         assert result == CancellationResult.SUCCESS
         assert mock_do_emit.call_count == 1
@@ -273,7 +273,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert event.event_category == EventCategory.USER_ACTION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.invocations.cancel"
+        assert event.source_component == "syntara.invocations.cancel"
         assert event.event_message == "Invocation cancelled: User requested"
         assert event.resource_urn == f"urn:syntara:invocation:{invocation_id}"
 
@@ -285,7 +285,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert event.structured_data.error_message is None
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_cancel_invocation_not_found_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -306,7 +306,7 @@ class TestInvocationServiceCancelAuditEvents:
         result = await service.cancel_invocation(invocation_id, reason="Test")
 
         # Assert
-        from nexus.agent_orchestrator.models.request import CancellationResult
+        from syntara.agent_orchestrator.models.request import CancellationResult
 
         assert result == CancellationResult.NOT_FOUND
         assert mock_do_emit.call_count == 1
@@ -318,7 +318,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert event.structured_data.invocation_id == str(invocation_id)  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_cancel_invocation_not_cancellable_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -347,7 +347,7 @@ class TestInvocationServiceCancelAuditEvents:
         result = await service.cancel_invocation(invocation_id, reason="Test")
 
         # Assert
-        from nexus.agent_orchestrator.models.request import CancellationResult
+        from syntara.agent_orchestrator.models.request import CancellationResult
 
         assert result == CancellationResult.NOT_CANCELLABLE
         assert mock_do_emit.call_count == 1
@@ -359,7 +359,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert event.structured_data.current_status == InvocationStatus.COMPLETED  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_cancel_invocation_with_files_cleanup_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -410,7 +410,7 @@ class TestInvocationServiceCancelAuditEvents:
         )
 
         # Act
-        with patch("nexus.files.utils.cleanup_files", new_callable=AsyncMock):
+        with patch("syntara.files.utils.cleanup_files", new_callable=AsyncMock):
             await service.cancel_invocation(invocation_id, reason="Cleanup test")
 
         # Assert
@@ -422,7 +422,7 @@ class TestInvocationServiceCancelAuditEvents:
         assert set(event.structured_data.files_cleaned) == {str(file_id_1), str(file_id_2)}  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_cancel_invocation_commit_error_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,

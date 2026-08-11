@@ -17,12 +17,12 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import SecretStr
 
-from nexus.agent_orchestrator.exceptions import CredentialResolutionError
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.agent_orchestrator.models import InvocationStatus
-from nexus.agent_orchestrator.models.context_data import InvocationContextData, InvocationMetadata
-from nexus.agent_orchestrator.services.orchestration_service import OrchestrationService
-from nexus.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+from syntara.agent_orchestrator.exceptions import CredentialResolutionError
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.models import InvocationStatus
+from syntara.agent_orchestrator.models.context_data import InvocationContextData, InvocationMetadata
+from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
 
 
 def _make_executor(mock_session: MagicMock | None = None) -> InvocationExecutor:
@@ -97,7 +97,7 @@ class TestMCPCredentialResolverWithMCPConnections:
     @pytest.mark.asyncio
     async def test_propagates_credential_resolution_error_from_resolution(self) -> None:
         """CredentialResolutionError raised by _resolve_mcp_execution_credential propagates to the caller."""
-        from nexus.agent_orchestrator.exceptions import CredentialResolutionError
+        from syntara.agent_orchestrator.exceptions import CredentialResolutionError
 
         integration_id = uuid4()
         integration_connections = [
@@ -120,7 +120,7 @@ class TestIntegrationConnectionConfig:
     """Tests for IntegrationConnectionConfig model in AgenticExecutorParameters."""
 
     def test_mcp_connection_config_validates(self) -> None:
-        from nexus.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+        from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
 
         conn = IntegrationConnectionConfig(
             integration_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -130,7 +130,7 @@ class TestIntegrationConnectionConfig:
         assert conn.credential_id == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
     def test_agentic_executor_config_accepts_integration_connections(self) -> None:
-        from nexus.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate(
             {
@@ -148,13 +148,13 @@ class TestIntegrationConnectionConfig:
         assert config.integration_connections[0].integration_id == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
     def test_agentic_executor_config_without_integration_connections(self) -> None:
-        from nexus.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate({"prompt": "Test"})
         assert config.integration_connections is None
 
     def test_agentic_executor_config_with_multiple_connections(self) -> None:
-        from nexus.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate(
             {
@@ -211,12 +211,12 @@ class TestInitOrchestrationToolSelectionExtraction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(mock_llm, None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService",
+                "syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService",
                 side_effect=capture_service,
             ),
         ):
@@ -246,12 +246,12 @@ class TestInitOrchestrationToolSelectionExtraction:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
                 return_value=(mock_llm, None),
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.OrchestrationService",
+                "syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService",
                 side_effect=capture_service,
             ),
         ):
@@ -537,7 +537,7 @@ class TestInitOrchestrationEagerValidation:
                     create=True,
                 ):
                     with patch(
-                        "nexus.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient"
+                        "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient"
                     ) as mock_signal:
                         mock_signal.send_failure_signal = AsyncMock()
                         result = await executor._init_orchestration(invocation, ctx)

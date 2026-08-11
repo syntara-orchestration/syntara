@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.exception_registry import (
+import syntara.aap.exceptions
+from syntara.core.exception_registry import (
     _exception_registry,
     fastapi_exception,
     register_exceptions,
@@ -36,7 +37,7 @@ class TestFastAPIExceptionDecorator:
 
     def test_decorator_registers_exception_with_string_handler(self) -> None:
         """Test that decorator registers exception with string handler."""
-        handler_path = "nexus.tool_manager.error_handlers.tool_not_found_handler"
+        handler_path = "syntara.tool_manager.error_handlers.tool_not_found_handler"
 
         @fastapi_exception(handler=handler_path)
         class TestException(Exception):
@@ -115,7 +116,7 @@ class TestIntegrationUsage:
         # Verify handler was added to app
         mock_app.add_exception_handler.assert_called_once_with(TestException, test_handler)
 
-    @patch("nexus.core.exception_registry.importlib.import_module")
+    @patch("syntara.core.exception_registry.importlib.import_module")
     def test_string_handler_workflow(self, mock_import: Mock) -> None:
         """Test workflow using string handler to avoid circular imports."""
         mock_app = Mock(spec=FastAPI)
@@ -127,7 +128,7 @@ class TestIntegrationUsage:
         mock_import.return_value = mock_module
 
         # Use decorator with string path
-        @fastapi_exception(handler="nexus.test.handlers.test_handler")
+        @fastapi_exception(handler="syntara.test.handlers.test_handler")
         class TestException(Exception):
             pass
 
@@ -135,7 +136,7 @@ class TestIntegrationUsage:
         register_exceptions(mock_app)
 
         # Verify import and registration
-        mock_import.assert_called_once_with("nexus.test.handlers")
+        mock_import.assert_called_once_with("syntara.test.handlers")
         mock_app.add_exception_handler.assert_called_once_with(TestException, mock_handler)
 
     def test_multiple_decorators_with_mixed_handlers(self) -> None:
@@ -147,7 +148,7 @@ class TestIntegrationUsage:
         class FunctionHandledException(Exception):
             pass
 
-        @fastapi_exception(handler="nexus.module.string_handler")
+        @fastapi_exception(handler="syntara.module.string_handler")
         class StringHandledException(Exception):
             pass
 
@@ -156,7 +157,7 @@ class TestIntegrationUsage:
         assert FunctionHandledException in _exception_registry
         assert StringHandledException in _exception_registry
         assert _exception_registry[FunctionHandledException] is func_handler
-        assert _exception_registry[StringHandledException] == "nexus.module.string_handler"
+        assert _exception_registry[StringHandledException] == "syntara.module.string_handler"
 
     def test_registry_persistence_across_modules(self) -> None:
         """Test that registry persists across different module imports."""
@@ -199,13 +200,11 @@ class TestAAPExceptionRegistration:
 
     def test_aap_exceptions_registered_after_import(self) -> None:
         """All 4 AAP exceptions should appear in _exception_registry after import."""
-        import nexus.aap.exceptions
-
         # Re-execute the module to re-fire @fastapi_exception decorators,
         # since prior test classes call _exception_registry.clear().
-        importlib.reload(nexus.aap.exceptions)
+        importlib.reload(syntara.aap.exceptions)
 
-        from nexus.aap.exceptions import (
+        from syntara.aap.exceptions import (
             AAPAuthenticationError,
             AAPConnectionError,
             AAPNotConfiguredError,

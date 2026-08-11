@@ -14,11 +14,11 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.exceptions import SafeValueError
-from nexus.workflows.validators.workflow_definition import WorkflowValidator
-from nexus.workflows.workflow_engine.graph import WorkflowGraph
-from nexus.workflows.workflow_engine.models.responses import WorkflowResultResponse
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.core.exceptions import SafeValueError
+from syntara.workflows.validators.workflow_definition import WorkflowValidator
+from syntara.workflows.workflow_engine.graph import WorkflowGraph
+from syntara.workflows.workflow_engine.models.responses import WorkflowResultResponse
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AgenticExecutorParameters,
     APIExecutorParameters,

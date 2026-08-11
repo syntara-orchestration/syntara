@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.instrumentation import (
+from syntara.metrics.instrumentation import (
     LLMCallMetrics,
     LLMStreamTracker,
     _extract_token_usage,
@@ -16,8 +16,8 @@ from nexus.metrics.instrumentation import (
     _resolve_model_provider,
     record_llm_call,
 )
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ Covers acceptance criteria for AAP-77452:
 
 from typing import Any
 
-from nexus.workflows.services.workflow_diff import generate_change_summary
+from syntara.workflows.services.workflow_diff import generate_change_summary
 
 
 def _make_definition(

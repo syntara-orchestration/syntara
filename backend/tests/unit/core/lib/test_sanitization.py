@@ -1,6 +1,6 @@
 """Unit tests for shared sanitization utilities."""
 
-from nexus.core.lib.sanitization import escape_control_chars, has_control_chars, strip_control_chars
+from syntara.core.lib.sanitization import escape_control_chars, has_control_chars, strip_control_chars
 
 
 class TestStripControlChars:

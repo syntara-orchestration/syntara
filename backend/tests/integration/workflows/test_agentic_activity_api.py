@@ -15,7 +15,7 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
+from syntara.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
 from tests.fixtures.temporal import CompleteAsyncError
 
 
@@ -50,9 +50,9 @@ def mock_agent_client() -> Generator[AsyncMock, None, None]:
     """Auto-mock Agent Orchestrator client for all tests."""
     with (
         patch("temporalio.activity.heartbeat"),
-        patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+        patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
         patch(
-            "nexus.workflows.workflow_engine.activities.agentic_activity._inject_runtime_settings",
+            "syntara.workflows.workflow_engine.activities.agentic_activity._inject_runtime_settings",
             side_effect=_fake_inject_runtime_settings,
         ),
     ):
@@ -133,7 +133,7 @@ class TestAgenticActivityErrorHandling:
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_unavailable(self, mock_agent_client) -> None:
         """Test error handling when Agent Orchestrator is unavailable."""
-        from nexus.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
+        from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
 
         mock_agent_client.invoke_agent_async.side_effect = AgentOrchestratorClientConnectionError(
             "Agent Orchestrator unavailable"
@@ -151,7 +151,7 @@ class TestAgenticActivityErrorHandling:
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_timeout(self, mock_agent_client) -> None:
         """Test timeout handling for Agent Orchestrator invocations."""
-        from nexus.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientError, ErrorCode
+        from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientError, ErrorCode
 
         mock_agent_client.invoke_agent_async.side_effect = AgentOrchestratorClientError(
             "Invocation timed out", code=ErrorCode.TIMEOUT

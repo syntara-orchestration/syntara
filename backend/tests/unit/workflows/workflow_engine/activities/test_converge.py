@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.converge import converge
+from syntara.workflows.workflow_engine.activities.converge import converge
 
 
 class TestConvergeMergeResults:

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.rate_limiting.token_bucket import TokenBucket, TokenBucketResult
+from syntara.rate_limiting.token_bucket import TokenBucket, TokenBucketResult
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ class TestTokenBucket:
     async def test_consume_passes_parameters(self, bucket: TokenBucket, mock_redis_client: AsyncMock) -> None:
         mock_redis_client.execute_rate_limit.return_value = (True, 99, 1060.0)
 
-        with patch("nexus.rate_limiting.token_bucket.time") as mock_time:
+        with patch("syntara.rate_limiting.token_bucket.time") as mock_time:
             mock_time.time.return_value = 1000.0
             await bucket.consume(user_id="u1", max_tokens=100, window_seconds=120)
 

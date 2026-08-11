@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from nexus.core.tls.certs import generate_ca, generate_service_cert
+from syntara.core.tls.certs import generate_ca, generate_service_cert
 
 _VALIDITY_DAYS = 365
 

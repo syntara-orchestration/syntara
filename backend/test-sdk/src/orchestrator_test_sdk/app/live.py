@@ -147,7 +147,7 @@ def nexus_client(nexus_base_url: str) -> AuthenticatedClient:
 
 
 @pytest.fixture(scope="session")
-def nexus_api(nexus_base_url: str, nexus_client: AuthenticatedClient) -> SyntaraApiRegistry:
+def syntara_api(nexus_base_url: str, nexus_client: AuthenticatedClient) -> SyntaraApiRegistry:
     """Return a SyntaraApiRegistry with internal_metrics wired to the root URL."""
     from syntara_api_client import AuthenticatedClient
     from syntara_api_client.api import SyntaraApiRegistry

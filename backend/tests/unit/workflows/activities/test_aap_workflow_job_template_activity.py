@@ -20,11 +20,11 @@ import pytest
 from pydantic import SecretStr, ValidationError
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine import constants
-from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
+from syntara.workflows.workflow_engine import constants
+from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
     execute_aap_workflow_job_template_activity,
 )
-from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
 # Test constants
 TEST_AAP_URL = "http://test.aap"
@@ -902,8 +902,8 @@ class TestBuildLaunchBody:
 
     def test_includes_inventory_when_provided(self) -> None:
         """Should include inventory ID in body when provided."""
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
+        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1)
         body = _build_launch_body(config, inventory_id=42)
@@ -912,8 +912,8 @@ class TestBuildLaunchBody:
 
     def test_skips_inventory_when_none(self) -> None:
         """Should not include inventory in body when None."""
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
+        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1)
         body = _build_launch_body(config, inventory_id=None)
@@ -922,8 +922,8 @@ class TestBuildLaunchBody:
 
     def test_skips_empty_extra_vars_dict(self) -> None:
         """Should not include extra_vars when empty dict."""
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
+        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1, extra_vars={})
         body = _build_launch_body(config, inventory_id=None)
@@ -932,8 +932,8 @@ class TestBuildLaunchBody:
 
     def test_includes_non_empty_extra_vars_dict(self) -> None:
         """Should include extra_vars when non-empty dict."""
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
+        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1, extra_vars={"key": "value"})
         body = _build_launch_body(config, inventory_id=None)
@@ -942,8 +942,8 @@ class TestBuildLaunchBody:
 
     def test_includes_all_fields_when_provided(self) -> None:
         """Should include all fields when provided with truthy values."""
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from nexus.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
+        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(
             workflow_job_template_id=1,
@@ -969,20 +969,20 @@ class TestWorkflowValidateConfig:
     """Tests for _validate_config helper."""
 
     def test_validate_config_success(self) -> None:
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _validate_config
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _validate_config
 
         config = _validate_config({"workflow_job_template_id": 42})
         assert config.workflow_job_template_id == 42
 
     def test_validate_config_failure(self) -> None:
-        from nexus.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _validate_config
+        from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _validate_config
 
         with pytest.raises(ApplicationError) as exc_info:
             _validate_config({"invalid_field_only": True})
         assert exc_info.value.type == "ConfigError"
 
 
-_AUDIT_PATCH = "nexus.workflows.audit.aap_job_execution.AuditEventDispatcher"
+_AUDIT_PATCH = "syntara.workflows.audit.aap_job_execution.AuditEventDispatcher"
 
 
 class TestWorkflowAuditEventIntegration:
@@ -1004,7 +1004,7 @@ class TestWorkflowAuditEventIntegration:
             )
 
             assert mock_dispatcher.dispatch.call_count == 2
-            from nexus.workflows.audit.aap_job_execution import AAPJobCompletedEvent, AAPJobLaunchedEvent
+            from syntara.workflows.audit.aap_job_execution import AAPJobCompletedEvent, AAPJobLaunchedEvent
 
             call_args = [call.args[0] for call in mock_dispatcher.dispatch.call_args_list]
             assert isinstance(call_args[0], AAPJobLaunchedEvent)
@@ -1027,7 +1027,7 @@ class TestWorkflowAuditEventIntegration:
             )
 
         assert mock_dispatcher.dispatch.call_count == 2
-        from nexus.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
+        from syntara.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
 
         call_args = [call.args[0] for call in mock_dispatcher.dispatch.call_args_list]
         assert isinstance(call_args[0], AAPJobLaunchedEvent)
@@ -1063,7 +1063,7 @@ class TestWorkflowAuditEventIntegration:
             )
 
         assert mock_dispatcher.dispatch.call_count == 2
-        from nexus.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
+        from syntara.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
 
         call_args = [call.args[0] for call in mock_dispatcher.dispatch.call_args_list]
         assert isinstance(call_args[0], AAPJobLaunchedEvent)
@@ -1092,7 +1092,7 @@ class TestWorkflowAuditEventIntegration:
             )
 
         assert mock_dispatcher.dispatch.call_count == 2
-        from nexus.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
+        from syntara.workflows.audit.aap_job_execution import AAPJobFailedEvent, AAPJobLaunchedEvent
 
         call_args = [call.args[0] for call in mock_dispatcher.dispatch.call_args_list]
         assert isinstance(call_args[0], AAPJobLaunchedEvent)

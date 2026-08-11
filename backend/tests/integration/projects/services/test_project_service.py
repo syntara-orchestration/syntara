@@ -12,21 +12,21 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.authz.exceptions import ProjectNotFoundError
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.role import Role
-from nexus.authz.seed import seed_authz_data
-from nexus.core.models import User
-from nexus.core.models.group import Group
-from nexus.core.models.secret import EncryptedSecret, Secret
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.projects.service import ProjectService
-from nexus.workflows.models.execution import Execution
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_version import WorkflowVersion
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.exceptions import ProjectNotFoundError
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.role import Role
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models import User
+from syntara.core.models.group import Group
+from syntara.core.models.secret import EncryptedSecret, Secret
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.projects.service import ProjectService
+from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 
@@ -487,7 +487,7 @@ async def test_delete_project_hard_deletes_credentials_and_cleans_secrets(
 @pytest.mark.asyncio
 async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSession, test_user: User) -> None:
     """Deleting a project hard-deletes all approval requests within it."""
-    from nexus.approvals.models.approval_request import ApprovalRequest
+    from syntara.approvals.models.approval_request import ApprovalRequest
 
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
@@ -597,8 +597,8 @@ async def test_delete_project_with_no_resources(seeded_db: AsyncSession, test_us
 @pytest.mark.asyncio
 async def test_update_builtin_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
     """Updating a builtin project raises BuiltinProtectionError."""
-    from nexus.authz.exceptions import BuiltinProtectionError
-    from nexus.authz.models.project import Project
+    from syntara.authz.exceptions import BuiltinProtectionError
+    from syntara.authz.models.project import Project
 
     result = await seeded_db.exec(select(Project).where(Project.is_builtin == True))  # noqa: E712
     builtin_project = result.first()
@@ -612,8 +612,8 @@ async def test_update_builtin_project_raises(seeded_db: AsyncSession, test_user:
 @pytest.mark.asyncio
 async def test_delete_builtin_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
     """Deleting a builtin project raises BuiltinProtectionError."""
-    from nexus.authz.exceptions import BuiltinProtectionError
-    from nexus.authz.models.project import Project
+    from syntara.authz.exceptions import BuiltinProtectionError
+    from syntara.authz.models.project import Project
 
     result = await seeded_db.exec(select(Project).where(Project.is_builtin == True))  # noqa: E712
     builtin_project = result.first()

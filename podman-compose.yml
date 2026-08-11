@@ -11,12 +11,12 @@ services:
     environment:
       POSTGRESQL_USER: ${APP_DB_USER:-admin}
       POSTGRESQL_PASSWORD: ${APP_DB_PASSWORD:-admin}
-      POSTGRESQL_DATABASE: ${APP_DB_NAME:-nexus_api}
+      POSTGRESQL_DATABASE: ${APP_DB_NAME:-syntara_api}
       POSTGRESQL_ADMIN_PASSWORD: ${APP_DB_PASSWORD:-admin}
     volumes:
       - syntara_postgres_data:/var/lib/pgsql/data
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U $${POSTGRESQL_USER:-admin} -d $${POSTGRESQL_DATABASE:-nexus_api}']
+      test: [CMD-SHELL, 'pg_isready -U $${POSTGRESQL_USER:-admin} -d $${POSTGRESQL_DATABASE:-syntara_api}']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -128,7 +128,7 @@ services:
       dockerfile: containers/nexus/Containerfile
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
-    command: [sh, -c, 'chmod -R g+rwX /data/audit-exports 2>/dev/null; uv run --no-sync alembic upgrade head && uv run --no-sync python -m nexus.seed --all && (uv run --no-sync python -c "import os,boto3; boto3.client(\"s3\", endpoint_url=os.environ[\"APP_S3_ENDPOINT_URL\"], aws_access_key_id=os.environ[\"APP_S3_ACCESS_KEY_ID\"], aws_secret_access_key=os.environ[\"APP_S3_SECRET_ACCESS_KEY\"], region_name=os.environ[\"APP_S3_REGION\"]).create_bucket(Bucket=os.environ[\"APP_S3_BUCKET_NAME\"])" || true) && uv run --no-sync python -m nexus.api.main']
+    command: [sh, -c, 'chmod -R g+rwX /data/audit-exports 2>/dev/null; uv run --no-sync alembic upgrade head && uv run --no-sync python -m syntara.seed --all && (uv run --no-sync python -c "import os,boto3; boto3.client(\"s3\", endpoint_url=os.environ[\"APP_S3_ENDPOINT_URL\"], aws_access_key_id=os.environ[\"APP_S3_ACCESS_KEY_ID\"], aws_secret_access_key=os.environ[\"APP_S3_SECRET_ACCESS_KEY\"], region_name=os.environ[\"APP_S3_REGION\"]).create_bucket(Bucket=os.environ[\"APP_S3_BUCKET_NAME\"])" || true) && uv run --no-sync python -m syntara.api.main']
     ports:
       - ${APP_API_PORT:-8000}:8000
     environment:
@@ -136,7 +136,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -208,7 +208,7 @@ services:
   temporal-worker:
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
-    command: [python, -m, nexus.workflows.worker]
+    command: [python, -m, syntara.workflows.worker]
     extra_hosts: # Dev mode: resolves 'syntara' to host when API runs outside containers
       - "syntara:host-gateway"
     environment:
@@ -216,7 +216,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -282,7 +282,7 @@ services:
       moto:
         condition: service_healthy
     healthcheck:
-      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa nexus.workflows.worker']
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflows.worker']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -291,7 +291,7 @@ services:
   temporal-background-worker:
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
-    command: [python, -m, nexus.workflows.background_worker]
+    command: [python, -m, syntara.workflows.background_worker]
     extra_hosts:
       - "syntara:host-gateway"
     environment:
@@ -299,7 +299,7 @@ services:
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
-      - APP_DB_NAME=${APP_DB_NAME:-nexus_api}
+      - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
 
       - APP_SERVER_SCHEME=${APP_SERVER_SCHEME:-https}
       - APP_SERVER_HOST=${APP_SERVER_HOST:-0.0.0.0}
@@ -347,7 +347,7 @@ services:
       moto:
         condition: service_healthy
     healthcheck:
-      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa nexus.workflows.background_worker']
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflows.background_worker']
       interval: 30s
       timeout: 10s
       retries: 3

@@ -3,7 +3,7 @@
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.constants import CONTEXT_KEY, CONTEXT_KEY_FILE_IDS
+from syntara.core.constants import CONTEXT_KEY, CONTEXT_KEY_FILE_IDS
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 
 

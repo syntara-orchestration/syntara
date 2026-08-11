@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
 

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.admin.__main__ import _get_actor, _revoke_all_tokens, _revoke_idp_sessions, _revoke_user_sessions
+from syntara.admin.__main__ import _get_actor, _revoke_all_tokens, _revoke_idp_sessions, _revoke_user_sessions
 
 
 def _make_mock_user(username: str = "alice") -> MagicMock:
@@ -50,18 +50,18 @@ class TestRevokeAllTokens:
         mock_session = _mock_db_session(rowcount=1)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
             patch(
-                "nexus.admin.services.set_global_revocation_timestamp",
+                "syntara.admin.services.set_global_revocation_timestamp",
                 new_callable=AsyncMock,
                 return_value=now,
             ) as mock_set,
@@ -80,18 +80,18 @@ class TestRevokeAllTokens:
         mock_session = _mock_db_session(rowcount=0)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
             patch(
-                "nexus.admin.services.set_global_revocation_timestamp",
+                "syntara.admin.services.set_global_revocation_timestamp",
                 new_callable=AsyncMock,
                 return_value=now,
             ) as mock_set,
@@ -109,18 +109,18 @@ class TestRevokeAllTokens:
         mock_session = _mock_db_session(rowcount=1)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
             patch(
-                "nexus.admin.services.set_global_revocation_timestamp",
+                "syntara.admin.services.set_global_revocation_timestamp",
                 new_callable=AsyncMock,
                 return_value=datetime.now(UTC),
             ) as mock_set,
@@ -153,18 +153,18 @@ class TestRevokeUserSessions:
         mock_store.increment_token_version = AsyncMock()
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher,
         ):
             await _revoke_user_sessions(username="alice", actor="admin-cli")
 
@@ -188,11 +188,11 @@ class TestRevokeUserSessions:
         mock_session.exec = AsyncMock(return_value=mock_result)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
@@ -217,18 +217,18 @@ class TestRevokeUserSessions:
         mock_store.increment_token_version = AsyncMock()
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher,
         ):
             await _revoke_user_sessions(username="alice", actor="security-team@corp.com")
 
@@ -258,18 +258,18 @@ class TestRevokeIdpSessions:
         mock_store.revoke_by_idp = AsyncMock(return_value=5)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher,
         ):
             await _revoke_idp_sessions(idp_name="Corporate Okta", actor="admin-cli")
 
@@ -292,11 +292,11 @@ class TestRevokeIdpSessions:
         mock_session.exec = AsyncMock(return_value=mock_result)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
@@ -320,18 +320,18 @@ class TestRevokeIdpSessions:
         mock_store.revoke_by_idp = AsyncMock(return_value=0)
 
         with (
-            patch("nexus.admin.__main__._register_audit_handlers"),
-            patch("nexus.admin.__main__.start_audit_subsystems"),
-            patch("nexus.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
+            patch("syntara.admin.__main__._register_audit_handlers"),
+            patch("syntara.admin.__main__.start_audit_subsystems"),
+            patch("syntara.admin.__main__.stop_audit_subsystems", new_callable=AsyncMock),
             patch(
-                "nexus.core.database.session.AsyncSessionLocal",
+                "syntara.core.database.session.AsyncSessionLocal",
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(return_value=mock_session),
                     __aexit__=AsyncMock(return_value=False),
                 ),
             ),
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher,
         ):
             await _revoke_idp_sessions(idp_name="Corporate Okta", actor="ops@example.com")
 
@@ -349,12 +349,12 @@ class TestGetActor:
 
     def test_returns_os_login(self) -> None:
         """Should return the OS login name."""
-        with patch("nexus.admin.__main__.os.getlogin", return_value="jdoe"):
+        with patch("syntara.admin.__main__.os.getlogin", return_value="jdoe"):
             assert _get_actor() == "jdoe"
 
     def test_falls_back_on_os_error(self) -> None:
         """Should fall back to 'admin-cli' when os.getlogin() raises OSError."""
-        with patch("nexus.admin.__main__.os.getlogin", side_effect=OSError("no tty")):
+        with patch("syntara.admin.__main__.os.getlogin", side_effect=OSError("no tty")):
             assert _get_actor() == "admin-cli"
 
 
@@ -363,7 +363,7 @@ class TestBuildParser:
 
     def test_revoke_user_sessions_requires_username(self) -> None:
         """The --username flag should be required for revoke-user-sessions."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         with pytest.raises(SystemExit, match="2"):
@@ -371,7 +371,7 @@ class TestBuildParser:
 
     def test_revoke_user_sessions_parses_all_flags(self) -> None:
         """Should parse --username and --yes."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-user-sessions", "--username", "alice", "--yes"])
@@ -382,7 +382,7 @@ class TestBuildParser:
 
     def test_revoke_idp_sessions_requires_idp_name(self) -> None:
         """The --idp-name flag should be required for revoke-idp-sessions."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         with pytest.raises(SystemExit, match="2"):
@@ -390,7 +390,7 @@ class TestBuildParser:
 
     def test_revoke_idp_sessions_parses_all_flags(self) -> None:
         """Should parse --idp-name and --yes."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-idp-sessions", "--idp-name", "Corporate Okta", "--yes"])
@@ -401,7 +401,7 @@ class TestBuildParser:
 
     def test_revoke_user_sessions_defaults(self) -> None:
         """Should default --yes to False."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-user-sessions", "--username", "bob"])
@@ -410,7 +410,7 @@ class TestBuildParser:
 
     def test_revoke_idp_sessions_defaults(self) -> None:
         """Should default --yes to False."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-idp-sessions", "--idp-name", "Keycloak"])
@@ -419,7 +419,7 @@ class TestBuildParser:
 
     def test_revoke_all_sessions_parses_all_flags(self) -> None:
         """Should parse --yes for revoke-all-sessions."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-all-sessions", "--yes"])
@@ -429,7 +429,7 @@ class TestBuildParser:
 
     def test_revoke_all_sessions_defaults(self) -> None:
         """Should default --yes to False."""
-        from nexus.admin.__main__ import _build_parser
+        from syntara.admin.__main__ import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["revoke-all-sessions"])

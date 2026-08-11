@@ -7,13 +7,13 @@ import pytest
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import (
     builtin_workflow_delete_handler,
     builtin_workflow_missing_handler,
     builtin_workflow_modify_handler,
 )
-from nexus.workflows.exceptions import (
+from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowMissingError,
     BuiltinWorkflowModifyError,

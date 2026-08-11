@@ -1,6 +1,6 @@
 """Check that API endpoint paths use snake_case (no hyphens).
 
-Scans all Python files under src/nexus/ for FastAPI router definitions and
+Scans all Python files under src/syntara/ for FastAPI router definitions and
 verifies that URL path segments do not contain hyphens. Path parameters
 (e.g., {project_id}) are ignored.
 
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT / "src" / "nexus"
+SRC_DIR = ROOT / "src" / "syntara"
 
 RED = "\033[91m"
 GREEN = "\033[92m"

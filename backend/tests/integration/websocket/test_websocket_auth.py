@@ -20,11 +20,11 @@ from uuid import uuid4
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from nexus.core.constants import WebSocketConfig
-from nexus.core.models import User
-from nexus.core.websocket.close_codes import POLICY_VIOLATION
-from nexus.core.websocket.connection import get_connection_manager
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.core.constants import WebSocketConfig
+from syntara.core.models import User
+from syntara.core.websocket.close_codes import POLICY_VIOLATION
+from syntara.core.websocket.connection import get_connection_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -38,8 +38,8 @@ INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
 
 TRY_AGAIN_LATER = 1013
 
-_PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
-_PATCH_AUTHZ = "nexus.core.websocket.endpoint_factory._check_websocket_authorization"
+_PATCH_AUTHN = "syntara.core.websocket.endpoint_factory._authenticate_websocket"
+_PATCH_AUTHZ = "syntara.core.websocket.endpoint_factory._check_websocket_authorization"
 
 _FAKE_USER = User(
     id=uuid4(),

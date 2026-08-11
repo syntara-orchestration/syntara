@@ -12,10 +12,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.agentic_activity import (
+from syntara.workflows.workflow_engine.activities.agentic_activity import (
     execute_agentic_activity,
 )
-from nexus.workflows.workflow_engine.activities.common import (
+from syntara.workflows.workflow_engine.activities.common import (
     HEARTBEAT_PARTIAL_OUTPUT_KEY,
     HEARTBEAT_STOP_MONITOR,
 )
@@ -27,7 +27,7 @@ def _mock_runtime_settings() -> Generator[None, None, None]:
     mock_cache = AsyncMock()
     mock_cache.get_int = AsyncMock(return_value=100000)
     with patch(
-        "nexus.workflows.workflow_engine.activities.agentic_activity.get_runtime_settings",
+        "syntara.workflows.workflow_engine.activities.agentic_activity.get_runtime_settings",
         return_value=mock_cache,
     ):
         yield
@@ -71,13 +71,13 @@ class TestAgenticActivityPartialOutput:
 
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient"
+                "syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient"
             ) as mock_client_cls,
             patch("temporalio.activity.info", return_value=mock_activity_info),
             patch("temporalio.activity.heartbeat") as mock_heartbeat,
             patch("temporalio.activity.raise_complete_async", side_effect=CompleteAsyncError),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
         ):
@@ -120,13 +120,13 @@ class TestAgenticActivityPartialOutput:
 
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient"
+                "syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient"
             ) as mock_client_cls,
             patch("temporalio.activity.info", return_value=mock_activity_info),
             patch("temporalio.activity.heartbeat", side_effect=track_heartbeat),
             patch("temporalio.activity.raise_complete_async", side_effect=CompleteAsyncError),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
         ):

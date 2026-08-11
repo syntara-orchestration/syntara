@@ -18,15 +18,15 @@ from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.metrics.completion_poller import poll_completed_executions
-from nexus.metrics.emission import emit_completion_metrics, emitted_completions, reset_emission_trackers
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
-from nexus.workflows.models.activity_execution import ActivityStatus
-from nexus.workflows.models.execution import Execution, ExecutionStatus
+from syntara.metrics.completion_poller import poll_completed_executions
+from syntara.metrics.emission import emit_completion_metrics, emitted_completions, reset_emission_trackers
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
+from syntara.workflows.models.activity_execution import ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 if TYPE_CHECKING:
-    from nexus.workflows.models.workflow import Workflow
+    from syntara.workflows.models.workflow import Workflow
     from tests.integration.helpers.workflow import ActivitiesFactory, ExecutionsFactory
 
 
@@ -184,7 +184,7 @@ class TestPollCompletedExecutions:
 
         session_factory = async_sessionmaker(test_db_session.bind, class_=AsyncSession, expire_on_commit=False)
 
-        with patch("nexus.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
             await poll_completed_executions(session_factory)
 
         assert completed_execution.id in emitted_completions
@@ -202,7 +202,7 @@ class TestPollCompletedExecutions:
 
         session_factory = async_sessionmaker(test_db_session.bind, class_=AsyncSession, expire_on_commit=False)
 
-        with patch("nexus.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
             await poll_completed_executions(session_factory)
 
         assert len(list(recorder.query(metric_types={MetricType.WORKFLOW_DURATION}))) == 0
@@ -218,7 +218,7 @@ class TestPollCompletedExecutions:
 
         session_factory = async_sessionmaker(test_db_session.bind, class_=AsyncSession, expire_on_commit=False)
 
-        with patch("nexus.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.completion_poller.get_metrics_recorder", return_value=recorder):
             await poll_completed_executions(session_factory)
 
         assert len(list(recorder.query(metric_types={MetricType.WORKFLOW_DURATION}))) == 0
@@ -236,7 +236,7 @@ class TestDedupTrimming:
         reset_emission_trackers()
 
     def test_bounded_dedup_evicts_oldest_on_overflow(self) -> None:
-        from nexus.metrics.emission import _BoundedDedup
+        from syntara.metrics.emission import _BoundedDedup
 
         max_size = 100
         dedup = _BoundedDedup(max_size=max_size)

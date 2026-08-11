@@ -15,7 +15,7 @@ import yaml
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from nexus.core.router.loader import load_openapi_schema
+from syntara.core.router.loader import load_openapi_schema
 
 _ACTION_OPERATION_PREFIXES = (
     "disable_",
@@ -69,7 +69,7 @@ def _load_spec() -> tuple[dict[str, Any], dict[str, Any]]:
         return _spec_cache
     schema = load_openapi_schema("openapi.yaml")
     if schema is None:
-        msg = "Failed to load OpenAPI spec from nexus.schemas.openapi.yaml"
+        msg = "Failed to load OpenAPI spec from syntara.schemas.openapi.yaml"
         raise FileNotFoundError(msg)
     spec = schema.schema_data
     _spec_cache = spec.get("paths", {}), spec.get("components", {}).get("schemas", {})

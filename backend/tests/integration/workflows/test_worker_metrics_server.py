@@ -12,7 +12,7 @@ No Temporal connection is required — the metrics server is started before
 the Temporal worker attempts to connect, so both paths are independent.
 
 The test file lives in ``tests/integration/workflows/`` because
-``worker_lifecycle.py`` belongs to the ``nexus.workflows`` domain.
+``worker_lifecycle.py`` belongs to the ``syntara.workflows`` domain.
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ import httpx
 import prometheus_client
 import pytest
 
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 
 if TYPE_CHECKING:
-    from nexus.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+    from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
 
 
 def _free_port() -> int:
@@ -105,7 +105,7 @@ class TestWorkerMetricsServer:
         """
         import asyncio
 
-        from nexus.workflows.worker_lifecycle import run_worker
+        from syntara.workflows.worker_lifecycle import run_worker
 
         captured_port: list[int] = []
 
@@ -120,16 +120,16 @@ class TestWorkerMetricsServer:
 
         with (
             patch(
-                "nexus.workflows.worker_lifecycle.prometheus_client.start_http_server",
+                "syntara.workflows.worker_lifecycle.prometheus_client.start_http_server",
                 side_effect=_fake_start_http_server,
             ),
-            patch("nexus.workflows.worker_lifecycle.set_runtime_settings"),
-            patch("nexus.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
+            patch("syntara.workflows.worker_lifecycle.set_runtime_settings"),
+            patch("syntara.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
             patch(
-                "nexus.workflows.worker_lifecycle.get_runtime_settings",
+                "syntara.workflows.worker_lifecycle.get_runtime_settings",
                 return_value=AsyncMock(stop_watching=AsyncMock(), start_watching=AsyncMock()),
             ),
-            patch("nexus.workflows.worker_lifecycle.discover_and_register_all_handlers"),
+            patch("syntara.workflows.worker_lifecycle.discover_and_register_all_handlers"),
         ):
             # Create the coroutine outside pytest.raises so only asyncio.run
             # (the single raising call) is inside the block — satisfies S5778.

@@ -111,10 +111,10 @@ def _get_activities(execution: ExecutionRead) -> dict[str, Any]:
 
 
 @pytest.mark.e2e
-def test_per_node_timeout_overrides_global(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_per_node_timeout_overrides_global(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Per-node settings.timeout (2s) kills a script faster than global default (300s)."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-node-timeout-override",
         {
             "name": "node_settings",
@@ -138,16 +138,16 @@ def test_per_node_timeout_overrides_global(nexus_api: SyntaraApiRegistry, first_
 
 
 @pytest.mark.e2e
-def test_per_node_timeout_allows_longer_execution(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_per_node_timeout_allows_longer_execution(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Per-node timeout (15s) overrides a restrictive global setting (2s)."""
     key = "workflow_engine.script_timeout_seconds"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key, value=2)
+        _patch_setting(syntara_api, key, value=2)
 
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-node-timeout-longer",
             {
                 "name": "node_settings",
@@ -169,20 +169,20 @@ def test_per_node_timeout_allows_longer_execution(nexus_api: SyntaraApiRegistry,
 
         assert result.status == ExecutionStatus.COMPLETED, f"Expected COMPLETED, got {result.status}"
     finally:
-        _restore_settings(nexus_api, {key: original})
+        _restore_settings(syntara_api, {key: original})
 
 
 @pytest.mark.e2e
-def test_timeout_fallback_to_global(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_timeout_fallback_to_global(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """No per-node timeout → falls back to global setting."""
     key = "workflow_engine.script_timeout_seconds"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key, value=2)
+        _patch_setting(syntara_api, key, value=2)
 
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-node-timeout-fallback",
             {
                 "name": "node_settings",
@@ -203,7 +203,7 @@ def test_timeout_fallback_to_global(nexus_api: SyntaraApiRegistry, first_project
 
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED (global timeout), got {result.status}"
     finally:
-        _restore_settings(nexus_api, {key: original})
+        _restore_settings(syntara_api, {key: original})
 
 
 # ---------------------------------------------------------------------------
@@ -212,10 +212,10 @@ def test_timeout_fallback_to_global(nexus_api: SyntaraApiRegistry, first_project
 
 
 @pytest.mark.e2e
-def test_continue_on_failure_downstream_executes(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_continue_on_failure_downstream_executes(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """continue_on_failure=true → downstream node still executes after failure."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-cof-downstream-executes",
         {
             "name": "node_settings",
@@ -254,10 +254,10 @@ def test_continue_on_failure_downstream_executes(nexus_api: SyntaraApiRegistry, 
 
 
 @pytest.mark.e2e
-def test_continue_on_failure_false_skips_downstream(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_continue_on_failure_false_skips_downstream(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """continue_on_failure=false (default) → downstream is skipped after failure."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-cof-false-skips",
         {
             "name": "node_settings",
@@ -293,16 +293,16 @@ def test_continue_on_failure_false_skips_downstream(nexus_api: SyntaraApiRegistr
 
 
 @pytest.mark.e2e
-def test_global_cof_default_applies(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_global_cof_default_applies(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Global continue_on_failure=true applies when no per-node setting is set."""
     key = "workflow_engine.continue_on_failure"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key, value=True)
+        _patch_setting(syntara_api, key, value=True)
 
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-cof-global-default",
             {
                 "name": "node_settings",
@@ -336,20 +336,20 @@ def test_global_cof_default_applies(nexus_api: SyntaraApiRegistry, first_project
         activities = _get_activities(result)
         assert "downstream" in activities, "Downstream should execute when global CoF is true"
     finally:
-        _restore_settings(nexus_api, {key: original})
+        _restore_settings(syntara_api, {key: original})
 
 
 @pytest.mark.e2e
-def test_per_node_cof_overrides_global(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_per_node_cof_overrides_global(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Per-node continue_on_failure=false overrides global true."""
     key = "workflow_engine.continue_on_failure"
-    original = nexus_api.settings.get(key=key).assert_and_get().to_dict()
+    original = syntara_api.settings.get(key=key).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key, value=True)
+        _patch_setting(syntara_api, key, value=True)
 
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-cof-override-global",
             {
                 "name": "node_settings",
@@ -382,7 +382,7 @@ def test_per_node_cof_overrides_global(nexus_api: SyntaraApiRegistry, first_proj
             f"Expected FAILED (per-node overrides global), got {result.status}"
         )
     finally:
-        _restore_settings(nexus_api, {key: original})
+        _restore_settings(syntara_api, {key: original})
 
 
 # ---------------------------------------------------------------------------
@@ -392,11 +392,11 @@ def test_per_node_cof_overrides_global(nexus_api: SyntaraApiRegistry, first_proj
 
 @requires_httpbin
 @pytest.mark.e2e
-def test_retry_policy_retries_on_transient_error(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_retry_policy_retries_on_transient_error(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request with retry_policy retries on 503 (transient). Slower than no-retry."""
     start = time.monotonic()
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-retry-transient",
         {
             "name": "node_settings",
@@ -434,11 +434,11 @@ def test_retry_policy_retries_on_transient_error(nexus_api: SyntaraApiRegistry, 
 
 @requires_httpbin
 @pytest.mark.e2e
-def test_retry_policy_max_retries_zero_no_retry(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_retry_policy_max_retries_zero_no_retry(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """max_retries=0 disables retry — fails faster than max_retries=2 on same 503."""
     start = time.monotonic()
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-retry-zero",
         {
             "name": "node_settings",
@@ -470,20 +470,20 @@ def test_retry_policy_max_retries_zero_no_retry(nexus_api: SyntaraApiRegistry, f
 
 
 @pytest.mark.e2e
-def test_retry_not_applied_to_script_nodes(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_retry_not_applied_to_script_nodes(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Script nodes ignore global retry defaults — fail immediately even with aggressive global retry."""
     key_max = "workflow_engine.retry_max_retries"
     key_interval = "workflow_engine.retry_initial_interval"
-    orig_max = nexus_api.settings.get(key=key_max).assert_and_get().to_dict()
-    orig_interval = nexus_api.settings.get(key=key_interval).assert_and_get().to_dict()
+    orig_max = syntara_api.settings.get(key=key_max).assert_and_get().to_dict()
+    orig_interval = syntara_api.settings.get(key=key_interval).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key_max, value=5)
-        _patch_setting(nexus_api, key_interval, value=2)
+        _patch_setting(syntara_api, key_max, value=5)
+        _patch_setting(syntara_api, key_interval, value=2)
 
         start = time.monotonic()
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-retry-not-script",
             {
                 "name": "node_settings",
@@ -507,7 +507,7 @@ def test_retry_not_applied_to_script_nodes(nexus_api: SyntaraApiRegistry, first_
         # If retry applied, 5 retries x 2s interval = >10s. Script should fail well under that.
         assert elapsed < 30, f"Script should fail fast (no retry despite global retry=5), took {elapsed:.1f}s"
     finally:
-        _restore_settings(nexus_api, {key_max: orig_max, key_interval: orig_interval})
+        _restore_settings(syntara_api, {key_max: orig_max, key_interval: orig_interval})
 
 
 # ---------------------------------------------------------------------------
@@ -516,10 +516,10 @@ def test_retry_not_applied_to_script_nodes(nexus_api: SyntaraApiRegistry, first_
 
 
 @pytest.mark.e2e
-def test_cof_with_multiple_branches_mixed_status(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_cof_with_multiple_branches_mixed_status(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Parallel branches: one fails with CoF=true, one succeeds → completed_with_errors."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-cof-parallel-mixed",
         {
             "name": "node_settings",
@@ -574,10 +574,10 @@ def test_cof_with_multiple_branches_mixed_status(nexus_api: SyntaraApiRegistry, 
 
 
 @pytest.mark.e2e
-def test_control_node_with_empty_settings_completes(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_control_node_with_empty_settings_completes(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """Switch node with empty settings field completes normally — no validation error."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-control-settings-empty",
         {
             "name": "node_settings",
@@ -631,10 +631,10 @@ def test_control_node_with_empty_settings_completes(nexus_api: SyntaraApiRegistr
 
 @requires_httpbin
 @pytest.mark.e2e
-def test_http_request_per_node_timeout(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_http_request_per_node_timeout(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request node per-node timeout (2s) overrides global http_request_timeout_seconds."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-http-timeout-override",
         {
             "name": "node_settings",
@@ -667,12 +667,12 @@ def test_http_request_per_node_timeout(nexus_api: SyntaraApiRegistry, first_proj
 
 @pytest.mark.e2e
 def test_retry_no_retry_on_permanent_error(
-    nexus_api: SyntaraApiRegistry, worker_base_url: str, first_project_id: UUID
+    syntara_api: SyntaraApiRegistry, worker_base_url: str, first_project_id: UUID
 ) -> None:
     """HTTP 404 (permanent) is not retried even with retry_policy configured."""
     start = time.monotonic()
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-retry-permanent",
         {
             "name": "node_settings",
@@ -716,20 +716,20 @@ def test_retry_no_retry_on_permanent_error(
 
 @requires_httpbin
 @pytest.mark.e2e
-def test_global_retry_defaults_apply_to_http_request(nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+def test_global_retry_defaults_apply_to_http_request(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request with no per-node retry_policy uses global retry defaults."""
     key_max = "workflow_engine.retry_max_retries"
     key_interval = "workflow_engine.retry_initial_interval"
-    orig_max = nexus_api.settings.get(key=key_max).assert_and_get().to_dict()
-    orig_interval = nexus_api.settings.get(key=key_interval).assert_and_get().to_dict()
+    orig_max = syntara_api.settings.get(key=key_max).assert_and_get().to_dict()
+    orig_interval = syntara_api.settings.get(key=key_interval).assert_and_get().to_dict()
 
     try:
-        _patch_setting(nexus_api, key_max, value=2)
-        _patch_setting(nexus_api, key_interval, value=2)
+        _patch_setting(syntara_api, key_max, value=2)
+        _patch_setting(syntara_api, key_interval, value=2)
 
         start = time.monotonic()
         result = _run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-retry-global-default",
             {
                 "name": "node_settings",
@@ -757,7 +757,7 @@ def test_global_retry_defaults_apply_to_http_request(nexus_api: SyntaraApiRegist
         # Global: 2 retries x 2s = 4s retry delay + poll/scheduling overhead > 5s
         assert elapsed > 5, f"Global retry (2 retries x 2s) should take >5s, took {elapsed:.1f}s"
     finally:
-        _restore_settings(nexus_api, {key_max: orig_max, key_interval: orig_interval})
+        _restore_settings(syntara_api, {key_max: orig_max, key_interval: orig_interval})
 
 
 # ---------------------------------------------------------------------------
@@ -767,11 +767,11 @@ def test_global_retry_defaults_apply_to_http_request(nexus_api: SyntaraApiRegist
 
 @pytest.mark.e2e
 def test_sequential_cof_second_failure_without_cof_is_failed(
-    nexus_api: SyntaraApiRegistry, first_project_id: UUID
+    syntara_api: SyntaraApiRegistry, first_project_id: UUID
 ) -> None:
     """Node A fails (CoF=true) → Node B runs → Node B fails (CoF=false) → execution is 'failed'."""
     result = _run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-cof-chain-mixed",
         {
             "name": "node_settings",

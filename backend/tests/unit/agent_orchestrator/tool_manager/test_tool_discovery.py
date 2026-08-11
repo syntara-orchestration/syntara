@@ -7,8 +7,8 @@ import httpx
 import pytest
 import respx
 
-from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
-from nexus.integrations.models.integration import IntegrationRead, IntegrationStatus, IntegrationType
+from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+from syntara.integrations.models.integration import IntegrationRead, IntegrationStatus, IntegrationType
 
 from .conftest import mock_paginated_api
 

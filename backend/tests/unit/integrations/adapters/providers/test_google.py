@@ -1,6 +1,6 @@
 """Tests for GoogleProvider."""
 
-from nexus.integrations.adapters.providers.google import GoogleProvider
+from syntara.integrations.adapters.providers.google import GoogleProvider
 
 
 class TestGoogleProvider:

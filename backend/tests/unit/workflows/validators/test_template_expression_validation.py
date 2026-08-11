@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-import nexus.workflows.validators.template_expressions
-from nexus.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
-from nexus.workflows.validators.template_expressions import (
+import syntara.workflows.validators.template_expressions
+from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.validators.template_expressions import (
     _extract_element_expressions,
     _extract_expressions,
     _identify_loop_body_nodes,
@@ -19,7 +19,7 @@ class TestModuleLevelCoverage:
     """Reload the module so coverage tracks the module-level constants and imports."""
 
     def test_module_reload_covers_constants(self) -> None:
-        importlib.reload(nexus.workflows.validators.template_expressions)
+        importlib.reload(syntara.workflows.validators.template_expressions)
 
 
 def _base_definition(**overrides: object) -> dict[str, Any]:

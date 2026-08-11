@@ -10,8 +10,8 @@ import pytest_asyncio
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.passwords import hash_password
-from nexus.core.models import User
+from syntara.auth.passwords import hash_password
+from syntara.core.models import User
 
 _TEST_PW_HASH = hash_password("testpassword")
 

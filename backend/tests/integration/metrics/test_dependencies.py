@@ -1,7 +1,7 @@
 """Integration tests for the metrics dependency provider."""
 
-from nexus.metrics.dependencies import get_metrics_recorder
-from nexus.metrics.recorder import MetricsRecorder
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.recorder import MetricsRecorder
 
 
 class TestGetMetricsRecorder:

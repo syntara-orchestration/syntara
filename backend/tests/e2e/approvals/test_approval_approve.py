@@ -75,7 +75,7 @@ class TestApproveSignal:
 
     def test_approve_resumes_execution_to_completed(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -101,29 +101,29 @@ class TestApproveSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
         assert approval.status == ApprovalRequestStatus.PENDING
         assert approval.execution_id == exec_id
         assert approval.approval_node_id == "approval_gate"
 
-        nexus_api.approvals.decide(
+        syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(status=ApprovalDecisionStatus.APPROVED),
         ).assert_and_get()
 
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status == ExecutionStatus.COMPLETED, (
             f"Expected COMPLETED after approve, got {final.status}: {final.error_details}"
         )
 
     def test_approve_executes_downstream_node_on_approved_path(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -147,18 +147,18 @@ class TestApproveSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
-        nexus_api.approvals.decide(
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(status=ApprovalDecisionStatus.APPROVED),
         ).assert_and_get()
 
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status == ExecutionStatus.COMPLETED, (
             f"Expected COMPLETED, got {final.status}: {final.error_details}"
         )
@@ -173,7 +173,7 @@ class TestApproveSignal:
 
     def test_approve_output_contains_required_fields(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -201,15 +201,15 @@ class TestApproveSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
         notes_text = "LGTM — approving for E2E test"
 
-        nexus_api.approvals.decide(
+        syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(
                 status=ApprovalDecisionStatus.APPROVED,
@@ -217,7 +217,7 @@ class TestApproveSignal:
             ),
         ).assert_and_get()
 
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status == ExecutionStatus.COMPLETED
 
         activities = {a.activity_id: a for a in (final.activities or [])}

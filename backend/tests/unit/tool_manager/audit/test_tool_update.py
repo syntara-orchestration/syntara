@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.tool_manager.audit.tool_update import ToolUpdateEvent, ToolUpdateHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.tool_manager.audit.tool_update import ToolUpdateEvent, ToolUpdateHandler
 
 
 class TestToolUpdateHandler:
@@ -31,7 +31,7 @@ class TestToolUpdateHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.tool_manager.tool"
+        assert audit_event.source_component == "syntara.tool_manager.tool"
         assert "create_issue" in audit_event.event_message
         assert "enabled, status" in audit_event.event_message
 

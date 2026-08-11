@@ -9,8 +9,8 @@ import pytest
 import pytest_asyncio
 from sqlmodel import select
 
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.models import User
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.models import User
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def default_user_data() -> dict[str, Any]:
     """Provide default user attributes."""
-    from nexus.auth.passwords import hash_password
+    from syntara.auth.passwords import hash_password
 
     return {
         "username": "testuser",
@@ -56,7 +56,7 @@ async def user_factory(
 
         from sqlalchemy import insert
 
-        from nexus.core.models.group import Group, user_groups
+        from syntara.core.models.group import Group, user_groups
 
         if group_names:
             for name in group_names:

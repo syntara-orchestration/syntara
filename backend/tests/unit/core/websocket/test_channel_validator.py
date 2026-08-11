@@ -3,7 +3,7 @@
 import types
 from typing import Any
 
-from nexus.core.websocket.channel_validator import (
+from syntara.core.websocket.channel_validator import (
     ChannelValidationResult,
     check_missing_handlers,
     check_orphaned_handlers,

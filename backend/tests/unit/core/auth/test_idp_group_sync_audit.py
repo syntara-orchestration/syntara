@@ -9,16 +9,16 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory
-from nexus.auth.services.idp_group_sync import sync_idp_groups
-from nexus.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
-from nexus.core.models import User, UserIdentity
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
-from nexus.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory
+from syntara.auth.services.idp_group_sync import sync_idp_groups
+from syntara.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
+from syntara.core.models import User, UserIdentity
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 def _make_user() -> User:
@@ -100,7 +100,7 @@ class TestIdpGroupSyncMembershipAudit:
         AuditEventDispatcher.register({GroupMembershipEvent: GroupMembershipHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_matching_group_emits_group_member_added(self, mock_do_emit: AsyncMock) -> None:
         """New IdP-mapped membership must emit group_member_added."""
         user = _make_user()
@@ -128,7 +128,7 @@ class TestIdpGroupSyncMembershipAudit:
         assert event.structured_data.group_id == str(nexus_group_id)
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_stale_idp_membership_emits_group_member_removed(self, mock_do_emit: AsyncMock) -> None:
         """Removing a previous IdP membership must emit group_member_removed."""
         user = _make_user()

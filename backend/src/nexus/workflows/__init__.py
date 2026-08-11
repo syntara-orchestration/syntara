@@ -1,3 +1,1 @@
-"""Workflow execution engine."""
-
-__all__ = []
+"""Compatibility shim — see syntara.workflows."""

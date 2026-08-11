@@ -10,9 +10,9 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.core.config.base import Settings
-from nexus.core.models.principal import service_principal_id
-from nexus.workflows.workflow_engine.activities.internal_activity import (
+from syntara.core.config.base import Settings
+from syntara.core.models.principal import service_principal_id
+from syntara.workflows.workflow_engine.activities.internal_activity import (
     execute_internal_activity,
 )
 
@@ -64,7 +64,7 @@ class TestExecuteInternalActivity:
         mock_handler = AsyncMock(return_value={"output": {"status": "SUCCESS"}})
 
         with patch.dict(
-            "nexus.workflows.workflow_engine.activities.internal_activity._DISPATCH",
+            "syntara.workflows.workflow_engine.activities.internal_activity._DISPATCH",
             {"document_conversion": mock_handler},
         ):
             result = await execute_internal_activity(
@@ -81,7 +81,7 @@ class TestExecuteInternalActivity:
         mock_handler = AsyncMock(return_value={"output": {"status": "completed"}})
 
         with patch.dict(
-            "nexus.workflows.workflow_engine.activities.internal_activity._DISPATCH",
+            "syntara.workflows.workflow_engine.activities.internal_activity._DISPATCH",
             {"invocation_execution": mock_handler},
         ):
             result = await execute_internal_activity(
@@ -136,11 +136,11 @@ class TestRunIntegrationHealthCheck:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
             patch(
-                "nexus.integrations.services.health_check.IntegrationService",
+                "syntara.integrations.services.health_check.IntegrationService",
                 return_value=mock_service,
             ),
         ):
@@ -167,8 +167,8 @@ class TestRunIntegrationHealthCheck:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
         ):
             result = await execute_internal_activity(
                 {"activity": "integration_health_check", "input": {}},
@@ -197,11 +197,11 @@ class TestRunIntegrationHealthCheck:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
             patch(
-                "nexus.integrations.services.health_check.IntegrationService",
+                "syntara.integrations.services.health_check.IntegrationService",
                 mock_integration_service_cls,
             ),
         ):
@@ -234,11 +234,11 @@ class TestRunIntegrationHealthCheck:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
             patch(
-                "nexus.integrations.services.health_check.IntegrationService",
+                "syntara.integrations.services.health_check.IntegrationService",
                 return_value=mock_service,
             ),
         ):
@@ -271,11 +271,11 @@ class TestRunIntegrationHealthCheck:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.health_check.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.health_check.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.health_check.create_secret_service", return_value=MagicMock()),
             patch(
-                "nexus.integrations.services.health_check.IntegrationService",
+                "syntara.integrations.services.health_check.IntegrationService",
                 return_value=mock_service,
             ),
         ):
@@ -313,10 +313,10 @@ class TestRunIntegrationResourceDiscovery:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.resource_discovery.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.resource_discovery.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.resource_discovery.create_secret_service", return_value=MagicMock()),
-            patch("nexus.integrations.services.resource_discovery.IntegrationService", return_value=mock_service),
+            patch("syntara.integrations.services.resource_discovery.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.resource_discovery.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.resource_discovery.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.resource_discovery.IntegrationService", return_value=mock_service),
         ):
             result = await execute_internal_activity(
                 {"activity": "integration_resource_discovery", "input": {"batch": True}},
@@ -347,10 +347,10 @@ class TestRunIntegrationResourceDiscovery:
         mock_settings.get = AsyncMock(return_value=300)
 
         with (
-            patch("nexus.integrations.services.resource_discovery.AsyncSessionLocal", _session_factory(session)),
-            patch("nexus.integrations.services.resource_discovery.get_runtime_settings", return_value=mock_settings),
-            patch("nexus.integrations.services.resource_discovery.create_secret_service", return_value=MagicMock()),
-            patch("nexus.integrations.services.resource_discovery.IntegrationService", return_value=mock_service),
+            patch("syntara.integrations.services.resource_discovery.AsyncSessionLocal", _session_factory(session)),
+            patch("syntara.integrations.services.resource_discovery.get_runtime_settings", return_value=mock_settings),
+            patch("syntara.integrations.services.resource_discovery.create_secret_service", return_value=MagicMock()),
+            patch("syntara.integrations.services.resource_discovery.IntegrationService", return_value=mock_service),
         ):
             result = await execute_internal_activity(
                 {"activity": "integration_resource_discovery", "input": {"batch": True}},

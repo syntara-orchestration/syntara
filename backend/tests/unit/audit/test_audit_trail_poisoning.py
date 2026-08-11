@@ -20,14 +20,14 @@ import jwt
 import pytest
 from fastapi import FastAPI
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import AuditActorContext, actor_context_var
-from nexus.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
-from nexus.audit.middleware import AuditMiddleware
-from nexus.audit.models.audit_event import AuditEvent
-from nexus.audit.models.structured_data import AuditContextData
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import AuditActorContext, actor_context_var
+from syntara.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
+from syntara.audit.middleware import AuditMiddleware
+from syntara.audit.models.audit_event import AuditEvent
+from syntara.audit.models.structured_data import AuditContextData
 
-_EMIT_PATCH = "nexus.audit.emitter._do_emit_audit_event"
+_EMIT_PATCH = "syntara.audit.emitter._do_emit_audit_event"
 
 
 # ---- helpers ----------------------------------------------------------------
@@ -299,7 +299,7 @@ class TestAuditTrailPoisoningCookieAuth:
         emit_audit_event() injects actor from context var when event.actor_id
         is None. If middleware set forged actor, business events are poisoned.
         """
-        from nexus.audit.emitter import emit_audit_event
+        from syntara.audit.emitter import emit_audit_event
 
         captured_events: list[AuditEvent] = []
 
@@ -310,7 +310,7 @@ class TestAuditTrailPoisoningCookieAuth:
         ) -> None:
             # Simulate a business audit event emitted during request processing
             # (before auth dependency would correct context var)
-            from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+            from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
 
             event = AuditEvent(
                 event_category=EventCategory.SECURITY_EVENT,
@@ -318,7 +318,7 @@ class TestAuditTrailPoisoningCookieAuth:
                 event_message="Token refreshed",
                 event_status=EventStatus.SUCCESS,
                 event_severity=EventSeverity.INFO,
-                source_component="nexus.auth.router",
+                source_component="syntara.auth.router",
                 structured_data=AuditContextData(data_type="session_lifecycle"),
             )
             # emit_audit_event will inject actor from context var

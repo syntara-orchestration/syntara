@@ -31,7 +31,7 @@ POLL_TIMEOUT = 20
 API_RETRIES = 3
 API_RETRY_DELAY = 2
 
-# Inline frozenset of terminal status strings — avoids importing from nexus app source.
+# Inline frozenset of terminal status strings — avoids importing from syntara app source.
 TERMINAL_EXECUTION_STATUSES: frozenset[str] = frozenset({"completed", "completed_with_errors", "failed", "cancelled"})
 
 
@@ -278,7 +278,7 @@ def extended_definition() -> dict[str, Any]:
 
 
 def poll_execution_until_complete(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     execution_id: UUID,
     max_polls: int = 30,
     poll_interval: int = 2,
@@ -286,7 +286,7 @@ def poll_execution_until_complete(
     """Poll execution until it reaches a terminal state.
 
     Args:
-        nexus_api: API client for making requests
+        syntara_api: API client for making requests
         execution_id: ID of the execution to poll
         max_polls: Maximum number of polling attempts (default: 30)
         poll_interval: Seconds to wait between polls (default: 2)
@@ -299,7 +299,7 @@ def poll_execution_until_complete(
 
     """
     for _ in range(max_polls):
-        execution = nexus_api.executions.get(
+        execution = syntara_api.executions.get(
             execution_id=execution_id,
             include="activities",
         ).assert_and_get()

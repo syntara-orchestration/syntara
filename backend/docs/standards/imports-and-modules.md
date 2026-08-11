@@ -25,10 +25,10 @@ from sqlalchemy import BigInteger, String, Text, text
 from sqlmodel import Column, DateTime, Field, Index
 
 # 3. Local nexus imports (organized by domain, alphabetically)
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.core.config.base import get_settings
-from nexus.core.models import User, UserRole
-from nexus.workflows.models import Execution, ExecutionStatus, Workflow
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.core.config.base import get_settings
+from syntara.core.models import User, UserRole
+from syntara.workflows.models import Execution, ExecutionStatus, Workflow
 ```
 
 **Rules:**
@@ -36,7 +36,7 @@ from nexus.workflows.models import Execution, ExecutionStatus, Workflow
 - Blank line separates each section
 - Within each section: alphabetical order by module path
 - Group `import` statements before `from ... import` statements within each section
-- Local nexus imports are sorted alphabetically by full module path (e.g., `nexus.agent_orchestrator` before `nexus.core`)
+- Local nexus imports are sorted alphabetically by full module path (e.g., `syntara.agent_orchestrator` before `syntara.core`)
 - No arbitrary grouping or domain-specific subsections within the local import block
 
 **Tooling Enforcement:**
@@ -60,11 +60,11 @@ Nexus is not a library — it has no external consumers or public API to maintai
 
 ```python
 # Correct — import from the defining module
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 # Wrong — import via __init__.py re-export
-from nexus.workflows.models import Workflow, Execution
+from syntara.workflows.models import Workflow, Execution
 ```
 
 Full import paths improve code readability, make it easier to trace where symbols are defined, and eliminate circular import issues.
@@ -79,17 +79,17 @@ Exception modules (`exceptions.py`) wire themselves to error handlers via the `@
 
 ```python
 # Correct — string reference, no import of error_handlers needed
-@fastapi_exception(handler="nexus.aap.error_handlers.aap_not_configured_handler")
+@fastapi_exception(handler="syntara.aap.error_handlers.aap_not_configured_handler")
 class AAPNotConfiguredError(NexusError): ...
 
 # Wrong — direct import creates exceptions ↔ error_handlers cycle
-from nexus.aap.error_handlers import aap_not_configured_handler
+from syntara.aap.error_handlers import aap_not_configured_handler
 
 @fastapi_exception(handler=aap_not_configured_handler)
 class AAPNotConfiguredError(NexusError): ...
 ```
 
-The `@fastapi_exception` decorator resolves string paths via `importlib` at registration time. See `src/nexus/auth/exceptions.py` for the reference implementation. See `src/nexus/core/exception_registry.py` line 59.
+The `@fastapi_exception` decorator resolves string paths via `importlib` at registration time. See `src/syntara/auth/exceptions.py` for the reference implementation. See `src/syntara/core/exception_registry.py` line 59.
 
 All domains use string-based handler references. The only remaining import cycle edge is `auth.__init__` ↔ `auth.dependencies` (accepted — public API boundary).
 
@@ -110,11 +110,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from uuid import UUID
-    from nexus.workflows.models.workflow import Workflow
-    from nexus.workflows.models.workflow_version import WorkflowVersion
+    from syntara.workflows.models.workflow import Workflow
+    from syntara.workflows.models.workflow_version import WorkflowVersion
 ```
 
-**Example (from `src/nexus/workflows/models/execution.py`):**
+**Example (from `src/syntara/workflows/models/execution.py`):**
 
 ```python
 from datetime import datetime
@@ -127,9 +127,9 @@ from sqlalchemy import BigInteger, String, Text, text
 from sqlmodel import Column, DateTime, Field, Index, Relationship
 
 if TYPE_CHECKING:
-    from nexus.workflows.models.activity_execution import ActivityExecution
-    from nexus.workflows.models.workflow import Workflow
-    from nexus.workflows.models.workflow_version import WorkflowVersion
+    from syntara.workflows.models.activity_execution import ActivityExecution
+    from syntara.workflows.models.workflow import Workflow
+    from syntara.workflows.models.workflow_version import WorkflowVersion
 
 
 class Execution(UserOwnedResource, SoftDeletableResource, table=True):
@@ -173,7 +173,7 @@ This does not affect the use of quoted annotations for deferred evaluation (e.g.
 Each domain follows a consistent structure:
 
 ```
-src/nexus/{domain}/
+src/syntara/{domain}/
 ├── __init__.py           # Empty or minimal (no re-exports)
 ├── router.py             # FastAPI routes (auto-discovered by core.router_discovery)
 ├── models/
@@ -190,15 +190,15 @@ src/nexus/{domain}/
 
 **Router Auto-Discovery:**
 
-Routers are automatically discovered and registered by `nexus.core.router_discovery` if they:
+Routers are automatically discovered and registered by `syntara.core.router_discovery` if they:
 
-1. Are located at `src/nexus/{domain}/router.py` or `src/nexus/api/v1/{module}.py`
+1. Are located at `src/syntara/{domain}/router.py` or `src/syntara/api/v1/{module}.py`
 2. Export a router via one of these (tried in order):
    - A `router` variable (an `APIRouter` instance) — most common
    - A `build_router()` function that returns an `APIRouter`
    - A `build_{module}_router()` function that returns an `APIRouter`
 
-**Example (`src/nexus/workflows/router.py`):**
+**Example (`src/syntara/workflows/router.py`):**
 
 ```python
 """Workflow API endpoints."""
@@ -210,11 +210,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.auth import get_current_user
-from nexus.core.database.session import get_db
-from nexus.core.models import User
-from nexus.workflows.models import WorkflowListParams
-from nexus.workflows.services import WorkflowService
+from syntara.api.auth import get_current_user
+from syntara.core.database.session import get_db
+from syntara.core.models import User
+from syntara.workflows.models import WorkflowListParams
+from syntara.workflows.services import WorkflowService
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 ```
@@ -283,7 +283,7 @@ make typecheck # Verify type hints (mypy strict mode)
 | File | Purpose |
 |---|---|
 | `pyproject.toml` | Ruff isort configuration, per-file ignores for `__init__.py` |
-| `src/nexus/core/router_discovery.py` | Router auto-discovery logic |
-| `src/nexus/workflows/models/__init__.py` | Example of `__all__` re-export pattern |
+| `src/syntara/core/router_discovery.py` | Router auto-discovery logic |
+| `src/syntara/workflows/models/__init__.py` | Example of `__all__` re-export pattern |
 
 Generated By: Claude Code (Claude Opus 4.6)

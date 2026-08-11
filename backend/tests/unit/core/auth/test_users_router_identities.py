@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.auth.exceptions import UserIdentityNotFoundError
-from nexus.core.models.user_identity_schemas import UserIdentityAttach, UserIdentityListResponse, UserIdentityRead
-from nexus.users.users_router import (
+from syntara.auth.exceptions import UserIdentityNotFoundError
+from syntara.core.models.user_identity_schemas import UserIdentityAttach, UserIdentityListResponse, UserIdentityRead
+from syntara.users.users_router import (
     attach_user_identity,
     detach_user_identity,
     list_user_identities,

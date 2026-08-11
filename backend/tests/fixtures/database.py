@@ -18,7 +18,7 @@ from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from testcontainers.postgres import PostgresContainer
 
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -41,7 +41,7 @@ def _get_alembic_config(db_url: str) -> Config:
     alembic_cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
     alembic_cfg.set_main_option(
         "script_location",
-        str(PROJECT_ROOT / "src" / "nexus" / "core" / "database" / "migrations"),
+        str(PROJECT_ROOT / "src" / "syntara" / "core" / "database" / "migrations"),
     )
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
     return alembic_cfg

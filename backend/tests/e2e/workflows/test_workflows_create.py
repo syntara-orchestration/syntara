@@ -32,7 +32,7 @@ class TestWorkflowCreation:
     """
 
     def test_create_workflow_with_labels(
-        self, nexus_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, cleanup_workflows: list[UUID], first_project_id: UUID
     ) -> None:
         """Test creating a workflow with labels.
 
@@ -46,7 +46,7 @@ class TestWorkflowCreation:
             )
         )
 
-        workflow = nexus_api.workflows.create(
+        workflow = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=workflow_name,
                 workflow_definition=workflow_def,
@@ -65,7 +65,9 @@ class TestWorkflowCreation:
         assert workflow.labels["environment"] == "test"
         assert workflow.labels["team"] == "engineering"
 
-    def test_create_workflow_with_long_description(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_create_workflow_with_long_description(
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID
+    ) -> None:
         """Test creating a workflow with a long description. The field limit is 2,000 characters.
 
         Expected: 422 Unprocessable
@@ -78,7 +80,7 @@ class TestWorkflowCreation:
             )
         )
 
-        response = nexus_api.workflows.create(
+        response = syntara_api.workflows.create(
             body=WorkflowCreate(
                 name=workflow_name,
                 description="=" * 2001,

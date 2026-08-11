@@ -5,15 +5,15 @@ from unittest.mock import Mock
 
 from fastapi import Request
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.credentials.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.credentials.error_handlers import (
     credential_decryption_error_handler,
     credential_error_handler,
     credential_name_conflict_handler,
     credential_not_found_handler,
     credential_validation_error_handler,
 )
-from nexus.credentials.exceptions import (
+from syntara.credentials.exceptions import (
     CredentialDecryptionError,
     CredentialError,
     CredentialNameConflictError,

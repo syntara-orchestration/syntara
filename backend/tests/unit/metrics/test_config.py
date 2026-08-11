@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.core.config.base import Settings
+from syntara.core.config.base import Settings
 
 
 class TestMetricsSettings:

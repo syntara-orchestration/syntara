@@ -359,7 +359,7 @@ The automatic CRUD audit trail is implemented using **PostgreSQL triggers** that
 
 3. **Model Configuration** (class variables on SQLModel)
    ```python
-   from nexus.core.models.base.base_resource import AuditLevel, BaseResource
+   from syntara.core.models.base.base_resource import AuditLevel, BaseResource
 
    class Credential(BaseResource, table=True):
        # Audit trail: metadata only (no secret_id to prevent exposure)
@@ -457,7 +457,7 @@ This discriminator allows downstream OTEL processors and observability platforms
 
 **Implementation details:**
 
-The `_build_otel_log_record()` function in `src/nexus/audit/outbox/worker.py` builds a `ReadableLogRecord` with the discriminator injected as an attribute. The worker then exports records directly via `OTLPLogExporter.export()` — bypassing the logging pipeline's `BatchLogRecordProcessor` which ignores export results and would cause silent event loss:
+The `_build_otel_log_record()` function in `src/syntara/audit/outbox/worker.py` builds a `ReadableLogRecord` with the discriminator injected as an attribute. The worker then exports records directly via `OTLPLogExporter.export()` — bypassing the logging pipeline's `BatchLogRecordProcessor` which ignores export results and would cause silent event loss:
 
 ```python
 def _build_otel_log_record(
@@ -541,13 +541,13 @@ sequenceDiagram
 **Usage:**
 
 ```python
-from nexus.audit.decorators import audit
-from nexus.audit.models.audit_event import EventCategory, EventSeverity
+from syntara.audit.decorators import audit
+from syntara.audit.models.audit_event import EventCategory, EventSeverity
 
 @audit(
     EventCategory.USER_ACTION,
     event_action="create_workflow",
-    source_component="nexus.workflows",
+    source_component="syntara.workflows",
     event_severity=EventSeverity.INFO,
     capture_args={"user_id", "workflow_name"},
     capture_result={"id", "status"},
@@ -586,14 +586,14 @@ async def create_workflow(
 **Usage:**
 
 ```python
-from nexus.audit.context_managers import audit_context
-from nexus.audit.models.audit_event import EventCategory, EventSeverity
+from syntara.audit.context_managers import audit_context
+from syntara.audit.models.audit_event import EventCategory, EventSeverity
 
 # With User actor (extracts actor_id, actor_type, actor_username atomically)
 with audit_context(
     event_category=EventCategory.USER_ACTION,
     event_action="export_data",
-    source_component="nexus.exports",
+    source_component="syntara.exports",
     actor=current_user,  # User object - ensures id/username integrity
     event_severity=EventSeverity.INFO,
     export_format="csv",
@@ -606,7 +606,7 @@ with audit_context(
 with audit_context(
     event_category=EventCategory.SYSTEM_OPERATION,
     event_action="backup_database",
-    source_component="nexus.maintenance",
+    source_component="syntara.maintenance",
     actor=None,  # SYSTEM actor
     event_severity=EventSeverity.INFO,
     database_name="production",
@@ -625,7 +625,7 @@ with audit_context(
 - Emits 1 event per HTTP request via `HTTPRequestEvent` → `HTTPRequestHandler` → `AuditEventDispatcher`
 - Captures method, path, status code, query params, response time, request payload size, user context
 - Sets event severity based on status code (5xx=ERROR, 4xx=WARNING, 2xx/3xx=INFO)
-- Excludes health/metrics endpoints (see `EXCLUDED_PATHS` in `nexus.api.constants`)
+- Excludes health/metrics endpoints (see `EXCLUDED_PATHS` in `syntara.api.constants`)
 - Propagates `X-Request-Id` header via context var
 - **Unverified JWT decode for audit logging:** Extracts actor information from JWT without signature verification for performance (crypto overhead eliminated). If token is forged, endpoint authentication will reject it with 401, and the audit log still captures the failed attempt. This avoids double-authentication overhead (middleware + endpoint).
 - **Context ID resolution:** Matches request path against FastAPI routes to extract `workflow_id`, `execution_id`, `activity_id` from URL path parameters **before** routing occurs, making these IDs available to route handlers via context variables.
@@ -640,9 +640,9 @@ with audit_context(
 
 **Pattern:**
 ```python
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.models.audit_event import ActorType
-from nexus.core.models.user import User
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.models.audit_event import ActorType
+from syntara.core.models.user import User
 
 # ✅ CORRECT: Atomic extraction from User object
 def extract_actor_from_user(user: User | None) -> AuditActorContext:
@@ -684,7 +684,7 @@ def extract_actor_wrong(user: User | None) -> tuple:
 **Pattern:**
 ```python
 from contextvars import ContextVar
-from nexus.audit.emitter import actor_context_var, AuditActorContext
+from syntara.audit.emitter import actor_context_var, AuditActorContext
 
 # ✅ CORRECT: Token-based reset with try/finally
 async def process_request(user: User) -> Response:
@@ -786,7 +786,7 @@ Each layer can coexist — a single HTTP request may generate events from **all 
 **Example use-case:**
 ```python
 # Set on model class - no other code needed
-from nexus.core.models.base.base_resource import AuditLevel, BaseResource
+from syntara.core.models.base.base_resource import AuditLevel, BaseResource
 
 class Credential(BaseResource, table=True):
     __auditable__: ClassVar[AuditLevel] = AuditLevel.META
@@ -809,13 +809,13 @@ After running migrations, you **must** run the audit seeder to populate metadata
 
 ```bash
 # After alembic upgrade head
-uv run python -m nexus.seed --only audit
+uv run python -m syntara.seed --only audit
 ```
 
 The seeder:
 1. Checks if `audit_table_metadata` table exists (skips gracefully if not)
 2. Deletes **all** existing metadata records and drops **all** audit triggers
-3. Discovers all SQLModel tables from `nexus.core.database.migrations.models.ALL_MODELS`
+3. Discovers all SQLModel tables from `syntara.core.database.migrations.models.ALL_MODELS`
 4. Filters to `BaseResource` subclasses with `__auditable__ != AuditLevel.NONE`
 5. Inserts fresh metadata records for each auditable table
 6. Creates `audit_trigger_<table>` for each auditable table
@@ -870,7 +870,7 @@ All HTTP requests automatically tracked - no action needed
 @audit(
     EventCategory.SYSTEM_OPERATION,
     event_action="database_backup",
-    source_component="nexus.maintenance",
+    source_component="syntara.maintenance",
     capture_args={"database_name"},
     capture_result={"backup_size_mb", "duration_seconds"},
 )
@@ -911,7 +911,7 @@ async def provision_infrastructure(user: User, config: InfraConfig):
     with audit_context(
         event_category=EventCategory.SYSTEM_OPERATION,
         event_action="provision_infrastructure",
-        source_component="nexus.infra",
+        source_component="syntara.infra",
         actor=user,  # User object - ensures atomic actor field extraction
         region=config.region,
         instance_count=config.instance_count,
@@ -985,7 +985,7 @@ class LoginAttemptHandler(AuditEventHandler[LoginAttemptEvent]):
 ```
 ```
 # In main.py startup:
-registry = discover_handlers(nexus.yourmodule.audit)
+registry = discover_handlers(syntara.yourmodule.audit)
 AuditEventDispatcher.register(registry)
 
 # In business logic:
@@ -1206,7 +1206,7 @@ class LoginAttemptHandler(AuditEventHandler[LoginAttemptEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.auth.login",
+            source_component="syntara.auth.login",
             structured_data=AuditContextData(
                 data_type="login-context",
                 error_type=error_type_str,
@@ -1257,4 +1257,4 @@ The Nexus audit framework provides:
 
 **For new domains:** Follow the step-by-step integration guide to add domain-specific audit events.
 
-**For questions:** Review existing implementations in `src/nexus/auth/audit/` or consult `/docs/standards/`.
+**For questions:** Review existing implementations in `src/syntara/auth/audit/` or consult `/docs/standards/`.

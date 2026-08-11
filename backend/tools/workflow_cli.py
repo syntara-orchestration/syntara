@@ -40,16 +40,16 @@ import structlog
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from nexus.core.config.base import get_settings
-from nexus.core.logging import configure_structlog
-from nexus.workflows.workflow_engine.activities.condition import condition
-from nexus.workflows.workflow_engine.activities.converge import converge
-from nexus.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
-from nexus.workflows.workflow_engine.activities.loop import loop
-from nexus.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from nexus.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.models import WorkflowResultResponse
+from syntara.core.config.base import get_settings
+from syntara.core.logging import configure_structlog
+from syntara.workflows.workflow_engine.activities.condition import condition
+from syntara.workflows.workflow_engine.activities.converge import converge
+from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
+from syntara.workflows.workflow_engine.activities.loop import loop
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.models import WorkflowResultResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

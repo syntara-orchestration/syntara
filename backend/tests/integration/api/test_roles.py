@@ -15,8 +15,8 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models.role import Role
-from nexus.core.models import User
+from syntara.authz.models.role import Role
+from syntara.core.models import User
 from tests.integration.api.conftest import make_admin, make_user_role
 
 # ============================================================================
