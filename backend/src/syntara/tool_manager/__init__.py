@@ -1,1 +1,1 @@
-"""Syntara Tool Manager - Provider-agnostic tool management system."""
+"""Nexus Tool Manager - Provider-agnostic tool management system."""

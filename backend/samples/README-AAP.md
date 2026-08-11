@@ -1,11 +1,11 @@
 # AAP Job Template Workflow Sample
 
-This directory contains sample files for testing the AAP (Ansible Automation Platform) Job Template executor in Syntara workflows.
+This directory contains sample files for testing the AAP (Ansible Automation Platform) Job Template executor in Nexus workflows.
 
 ## Files
 
 - **playbooks/test-aap-parameters.yml** - Ansible playbook that demonstrates all AAP parameters
-- **workflow-aap-job-template.yaml** - Syntara workflow that executes the AAP job template
+- **workflow-aap-job-template.yaml** - Nexus workflow that executes the AAP job template
 
 ## Setup Instructions
 
@@ -37,7 +37,7 @@ APP_AAP_POLL_INTERVAL_SECONDS=5.0
    - Sync the project in AAP
 
 2. **Create a Job Template**:
-   - Name: `Syntara Test - AAP Parameters`
+   - Name: `Nexus Test - AAP Parameters`
    - Project: Your project containing the playbook
    - Playbook: `test-aap-parameters.yml`
    - Inventory: Select a test inventory with at least one host
@@ -51,7 +51,7 @@ APP_AAP_POLL_INTERVAL_SECONDS=5.0
 
 ### 3. Execute the Workflow
 
-#### Using the Syntara API
+#### Using the Nexus API
 
 ```bash
 # Step 1: Read the workflow YAML file and create the workflow
@@ -205,7 +205,7 @@ The playbook accepts these extra variables:
 - `app_version` (default: "1.0.0") - Version to deploy
 - `deployment_env` (default: "development") - Target environment (note: renamed from 'environment' as that's reserved in Ansible)
 - `operation` (default: "status") - Operation: deploy, config, status, backup
-- `custom_message` (default: "Hello from Syntara Workflow!") - Custom message
+- `custom_message` (default: "Hello from Nexus Workflow!") - Custom message
 
 ## Troubleshooting
 
@@ -237,7 +237,7 @@ curl -k https://your-aap.example.com/api/v2/job_templates/42/ \
 
 ### Enable Debug Logging
 
-In Syntara, set log level to DEBUG to see detailed AAP activity logs:
+In Nexus, set log level to DEBUG to see detailed AAP activity logs:
 
 ```bash
 APP_FALLBACK_LOG_LEVEL=DEBUG
@@ -318,5 +318,5 @@ or by ID:
 ## References
 
 - [AAP Job Templates Documentation](https://docs.ansible.com/automation-controller/latest/html/userguide/job_templates.html)
-- [Syntara Workflow Examples](../tests/integration/workflow/examples/README.md)
+- [Nexus Workflow Examples](../tests/integration/workflow/examples/README.md)
 - [AAP REST API Guide](https://docs.ansible.com/automation-controller/latest/html/controllerapi/api_ref.html)

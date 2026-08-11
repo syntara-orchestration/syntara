@@ -1,7 +1,7 @@
 """AAP OIDC push-button setup service.
 
 Orchestrates creating an OAuth2 application on an AAP and
-configuring the corresponding identity provider in Syntara.
+configuring the corresponding identity provider in Nexus.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ class AAPOIDCSetupService:
         self._settings = settings
 
     async def setup(self, request: AAPOIDCSetupRequest) -> IdentityProviderResponse:
-        """Create an OAuth2 app on AAP and configure the IdP in Syntara."""
+        """Create an OAuth2 app on AAP and configure the IdP in Nexus."""
         aap_url = request.aap_url.rstrip("/")
         redirect_uri = f"{self._settings.jwt_issuer}{OIDC_CALLBACK_PATH}"
 

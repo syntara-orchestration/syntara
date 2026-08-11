@@ -1,6 +1,6 @@
 # Credentials
 
-**Developer Guide — Understanding the Syntara credential system**
+**Developer Guide — Understanding the Nexus credential system**
 
 ## Table of Contents
 

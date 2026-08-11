@@ -1,6 +1,6 @@
 """Core services package.
 
-This package contains base service classes and utilities for the Syntara application.
+This package contains base service classes and utilities for the Nexus application.
 """
 
 from syntara.core.services.base import BaseService

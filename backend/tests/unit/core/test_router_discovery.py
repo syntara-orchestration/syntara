@@ -250,7 +250,7 @@ class TestRealRouterDiscovery:
         nexus_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "syntara"
 
         if not nexus_root.exists():
-            pytest.skip("Syntara source directory not found")
+            pytest.skip("Nexus source directory not found")
 
         routers = discover_routers(
             base_paths=[nexus_root],

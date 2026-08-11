@@ -167,7 +167,7 @@ describe('NexusGroupMappingSelect', () => {
   })
 
   it('shows danger status when validation fails', () => {
-    const entry = { ...defaultEntry, idpGroupValue: 'admin' } // has IdP value but no Syntara group
+    const entry = { ...defaultEntry, idpGroupValue: 'admin' } // has IdP value but no Nexus group
     render(<NexusGroupMappingSelect {...defaultProps} entry={entry} showValidation />)
 
     const filterInput = screen.getByPlaceholderText('Select a group...')
@@ -351,7 +351,7 @@ describe('MappingRow', () => {
       expect(screen.getByText('admin')).toBeInTheDocument()
     })
 
-    it('links Syntara group names to group detail pages', () => {
+    it('links Nexus group names to group detail pages', () => {
       render(
         <table>
           <tbody>
@@ -422,7 +422,7 @@ describe('MappingRow', () => {
   })
 
   describe('Validation states', () => {
-    it('shows validation error when IdP has value but no Syntara group', () => {
+    it('shows validation error when IdP has value but no Nexus group', () => {
       const incompleteEntry = { ...defaultEntry, nexusGroupId: '' }
       render(
         <table>

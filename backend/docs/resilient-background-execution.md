@@ -1,6 +1,6 @@
 # Resilient Background Execution
 
-Syntara originally processed system operations — document conversion, agent execution — inside
+Nexus originally processed system operations — document conversion, agent execution — inside
 FastAPI `BackgroundTasks`. These are fire-and-forget callbacks that run in the same process as the
 HTTP request that triggered them: no retry, no durability, no visibility, and critically, they share
 a single-process execution slot with user workflows. A burst of file uploads could saturate the
@@ -30,7 +30,7 @@ own dedicated queue, served by their own dedicated worker deployment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Syntara API (FastAPI)                                                        │
+│  Nexus API (FastAPI)                                                        │
 │                                                                             │
 │  POST /executions  →  ExecutionService.start_workflow(is_builtin=False)    │
 │       ↓ task_queue = orchestrator-workflow-queue                                   │
@@ -452,7 +452,7 @@ await execution_service.start_workflow(
 The service looks up `background_task_queue` from settings and routes the Temporal workflow
 there. From this point, execution is identical to any other workflow — visible in the Temporal
 UI under `orchestrator-background-queue`, status synced to the DB via `ActivitySyncService`, and
-surfaced in the Syntara UI for administrators with the builtin toggle enabled.
+surfaced in the Nexus UI for administrators with the builtin toggle enabled.
 
 ## Constraints and Known Gaps
 

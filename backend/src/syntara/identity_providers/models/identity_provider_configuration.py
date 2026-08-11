@@ -26,7 +26,7 @@ class OIDCIdpType(StrEnum):
 
 
 class OIDCClaimMapping(SQLModel):
-    """Maps Syntara user fields to IdP-specific OIDC claim names."""
+    """Maps Nexus user fields to IdP-specific OIDC claim names."""
 
     subject: str = Field(default="sub")
     email: str = Field(default="email")
@@ -38,14 +38,14 @@ class OIDCClaimMapping(SQLModel):
 
 
 class OIDCGroupMappingEntry(SQLModel):
-    """API-facing schema for a single IdP-to-Syntara group mapping entry.
+    """API-facing schema for a single IdP-to-Nexus group mapping entry.
 
     Used in API requests/responses. Actual storage is in the
     ``idp_group_mapping_entries`` table.
     """
 
     idp_group_value: str = Field(min_length=1, description="Group value from the IdP token (e.g. GUID or role name)")
-    nexus_group_id: UUID = Field(description="ID of the Syntara group to map to")
+    nexus_group_id: UUID = Field(description="ID of the Nexus group to map to")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 

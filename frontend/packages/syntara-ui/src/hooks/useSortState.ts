@@ -37,7 +37,7 @@ export type UseSortStateOptions = {
  * Manages sort state in a URL query parameter (default `sort`).
  *
  * Enables bookmarkable/shareable sorted views by syncing `SortConfig` with the
- * Syntara API sort format (`field` ascending, `-field` descending). Browser
+ * Nexus API sort format (`field` ascending, `-field` descending). Browser
  * back/forward updates the hook via `useSearchParams`.
  *
  * @param defaultSort - Optional default sort when the URL has no valid sort param

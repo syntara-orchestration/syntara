@@ -49,6 +49,6 @@ async def list_tool_executions(
     """Return paginated tool execution history.
 
     Supports filtering by namespaced_name, status, and time range.
-    Uses cursor-based pagination consistent with other Syntara list endpoints.
+    Uses cursor-based pagination consistent with other Nexus list endpoints.
     """
     return await service.list_executions(params)

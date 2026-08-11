@@ -79,7 +79,7 @@ test.describe('UI-11: Auto group mapping — configuration screen', () => {
 test.describe('UI-12: Manual group mapping — configuration screen', () => {
   const idpGroupValue = 'platform-admins'
 
-  test('creates manual mapping from IdP group value to Syntara group', async ({ app }) => {
+  test('creates manual mapping from IdP group value to Nexus group', async ({ app }) => {
     const providerId = await createMappingTestProvider(app, 'e2e-manual-mapping')
     try {
       await gotoGroupMappingEdit(app, providerId, 'new=1')

@@ -70,7 +70,7 @@ export type UseCursorPaginationResult = {
   getFooterProps: (data: PaginatedResponse | undefined) => PaginationFooterProps
   /** Current sort configuration (URL-synced) */
   sort: SortConfig | null
-  /** Syntara API `sort` query param (`field` / `-field`), or `undefined` when unsorted */
+  /** Nexus API `sort` query param (`field` / `-field`), or `undefined` when unsorted */
   sortParam: string | undefined
   /** Set sort and reset pagination to page 1 */
   setSort: (sort: SortConfig) => void

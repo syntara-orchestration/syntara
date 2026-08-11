@@ -1,4 +1,4 @@
-"""Syntara API schemas directory."""
+"""Nexus API schemas directory."""
 
 from pathlib import Path
 

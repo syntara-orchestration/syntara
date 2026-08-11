@@ -1,10 +1,10 @@
 # Access Control
 
-This document defines how API endpoints are secured in Syntara and how the compliance test suite enforces coverage.
+This document defines how API endpoints are secured in Nexus and how the compliance test suite enforces coverage.
 
 ## Access Control Layers
 
-Syntara uses three layers, each enforced via FastAPI dependency injection:
+Nexus uses three layers, each enforced via FastAPI dependency injection:
 
 | Layer | Mechanism | What it does |
 |-------|-----------|-------------|

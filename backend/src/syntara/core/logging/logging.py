@@ -69,7 +69,7 @@ def build_nexus_shared_formatters() -> list[Any]:
 
 
 def build_nexus_formatter() -> Formatter:
-    """Configure Syntara log formatter."""
+    """Configure Nexus log formatter."""
     if settings.log_output_format == "text":
         return build_nexus_text_formatter()
     return build_nexus_json_formatter()

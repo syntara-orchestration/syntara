@@ -25,8 +25,8 @@ NO_PERMISSION = Depends(_NoPermissionSentinel())
 
 
 class NexusRouter(APIRouter):
-    """APIRouter subclass used by all Syntara domain routers.
+    """APIRouter subclass used by all Nexus domain routers.
 
     Currently identical to ``APIRouter`` in behaviour; the type is used
-    by the route scanner to limit scanning to Syntara-owned routes.
+    by the route scanner to limit scanning to Nexus-owned routes.
     """

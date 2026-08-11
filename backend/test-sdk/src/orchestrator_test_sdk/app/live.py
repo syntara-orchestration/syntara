@@ -36,7 +36,7 @@ def _is_retryable(exc: Exception) -> bool:
 
 
 def _generate_live_token(base_url: str) -> str:
-    """Obtain a JWT access token for tests that hit a live Syntara deployment.
+    """Obtain a JWT access token for tests that hit a live Nexus deployment.
 
     Resolution order:
     1. NEXUS_API_TOKEN env var (pre-generated token for remote deployments)
@@ -91,7 +91,7 @@ def _generate_live_token(base_url: str) -> str:
 
 @pytest.fixture(scope="session")
 def nexus_base_url() -> str:
-    """Return the Syntara API base URL from the environment."""
+    """Return the Nexus API base URL from the environment."""
     return os.environ.get("APP_BASE_URL", "http://localhost:8000").rstrip("/")
 
 
@@ -133,7 +133,7 @@ def nexus_client(nexus_base_url: str) -> AuthenticatedClient:
 
     if last_exc is not None:
         pytest.exit(
-            f"Syntara deployment not available at {nexus_base_url}: {last_exc}\n"
+            f"Nexus deployment not available at {nexus_base_url}: {last_exc}\n"
             "Start the services first with: make services-run && make dev",
             returncode=1,
         )

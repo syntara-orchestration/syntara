@@ -1,1 +1,1 @@
-"""Syntara admin CLI package."""
+"""Nexus admin CLI package."""

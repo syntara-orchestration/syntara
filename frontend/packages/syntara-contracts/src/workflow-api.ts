@@ -1712,7 +1712,7 @@ export interface components {
       llm_model_id?: string | null
       /**
        * Credential Id
-       * @description Syntara credential UUID for LLM provider authentication
+       * @description Nexus credential UUID for LLM provider authentication
        */
       credential_id?: string | null
       /**

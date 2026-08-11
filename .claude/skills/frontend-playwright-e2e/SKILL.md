@@ -62,7 +62,7 @@ If you bypass the runner (e.g. `NEXUS_E2E_SKIP_WEB_SERVER=1`) and manage servers
 
 ### Real Backend Mode
 
-To test against the real Syntara backend instead of the mock API:
+To test against the real Nexus backend instead of the mock API:
 
 1. **Start the real backend** (see backend repo README):
 

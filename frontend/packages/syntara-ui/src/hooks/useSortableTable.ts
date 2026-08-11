@@ -17,7 +17,7 @@ export type UseSortableTableResult = {
    */
   sort: SortConfig | null
   /**
-   * Syntara API `sort` query parameter (`field` / `-field`) for
+   * Nexus API `sort` query parameter (`field` / `-field`) for
    * {@link useFilteredQuery} and other list queries. `undefined` when unsorted.
    */
   sortParam: string | undefined

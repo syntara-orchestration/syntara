@@ -45,7 +45,7 @@ describe('groupMappingEditFormSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects invalid Syntara group IDs', () => {
+  it('rejects invalid Nexus group IDs', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
       entries: [{ idpGroupValue: 'admin', nexusGroupId: 'not-a-uuid' }],
@@ -72,7 +72,7 @@ describe('groupMappingEditFormSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects partial rows missing a Syntara group', () => {
+  it('rejects partial rows missing a Nexus group', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
       entries: [{ idpGroupValue: 'admin', nexusGroupId: '' }],

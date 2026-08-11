@@ -3,7 +3,7 @@ r"""CLI tool for managing authorization data (users, groups, roles, policies, pr
 
 ## Purpose
 
-Development utility for populating and querying authorization data via the Syntara API.
+Development utility for populating and querying authorization data via the Nexus API.
 Supports seeding built-in policies/roles, creating entities, and testing access checks.
 
 The ``--username`` flag authenticates as a specific user. Requires ``--password`` (or the
@@ -146,7 +146,7 @@ async def api_request(
     *,
     body: dict | None = None,
 ) -> tuple[dict | list | None, int]:
-    """Make an authenticated HTTP request to the Syntara API. Returns (data, status_code)."""
+    """Make an authenticated HTTP request to the Nexus API. Returns (data, status_code)."""
     import httpx
 
     if not _config["json_mode"]:

@@ -1,7 +1,7 @@
 """SQLModel utility functions for database model configuration.
 
 This module provides helper functions for common SQLModel/SQLAlchemy patterns
-used throughout the Syntara project.
+used throughout the Nexus project.
 """
 
 import json

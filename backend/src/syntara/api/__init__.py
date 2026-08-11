@@ -1,6 +1,6 @@
-"""Syntara API - A distributed multi-agent system.
+"""Nexus API - A distributed multi-agent system.
 
-Syntara enables coordinated AI agents to work together on complex tasks.
+Nexus enables coordinated AI agents to work together on complex tasks.
 """
 
 # ===========================================================

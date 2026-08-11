@@ -1,1 +1,1 @@
-"""Syntara Test SDK — reusable pytest fixtures for Syntara E2E tests."""
+"""Nexus Test SDK — reusable pytest fixtures for Nexus E2E tests."""

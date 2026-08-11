@@ -30,7 +30,7 @@ class APIExecutorParameters:
         body (APIExecutorParametersBodyType0 | None | str | Unset):
         query_params (APIExecutorParametersQueryParams | Unset):
         authentication (Authentication | None | Unset):
-        credential_id (None | str | Unset): Syntara credential UUID for authentication or Secret URL. Takes priority over
+        credential_id (None | str | Unset): Nexus credential UUID for authentication or Secret URL. Takes priority over
             authentication field.
     """
 

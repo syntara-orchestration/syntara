@@ -176,7 +176,7 @@ def sync_detailed(
      Return paginated tool execution history.
 
     Supports filtering by namespaced_name, status, and time range.
-    Uses cursor-based pagination consistent with other Syntara list endpoints.
+    Uses cursor-based pagination consistent with other Nexus list endpoints.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -232,7 +232,7 @@ def sync(
      Return paginated tool execution history.
 
     Supports filtering by namespaced_name, status, and time range.
-    Uses cursor-based pagination consistent with other Syntara list endpoints.
+    Uses cursor-based pagination consistent with other Nexus list endpoints.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -282,7 +282,7 @@ async def asyncio_detailed(
      Return paginated tool execution history.
 
     Supports filtering by namespaced_name, status, and time range.
-    Uses cursor-based pagination consistent with other Syntara list endpoints.
+    Uses cursor-based pagination consistent with other Nexus list endpoints.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -335,7 +335,7 @@ async def asyncio(
      Return paginated tool execution history.
 
     Supports filtering by namespaced_name, status, and time range.
-    Uses cursor-based pagination consistent with other Syntara list endpoints.
+    Uses cursor-based pagination consistent with other Nexus list endpoints.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.

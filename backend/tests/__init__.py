@@ -1,1 +1,1 @@
-"""Tests for Syntara project."""
+"""Tests for Nexus project."""

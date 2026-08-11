@@ -1,4 +1,4 @@
-"""Syntara E2E test fixtures and helpers."""
+"""Nexus E2E test fixtures and helpers."""
 
 from __future__ import annotations
 

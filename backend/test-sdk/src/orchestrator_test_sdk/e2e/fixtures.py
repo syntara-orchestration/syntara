@@ -1,4 +1,4 @@
-"""Pytest fixtures for Syntara E2E tests.
+"""Pytest fixtures for Nexus E2E tests.
 
 All fixtures in this module are intended to be imported into a project's
 ``tests/e2e/conftest.py`` so they apply to tests under that directory tree.
@@ -287,7 +287,7 @@ def auditor_api(auditor_client: AuthenticatedClient) -> SyntaraApiRegistry:
 
 @pytest.fixture(scope="session")
 def worker_base_url() -> str:
-    """Return the URL the Temporal worker uses to reach the Syntara API.
+    """Return the URL the Temporal worker uses to reach the Nexus API.
 
     The worker runs inside a container, so it cannot use localhost or the
     nexus_base_url (which is host-side).  The default uses the podman host
@@ -304,7 +304,7 @@ def worker_base_url() -> str:
 
 @pytest.fixture(scope="session")
 def syntara_api_admin_group_id(syntara_api: SyntaraApiRegistry) -> UUID:
-    """Get admin role group ID for Syntara API."""
+    """Get admin role group ID for Nexus API."""
     groups_resp = syntara_api.groups.list(additional_params={"name": "admins"}, limit=100)
     if groups_resp.parsed is None or len(groups_resp.parsed.resources) == 0:
         msg = "Unable to retrieve admin group ID."
@@ -374,7 +374,7 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
 
 @pytest.fixture(scope="session")
 def nexus_admin_user(syntara_api: SyntaraApiRegistry) -> UserInfo:
-    """Get admin user ID for Syntara API."""
+    """Get admin user ID for Nexus API."""
     return cast("UserInfo", syntara_api.authentication.get_current_user().assert_and_get())
 
 

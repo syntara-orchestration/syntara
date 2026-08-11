@@ -1,6 +1,6 @@
 # Development with Git Worktrees
 
-This guide explains how to use Git worktrees for parallel development in the Syntara project.
+This guide explains how to use Git worktrees for parallel development in the Nexus project.
 
 ## Prerequisites
 
@@ -290,5 +290,5 @@ When using Claude Code inside a worktree, you may see this warning:
 ## Additional Resources
 
 - [Git Worktree Documentation](https://git-scm.com/docs/git-worktree)
-- [Syntara Development Guide](../README.md)
+- [Nexus Development Guide](../README.md)
 - [Podman Compose Documentation](https://github.com/containers/podman-compose)
