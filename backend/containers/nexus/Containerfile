@@ -27,13 +27,13 @@ WORKDIR /opt/app-root/src
 
 # Build tools required by regopy (C/C++ compiler, cmake, ninja) and its
 # setup.py (git).  uv is the project's package manager.
-# When BUILDER_IMAGE is overridden to uv-builder-rhel9, these are already
-# present and the installs are no-ops.
+# When BUILDER_IMAGE is overridden to uv-builder-rhel9, the dnf packages
+# are already present (no-ops) and the uv guard skips the pip install.
 RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
-        gcc gcc-c++ cmake ninja-build git libatomic \
+        cmake gcc gcc-c++ git libatomic ninja-build \
     && dnf clean all \
-    && pip3.12 install --no-cache-dir uv \
-    && [ -f /usr/local/bin/uv ] || ln -s "$(command -v uv)" /usr/local/bin/uv
+    && (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
+    && [ -f /usr/local/bin/uv ] || { command -v uv && ln -s "$(command -v uv)" /usr/local/bin/uv; }
 
 # Copy dependency files first (for layer caching)
 COPY pyproject.toml uv.lock LICENSE README.md alembic.ini ./
