@@ -1,11 +1,45 @@
 """Helper functions for Invocations."""
 
-import asyncio
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Any
+from __future__ import annotations
 
-from httpx import AsyncClient
+import asyncio
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any
+from uuid import UUID, uuid4
+
+from nexus.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from httpx import AsyncClient
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+
+async def create_test_invocation(
+    session: AsyncSession,
+    *,
+    project_id: UUID,
+    created_by: UUID,
+    prompt: str = "test prompt",
+    session_id: str | None = None,
+    status: InvocationStatus = InvocationStatus.CREATED,
+) -> Invocation:
+    """Insert a minimal Invocation with valid FK references.
+
+    Callers must ensure ``project_id`` / ``created_by`` already exist.
+    """
+    invocation = Invocation(
+        project_id=project_id,
+        created_by=created_by,
+        prompt=prompt,
+        session_id=session_id or f"test-session-{uuid4().hex[:8]}",
+        status=status,
+    )
+    session.add(invocation)
+    await session.commit()
+    await session.refresh(invocation)
+    return invocation
 
 
 @asynccontextmanager

@@ -2,7 +2,7 @@
 
 Tests cover:
 - AUTHZ_DURATION metric type and Prometheus histogram
-- OPA_REQUEST_DURATION metric type and Prometheus histogram
+- Policy-eval duration metric type and Prometheus histogram (legacy OPA_REQUEST_DURATION wire id)
 - Method label on request_duration_seconds histogram
 - Recorder dispatch for authz metrics
 - Fire-and-forget safety of instrumentation helpers
@@ -48,8 +48,8 @@ class TestAuthzHistogramDefinitions:
         """orchestrator_authz_duration_seconds histogram exists."""
         assert prom.authz_duration_seconds is not None
 
-    def test_opa_request_duration_seconds_defined(self, prom: OrchestratorPrometheusMetrics) -> None:
-        """orchestrator_opa_request_duration_seconds histogram exists."""
+    def test_policy_eval_request_duration_seconds_defined(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """Legacy orchestrator_opa_request_duration_seconds histogram exists."""
         assert prom.opa_request_duration_seconds is not None
 
     def test_authz_duration_labels(self, prom: OrchestratorPrometheusMetrics) -> None:
@@ -58,8 +58,8 @@ class TestAuthzHistogramDefinitions:
         total = prom.authz_duration_seconds.labels(resource_type="workflow", action="create")._sum.get()
         assert total == pytest.approx(0.05)
 
-    def test_opa_request_duration_labels(self, prom: OrchestratorPrometheusMetrics) -> None:
-        """opa_request_duration_seconds accepts resource_type and action labels."""
+    def test_policy_eval_request_duration_labels(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """Legacy opa_request_duration_seconds accepts resource_type and action labels."""
         prom.opa_request_duration_seconds.labels(resource_type="credential", action="read").observe(0.01)
         total = prom.opa_request_duration_seconds.labels(resource_type="credential", action="read")._sum.get()
         assert total == pytest.approx(0.01)
@@ -97,8 +97,8 @@ class TestAuthzRecorderDispatch:
         )._sum.get()
         assert sample_sum == pytest.approx(0.05, rel=0.01)
 
-    def test_opa_request_duration_dispatched(self, recorder: MetricsRecorder) -> None:
-        """OPA_REQUEST_DURATION recording updates the Prometheus histogram."""
+    def test_policy_eval_request_duration_dispatched(self, recorder: MetricsRecorder) -> None:
+        """Legacy OPA_REQUEST_DURATION recording updates the Prometheus histogram."""
         recorder.record(
             MetricType.OPA_REQUEST_DURATION,
             10.0,
@@ -124,8 +124,8 @@ class TestAuthzRecorderDispatch:
         assert results[0].labels["resource_type"] == "project"
         assert results[0].labels["action"] == "update"
 
-    def test_opa_request_duration_stored_in_memory(self, recorder: MetricsRecorder) -> None:
-        """OPA_REQUEST_DURATION metric is stored in the in-memory metrics store."""
+    def test_policy_eval_request_duration_stored_in_memory(self, recorder: MetricsRecorder) -> None:
+        """Legacy OPA_REQUEST_DURATION metric is stored in the in-memory metrics store."""
         recorder.record(
             MetricType.OPA_REQUEST_DURATION,
             8.0,
@@ -196,11 +196,11 @@ class TestRequestDurationMethodLabel:
 
 
 class TestAuthzEngineInstrumentation:
-    """Verify _evaluate_authz_policy records OPA_REQUEST_DURATION."""
+    """Verify _evaluate_authz_policy records the policy-eval duration metric."""
 
     @pytest.mark.asyncio
     async def test_evaluate_authz_policy_records_duration(self) -> None:
-        """_evaluate_authz_policy records OPA_REQUEST_DURATION with resource_type and action."""
+        """_evaluate_authz_policy records MetricType.OPA_REQUEST_DURATION with resource_type and action."""
         from nexus.authz.engine import _evaluate_authz_policy
 
         mock_evaluator = MagicMock()

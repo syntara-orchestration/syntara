@@ -53,13 +53,13 @@ async def _fetch_all_what_can_i(client: AsyncClient) -> list[dict[str, Any]]:
     return all_permissions
 
 
-def _opa_evaluate_cli(opa_input: dict[str, Any]) -> dict[str, Any]:
+def _evaluate_policy(authz_input: dict[str, Any]) -> dict[str, Any]:
     """Evaluate authz against the real rego policy through regopy."""
-    return evaluate_policy_input(opa_input)
+    return evaluate_policy_input(authz_input)
 
 
 @pytest.fixture(autouse=True)
-def _override_opa_dependency() -> Generator[None, None, None]:
+def _override_authz_evaluator() -> Generator[None, None, None]:
     """Override the authz evaluator dependency via app.dependency_overrides.
 
     The conftest _mock_evaluator uses monkeypatch.setattr which doesn't affect
@@ -67,7 +67,7 @@ def _override_opa_dependency() -> Generator[None, None, None]:
     This fixture uses dependency_overrides which FastAPI resolves at call time.
     """
     mock_evaluator = AsyncMock()
-    mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
+    mock_evaluator.evaluate = MagicMock(side_effect=_evaluate_policy)
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
     yield

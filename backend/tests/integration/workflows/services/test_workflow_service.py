@@ -2039,7 +2039,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         mock_evaluator.evaluate = MagicMock(
             return_value={"allow": True, "deny": False, "matched_policy": "", "denial_reason": "", "denied_by": ""}
         )
-        service = WorkflowService(test_db_session, test_user, opa_client=mock_evaluator)
+        service = WorkflowService(test_db_session, test_user, authz_evaluator=mock_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
 
         with (
@@ -2114,10 +2114,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         project_a_id: UUID,
         credential_in_a: Credential,
     ) -> None:
-        """Workflow save with a credential fails when opa_client is None (fail-closed)."""
+        """Workflow save with a credential fails when authz_evaluator is None (fail-closed)."""
         from nexus.authz.exceptions import AuthorizationDeniedError
 
-        service = WorkflowService(test_db_session, test_user, opa_client=None)
+        service = WorkflowService(test_db_session, test_user, authz_evaluator=None)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
 
         with (
@@ -2156,7 +2156,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
                 "denied_by": "",
             }
         )
-        service = WorkflowService(test_db_session, test_user, opa_client=mock_evaluator)
+        service = WorkflowService(test_db_session, test_user, authz_evaluator=mock_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
 
         with (
@@ -2187,7 +2187,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         mock_evaluator.evaluate = MagicMock(
             return_value={"allow": True, "deny": False, "matched_policy": "", "denial_reason": "", "denied_by": ""}
         )
-        service = WorkflowService(test_db_session, test_user, opa_client=mock_evaluator)
+        service = WorkflowService(test_db_session, test_user, authz_evaluator=mock_evaluator)
         cred_id = str(credential_in_a.id)
 
         workflow = Workflow(
@@ -2273,7 +2273,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         """publish_workflow_version with inline workflow_definition runs credential:use check."""
         from nexus.authz.exceptions import AuthorizationDeniedError
 
-        service = WorkflowService(test_db_session, test_user, opa_client=None)
+        service = WorkflowService(test_db_session, test_user, authz_evaluator=None)
 
         workflow = Workflow(
             id=uuid4(),

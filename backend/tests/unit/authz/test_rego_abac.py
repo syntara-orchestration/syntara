@@ -1,12 +1,12 @@
 """Group 5: ABAC Conditions — label-based conditional access."""
 
-from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy, policies_for_role
+from tests.unit.authz.conftest import allow_policy, build_authz_input, deny_policy, policies_for_role
 
 
 class TestResourceLabelConditions:
     """Allow workflow:read only when team=platform."""
 
-    def test_read_team_platform_allowed(self, opa_evaluate):
+    def test_read_team_platform_allowed(self, evaluate_policy):
         policies = [
             allow_policy(
                 "only-platform-read",
@@ -14,8 +14,8 @@ class TestResourceLabelConditions:
                 conditions={"resource_labels": {"team": "platform"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"team": "platform"},
@@ -24,7 +24,7 @@ class TestResourceLabelConditions:
         )
         assert result["allow"] is True
 
-    def test_read_team_infra_denied(self, opa_evaluate):
+    def test_read_team_infra_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "only-platform-read",
@@ -32,8 +32,8 @@ class TestResourceLabelConditions:
                 conditions={"resource_labels": {"team": "platform"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_labels={"team": "infra"},
@@ -42,7 +42,7 @@ class TestResourceLabelConditions:
         )
         assert result["allow"] is False
 
-    def test_read_no_labels_denied(self, opa_evaluate):
+    def test_read_no_labels_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "only-platform-read",
@@ -50,8 +50,8 @@ class TestResourceLabelConditions:
                 conditions={"resource_labels": {"team": "platform"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 effective_policies=policies,
@@ -63,7 +63,7 @@ class TestResourceLabelConditions:
 class TestUserLabelConditions:
     """Allow workflow:delete only when user level=senior."""
 
-    def test_senior_user_allowed(self, opa_evaluate):
+    def test_senior_user_allowed(self, evaluate_policy):
         policies = [
             allow_policy(
                 "senior-delete",
@@ -71,8 +71,8 @@ class TestUserLabelConditions:
                 conditions={"user_labels": {"level": "senior"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 user_labels={"level": "senior"},
@@ -81,7 +81,7 @@ class TestUserLabelConditions:
         )
         assert result["allow"] is True
 
-    def test_junior_user_denied(self, opa_evaluate):
+    def test_junior_user_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "senior-delete",
@@ -89,8 +89,8 @@ class TestUserLabelConditions:
                 conditions={"user_labels": {"level": "senior"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 user_labels={"level": "junior"},
@@ -110,10 +110,10 @@ class TestUserLabelsNotCondition:
         conditions={"user_labels_not": {"department": "engineering"}},
     )
 
-    def test_deny_fires_when_user_label_key_missing(self, opa_evaluate):
+    def test_deny_fires_when_user_label_key_missing(self, evaluate_policy):
         """User has no labels — deny fires because they can't prove they're in engineering."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={},
@@ -123,9 +123,9 @@ class TestUserLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_deny_fires_when_user_label_value_differs(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_deny_fires_when_user_label_value_differs(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"department": "contractors"},
@@ -135,9 +135,9 @@ class TestUserLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_allow_when_user_label_matches_excluded_value(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_allow_when_user_label_matches_excluded_value(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"department": "engineering"},
@@ -147,14 +147,14 @@ class TestUserLabelsNotCondition:
         assert result["allow"] is True
         assert result["deny"] is False
 
-    def test_deny_fires_when_all_user_keys_differ_or_missing(self, opa_evaluate):
+    def test_deny_fires_when_all_user_keys_differ_or_missing(self, evaluate_policy):
         deny_multi = deny_policy(
             "deny-not-eng-senior",
             ["credential:read"],
             conditions={"user_labels_not": {"department": "engineering", "level": "senior"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"department": "contractors"},
@@ -164,14 +164,14 @@ class TestUserLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_allow_when_one_user_key_matches_excluded_value(self, opa_evaluate):
+    def test_allow_when_one_user_key_matches_excluded_value(self, evaluate_policy):
         deny_multi = deny_policy(
             "deny-not-eng-senior",
             ["credential:read"],
             conditions={"user_labels_not": {"department": "engineering", "level": "senior"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"department": "engineering"},
@@ -181,15 +181,15 @@ class TestUserLabelsNotCondition:
         assert result["allow"] is True
         assert result["deny"] is False
 
-    def test_allow_effect_with_user_labels_not_grants_when_label_absent(self, opa_evaluate):
+    def test_allow_effect_with_user_labels_not_grants_when_label_absent(self, evaluate_policy):
         """Allow-effect policy with user_labels_not grants access when user lacks the label."""
         policy = allow_policy(
             "allow-non-contractor",
             ["credential:read"],
             conditions={"user_labels_not": {"role": "contractor"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"role": "engineer"},
@@ -198,15 +198,15 @@ class TestUserLabelsNotCondition:
         )
         assert result["allow"] is True
 
-    def test_allow_effect_with_user_labels_not_denies_when_label_matches(self, opa_evaluate):
+    def test_allow_effect_with_user_labels_not_denies_when_label_matches(self, evaluate_policy):
         """Allow-effect policy with user_labels_not does not grant when user has the label."""
         policy = allow_policy(
             "allow-non-contractor",
             ["credential:read"],
             conditions={"user_labels_not": {"role": "contractor"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"role": "contractor"},
@@ -215,7 +215,7 @@ class TestUserLabelsNotCondition:
         )
         assert result["allow"] is False
 
-    def test_combined_user_labels_and_user_labels_not(self, opa_evaluate):
+    def test_combined_user_labels_and_user_labels_not(self, evaluate_policy):
         """Policy requiring user_labels AND user_labels_not — must be ops but not intern."""
         policy = allow_policy(
             "allow-ops-non-intern",
@@ -225,8 +225,8 @@ class TestUserLabelsNotCondition:
                 "user_labels_not": {"role": "intern"},
             },
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"team": "ops", "role": "senior"},
@@ -235,8 +235,8 @@ class TestUserLabelsNotCondition:
         )
         assert result["allow"] is True
 
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 user_labels={"team": "ops", "role": "intern"},
@@ -249,7 +249,7 @@ class TestUserLabelsNotCondition:
 class TestGroupLabelConditions:
     """Allow execution:run only when group tier=premium."""
 
-    def test_premium_group_allowed(self, opa_evaluate):
+    def test_premium_group_allowed(self, evaluate_policy):
         policies = [
             allow_policy(
                 "premium-run",
@@ -257,8 +257,8 @@ class TestGroupLabelConditions:
                 conditions={"group_labels": {"tier": "premium"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="run",
                 resource_type="execution",
                 groups=[{"name": "premium-team", "labels": {"tier": "premium"}}],
@@ -267,7 +267,7 @@ class TestGroupLabelConditions:
         )
         assert result["allow"] is True
 
-    def test_basic_group_denied(self, opa_evaluate):
+    def test_basic_group_denied(self, evaluate_policy):
         policies = [
             allow_policy(
                 "premium-run",
@@ -275,8 +275,8 @@ class TestGroupLabelConditions:
                 conditions={"group_labels": {"tier": "premium"}},
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="run",
                 resource_type="execution",
                 groups=[{"name": "basic-team", "labels": {"tier": "basic"}}],
@@ -296,10 +296,10 @@ class TestResourceLabelsNotCondition:
         conditions={"resource_labels_not": {"env": "production"}},
     )
 
-    def test_deny_fires_when_label_key_missing(self, opa_evaluate):
+    def test_deny_fires_when_label_key_missing(self, evaluate_policy):
         """THE BUG: resource has no labels at all — deny must fire."""
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={},
@@ -309,9 +309,9 @@ class TestResourceLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_deny_fires_when_label_value_differs(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_deny_fires_when_label_value_differs(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={"env": "staging"},
@@ -321,9 +321,9 @@ class TestResourceLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_allow_when_label_matches_excluded_value(self, opa_evaluate):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_allow_when_label_matches_excluded_value(self, evaluate_policy):
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={"env": "production"},
@@ -333,15 +333,15 @@ class TestResourceLabelsNotCondition:
         assert result["allow"] is True
         assert result["deny"] is False
 
-    def test_deny_fires_when_all_keys_differ_or_missing(self, opa_evaluate):
+    def test_deny_fires_when_all_keys_differ_or_missing(self, evaluate_policy):
         """Multi-key: env=staging (differs) and tier missing — deny fires for both."""
         deny_multi = deny_policy(
             "deny-not-prod-gold",
             ["credential:read"],
             conditions={"resource_labels_not": {"env": "production", "tier": "gold"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={"env": "staging"},
@@ -351,15 +351,15 @@ class TestResourceLabelsNotCondition:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_allow_when_one_key_matches_excluded_value(self, opa_evaluate):
+    def test_allow_when_one_key_matches_excluded_value(self, evaluate_policy):
         """Multi-key AND semantics: env=production matches, so deny does not fire."""
         deny_multi = deny_policy(
             "deny-not-prod-gold",
             ["credential:read"],
             conditions={"resource_labels_not": {"env": "production", "tier": "gold"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={"env": "production"},
@@ -369,15 +369,15 @@ class TestResourceLabelsNotCondition:
         assert result["allow"] is True
         assert result["deny"] is False
 
-    def test_allow_when_all_keys_match_excluded_values(self, opa_evaluate):
+    def test_allow_when_all_keys_match_excluded_values(self, evaluate_policy):
         """All labels match the excluded values — deny does not fire."""
         deny_multi = deny_policy(
             "deny-not-prod-gold",
             ["credential:read"],
             conditions={"resource_labels_not": {"env": "production", "tier": "gold"}},
         )
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="credential",
                 resource_labels={"env": "production", "tier": "gold"},
@@ -397,10 +397,10 @@ class TestResourceLabelsNotViaDeny:
         conditions={"resource_labels": {"status": "archived"}},
     )
 
-    def test_delete_active_allowed(self, opa_evaluate):
+    def test_delete_active_allowed(self, evaluate_policy):
         policies = [*policies_for_role("admin"), self._DENY_ARCHIVED]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 resource_labels={"status": "active"},
@@ -409,10 +409,10 @@ class TestResourceLabelsNotViaDeny:
         )
         assert result["allow"] is True
 
-    def test_delete_archived_denied(self, opa_evaluate):
+    def test_delete_archived_denied(self, evaluate_policy):
         policies = [*policies_for_role("admin"), self._DENY_ARCHIVED]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="delete",
                 resource_type="workflow",
                 resource_labels={"status": "archived"},

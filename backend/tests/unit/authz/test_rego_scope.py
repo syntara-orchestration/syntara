@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.unit.authz.conftest import allow_policy, build_opa_input, policies_for_role
+from tests.unit.authz.conftest import allow_policy, build_authz_input, policies_for_role
 
 
 class TestAnyScopeUniversal:
@@ -17,9 +17,9 @@ class TestAnyScopeUniversal:
         ],
         ids=["workflow:read", "execution:read", "project:read"],
     )
-    def test_any_scope_universal(self, opa_evaluate, action: str, resource_type: str):
-        result = opa_evaluate(
-            build_opa_input(
+    def test_any_scope_universal(self, evaluate_policy, action: str, resource_type: str):
+        result = evaluate_policy(
+            build_authz_input(
                 action=action,
                 resource_type=resource_type,
                 effective_policies=policies_for_role("auditor"),
@@ -31,13 +31,13 @@ class TestAnyScopeUniversal:
 class TestSelfScopeOwnOnly:
     """Self-scoped policy only allows when resource_id matches user_id."""
 
-    def test_self_scope_own_resource(self, opa_evaluate):
+    def test_self_scope_own_resource(self, evaluate_policy):
         user_id = "user-uuid-123"
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id=user_id,
@@ -47,12 +47,12 @@ class TestSelfScopeOwnOnly:
         )
         assert result["allow"] is True
 
-    def test_self_scope_other_resource_denied(self, opa_evaluate):
+    def test_self_scope_other_resource_denied(self, evaluate_policy):
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="other-user-id",
@@ -62,12 +62,12 @@ class TestSelfScopeOwnOnly:
         )
         assert result["allow"] is False
 
-    def test_self_scope_empty_resource_id_denied(self, opa_evaluate):
+    def test_self_scope_empty_resource_id_denied(self, evaluate_policy):
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="",
@@ -81,13 +81,13 @@ class TestSelfScopeOwnOnly:
 class TestGroupSelfScope:
     """Self-scoped group policy allows when user is a member of the group."""
 
-    def test_group_self_scope_member_allowed(self, opa_evaluate):
+    def test_group_self_scope_member_allowed(self, evaluate_policy):
         group_id = "group-uuid-123"
         policies = [
             allow_policy("group:read:self", ["group:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="group",
                 resource_id=group_id,
@@ -97,12 +97,12 @@ class TestGroupSelfScope:
         )
         assert result["allow"] is True
 
-    def test_group_self_scope_non_member_denied(self, opa_evaluate):
+    def test_group_self_scope_non_member_denied(self, evaluate_policy):
         policies = [
             allow_policy("group:read:self", ["group:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="group",
                 resource_id="other-group-id",
@@ -112,12 +112,12 @@ class TestGroupSelfScope:
         )
         assert result["allow"] is False
 
-    def test_group_self_scope_empty_groups_denied(self, opa_evaluate):
+    def test_group_self_scope_empty_groups_denied(self, evaluate_policy):
         policies = [
             allow_policy("group:read:self", ["group:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="group",
                 resource_id="some-group-id",
@@ -127,12 +127,12 @@ class TestGroupSelfScope:
         )
         assert result["allow"] is False
 
-    def test_group_any_scope_still_works(self, opa_evaluate):
+    def test_group_any_scope_still_works(self, evaluate_policy):
         policies = [
             allow_policy("group:read:any", ["group:read"], scope="any"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="group",
                 resource_id="any-group-id",
@@ -145,12 +145,12 @@ class TestGroupSelfScope:
 class TestProjectScopeBoundaries:
     """Project-scoped policy allows in matching project, denies in others."""
 
-    def test_project_scope_matching_project_allowed(self, opa_evaluate):
+    def test_project_scope_matching_project_allowed(self, evaluate_policy):
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-x",
@@ -159,12 +159,12 @@ class TestProjectScopeBoundaries:
         )
         assert result["allow"] is True
 
-    def test_project_scope_different_project_denied(self, opa_evaluate):
+    def test_project_scope_different_project_denied(self, evaluate_policy):
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-y",

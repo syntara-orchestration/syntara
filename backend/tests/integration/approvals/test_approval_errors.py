@@ -62,7 +62,7 @@ class TestApprovalErrorScenarios:
         )
 
     def _create_test_service(self, session: AsyncSession, user: User) -> ApprovalService:
-        """Create ApprovalService with mocked OPA client for integration testing."""
+        """Create ApprovalService with mocked authz evaluator for integration testing."""
         mock_evaluator = AsyncMock()
         mock_evaluator.__bool__ = AsyncMock(return_value=True)
         mock_evaluator.evaluate = MagicMock(return_value={"allow": True})

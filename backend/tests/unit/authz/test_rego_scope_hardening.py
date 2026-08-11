@@ -6,19 +6,19 @@ by manipulating resource IDs or project fields.
 
 import pytest
 
-from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy
+from tests.unit.authz.conftest import allow_policy, build_authz_input, deny_policy
 
 
 class TestSelfScopeBypass:
     """SEC-006/007: Self-scope must not be tricked by wrong or empty IDs."""
 
-    def test_self_scope_wrong_user_id_denied(self, opa_evaluate):
+    def test_self_scope_wrong_user_id_denied(self, evaluate_policy):
         """SEC-006: Self-scope denies when resource_id is a different user."""
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="attacker-id",
@@ -28,7 +28,7 @@ class TestSelfScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_self_scope_empty_both_ids_allowed(self, opa_evaluate):
+    def test_self_scope_empty_both_ids_allowed(self, evaluate_policy):
         """SEC-007: When both user_id and resource_id are empty, "" == "" matches.
 
         This is a known Rego behavior — empty strings are equal.  The
@@ -38,8 +38,8 @@ class TestSelfScopeBypass:
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id="",
@@ -49,7 +49,7 @@ class TestSelfScopeBypass:
         )
         assert result["allow"] is True
 
-    def test_self_scope_rejects_mismatched_resource_type(self, opa_evaluate):
+    def test_self_scope_rejects_mismatched_resource_type(self, evaluate_policy):
         """Self-scope must not match when resource type differs from policy target.
 
         A self-scoped policy granting workflow:read should not match just
@@ -61,8 +61,8 @@ class TestSelfScopeBypass:
         policies = [
             allow_policy("user:read:self", ["workflow:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_id="test-user-id",
@@ -81,13 +81,13 @@ class TestSelfScopeBypass:
         ],
         ids=["trailing-space", "leading-space", "uppercase"],
     )
-    def test_self_scope_near_match_denied(self, opa_evaluate, resource_id: str):
+    def test_self_scope_near_match_denied(self, evaluate_policy, resource_id: str):
         """Self-scope requires exact string match — whitespace/case variants denied."""
         policies = [
             allow_policy("user:read:self", ["user:read"], scope="self"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="user",
                 resource_id=resource_id,
@@ -101,13 +101,13 @@ class TestSelfScopeBypass:
 class TestProjectScopeBypass:
     """SEC-008: Project-scope must not grant access when project is empty or mismatched."""
 
-    def test_project_scope_empty_resource_project_denied(self, opa_evaluate):
+    def test_project_scope_empty_resource_project_denied(self, evaluate_policy):
         """SEC-008: Project-scoped policy denies when resource has no project."""
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="",
@@ -116,13 +116,13 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_project_scope_empty_policy_project_denied(self, opa_evaluate):
+    def test_project_scope_empty_policy_project_denied(self, evaluate_policy):
         """Project-scoped policy with empty project field should not match any resource."""
         policies = [
             allow_policy("workflow:read:empty", ["workflow:read"], scope="project", project=""),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-x",
@@ -131,7 +131,7 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_project_scope_both_empty_denied(self, opa_evaluate):
+    def test_project_scope_both_empty_denied(self, evaluate_policy):
         """When policy project is empty, allow_policy() omits the key entirely.
 
         Rego treats missing ``policy.project`` as undefined, so the
@@ -142,8 +142,8 @@ class TestProjectScopeBypass:
         policies = [
             allow_policy("workflow:read:empty", ["workflow:read"], scope="project", project=""),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="",
@@ -161,13 +161,13 @@ class TestProjectScopeBypass:
         ],
         ids=["case-mismatch", "trailing-space", "leading-space"],
     )
-    def test_project_scope_near_match_denied(self, opa_evaluate, resource_project: str):
+    def test_project_scope_near_match_denied(self, evaluate_policy, resource_project: str):
         """Project scope requires exact string match."""
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project=resource_project,
@@ -176,13 +176,13 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_project_scope_multiple_projects_isolated(self, opa_evaluate):
+    def test_project_scope_multiple_projects_isolated(self, evaluate_policy):
         """User with access to proj-a cannot access proj-b resources."""
         policies = [
             allow_policy("workflow:read:proj-a", ["workflow:read"], scope="project", project="proj-a"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="proj-b",
@@ -191,7 +191,7 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_any_project_flag_allows_empty_resource_project(self, opa_evaluate):
+    def test_any_project_flag_allows_empty_resource_project(self, evaluate_policy):
         """check_any_project / any_project=true matches a concrete project grant."""
         policies = [
             allow_policy(
@@ -201,8 +201,8 @@ class TestProjectScopeBypass:
                 project="proj-x",
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="role-assignment",
                 resource_project="",
@@ -212,13 +212,13 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is True
 
-    def test_any_project_flag_false_still_denies_empty_project(self, opa_evaluate):
+    def test_any_project_flag_false_still_denies_empty_project(self, evaluate_policy):
         """SEC-008 still holds when any_project is explicitly false."""
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="",
@@ -228,13 +228,13 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_any_project_flag_ignores_empty_policy_project(self, opa_evaluate):
+    def test_any_project_flag_ignores_empty_policy_project(self, evaluate_policy):
         """any_project must not match project-scoped policies with empty project."""
         policies = [
             allow_policy("workflow:read:empty", ["workflow:read"], scope="project", project=""),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="workflow",
                 resource_project="",
@@ -244,13 +244,13 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_any_project_does_not_grant_unrelated_action(self, opa_evaluate):
+    def test_any_project_does_not_grant_unrelated_action(self, evaluate_policy):
         """any_project only widens scope matching — action must still match."""
         policies = [
             allow_policy("workflow:read:proj-x", ["workflow:read"], scope="project", project="proj-x"),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="create",
                 resource_type="workflow",
                 resource_project="",
@@ -260,7 +260,7 @@ class TestProjectScopeBypass:
         )
         assert result["allow"] is False
 
-    def test_any_project_deny_in_one_project_blocks_allow_elsewhere(self, opa_evaluate):
+    def test_any_project_deny_in_one_project_blocks_allow_elsewhere(self, evaluate_policy):
         """Deny+any_project is fail-closed across projects.
 
         Deny policies also use _scope_matches — any_project makes a project
@@ -285,8 +285,8 @@ class TestProjectScopeBypass:
             },
         ]
 
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="role-assignment",
                 resource_project="",
@@ -297,7 +297,7 @@ class TestProjectScopeBypass:
         assert result["allow"] is False
         assert result["deny"] is True
 
-    def test_any_project_allow_without_deny_still_allows(self, opa_evaluate):
+    def test_any_project_allow_without_deny_still_allows(self, evaluate_policy):
         """Control: allow-only project grant still allows with any_project."""
         policies = [
             allow_policy(
@@ -307,8 +307,8 @@ class TestProjectScopeBypass:
                 project="proj-a",
             ),
         ]
-        result = opa_evaluate(
-            build_opa_input(
+        result = evaluate_policy(
+            build_authz_input(
                 action="read",
                 resource_type="role-assignment",
                 resource_project="",

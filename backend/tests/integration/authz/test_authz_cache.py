@@ -32,7 +32,7 @@ class TestRegoCacheHitMiss:
     """Tests for Rego cache hit/miss behavior."""
 
     @pytest.mark.asyncio
-    async def test_second_call_uses_cached_opa_result(
+    async def test_second_call_uses_cached_authz_result(
         self,
         seeded_db: AsyncSession,
         test_user: User,
@@ -47,10 +47,10 @@ class TestRegoCacheHitMiss:
         )
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
     @pytest.mark.asyncio
     async def test_different_action_misses_cache(
@@ -75,7 +75,7 @@ class TestRegoCacheHitMiss:
             resource_id="wf-1",
         )
         await authorize(seeded_db, mock_evaluator, req2)
-        assert mock_evaluator.evaluate.await_count == 2
+        assert mock_evaluator.evaluate.call_count == 2
 
     @pytest.mark.asyncio
     async def test_different_users_miss_cache(
@@ -113,7 +113,7 @@ class TestRegoCacheHitMiss:
             ),
         ):
             await authorize(seeded_db, mock_evaluator, req2)
-        assert mock_evaluator.evaluate.await_count == 2
+        assert mock_evaluator.evaluate.call_count == 2
 
 
 class TestRegoCacheDisabled:
@@ -124,7 +124,7 @@ class TestRegoCacheDisabled:
         init_authz_cache(enabled=False)
 
     @pytest.mark.asyncio
-    async def test_every_call_hits_opa(
+    async def test_every_call_hits_evaluator(
         self,
         seeded_db: AsyncSession,
         test_user: User,
@@ -139,7 +139,7 @@ class TestRegoCacheDisabled:
         )
         await authorize(seeded_db, mock_evaluator, request)
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 2
+        assert mock_evaluator.evaluate.call_count == 2
 
 
 class TestRegoCacheTTLExpiry:
@@ -168,12 +168,12 @@ class TestRegoCacheTTLExpiry:
         )
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
         time.sleep(1.1)  # noqa: ASYNC251
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 2
+        assert mock_evaluator.evaluate.call_count == 2
 
 
 class TestClearRegoCache:
@@ -195,12 +195,12 @@ class TestClearRegoCache:
         )
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
         clear_authz_cache()
 
         await authorize(seeded_db, mock_evaluator, request)
-        assert mock_evaluator.evaluate.await_count == 2
+        assert mock_evaluator.evaluate.call_count == 2
 
 
 class TestHashRegoInput:
@@ -208,8 +208,8 @@ class TestHashRegoInput:
 
     def test_deterministic(self) -> None:
         """Same dict produces same hash."""
-        opa_input = {"user": {"id": "abc"}, "action": "read", "groups": []}
-        assert _hash_authz_input(opa_input) == _hash_authz_input(opa_input)
+        authz_input = {"user": {"id": "abc"}, "action": "read", "groups": []}
+        assert _hash_authz_input(authz_input) == _hash_authz_input(authz_input)
 
     def test_key_order_independent(self) -> None:
         """Dict key order doesn't affect hash."""
@@ -266,7 +266,7 @@ class TestRegoCacheDefensiveCopy:
 
         result2 = await authorize(seeded_db, mock_evaluator, request)
         assert result2.matched_policy == "test-allow"
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
 
 class TestResolveAllowedProjectsCache:
@@ -281,7 +281,7 @@ class TestResolveAllowedProjectsCache:
     ) -> None:
         """resolve_allowed_projects() uses cache on repeated calls."""
         await resolve_allowed_projects(seeded_db, mock_evaluator, test_user.id, "workflow", "read")
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1
 
         await resolve_allowed_projects(seeded_db, mock_evaluator, test_user.id, "workflow", "read")
-        assert mock_evaluator.evaluate.await_count == 1
+        assert mock_evaluator.evaluate.call_count == 1

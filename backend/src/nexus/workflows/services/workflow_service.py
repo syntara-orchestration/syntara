@@ -99,10 +99,10 @@ class WorkflowService(BaseService):
     including CRUD operations, validation, and version management.
     """
 
-    def __init__(self, session: AsyncSession, user: User, opa_client: AuthzEvaluator | None = None) -> None:
+    def __init__(self, session: AsyncSession, user: User, authz_evaluator: AuthzEvaluator | None = None) -> None:
         """Initialize WorkflowService with database session and user context."""
         super().__init__(session, user, convert_resource_mixin=WorkflowConvertResourceMixin())
-        self.opa_client = opa_client
+        self.authz_evaluator = authz_evaluator
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -346,7 +346,7 @@ class WorkflowService(BaseService):
             AuthorizationDeniedError: If the user lacks credential:use on any new credential.
 
         """
-        if self.opa_client is None:
+        if self.authz_evaluator is None:
             msg = "Authorization service unavailable; cannot verify credential:use permission"
             raise AuthorizationDeniedError(msg)
 
@@ -362,7 +362,7 @@ class WorkflowService(BaseService):
         for cred_id in new_credentials:
             authz_result = await authorize(
                 self.session,
-                self.opa_client,
+                self.authz_evaluator,
                 AuthzRequest(
                     user_id=self.user.id,
                     action="use",

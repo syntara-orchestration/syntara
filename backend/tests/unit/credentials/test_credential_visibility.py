@@ -27,7 +27,7 @@ def _make_user() -> MagicMock:
 class TestCredentialVisibilityCertAuth:  # noqa: D101
     @pytest.mark.asyncio
     async def test_cert_authenticated_returns_unrestricted(self) -> None:
-        """S2S cert-authenticated requests bypass OPA entirely."""
+        """S2S cert-authenticated requests bypass the authz evaluator entirely."""
         visibility = _CredentialVisibility()
         result = await visibility(
             request=_make_request(cert_auth=True),

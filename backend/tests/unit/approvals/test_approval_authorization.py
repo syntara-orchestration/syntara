@@ -530,7 +530,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
         assert is_authorized is False
 
     @pytest.mark.asyncio
-    async def test_opa_denies_access_even_if_in_approver_list(
+    async def test_authz_denies_access_even_if_in_approver_list(
         self,
         test_db_session: AsyncSession,
         users: dict[str, User],
@@ -577,7 +577,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
         assert is_authorized is False
 
     @pytest.mark.asyncio
-    async def test_opa_allows_with_approver_list_check(
+    async def test_authz_allows_with_approver_list_check(
         self,
         test_db_session: AsyncSession,
         users: dict[str, User],
@@ -624,7 +624,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
         assert is_authorized is True
 
     @pytest.mark.asyncio
-    async def test_opa_allows_but_not_in_approver_list(
+    async def test_authz_allows_but_not_in_approver_list(
         self,
         test_db_session: AsyncSession,
         users: dict[str, User],
@@ -672,7 +672,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
         assert is_authorized is False
 
     @pytest.mark.asyncio
-    async def test_opa_allows_with_empty_approver_list(
+    async def test_authz_allows_with_empty_approver_list(
         self,
         test_db_session: AsyncSession,
         users: dict[str, User],

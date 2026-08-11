@@ -11,18 +11,18 @@ import pytest
 from nexus.authz.evaluator import evaluate_policy_input
 
 
-def _opa_evaluate(opa_input: dict[str, Any]) -> dict[str, Any]:
+def _evaluate_policy(authz_input: dict[str, Any]) -> dict[str, Any]:
     """Evaluate authz using the real rego policy through regopy."""
-    return evaluate_policy_input(opa_input)
+    return evaluate_policy_input(authz_input)
 
 
 @pytest.fixture
-def opa_evaluate() -> Any:  # noqa: ANN401
+def evaluate_policy() -> Any:  # noqa: ANN401
     """Fixture that returns the policy evaluation function."""
-    return _opa_evaluate
+    return _evaluate_policy
 
 
-def build_opa_input(
+def build_authz_input(
     *,
     action: str,
     resource_type: str,
