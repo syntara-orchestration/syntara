@@ -11,7 +11,7 @@ import {
   SelectList,
   SelectOption,
 } from '@patternfly/react-core'
-import { type Ref, useEffect, useMemo, useState } from 'react'
+import { type Ref, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -54,7 +54,7 @@ type AssignRoleModalProps = {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  assignedRoles: AssignedRolesByScope
+  assignedRoles?: AssignedRolesByScope
 }
 
 function SingleSelect({
@@ -132,12 +132,6 @@ export function AssignRoleModal({
 
   const scope = useWatch({ control, name: 'scope' })
 
-  useEffect(() => {
-    if (isOpen) {
-      reset({ scope: defaultScope, projectId: '', roleIds: [] })
-    }
-  }, [isOpen, reset, defaultScope])
-
   const { projects: allProjects } = useSelectableProjects()
 
   // ── Server-side role search ──────────────────────────────────────────────
@@ -158,6 +152,7 @@ export function AssignRoleModal({
   })
 
   const alreadyAssigned = useMemo((): Set<string> => {
+    if (!assignedRoles) return new Set()
     if (scope === 'system') return assignedRoles.system
     if (projectId) return assignedRoles.byProject.get(projectId) ?? new Set()
     return new Set()

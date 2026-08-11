@@ -295,6 +295,41 @@ function TableContent({
   )
 }
 
+function computeAssignedRoles(rows: RoleAssignmentRow[]): AssignedRolesByScope {
+  const system = new Set<string>()
+  const byProject = new Map<string, Set<string>>()
+  for (const row of rows) {
+    if (row.scopeType === 'system') {
+      system.add(row.roleName)
+    } else if (row.projectId) {
+      let projectSet = byProject.get(row.projectId)
+      if (!projectSet) {
+        projectSet = new Set<string>()
+        byProject.set(row.projectId, projectSet)
+      }
+      projectSet.add(row.roleName)
+    }
+  }
+  return { system, byProject }
+}
+
+function ForbiddenAlert({ visible }: Readonly<{ visible: boolean }>) {
+  if (!visible) return null
+  return (
+    <StackItem>
+      <Alert
+        variant="info"
+        isInline
+        title="Showing project-scoped roles only"
+        style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}
+      >
+        System-level role assignments require administrator access. Only roles within your accessible projects are
+        shown.
+      </Alert>
+    </StackItem>
+  )
+}
+
 export function RoleAssignmentsPanel({
   principalType,
   principalId,
@@ -323,23 +358,7 @@ export function RoleAssignmentsPanel({
     principalId
   )
 
-  const assignedRoles = useMemo((): AssignedRolesByScope => {
-    const system = new Set<string>()
-    const byProject = new Map<string, Set<string>>()
-    for (const row of rows) {
-      if (row.scopeType === 'system') {
-        system.add(row.roleName)
-      } else if (row.projectId) {
-        let projectSet = byProject.get(row.projectId)
-        if (!projectSet) {
-          projectSet = new Set<string>()
-          byProject.set(row.projectId, projectSet)
-        }
-        projectSet.add(row.roleName)
-      }
-    }
-    return { system, byProject }
-  }, [rows])
+  const assignedRoles = useMemo(() => computeAssignedRoles(rows), [rows])
 
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
@@ -432,19 +451,7 @@ export function RoleAssignmentsPanel({
   return (
     <>
       <NxPanelContentStack>
-        {queryForbidden && (
-          <StackItem>
-            <Alert
-              variant="info"
-              isInline
-              title="Showing project-scoped roles only"
-              style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}
-            >
-              System-level role assignments require administrator access. Only roles within your accessible projects are
-              shown.
-            </Alert>
-          </StackItem>
-        )}
+        <ForbiddenAlert visible={queryForbidden} />
 
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
@@ -509,6 +516,7 @@ export function RoleAssignmentsPanel({
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onSuccess={refetchAndInvalidateAuthz}
+        assignedRoles={assignedRoles}
       />
 
       <NxConfirmationDialog
