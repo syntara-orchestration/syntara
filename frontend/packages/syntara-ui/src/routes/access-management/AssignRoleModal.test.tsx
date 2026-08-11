@@ -9,7 +9,7 @@ import { AlertProvider } from '../../providers/alerts'
 import { accessClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
 
-import { AssignRoleModal } from './AssignRoleModal'
+import { AssignRoleModal, type AssignedRolesByScope } from './AssignRoleModal'
 import type { RolePrincipalType } from './RoleAssignmentTypes'
 
 vi.mock('../access/accessClient', () => ({
@@ -150,7 +150,12 @@ describe('AssignRoleModal', () => {
   })
 
   function renderModal(
-    props: Partial<{ principalType: RolePrincipalType; principalId: string; isOpen: boolean }> = {}
+    props: Partial<{
+      principalType: RolePrincipalType
+      principalId: string
+      isOpen: boolean
+      assignedRoles: AssignedRolesByScope
+    }> = {}
   ) {
     return render(
       <AssignRoleModal
@@ -159,6 +164,7 @@ describe('AssignRoleModal', () => {
         isOpen={props.isOpen ?? true}
         onClose={mockOnClose}
         onSuccess={mockOnSuccess}
+        assignedRoles={props.assignedRoles}
       />,
       { wrapper }
     )
@@ -620,6 +626,78 @@ describe('AssignRoleModal', () => {
           body: { principal_id: 'sa-1', role_name: 'project-admin' },
         })
       })
+    })
+  })
+
+  describe('Already-assigned role filtering', () => {
+    it('filters out already-assigned system roles from dropdown', async () => {
+      const user = userEvent.setup()
+
+      renderModal({
+        principalType: 'user',
+        principalId: 'user-1',
+        assignedRoles: {
+          system: new Set(['admin-role']),
+          byProject: new Map(),
+        },
+      })
+
+      // Open role dropdown
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+
+      // admin-role should not appear (already assigned)
+      expect(screen.queryByRole('option', { name: /admin-role/i })).not.toBeInTheDocument()
+
+      // Other roles should still appear
+      expect(screen.getByRole('option', { name: /viewer-role/i })).toBeInTheDocument()
+    })
+
+    it('filters out already-assigned project roles for selected project', async () => {
+      const user = userEvent.setup()
+
+      renderModal({
+        principalType: 'user',
+        principalId: 'user-1',
+        assignedRoles: {
+          system: new Set(),
+          byProject: new Map([['proj1', new Set(['project-admin'])]]),
+        },
+      })
+
+      // Switch to project scope
+      const scopeToggle = screen.getByRole('button', { name: 'System' })
+      await user.click(scopeToggle)
+      await user.click(screen.getByRole('option', { name: 'Project' }))
+
+      // Select project
+      const projectToggle = screen.getByRole('button', { name: 'Select a project...' })
+      await user.click(projectToggle)
+      await user.click(screen.getByRole('option', { name: 'Project Alpha' }))
+
+      // Open role dropdown
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+
+      // project-admin should not appear for proj1 (already assigned)
+      expect(screen.queryByRole('option', { name: /project-admin/i })).not.toBeInTheDocument()
+
+      // Other project roles should appear
+      expect(screen.getByRole('option', { name: /project-auditor/i })).toBeInTheDocument()
+    })
+
+    it('shows all roles when no assignedRoles prop provided', async () => {
+      const user = userEvent.setup()
+
+      renderModal({
+        principalType: 'user',
+        principalId: 'user-1',
+      })
+
+      // Open role dropdown
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+
+      // All roles should appear (no filtering)
+      expect(screen.getByRole('option', { name: /admin-role/i })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /viewer-role/i })).toBeInTheDocument()
     })
   })
 })

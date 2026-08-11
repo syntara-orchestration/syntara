@@ -39,6 +39,7 @@ import {
   getVisibleColumns,
   sortRoleAssignmentRows,
 } from './roleAssignmentColumns'
+import styles from './RoleAssignmentsPanel.module.css'
 import { principalTypeLabel, RolePrincipalType } from './RoleAssignmentTypes'
 import type { RoleAssignmentRow } from './useRoleAssignmentData'
 import { useRoleAssignmentData } from './useRoleAssignmentData'
@@ -301,7 +302,7 @@ function computeAssignedRoles(rows: RoleAssignmentRow[]): AssignedRolesByScope {
   for (const row of rows) {
     if (row.scopeType === 'system') {
       system.add(row.roleName)
-    } else if (row.projectId) {
+    } else if (row.scopeType === 'project' && row.projectId) {
       let projectSet = byProject.get(row.projectId)
       if (!projectSet) {
         projectSet = new Set<string>()
@@ -317,12 +318,7 @@ function ForbiddenAlert({ visible }: Readonly<{ visible: boolean }>) {
   if (!visible) return null
   return (
     <StackItem>
-      <Alert
-        variant="info"
-        isInline
-        title="Showing project-scoped roles only"
-        style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}
-      >
+      <Alert variant="info" isInline title="Showing project-scoped roles only" className={styles.forbiddenAlert}>
         System-level role assignments require administrator access. Only roles within your accessible projects are
         shown.
       </Alert>
