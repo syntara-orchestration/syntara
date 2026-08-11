@@ -43,6 +43,14 @@ def _format_user_message(error_type: str, error_message: str) -> str:
     return f"An unexpected error occurred: {error_message}"
 
 
+# User-facing fallback when a failure signal has no error.message.
+EMPTY_SIGNAL_ERROR_MESSAGE = (
+    "The AI Agent encountered an error but did not provide details. "
+    "Try running the workflow again. If this persists, check the agent "
+    "configuration or contact your administrator."
+)
+
+
 class WorkflowSignalProcessor:
     """Processor for workflow activity signals.
 
@@ -86,9 +94,19 @@ class WorkflowSignalProcessor:
 
         if signal_status == "failed":
             # Extract error information and raise exception
-            error_info = signal_data.get("error", {})
-            error_message = error_info.get("message", "Agent execution failed")
+            error_info = signal_data.get("error") or {}
+            if not isinstance(error_info, dict):
+                error_info = {}
+            raw_message = error_info.get("message")
+            if isinstance(raw_message, str) and raw_message.strip():
+                has_error_detail = True
+                error_message = raw_message.strip()
+            else:
+                has_error_detail = False
+                error_message = EMPTY_SIGNAL_ERROR_MESSAGE
             error_type = error_info.get("error_type", "UnknownError")
+            if not isinstance(error_type, str) or not error_type:
+                error_type = "UnknownError"
 
             # Log only if in workflow context (workflow.logger requires workflow event loop)
             with contextlib.suppress(Exception):  # Silently skip logging if not in workflow context
@@ -102,10 +120,10 @@ class WorkflowSignalProcessor:
                     },
                 )
 
-            msg = _format_user_message(error_type, error_message)
+            msg = _format_user_message(error_type, error_message) if has_error_detail else error_message
 
             # Extract error code from message (works for HTTP status codes AND exit codes)
-            error_code = extract_error_code(error_message)
+            error_code = extract_error_code(error_message) if has_error_detail else None
 
             # Get retryable error codes from retry policy config (whitelist approach)
             # Default: common transient server errors that should be retried
