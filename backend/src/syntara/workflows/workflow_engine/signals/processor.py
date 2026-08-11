@@ -17,23 +17,14 @@ from syntara.workflows.workflow_engine.activities.common import (
 )
 
 _USER_FRIENDLY_MESSAGES: dict[str, str] = {
-    "AuthenticationError": (
-        "Authentication failed. Check that your credentials are valid and have not expired."
-    ),
-    "AuthError": (
-        "Authentication failed. Check that your credentials are valid and have not expired."
-    ),
+    "AuthenticationError": ("Authentication failed. Check that your credentials are valid and have not expired."),
+    "AuthError": ("Authentication failed. Check that your credentials are valid and have not expired."),
     "RateLimitError": "The request was rate-limited. The workflow will retry automatically.",
-    "NetworkError": (
-        "A network error occurred. Check your connection and verify"
-        " the service endpoint is reachable."
-    ),
+    "NetworkError": ("A network error occurred. Check your connection and verify the service endpoint is reachable."),
     "TimeoutError": "The request timed out. The service may be under heavy load or unreachable.",
     "ServerError": "The service encountered an internal error. This is usually temporary.",
     "ValidationError": "The request was invalid. Check the step configuration and input values.",
-    "LLMConfigurationError": (
-        "The AI model configuration is invalid. Check the model name and parameters."
-    ),
+    "LLMConfigurationError": ("The AI model configuration is invalid. Check the model name and parameters."),
 }
 
 _ERROR_TYPE_CATEGORIES: dict[str, str] = {
@@ -50,7 +41,8 @@ _ERROR_TYPE_CATEGORIES: dict[str, str] = {
 
 def _format_user_message(error_type: str, error_message: str) -> str:
     if error_type in _USER_FRIENDLY_MESSAGES:
-        return _USER_FRIENDLY_MESSAGES[error_type]
+        friendly_message = _USER_FRIENDLY_MESSAGES[error_type]
+        return f"{friendly_message} Details: {error_message}"
     return f"An unexpected error occurred: {error_message}"
 
 

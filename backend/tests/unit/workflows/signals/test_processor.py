@@ -452,3 +452,21 @@ class TestUserFacingErrorMessages:
         error_msg = str(exc_info.value)
         assert "connection" in error_msg.lower()
         assert "reachable" in error_msg.lower()
+
+    def test_known_error_type_preserves_original_error_details(self) -> None:
+        """Known error types should keep contextual details from the original message."""
+        detail = "DNS resolution failed for api.example.com"
+        signal_data = {
+            "status": "failed",
+            "error": {
+                "message": detail,
+                "error_type": "NetworkError",
+            },
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            WorkflowSignalProcessor.process_signal(signal_data, "act", "exec")
+
+        error_msg = str(exc_info.value)
+        assert "network error" in error_msg.lower()
+        assert detail in error_msg
