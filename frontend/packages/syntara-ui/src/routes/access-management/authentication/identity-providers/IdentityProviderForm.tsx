@@ -26,6 +26,7 @@ import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../../components/NxPageTitle'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage, getErrorStatus, isConflictError } from '../../../../utils/apiErrors'
@@ -314,13 +315,29 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   const formValues = providerData ? toFormValues(providerData) : undefined
 
   const schema = isEdit ? identityProviderEditSchema : identityProviderAddSchema
-  const { control, handleSubmit, setError, getValues, setValue, trigger } = useForm<IdentityProviderFormData>({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    getValues,
+    setValue,
+    trigger,
+    formState: { isDirty },
+    reset,
+  } = useForm<IdentityProviderFormData>({
     resolver: zodResolver(schema, undefined, { mode: 'sync' }),
     mode: 'onBlur',
     defaultValues: formValues ?? identityProviderDefaults,
     values: isEdit && formValues ? formValues : undefined,
   })
   const handleError = useFormMutationErrorHandler<IdentityProviderFormData>(setError)
+
+  useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this identity provider. Your changes will be lost if you leave.',
+  })
 
   const navigateBack = useCallback(
     () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root })),

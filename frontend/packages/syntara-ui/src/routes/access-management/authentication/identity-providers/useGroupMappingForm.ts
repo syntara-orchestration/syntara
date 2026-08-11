@@ -9,6 +9,7 @@ import { breadcrumbsIdentityProviderGroupMappingForm } from '../../../../app/bre
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
 import { identityProvidersClient } from '../../../../client'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useMutationErrorHandler } from '../../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorStatus } from '../../../../utils/apiErrors'
@@ -259,6 +260,13 @@ export function useGroupMappingEditForm({
       setCreateGroupForIndex(null)
     }
   }, [refetchGroups, createGroupForIndex, form])
+
+  useDirtyFormGuard({
+    isDirty: form.formState.isDirty,
+    onDiscard: () => form.reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to group mapping. Your changes will be lost if you leave.',
+  })
 
   const panel: GroupMappingEditPanelState = {
     signInAlert,

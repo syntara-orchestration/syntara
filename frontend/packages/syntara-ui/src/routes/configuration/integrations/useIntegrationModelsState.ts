@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 
-import { useUnsavedChanges } from '../../../app/useUnsavedChanges'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { useAllIntegrationModels } from './useAllIntegrationModels'
@@ -9,8 +9,6 @@ import { useModelDefaultTracking } from './useModelDefaultTracking'
 import { useModelSave } from './useModelSave'
 
 export function useIntegrationModelsState(integrationId: string, isActive: boolean) {
-  const { registerDirtyCheck } = useUnsavedChanges()
-
   const { models, isLoading, error, refetch: refetchModels } = useAllIntegrationModels(integrationId)
 
   const {
@@ -47,26 +45,18 @@ export function useIntegrationModelsState(integrationId: string, isActive: boole
     detachPromise(saveRef.current?.() ?? Promise.resolve(false))
   }, [])
 
-  const isDirtyRef = useRef(false)
-
-  useEffect(() => {
-    isDirtyRef.current = isDirty
+  useDirtyFormGuard({
+    isDirty,
+    onSave: () => saveRef.current?.() ?? Promise.resolve(false),
+    onDiscard: () => {
+      resetSelectionToServer()
+      resetDefault()
+    },
+    title: 'Save model changes?',
+    body: 'You have unsaved changes to enabled models. Would you like to save before leaving?',
+    saveLabel: 'Save model changes',
+    isActive,
   })
-
-  useEffect(() => {
-    return registerDirtyCheck({
-      check: () => isActive && isDirtyRef.current,
-      saveAndExit: () => saveRef.current?.() ?? Promise.resolve(false),
-      exitWithoutSaving: () => {
-        isDirtyRef.current = false
-        resetSelectionToServer()
-        resetDefault()
-      },
-      title: 'Save model changes?',
-      body: 'You have unsaved changes to enabled models. Would you like to save before leaving?',
-      saveLabel: 'Save model changes',
-    })
-  }, [registerDirtyCheck, resetSelectionToServer, resetDefault, isActive])
 
   return {
     models,
