@@ -1,5 +1,6 @@
 import { Button, Popover } from '@patternfly/react-core'
-import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons'
+
+import { FieldHelpIcon } from './FieldHelpIcon'
 
 type FormLabelWithHelpProps = {
   label: string
@@ -16,9 +17,8 @@ export function FormLabelWithHelp({ label, helpText }: Readonly<FormLabelWithHel
             variant="plain"
             aria-label={`${label} help`}
             style={{ padding: 0, marginLeft: 'var(--pf-t--global--spacer--xs)' }}
-          >
-            <OutlinedQuestionCircleIcon style={{ color: 'var(--pf-t--global--color--icon--default)' }} />
-          </Button>
+            icon={<FieldHelpIcon />}
+          />
         </Popover>
       )}
     </>

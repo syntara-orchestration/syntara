@@ -4,7 +4,7 @@
  */
 
 import { Button, Popover } from '@patternfly/react-core'
-import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons'
+import { RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
 type HelpPopoverProps = {
@@ -27,7 +27,7 @@ export function HelpPopover({ ariaLabel, headerContent, bodyContent }: HelpPopov
         variant="plain"
         aria-label={ariaLabel}
         onClick={(e) => e.preventDefault()}
-        icon={<OutlinedQuestionCircleIcon />}
+        icon={<RhUiQuestionMarkCircleIcon />}
       />
     </Popover>
   )

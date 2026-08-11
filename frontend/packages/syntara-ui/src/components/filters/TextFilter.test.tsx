@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
@@ -488,6 +489,102 @@ describe('TextFilter', () => {
       await waitFor(() => {
         expect(screen.queryByText('Stale')).not.toBeInTheDocument()
       })
+    })
+
+    it('clears pending async search debounce when the value menu closes', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const asyncOptionsFn = vi.fn((search: string) => {
+        if (search === '') {
+          return Promise.resolve([{ label: 'Alpha', value: 'alpha' }])
+        }
+        return Promise.resolve([{ label: `Result for ${search}`, value: search }])
+      })
+      const asyncField: FilterFieldDefinition = {
+        key: 'wf',
+        label: 'Workflow',
+        type: FilterTypeEnum.SELECT,
+        asyncOptions: asyncOptionsFn,
+      }
+
+      render(<TextFilter fieldDefinitions={[asyncField]} filters={[]} onFilterChange={vi.fn()} />)
+
+      await user.click(screen.getByText('Filter by workflow'))
+      expect(await screen.findByText('Alpha')).toBeInTheDocument()
+
+      const callsAfterOpen = asyncOptionsFn.mock.calls.length
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'be')
+      await user.click(screen.getByText('Filter by workflow'))
+
+      vi.advanceTimersByTime(300)
+
+      expect(asyncOptionsFn.mock.calls.length).toBe(callsAfterOpen)
+      expect(screen.queryByText('Result for be')).not.toBeInTheDocument()
+
+      vi.useRealTimers()
+    })
+
+    it('shows empty list when async options request fails', async () => {
+      const user = userEvent.setup()
+      const asyncField: FilterFieldDefinition = {
+        key: 'wf',
+        label: 'Workflow',
+        type: FilterTypeEnum.SELECT,
+        asyncOptions: () => Promise.reject(new Error('network error')),
+      }
+
+      render(<TextFilter fieldDefinitions={[asyncField]} filters={[]} onFilterChange={vi.fn()} />)
+
+      await user.click(screen.getByText('Filter by workflow'))
+
+      expect(await screen.findByText('No results found')).toBeInTheDocument()
+    })
+
+    it('keeps the selected async option label when search results no longer include it', async () => {
+      const user = userEvent.setup()
+      const asyncOptionsFn = vi.fn((search: string) => {
+        if (search === 'z') {
+          return Promise.resolve([])
+        }
+        return Promise.resolve([
+          { label: 'Alpha workflow', value: 'alpha' },
+          { label: 'Beta workflow', value: 'beta' },
+        ])
+      })
+      const asyncField: FilterFieldDefinition = {
+        key: 'wf',
+        label: 'Workflow',
+        type: FilterTypeEnum.SELECT,
+        asyncOptions: asyncOptionsFn,
+      }
+
+      function ControlledAsyncTextFilter() {
+        const [filters, setFilters] = useState<FilterConfig[]>([])
+
+        return (
+          <TextFilter
+            fieldDefinitions={[asyncField]}
+            filters={filters}
+            onFilterChange={(filter) => {
+              setFilters(filter ? [filter] : [])
+            }}
+          />
+        )
+      }
+
+      render(<ControlledAsyncTextFilter />)
+
+      await user.click(screen.getByText('Filter by workflow'))
+      await user.click(await screen.findByRole('option', { name: 'Alpha workflow' }))
+
+      expect(screen.getByText('Alpha workflow')).toBeInTheDocument()
+
+      await user.click(screen.getByText('Alpha workflow'))
+      await user.type(screen.getByPlaceholderText('Search...'), 'z')
+
+      expect(await screen.findByText('No results found')).toBeInTheDocument()
+      expect(screen.getByText('Alpha workflow')).toBeInTheDocument()
     })
   })
 
