@@ -11,6 +11,12 @@ from uuid import UUID
 
 from syntara.agent_orchestrator.exceptions import AgentOrchestratorError
 
+# User-facing copy for orchestrator/UI surfaces (no UUIDs or raw counters).
+LIMIT_EXCEEDED_USER_MESSAGE = (
+    "The AI Agent prompt and context exceed the model token limit. "
+    "Shorten the prompt, reduce input data, or choose a model with a larger context window."
+)
+
 
 class TokenValidationError(AgentOrchestratorError):
     """Base exception for all token validation errors."""
@@ -21,6 +27,7 @@ class TokenLimitExceededError(TokenValidationError):
 
     This exception contains structured information about the limit violation,
     including current usage, the configured limit, and the tokens in the current request.
+    The exception message is user-facing; use attributes / to_dict() for diagnostics.
     """
 
     def __init__(
@@ -38,7 +45,7 @@ class TokenLimitExceededError(TokenValidationError):
             current_usage: Current token usage within the rolling window
             token_limit: The configured token limit
             request_tokens: Tokens in the current request
-            message: Optional custom message (auto-generated if not provided)
+            message: Optional custom message (user-facing default if not provided)
 
         """
         self.user_id = user_id
@@ -47,12 +54,7 @@ class TokenLimitExceededError(TokenValidationError):
         self.request_tokens = request_tokens
 
         if message is None:
-            total = current_usage + request_tokens
-            message = (
-                f"Token limit exceeded for user {user_id}: "
-                f"current={current_usage}, limit={token_limit}, "
-                f"request={request_tokens}, total={total}"
-            )
+            message = LIMIT_EXCEEDED_USER_MESSAGE
 
         super().__init__(message)
 
