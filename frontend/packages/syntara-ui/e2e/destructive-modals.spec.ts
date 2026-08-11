@@ -135,12 +135,19 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
       // Title ends with question mark
       await expect(modal.getByText('Delete workflow?')).toBeVisible()
 
-      // Body mentions the workflow name and consequences
+      // Body mentions the workflow name and simplified delete consequences
       await expect(modal.getByText(new RegExp(workflowName))).toBeVisible()
-      await expect(modal.getByText(/cannot be undone/)).toBeVisible()
+      await expect(
+        modal
+          .locator('p')
+          .getByText(/will be deleted and any in-progress runs will stop immediately\. This action cannot be undone/)
+      ).toBeVisible()
+      await expect(modal.getByText(/dependent workflows|use this one as a step/)).toHaveCount(0)
 
       // Tier 1: checkbox must be present and checked to enable delete
-      const checkbox = modal.getByRole('checkbox')
+      const checkbox = modal.getByRole('checkbox', {
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+      })
       await expect(checkbox).toBeVisible()
       await expect(checkbox).not.toBeChecked()
 
@@ -151,6 +158,45 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
       await expect(deleteButton).toBeEnabled()
 
       // Cancel to keep the workflow for cleanup
+      await modal.getByRole('button', { name: 'Cancel' }).click()
+      await expect(modal).not.toBeVisible()
+    } finally {
+      await deleteWorkflow(app, workflowName)
+    }
+  })
+
+  test('builder delete workflow modal matches list copy', async ({ app }) => {
+    const workflowName = buildUniqueName('e2e-builder-delete-modal')
+    const workflow = await createBasicWorkflowViaApi(app, workflowName, 'Modal test action')
+
+    try {
+      await app.goto(toAppUrl(`/workflow-builder/${workflow.id}`))
+      await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 15000 })
+
+      await app.getByRole('button', { name: 'Workflow actions' }).click()
+      await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
+
+      const modal = app.getByRole('dialog')
+      await expect(modal).toBeVisible()
+      await expect(modal.getByText('Delete workflow?')).toBeVisible()
+      await expect(modal.getByText(new RegExp(workflowName))).toBeVisible()
+      await expect(
+        modal
+          .locator('p')
+          .getByText(/will be deleted and any in-progress runs will stop immediately\. This action cannot be undone/)
+      ).toBeVisible()
+      await expect(modal.getByText(/dependent workflows|use this one as a step/)).toHaveCount(0)
+
+      const checkbox = modal.getByRole('checkbox', {
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+      })
+      await expect(checkbox).toBeVisible()
+
+      const deleteButton = modal.getByRole('button', { name: 'Delete' })
+      await expect(deleteButton).toBeDisabled()
+      await checkbox.click()
+      await expect(deleteButton).toBeEnabled()
+
       await modal.getByRole('button', { name: 'Cancel' }).click()
       await expect(modal).not.toBeVisible()
     } finally {
