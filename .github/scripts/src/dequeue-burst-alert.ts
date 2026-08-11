@@ -6,6 +6,10 @@ import { getEnvironment } from './lib/env.js';
 const DEQUEUE_THRESHOLD = 3;
 const TIME_WINDOW_MINUTES = 30;
 
+/**
+ * Detects dequeue bursts in the merge queue and sends Slack alerts.
+ * Triggers on the 3rd dequeue within a 30-minute window.
+ */
 async function main() {
   const env = getEnvironment();
 

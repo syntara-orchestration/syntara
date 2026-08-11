@@ -12,9 +12,21 @@ type SlackMessage = {
   attachments: SlackAttachment[];
 };
 
+/**
+ * Slack notification client using Block Kit formatted messages.
+ * Sends color-coded alerts for merge queue health events.
+ */
 export class SlackNotifier {
-  constructor(private webhookUrl: string) {}
+  private readonly webhookUrl: string;
 
+  constructor(webhookUrl: string) {
+    this.webhookUrl = webhookUrl;
+  }
+
+  /**
+   * Sends a red alert when multiple PRs are dequeued in rapid succession.
+   * Indicates a systemic issue causing repeated check failures.
+   */
   async sendDequeueBurstAlert(
     dequeueCount: number,
     prNumber: string,
@@ -74,6 +86,10 @@ export class SlackNotifier {
     await this.send(message);
   }
 
+  /**
+   * Sends a red alert when the merge queue has stalled.
+   * Fires when PRs are waiting but nothing has merged in 60+ minutes.
+   */
   async sendQueueBackupAlert(
     queueDepth: number,
     minutesSinceMerge: number,
@@ -132,6 +148,10 @@ export class SlackNotifier {
     await this.send(message);
   }
 
+  /**
+   * Sends a green recovery notification when the merge queue resumes merging.
+   * Fires when queue transitions from unhealthy back to healthy.
+   */
   async sendQueueRecoveryAlert(queueUrl: string): Promise<void> {
     const message: SlackMessage = {
       attachments: [
@@ -186,6 +206,10 @@ export class SlackNotifier {
     await this.send(message);
   }
 
+  /**
+   * Posts a Block Kit message to the configured Slack webhook.
+   * Throws if the webhook request fails.
+   */
   private async send(message: SlackMessage): Promise<void> {
     const response = await fetch(this.webhookUrl, {
       method: 'POST',

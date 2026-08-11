@@ -10,11 +10,15 @@ import {
   type Commit,
 } from './types.js';
 
+/**
+ * GitHub API client with type-safe wrappers for merge queue monitoring.
+ * Combines REST and GraphQL APIs to query workflow runs, queue state, and commits.
+ */
 export class GitHubClient {
-  private octokit: Octokit;
-  private graphqlClient: typeof graphql;
-  private owner: string;
-  private repo: string;
+  private readonly octokit: Octokit;
+  private readonly graphqlClient: typeof graphql;
+  private readonly owner: string;
+  private readonly repo: string;
 
   constructor(token: string, repository: string) {
     this.octokit = new Octokit({ auth: token });
@@ -27,6 +31,10 @@ export class GitHubClient {
     this.repo = repo;
   }
 
+  /**
+   * Fetches recent workflow runs created after a specific time.
+   * Returns only completed runs, optionally excluding a specific run ID.
+   */
   async getWorkflowRuns(
     workflowFileName: string,
     since: Date,
@@ -47,6 +55,10 @@ export class GitHubClient {
     );
   }
 
+  /**
+   * Fetches current merge queue entries for a branch via GraphQL.
+   * Returns up to 10 PRs waiting in the queue.
+   */
   async getMergeQueueEntries(branch: string): Promise<MergeQueueEntry[]> {
     const query = `
       query($owner: String!, $repo: String!, $branch: String!) {
@@ -79,6 +91,10 @@ export class GitHubClient {
     return parsed.repository.mergeQueue?.entries.nodes ?? [];
   }
 
+  /**
+   * Fetches commits to a branch created after a specific time.
+   * Used to check if merges have occurred recently.
+   */
   async getRecentCommits(branch: string, since: Date): Promise<Commit[]> {
     const response = await this.octokit.repos.listCommits({
       owner: this.owner,
@@ -91,6 +107,10 @@ export class GitHubClient {
     return z.array(CommitSchema).parse(response.data);
   }
 
+  /**
+   * Fetches job details for a specific workflow run.
+   * Used to inspect step results from previous monitoring runs.
+   */
   async getWorkflowRunJobs(runId: number) {
     const response = await this.octokit.actions.listJobsForWorkflowRun({
       owner: this.owner,
@@ -101,10 +121,16 @@ export class GitHubClient {
     return response.data.jobs;
   }
 
+  /**
+   * Builds a URL to the GitHub merge queue page for a branch.
+   */
   getQueueUrl(branch: string): string {
     return `https://github.com/${this.owner}/${this.repo}/queue/${branch}`;
   }
 
+  /**
+   * Builds a URL to a specific pull request.
+   */
   getPrUrl(prNumber: number): string {
     return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`;
   }

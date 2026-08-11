@@ -7,6 +7,10 @@ import type { HealthState } from './lib/types.js';
 const MERGE_TIMEOUT_MINUTES = 60;
 const BRANCH = 'devel';
 
+/**
+ * Checks if the merge queue is healthy by verifying recent merge activity.
+ * Returns unhealthy if the queue has entries but no merges in 60+ minutes.
+ */
 async function assessHealth(github: GitHubClient): Promise<HealthState> {
   console.log('Querying merge queue status...');
 
@@ -61,6 +65,10 @@ async function assessHealth(github: GitHubClient): Promise<HealthState> {
   };
 }
 
+/**
+ * Determines the health state from the previous workflow run.
+ * Used to detect state transitions and avoid duplicate alerts.
+ */
 async function getPreviousHealthState(
   github: GitHubClient,
   currentRunId: number
@@ -115,6 +123,10 @@ async function getPreviousHealthState(
   }
 }
 
+/**
+ * Monitors merge queue health and sends alerts on state transitions.
+ * Runs every 5 minutes to detect queue backups and recoveries.
+ */
 async function main() {
   const env = getEnvironment();
 
