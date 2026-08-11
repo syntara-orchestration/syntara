@@ -2,7 +2,7 @@
 # Defaults to scratch (empty, built-in) so builds without --build-arg succeed.
 ARG DOWNSTREAM_OVERRIDE=scratch
 ARG BRANDING=false
-ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
+ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312@sha256:c95de2fee424548cc530c671cda0c77433801d88bdeb66d75f0101490fe3e269
 
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
