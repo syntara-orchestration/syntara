@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.token_manager.exceptions import (
+from syntara.agent_orchestrator.token_manager.exceptions import (
     LIMIT_EXCEEDED_USER_MESSAGE,
     TokenLimitExceededError,
 )
