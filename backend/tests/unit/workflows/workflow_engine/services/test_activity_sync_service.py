@@ -24,6 +24,8 @@ from syntara.workflows.workflow_engine.services.activity_sync_service import (
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
+    _build_timeout_error_message,
+    _format_timeout_friendly,
 )
 
 
@@ -589,7 +591,7 @@ class TestActivityEventProcessing:
             (
                 EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
                 ActivityStatus.FAILED,
-                "Activity timeout",
+                'The step "test-activity" did not finish within',
                 "Activity timeout",
             ),
             (EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED, ActivityStatus.CANCELLED, "Activity was canceled", None),
@@ -628,7 +630,7 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == expected_status
         assert self.metadata.pending_activity_updates[1]["completed_at"] is not None
         if expected_error:
-            assert self.metadata.pending_activity_updates[1]["error_details"] == expected_error
+            assert expected_error in self.metadata.pending_activity_updates[1]["error_details"]
 
     def test_process_activity_completed_sets_completed_for_approval_nodes(self) -> None:
         """Test that approval activities get COMPLETED status on ACTIVITY_TASK_COMPLETED."""
@@ -694,6 +696,74 @@ class TestActivityEventProcessing:
             with patch.object(self.service, handler_name) as mock_handler:
                 self.service._process_activity_event(event, metadata)
                 mock_handler.assert_called_once_with(event, metadata)
+
+
+# ---------------------------------------------------------------------------
+# AAP-87135: User-facing timeout messages must not expose Temporal jargon
+# ---------------------------------------------------------------------------
+
+
+class TestUserFacingTimeoutMessages:
+    """Regression tests for AAP-87135: no Temporal jargon in timeout messages."""
+
+    def test_format_timeout_friendly_seconds(self) -> None:
+        assert _format_timeout_friendly(30) == "30 seconds"
+        assert _format_timeout_friendly(1) == "1 second"
+
+    def test_format_timeout_friendly_minutes(self) -> None:
+        assert _format_timeout_friendly(120) == "2 minutes"
+        assert _format_timeout_friendly(60) == "1 minute"
+
+    def test_format_timeout_friendly_minutes_and_seconds(self) -> None:
+        assert _format_timeout_friendly(90) == "1 minute 30 seconds"
+        assert _format_timeout_friendly(121) == "2 minutes 1 second"
+
+    def test_format_timeout_friendly_none(self) -> None:
+        assert _format_timeout_friendly(None) == "the configured timeout"
+        assert _format_timeout_friendly(0) == "the configured timeout"
+
+    def test_timeout_message_includes_step_name(self) -> None:
+        msg = _build_timeout_error_message(
+            "my_step",
+            300,
+            {"my_step": {"type": "http_request", "name": "Fetch Users"}},
+        )
+        assert '"Fetch Users"' in msg
+        assert "5 minutes" in msg
+
+    def test_timeout_message_falls_back_to_activity_id(self) -> None:
+        msg = _build_timeout_error_message("fetch_data", 60, {})
+        assert '"fetch_data"' in msg
+
+    def test_timeout_message_no_temporal_jargon(self) -> None:
+        msg = _build_timeout_error_message("my_step", 300, {})
+        assert "Temporal" not in msg
+        assert "StartToClose" not in msg
+        assert "start_to_close" not in msg
+
+    def test_agentic_node_gets_ai_agent_label(self) -> None:
+        msg = _build_timeout_error_message(
+            "analyze",
+            600,
+            {"analyze": {"type": "agentic", "name": "Analyze Code"}},
+        )
+        assert 'The AI Agent step "Analyze Code"' in msg
+        assert "simplify the prompt" in msg
+        assert "agent may still be running" in msg
+
+    def test_non_agentic_node_gets_generic_label(self) -> None:
+        msg = _build_timeout_error_message(
+            "fetch",
+            300,
+            {"fetch": {"type": "http_request", "name": "Fetch Data"}},
+        )
+        assert 'The step "Fetch Data"' in msg
+        assert "AI Agent" not in msg
+
+    def test_timeout_message_includes_guidance(self) -> None:
+        msg = _build_timeout_error_message("step1", 120, {})
+        assert "Timeout setting" in msg
+        assert "Increase the timeout" in msg
 
 
 class TestHandleEventPostProcessing:

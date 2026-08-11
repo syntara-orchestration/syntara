@@ -13,6 +13,7 @@ from typing import Any, ClassVar, cast
 
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
@@ -352,7 +353,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         elif isinstance(error, ApplicationError):
             app_error = error
 
-        error_message = (app_error.message or str(app_error)) if app_error is not None else str(error)
+        # Detect Temporal timeout and produce a user-friendly message
+        is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
+        if is_timeout:
+            node = graph.get_node(node_id)
+            timeout_seconds = resolve_timeout(node, self._runtime_settings)
+            error_message = self._build_timeout_message(node, timeout_seconds)
+        elif app_error is not None:
+            error_message = app_error.message or str(app_error)
+        else:
+            error_message = str(error)
 
         self.failed_nodes[node_id] = error_message
 
@@ -391,6 +401,32 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if output_model_class:
             return output_model_class().dump(node.outputs)
         return {}
+
+    @staticmethod
+    def _build_timeout_message(node: ActivityNode, timeout_seconds: int) -> str:
+        node_name = node.name or node.id
+        total = int(timeout_seconds)
+        if total < 60:
+            timeout_friendly = f"{total} second{'s' if total != 1 else ''}"
+        else:
+            minutes = total // 60
+            remaining = total % 60
+            timeout_friendly = f"{minutes} minute{'s' if minutes != 1 else ''}"
+            if remaining:
+                timeout_friendly += f" {remaining} second{'s' if remaining != 1 else ''}"
+
+        is_agentic = node.type == NodeType.AGENTIC
+        step_label = f'The AI Agent step "{node_name}"' if is_agentic else f'The step "{node_name}"'
+        guidance = (
+            "Increase the timeout, simplify the prompt, or try again. "
+            "If the agent may still be running, check execution details before re-running."
+            if is_agentic
+            else "Increase the timeout in the node settings, or try again."
+        )
+        return (
+            f"{step_label} did not finish within {timeout_friendly}"
+            f" (configured in the node Timeout setting). {guidance}"
+        )
 
     async def _handle_continued_failure(
         self,
