@@ -138,7 +138,7 @@ class TestWorkflowSignalProcessorProcessSignal:
             with pytest.raises(ApplicationError) as exc_info:
                 WorkflowSignalProcessor.process_signal(signal_data, "test_activity", "test_exec")
 
-            error_msg = str(exc_info.value)
+            error_msg = exc_info.value.message
             assert exc_info.value.non_retryable is True
             assert expected_fragment.lower() in error_msg.lower()
             assert f"{error_type}:" not in error_msg
@@ -374,7 +374,7 @@ class TestUserFacingErrorMessages:
     """Regression tests for AAP-87136: no raw exception types in user-facing messages."""
 
     def test_no_error_type_colon_prefix_for_known_types(self) -> None:
-        """Known error types must not appear as 'ErrorType:' prefix."""
+        """Known error types must not appear as 'ErrorType:' prefix in the message."""
         known_types = [
             "AuthenticationError",
             "RateLimitError",
@@ -397,7 +397,7 @@ class TestUserFacingErrorMessages:
             with pytest.raises((ApplicationError, ActivityExecutionError)) as exc_info:
                 WorkflowSignalProcessor.process_signal(signal_data, "act", "exec")
 
-            error_msg = str(exc_info.value)
+            error_msg = exc_info.value.message if hasattr(exc_info.value, "message") else str(exc_info.value)
             assert f"{error_type}:" not in error_msg, (
                 f"Raw exception prefix '{error_type}:' must not appear in user-facing message"
             )
@@ -415,7 +415,7 @@ class TestUserFacingErrorMessages:
         with pytest.raises(ApplicationError) as exc_info:
             WorkflowSignalProcessor.process_signal(signal_data, "act", "exec")
 
-        error_msg = str(exc_info.value)
+        error_msg = exc_info.value.message
         assert "SomeInternalException:" not in error_msg
         assert "An unexpected error occurred" in error_msg
         assert "Something broke" in error_msg

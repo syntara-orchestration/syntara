@@ -50,45 +50,11 @@ from syntara.workflows.workflow_engine.activities.common import (
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
+from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 
 
-def _format_timeout_friendly(seconds: float | None) -> str:
-    """Format timeout seconds into a human-readable string."""
-    if not seconds or seconds <= 0:
-        return "the configured timeout"
-    total = int(seconds)
-    if total < 60:
-        return f"{total} second{'s' if total != 1 else ''}"
-    minutes = total // 60
-    remaining_seconds = total % 60
-    if remaining_seconds == 0:
-        return f"{minutes} minute{'s' if minutes != 1 else ''}"
-    return f"{minutes} minute{'s' if minutes != 1 else ''} {remaining_seconds} second{'s' if remaining_seconds != 1 else ''}"
-
-
-def _build_timeout_error_message(
-    activity_id: str,
-    configured_timeout_seconds: float | None,
-    activity_definitions_map: dict[str, dict[str, Any]],
-) -> str:
-    activity_def = activity_definitions_map.get(activity_id, {})
-    node_name = activity_def.get("name") or activity_id
-    timeout_friendly = _format_timeout_friendly(configured_timeout_seconds)
-    is_agentic = activity_def.get("type") == "agentic"
-
-    step_label = f'The AI Agent step "{node_name}"' if is_agentic else f'The step "{node_name}"'
-    guidance = (
-        "Increase the timeout, simplify the prompt, or try again. "
-        "If the agent may still be running, check execution details before re-running."
-        if is_agentic
-        else "Increase the timeout in the node settings, or try again."
-    )
-    return (
-        f"{step_label} did not finish within {timeout_friendly}"
-        f" (configured in the node Timeout setting). {guidance}"
-    )
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -1295,10 +1261,11 @@ class ActivitySyncService:
                     activity_id=update["activity_id"],
                     raw_message=attrs.failure.message,
                 )
-            update["error_details"] = _build_timeout_error_message(
-                update["activity_id"],
-                update.get("configured_timeout_seconds"),
-                metadata.activity_definitions_map,
+            activity_def = metadata.activity_definitions_map.get(update["activity_id"], {})
+            update["error_details"] = build_timeout_error_message(
+                step_name=activity_def.get("name") or update["activity_id"],
+                is_agentic=activity_def.get("type") == "agentic",
+                timeout_seconds=update.get("configured_timeout_seconds"),
             )
 
             start_time = update.get("started_at") or update.get("scheduled_at")

@@ -25,17 +25,14 @@ _USER_FRIENDLY_MESSAGES: dict[str, str] = {
     "ServerError": "The service encountered an internal error. This is usually temporary.",
     "ValidationError": "The request was invalid. Check the step configuration and input values.",
     "LLMConfigurationError": ("The AI model configuration is invalid. Check the model name and parameters."),
-}
-
-_ERROR_TYPE_CATEGORIES: dict[str, str] = {
-    "AuthenticationError": "AuthenticationFailure",
-    "AuthError": "AuthenticationFailure",
-    "RateLimitError": "RateLimitExceeded",
-    "NetworkError": "NetworkFailure",
-    "TimeoutError": "Timeout",
-    "ServerError": "ServiceError",
-    "ValidationError": "InvalidRequest",
-    "LLMConfigurationError": "ConfigurationError",
+    "ToolDiscoveryError": "Failed to discover available tools. Check tool configuration and connectivity.",
+    "ToolSelectionUnavailableError": (
+        "A selected tool is not available. Verify the tool is enabled and properly configured."
+    ),
+    "CredentialResolutionError": (
+        "Failed to resolve credentials for this step. Check that the credential exists and is accessible."
+    ),
+    "EmptyLLMResponseError": "The AI model returned an empty response. Try simplifying the prompt or retrying.",
 }
 
 
@@ -44,10 +41,6 @@ def _format_user_message(error_type: str, error_message: str) -> str:
         friendly_message = _USER_FRIENDLY_MESSAGES[error_type]
         return f"{friendly_message} Details: {error_message}"
     return f"An unexpected error occurred: {error_message}"
-
-
-def _get_error_category(error_type: str) -> str:
-    return _ERROR_TYPE_CATEGORIES.get(error_type, "UnexpectedError")
 
 
 class WorkflowSignalProcessor:
@@ -132,7 +125,7 @@ class WorkflowSignalProcessor:
                 # Non-retryable error - raise ApplicationError to tell Temporal not to retry
                 raise ApplicationError(
                     msg,
-                    type=f"ErrorCode{error_code}" if error_code else _get_error_category(error_type),
+                    type=f"ErrorCode{error_code}" if error_code else error_type,
                     non_retryable=True,
                 )
             # Retryable error - raise normal exception so workflow may retry

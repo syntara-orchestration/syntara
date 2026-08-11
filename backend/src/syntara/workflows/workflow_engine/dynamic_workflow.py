@@ -37,6 +37,7 @@ with workflow.unsafe.imports_passed_through():
         resolve_timeout,
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
+    from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
@@ -345,24 +346,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         continue_on_failure: bool = False,
     ) -> None:
         """Record a node failure; skip downstream unless continue_on_failure is set."""
-        # Unwrap Temporal's ActivityError to surface the inner ApplicationError message.
-        # Also handle bare ApplicationError raised directly from workflow code.
-        app_error: ApplicationError | None = None
-        if isinstance(error, ActivityError) and isinstance(error.cause, ApplicationError):
-            app_error = error.cause
-        elif isinstance(error, ApplicationError):
-            app_error = error
-
-        # Detect Temporal timeout and produce a user-friendly message
-        is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
-        if is_timeout:
-            node = graph.get_node(node_id)
-            timeout_seconds = resolve_timeout(node, self._runtime_settings)
-            error_message = self._build_timeout_message(node, timeout_seconds)
-        elif app_error is not None:
-            error_message = app_error.message or str(app_error)
-        else:
-            error_message = str(error)
+        app_error = self._extract_application_error(error)
+        error_message = self._resolve_failure_message(node_id, error, app_error, graph)
 
         self.failed_nodes[node_id] = error_message
 
@@ -395,38 +380,43 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._check_converge_successors(node_id, graph, pending_tasks)
 
     @staticmethod
+    def _extract_application_error(error: Exception) -> ApplicationError | None:
+        """Extract ApplicationError from direct or wrapped Temporal activity errors."""
+        if isinstance(error, ActivityError) and isinstance(error.cause, ApplicationError):
+            return error.cause
+        if isinstance(error, ApplicationError):
+            return error
+        return None
+
+    def _resolve_failure_message(
+        self,
+        node_id: str,
+        error: Exception,
+        app_error: ApplicationError | None,
+        graph: WorkflowGraph,
+    ) -> str:
+        """Build a user-facing failure message for node execution errors."""
+        is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
+        if is_timeout:
+            node = graph.get_node(node_id)
+            timeout_seconds = resolve_timeout(node, self._runtime_settings)
+            node_name = node.name or node.id
+            return build_timeout_error_message(
+                step_name=node_name,
+                is_agentic=node.type == NodeType.AGENTIC,
+                timeout_seconds=timeout_seconds,
+            )
+        if app_error is not None:
+            return app_error.message or str(app_error)
+        return str(error)
+
+    @staticmethod
     def _build_empty_node_output(node: ActivityNode) -> dict[str, Any]:
         """Build an empty output dict for a node type using its output model."""
         output_model_class = NODE_OUTPUT_MODELS.get(node.type)
         if output_model_class:
             return output_model_class().dump(node.outputs)
         return {}
-
-    @staticmethod
-    def _build_timeout_message(node: ActivityNode, timeout_seconds: int) -> str:
-        node_name = node.name or node.id
-        total = int(timeout_seconds)
-        if total < 60:
-            timeout_friendly = f"{total} second{'s' if total != 1 else ''}"
-        else:
-            minutes = total // 60
-            remaining = total % 60
-            timeout_friendly = f"{minutes} minute{'s' if minutes != 1 else ''}"
-            if remaining:
-                timeout_friendly += f" {remaining} second{'s' if remaining != 1 else ''}"
-
-        is_agentic = node.type == NodeType.AGENTIC
-        step_label = f'The AI Agent step "{node_name}"' if is_agentic else f'The step "{node_name}"'
-        guidance = (
-            "Increase the timeout, simplify the prompt, or try again. "
-            "If the agent may still be running, check execution details before re-running."
-            if is_agentic
-            else "Increase the timeout in the node settings, or try again."
-        )
-        return (
-            f"{step_label} did not finish within {timeout_friendly}"
-            f" (configured in the node Timeout setting). {guidance}"
-        )
 
     async def _handle_continued_failure(
         self,
