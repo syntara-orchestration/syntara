@@ -4,7 +4,7 @@ info:
   title: Syntara Settings API
   version: 1.0.0
   description: |
-    Runtime settings API for the Nexus platform.
+    Runtime settings API for the Syntara platform.
 
     Provides endpoints for listing, reading, and updating
     database-backed runtime configuration settings. Settings are identified

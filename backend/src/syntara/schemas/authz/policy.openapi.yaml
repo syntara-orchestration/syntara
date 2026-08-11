@@ -4,7 +4,7 @@ info:
   title: Syntara Policies API
   version: 1.0.0
   description: |
-    Policy management endpoints for the Nexus authorization system.
+    Policy management endpoints for the Syntara authorization system.
 
     Policies define fine-grained access control rules with allow/deny statements.
     Each statement specifies actions, scope, and optional conditions.

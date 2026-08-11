@@ -4,7 +4,7 @@ info:
   title: Syntara Roles API
   version: 1.0.0
   description: |
-    Role management endpoints for the Nexus authorization system.
+    Role management endpoints for the Syntara authorization system.
 
     Roles are collections of policies that can be assigned to users or groups.
     Builtin roles (e.g., admin, viewer) cannot be modified or deleted.

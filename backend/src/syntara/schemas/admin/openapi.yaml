@@ -4,7 +4,7 @@ info:
   title: Syntara Admin API
   version: 1.0.0
   description: |
-    Administrative operations for the Nexus platform.
+    Administrative operations for the Syntara platform.
 
     Provides endpoints for global session revocation, per-user session
     revocation, and per-identity-provider session revocation.

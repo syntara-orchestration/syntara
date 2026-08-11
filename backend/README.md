@@ -1,6 +1,6 @@
-# Nexus
+# Syntara
 
-A distributed multi-agent system. Nexus enables coordinated AI agents to work together on complex tasks.
+A distributed multi-agent system. Syntara enables coordinated AI agents to work together on complex tasks.
 [![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/syntara-orchestration/syntara/graphs/commit-activity)
 [![CI](https://github.com/syntara-orchestration/syntara/actions/workflows/ci.yml/badge.svg)](https://github.com/syntara-orchestration/syntara/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://pypi.python.org/pypi/)

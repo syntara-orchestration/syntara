@@ -10,7 +10,7 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Nexus API
+  title: Syntara API
   version: 0.1.0
   description: A distributed multi-agent workflow orchestration system
 servers:
@@ -8314,6 +8314,123 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
+  /files/storage_status:
+    get:
+      summary: Get File Storage Status
+      description: Report whether the S3-compatible object storage backend is configured and reachable. Clients use this to disable file upload controls when uploads cannot succeed. Object storage is not a hard dependency of the API, so this is reported here rather than on the readiness probe.
+      operationId: get_file_storage_status
+      tags:
+        - Files
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileStorageStatusResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
   /files/metadata:
     get:
       summary: Get files metadata (batch)
@@ -12155,9 +12272,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
-                title: Response Bulk Update Integration Tools
+                $ref: '#/components/schemas/ToolBulkUpdateResponse'
         '400':
           description: Bad Request
           content:
@@ -29241,15 +29356,22 @@ components:
         Contains workflow identification, inputs, and the output from the immediately
         preceding activity.
       required:
-        - workflow_version_id
         - workflow_name
         - inputs
       properties:
-        workflow_version_id:
-          type: string
-          format: uuid
-          description: ID of the workflow version being executed
-          title: Workflow Version Id
+        workflow_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          description: ID of the workflow
+          title: Workflow Id
+        workflow_version:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          description: Integer version number of the workflow version executed
+          title: Workflow Version
         workflow_name:
           type: string
           description: Name of the workflow
@@ -30952,6 +31074,27 @@ components:
         - name
       title: CredentialWorkflowRef
       type: object
+    FileStorageStatus:
+      type: string
+      enum:
+        - ok
+        - degraded
+        - unconfigured
+        - error
+      title: FileStorageStatus
+      description: Availability of the S3-compatible object storage backend.
+    FileStorageStatusResponse:
+      type: object
+      title: FileStorageStatusResponse
+      description: Response model for GET /files/storage_status endpoint.
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/FileStorageStatus'
+          description: Availability of the object storage backend. Anything other than 'ok' means file uploads are unavailable.
+          examples:
+            - ok
     UploadFilesBody:
       type: object
       title: UploadFilesBody
@@ -32990,6 +33133,7 @@ components:
       required:
         - updated_count
         - skipped_count
+        - updated_at
       properties:
         updated_count:
           type: integer
@@ -32999,6 +33143,11 @@ components:
           type: integer
           title: Skipped Count
           description: Number of model IDs not found in integration
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+          description: Timestamp of the update
     ToolListResponse:
       title: ToolListResponse
       description: Paginated list response for tools.
@@ -33103,10 +33252,8 @@ components:
           description: Detailed description of the resource
           example: Handles user authentication and authorization workflows
         integration_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
+          type: string
+          format: uuid
           title: Integration Id
           description: UUID of the owning Integration (mcp_server)
         namespaced_name:
@@ -33153,6 +33300,7 @@ components:
       required:
         - created_by
         - name
+        - integration_id
         - namespaced_name
         - parameters
       type: object
@@ -33208,6 +33356,28 @@ components:
       required:
         - tool_ids
         - enabled
+    ToolBulkUpdateResponse:
+      type: object
+      title: ToolBulkUpdateResponse
+      description: Response model for bulk tool update.
+      properties:
+        updated_count:
+          type: integer
+          title: Updated Count
+          description: Number of tools updated
+        skipped_count:
+          type: integer
+          title: Skipped Count
+          description: Number of tool IDs not found or not in scope
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+          description: Timestamp of the update
+      required:
+        - updated_count
+        - skipped_count
+        - updated_at
     ComponentKPISummary:
       properties:
         component:
@@ -36075,6 +36245,12 @@ components:
           type: string
           format: uuid
           title: Workflow Version Id
+        workflow_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Workflow Name
+          description: Name of the workflow
         workflow_version:
           anyOf:
             - type: integer

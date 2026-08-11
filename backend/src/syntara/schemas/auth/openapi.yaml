@@ -4,7 +4,7 @@ info:
   title: Syntara Authentication API
   version: 1.0.0
   description: |
-    Authentication endpoints for the Nexus platform.
+    Authentication endpoints for the Syntara platform.
 
     This API provides endpoints for JWT token management, current user
     information, and identity provider discovery.

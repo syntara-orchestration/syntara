@@ -4,7 +4,7 @@ info:
   title: Syntara Authorization Query API
   version: 1.0.0
   description: |
-    Authorization debug and query endpoints for the Nexus platform.
+    Authorization debug and query endpoints for the Syntara platform.
 
     Provides three query patterns for inspecting authorization decisions:
     - **Can I?** - Check if the current user can perform a specific action
