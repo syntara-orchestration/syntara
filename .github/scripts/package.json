@@ -1,0 +1,22 @@
+{
+  "name": "@syntara/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "check-dequeue-burst": "tsx src/dequeue-burst-alert.ts",
+    "check-queue-health": "tsx src/queue-health-poll.ts",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@octokit/graphql": "^8.2.1",
+    "@octokit/rest": "^21.0.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

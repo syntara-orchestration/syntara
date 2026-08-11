@@ -40,7 +40,8 @@
     "podman:run:mock-api": "podman run --rm -p 3000:3000 --name syntara-mock-api localhost/syntara-mock-api:latest"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "../.github/scripts"
   ],
   "overrides": {
     "eslint": "^9.39.4",
