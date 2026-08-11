@@ -547,7 +547,7 @@ from nexus.audit.models.audit_event import EventCategory, EventSeverity
 @audit(
     EventCategory.USER_ACTION,
     event_action="create_workflow",
-    source_component="nexus.workflows",
+    source_component="syntara.workflows",
     event_severity=EventSeverity.INFO,
     capture_args={"user_id", "workflow_name"},
     capture_result={"id", "status"},
@@ -593,7 +593,7 @@ from nexus.audit.models.audit_event import EventCategory, EventSeverity
 with audit_context(
     event_category=EventCategory.USER_ACTION,
     event_action="export_data",
-    source_component="nexus.exports",
+    source_component="syntara.exports",
     actor=current_user,  # User object - ensures id/username integrity
     event_severity=EventSeverity.INFO,
     export_format="csv",
@@ -606,7 +606,7 @@ with audit_context(
 with audit_context(
     event_category=EventCategory.SYSTEM_OPERATION,
     event_action="backup_database",
-    source_component="nexus.maintenance",
+    source_component="syntara.maintenance",
     actor=None,  # SYSTEM actor
     event_severity=EventSeverity.INFO,
     database_name="production",
@@ -870,7 +870,7 @@ All HTTP requests automatically tracked - no action needed
 @audit(
     EventCategory.SYSTEM_OPERATION,
     event_action="database_backup",
-    source_component="nexus.maintenance",
+    source_component="syntara.maintenance",
     capture_args={"database_name"},
     capture_result={"backup_size_mb", "duration_seconds"},
 )
@@ -911,7 +911,7 @@ async def provision_infrastructure(user: User, config: InfraConfig):
     with audit_context(
         event_category=EventCategory.SYSTEM_OPERATION,
         event_action="provision_infrastructure",
-        source_component="nexus.infra",
+        source_component="syntara.infra",
         actor=user,  # User object - ensures atomic actor field extraction
         region=config.region,
         instance_count=config.instance_count,
@@ -1206,7 +1206,7 @@ class LoginAttemptHandler(AuditEventHandler[LoginAttemptEvent]):
             event_status=status,
             event_action=action,
             event_message=message,
-            source_component="nexus.auth.login",
+            source_component="syntara.auth.login",
             structured_data=AuditContextData(
                 data_type="login-context",
                 error_type=error_type_str,
