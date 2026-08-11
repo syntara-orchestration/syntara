@@ -387,6 +387,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      XFAIL_URL: https://raw.githubusercontent.com/goneri/goneri-nexus-xfail/refs/heads/main/backend.md
 
     steps:
       - name: Checkout code
@@ -428,6 +429,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      XFAIL_URL: https://raw.githubusercontent.com/goneri/goneri-nexus-xfail/refs/heads/main/backend.md
 
     steps:
       - name: Checkout code
@@ -470,6 +472,7 @@ jobs:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
       PYTEST_XDIST_AUTO_NUM_WORKERS: "8"
+      XFAIL_URL: https://raw.githubusercontent.com/goneri/goneri-nexus-xfail/refs/heads/main/backend.md
 
     steps:
       - name: Checkout code
@@ -515,6 +518,8 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      XFAIL_URL: https://raw.githubusercontent.com/goneri/goneri-nexus-xfail/refs/heads/main/backend.md
     steps:
       - name: Free disk space
         run: |
