@@ -95,9 +95,10 @@ class TestToolServices:
 
             tool_manager_client.update_tool_status.assert_called_once()
 
-    async def test_graceful_handling_of_tool_manager_unavailability(self, tool_manager_client: Mock) -> None:
-        """Test graceful handling of Tool Manager API unavailability."""
-        # Setup Tool Manager client to raise connection error
+    async def test_discovery_failure_raises_tool_discovery_error(self, tool_manager_client: Mock) -> None:
+        """Discovery must raise ToolDiscoveryError instead of returning [] on API failure."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
         tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
 
         # Mock the ToolManagerClient context manager
@@ -105,11 +106,35 @@ class TestToolServices:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
-            # This should return empty list when Tool Manager is unavailable (graceful handling)
-            all_integrations = await tool_services._discover_mcp_integrations()
+            with pytest.raises(ToolDiscoveryError, match="Failed to discover MCP integrations"):
+                await tool_services._discover_mcp_integrations()
 
-            # Should return empty list when Tool Manager is unavailable
-            assert all_integrations == []
+    async def test_discover_tools_failure_raises_tool_discovery_error(self, tool_manager_client: Mock) -> None:
+        """Tool discovery must raise ToolDiscoveryError instead of returning empty lists."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_tools.side_effect = ConnectionError("Tool Manager unavailable")
+
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            with pytest.raises(ToolDiscoveryError, match="Failed to discover tools"):
+                await tool_services._discover_tools()
+
+    async def test_retrieve_tools_propagates_discovery_failure(self, tool_manager_client: Mock) -> None:
+        """ToolRetriever.retrieve_tools must re-raise discovery failures after audit."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
+
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(ToolDiscoveryError):
+                await retriever.retrieve_tools()
 
     async def test_tool_retrieval_integration(
         self,

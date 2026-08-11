@@ -13,6 +13,7 @@ import structlog
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.audit.tool_management import ToolDiscoveryEvent, ToolDiscoveryStatus
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
 from syntara.agent_orchestrator.tool_manager.tool_filtering import (
     enhance_namespaced_tools_with_metadata,
     filter_base_tools_by_enabled,
@@ -54,7 +55,9 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
 
     Returns:
         List of all MCP server IntegrationRead records.
-        Returns empty list if the API is unavailable or fails.
+
+    Raises:
+        ToolDiscoveryError: If the Integrations/Tool Manager API is unavailable or fails.
 
     """
     try:
@@ -62,9 +65,12 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
             all_integrations = await client.get_all_mcp_integrations()
             logger.info("Discovered MCP integrations", integration_count=len(all_integrations))
             return all_integrations
-    except Exception as e:  # noqa: BLE001 (Failure of ToolManagerClient for whatever reason is not critical)
-        logger.warning("Failed to discover MCP integrations, continuing without them", error=str(e))
-        return []
+    except ToolDiscoveryError:
+        raise
+    except Exception as e:
+        logger.warning("Failed to discover MCP integrations", error=str(e))
+        msg = f"Failed to discover MCP integrations: {type(e).__name__}"
+        raise ToolDiscoveryError(msg) from e
 
 
 async def _discover_tools() -> ToolDiscoveryResult:
@@ -74,7 +80,9 @@ async def _discover_tools() -> ToolDiscoveryResult:
 
     Returns:
         Tuple of (enabled_tools, disabled_tools).
-        Returns empty lists if Tool Manager is unavailable or fails.
+
+    Raises:
+        ToolDiscoveryError: If Tool Manager is unavailable or fails.
 
     """
     try:
@@ -89,9 +97,12 @@ async def _discover_tools() -> ToolDiscoveryResult:
                 total_count=len(all_tools),
             )
             return enabled_tools, disabled_tools
-    except Exception as e:  # noqa: BLE001 (Failure of ToolManagerClient for whatever reason is not critical)
-        logger.warning("Tool Manager failed, continuing without tools", error=str(e))
-        return [], []
+    except ToolDiscoveryError:
+        raise
+    except Exception as e:
+        logger.warning("Tool Manager discovery failed", error=str(e))
+        msg = f"Failed to discover tools from Tool Manager: {type(e).__name__}"
+        raise ToolDiscoveryError(msg) from e
 
 
 async def report_tool_execution_failure(tool_id: UUID, error_message: str) -> None:
@@ -359,6 +370,12 @@ class ToolRetriever:
         Returns:
             List of filtered BaseTools ready for execution
 
+        Raises:
+            ToolDiscoveryError: If Tool Manager / Integrations discovery fails.
+            Exception: Propagates unexpected retrieval failures after emitting a
+                FAILED audit event. Callers that require tools must not swallow
+                these errors and continue toolless.
+
         """
         logger.info("Starting tool retrieval", invocation_id=self.invocation_id)
 
@@ -429,4 +446,4 @@ class ToolRetriever:
             )
 
             logger.exception("Tool retrieval failed", invocation_id=self.invocation_id)
-            return []
+            raise

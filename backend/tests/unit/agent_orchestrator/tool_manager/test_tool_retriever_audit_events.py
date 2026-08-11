@@ -202,7 +202,7 @@ class TestToolDiscoveryEventDispatch:
 
     @pytest.mark.asyncio
     async def test_retrieve_emits_failed_event_on_error(self, mock_tool_sync_internals: Callable[..., Any]) -> None:
-        """Failed retrieval emits STARTED and FAILED events."""
+        """Failed retrieval emits STARTED and FAILED events, then re-raises."""
         session_id = "sess-sync-fail"
         invocation_id = uuid4()
         execution_id = uuid4()
@@ -219,11 +219,9 @@ class TestToolDiscoveryEventDispatch:
             mock_tool_sync_internals(
                 {"discover_providers": {"side_effect": ConnectionError("Tool Manager unavailable")}}
             ),
+            pytest.raises(ConnectionError, match="Tool Manager unavailable"),
         ):
-            result = await retriever.retrieve_tools()
-
-        # Verify empty list returned (graceful degradation)
-        assert result == []
+            await retriever.retrieve_tools()
 
         # Verify events emitted
         events: list[AuditEvent] = [call.args[0] for call in mock_do_emit.call_args_list]

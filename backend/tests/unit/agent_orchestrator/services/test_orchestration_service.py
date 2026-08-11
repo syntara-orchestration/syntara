@@ -682,10 +682,14 @@ class TestApplyToolSelection:
         result = service._apply_tool_selection([tool_a, tool_b, tool_c])
         assert result == [tool_a, tool_c]
 
-    def test_selected_strategy_with_no_matching_tools_returns_empty(self) -> None:
+    def test_selected_strategy_with_no_matching_tools_raises(self) -> None:
+        """SELECTED with zero provisionable tools must fail the invocation."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
         service = self._make_service(strategy="SELECTED", selections=["uuid-x"])
         tools = [self._make_tool("uuid-a"), self._make_tool("uuid-b")]
-        assert service._apply_tool_selection(tools) == []
+        with pytest.raises(ToolSelectionUnavailableError, match="None of the requested tools"):
+            service._apply_tool_selection(tools)
 
     def test_selected_strategy_with_empty_selections_returns_empty(self) -> None:
         service = self._make_service(strategy="SELECTED", selections=[])
@@ -722,3 +726,41 @@ class TestApplyToolSelection:
 
         assert len(result) == 100  # every 50th of 5000
         assert elapsed_ms < 50, f"Tool filtering took {elapsed_ms:.1f}ms; expected < 50ms"
+
+
+class TestGetToolsStrategy:
+    """Tests for OrchestrationService._get_tools strategy short-circuit and failure signaling."""
+
+    @pytest.mark.asyncio
+    async def test_none_strategy_skips_tool_retrieval(self) -> None:
+        """NONE strategy must not call ToolRetriever (avoids silent toolless runs after failure)."""
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="NONE",
+        )
+        with patch(
+            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever"
+        ) as mock_retriever_cls:
+            result = await service._get_tools("session", uuid4())
+        assert result == []
+        mock_retriever_cls.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_all_strategy_propagates_discovery_failure(self) -> None:
+        """ALL strategy must surface discovery failures to fail the invocation."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="ALL",
+        )
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve_tools = AsyncMock(side_effect=ToolDiscoveryError("discovery failed"))
+        with patch(
+            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever",
+            return_value=mock_retriever,
+        ):
+            with pytest.raises(ToolDiscoveryError, match="discovery failed"):
+                await service._get_tools("session", uuid4())

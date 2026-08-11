@@ -39,6 +39,23 @@ class OrchestrationError(AgentOrchestratorError):
     """Exception for orchestration service failures."""
 
 
+class ToolDiscoveryError(OrchestrationError):
+    """Raised when tool discovery fails while tools were required for the invocation.
+
+    Covers Tool Manager / Integrations API failures during discovery. Callers that
+    request tools (ALL or SELECTED) must not continue toolless, or the LLM may
+    fabricate tool results.
+    """
+
+
+class ToolSelectionUnavailableError(OrchestrationError):
+    """Raised when none of the requested SELECTED tools could be provisioned.
+
+    Distinct from ToolDiscoveryError: discovery succeeded, but every selected
+    tool ID was missing, disabled, or otherwise unavailable at runtime.
+    """
+
+
 @fastapi_exception(handler="syntara.agent_orchestrator.error_handlers.llm_configuration_error_handler")
 class LLMConfigurationError(AgentOrchestratorError):
     """Raised when LLM model configuration is missing or invalid.

@@ -38,6 +38,7 @@ from syntara.agent_orchestrator.models.streaming_events import (
     ToolCallEventData,
     ToolResultEventData,
 )
+from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.agent_orchestrator.services.streaming_service import get_invocation_stream_id
 from syntara.agent_orchestrator.tool_manager import ToolRetriever
@@ -372,6 +373,10 @@ class OrchestrationService:
         Performs tool discovery and synchronization to ensure all available
         tools are properly registered and accessible for the current invocation.
 
+        For NONE / absent strategy, discovery is skipped entirely. For ALL and
+        SELECTED, discovery failures propagate so the invocation fails instead of
+        continuing toolless (which can cause the LLM to fabricate tool results).
+
         Args:
             session_id: Session identifier
             invocation_id: Unique identifier for the current invocation
@@ -383,7 +388,15 @@ class OrchestrationService:
         Returns:
             List of synchronized BaseTool instances available for agent use
 
+        Raises:
+            ToolDiscoveryError: If discovery fails when tools were requested.
+            ToolSelectionUnavailableError: If SELECTED tools cannot be provisioned.
+
         """
+        strategy = self._tool_selection_strategy
+        if strategy in (None, "NONE"):
+            return []
+
         retriever = ToolRetriever(
             session_id,
             invocation_id,
@@ -402,7 +415,9 @@ class OrchestrationService:
         ALL: return all enabled tools unchanged.
         SELECTED: return only tools whose tool_id is in self._tool_selections.
             Invalid/unavailable selected IDs are reported via warning log; execution
-            continues with the valid tools.
+            continues with the valid tools. If none of the selected tools are
+            available, raises ToolSelectionUnavailableError so the invocation fails
+            instead of running toolless.
         None or NONE: return an empty list (NONE is the explicit default).
         """
         strategy = self._tool_selection_strategy
@@ -419,7 +434,14 @@ class OrchestrationService:
                     selected_count=len(self._tool_selections),
                     available_count=len(available_ids),
                 )
-            return [t for t in tools if (t.metadata or {}).get("tool_id", "") in self._tool_selections]
+            selected = [t for t in tools if (t.metadata or {}).get("tool_id", "") in self._tool_selections]
+            if self._tool_selections and not selected:
+                msg = (
+                    "None of the requested tools could be provisioned; "
+                    "refusing to continue the invocation without tools"
+                )
+                raise ToolSelectionUnavailableError(msg)
+            return selected
         # None or "NONE" → no tools
         return []
 
