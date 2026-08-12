@@ -29,69 +29,13 @@ import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
 import { assignRoleSchema } from './assignRoleSchema'
 import type { AssignRoleFormData } from './assignRoleSchema'
+import { PrincipalField } from './PrincipalField'
 import { PrincipalTypeSelect } from './PrincipalTypeSelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
+import { useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 const PAGE_SIZE = 20
-
-// ── Principal selector field ──────────────────────────────────────────────
-
-type PrincipalFieldProps = {
-  control: ReturnType<typeof useForm<AssignRoleFormData>>['control']
-  name: 'userId' | 'groupId' | 'serviceAccountId'
-  label: string
-  fieldId: string
-  options: { value: string; label: string }[]
-  placeholder: string
-  onSearchChange?: (term: string) => void
-  hasMore?: boolean
-  isLoading?: boolean
-}
-
-function PrincipalField({
-  control,
-  name,
-  label,
-  fieldId,
-  options,
-  placeholder,
-  onSearchChange,
-  hasMore,
-  isLoading,
-}: Readonly<PrincipalFieldProps>) {
-  return (
-    <FormGroup label={label} isRequired fieldId={fieldId}>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field, fieldState }) => (
-          <>
-            <TypeaheadSelect
-              id={fieldId}
-              ariaLabel={label}
-              options={options}
-              selected={field.value ?? ''}
-              onChange={field.onChange}
-              placeholder={placeholder}
-              hasError={!!fieldState.error}
-              onSearchChange={onSearchChange}
-              hasMore={hasMore}
-              isLoading={isLoading}
-            />
-            {fieldState.error && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </>
-        )}
-      />
-    </FormGroup>
-  )
-}
 
 // ── Form body (extracted to stay within max-lines-per-function) ───────────
 
@@ -355,7 +299,15 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const principalType = useWatch({ control, name: 'principalType' })
   const scope = useWatch({ control, name: 'scope' })
   const selectedProjectId = useWatch({ control, name: 'projectId' })
+  const watchedUserId = useWatch({ control, name: 'userId' })
+  const watchedGroupId = useWatch({ control, name: 'groupId' })
+  const watchedSaId = useWatch({ control, name: 'serviceAccountId' })
   const isProjectScoped = scope === 'project'
+  const selectedPrincipalId = {
+    [RolePrincipalType.USER]: watchedUserId,
+    [RolePrincipalType.GROUP]: watchedGroupId,
+    [RolePrincipalType.SERVICE_ACCOUNT]: watchedSaId,
+  }[principalType]
 
   const { projects: allProjects, isLoading: isProjectsLoading } = useSelectableProjects()
   const projectOptions = useMemo(
@@ -413,6 +365,12 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     [serviceAccountsQuery.data]
   )
 
+  const alreadyAssignedRoles = useAlreadyAssignedRoles(
+    principalType,
+    selectedPrincipalId ?? '',
+    isProjectScoped,
+    selectedProjectId ?? ''
+  )
   const [roleSearchTerm, setRoleSearchTerm] = useState('')
   const debouncedRoleSearch = useDebouncedValue(roleSearchTerm)
   const systemRolesQuery = accessClient.useQuery('get', '/roles', {
@@ -442,8 +400,11 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   )
   const activeRolesQuery = isProjectScoped ? projectRolesQuery : systemRolesQuery
   const roleOptions = useMemo(
-    () => (activeRolesQuery.data?.resources ?? []).map((role) => ({ value: role.name, label: role.name })),
-    [activeRolesQuery.data]
+    () =>
+      (activeRolesQuery.data?.resources ?? [])
+        .filter((r) => !alreadyAssignedRoles.has(r.name))
+        .map((r) => ({ value: r.name, label: r.name })),
+    [activeRolesQuery.data, alreadyAssignedRoles]
   )
 
   const { mutate: createRoleAssignment, isPending: isPendingSystem } = accessClient.useMutation(
