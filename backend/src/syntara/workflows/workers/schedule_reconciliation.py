@@ -114,8 +114,9 @@ async def reconcile_scheduled_triggers(
     # -- Step 3: Compute delta --
     missing = expected_ids - actual_ids
     orphans = actual_ids - expected_ids
+    existing = expected_ids & actual_ids
 
-    if not missing and not orphans:
+    if not missing and not orphans and not existing:
         logger.debug(
             "schedule_reconciliation_noop",
             expected=len(expected_ids),
@@ -124,20 +125,30 @@ async def reconcile_scheduled_triggers(
         return
 
     # -- Step 4: Apply delta (concurrent) --
+    # Re-create existing schedules to ensure auth headers are present
+    # (handles rollout from unsigned to signed schedule actions).
     missing_list = sorted(missing)
+    existing_list = sorted(existing)
     orphan_list = sorted(orphans)
     all_results = await asyncio.gather(
         *(service.create_schedule(*lookup[sid]) for sid in missing_list),
+        *(service.create_schedule(*lookup[sid]) for sid in existing_list),
         *(ScheduledTriggerService.delete_schedule(client, sid) for sid in orphan_list),
         return_exceptions=True,
     )
     create_results = all_results[: len(missing_list)]
-    delete_results = all_results[len(missing_list) :]
+    update_results = all_results[len(missing_list) : len(missing_list) + len(existing_list)]
+    delete_results = all_results[len(missing_list) + len(existing_list) :]
 
     created = sum(1 for r in create_results if not isinstance(r, Exception))
     for sid, outcome in zip(missing_list, create_results, strict=True):
         if isinstance(outcome, Exception):
             logger.warning("schedule_reconciliation_create_failed", schedule_id=sid, exc_info=outcome)
+
+    updated = sum(1 for r in update_results if not isinstance(r, Exception))
+    for sid, outcome in zip(existing_list, update_results, strict=True):
+        if isinstance(outcome, Exception):
+            logger.warning("schedule_reconciliation_update_failed", schedule_id=sid, exc_info=outcome)
 
     deleted = sum(1 for r in delete_results if r is True)
     for sid, outcome in zip(orphan_list, delete_results, strict=True):
@@ -149,8 +160,10 @@ async def reconcile_scheduled_triggers(
         expected=len(expected_ids),
         actual=len(actual_ids),
         created=created,
+        updated=updated,
         deleted=deleted,
         create_errors=len(missing_list) - created,
+        update_errors=len(existing_list) - updated,
         delete_errors=len(orphan_list) - deleted,
     )
 

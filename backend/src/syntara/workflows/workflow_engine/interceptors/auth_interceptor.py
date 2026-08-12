@@ -18,7 +18,8 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
 )
 
-from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_workflow_id
+with workflow.unsafe.imports_passed_through():
+    from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_workflow_id
 
 logger = structlog.stdlib.get_logger(__name__)
 
