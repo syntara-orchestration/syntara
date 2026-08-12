@@ -49,6 +49,11 @@ export default defineConfig({
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  projects: [
+    {
+      name: 'chromium',
+    },
+  ],
   webServer: useWebServer
     ? [
         {
