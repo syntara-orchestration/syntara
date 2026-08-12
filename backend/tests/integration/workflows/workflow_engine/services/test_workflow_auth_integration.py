@@ -6,10 +6,12 @@ workflow submissions and allows authorized ones.
 
 import asyncio
 from collections.abc import Callable
+from typing import Any
 from uuid import uuid4
 
 import pytest
-from temporalio.client import Client
+from temporalio.api.common.v1 import Payload
+from temporalio.client import Client, Interceptor, OutboundInterceptor, StartWorkflowInput
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -23,6 +25,26 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 from syntara.workflows.workflow_engine.workflow_auth import build_auth_header, init_signing_key
 
 TASK_QUEUE = "test-auth-queue"
+
+
+class _FixedHeaderInterceptor(Interceptor):
+    """Test interceptor that injects pre-built auth headers (simulates the schedule path)."""
+
+    def __init__(self, headers: dict[str, Payload]) -> None:
+        self._headers = headers
+
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:  # noqa: A002
+        headers = self._headers
+
+        class _Outbound(OutboundInterceptor):
+            async def start_workflow(self, input: StartWorkflowInput) -> Any:  # noqa: A002, ANN401
+                merged = dict(input.headers)
+                merged.update(headers)
+                input.headers = merged
+                return await super().start_workflow(input)
+
+        return _Outbound(next)
+
 
 _TEST_ACTIVITIES: list[Callable[..., object]] = [
     manual_trigger,
@@ -92,6 +114,12 @@ class TestWorkflowAuthIntegration:
         workflow_id = f"sched-auth-test-{uuid4()}"
         auth_headers = build_auth_header(workflow_id)
 
+        header_client = await Client.connect(
+            temporal_env.client.service_client.config.target_host,
+            namespace=temporal_env.client.namespace,
+            interceptors=[_FixedHeaderInterceptor(auth_headers)],
+        )
+
         async with Worker(
             temporal_env.client,
             task_queue=TASK_QUEUE,
@@ -99,7 +127,7 @@ class TestWorkflowAuthIntegration:
             activities=_TEST_ACTIVITIES,
             interceptors=[WorkflowAuthInterceptor()],
         ):
-            handle = await temporal_env.client.start_workflow(
+            handle = await header_client.start_workflow(
                 "orchestrator_workflow",
                 args=[
                     SIMPLE_WORKFLOW,
@@ -114,7 +142,6 @@ class TestWorkflowAuthIntegration:
                 ],
                 id=workflow_id,
                 task_queue=TASK_QUEUE,
-                headers=dict(auth_headers.items()),
             )
 
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
