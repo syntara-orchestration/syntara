@@ -12,18 +12,30 @@ from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.fixture
-def file_manager_with_retriever() -> FileManager:
+def mock_retriever() -> AsyncMock:
+    """Return a retriever mock with a successful delete_file."""
+    retriever = AsyncMock()
+    retriever.delete_file = AsyncMock(return_value=True)
+    return retriever
+
+
+@pytest.fixture
+def file_manager_with_retriever(mock_retriever: AsyncMock) -> FileManager:
+    """Return a FileManager with a mocked storage retriever."""
     manager = FileManager.__new__(FileManager)
     manager.settings = MagicMock()
-    manager._retriever = AsyncMock()
-    manager._retriever.delete_file = AsyncMock(return_value=True)
+    manager._retriever = mock_retriever
     return manager
 
 
 class TestFileManagerDeleteFile:
+    """Tests for FileManager.delete_file storage and metadata cleanup."""
+
     @pytest.mark.asyncio
     async def test_delete_file_removes_storage_and_metadata(
-        self, file_manager_with_retriever: FileManager
+        self,
+        file_manager_with_retriever: FileManager,
+        mock_retriever: AsyncMock,
     ) -> None:
         metadata = FileMetadata(
             id=uuid4(),
@@ -43,16 +55,16 @@ class TestFileManagerDeleteFile:
         result = await file_manager_with_retriever.delete_file(metadata.id, session)
 
         assert result is metadata
-        assert file_manager_with_retriever._retriever.delete_file.await_count == 2
-        file_manager_with_retriever._retriever.delete_file.assert_has_awaits(
-            [call("file-id-doc.pdf"), call("file-id-content.md")]
-        )
+        assert mock_retriever.delete_file.await_count == 2
+        mock_retriever.delete_file.assert_has_awaits([call("file-id-doc.pdf"), call("file-id-content.md")])
         session.delete.assert_awaited_once_with(metadata)
         session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_delete_file_deletes_metadata_before_storage(
-        self, file_manager_with_retriever: FileManager
+        self,
+        file_manager_with_retriever: FileManager,
+        mock_retriever: AsyncMock,
     ) -> None:
         metadata = FileMetadata(
             id=uuid4(),
@@ -80,9 +92,7 @@ class TestFileManagerDeleteFile:
 
         session.delete = AsyncMock(side_effect=track_delete)
         session.commit = AsyncMock(side_effect=track_commit)
-        file_manager_with_retriever._retriever.delete_file = AsyncMock(
-            side_effect=track_storage_delete
-        )
+        mock_retriever.delete_file = AsyncMock(side_effect=track_storage_delete)
 
         await file_manager_with_retriever.delete_file(metadata.id, session)
 
@@ -90,7 +100,9 @@ class TestFileManagerDeleteFile:
 
     @pytest.mark.asyncio
     async def test_delete_file_not_found_raises(
-        self, file_manager_with_retriever: FileManager
+        self,
+        file_manager_with_retriever: FileManager,
+        mock_retriever: AsyncMock,
     ) -> None:
         session = AsyncMock()
         session.get = AsyncMock(return_value=None)
@@ -98,11 +110,13 @@ class TestFileManagerDeleteFile:
         with pytest.raises(SafeValueError, match="File not found"):
             await file_manager_with_retriever.delete_file(uuid4(), session)
 
-        file_manager_with_retriever._retriever.delete_file.assert_not_called()
+        mock_retriever.delete_file.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_delete_file_continues_if_converted_cleanup_fails(
-        self, file_manager_with_retriever: FileManager
+        self,
+        file_manager_with_retriever: FileManager,
+        mock_retriever: AsyncMock,
     ) -> None:
         metadata = FileMetadata(
             id=uuid4(),
@@ -118,9 +132,7 @@ class TestFileManagerDeleteFile:
         session.get = AsyncMock(return_value=metadata)
         session.delete = AsyncMock()
         session.commit = AsyncMock()
-        file_manager_with_retriever._retriever.delete_file = AsyncMock(
-            side_effect=[True, FileError("converted missing")]
-        )
+        mock_retriever.delete_file = AsyncMock(side_effect=[True, FileError("converted missing")])
 
         await file_manager_with_retriever.delete_file(metadata.id, session)
 
@@ -129,7 +141,9 @@ class TestFileManagerDeleteFile:
 
     @pytest.mark.asyncio
     async def test_delete_file_continues_if_primary_storage_cleanup_fails(
-        self, file_manager_with_retriever: FileManager
+        self,
+        file_manager_with_retriever: FileManager,
+        mock_retriever: AsyncMock,
     ) -> None:
         metadata = FileMetadata(
             id=uuid4(),
@@ -145,39 +159,49 @@ class TestFileManagerDeleteFile:
         session.get = AsyncMock(return_value=metadata)
         session.delete = AsyncMock()
         session.commit = AsyncMock()
-        file_manager_with_retriever._retriever.delete_file = AsyncMock(
-            side_effect=[FileError("object missing"), True]
-        )
+        mock_retriever.delete_file = AsyncMock(side_effect=[FileError("object missing"), True])
 
         result = await file_manager_with_retriever.delete_file(metadata.id, session)
 
         assert result is metadata
         session.delete.assert_awaited_once_with(metadata)
         session.commit.assert_awaited_once()
-        assert file_manager_with_retriever._retriever.delete_file.await_count == 2
+        assert mock_retriever.delete_file.await_count == 2
 
 
 class TestFileManagerIsProjectDeleted:
+    """Tests for FileManager.is_project_deleted orphan detection."""
+
     @pytest.mark.asyncio
-    async def test_is_project_deleted_true_when_deleted_at_set(
-        self, file_manager_with_retriever: FileManager
-    ) -> None:
+    async def test_is_project_deleted_true_when_deleted_at_set(self, file_manager_with_retriever: FileManager) -> None:
         from datetime import UTC, datetime
 
+        project = Mock()
+        project.deleted_at = datetime.now(UTC)
         session = AsyncMock()
         result = Mock()
-        result.one_or_none = Mock(return_value=datetime.now(UTC))
+        result.one_or_none = Mock(return_value=project)
         session.exec = AsyncMock(return_value=result)
 
         assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is True
 
     @pytest.mark.asyncio
-    async def test_is_project_deleted_false_when_active(
-        self, file_manager_with_retriever: FileManager
-    ) -> None:
+    async def test_is_project_deleted_false_when_active(self, file_manager_with_retriever: FileManager) -> None:
+        project = Mock()
+        project.deleted_at = None
+        session = AsyncMock()
+        result = Mock()
+        result.one_or_none = Mock(return_value=project)
+        session.exec = AsyncMock(return_value=result)
+
+        assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is False
+
+    @pytest.mark.asyncio
+    async def test_is_project_deleted_true_when_project_missing(self, file_manager_with_retriever: FileManager) -> None:
+        """Hard-deleted/missing projects must be treated as deleted orphans."""
         session = AsyncMock()
         result = Mock()
         result.one_or_none = Mock(return_value=None)
         session.exec = AsyncMock(return_value=result)
 
-        assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is False
+        assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is True

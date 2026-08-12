@@ -30,9 +30,10 @@ describe('useFileUploadState', () => {
   const removeFile = vi.fn()
   const removeFilesByName = vi.fn()
   const addFiles = vi.fn()
+  const uploadFiles = vi.fn()
 
-  const successFile: UploadedFile = {
-    id: 'server-file-1',
+  const hydratedFile: UploadedFile = {
+    id: 'hydrated-file-1',
     file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
     progress: 100,
     status: 'success',
@@ -46,7 +47,7 @@ describe('useFileUploadState', () => {
     errorMessage: 'Upload failed. Please try again.',
   }
 
-  function createFileContext(completedFiles: UploadedFile[] = [successFile]): FileContextType {
+  function createFileContext(completedFiles: UploadedFile[] = [hydratedFile]): FileContextType {
     return {
       completedFiles,
       addFiles,
@@ -54,6 +55,26 @@ describe('useFileUploadState', () => {
       removeFilesByName,
       isFilesError: false,
     }
+  }
+
+  /** Upload a file in-session so its server id is tracked as deletable. */
+  async function uploadSessionFile(
+    result: { current: ReturnType<typeof useFileUploadState> },
+    fileName = 'Report.pdf',
+    serverId = 'session-file-1'
+  ) {
+    uploadFiles.mockResolvedValue({ files: [{ file_id: serverId }] })
+
+    act(() => {
+      result.current.handleFilesSelected([new File(['content'], fileName, { type: 'application/pdf' })])
+    })
+
+    await waitFor(() => {
+      expect(addFiles).toHaveBeenCalled()
+    })
+
+    const uploaded = vi.mocked(addFiles).mock.calls.at(-1)?.[0] as UploadedFile[]
+    expect(uploaded[0]?.id).toBe(serverId)
   }
 
   beforeEach(() => {
@@ -68,7 +89,7 @@ describe('useFileUploadState', () => {
       clearAllAlerts: vi.fn(),
     })
     vi.mocked(useFileUploadWithProgress).mockReturnValue({
-      uploadFiles: vi.fn(),
+      uploadFiles,
       progress: [],
       error: null,
       uploading: false,
@@ -78,29 +99,65 @@ describe('useFileUploadState', () => {
     vi.mocked(deleteFileById).mockResolvedValue(undefined)
   })
 
-  it('deletes a successfully uploaded file from the server then removes it locally', async () => {
-    const { result } = renderHook(() => useFileUploadState(createFileContext(), 'project-1'))
+  it('deletes a session-uploaded file from the server then removes it locally', async () => {
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result)
+
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
 
     act(() => {
-      result.current.handleFileRemove('server-file-1')
+      result.current.handleFileRemove('session-file-1')
     })
 
     await waitFor(() => {
-      expect(deleteFileById).toHaveBeenCalledWith('server-file-1')
+      expect(deleteFileById).toHaveBeenCalledWith('session-file-1')
     })
     await waitFor(() => {
-      expect(removeFile).toHaveBeenCalledWith('server-file-1')
+      expect(removeFile).toHaveBeenCalledWith('session-file-1')
     })
     expect(showSuccess).toHaveBeenCalledWith({ title: 'Report.pdf deleted successfully.' })
     expect(showError).not.toHaveBeenCalled()
   })
 
-  it('keeps the file and shows an error when server delete fails', async () => {
-    vi.mocked(deleteFileById).mockRejectedValue(new Error('network'))
-    const { result } = renderHook(() => useFileUploadState(createFileContext(), 'project-1'))
+  it('detaches hydrated existing files locally without calling DELETE', () => {
+    const { result } = renderHook(() => useFileUploadState(createFileContext([hydratedFile]), 'project-1'))
 
     act(() => {
-      result.current.handleFileRemove('server-file-1')
+      result.current.handleFileRemove('hydrated-file-1')
+    })
+
+    expect(deleteFileById).not.toHaveBeenCalled()
+    expect(removeFile).toHaveBeenCalledWith('hydrated-file-1')
+    expect(showSuccess).not.toHaveBeenCalled()
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('keeps the session file and shows an error when server delete fails', async () => {
+    vi.mocked(deleteFileById).mockRejectedValue(new Error('network'))
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result)
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
+
+    act(() => {
+      result.current.handleFileRemove('session-file-1')
     })
 
     await waitFor(() => {
@@ -134,17 +191,28 @@ describe('useFileUploadState', () => {
         })
     )
 
-    const { result } = renderHook(() => useFileUploadState(createFileContext(), 'project-1'))
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result)
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
 
     act(() => {
-      result.current.handleFileRemove('server-file-1')
+      result.current.handleFileRemove('session-file-1')
     })
     await waitFor(() => {
-      expect(result.current.deletingFileIds.has('server-file-1')).toBe(true)
+      expect(result.current.deletingFileIds.has('session-file-1')).toBe(true)
     })
 
     act(() => {
-      result.current.handleFileRemove('server-file-1')
+      result.current.handleFileRemove('session-file-1')
     })
     expect(deleteFileById).toHaveBeenCalledTimes(1)
 
@@ -152,7 +220,52 @@ describe('useFileUploadState', () => {
       resolveDelete()
     })
     await waitFor(() => {
-      expect(removeFile).toHaveBeenCalledWith('server-file-1')
+      expect(removeFile).toHaveBeenCalledWith('session-file-1')
+    })
+  })
+
+  it('on same-name re-upload, deletes prior session upload but not hydrated files', async () => {
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result, 'Report.pdf', 'session-file-1')
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile, hydratedFile]) })
+    vi.mocked(deleteFileById).mockClear()
+    vi.mocked(removeFilesByName).mockClear()
+    uploadFiles.mockResolvedValue({ files: [{ file_id: 'session-file-2' }] })
+
+    act(() => {
+      result.current.handleFilesSelected([new File(['new'], 'Report.pdf', { type: 'application/pdf' })])
+    })
+
+    expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('session-file-1')
+    })
+    expect(deleteFileById).not.toHaveBeenCalledWith('hydrated-file-1')
+    expect(deleteFileById).toHaveBeenCalledTimes(1)
+  })
+
+  it('on same-name re-upload of a hydrated file only, detaches locally without DELETE', async () => {
+    const { result } = renderHook(() => useFileUploadState(createFileContext([hydratedFile]), 'project-1'))
+    uploadFiles.mockResolvedValue({ files: [{ file_id: 'session-file-2' }] })
+
+    act(() => {
+      result.current.handleFilesSelected([new File(['new'], 'Report.pdf', { type: 'application/pdf' })])
+    })
+
+    expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
+    expect(deleteFileById).not.toHaveBeenCalled()
+
+    await waitFor(() => {
+      expect(addFiles).toHaveBeenCalled()
     })
   })
 })

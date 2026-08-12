@@ -499,16 +499,21 @@ class FileManager:
         project_id: UUID,
         session: AsyncSession,
     ) -> bool:
-        """Return whether the owning project has been soft-deleted.
+        """Return whether the owning project is soft-deleted or missing.
 
         Mirrors the service-account pattern: files are retained after project
         deletion, and callers learn the orphaned state via this flag.
+
+        Selecting the full row distinguishes an active project (``deleted_at``
+        is NULL) from a hard-deleted/missing project (no row). Selecting only
+        ``deleted_at`` would return ``None`` for both and incorrectly mark
+        hard-deleted projects as active.
         """
         from syntara.authz.models.project import Project  # noqa: PLC0415
 
-        result = await session.exec(select(Project.deleted_at).where(Project.id == project_id))
-        deleted_at = result.one_or_none()
-        return deleted_at is not None
+        result = await session.exec(select(Project).where(Project.id == project_id))
+        project = result.one_or_none()
+        return project is None or project.deleted_at is not None
 
     async def update_file_status(
         self,

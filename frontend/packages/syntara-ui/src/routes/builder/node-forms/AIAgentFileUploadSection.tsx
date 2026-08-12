@@ -26,7 +26,10 @@ export function AIAgentFileUploadSection({
   hasExistingFiles,
   fileContext,
 }: AIAgentFileUploadSectionProps) {
-  const { uploadedFiles, handleFilesSelected, handleFileRemove } = useFileUploadState(fileContext, projectId)
+  const { uploadedFiles, handleFilesSelected, handleFileRemove, deletingFileIds } = useFileUploadState(
+    fileContext,
+    projectId
+  )
   const { isConfigured: isFileStorageConfigured, status: fileStorageStatus } = useFileStorageStatus()
   const { showSuccess, showError } = useAlerts()
   const [downloadingFileIds, setDownloadingFileIds] = useState<Set<string>>(() => new Set())
@@ -89,6 +92,7 @@ export function AIAgentFileUploadSection({
         onFileDownload={handleFileDownload}
         onFileDownloadCancel={handleFileDownloadCancel}
         downloadingFileIds={downloadingFileIds}
+        deletingFileIds={deletingFileIds}
         canRemove={!isVersionView}
         acceptedMimeTypes={['.pdf', '.doc', '.docx', '.txt', '.md']}
         aria-label="Context file upload"

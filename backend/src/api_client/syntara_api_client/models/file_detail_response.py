@@ -30,7 +30,7 @@ class FileDetailResponse:
                 CONVERTED: Successfully converted to text/markdown
                 CONVERSION_FAILED: Conversion failed with error
         is_project_deleted (bool): True when the owning project has been soft-deleted; the file is retained as an orphan
-            and remains deletable via DELETE /files/{id}. Default: False.
+            and remains deletable via DELETE /files/{id}.
         conversion_error (None | str | Unset): Error message if conversion failed
     """
 
@@ -39,7 +39,7 @@ class FileDetailResponse:
     size_bytes: int
     mime_type: str
     status: FileStatus
-    is_project_deleted: bool = False
+    is_project_deleted: bool
     conversion_error: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

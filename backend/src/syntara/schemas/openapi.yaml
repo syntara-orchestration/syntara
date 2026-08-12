@@ -30140,7 +30140,6 @@ components:
           type: boolean
           title: Is Project Deleted
           description: True when the owning project has been soft-deleted; the file is retained as an orphan and remains deletable via DELETE /files/{id}.
-          default: false
     FilesMetadataResponse:
       type: object
       title: FilesMetadataResponse

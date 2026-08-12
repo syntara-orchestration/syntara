@@ -283,9 +283,7 @@ export function ProjectDetail() {
             <List>
               <ListItem>All workflows in this project will be permanently deleted.</ListItem>
               <ListItem>All project role assignments will be removed.</ListItem>
-              <ListItem>
-                Uploaded files are retained but marked as orphaned; delete them separately if they should not be kept.
-              </ListItem>
+              <ListItem>Uploaded files are retained after project deletion for administrator cleanup.</ListItem>
             </List>
           </StackItem>
         </Stack>

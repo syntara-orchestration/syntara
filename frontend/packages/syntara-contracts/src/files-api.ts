@@ -243,7 +243,6 @@ export interface components {
       /**
        * Is Project Deleted
        * @description True when the owning project has been soft-deleted; the file is retained as an orphan and remains deletable via DELETE /files/{id}.
-       * @default false
        */
       is_project_deleted: boolean
     }

@@ -262,8 +262,10 @@ class FileDetailResponse(BaseModel):
         default=None, description="Error message if conversion failed", examples=[None]
     )
     is_project_deleted: bool = Field(
-        default=False,
-        description="True when the owning project has been soft-deleted; file is retained as an orphan",
+        description=(
+            "True when the owning project has been soft-deleted; the file is "
+            "retained as an orphan and remains deletable via DELETE /files/{id}."
+        ),
     )
 
 
@@ -487,6 +489,7 @@ async def get_file_details(
     description="Permanently delete a file and its stored content. "
     "Files that outlive a deleted project can still be removed via this endpoint.",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_204_NO_CONTENT: {"description": "File deleted successfully"}},
     dependencies=[Depends(_files_perm_delete)],
     operation_id="delete_file",
 )
@@ -501,6 +504,7 @@ async def delete_file(
 
     Raises:
         HTTPException: 404 if file not found
+
     """
     existing = await file_manager.get_file_metadata(file_id, db)
     if existing is None:
