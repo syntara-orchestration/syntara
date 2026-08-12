@@ -24,12 +24,7 @@ type HelpPopoverProps = {
 export function HelpPopover({ ariaLabel, headerContent, bodyContent }: HelpPopoverProps) {
   return (
     <Popover aria-label={ariaLabel} headerContent={headerContent} bodyContent={bodyContent} triggerAction="click">
-      <Button
-        variant="plain"
-        aria-label={ariaLabel}
-        onClick={(e) => e.preventDefault()}
-        icon={<FieldHelpIcon />}
-      />
+      <Button variant="plain" aria-label={ariaLabel} onClick={(e) => e.preventDefault()} icon={<FieldHelpIcon />} />
     </Popover>
   )
 }
