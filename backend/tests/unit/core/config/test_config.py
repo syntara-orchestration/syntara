@@ -284,14 +284,14 @@ class TestServerSettings:
     def test_product_name_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Product build: product_name uses APP_PRODUCT_NAME when set."""
         monkeypatch.setenv("APP_PRODUCT_NAME", "Custom Product")
-        settings = Settings()
+        settings = Settings(_env_file=None)
         assert settings.product_name == "Custom Product"
 
     def test_product_name_rejects_invalid_characters(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Product name must match the alphanumeric+space pattern."""
         monkeypatch.setenv("APP_PRODUCT_NAME", "Bad<Name>!")
         with pytest.raises(ValidationError, match="pattern"):
-            Settings()
+            Settings(_env_file=None)
 
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
