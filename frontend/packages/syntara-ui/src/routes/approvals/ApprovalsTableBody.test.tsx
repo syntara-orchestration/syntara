@@ -223,6 +223,68 @@ describe('FlatApprovalsTableBody', () => {
     expect(screen.getAllByRole('button', { name: /details/i })).toHaveLength(1)
   })
 
+  it('renders "Actioned on" with UserTimestamp when decided_at is set', () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <Table aria-label="Approvals" isExpandable>
+          <FlatApprovalsTableBody
+            {...defaultProps}
+            approvals={[
+              makeApproval({
+                status: 'approved',
+                decided_at: '2026-07-15T14:30:00Z',
+                decided_by: { id: 'user-2', name: 'reviewer' },
+              }),
+            ]}
+          />
+        </Table>
+      </Wrapper>
+    )
+
+    expect(screen.getByText('reviewer')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'reviewer' })).toBeInTheDocument()
+  })
+
+  it('renders "Actioned on" with timestamp only when decided_at is set but decided_by is null', () => {
+    const Wrapper = createWrapper()
+    const { container } = render(
+      <Wrapper>
+        <Table aria-label="Approvals" isExpandable>
+          <FlatApprovalsTableBody
+            {...defaultProps}
+            approvals={[
+              makeApproval({
+                status: 'approved',
+                decided_at: '2026-08-05T14:30:00Z',
+                decided_by: null,
+              }),
+            ]}
+          />
+        </Table>
+      </Wrapper>
+    )
+
+    expect(screen.getByText(/Aug 5/)).toBeInTheDocument()
+    expect(container.textContent).not.toContain(' by ')
+  })
+
+  it('renders dash for "Actioned on" when decided_at is null', () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <Table aria-label="Approvals" isExpandable>
+          <FlatApprovalsTableBody
+            {...defaultProps}
+            approvals={[makeApproval({ decided_at: null, workflowId: 'wf-1' })]}
+          />
+        </Table>
+      </Wrapper>
+    )
+
+    expect(screen.getByText('-')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const Wrapper = createWrapper()
     const { container } = render(
