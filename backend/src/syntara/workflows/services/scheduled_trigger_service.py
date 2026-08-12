@@ -2,7 +2,7 @@
 
 Scheduled triggers are managed entirely through Temporal Schedules. No database
 model is needed because the schedule ID is deterministic:
-``nexus-sched-{workflow_id}-{trigger_node_id}``.
+``syntara-sched-{workflow_id}-{trigger_node_id}``.
 
 This service synchronises Temporal Schedules when workflows are created,
 updated, published, unpublished, or deleted.
@@ -34,6 +34,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
+    _LEGACY_SCHEDULE_ID_PREFIX,
     SCHEDULE_ID_PREFIX,
     build_schedule_id,
     config_to_temporal_schedule,
@@ -487,13 +488,16 @@ class ScheduledTriggerService:
     async def list_schedules_by_prefix(client: Client, prefix: str = "") -> set[str]:
         """List nexus-managed Temporal Schedule IDs, optionally narrowed by *prefix*.
 
-        Matches IDs starting with ``nexus-sched-{prefix}-`` when *prefix*
-        is given, or ``nexus-sched-`` when omitted.
+        Matches IDs starting with ``syntara-sched-{prefix}-`` when *prefix*
+        is given, or ``syntara-sched-`` when omitted.  Also matches the
+        legacy ``nexus-sched-`` prefix so that old schedules are found
+        during the transition period.
         """
-        full_prefix = f"{SCHEDULE_ID_PREFIX}{prefix}-" if prefix else SCHEDULE_ID_PREFIX
+        current = f"{SCHEDULE_ID_PREFIX}{prefix}-" if prefix else SCHEDULE_ID_PREFIX
+        legacy = f"{_LEGACY_SCHEDULE_ID_PREFIX}{prefix}-" if prefix else _LEGACY_SCHEDULE_ID_PREFIX
         schedule_ids: set[str] = set()
         async for entry in await client.list_schedules():
-            if entry.id.startswith(full_prefix):
+            if entry.id.startswith(current) or entry.id.startswith(legacy):
                 schedule_ids.add(entry.id)
         return schedule_ids
 

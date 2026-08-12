@@ -304,13 +304,14 @@ def build_schedule_policy(missed_policy: MissedSchedulePolicy) -> SchedulePolicy
     return SchedulePolicy(catchup_window=catchup, overlap=overlap)
 
 
-SCHEDULE_ID_PREFIX = "nexus-sched-"
+SCHEDULE_ID_PREFIX = "syntara-sched-"
+_LEGACY_SCHEDULE_ID_PREFIX = "nexus-sched-"
 
 
 def build_schedule_id(workflow_id: str, trigger_node_id: str) -> str:
     """Build a deterministic Temporal Schedule ID.
 
-    Convention: ``nexus-sched-{workflow_id}-{trigger_node_id}``
+    Convention: ``syntara-sched-{workflow_id}-{trigger_node_id}``
 
     Args:
         workflow_id: The workflow UUID (as string).
