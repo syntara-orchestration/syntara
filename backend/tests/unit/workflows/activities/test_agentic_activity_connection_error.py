@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
+from temporalio.exceptions import ApplicationError
+
 from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
 from syntara.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
-from temporalio.exceptions import ApplicationError
 
 AGENT_SERVICE_UNAVAILABLE_MESSAGE = (
     "The AI Agent service is temporarily unavailable. This is a system issue. "
