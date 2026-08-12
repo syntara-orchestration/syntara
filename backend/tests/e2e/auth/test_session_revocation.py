@@ -36,48 +36,48 @@ class TestAPIUserScopedSessionRevocation:
     def test_disable_user_revokes_all_sessions(
         self,
         syntara_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """PATCH user with is_enabled=false must invalidate every refresh session for that user."""
         user, password = local_user_factory(first_name="Revoke", last_name="Target")
         other_user, other_password = local_user_factory(first_name="Other", last_name="User")
 
-        _, cookies_a1 = local_login_session(nexus_base_url, user.username, password)
-        _, cookies_a2 = local_login_session(nexus_base_url, user.username, password)
-        _, cookies_other = local_login_session(nexus_base_url, other_user.username, other_password)
+        _, cookies_a1 = local_login_session(syntara_base_url, user.username, password)
+        _, cookies_a2 = local_login_session(syntara_base_url, user.username, password)
+        _, cookies_other = local_login_session(syntara_base_url, other_user.username, other_password)
 
-        assert_refresh_succeeds(nexus_base_url, cookies_a1)
-        assert_refresh_succeeds(nexus_base_url, cookies_a2)
+        assert_refresh_succeeds(syntara_base_url, cookies_a1)
+        assert_refresh_succeeds(syntara_base_url, cookies_a2)
 
         syntara_api.users.update(
             user_id=user.id,
             body=UserUpdate(is_enabled=False),
         ).assert_and_get()
 
-        assert_refresh_unauthorized(nexus_base_url, cookies_a1)
-        assert_refresh_unauthorized(nexus_base_url, cookies_a2)
-        assert_refresh_succeeds(nexus_base_url, cookies_other)
+        assert_refresh_unauthorized(syntara_base_url, cookies_a1)
+        assert_refresh_unauthorized(syntara_base_url, cookies_a2)
+        assert_refresh_succeeds(syntara_base_url, cookies_other)
 
     def test_password_change_revokes_all_sessions(
         self,
         syntara_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """PATCH user with a new password must invalidate existing refresh sessions."""
         user, password = local_user_factory(first_name="Password", last_name="Revoke Target")
         new_password = generate_test_password()
 
-        _, cookies_before = local_login_session(nexus_base_url, user.username, password)
-        assert_refresh_succeeds(nexus_base_url, cookies_before)
+        _, cookies_before = local_login_session(syntara_base_url, user.username, password)
+        assert_refresh_succeeds(syntara_base_url, cookies_before)
 
         syntara_api.users.update(
             user_id=user.id,
             body=UserUpdate(password=new_password),
         ).assert_and_get()
 
-        assert_refresh_unauthorized(nexus_base_url, cookies_before)
+        assert_refresh_unauthorized(syntara_base_url, cookies_before)
 
-        _, cookies_after = local_login_session(nexus_base_url, user.username, new_password)
-        assert_refresh_succeeds(nexus_base_url, cookies_after)
+        _, cookies_after = local_login_session(syntara_base_url, user.username, new_password)
+        assert_refresh_succeeds(syntara_base_url, cookies_after)

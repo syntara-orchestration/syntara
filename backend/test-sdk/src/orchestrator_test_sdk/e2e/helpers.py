@@ -1,4 +1,4 @@
-"""Shared utility functions for Nexus E2E tests."""
+"""Shared utility functions for Syntara E2E tests."""
 
 from __future__ import annotations
 
