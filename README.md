@@ -85,18 +85,15 @@ SonarCloud analysis runs automatically on all PRs. Quality gate results are **in
 * [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md)
 * [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
 
+## Community
+
+Have a question or idea? Start a conversation in [GitHub Discussions](https://github.com/orgs/syntara-orchestration/discussions).
+
 ## AI Contributions
 
-The use of AI tools MUST be explicitly disclosed by the author when a significant part of the contribution is taken from the AI tools output without significant changes. Grammar, spelling, and stylistic corrections do not need disclosure.
+AI-assisted contributions are welcome and held to the same review and quality standards as any other contribution. Contributors take full responsibility for AI-assisted work and MUST disclose significant use of AI tools via a commit trailer, for example: `Assisted-by: Opus 4.6`. Grammar and stylistic corrections do not need disclosure.
 
-We recommend using the following statement as a disclosure: `Assisted-by:` followed by any information about the contributor’s use of AI tools that they consider relevant, for example:
-
-      i. `Assisted-by: gpt-5.4`
-      ii. `Assisted-by: Opus 4.6`
-      iii. `Assisted-by: locally trained model`
-
-
-See [AI_POLICY.md](.github/AI_POLICY.md) for more details.
+See [AI_POLICY.md](.github/AI_POLICY.md) for the full policy.
 
 ## License
 

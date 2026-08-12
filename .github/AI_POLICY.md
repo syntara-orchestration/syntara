@@ -21,7 +21,7 @@ This policy applies to the following projects and resources:
 
    a. Autonomous actions performed by AI tools used by resource maintainers for validation and automation purposes (for example, automatic releasing, testing, spam filtering, and AI contribution detection) SHOULD be reviewed and manually authorized by the maintainers.
 
-5. The use of AI tools SHOULD be explicitly disclosed by the author when a significant part of the contribution is taken from the AI tools output without significant changes. Grammar, spelling, and stylistic corrections do not need disclosure.
+5. The use of AI tools MUST be explicitly disclosed by the author when a significant part of the contribution is taken from the AI tools output without significant changes. Grammar, spelling, and stylistic corrections do not need disclosure.
 
    a. For code contributions, the contributor MAY use a short commit message trailer.
    b. For other contributions, disclosure MAY include a short preamble.

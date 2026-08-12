@@ -30,16 +30,9 @@ See [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md) and [frontend/CONTRIBUTIN
 
 ## AI Contributions
 
-The use of AI tools MUST be explicitly disclosed by the author when a significant part of the contribution is taken from the AI tools output without significant changes. Grammar, spelling, and stylistic corrections do not need disclosure.
+AI-assisted contributions are welcome and held to the same review and quality standards as any other contribution. Contributors take full responsibility for AI-assisted work and MUST disclose significant use of AI tools via a commit trailer, for example: `Assisted-by: Opus 4.6`. Grammar and stylistic corrections do not need disclosure.
 
-We recommend using the following statement as a disclosure: `Assisted-by:` followed by any information about the contributor’s use of AI tools that they consider relevant, for example:
-
-      i. `Assisted-by: gpt-5.4`
-      ii. `Assisted-by: Opus 4.6`
-      iii. `Assisted-by: locally trained model`
-
-
-See [AI_POLICY.md](.github/AI_POLICY.md) for more details.
+See [AI_POLICY.md](.github/AI_POLICY.md) for the full policy.
 
 ## Submitting a PR
 
@@ -69,6 +62,20 @@ This reads OpenAPI specs from `backend/src/syntara/schemas/` and generates types
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 
+## Developer Certificate of Origin
+
+All contributions MUST include a `Signed-off-by` line in the commit message, certifying that you wrote or have the right to submit the code under the project's license. Add it automatically with:
+
+```bash
+git commit -s
+```
+
+By signing off, you agree to the [Developer Certificate of Origin](https://developercertificate.org/).
+
 ## Code Review
 
 All changes require review before merging. Backend-only changes need backend reviewer approval; frontend-only changes need frontend reviewer approval. Cross-cutting changes need both.
+
+## Getting Help
+
+Have a question or need guidance? Start a conversation in [GitHub Discussions](https://github.com/orgs/syntara-orchestration/discussions) before opening an issue.
