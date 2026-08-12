@@ -50,7 +50,7 @@ logger = structlog.stdlib.get_logger(__name__)
 _MAX_PAGINATION_PAGES = 10
 
 _PROVIDER_CONSTRUCTORS: dict[LLMProviderHint, Callable[[], LLMProviderBase]] = {
-    LLMProviderHint.OPENAI: lambda: OpenAICompatibleProvider(default_url="https://api.openai.com"),
+    LLMProviderHint.OPENAI: OpenAICompatibleProvider,
     LLMProviderHint.RED_HAT_AI: lambda: OpenAICompatibleProvider(default_url=None),
     LLMProviderHint.CUSTOM: lambda: OpenAICompatibleProvider(default_url=None),
     LLMProviderHint.ANTHROPIC: AnthropicProvider,

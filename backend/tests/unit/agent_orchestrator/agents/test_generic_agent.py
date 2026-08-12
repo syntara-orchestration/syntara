@@ -189,6 +189,8 @@ class TestGenericAgentLLMIntegration:
             await agent.execute_as_node(state)
 
         assert exc_info.value.invocation_id == str(invocation_id)
+        assert "did not respond in time" in str(exc_info.value)
+        assert "Request timed out" not in str(exc_info.value)
 
 
 class TestGenericAgentContextInjection:
