@@ -39,14 +39,14 @@ def project_manager_env(
     create_role: RoleFactory,
     create_user: UserFactory,
     assign_system_role: UserRoleAssignmentFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ) -> tuple[SyntaraApiRegistry, UUID]:
     """Create user with system-level project manager role."""
     user_id, name, password = create_user(admin_api, "projmgr")
 
     role_name = create_role(admin_api, "projmgr", _POLICIES)
     assign_system_role(admin_api, user_id, role_name)
-    user_api = api_for(nexus_base_url, name, password)
+    user_api = api_for(syntara_base_url, name, password)
     return user_api, user_id
 
 

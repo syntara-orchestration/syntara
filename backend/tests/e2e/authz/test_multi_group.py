@@ -42,7 +42,7 @@ class TestMultiGroupMembership:
 
     def test_both_groups_grant_full_access(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -83,7 +83,7 @@ class TestMultiGroupMembership:
         create_workflow(admin_api, proj_id, "multi-seed")
         create_credential(admin_api, proj_id, "multi-seed")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # workflow:read from ops
         user_api.projects.list_workflows(project_id=proj_id).assert_and_get()
@@ -102,7 +102,7 @@ class TestMultiGroupMembership:
 
     def test_removing_from_ops_revokes_only_ops_permissions(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -142,7 +142,7 @@ class TestMultiGroupMembership:
         remove_from_group(admin_api, ops_group_id, user_id)
 
         # Re-login to pick up new permissions
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # credential:read still works (from security group)
         user_api.credentials.list().assert_and_get()
@@ -162,7 +162,7 @@ class TestMultiGroupMembership:
 
     def test_removing_from_security_revokes_only_security_permissions(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -202,7 +202,7 @@ class TestMultiGroupMembership:
         # -- remove from security --
         remove_from_group(admin_api, sec_group_id, user_id)
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # workflow:read still works (from ops group)
         user_api.projects.list_workflows(project_id=proj_id).assert_and_get()

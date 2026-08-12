@@ -39,7 +39,7 @@ def user_manager_env(
     create_role: RoleFactory,
     assign_system_role: UserRoleAssignmentFactory,
     create_user: UserFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ) -> tuple[SyntaraApiRegistry, UUID]:
     """Create user with system-level user manager role."""
     user_id, name, password = create_user(admin_api, "usermgr")
@@ -47,7 +47,7 @@ def user_manager_env(
     role_name = create_role(admin_api, "usermgr", _POLICIES)
     assign_system_role(admin_api, user_id, role_name)
 
-    user_api = api_for(nexus_base_url, name, password)
+    user_api = api_for(syntara_base_url, name, password)
     return user_api, user_id
 
 

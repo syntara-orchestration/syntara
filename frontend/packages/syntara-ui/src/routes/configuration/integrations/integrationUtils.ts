@@ -11,7 +11,7 @@ const integrationTypeSchema = z.discriminatedUnion('integration_type', [
 ])
 
 const PROVIDER_DEFAULT_URLS: Record<string, string> = {
-  [LLMProviderHintEnum.OPENAI]: 'https://api.openai.com',
+  [LLMProviderHintEnum.OPENAI]: 'https://api.openai.com/v1',
   [LLMProviderHintEnum.ANTHROPIC]: 'https://api.anthropic.com/v1',
   [LLMProviderHintEnum.GEMINI]: 'https://generativelanguage.googleapis.com/v1',
 }

@@ -1,4 +1,4 @@
-"""Pytest fixtures for Nexus E2E tests.
+"""Pytest fixtures for Syntara E2E tests.
 
 All fixtures in this module are intended to be imported into a project's
 ``tests/e2e/conftest.py`` so they apply to tests under that directory tree.
@@ -77,16 +77,16 @@ _API_HEALTH_TIMEOUT = 15.0
 
 
 @pytest.fixture(scope="session")
-def auth_headers(nexus_base_url: str) -> dict[str, str]:
+def auth_headers(syntara_base_url: str) -> dict[str, str]:
     """Return Bearer auth headers for raw httpx calls."""
-    token = _generate_e2e_token(nexus_base_url)
+    token = _generate_e2e_token(syntara_base_url)
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(scope="session")
-def nexus_client(nexus_base_url: str) -> AuthenticatedClient:
+def syntara_client(syntara_base_url: str) -> AuthenticatedClient:
     """Return an authenticated Syntara API client connected to the test environment."""
-    base_url = nexus_base_url
+    base_url = syntara_base_url
 
     try:
         response = httpx.get(f"{base_url}/health", timeout=5, verify=e2e_ssl_context())
@@ -110,19 +110,19 @@ def nexus_client(nexus_base_url: str) -> AuthenticatedClient:
 
 
 @pytest.fixture(scope="session")
-def syntara_api(nexus_client: AuthenticatedClient) -> SyntaraApiRegistry:
+def syntara_api(syntara_client: AuthenticatedClient) -> SyntaraApiRegistry:
     """Return a SyntaraApiRegistry bound to the session-scoped authenticated client.
 
-    Uses ``nexus_client``, which refreshes the admin JWT via ``_AutoRefreshAuth`` on
+    Uses ``syntara_client``, which refreshes the admin JWT via ``_AutoRefreshAuth`` on
     expiry or 401. Authentication E2E tests that revoke user/IdP sessions should use
     this fixture for admin API calls; those revocations do not invalidate unrelated
     admin tokens.
     """
-    return SyntaraApiRegistry(nexus_client)
+    return SyntaraApiRegistry(syntara_client)
 
 
 @pytest.fixture(scope="session")
-def unauthenticated_client(nexus_base_url: str) -> AuthenticatedClient:
+def unauthenticated_client(syntara_base_url: str) -> AuthenticatedClient:
     """Return an unauthenticated Syntara API client for login flows and public endpoints.
 
     Uses an invalid token so requests are rejected with 401 by protected endpoints.
@@ -131,14 +131,14 @@ def unauthenticated_client(nexus_base_url: str) -> AuthenticatedClient:
     used in production.
     """
     return AuthenticatedClient(
-        base_url=f"{nexus_base_url}/api/v1",
+        base_url=f"{syntara_base_url}/api/v1",
         token="unauthenticated",  # noqa: S106
         verify_ssl=e2e_ssl_context(),
     )
 
 
 @pytest.fixture
-def unauth_api(nexus_base_url: str, unauthenticated_client: AuthenticatedClient) -> SyntaraApiRegistry:
+def unauth_api(syntara_base_url: str, unauthenticated_client: AuthenticatedClient) -> SyntaraApiRegistry:
     """SyntaraApiRegistry backed by a client with no valid auth token.
 
     Used to verify that unauthenticated requests are rejected with 401.
@@ -150,15 +150,15 @@ def unauth_api(nexus_base_url: str, unauthenticated_client: AuthenticatedClient)
 
 
 @pytest.fixture(autouse=True)
-def reset_async_client(nexus_client: AuthenticatedClient) -> Generator[None, None, None]:
+def reset_async_client(syntara_client: AuthenticatedClient) -> Generator[None, None, None]:
     """Reset the cached async httpx client between tests.
 
-    nexus_client is session-scoped but async tests run with function-scoped event loops.
+    syntara_client is session-scoped but async tests run with function-scoped event loops.
     Without this, the AsyncClient created in one test's loop becomes stale for the next.
     Token refresh is handled transparently by _AutoRefreshAuth on every request.
     """
     yield
-    nexus_client._async_client = None  # noqa: SLF001
+    syntara_client._async_client = None  # noqa: SLF001
 
 
 @pytest.fixture(autouse=True)
@@ -188,7 +188,7 @@ def _wait_for_api(syntara_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.fixture(scope="session")
-def viewer_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
+def viewer_client(syntara_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
     """Return an authenticated client for a non-admin (viewer) user.
 
     Creates the user via the admin client on first use.  The user has no
@@ -208,13 +208,13 @@ def viewer_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> Authe
     if resp.status_code not in (HTTPStatus.CREATED, HTTPStatus.CONFLICT):
         pytest.fail(f"Failed to create viewer user: {resp.status_code} {resp.content!r}")
 
-    token = _login(nexus_base_url, username, password)
+    token = _login(syntara_base_url, username, password)
     return AuthenticatedClient(
-        base_url=f"{nexus_base_url}/api/v1",
+        base_url=f"{syntara_base_url}/api/v1",
         token=token,
         verify_ssl=e2e_ssl_context(),
         timeout=httpx.Timeout(60.0),
-        httpx_args={"auth": _AutoRefreshAuth(nexus_base_url, token, username=username, password=password)},
+        httpx_args={"auth": _AutoRefreshAuth(syntara_base_url, token, username=username, password=password)},
     )
 
 
@@ -225,7 +225,7 @@ def viewer_api(viewer_client: AuthenticatedClient) -> SyntaraApiRegistry:
 
 
 @pytest.fixture(scope="session")
-def auditor_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
+def auditor_client(syntara_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
     """Return an authenticated client for a user with the auditor role.
 
     Creates the user and assigns the auditor role via the generated API
@@ -264,13 +264,13 @@ def auditor_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> Auth
     ):
         pytest.fail(f"Failed to assign auditor role: {role_resp.status_code} {role_resp.content!r}")
 
-    token = _login(nexus_base_url, username, password)
+    token = _login(syntara_base_url, username, password)
     return AuthenticatedClient(
-        base_url=f"{nexus_base_url}/api/v1",
+        base_url=f"{syntara_base_url}/api/v1",
         token=token,
         verify_ssl=e2e_ssl_context(),
         timeout=httpx.Timeout(60.0),
-        httpx_args={"auth": _AutoRefreshAuth(nexus_base_url, token, username=username, password=password)},
+        httpx_args={"auth": _AutoRefreshAuth(syntara_base_url, token, username=username, password=password)},
     )
 
 
@@ -287,10 +287,10 @@ def auditor_api(auditor_client: AuthenticatedClient) -> SyntaraApiRegistry:
 
 @pytest.fixture(scope="session")
 def worker_base_url() -> str:
-    """Return the URL the Temporal worker uses to reach the Nexus API.
+    """Return the URL the Temporal worker uses to reach the Syntara API.
 
     The worker runs inside a container, so it cannot use localhost or the
-    nexus_base_url (which is host-side).  The default uses the podman host
+    syntara_base_url (which is host-side).  The default uses the podman host
     gateway so the containerised worker can reach the API process running on
     the host.  Override with APP_WORKER_BASE_URL in CI or other environments.
     """
@@ -304,7 +304,7 @@ def worker_base_url() -> str:
 
 @pytest.fixture(scope="session")
 def syntara_api_admin_group_id(syntara_api: SyntaraApiRegistry) -> UUID:
-    """Get admin role group ID for Nexus API."""
+    """Get admin role group ID."""
     groups_resp = syntara_api.groups.list(additional_params={"name": "admins"}, limit=100)
     if groups_resp.parsed is None or len(groups_resp.parsed.resources) == 0:
         msg = "Unable to retrieve admin group ID."
@@ -373,8 +373,8 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
 
 
 @pytest.fixture(scope="session")
-def nexus_admin_user(syntara_api: SyntaraApiRegistry) -> UserInfo:
-    """Get admin user ID for Nexus API."""
+def syntara_admin_user(syntara_api: SyntaraApiRegistry) -> UserInfo:
+    """Get admin user ID."""
     return cast("UserInfo", syntara_api.authentication.get_current_user().assert_and_get())
 
 
@@ -652,19 +652,19 @@ def integration_factory(
 
 
 @pytest.fixture
-def orchestrator_authenticated_cli(nexus_base_url: str) -> Callable[[list[str]], Result]:
+def orchestrator_authenticated_cli(syntara_base_url: str) -> Callable[[list[str]], Result]:
     """Invokable orchestrator cli with base url and a fresh admin token."""
     from orchestrator_cli import app  # lazy import — optional dependency
 
     runner = CliRunner()
-    token = _generate_e2e_token(nexus_base_url)
+    token = _generate_e2e_token(syntara_base_url)
 
     def invoke(args: list[str]) -> Result:
         return runner.invoke(
             app,
             [
                 "--base-url",
-                nexus_base_url,
+                syntara_base_url,
                 "--token",
                 token,
                 *args,

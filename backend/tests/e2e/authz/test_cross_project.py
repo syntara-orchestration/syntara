@@ -34,7 +34,7 @@ class TestCrossProjectIsolation:
 
     def test_writer_on_alpha_reader_on_beta(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_project_role: ProjectRoleFactory,
@@ -69,7 +69,7 @@ class TestCrossProjectIsolation:
         create_workflow(admin_api, alpha_id, "alpha-seed")
         create_workflow(admin_api, beta_id, "beta-seed")
 
-        user_api = api_for(nexus_base_url, user_name, user_pass)
+        user_api = api_for(syntara_base_url, user_name, user_pass)
 
         # -- can read workflows in alpha --
         user_api.projects.list_workflows(project_id=alpha_id).assert_successful()
