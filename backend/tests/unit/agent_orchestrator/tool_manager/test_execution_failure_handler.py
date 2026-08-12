@@ -15,8 +15,10 @@ from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     _resolve_execution_status,
     create_tool_awrapper,
     create_tool_wrapper,
+    _report_tool_failure,
 )
 from syntara.core.utils.retry import is_retryable_error
+from syntara.tool_manager.models.tool import ToolStatus
 from syntara.tool_manager.models.tool_execution import ToolExecutionStatus
 
 
@@ -190,7 +192,7 @@ class TestSyncToolWrapper:
         assert result.status == "error"
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     def test_sync_wrapper_tool_disable_scheduling(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
         """Test sync tool wrapper disables tool for valid tool_id (no event loop provided)."""
@@ -213,7 +215,7 @@ class TestSyncToolWrapper:
             tool_name="sync_tool",
         )
 
-        # Verify _disable_tool_by_id was actually called (fallback path using asyncio.run)
+        # Verify _report_tool_failure was actually called (fallback path using asyncio.run)
         mock_disable_tool.assert_called_once()
         args = mock_disable_tool.call_args[0]
         assert len(args) == 2
@@ -230,7 +232,7 @@ class TestSyncToolWrapper:
         assert result.status == "error"
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     def test_sync_wrapper_tool_disable_with_event_loop(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
         """Test sync tool wrapper disables tool for valid tool_id (with event loop provided)."""
@@ -259,7 +261,7 @@ class TestSyncToolWrapper:
             tool_name="loop_tool",
         )
 
-        # Verify _disable_tool_by_id was actually called (via run_coroutine_threadsafe path)
+        # Verify _report_tool_failure was actually called (via run_coroutine_threadsafe path)
         mock_disable_tool.assert_called_once()
         args = mock_disable_tool.call_args[0]
         assert len(args) == 2
@@ -469,7 +471,7 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "key_tool"
         assert result.status == "error"
 
-    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_successful_tool_id_extraction_and_disable_scheduling(
         self, mock_logger: Mock, mock_disable_tool: AsyncMock
@@ -668,3 +670,27 @@ class TestMetricsEmissionAndDbPersistence:
         assert mock_run_coro.call_count == 2
         persist_call = mock_run_coro.call_args_list[-1]
         assert persist_call[0][2] == "tool execution DB persistence"
+
+
+class TestReportToolFailure:
+    """Tests for the execution failure reporting helper."""
+
+    @pytest.mark.asyncio
+    async def test_report_tool_failure_leaves_enabled_untouched(self) -> None:
+        """Test that reporting a failure records status only and never changes the enabled flag."""
+        tool_id = uuid4()
+        client = AsyncMock()
+        client.__aenter__.return_value = client
+
+        with patch(
+            "syntara.agent_orchestrator.tool_manager.execution_failure_handler._get_tool_manager_client",
+            return_value=client,
+        ):
+            await _report_tool_failure(tool_id, TimeoutError("boom"))
+
+        client.update_tool_status.assert_awaited_once()
+        kwargs = client.update_tool_status.await_args.kwargs
+        assert kwargs["tool_id"] == tool_id
+        assert kwargs["status"] == ToolStatus.ERROR
+        assert "TimeoutError" in kwargs["refresh_error"]
+        assert "enabled" not in kwargs
