@@ -373,9 +373,7 @@ async def test_delete_project_soft_deletes_workflows(seeded_db: AsyncSession, te
 
     seeded_db.expire_all()
     wf = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf_id))).first()
-    assert wf is not None
-    assert wf.deleted_at is not None
-    assert wf.deleted_by == user_id
+    assert wf is None
 
 
 @pytest.mark.asyncio
@@ -422,9 +420,7 @@ async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, t
 
     seeded_db.expire_all()
     ex = (await seeded_db.exec(select(Execution).where(Execution.id == exec_id))).first()
-    assert ex is not None
-    assert ex.deleted_at is not None
-    assert ex.deleted_by == user_id
+    assert ex is None, "Execution should cascade-delete with its workflow when project is deleted"
 
 
 @pytest.mark.asyncio
@@ -565,18 +561,16 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
     await svc.delete_project(p1_id)
 
     seeded_db.expire_all()
-    # p1 resources should be gone/soft-deleted
+    # p1 resources should be gone (hard-deleted)
     assert (await seeded_db.exec(select(Role).where(Role.project_id == p1_id))).all() == []
     wf1_row = (await seeded_db.exec(select(Workflow).where(Workflow.project_id == p1_id))).first()
-    assert wf1_row is not None
-    assert wf1_row.deleted_at is not None
+    assert wf1_row is None
 
     # p2 resources should be untouched
     r2 = (await seeded_db.exec(select(Role).where(Role.id == role2_id))).first()
     assert r2 is not None
     wf2_row = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf2_id))).first()
     assert wf2_row is not None
-    assert wf2_row.deleted_at is None
 
 
 @pytest.mark.asyncio

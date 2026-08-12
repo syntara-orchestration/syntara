@@ -244,7 +244,7 @@ class TestPeriodicAnalyticsFlow:
         assert usage_by_endpoint["/api/v1/executions"]["request_count"] == 3
         assert usage_by_endpoint["/api/v1/executions"]["interface"] == "ui"
 
-    async def test_soft_deleted_records_excluded(
+    async def test_deleted_records_excluded(
         self,
         test_db_session: AsyncSession,
         test_user: User,
@@ -258,9 +258,12 @@ class TestPeriodicAnalyticsFlow:
         # Create an active workflow
         await workflow_factory.create("active-wf")
 
-        # Create a soft-deleted workflow
+        # Create and hard-delete a workflow
         deleted_wf, _ = await workflow_factory.create("deleted-wf")
-        deleted_wf.soft_delete(test_user.id)
+        deleted_wf.published_version_id = None
+        deleted_wf.is_enabled = False
+        await test_db_session.flush()
+        await test_db_session.delete(deleted_wf)
 
         await test_db_session.commit()
 
@@ -304,7 +307,7 @@ class TestQueryWorkflowCountsRealDB:
         assert result.enabled == 3
         assert result.disabled == 2
 
-    async def test_excludes_soft_deleted_workflows(
+    async def test_excludes_deleted_workflows(
         self,
         test_db_session: AsyncSession,
         test_user: User,
@@ -314,7 +317,10 @@ class TestQueryWorkflowCountsRealDB:
         await workflow_factory.create("active-wf")
 
         deleted_wf, _ = await workflow_factory.create("deleted-wf")
-        deleted_wf.soft_delete(test_user.id)
+        deleted_wf.published_version_id = None
+        deleted_wf.is_enabled = False
+        await test_db_session.flush()
+        await test_db_session.delete(deleted_wf)
 
         await test_db_session.commit()
 
@@ -780,7 +786,10 @@ class TestQueryCredentialCountsRealDB:
             actor_id=test_user.id,
         )
         test_db_session.add(publish_event)
-        workflow.soft_delete(test_user.id)
+        workflow.published_version_id = None
+        workflow.is_enabled = False
+        await test_db_session.flush()
+        await test_db_session.delete(workflow)
         await test_db_session.commit()
 
         result = await query_credential_counts(test_db_session)
