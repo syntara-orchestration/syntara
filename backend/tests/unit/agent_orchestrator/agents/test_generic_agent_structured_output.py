@@ -210,7 +210,7 @@ class TestStructuredOutputSystemPrompt:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
+            patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
             override_runtime_settings({"agentic.task_agent_system_prompt": custom_prompt}),
         ):
             mock_record.side_effect = _make_record_side_effect()
