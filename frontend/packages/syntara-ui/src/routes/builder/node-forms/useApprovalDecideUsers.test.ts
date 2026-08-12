@@ -170,6 +170,49 @@ describe('useApprovalDecideUsers', () => {
     expect(mockPOST).toHaveBeenCalledTimes(2)
   })
 
+  it('sets isPermissionDenied when API returns AUTHORIZATION_DENIED', async () => {
+    mockPOST.mockResolvedValue({
+      data: undefined,
+      error: { code: 'AUTHORIZATION_DENIED', title: 'Authorization Denied', detail: 'Not authorized' },
+    })
+
+    const { result } = renderHook(() => useApprovalDecideUsers('project-123'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.isPermissionDenied).toBe(true)
+    expect(result.current.users).toEqual([])
+    expect(result.current.error).toBeNull()
+  })
+
+  it('does not retry on PermissionDeniedError', async () => {
+    mockPOST.mockResolvedValue({
+      data: undefined,
+      error: { code: 'AUTHORIZATION_DENIED', title: 'Authorization Denied', detail: 'Not authorized' },
+    })
+
+    const retryEnabledClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: 3 },
+      },
+    })
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      createElement(QueryClientProvider, { client: retryEnabledClient }, children)
+
+    const { result } = renderHook(() => useApprovalDecideUsers(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(mockPOST).toHaveBeenCalledTimes(1)
+    expect(result.current.isPermissionDenied).toBe(true)
+  })
+
   it('returns empty array when no users have permission', async () => {
     mockPOST.mockResolvedValue({
       data: { resources: [], next: null },

@@ -21,7 +21,7 @@ from sqlmodel import Field, SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.dependencies import get_current_user
-from syntara.authz.dependencies import PermissionChecker, get_authz_evaluator
+from syntara.authz.dependencies import get_authz_evaluator
 from syntara.authz.engine import AuthzRequest, authorize, resolve_readable_project_ids
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
@@ -660,9 +660,6 @@ async def _user_has_authz_query_permission(
 # ============================================================================
 # Endpoints
 # ============================================================================
-
-
-_authz_query_perm = PermissionChecker("authz", "query")
 
 
 @router.post(

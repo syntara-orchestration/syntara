@@ -13,6 +13,7 @@ const mockUseApprovalDecideUsers = vi.fn(() => ({
     { id: 'user-2', username: 'approver2' },
   ],
   isLoading: false,
+  isPermissionDenied: false,
   error: null,
   refetch: vi.fn(),
 }))
@@ -469,6 +470,7 @@ describe('ApprovalNodeForm', () => {
       mockUseApprovalDecideUsers.mockReturnValue({
         users: [],
         isLoading: true,
+        isPermissionDenied: false,
         error: null,
         refetch: vi.fn(),
       })
@@ -477,6 +479,44 @@ describe('ApprovalNodeForm', () => {
 
       // Verify label exists
       expect(screen.getByText('Approver users')).toBeInTheDocument()
+    })
+
+    it('shows warning alert when user lacks who_can permission', () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+
+      expect(screen.getByText('Dropdown unavailable')).toBeInTheDocument()
+      expect(
+        screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
+      ).toBeInTheDocument()
+      expect(screen.getByText('Enter usernames manually')).toBeInTheDocument()
+    })
+
+    it('has no accessibility violations in permission-denied state', async () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      const { container } = renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      expect(await screen.findByText('Dropdown unavailable')).toBeInTheDocument()
+      const results = await axe(container, {
+        rules: {
+          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          'aria-valid-attr-value': { enabled: false },
+        },
+      })
+      expect(results).toHaveNoViolations()
     })
 
     it('renders with groups loading state', () => {
@@ -675,6 +715,7 @@ describe('ApprovalNodeForm', () => {
 
       const results = await axe(container, {
         rules: {
+          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })

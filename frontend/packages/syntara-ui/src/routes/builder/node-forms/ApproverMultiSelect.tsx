@@ -114,13 +114,15 @@ export function ApproverMultiSelect<T extends SelectableItem>({
     }
   }, [])
 
-  // Get selected item labels for display
-  const selectedLabels = useMemo(
+  const selectedChips = useMemo(
     () =>
-      selectedValues
-        .map((val) => items.find((item) => getItemValue(item) === val))
-        .filter((item): item is T => item !== undefined),
-    [selectedValues, items, getItemValue]
+      selectedValues.map((val) => {
+        const item = items.find((i) => getItemValue(i) === val)
+        return item
+          ? { key: getItemId(item), label: getItemLabel(item), value: getItemValue(item) }
+          : { key: val, label: val, value: val }
+      }),
+    [selectedValues, items, getItemId, getItemValue, getItemLabel]
   )
 
   const handleRemoveSelection = useCallback(
@@ -156,18 +158,18 @@ export function ApproverMultiSelect<T extends SelectableItem>({
             autoComplete="off"
             innerRef={inputRef}
           >
-            {selectedLabels.length > 0 && (
+            {selectedChips.length > 0 && (
               <LabelGroup numLabels={3}>
-                {selectedLabels.map((item) => (
+                {selectedChips.map((chip) => (
                   <Label
-                    key={getItemId(item)}
+                    key={chip.key}
                     color="blue"
                     onClose={(e) => {
                       e.stopPropagation()
-                      handleRemoveSelection(getItemValue(item))
+                      handleRemoveSelection(chip.value)
                     }}
                   >
-                    {getItemLabel(item)}
+                    {chip.label}
                   </Label>
                 ))}
               </LabelGroup>
@@ -198,10 +200,8 @@ export function ApproverMultiSelect<T extends SelectableItem>({
       filterValue,
       validationError,
       clearAll,
-      selectedLabels,
-      getItemId,
-      getItemLabel,
-      getItemValue,
+      handleKeyDown,
+      selectedChips,
       handleRemoveSelection,
     ]
   )
