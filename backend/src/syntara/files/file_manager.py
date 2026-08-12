@@ -422,6 +422,94 @@ class FileManager:
         result = await session.exec(statement)
         return list(result.all())
 
+    async def delete_file(
+        self,
+        file_id: UUID,
+        session: AsyncSession,
+    ) -> FileMetadata:
+        """Delete a file's metadata and best-effort remove storage objects.
+
+        Hard-deletes the FileMetadata record first, then attempts to remove the
+        original object and any converted content from S3. Storage cleanup is
+        best-effort: failures after a successful DB commit are logged and do
+        not fail the request.
+
+        Args:
+            file_id: UUID of the file to delete
+            session: Database session
+
+        Returns:
+            The deleted FileMetadata (detached after commit)
+
+        Raises:
+            SafeValueError: If the file metadata is not found
+
+        """
+        file_metadata = await session.get(FileMetadata, file_id)
+        if file_metadata is None:
+            msg = f"File not found: {file_id}"
+            raise SafeValueError(msg)
+
+        file_path = file_metadata.file_path
+        converted_content_path = file_metadata.converted_content_path
+
+        await session.delete(file_metadata)
+        await session.commit()
+
+        try:
+            retriever = self.get_retriever()
+        except FileStorageUnavailableError:
+            logger.warning(
+                "File storage unavailable during cleanup after file delete",
+                file_id=str(file_id),
+                path=file_path,
+                exc_info=True,
+            )
+        else:
+            try:
+                await retriever.delete_file(file_path)
+            except (OSError, FileError):
+                logger.warning(
+                    "Failed to delete file from storage during file delete",
+                    file_id=str(file_id),
+                    path=file_path,
+                    exc_info=True,
+                )
+            if converted_content_path:
+                try:
+                    await retriever.delete_file(converted_content_path)
+                except (OSError, FileError):
+                    logger.warning(
+                        "Failed to delete converted content during file delete",
+                        file_id=str(file_id),
+                        path=converted_content_path,
+                        exc_info=True,
+                    )
+
+        logger.info(
+            "File deleted",
+            file_id=str(file_id),
+            filename=file_metadata.filename,
+            project_id=str(file_metadata.project_id),
+        )
+        return file_metadata
+
+    async def is_project_deleted(
+        self,
+        project_id: UUID,
+        session: AsyncSession,
+    ) -> bool:
+        """Return whether the owning project has been soft-deleted.
+
+        Mirrors the service-account pattern: files are retained after project
+        deletion, and callers learn the orphaned state via this flag.
+        """
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+
+        result = await session.exec(select(Project.deleted_at).where(Project.id == project_id))
+        deleted_at = result.one_or_none()
+        return deleted_at is not None
+
     async def update_file_status(
         self,
         file_id: UUID,

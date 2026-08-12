@@ -78,7 +78,11 @@ export interface paths {
     get: operations['get_file_details']
     put?: never
     post?: never
-    delete?: never
+    /**
+     * Delete file
+     * @description Permanently delete a file and its stored content. Files that outlive a deleted project can still be removed via this endpoint.
+     */
+    delete: operations['delete_file']
     options?: never
     head?: never
     patch?: never
@@ -236,6 +240,12 @@ export interface components {
        * @example null
        */
       conversion_error?: string | null
+      /**
+       * Is Project Deleted
+       * @description True when the owning project has been soft-deleted; the file is retained as an orphan and remains deletable via DELETE /files/{id}.
+       * @default false
+       */
+      is_project_deleted: boolean
     }
     /**
      * FilesMetadataResponse
@@ -593,6 +603,35 @@ export interface operations {
         content: {
           'application/json': components['schemas']['FileDetailResponse']
         }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  delete_file: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description UUID of the file to delete */
+        file_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description File deleted successfully */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']

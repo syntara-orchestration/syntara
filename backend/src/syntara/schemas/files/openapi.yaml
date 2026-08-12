@@ -226,6 +226,46 @@ paths:
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
       security:
         - bearerAuth: []
+    delete:
+      summary: Delete file
+      description: |-
+        Permanently delete a file and its stored content. Files that outlive a deleted project can still be removed via this endpoint.
+      operationId: delete_file
+      tags:
+        - Files
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: File Id
+          description: UUID of the file to delete
+      x-app-permission:
+        resource: files
+        action: delete
+      responses:
+        '204':
+          description: File deleted successfully
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
 
   /files/{file_id}/download:
     get:
@@ -402,6 +442,7 @@ components:
         - size_bytes
         - mime_type
         - status
+        - is_project_deleted
       properties:
         file_id:
           type: string
@@ -439,6 +480,13 @@ components:
           description: Error message if conversion failed
           examples:
             - null
+        is_project_deleted:
+          type: boolean
+          title: Is Project Deleted
+          description: >-
+            True when the owning project has been soft-deleted; the file is
+            retained as an orphan and remains deletable via DELETE /files/{id}.
+          default: false
 
     FilesMetadataResponse:
       type: object

@@ -229,6 +229,11 @@ class ProjectService(BaseService):
 
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
         Soft-deletable resources are soft-deleted; others are hard-deleted.
+
+        Files and service accounts are intentionally retained after project
+        deletion (not cascaded here). Callers observe the orphaned state via
+        ``is_project_deleted`` on their read models; files remain deletable
+        via ``DELETE /files/{id}``.
         """
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
         from syntara.authz.models.policy import Policy  # noqa: PLC0415

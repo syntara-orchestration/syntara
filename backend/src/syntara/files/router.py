@@ -29,8 +29,10 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.files.audit.file_deleted import FileDeletedEvent
 from syntara.files.audit.file_downloaded import FileDownloadedEvent
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.health import FileStorageStatus, check_file_storage_health
@@ -236,6 +238,13 @@ _files_perm_download = PermissionChecker(
     resource_id_param="file_id",
 )
 
+_files_perm_delete = PermissionChecker(
+    "files",
+    "delete",
+    resource_model=FileMetadata,
+    resource_id_param="file_id",
+)
+
 
 class FileDetailResponse(BaseModel):
     """Response model for GET /api/v1/files/{file_id} endpoint."""
@@ -251,6 +260,10 @@ class FileDetailResponse(BaseModel):
     status: FileStatus = Field(description="Current processing status")
     conversion_error: str | None = Field(
         default=None, description="Error message if conversion failed", examples=[None]
+    )
+    is_project_deleted: bool = Field(
+        default=False,
+        description="True when the owning project has been soft-deleted; file is retained as an orphan",
     )
 
 
@@ -464,4 +477,58 @@ async def get_file_details(
         mime_type=metadata.mime_type,
         status=metadata.status,
         conversion_error=metadata.conversion_error,
+        is_project_deleted=await file_manager.is_project_deleted(metadata.project_id, db),
     )
+
+
+@router.delete(
+    "/{file_id}",
+    summary="Delete file",
+    description="Permanently delete a file and its stored content. "
+    "Files that outlive a deleted project can still be removed via this endpoint.",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(_files_perm_delete)],
+    operation_id="delete_file",
+)
+async def delete_file(
+    file_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file_manager: Annotated[FileManager, Depends(get_file_manager)],
+) -> None:
+    """Delete a file by ID from storage and the database.
+
+    Authorization is handled by PermissionChecker (files:delete).
+
+    Raises:
+        HTTPException: 404 if file not found
+    """
+    existing = await file_manager.get_file_metadata(file_id, db)
+    if existing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The requested file could not be found",
+        )
+
+    delete_error: str | None = None
+    try:
+        await file_manager.delete_file(file_id, db)
+    except SafeValueError as e:
+        # Race: deleted between lookup and delete
+        delete_error = type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The requested file could not be found",
+        ) from e
+    except Exception as e:
+        delete_error = type(e).__name__
+        raise
+    finally:
+        AuditEventDispatcher.dispatch(
+            FileDeletedEvent(
+                file_id=file_id,
+                filename=existing.filename,
+                project_id=existing.project_id,
+                storage_backend="s3",
+                error_type=delete_error,
+            ),
+        )
