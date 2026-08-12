@@ -29,6 +29,7 @@ from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
+from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
@@ -38,7 +39,6 @@ from syntara.agent_orchestrator.models.streaming_events import (
     ToolCallEventData,
     ToolResultEventData,
 )
-from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.agent_orchestrator.services.streaming_service import get_invocation_stream_id
 from syntara.agent_orchestrator.tool_manager import ToolRetriever
@@ -374,8 +374,9 @@ class OrchestrationService:
         tools are properly registered and accessible for the current invocation.
 
         For NONE / absent strategy, discovery is skipped entirely. For ALL and
-        SELECTED, discovery failures propagate so the invocation fails instead of
-        continuing toolless (which can cause the LLM to fabricate tool results).
+        SELECTED, discovery or provisioning failures propagate so the invocation
+        fails instead of continuing toolless (which can cause the LLM to fabricate
+        tool results).
 
         Args:
             session_id: Session identifier
@@ -389,7 +390,8 @@ class OrchestrationService:
             List of synchronized BaseTool instances available for agent use
 
         Raises:
-            ToolDiscoveryError: If discovery fails when tools were requested.
+            ToolDiscoveryError: If discovery fails, or enabled tools cannot be
+                provisioned from MCP (ALL/SELECTED).
             ToolSelectionUnavailableError: If SELECTED tools cannot be provisioned.
 
         """
@@ -501,12 +503,15 @@ class OrchestrationService:
             response_schema=response_schema,
         )
 
-        graph: CompiledStateGraph[AgentState, None, Any, Any] = await self._setup_graph(initial_state)
-
         trace_accumulator = _TraceAccumulator()
 
         async with StreamClient() as client:
             try:
+                # Tool discovery/selection runs inside this try so stream clients get a
+                # terminal error event and workflow failure signals fire (same path as
+                # mid-stream failures). Setup must not run before StreamClient.
+                graph: CompiledStateGraph[AgentState, None, Any, Any] = await self._setup_graph(initial_state)
+
                 # Execute graph with streaming events
                 config: RunnableConfig = cast("RunnableConfig", {"configurable": {"thread_id": session_id}})
                 final_state = await self._execute_graph_streaming(

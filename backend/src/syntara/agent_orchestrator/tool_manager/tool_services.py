@@ -65,8 +65,6 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
             all_integrations = await client.get_all_mcp_integrations()
             logger.info("Discovered MCP integrations", integration_count=len(all_integrations))
             return all_integrations
-    except ToolDiscoveryError:
-        raise
     except Exception as e:
         logger.warning("Failed to discover MCP integrations", error=str(e))
         msg = f"Failed to discover MCP integrations: {type(e).__name__}"
@@ -97,8 +95,6 @@ async def _discover_tools() -> ToolDiscoveryResult:
                 total_count=len(all_tools),
             )
             return enabled_tools, disabled_tools
-    except ToolDiscoveryError:
-        raise
     except Exception as e:
         logger.warning("Tool Manager discovery failed", error=str(e))
         msg = f"Failed to discover tools from Tool Manager: {type(e).__name__}"
@@ -329,6 +325,23 @@ def _enhance_tools_with_metadata(
     return enhanced_tools
 
 
+def _require_provisioned_tools_when_enabled(
+    enabled_tools: list[ToolWithParameters],
+    provisioned_tools: list[BaseTool],
+) -> None:
+    """Fail closed when enabled tools exist but none were provisioned from MCP.
+
+    Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
+    (and SELECTED) would continue toolless and the LLM may fabricate results.
+    """
+    if enabled_tools and not provisioned_tools:
+        msg = (
+            "Enabled tools were discovered but none could be provisioned "
+            "from MCP integrations; refusing to continue without tools"
+        )
+        raise ToolDiscoveryError(msg)
+
+
 class ToolRetriever:
     """Read-only tool retrieval orchestrator for agent execution.
 
@@ -371,7 +384,9 @@ class ToolRetriever:
             List of filtered BaseTools ready for execution
 
         Raises:
-            ToolDiscoveryError: If Tool Manager / Integrations discovery fails.
+            ToolDiscoveryError: If Tool Manager / Integrations discovery fails, or
+                if enabled tools were discovered but none could be provisioned from
+                MCP integrations.
             Exception: Propagates unexpected retrieval failures after emitting a
                 FAILED audit event. Callers that require tools must not swallow
                 these errors and continue toolless.
@@ -406,6 +421,7 @@ class ToolRetriever:
 
             # Step 4: Enhance BaseTools with metadata for failure handling
             enhanced_tools = _enhance_tools_with_metadata(filtered_tools, self.enabled_tools)
+            _require_provisioned_tools_when_enabled(self.enabled_tools, enhanced_tools)
 
             logger.info("Tool retrieval completed", invocation_id=self.invocation_id)
 

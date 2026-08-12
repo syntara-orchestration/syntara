@@ -40,11 +40,12 @@ class OrchestrationError(AgentOrchestratorError):
 
 
 class ToolDiscoveryError(OrchestrationError):
-    """Raised when tool discovery fails while tools were required for the invocation.
+    """Raised when tool discovery or provisioning fails while tools were required.
 
-    Covers Tool Manager / Integrations API failures during discovery. Callers that
-    request tools (ALL or SELECTED) must not continue toolless, or the LLM may
-    fabricate tool results.
+    Covers Tool Manager / Integrations API failures during discovery, and the case
+    where enabled tools were discovered but none could be provisioned from MCP.
+    Callers that request tools (ALL or SELECTED) must not continue toolless, or
+    the LLM may fabricate tool results.
     """
 
 

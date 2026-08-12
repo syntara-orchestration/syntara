@@ -136,6 +136,57 @@ class TestToolServices:
             with pytest.raises(ToolDiscoveryError):
                 await retriever.retrieve_tools()
 
+    async def test_retrieve_tools_fails_when_enabled_tools_cannot_be_provisioned(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """ALL/SELECTED must fail closed when enabled tools exist but MCP yields none."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = sample_tools
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(ToolDiscoveryError, match="none could be provisioned"):
+                await retriever.retrieve_tools()
+
+    async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+    ) -> None:
+        """Zero provisioned tools is OK when Tool Manager reports no enabled tools."""
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = []
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            result = await retriever.retrieve_tools()
+            assert result == []
+
     async def test_tool_retrieval_integration(
         self,
         tool_manager_client: Mock,

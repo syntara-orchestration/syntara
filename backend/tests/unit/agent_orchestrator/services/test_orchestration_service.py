@@ -313,6 +313,98 @@ class TestOrchestrationServiceErrorHandling:
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
 
+    @pytest.mark.asyncio
+    async def test_tool_discovery_failure_publishes_stream_error_and_failure_signal(self) -> None:
+        """Discovery/selection failures during setup must use the stream failure path.
+
+        `_setup_graph()` (and thus `_get_tools()`) runs inside the StreamClient try so
+        WebSocket clients get a terminal error and workflow failure signals fire.
+        """
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+        callback_url = "http://localhost/signal/activity/1"
+        ctx = InvocationContextData.model_validate({"callback_url": callback_url})
+
+        with (
+            patch.object(
+                service,
+                "_setup_graph",
+                side_effect=ToolDiscoveryError("discovery failed"),
+            ),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(ToolDiscoveryError, match="discovery failed"):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=ctx,
+                )
+
+            error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
+            assert len(error_calls) == 1
+            mock_failure_signal.assert_awaited_once()
+            assert mock_failure_signal.await_args is not None
+            assert mock_failure_signal.await_args.args[0] == callback_url
+            assert mock_failure_signal.await_args.args[1] == invocation_id
+            assert isinstance(mock_failure_signal.await_args.args[2], ToolDiscoveryError)
+
+    @pytest.mark.asyncio
+    async def test_tool_selection_unavailable_publishes_stream_error_and_failure_signal(self) -> None:
+        """SELECTED zero-provision errors must also hit stream error + failure signal."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+        callback_url = "http://localhost/signal/activity/2"
+        ctx = InvocationContextData.model_validate({"callback_url": callback_url})
+
+        with (
+            patch.object(
+                service,
+                "_setup_graph",
+                side_effect=ToolSelectionUnavailableError("None of the requested tools"),
+            ),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(ToolSelectionUnavailableError, match="None of the requested tools"):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=ctx,
+                )
+
+            error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
+            assert len(error_calls) == 1
+            mock_failure_signal.assert_awaited_once()
+            assert mock_failure_signal.await_args is not None
+            assert mock_failure_signal.await_args.args[0] == callback_url
+
 
 class TestOrchestrationServiceSessionManagement:
     """Test OrchestrationService session management for multi-turn conversations."""
@@ -739,9 +831,7 @@ class TestGetToolsStrategy:
             MagicMock(),
             tool_selection_strategy="NONE",
         )
-        with patch(
-            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever"
-        ) as mock_retriever_cls:
+        with patch("syntara.agent_orchestrator.services.orchestration_service.ToolRetriever") as mock_retriever_cls:
             result = await service._get_tools("session", uuid4())
         assert result == []
         mock_retriever_cls.assert_not_called()
