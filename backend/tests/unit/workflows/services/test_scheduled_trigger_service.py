@@ -93,7 +93,7 @@ def _make_mock_operator_service(
     list_resp = MagicMock()
     if attr_registered:
         list_resp.custom_attributes = {
-            "NexusWorkflowId": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+            "SyntaraWorkflowId": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
         }
     else:
         list_resp.custom_attributes = {}
@@ -667,7 +667,7 @@ class TestSearchAttributeRegistration:
     """Tests for _ensure_search_attribute feature detection and registration."""
 
     async def test_registers_attribute_when_not_present(self) -> None:
-        """Should register NexusWorkflowId and return True."""
+        """Should register SyntaraWorkflowId and return True."""
         client = _make_mock_client(search_attr_available=False)
 
         result = await _mod._ensure_search_attribute(client)
@@ -721,11 +721,11 @@ class TestSearchAttributeRegistration:
         assert _mod._search_attr_available is False
 
     async def test_wrong_type_falls_back(self) -> None:
-        """Should fall back if NexusWorkflowId exists with wrong type."""
+        """Should fall back if SyntaraWorkflowId exists with wrong type."""
         client = _make_mock_client()
         resp = MagicMock()
         resp.custom_attributes = {
-            "NexusWorkflowId": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
+            "SyntaraWorkflowId": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
         }
         client.operator_service.list_search_attributes = AsyncMock(return_value=resp)
 
@@ -793,7 +793,7 @@ class TestListWorkflowSchedulesOptimized:
         result = await service._list_workflow_schedules(client, "wf-123")
 
         assert result == {"nexus-sched-wf-123-trigger_1"}
-        client.list_schedules.assert_called_once_with(query='NexusWorkflowId = "wf-123"')
+        client.list_schedules.assert_called_once_with(query='SyntaraWorkflowId = "wf-123"')
 
     async def test_falls_back_to_prefix_scan(self) -> None:
         """Should use prefix scan when search attr not available."""
@@ -896,7 +896,7 @@ class TestCreateScheduleWithSearchAttributes:
     """Tests for _create_or_update_schedule with search attributes."""
 
     async def test_create_passes_search_attributes(self) -> None:
-        """Should pass TypedSearchAttributes with NexusWorkflowId to create_schedule."""
+        """Should pass TypedSearchAttributes with SyntaraWorkflowId to create_schedule."""
         client = _make_mock_client(search_attr_available=True)
         service = ScheduledTriggerService(temporal_client=client)
 
@@ -912,7 +912,7 @@ class TestCreateScheduleWithSearchAttributes:
         assert isinstance(search_attrs, TypedSearchAttributes)
         pairs = list(search_attrs)
         assert len(pairs) == 1
-        assert pairs[0].key.name == "NexusWorkflowId"
+        assert pairs[0].key.name == "SyntaraWorkflowId"
         assert pairs[0].value == "wf-123"
 
     async def test_update_passes_search_attributes(self) -> None:
@@ -935,7 +935,7 @@ class TestCreateScheduleWithSearchAttributes:
         assert update_result.search_attributes is not None
         pairs = list(update_result.search_attributes)
         assert len(pairs) == 1
-        assert pairs[0].key.name == "NexusWorkflowId"
+        assert pairs[0].key.name == "SyntaraWorkflowId"
 
     async def test_create_without_search_attr_when_unavailable(self) -> None:
         """Should pass None search_attributes when feature not available."""
@@ -1039,7 +1039,7 @@ class TestListAllSchedules:
     """Tests for the list_all_schedules method."""
 
     async def test_uses_query_when_search_attr_available(self) -> None:
-        """Should query with NexusWorkflowId != '' for server-side filtering."""
+        """Should query with SyntaraWorkflowId != '' for server-side filtering."""
         client = _make_mock_client(search_attr_available=True)
         client.list_schedules = AsyncMock(
             return_value=_async_iter_from(
@@ -1054,7 +1054,7 @@ class TestListAllSchedules:
         result = await service.list_all_schedules(client)
 
         assert result == {"nexus-sched-wf-1-t1", "nexus-sched-wf-2-t1"}
-        client.list_schedules.assert_called_once_with(query='NexusWorkflowId != ""')
+        client.list_schedules.assert_called_once_with(query='SyntaraWorkflowId != ""')
 
     async def test_falls_back_to_prefix_scan_when_search_attr_unavailable(self) -> None:
         """Should use prefix scan when search attribute is not available."""

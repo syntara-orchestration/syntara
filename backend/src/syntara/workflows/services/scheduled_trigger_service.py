@@ -42,7 +42,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 
 logger = structlog.stdlib.get_logger(__name__)
 
-SA_NEXUS_WORKFLOW_ID = SearchAttributeKey.for_keyword("NexusWorkflowId")
+SA_SYNTARA_WORKFLOW_ID = SearchAttributeKey.for_keyword("SyntaraWorkflowId")
 
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
@@ -83,7 +83,7 @@ def _invalidate_client_cache() -> None:
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
-    """Ensure the NexusWorkflowId search attribute is registered in Temporal.
+    """Ensure the SyntaraWorkflowId search attribute is registered in Temporal.
 
     Returns True if the attribute is available for server-side filtering,
     False if the Temporal server does not support it.  The result is cached
@@ -99,14 +99,14 @@ async def _ensure_search_attribute(client: Client) -> bool:
         resp = await client.operator_service.list_search_attributes(
             ListSearchAttributesRequest(namespace=settings.temporal_namespace),
         )
-        attr_type = resp.custom_attributes.get(SA_NEXUS_WORKFLOW_ID.name)
+        attr_type = resp.custom_attributes.get(SA_SYNTARA_WORKFLOW_ID.name)
         if attr_type == IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD:
             _search_attr_available = True
-            logger.info("NexusWorkflowId search attribute already registered")
+            logger.info("SyntaraWorkflowId search attribute already registered")
             return True
         if attr_type is not None:
             logger.warning(
-                "NexusWorkflowId has unexpected type, using prefix scan fallback",
+                "SyntaraWorkflowId has unexpected type, using prefix scan fallback",
                 type=attr_type,
             )
             _search_attr_available = False
@@ -117,16 +117,16 @@ async def _ensure_search_attribute(client: Client) -> bool:
                 AddSearchAttributesRequest(
                     namespace=settings.temporal_namespace,
                     search_attributes={
-                        SA_NEXUS_WORKFLOW_ID.name: IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+                        SA_SYNTARA_WORKFLOW_ID.name: IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
                     },
                 ),
             )
         except RPCError as add_err:
             if add_err.status != RPCStatusCode.ALREADY_EXISTS:
                 raise
-            logger.info("NexusWorkflowId registered concurrently by another replica")
+            logger.info("SyntaraWorkflowId registered concurrently by another replica")
         else:
-            logger.info("Registered NexusWorkflowId search attribute")
+            logger.info("Registered SyntaraWorkflowId search attribute")
         _search_attr_available = True
         return True
 
@@ -292,7 +292,7 @@ class ScheduledTriggerService:
     ) -> int:
         """Delete all Temporal Schedules for a workflow.
 
-        Finds schedules via the NexusWorkflowId search attribute when
+        Finds schedules via the SyntaraWorkflowId search attribute when
         available, falling back to prefix scan otherwise.  Does not
         iterate the workflow definition, so schedules created by any
         version are cleaned up — not just those in the current draft.
@@ -408,7 +408,7 @@ class ScheduledTriggerService:
         search_attrs: TypedSearchAttributes | None = None
         if await _ensure_search_attribute(client):
             search_attrs = TypedSearchAttributes(
-                [SearchAttributePair(SA_NEXUS_WORKFLOW_ID, workflow_id)],
+                [SearchAttributePair(SA_SYNTARA_WORKFLOW_ID, workflow_id)],
             )
 
         try:
@@ -439,12 +439,12 @@ class ScheduledTriggerService:
     async def _list_workflow_schedules(self, client: Client, workflow_id: str) -> set[str]:
         """List all Temporal Schedule IDs belonging to a workflow.
 
-        Uses server-side filtering via the NexusWorkflowId search attribute
+        Uses server-side filtering via the SyntaraWorkflowId search attribute
         when available, falling back to client-side prefix scan otherwise.
         """
         can_use_search_attr = await _ensure_search_attribute(client) and workflow_id.replace("-", "").isalnum()
         if can_use_search_attr:
-            query = f'{SA_NEXUS_WORKFLOW_ID.name} = "{workflow_id}"'
+            query = f'{SA_SYNTARA_WORKFLOW_ID.name} = "{workflow_id}"'
             result = await self._list_schedules_by_query(client, query)
             if result is not None:
                 return result
@@ -454,11 +454,11 @@ class ScheduledTriggerService:
     async def list_all_schedules(self, client: Client) -> set[str]:
         """List all syntara-managed Temporal Schedule IDs.
 
-        Uses server-side filtering via the NexusWorkflowId search attribute
+        Uses server-side filtering via the SyntaraWorkflowId search attribute
         when available, falling back to client-side prefix scan otherwise.
         """
         if await _ensure_search_attribute(client):
-            query = f'{SA_NEXUS_WORKFLOW_ID.name} != ""'
+            query = f'{SA_SYNTARA_WORKFLOW_ID.name} != ""'
             result = await self._list_schedules_by_query(client, query)
             if result is not None:
                 return result
