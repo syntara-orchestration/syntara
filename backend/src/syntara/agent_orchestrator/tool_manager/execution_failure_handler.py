@@ -14,8 +14,9 @@ from uuid import UUID
 
 import structlog
 from langchain_core.messages.tool import ToolMessage
-from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.prebuilt.tool_node import ToolCallRequest, ToolInvocationError
 from langgraph.types import Command
+from pydantic import ValidationError
 
 from syntara.agent_orchestrator.audit.tool_management import ToolInvocationEvent, ToolInvocationStatus
 from syntara.agent_orchestrator.tool_manager.tool_services import _get_tool_manager_client
@@ -35,6 +36,19 @@ logger = structlog.stdlib.get_logger(__name__)
 
 # Constants
 MAX_ERROR_MESSAGE_LENGTH = 500
+
+# Caller/LLM argument and schema faults — record the invocation failure but do not
+# auto-disable the shared tool for other users.
+# ToolInvocationError is LangGraph ToolNode's wrap of pydantic ValidationError when
+# the model supplies args that violate the tool schema.
+_NON_OUTAGE_EXCEPTION_TYPES: tuple[type[BaseException], ...] = (
+    ValidationError,
+    ToolInvocationError,
+    ValueError,
+    TypeError,
+    KeyError,
+    AttributeError,
+)
 
 
 def _create_error_tool_message(error: Exception, tool_call_id: str, tool_name: str) -> ToolMessage:
@@ -108,6 +122,36 @@ def _resolve_execution_status(error: Exception | None) -> ToolExecutionStatus:
     if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
         return ToolExecutionStatus.TIMEOUT
     return ToolExecutionStatus.ERROR
+
+
+def _should_auto_disable_tool(error: Exception) -> bool:
+    """Return whether a tool execution failure warrants auto-disabling the tool.
+
+    Validation and argument errors are caller/LLM faults and must not flip a
+    shared tool to ``enabled:false`` / ``status:error`` for everyone. Timeouts,
+    connectivity failures, and other unexpected execution errors that survive
+    retries indicate a tool or provider outage and should auto-disable.
+
+    Walks the ``__cause__`` chain so explicitly wrapped schema faults (e.g.
+    ``ToolInvocationError`` raised from ``ValidationError``) are not treated as
+    outages. Does not walk ``__context__``, which can attach unrelated prior
+    exceptions during ``except`` handling.
+
+    Args:
+        error: The exception raised during tool execution (after retries).
+
+    Returns:
+        True when the tool should be auto-disabled; False for caller/schema faults.
+
+    """
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        if isinstance(current, _NON_OUTAGE_EXCEPTION_TYPES):
+            return False
+        seen.add(id(current))
+        current = current.__cause__
+    return True
 
 
 def _emit_tool_metrics(
@@ -398,8 +442,14 @@ def create_tool_awrapper(
         except Exception as error:  # noqa: BLE001 - logged inside _handle_tool_execution_error
             caught_error = error
             tool_id, error_msg = _handle_tool_execution_error(ctx, request, error)
-            if tool_id is not None:
+            if tool_id is not None and _should_auto_disable_tool(error):
                 await _disable_tool_by_id(tool_id, error)
+            elif tool_id is not None:
+                logger.info(
+                    "Skipping tool auto-disable for non-outage failure",
+                    tool_id=tool_id,
+                    error_type=error.__class__.__name__,
+                )
             return error_msg
         finally:
             duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
@@ -504,8 +554,14 @@ def create_tool_wrapper(
         except Exception as error:  # noqa: BLE001 - logged inside _handle_tool_execution_error
             caught_error = error
             tool_id, error_msg = _handle_tool_execution_error(ctx, request, error)
-            if tool_id is not None:
+            if tool_id is not None and _should_auto_disable_tool(error):
                 _run_coroutine_from_sync(_disable_tool_by_id(tool_id, error), loop, "tool auto-disable")
+            elif tool_id is not None:
+                logger.info(
+                    "Skipping tool auto-disable for non-outage failure",
+                    tool_id=tool_id,
+                    error_type=error.__class__.__name__,
+                )
             return error_msg
         finally:
             duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)

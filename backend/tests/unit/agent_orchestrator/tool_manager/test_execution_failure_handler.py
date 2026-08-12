@@ -8,11 +8,13 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import ToolCall, ToolMessage
 from langchain_core.tools import BaseTool
-from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.prebuilt.tool_node import ToolCallRequest, ToolInvocationError
 from langgraph.types import Command
+from pydantic import BaseModel, ValidationError
 
 from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     _resolve_execution_status,
+    _should_auto_disable_tool,
     create_tool_awrapper,
     create_tool_wrapper,
 )
@@ -568,6 +570,247 @@ class TestResolveToolExecutionStatus:
         assert _resolve_execution_status(ConnectionError("conn")) == ToolExecutionStatus.ERROR
 
 
+class TestShouldAutoDisableTool:
+    """Test failure classification for shared-tool auto-disable."""
+
+    def test_validation_error_does_not_auto_disable(self) -> None:
+        class _Args(BaseModel):
+            count: int
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Args.model_validate({"count": "not-an-int"})
+
+        assert _should_auto_disable_tool(exc_info.value) is False
+
+    def test_tool_invocation_error_does_not_auto_disable(self) -> None:
+        """LangGraph wraps schema ValidationError as ToolInvocationError."""
+
+        class _Args(BaseModel):
+            count: int
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Args.model_validate({"count": "not-an-int"})
+
+        wrapped = ToolInvocationError("echo_count", exc_info.value, {"count": "not-an-int"})
+        assert _should_auto_disable_tool(wrapped) is False
+
+    def test_wrapped_validation_error_cause_does_not_auto_disable(self) -> None:
+        """Generic wrappers that set __cause__ to ValidationError are non-outage."""
+
+        class _Args(BaseModel):
+            count: int
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Args.model_validate({"count": "not-an-int"})
+
+        wrapped = RuntimeError("tool call failed")
+        wrapped.__cause__ = exc_info.value
+        assert _should_auto_disable_tool(wrapped) is False
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ValueError("Invalid parameter"),
+            TypeError("bad type"),
+            KeyError("missing_arg"),
+            AttributeError("missing attribute"),
+        ],
+    )
+    def test_caller_argument_errors_do_not_auto_disable(self, error: Exception) -> None:
+        assert _should_auto_disable_tool(error) is False
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            TimeoutError("Request timed out"),
+            ConnectionError("Network failure"),
+            OSError("Disk full"),
+            RuntimeError("Provider unavailable"),
+        ],
+    )
+    def test_outage_errors_do_auto_disable(self, error: Exception) -> None:
+        assert _should_auto_disable_tool(error) is True
+
+
+class TestAutoDisableClassificationInWrappers:
+    """Test wrappers only auto-disable on outage failures."""
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    async def test_async_wrapper_skips_disable_for_validation_error(
+        self, mock_logger: Mock, mock_disable_tool: AsyncMock
+    ) -> None:
+        """Pydantic ValidationError records failure but does not disable the tool."""
+
+        class _Args(BaseModel):
+            count: int
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Args.model_validate({"count": "not-an-int"})
+
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "validated_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = await _execute_async_wrapper(
+            tool_name="validated_tool",
+            tool_call_id="validation-call-1",
+            exception=exc_info.value,
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Skipping tool auto-disable for non-outage failure",
+            tool_id=valid_tool_id,
+            error_type="ValidationError",
+        )
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+        assert "ValidationError" in result.content
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    async def test_async_wrapper_skips_disable_for_tool_invocation_error(
+        self, mock_logger: Mock, mock_disable_tool: AsyncMock
+    ) -> None:
+        """LangGraph ToolInvocationError (schema fault) must not disable the shared tool."""
+
+        class _Args(BaseModel):
+            count: int
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Args.model_validate({"count": "not-an-int"})
+
+        invocation_error = ToolInvocationError(
+            "schema_tool",
+            exc_info.value,
+            {"count": "not-an-int"},
+        )
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "schema_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = await _execute_async_wrapper(
+            tool_name="schema_tool",
+            tool_call_id="schema-call-1",
+            exception=invocation_error,
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Skipping tool auto-disable for non-outage failure",
+            tool_id=valid_tool_id,
+            error_type="ToolInvocationError",
+        )
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+        assert "ToolInvocationError" in result.content
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    async def test_async_wrapper_skips_disable_for_value_error(
+        self, mock_logger: Mock, mock_disable_tool: AsyncMock
+    ) -> None:
+        """ValueError from bad args records failure but does not disable the tool."""
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "arg_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = await _execute_async_wrapper(
+            tool_name="arg_tool",
+            tool_call_id="arg-call-1",
+            exception=ValueError("Invalid parameter"),
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Skipping tool auto-disable for non-outage failure",
+            tool_id=valid_tool_id,
+            error_type="ValueError",
+        )
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+        assert "ValueError: Invalid parameter" in result.content
+
+    @pytest.mark.usefixtures("fast_retry_settings")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    def test_sync_wrapper_skips_disable_for_type_error(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
+        """TypeError from bad args records failure but does not disable the tool."""
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "type_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = _execute_sync_wrapper(
+            tool_name="type_tool",
+            tool_call_id="type-call-1",
+            exception=TypeError("expected str, got int"),
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Skipping tool auto-disable for non-outage failure",
+            tool_id=valid_tool_id,
+            error_type="TypeError",
+        )
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+        assert "TypeError" in result.content
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    async def test_async_wrapper_disables_on_timeout(self, mock_disable_tool: AsyncMock) -> None:
+        """TimeoutError still auto-disables the shared tool."""
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "slow_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = await _execute_async_wrapper(
+            tool_name="slow_tool",
+            tool_call_id="timeout-call-1",
+            exception=TimeoutError("Request timed out"),
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_called_once()
+        disabled_tool_id, disabled_error = mock_disable_tool.call_args[0]
+        assert disabled_tool_id == valid_tool_id
+        assert isinstance(disabled_error, TimeoutError)
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
+    async def test_async_wrapper_disables_on_connection_error(self, mock_disable_tool: AsyncMock) -> None:
+        """ConnectionError (tool/provider outage) still auto-disables the shared tool."""
+        valid_tool_id = uuid4()
+        tool = Mock(spec=BaseTool)
+        tool.name = "remote_tool"
+        tool.metadata = {"tool_id": str(valid_tool_id)}
+
+        result = await _execute_async_wrapper(
+            tool_name="remote_tool",
+            tool_call_id="conn-call-1",
+            exception=ConnectionError("Network failure"),
+            tool=tool,
+        )
+
+        mock_disable_tool.assert_called_once()
+        disabled_tool_id, disabled_error = mock_disable_tool.call_args[0]
+        assert disabled_tool_id == valid_tool_id
+        assert isinstance(disabled_error, ConnectionError)
+        assert isinstance(result, ToolMessage)
+        assert result.status == "error"
+        assert "ConnectionError" in result.content
+
+
 class TestMetricsEmissionAndDbPersistence:
     """Test that tool wrappers emit metrics with correct status and persist to DB."""
 
@@ -667,4 +910,29 @@ class TestMetricsEmissionAndDbPersistence:
         # _run_coroutine_from_sync is called twice: once for tool disable, once for DB persistence
         assert mock_run_coro.call_count == 2
         persist_call = mock_run_coro.call_args_list[-1]
+        assert persist_call[0][2] == "tool execution DB persistence"
+
+    @pytest.mark.usefixtures("fast_retry_settings")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._run_coroutine_from_sync")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    def test_sync_wrapper_value_error_skips_disable_but_persists(self, mock_emit: Mock, mock_run_coro: Mock) -> None:
+        """ValueError still emits metrics/persists but does not schedule auto-disable."""
+        tool = Mock(spec=BaseTool)
+        tool.name = "sync_bad_args"
+        tool.metadata = {"tool_id": str(uuid4()), "namespaced_name": "provider::sync_bad_args"}
+
+        _execute_sync_wrapper(
+            tool_name="sync_bad_args",
+            tool_call_id="call-6",
+            exception=ValueError("bad args"),
+            tool=tool,
+        )
+
+        mock_emit.assert_called_once()
+        _, _, emit_status = mock_emit.call_args[0]
+        assert emit_status == ToolExecutionStatus.ERROR
+
+        # Only DB persistence is scheduled; auto-disable is skipped for ValueError
+        assert mock_run_coro.call_count == 1
+        persist_call = mock_run_coro.call_args_list[0]
         assert persist_call[0][2] == "tool execution DB persistence"
