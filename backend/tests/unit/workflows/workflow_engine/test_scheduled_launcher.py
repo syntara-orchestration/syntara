@@ -461,9 +461,9 @@ class TestNonRetryablePermanentFailures:
         mock_recorder = MagicMock()
 
         with (
-            patch("nexus.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
             patch(
-                "nexus.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
             ),
             patch.object(
                 launcher,
@@ -496,9 +496,9 @@ class TestNonRetryablePermanentFailures:
         mock_recorder = MagicMock()
 
         with (
-            patch("nexus.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
             patch(
-                "nexus.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
             ),
             patch.object(
                 launcher,
