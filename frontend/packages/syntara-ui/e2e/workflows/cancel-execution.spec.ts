@@ -1,6 +1,5 @@
 /**
  * E2E Tests: Cancel Execution
- * Jira: AAP-82020
  *
  * Objective: Verify the cancel execution flow from the execution detail page.
  *
@@ -9,7 +8,7 @@
  * - Clicking cancel transitions execution to cancelled status
  * - Cancel button hidden for completed executions
  *
- * Requires a real backend with Temporal — the sleep node keeps the execution
+ * Requires a real backend with Temporal — the wait node keeps the execution
  * in "running" state long enough to interact with the cancel button.
  */
 
@@ -47,13 +46,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'sleep_node',
-          type: 'script',
-          name: 'Long Sleep',
-          parameters: { language: 'bash', code: 'sleep 300' },
+          id: 'long_wait',
+          type: 'wait',
+          name: 'Long Wait',
+          parameters: { duration: 300 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'sleep_node' }]
+      [{ from: 'trigger_manual', to: 'long_wait' }]
     ))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
@@ -72,13 +71,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'echo_node',
-          type: 'script',
-          name: 'Quick Echo',
-          parameters: { language: 'bash', code: 'echo done' },
+          id: 'quick_wait',
+          type: 'wait',
+          name: 'Quick Wait',
+          parameters: { duration: 1 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'echo_node' }]
+      [{ from: 'trigger_manual', to: 'quick_wait' }]
     ))
 
     const echoRunResp = await apiRequest(page, 'post', '/executions', {
