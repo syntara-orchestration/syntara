@@ -30,7 +30,13 @@ export function FieldHelpPopover({
 
   return (
     <Popover triggerRef={triggerRef} bodyContent={helpText} headerContent={headerContent} aria-label={ariaLabel}>
-      <Button ref={triggerRef} variant="plain" aria-label={triggerAriaLabel} icon={<FieldHelpIcon />} />
+      <Button
+        ref={triggerRef}
+        variant="plain"
+        aria-label={triggerAriaLabel}
+        style={{ padding: 0 }}
+        icon={<FieldHelpIcon />}
+      />
     </Popover>
   )
 }
