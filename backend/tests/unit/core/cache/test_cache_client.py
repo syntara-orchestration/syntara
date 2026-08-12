@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from nexus.core.cache.base import BaseRedisClient
-from nexus.core.cache.cache_client import CacheMixin
+from syntara.core.cache.base import BaseRedisClient
+from syntara.core.cache.cache_client import CacheMixin
 
 
 class _TestCacheClient(BaseRedisClient, CacheMixin):
@@ -31,7 +31,7 @@ def _make_client() -> tuple[_TestCacheClient, AsyncMock]:
     Returns (client, mock_redis) so tests can configure method responses
     on the mock without triggering mypy union-attr errors.
     """
-    with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+    with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
         client = _TestCacheClient()
     mock_redis = AsyncMock()
     client._client = mock_redis

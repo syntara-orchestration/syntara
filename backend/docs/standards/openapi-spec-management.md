@@ -6,15 +6,15 @@ This document defines the conventions for maintaining, bundling, and validating 
 
 Nexus follows a **domain sub-spec → bundled spec** model:
 
-- Each API domain owns a sub-spec under `src/nexus/schemas/{domain}/openapi.yaml`
-- A single bundled spec at `src/nexus/schemas/openapi.yaml` is the committed source of truth
+- Each API domain owns a sub-spec under `src/syntara/schemas/{domain}/openapi.yaml`
+- A single bundled spec at `src/syntara/schemas/openapi.yaml` is the committed source of truth
 - The bundled spec is **generated** — never edit it by hand
 - CI and pre-commit hooks enforce that the committed spec stays in sync with the implementation
 
 ## File Layout
 
 ```
-src/nexus/schemas/
+src/syntara/schemas/
 ├── openapi.yaml               # Bundled spec (generated — do not edit)
 ├── base/                      # Shared base schemas (skipped during bundling)
 ├── {domain}/
@@ -39,14 +39,14 @@ src/nexus/schemas/
 
 | Target | Purpose |
 |--------|---------|
-| `make api-spec-bundle` | Merge all domain sub-specs into `src/nexus/schemas/openapi.yaml` |
+| `make api-spec-bundle` | Merge all domain sub-specs into `src/syntara/schemas/openapi.yaml` |
 | `make api-spec-drift` | Check that the committed spec matches the generated one (exit 1 if out of sync) |
 | `make api-spec-drift VERBOSITY=-vv` | Same, with full unified diff output |
 | `make api-spec-validation` | Validate OpenAPI and AsyncAPI spec files for syntax and convention errors |
 
 **Workflow when adding or changing an endpoint:**
 
-1. Edit the relevant domain sub-spec (`src/nexus/schemas/{domain}/openapi.yaml`)
+1. Edit the relevant domain sub-spec (`src/syntara/schemas/{domain}/openapi.yaml`)
 2. Run `make api-spec-bundle` to regenerate the bundled spec
 3. Commit both the sub-spec change and the updated `openapi.yaml`
 
@@ -115,10 +115,10 @@ The server URL in the sub-spec provides the prefix. The bundler resolves full pa
 
 Each domain sub-spec MUST have a corresponding router module:
 
-- Standard: `src/nexus/{domain}/router.py`
-- Remapped domain (schema folder differs from Python package): define the mapping in `SCHEMA_DOMAIN_TO_PYTHON_DOMAIN` inside `tools/ci/validate_api_specs.py` and provide a `src/nexus/{python_domain}/{schema_domain}_router.py`
+- Standard: `src/syntara/{domain}/router.py`
+- Remapped domain (schema folder differs from Python package): define the mapping in `SCHEMA_DOMAIN_TO_PYTHON_DOMAIN` inside `tools/ci/validate_api_specs.py` and provide a `src/syntara/{python_domain}/{schema_domain}_router.py`
 
-Example of an existing remapping: the `executions` schema domain maps to the `workflows` Python package, implemented at `src/nexus/workflows/executions_router.py`.
+Example of an existing remapping: the `executions` schema domain maps to the `workflows` Python package, implemented at `src/syntara/workflows/executions_router.py`.
 
 ### Component Name Collisions
 
@@ -145,7 +145,7 @@ Channel addresses MUST follow: `/ws/{component}/v1/{channel_name}`
 
 Every AsyncAPI spec MUST have a corresponding handler and vice versa:
 
-- Spec `schemas/{component}/websocket-{name}.yaml` → handler `src/nexus/{component}/ws/{name}.py`
+- Spec `schemas/{component}/websocket-{name}.yaml` → handler `src/syntara/{component}/ws/{name}.py`
 - A spec without a handler (orphan) or a handler without a spec (missing) both fail validation
 
 ## Tooling Reference
@@ -160,7 +160,7 @@ Every AsyncAPI spec MUST have a corresponding handler and vice versa:
 `tools/export_openapi.py` produces the **generated** spec (from the running app). It is piped into `check_openapi_spec.py` during drift detection:
 
 ```bash
-uv run python tools/export_openapi.py | uv run python tools/ci/check_openapi_spec.py src/nexus/schemas/openapi.yaml -v
+uv run python tools/export_openapi.py | uv run python tools/ci/check_openapi_spec.py src/syntara/schemas/openapi.yaml -v
 ```
 
 This is what `make api-spec-drift` does internally.
@@ -175,7 +175,7 @@ The Nexus Python API client (generated from the OpenAPI spec) provides type-safe
 from syntara_api_client import build_filters
 
 # Instead of manual dictionary construction:
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params={
         "name[contains]": "auth",
         "created_at[gte]": "2025-01-01"
@@ -183,7 +183,7 @@ workflows = nexus_api.workflows.list(
 )
 
 # Use the filter builder:
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(
         name__contains="auth",
         created_at__gte="2025-01-01"
@@ -249,7 +249,7 @@ if environment:
     filters.update(build_filters(labels__environment=environment))
 
 # Use the combined filters
-workflows = nexus_api.workflows.list(additional_params=filters)
+workflows = syntara_api.workflows.list(additional_params=filters)
 ```
 
 ### Error Handling
@@ -279,12 +279,12 @@ Check the endpoint's method signature - if it has `additional_params`, you can u
 
 ```python
 # Find workflows containing "deploy" in the name
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(name__contains="deploy")
 )
 
 # Find enabled workflows in production
-workflows = nexus_api.workflows.list(
+workflows = syntara_api.workflows.list(
     additional_params=build_filters(
         is_enabled=True,
         labels__environment="production"
@@ -299,7 +299,7 @@ from datetime import UTC, datetime, timedelta
 
 # Find recent executions
 yesterday = datetime.now(UTC) - timedelta(days=1)
-executions = nexus_api.workflows.executions.list(
+executions = syntara_api.workflows.executions.list(
     workflow_id=workflow_id,
     additional_params=build_filters(
         created_at__gte=yesterday,
@@ -320,7 +320,7 @@ filters = build_filters(
     labels__priority="high"
 )
 
-workflows = nexus_api.workflows.list(additional_params=filters)
+workflows = syntara_api.workflows.list(additional_params=filters)
 ```
 
 ### Implementation Details

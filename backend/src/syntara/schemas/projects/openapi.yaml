@@ -1,0 +1,1763 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Projects API
+  version: 1.0.0
+  description: |
+    Project management and project-scoped resource access for the Syntara platform.
+
+    Projects provide multi-tenant isolation for workflows, approvals, and other
+    resources. Each project has its own role assignments for users and groups,
+    and supports project-scoped roles and policies.
+
+    ## Key Features
+    - Project CRUD with soft deletion
+    - Project-scoped workflow and approval listing
+    - User role assignments (project-admin, project-user, project-auditor)
+    - Group role assignments with inherited membership
+    - Project-scoped role and policy CRUD
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: Projects
+    description: Project CRUD and project-scoped resource operations
+
+paths:
+  # ── Project CRUD ─────────────────────────────────────────────────────
+  /projects:
+    post:
+      summary: Create project
+      description: |
+        Create a new project.
+
+        The creator is automatically assigned the project-admin role.
+
+        Requires: project:create permission.
+      operationId: create_project
+      x-app-permission:
+        resource: project
+        action: create
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List projects
+      description: |-
+        List projects the current user has read access to.
+      operationId: list_projects
+      x-app-permission:
+        resource: project
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Name
+          description: Filter by project name
+        - name: is_default
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Is Default
+          description: Filter by default project status
+        - name: is_builtin
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Is Builtin
+          description: Filter by built-in project status
+      responses:
+        "200":
+          description: Paginated list of accessible projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}:
+    get:
+      summary: Get project
+      description: Get a project by ID.
+      operationId: get_project
+      x-app-permission:
+        resource: project
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update project
+      description: |-
+        Patch a project. Requires: project:update permission scoped to this project.
+      operationId: update_project
+      x-app-permission:
+        resource: project
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    put:
+      summary: Replace project
+      description: |-
+        Replace a project. Requires: project:update permission scoped to this project.
+      operationId: replace_project
+      x-app-permission:
+        resource: project
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete project
+      description: |-
+        Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+      operationId: delete_project
+      x-app-permission:
+        resource: project
+        action: delete
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      responses:
+        "204":
+          description: Project deleted
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Workflows ────────────────────────────────────────────────
+  /projects/{project_id}/workflows:
+    get:
+      summary: List project workflows
+      description: |-
+        List workflows belonging to a specific project.
+
+        Returns only workflows with project_id matching the given project.
+        Requires: workflow:read permission scoped to this project.
+      operationId: list_project_workflows
+      x-app-permission:
+        resource: workflow
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+      responses:
+        "200":
+          description: Paginated list of workflows in the project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Approvals ────────────────────────────────────────────────
+  /projects/{project_id}/approvals:
+    get:
+      summary: List project approvals
+      description: |-
+        List approval requests belonging to a specific project.
+
+        Returns only approvals with project_id matching the given project.
+        Requires: approval:read permission scoped to this project.
+      operationId: list_project_approvals
+      x-app-permission:
+        resource: approval
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: "#/components/schemas/ApprovalRequestStatus"
+              - type: 'null'
+            title: Status
+          description: Filter by approval status
+        - name: execution_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Execution Id
+          description: Filter by parent workflow execution ID
+      responses:
+        "200":
+          description: Paginated list of approvals in the project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Role Assignments ─────────────────────────────────────────
+  /projects/{project_id}/role_assignments:
+    post:
+      summary: Create project role assignment
+      description: |-
+        Assign a role to a user or group within a project.
+      operationId: create_project_role_assignment
+      x-app-permission:
+        resource: role-assignment
+        action: assign
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleAssignmentCreate"
+      responses:
+        "201":
+          description: Role assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleAssignmentRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List project role assignments
+      description: |-
+        List role assignments for a project with policy-driven visibility.
+
+        Users with ``role-assignment:read:any`` see all assignments in the project.
+        Users with ``role-assignment:read:project`` for this project see all.
+        Users with ``role-assignment:read:self`` see only their own (direct and via groups).
+      operationId: list_project_role_assignments
+      x-app-permission:
+        resource: role-assignment
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: principal_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Principal Id
+          description: Filter by principal ID (user or service account)
+        - name: group_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Group Id
+          description: Filter by group ID
+        - name: principal_name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Principal Name
+        - name: role_name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Role Name
+      responses:
+        "200":
+          description: List of role assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleAssignmentListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}/role_assignments/{assignment_id}:
+    delete:
+      summary: Delete project role assignment
+      description: |-
+        Remove a role assignment from a project.
+      operationId: delete_project_role_assignment
+      x-app-permission:
+        resource: role-assignment
+        action: revoke
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - name: assignment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Assignment Id
+          description: Assignment UUID
+      responses:
+        "204":
+          description: Assignment removed
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Roles (CRUD) ────────────────────────────────────────────
+  /projects/{project_id}/roles:
+    post:
+      summary: Create project role
+      description: |-
+        Create a role scoped to this project. Requires: role:create permission.
+      operationId: create_project_role
+      x-app-permission:
+        resource: role
+        action: create
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectRoleCreate"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List project roles
+      description: |-
+        List roles visible within this project.
+
+        Includes project-owned roles and global roles with scope "project".
+      operationId: list_project_roles
+      x-app-permission:
+        resource: role
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            anyOf:
+              - format: uuid
+                type: string
+              - type: 'null'
+            title: Project Id
+          description: Project UUID
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Name
+          description: Filter by role name
+        - name: is_builtin
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Is Builtin
+          description: Filter by builtin status
+        - name: scope
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Scope
+          description: Filter by scope
+        - name: policy_name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Policy Name
+          description: Filter by policy name
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}/roles/{role_id}:
+    get:
+      summary: Get project role
+      description: Get a single role, verifying it belongs to this project.
+      operationId: get_project_role
+      x-app-permission:
+        resource: role
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/roleIdParam"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update project role
+      description: |-
+        Patch a project role. Builtin roles cannot be modified.
+      operationId: update_project_role
+      x-app-permission:
+        resource: role
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/roleIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    put:
+      summary: Replace project role
+      description: |-
+        Replace a project role. Builtin roles cannot be modified.
+      operationId: replace_project_role
+      x-app-permission:
+        resource: role
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/roleIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete project role
+      description: |-
+        Delete a project role. Builtin roles cannot be deleted.
+      operationId: delete_project_role
+      x-app-permission:
+        resource: role
+        action: delete
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/roleIdParam"
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Policies (CRUD) ──────────────────────────────────────────
+  /projects/{project_id}/policies:
+    post:
+      summary: Create project policy
+      description: |-
+        Create a policy scoped to this project. Requires: policy:create permission.
+      operationId: create_project_policy
+      x-app-permission:
+        resource: policy
+        action: create
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectPolicyCreate"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List project policies
+      description: |-
+        List policies visible within this project.
+
+        Includes project-owned policies and global policies with scope "project".
+      operationId: list_project_policies
+      x-app-permission:
+        resource: policy
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            anyOf:
+              - format: uuid
+                type: string
+              - type: 'null'
+            title: Project Id
+          description: Project UUID
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Name
+          description: Filter by policy name
+        - name: is_builtin
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Is Builtin
+          description: Filter by builtin status
+        - name: project_eligible
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Project Eligible
+          description: Filter by project eligibility
+        - name: scope
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Scope
+          description: Filter by scope
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}/policies/{policy_id}:
+    get:
+      summary: Get project policy
+      description: |-
+        Get a single policy, if it belongs to this project or is a global project-scoped policy.
+      operationId: get_project_policy
+      x-app-permission:
+        resource: policy
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/policyIdParam"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update project policy
+      description: |-
+        Patch a project policy. Only project-owned policies can be modified.
+      operationId: update_project_policy
+      x-app-permission:
+        resource: policy
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/policyIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    put:
+      summary: Replace project policy
+      description: |-
+        Replace a project policy. Only project-owned policies can be modified.
+      operationId: replace_project_policy
+      x-app-permission:
+        resource: policy
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/policyIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete project policy
+      description: |-
+        Delete a project policy. Only project-owned policies can be deleted.
+      operationId: delete_project_policy
+      x-app-permission:
+        resource: policy
+        action: delete
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/policyIdParam"
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  # ── Project Credentials (CRUD) ──────────────────────────────────────
+  /projects/{project_id}/credentials:
+    post:
+      summary: Create project credential
+      description: |-
+        Create a new credential in this project. Requires: credential:create permission.
+      operationId: create_project_credential
+      x-app-permission:
+        resource: credential
+        action: create
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCredentialCreate"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List project credentials
+      description: |-
+        List credentials belonging to this project. Requires: credential:read permission.
+
+        The ``for_action`` parameter is accepted for API consistency but not enforced
+        here.
+
+        Use ``GET /credentials?for_action=use`` for use-permission-filtered listing.
+      operationId: list_project_credentials
+      x-app-permission:
+        resource: credential
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: credential_type_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Credential Type Id
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            title: Enabled
+        - name: for_action
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - const: use
+                type: string
+              - type: 'null'
+            title: For Action
+          description: "Filter by permission action. Currently accepted but not enforced on this endpoint; use GET /credentials?for_action=use for use-filtered listing."
+      responses:
+        "200":
+          description: Paginated list of credentials in the project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}/credentials/{credential_id}:
+    get:
+      summary: Get project credential
+      description: |-
+        Get a credential in this project. Secret fields masked as $encrypted$.
+      operationId: get_project_credential
+      x-app-permission:
+        resource: credential
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/credentialIdParam"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update project credential
+      description: |-
+        Update a credential in this project. Requires: credential:update permission.
+      operationId: update_project_credential
+      x-app-permission:
+        resource: credential
+        action: update
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/credentialIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete project credential
+      description: |-
+        Delete a credential in this project. Requires: credential:delete permission.
+      operationId: delete_project_credential
+      x-app-permission:
+        resource: credential
+        action: delete
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/credentialIdParam"
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /projects/{project_id}/credentials/{credential_id}/workflows:
+    get:
+      summary: Get project credential workflows
+      description: |-
+        Get workflows that reference this credential. Requires: credential:read permission.
+      operationId: get_project_credential_workflows
+      x-app-permission:
+        resource: credential
+        action: read
+      tags:
+        - Projects
+      parameters:
+        - $ref: "#/components/parameters/projectIdParam"
+        - $ref: "#/components/parameters/credentialIdParam"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Response Get Project Credential Workflows
+                items:
+                  $ref: "#/components/schemas/CredentialWorkflowRef"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+components:
+  parameters:
+    projectIdParam:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        title: Project Id
+      description: Project UUID
+    roleIdParam:
+      name: role_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        title: Role Id
+      description: Role UUID
+    policyIdParam:
+      name: policy_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        title: Policy Id
+      description: Policy UUID
+    credentialIdParam:
+      name: credential_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        title: Credential Id
+      description: Credential UUID
+
+  schemas:
+    ProjectCreate:
+      type: object
+      title: ProjectCreate
+      description: Request body for creating a project.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: "^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$"
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        labels:
+          type: object
+          default: {}
+          additionalProperties: true
+          title: Labels
+
+    ProjectUpdate:
+      type: object
+      title: ProjectUpdate
+      description: Request body for updating a project.
+      properties:
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 255
+              pattern: "^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$"
+            - type: "null"
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        labels:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+          title: Labels
+
+    ProjectRead:
+      title: ProjectRead
+      description: Response body for a project.
+      additionalProperties: false
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/BaseResource"
+        - type: object
+          title: ProjectRead
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              title: Name
+            description:
+              anyOf:
+                - type: string
+                - type: "null"
+              title: Description
+            is_default:
+              type: boolean
+              default: false
+              title: Is Default
+            is_builtin:
+              type: boolean
+              default: false
+              title: Is Builtin
+
+
+    ProjectListResponse:
+      title: ProjectListResponse
+      description: Paginated list response for projects.
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              title: Resources
+              items:
+                $ref: "#/components/schemas/ProjectRead"
+              maxItems: 100
+              description: Array of resources in current page
+
+    ProjectRoleCreate:
+      type: object
+      title: ProjectRoleCreate
+      description: Request body for creating a project-scoped role (project_id comes from URL path).
+      required:
+        - name
+        - policies
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        policies:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          title: Policies
+        labels:
+          type: object
+          default: {}
+          additionalProperties:
+            type: string
+          title: Labels
+
+    ProjectPolicyCreate:
+      type: object
+      title: ProjectPolicyCreate
+      description: Request body for creating a project-scoped policy (project_id comes from URL path).
+      required:
+        - name
+        - statements
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        statements:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PolicyStatementSchema"
+          title: Statements
+        labels:
+          type: object
+          default: {}
+          additionalProperties:
+            type: string
+          title: Labels
+
+    PolicyStatementSchema:
+      $ref: "../authz/policy.openapi.yaml#/components/schemas/PolicyStatementSchema"
+
+    PolicyRead:
+      $ref: "../authz/policy.openapi.yaml#/components/schemas/PolicyRead"
+    PolicyUpdate:
+      $ref: "../authz/policy.openapi.yaml#/components/schemas/PolicyUpdate"
+    PolicyListResponse:
+      $ref: "../authz/policy.openapi.yaml#/components/schemas/PolicyListResponse"
+    RoleRead:
+      $ref: "../authz/role.openapi.yaml#/components/schemas/RoleRead"
+    RoleUpdate:
+      $ref: "../authz/role.openapi.yaml#/components/schemas/RoleUpdate"
+    RoleListResponse:
+      $ref: "../authz/role.openapi.yaml#/components/schemas/RoleListResponse"
+      description: Paginated list response for roles.
+
+    WorkflowListResponse:
+      $ref: "../workflows/v2/openapi.yaml#/components/schemas/WorkflowListResponse"
+
+    ApprovalListResponse:
+      $ref: "../approvals/openapi.yaml#/components/schemas/ApprovalListResponse"
+
+    ApprovalRequestStatus:
+      $ref: "../approvals/openapi.yaml#/components/schemas/ApprovalRequestStatus"
+
+    RoleAssignmentCreate:
+      $ref: "../authz/role_assignment.openapi.yaml#/components/schemas/RoleAssignmentCreate"
+    RoleAssignmentRead:
+      $ref: "../authz/role_assignment.openapi.yaml#/components/schemas/RoleAssignmentRead"
+    RoleAssignmentListResponse:
+      $ref: "../authz/role_assignment.openapi.yaml#/components/schemas/RoleAssignmentListResponse"
+
+    ProjectCredentialCreate:
+      type: object
+      title: ProjectCredentialCreate
+      description: Schema for creating a credential via a project-scoped endpoint (project_id from URL path).
+      required:
+        - name
+        - credential_type_id
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Name
+          description: Human-readable credential name
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Description
+          description: Optional description
+        credential_type_id:
+          type: string
+          format: uuid
+          title: Credential Type Id
+          description: ID of the credential type
+        inputs:
+          type: object
+          additionalProperties: true
+          title: Inputs
+          description: Field values validated against type schema
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          title: Labels
+          description: Key-value labels
+
+    CredentialRead:
+      $ref: "../credentials/openapi.yaml#/components/schemas/CredentialRead"
+    CredentialUpdate:
+      $ref: "../credentials/openapi.yaml#/components/schemas/CredentialUpdate"
+    CredentialListResponse:
+      $ref: "../credentials/openapi.yaml#/components/schemas/CredentialListResponse"
+    CredentialWorkflowRef:
+      $ref: "../credentials/openapi.yaml#/components/schemas/CredentialWorkflowRef"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

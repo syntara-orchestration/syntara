@@ -7,13 +7,13 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.auth.error_handlers import (
+from syntara.auth.error_handlers import (
     authentication_required_handler,
     invalid_token_handler,
     refresh_token_revoked_handler,
     token_expired_handler,
 )
-from nexus.auth.exceptions import (
+from syntara.auth.exceptions import (
     AuthenticationRequiredError,
     InvalidTokenError,
     RefreshTokenRevokedError,

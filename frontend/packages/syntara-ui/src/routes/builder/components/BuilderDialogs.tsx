@@ -1,4 +1,4 @@
-import { Checkbox, Content, List, ListItem, Stack, StackItem } from '@patternfly/react-core'
+import { Checkbox, Content, Stack, StackItem } from '@patternfly/react-core'
 import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
 
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
@@ -6,6 +6,7 @@ import type { DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
+import { WorkflowDeleteDialog } from '../../workflows/WorkflowDeleteDialog'
 import type { BuilderAction } from '../builderReducer'
 import { useBuilderImportHandlers, type UseBuilderImportHandlersParams } from '../hooks/useBuilderImportHandlers'
 import type { PendingImportData } from '../useWorkflowImportExport'
@@ -206,37 +207,14 @@ export function BuilderDialogs({
         inputSchema={triggerInputSchema}
         workflowId={workflowId}
       />
-      <NxConfirmationDialog
+      <WorkflowDeleteDialog
         isOpen={deleteDialogOpen}
+        workflowName={workflowName}
         onClose={() => dispatch({ type: 'SET_DELETE_DIALOG', payload: false })}
         onConfirm={handleDeleteWorkflow}
-        title="Delete workflow?"
-        confirmLabel="Delete"
-        confirmVariant="danger"
-        titleIconVariant="warning"
         aria-labelledby="delete-workflow-modal-title"
         aria-describedby="delete-workflow-modal-body"
-        destructiveAcknowledgement={{
-          checkboxId: `delete-workflow-ack-${workflowId ?? ''}`,
-          label: 'I understand this workflow and any dependent workflows will be affected by this deletion.',
-        }}
-      >
-        <Stack hasGutter>
-          <StackItem>
-            <Content component="p">
-              The workflow <strong>{workflowName}</strong> will be deleted. This cannot be undone.
-            </Content>
-          </StackItem>
-          <StackItem>
-            <List>
-              <ListItem>This workflow will stop running immediately.</ListItem>
-              <ListItem>
-                Any other workflows that use this one as a step will also become invalid and stop running.
-              </ListItem>
-            </List>
-          </StackItem>
-        </Stack>
-      </NxConfirmationDialog>
+      />
       <RunStepDialog
         isOpen={runStepDialog.isOpen}
         onClose={runStepDialog.close}

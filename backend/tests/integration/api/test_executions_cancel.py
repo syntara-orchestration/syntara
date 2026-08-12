@@ -10,18 +10,18 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_version import WorkflowVersion
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.core.models import User
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.error_data import assert_error_data
 
 
 @pytest.fixture
 def mock_temporal_service(session_app) -> Generator[Mock, None, None]:
     """Override temporal service dependency with a mock."""
-    from nexus.workflows.executions_router import get_temporal_execution_service
+    from syntara.workflows.executions_router import get_temporal_execution_service
 
     mock_service = Mock(spec=TemporalExecutionService)
     mock_service.cancel_workflow = AsyncMock()

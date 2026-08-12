@@ -44,7 +44,7 @@ class TestWorkflowAgenticSignal:
 
     def test_agentic_signal_completion(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
         llm_credential_id: str,
@@ -100,16 +100,16 @@ class TestWorkflowAgenticSignal:
         )
 
         # Step 2: Execute the workflow
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual"),
         ).assert_and_get()
         assert execution.id is not None
 
         # Step 3: Poll until the agentic activity is in a waiting state
-        wait_for_agentic_activity(nexus_api, execution.id, "name_via_ai")
+        wait_for_agentic_activity(syntara_api, execution.id, "name_via_ai")
 
         # Step 4: Send a completion signal with AI result
-        signal_response = nexus_api.executions.signal_activity(
+        signal_response = syntara_api.executions.signal_activity(
             execution_id=execution.id,
             activity_id="name_via_ai",
             body=ActivitySignalPayload(
@@ -127,7 +127,7 @@ class TestWorkflowAgenticSignal:
 
         # Step 5: Verify the workflow resumes and completes
         final = poll_execution_until_complete(
-            nexus_api,
+            syntara_api,
             execution.id,
             max_polls=_MAX_POLLS,
             poll_interval=_POLL_INTERVAL,

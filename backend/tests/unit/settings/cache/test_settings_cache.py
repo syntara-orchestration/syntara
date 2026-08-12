@@ -14,13 +14,13 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.settings.cache.settings_cache import (
+from syntara.settings.cache.settings_cache import (
     CachedValue,
     SettingsCache,
     get_runtime_settings,
     set_runtime_settings,
 )
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
 
 
 def _make_setting(
@@ -66,7 +66,7 @@ async def test_get_returns_default_value_when_value_is_none(cache: SettingsCache
     mock_store.get = AsyncMock(return_value=setting)
 
     with patch(
-        "nexus.settings.cache.settings_cache.SettingsStore",
+        "syntara.settings.cache.settings_cache.SettingsStore",
         return_value=mock_store,
     ):
         result = await cache.get("logging.log_level")
@@ -83,7 +83,7 @@ async def test_get_returns_value_when_set(cache: SettingsCache) -> None:
     mock_store.get = AsyncMock(return_value=setting)
 
     with patch(
-        "nexus.settings.cache.settings_cache.SettingsStore",
+        "syntara.settings.cache.settings_cache.SettingsStore",
         return_value=mock_store,
     ):
         result = await cache.get("logging.log_level")
@@ -99,7 +99,7 @@ async def test_get_raises_for_unknown_key(cache: SettingsCache) -> None:
 
     with (
         patch(
-            "nexus.settings.cache.settings_cache.SettingsStore",
+            "syntara.settings.cache.settings_cache.SettingsStore",
             return_value=mock_store,
         ),
         pytest.raises(KeyError, match="not in catalog"),
@@ -112,7 +112,7 @@ async def test_get_raises_for_unknown_key(cache: SettingsCache) -> None:
 @pytest.mark.asyncio
 async def test_unknown_key_not_cached(cache: SettingsCache) -> None:
     """Unknown keys are not stored in L1, keeping the cache bounded."""
-    with patch("nexus.settings.cache.settings_cache.SettingsStore"), pytest.raises(KeyError):
+    with patch("syntara.settings.cache.settings_cache.SettingsStore"), pytest.raises(KeyError):
         await cache.get("attacker.injected.key")
 
     assert "attacker.injected.key" not in cache._cache

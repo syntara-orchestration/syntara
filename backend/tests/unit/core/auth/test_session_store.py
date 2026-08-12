@@ -16,8 +16,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.auth.session.models import RefreshSession
-from nexus.auth.session.session_store import SessionInfo, SessionStore
+from syntara.auth.session.models import RefreshSession
+from syntara.auth.session.session_store import SessionInfo, SessionStore
 
 
 def _mock_settings() -> MagicMock:
@@ -78,7 +78,7 @@ def mock_db() -> AsyncMock:
 
 @pytest.fixture
 def store(mock_db: AsyncMock) -> SessionStore:
-    with patch("nexus.auth.session.session_store.get_settings", return_value=_mock_settings()):
+    with patch("syntara.auth.session.session_store.get_settings", return_value=_mock_settings()):
         return SessionStore(mock_db)
 
 

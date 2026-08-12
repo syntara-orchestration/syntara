@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.telemetry.events.api_call import APICallEvent
+from syntara.telemetry.events.api_call import APICallEvent
 
 
 class TestAPICallEventConstruction:

@@ -13,8 +13,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.utils.cursor import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.cursor import (
     CursorData,
     PaginationDirection,
     SortDirection,
@@ -671,7 +671,7 @@ class TestColumnPythonType:
     """Tests for column_python_type / deserialize_column_sort_value helpers."""
 
     def test_returns_python_type_for_datetime_column(self) -> None:
-        from nexus.workflows.models.workflow import Workflow
+        from syntara.workflows.models.workflow import Workflow
 
         assert column_python_type(Workflow.updated_at) is datetime
 
@@ -689,7 +689,7 @@ class TestColumnPythonType:
         assert column_python_type(column("name", _NoPythonType())) is None
 
     def test_deserialize_column_sort_value_datetime(self) -> None:
-        from nexus.workflows.models.workflow import Workflow
+        from syntara.workflows.models.workflow import Workflow
 
         dt = datetime(2025, 1, 15, 10, 30, 0, tzinfo=UTC)
         assert deserialize_column_sort_value(dt.isoformat(), Workflow.updated_at) == dt

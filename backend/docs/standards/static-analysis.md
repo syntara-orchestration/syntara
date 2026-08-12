@@ -8,7 +8,7 @@ Three static analysis checks run in CI to catch dead code, import cycles, and or
 
 ### How It Works
 
-- Scans `src/nexus/` at 100% confidence (no speculative findings)
+- Scans `src/syntara/` at 100% confidence (no speculative findings)
 - Ignores test files, migrations, and `__pycache__`
 - Skips code under framework decorators (`@router.*`, `@validator`, `@property`, etc.)
 - Known false positives suppressed via `ignore_names` and `exclude` in `pyproject.toml`
@@ -52,7 +52,7 @@ Vulture checks whether individual symbols are referenced, but it cannot detect a
 
 ### How It Works
 
-- Runs `pyan3 --module-level --cycles` against `src/nexus/`
+- Runs `pyan3 --module-level --cycles` against `src/syntara/`
 - Deduplicates cycle permutations into unique edges (A ↔ B pairs)
 - Compares against baseline in `tools/ci/known_import_cycles.json`
 - Fails if any new cycle edges appear
@@ -85,10 +85,10 @@ Two patterns exist in the codebase for wiring exceptions to error handlers:
 
 | Pattern | How | Cycle? | Used By |
 |---------|-----|--------|---------|
-| **B** — string path | `@fastapi_exception(handler="nexus.X.error_handlers.handler_func")` | No | all domains |
+| **B** — string path | `@fastapi_exception(handler="syntara.X.error_handlers.handler_func")` | No | all domains |
 | **C** — embedded | Handler functions defined in exceptions.py itself | No | authz |
 
-Pattern B is the standard approach. String paths are resolved via `importlib` at registration time. See `src/nexus/core/exception_registry.py` line 59.
+Pattern B is the standard approach. String paths are resolved via `importlib` at registration time. See `src/syntara/core/exception_registry.py` line 59.
 
 ## Orphan Module Detection
 
@@ -96,7 +96,7 @@ Custom script that finds Python modules not imported by any other module in the 
 
 ### How It Works
 
-- Scans all `.py` files in `src/nexus/` (excluding `__init__.py`, tests)
+- Scans all `.py` files in `src/syntara/` (excluding `__init__.py`, tests)
 - Extracts all `import` and `from ... import` statements (absolute and relative)
 - Identifies modules with zero incoming imports
 - Compares against glob-pattern allowlist in `tools/ci/known_orphan_modules.json`
@@ -118,13 +118,13 @@ make check-orphans
 1. **Genuinely dead module**: remove it
 2. **New module using an existing pattern** (e.g., a new router): existing patterns like `nexus/*/router.py` already cover it — no allowlist change needed
 3. **New discovery/registration pattern**: add a glob pattern to `known_orphan_modules.json` with a justification documenting the discovery mechanism. Every pattern must explain HOW the module is loaded at runtime
-4. **False positive from package-style import**: modules imported via `from nexus.X import module_name` (not `from nexus.X.module_name import ...`) are invisible to the import scanner — add a specific pattern with the import mechanism documented
+4. **False positive from package-style import**: modules imported via `from syntara.X import module_name` (not `from syntara.X.module_name import ...`) are invisible to the import scanner — add a specific pattern with the import mechanism documented
 
 ### Adding Allowlist Patterns
 
 Each pattern in `known_orphan_modules.json` maps to a justification string. Before adding a new pattern:
 
-1. **Verify the module is actually used** — grep for its function/class names across the entire repo, not just import paths. Checking import paths alone misses package-style imports (`from nexus.X import module_name`)
+1. **Verify the module is actually used** — grep for its function/class names across the entire repo, not just import paths. Checking import paths alone misses package-style imports (`from syntara.X import module_name`)
 2. **Document the registration mechanism** — how does the module get loaded? (discovery scan, CLI entrypoint, `importlib`, package import, etc.)
 3. **Prefer specific patterns over broad ones** — `nexus/files/validators.py` is better than `nexus/*/validators.py` unless the pattern genuinely applies to all domains
 4. **Do not assume existing state is valid** — a module being in the repo does not mean it is used. Verify before allowlisting
@@ -158,7 +158,7 @@ Requires graphviz (`dot`) installed on the system.
 # Generate dot file
 uv run pyan3 --module-level --dot --colored --grouped --nested-groups --concentrate \
   --exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
-  --root src src/nexus/**/*.py \
+  --root src src/syntara/**/*.py \
   > scripts/explore/call-graph-module-level.dot
 
 # Render to SVG (fdp layout handles large graphs better than dot)
@@ -167,5 +167,5 @@ uv run pyan3 --module-level --svg --colored --grouped --nested-groups --concentr
   --exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
   --root src \
   -f scripts/explore/call-graph-module-level-fdp.svg \
-  src/nexus/**/*.py
+  src/syntara/**/*.py
 ```

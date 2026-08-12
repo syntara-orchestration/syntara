@@ -8,8 +8,8 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.core.models.user import AuthType
+from syntara.core.models import User
+from syntara.core.models.user import AuthType
 
 USERS_URL = "/api/v1/users"
 
@@ -17,7 +17,7 @@ USERS_URL = "/api/v1/users"
 @pytest.fixture
 async def local_user(test_db_session: AsyncSession, admin_user: User) -> User:
     """Create a local (non-builtin) user for testing."""
-    from nexus.users.services.user_service import UsersService
+    from syntara.users.services.user_service import UsersService
 
     service = UsersService(test_db_session, admin_user)
     return await service.create_user(

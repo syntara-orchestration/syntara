@@ -13,8 +13,8 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
-from nexus.integrations.models.integration import Integration, IntegrationType
-from nexus.integrations.models.integration_configuration import (
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration_configuration import (
     LLMProviderConfiguration,
     LLMProviderHint,
     MCPServerConfiguration,
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.tool_manager.models import Tool
+    from syntara.core.models import User
+    from syntara.tool_manager.models import Tool
     from tests.integration.helpers.tool_manager import ToolFactory
 
 

@@ -26,10 +26,10 @@ AGENTIC_POLL_TIMEOUT = 120
 
 
 @pytest.mark.e2e
-def test_script_node_bash(nexus_api: SyntaraApiRegistry):
+def test_script_node_bash(syntara_api: SyntaraApiRegistry):
     """A bash script node executes and the workflow completes."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-script-bash",
         {
             "name": "nodes",
@@ -59,10 +59,10 @@ def test_script_node_bash(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_script_node_python(nexus_api: SyntaraApiRegistry):
+def test_script_node_python(syntara_api: SyntaraApiRegistry):
     """A python script node executes and the workflow completes."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-script-python",
         {
             "name": "nodes",
@@ -96,7 +96,7 @@ def test_script_node_python(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_http_request_node(nexus_api: SyntaraApiRegistry):
+def test_http_request_node(syntara_api: SyntaraApiRegistry):
     """An HTTP request node calls an endpoint and the workflow completes.
 
     Note: targets an external URL because SSRF mitigation (AAP-79016) blocks
@@ -105,7 +105,7 @@ def test_http_request_node(nexus_api: SyntaraApiRegistry):
     working in CI.
     """
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-http-request",
         {
             "name": "nodes",
@@ -139,10 +139,10 @@ def test_http_request_node(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_condition_true_branch(nexus_api: SyntaraApiRegistry):
+def test_condition_true_branch(syntara_api: SyntaraApiRegistry):
     """A condition that evaluates to true routes to the true branch only."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-condition-true",
         {
             "name": "nodes",
@@ -187,10 +187,10 @@ def test_condition_true_branch(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_condition_false_branch(nexus_api: SyntaraApiRegistry):
+def test_condition_false_branch(syntara_api: SyntaraApiRegistry):
     """A condition that evaluates to false routes to the false branch only."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-condition-false",
         {
             "name": "nodes",
@@ -240,10 +240,10 @@ def test_condition_false_branch(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_loop_for_each(nexus_api: SyntaraApiRegistry):
+def test_loop_for_each(syntara_api: SyntaraApiRegistry):
     """A for_each loop iterates over items and executes the body for each."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-loop-foreach",
         {
             "name": "nodes",
@@ -288,10 +288,10 @@ def test_loop_for_each(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_parallel_paths_with_converge(nexus_api: SyntaraApiRegistry):
+def test_parallel_paths_with_converge(syntara_api: SyntaraApiRegistry):
     """Two parallel script nodes converge before a final node executes."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-parallel-converge",
         {
             "name": "nodes",
@@ -349,10 +349,10 @@ def test_parallel_paths_with_converge(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_multi_node_workflow(nexus_api: SyntaraApiRegistry):
+def test_multi_node_workflow(syntara_api: SyntaraApiRegistry):
     """A workflow combining script, condition, parallel paths, and converge."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-multi-node",
         {
             "name": "nodes",
@@ -429,14 +429,14 @@ def test_multi_node_workflow(nexus_api: SyntaraApiRegistry):
 @pytest.mark.e2e
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_script_then_agentic(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ):
     """A script node feeds into an agentic node."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-script-to-agentic",
         {
             "name": "nodes",
@@ -483,14 +483,14 @@ def test_script_then_agentic(
 @pytest.mark.e2e
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_then_script(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ):
     """An agentic node feeds into a script node."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-to-script",
         {
             "name": "nodes",
@@ -537,14 +537,14 @@ def test_agentic_then_script(
 @pytest.mark.e2e
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_loop_with_agentic_body(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ):
     """A loop iterates with an agentic node as the loop body."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-loop-agentic",
         {
             "name": "nodes",
@@ -592,7 +592,7 @@ def test_loop_with_agentic_body(
 @pytest.mark.e2e
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_http_request_then_agentic(
-    nexus_api: SyntaraApiRegistry, llm_credential_id: str, llm_model_id: str, first_project_id: UUID
+    syntara_api: SyntaraApiRegistry, llm_credential_id: str, llm_model_id: str, first_project_id: UUID
 ):
     """An HTTP request node feeds into an agentic node.
 
@@ -602,7 +602,7 @@ def test_http_request_then_agentic(
     working in CI.
     """
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-http-to-agentic",
         {
             "name": "nodes",
@@ -696,10 +696,10 @@ def _switch_workflow_definition(cases: list[dict[str, str]], default_port: str =
 
 
 @pytest.mark.e2e
-def test_switch_first_case_matches(nexus_api: SyntaraApiRegistry):
+def test_switch_first_case_matches(syntara_api: SyntaraApiRegistry):
     """Switch routes to first matching case, other cases and default are skipped."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-first-case",
         _switch_workflow_definition(
             [
@@ -724,10 +724,10 @@ def test_switch_first_case_matches(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_second_case_matches(nexus_api: SyntaraApiRegistry):
+def test_switch_second_case_matches(syntara_api: SyntaraApiRegistry):
     """Switch skips first case (false), routes to second case (true)."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-second-case",
         _switch_workflow_definition(
             [
@@ -746,10 +746,10 @@ def test_switch_second_case_matches(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_default_fallback(nexus_api: SyntaraApiRegistry):
+def test_switch_default_fallback(syntara_api: SyntaraApiRegistry):
     """Switch routes to default when no case matches."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-default",
         _switch_workflow_definition(
             [
@@ -768,10 +768,10 @@ def test_switch_default_fallback(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_3_case_routing(nexus_api: SyntaraApiRegistry):
+def test_switch_3_case_routing(syntara_api: SyntaraApiRegistry):
     """Switch with 3 cases routes to the first matching case; later cases and default are skipped."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-3-case",
         _switch_workflow_definition(
             [
@@ -792,10 +792,10 @@ def test_switch_3_case_routing(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_single_case_with_default(nexus_api: SyntaraApiRegistry):
+def test_switch_single_case_with_default(syntara_api: SyntaraApiRegistry):
     """Switch with one case + default works correctly."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-single-case",
         _switch_workflow_definition(
             [
@@ -812,10 +812,10 @@ def test_switch_single_case_with_default(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_numeric_comparison(nexus_api: SyntaraApiRegistry):
+def test_switch_numeric_comparison(syntara_api: SyntaraApiRegistry):
     """Switch evaluates numeric comparison operators correctly."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-numeric",
         _switch_workflow_definition(
             [
@@ -833,10 +833,10 @@ def test_switch_numeric_comparison(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_negation(nexus_api: SyntaraApiRegistry):
+def test_switch_negation(syntara_api: SyntaraApiRegistry):
     """Switch evaluates not() expressions correctly."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-negation",
         _switch_workflow_definition(
             [
@@ -852,10 +852,10 @@ def test_switch_negation(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_skipped_branches_have_activity_records(nexus_api: SyntaraApiRegistry):
+def test_switch_skipped_branches_have_activity_records(syntara_api: SyntaraApiRegistry):
     """Skipped branches have ActivityExecution records with correct status and null timing."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-skipped",
         _switch_workflow_definition(
             [
@@ -881,10 +881,10 @@ def test_switch_skipped_branches_have_activity_records(nexus_api: SyntaraApiRegi
 
 
 @pytest.mark.e2e
-def test_switch_in_operator(nexus_api: SyntaraApiRegistry):
+def test_switch_in_operator(syntara_api: SyntaraApiRegistry):
     """Switch evaluates 'in' operator correctly."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-in-operator",
         _switch_workflow_definition(
             [
@@ -902,7 +902,7 @@ def test_switch_in_operator(nexus_api: SyntaraApiRegistry):
 
 
 @pytest.mark.e2e
-def test_switch_empty_cases_saves_with_validation_issues(nexus_api: SyntaraApiRegistry, first_project_id: UUID):
+def test_switch_empty_cases_saves_with_validation_issues(syntara_api: SyntaraApiRegistry, first_project_id: UUID):
     """Switch with empty cases array saves with validation issues."""
     wf_def = WorkflowDefinition.from_dict(
         {
@@ -931,7 +931,7 @@ def test_switch_empty_cases_saves_with_validation_issues(nexus_api: SyntaraApiRe
             ],
         },
     )
-    response = nexus_api.workflows.create(
+    response = syntara_api.workflows.create(
         body=WorkflowCreate(
             name="e2e-switch-empty-cases",
             description="E2E test: empty switch cases",
@@ -945,10 +945,10 @@ def test_switch_empty_cases_saves_with_validation_issues(nexus_api: SyntaraApiRe
 
 
 @pytest.mark.e2e
-def test_switch_after_script_node(nexus_api: SyntaraApiRegistry):
+def test_switch_after_script_node(syntara_api: SyntaraApiRegistry):
     """Switch reads upstream node output via namespace injection."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-switch-after-script",
         {
             "name": "test",

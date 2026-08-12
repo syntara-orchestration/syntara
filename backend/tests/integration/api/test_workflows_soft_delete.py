@@ -4,7 +4,7 @@ Verifies soft delete implementation (deleted_at timestamps, deleted_by audit tra
 by querying the database directly. The API only returns 404 for deleted records, so
 DB access is required to verify soft delete vs hard delete behavior.
 
-Uses auth_client + test_db_session (not nexus_api) because nexus_api is session-scoped
+Uses auth_client + test_db_session (not syntara_api) because syntara_api is session-scoped
 with its own connection pool, causing race conditions with function-scoped test_db_session
 in parallel test execution.
 """
@@ -17,7 +17,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel import select
 
-from nexus.workflows.models import Workflow
+from syntara.workflows.models import Workflow
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:

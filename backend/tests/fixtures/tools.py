@@ -7,13 +7,13 @@ from uuid import uuid4
 
 import pytest_asyncio
 
-from nexus.tool_manager.models import Tool
+from syntara.tool_manager.models import Tool
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.integrations.models.integration import Integration
+    from syntara.core.models import User
+    from syntara.integrations.models.integration import Integration
 
 
 @pytest_asyncio.fixture

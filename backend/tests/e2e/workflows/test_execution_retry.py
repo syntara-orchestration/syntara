@@ -51,17 +51,17 @@ class TestRetryExecution:
 
     def test_retry_completed_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
     ) -> None:
         """Retry a successfully completed execution creates a new execution with same version and inputs."""
         name = unique_name("e2e-retry-completed")
         original = create_and_run_workflow(
-            nexus_api, name, _script_workflow_def(name, "echo ok"), project_id=first_project_id
+            syntara_api, name, _script_workflow_def(name, "echo ok"), project_id=first_project_id
         )
         assert str(original.status) == "completed"
 
-        retry_response = nexus_api.executions.retry(execution_id=original.id)
+        retry_response = syntara_api.executions.retry(execution_id=original.id)
         assert retry_response.status_code == HTTPStatus.CREATED
 
         retried = retry_response.assert_and_get()
@@ -71,22 +71,22 @@ class TestRetryExecution:
         assert retried.input_data == original.input_data
         assert str(retried.status) == "pending"
 
-        final = poll_execution_until_complete(nexus_api, retried.id)
+        final = poll_execution_until_complete(syntara_api, retried.id)
         assert str(final.status) == "completed"
 
     def test_retry_failed_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
     ) -> None:
         """Retry a failed execution creates a new execution that also runs (and fails with same script)."""
         name = unique_name("e2e-retry-failed")
         original = create_and_run_workflow(
-            nexus_api, name, _script_workflow_def(name, "exit 1"), project_id=first_project_id
+            syntara_api, name, _script_workflow_def(name, "exit 1"), project_id=first_project_id
         )
         assert str(original.status) == "failed"
 
-        retry_response = nexus_api.executions.retry(execution_id=original.id)
+        retry_response = syntara_api.executions.retry(execution_id=original.id)
         assert retry_response.status_code == HTTPStatus.CREATED
 
         retried = retry_response.assert_and_get()
@@ -94,12 +94,12 @@ class TestRetryExecution:
         assert retried.workflow_version_id == original.workflow_version_id
         assert retried.input_data == original.input_data
 
-        final = poll_execution_until_complete(nexus_api, retried.id)
+        final = poll_execution_until_complete(syntara_api, retried.id)
         assert str(final.status) == "failed"
 
     def test_retry_test_execution_returns_409(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -139,7 +139,7 @@ class TestRetryExecution:
         )
 
         pre_resolved = TestExecutionCreatePreResolvedNodes.from_dict({"node_a": {"output": {"stdout": "mocked"}}})
-        test_response = nexus_api.workflows.test_node(
+        test_response = syntara_api.workflows.test_node(
             workflow_id=workflow.id,
             body=TestExecutionCreate(
                 target_node_id="node_b",
@@ -148,7 +148,7 @@ class TestRetryExecution:
             ),
         )
         test_execution = test_response.assert_and_get()
-        poll_execution_until_complete(nexus_api, test_execution.id)
+        poll_execution_until_complete(syntara_api, test_execution.id)
 
-        retry_response = nexus_api.executions.retry(execution_id=test_execution.id)
+        retry_response = syntara_api.executions.retry(execution_id=test_execution.id)
         assert retry_response.status_code == HTTPStatus.CONFLICT

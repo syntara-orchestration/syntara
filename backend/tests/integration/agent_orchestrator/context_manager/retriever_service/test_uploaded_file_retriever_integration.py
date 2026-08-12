@@ -11,18 +11,18 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
     UploadedFileRetriever,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.services.retriever_service import (
+from syntara.agent_orchestrator.context_manager.retriever_service.services.retriever_service import (
     get_retriever_service,
 )
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.core.constants import CONTEXT_KEY_FILE_IDS
-from nexus.files.file_manager import get_file_manager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.core.constants import CONTEXT_KEY_FILE_IDS
+from syntara.files.file_manager import get_file_manager
+from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.mark.integration

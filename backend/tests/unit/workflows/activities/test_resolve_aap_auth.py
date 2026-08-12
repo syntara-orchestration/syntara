@@ -7,8 +7,8 @@ import pytest
 from pydantic import SecretStr
 from temporalio.exceptions import ApplicationError
 
-from nexus.core.config.base import get_settings
-from nexus.workflows.workflow_engine.activities.aap_common import (
+from syntara.core.config.base import get_settings
+from syntara.workflows.workflow_engine.activities.aap_common import (
     AAPResolvedAuth,
     resolve_aap_auth,
 )

@@ -7,7 +7,7 @@ model, ensuring proper data validation and error handling.
 import pytest
 from pydantic import ValidationError
 
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
 

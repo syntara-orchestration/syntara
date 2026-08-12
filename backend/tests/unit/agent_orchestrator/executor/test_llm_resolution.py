@@ -11,11 +11,11 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.exceptions import LLMConfigurationError
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.integrations.models.integration import Integration
-from nexus.integrations.models.integration_configuration import LLMProviderConfiguration, LLMProviderHint
-from nexus.integrations.models.llm_model import LLMModel
+from syntara.agent_orchestrator.exceptions import LLMConfigurationError
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.integrations.models.integration import Integration
+from syntara.integrations.models.integration_configuration import LLMProviderConfiguration, LLMProviderHint
+from syntara.integrations.models.llm_model import LLMModel
 
 
 def _make_executor(mock_session: MagicMock | None = None) -> tuple[InvocationExecutor, MagicMock]:
@@ -189,8 +189,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -204,8 +204,8 @@ class TestResolveLlmApiKey:
         mock_resolved.extra_vars = {"llm_api_key": "sk-test-key-123"}
 
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved
@@ -265,7 +265,7 @@ class TestResolveLlmApiKey:
         session.get = AsyncMock(return_value=mock_credential)
 
         cred_id = str(uuid4())
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(side_effect=RuntimeError("decrypt failed"))
 
             with pytest.raises(LLMConfigurationError, match=r"Failed to decrypt.*key rotation"):
@@ -281,7 +281,7 @@ class TestResolveLlmApiKey:
         mock_credential.credential_type_id = uuid4()
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
+            from syntara.credentials.models.credential import Credential
 
             if model_class is Credential:
                 return mock_credential
@@ -290,7 +290,7 @@ class TestResolveLlmApiKey:
         session.get = AsyncMock(side_effect=mock_get)
 
         cred_id = str(uuid4())
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
 
             with pytest.raises(LLMConfigurationError, match="Credential type for"):
@@ -309,8 +309,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -322,8 +322,8 @@ class TestResolveLlmApiKey:
 
         cred_id = str(uuid4())
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.side_effect = RuntimeError("template error")
@@ -344,8 +344,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -360,8 +360,8 @@ class TestResolveLlmApiKey:
 
         cred_id = str(uuid4())
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved

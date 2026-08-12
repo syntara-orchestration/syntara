@@ -2,7 +2,7 @@
  * Auto-generated from backend JSON Schema files.
  * DO NOT EDIT — run `npm run gen` to regenerate.
  *
- * Source: nexus/src/nexus/schemas/workflows/v2/
+ * Source: nexus/src/syntara/schemas/workflows/v2/
  */
 
 export interface OutputFieldDef {

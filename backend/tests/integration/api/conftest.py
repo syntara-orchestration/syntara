@@ -17,14 +17,14 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.dependencies import get_authz_evaluator
-from nexus.authz.evaluator import evaluate_policy_input
-from nexus.authz.models import Project, RoleAssignment
-from nexus.authz.seed import seed_authz_data
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.dependencies import get_authz_evaluator
+from syntara.authz.evaluator import evaluate_policy_input
+from syntara.authz.models import Project, RoleAssignment
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 
 # Name for the test group that grants the 'user' role
 _TEST_GROUP_NAME = "test-users"
@@ -46,7 +46,7 @@ async def _seed_authz(test_db_session: AsyncSession) -> None:
     """
     await seed_authz_data(test_db_session)
 
-    from nexus.workflows.seed_builtin import seed_builtin_workflows
+    from syntara.workflows.seed_builtin import seed_builtin_workflows
 
     await seed_builtin_workflows(test_db_session)
 
@@ -223,11 +223,11 @@ def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator
 
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.role_assignment_router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.workflows.executions_router.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.router.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.role_assignment_router.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
 
     # Also override via FastAPI dependency_overrides so Depends(...) resolves correctly.
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator

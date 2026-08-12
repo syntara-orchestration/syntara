@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.telemetry.events.integration_health import (
+from syntara.telemetry.events.integration_health import (
     CredentialHealth,
     CredentialInfo,
     IdentityProviderHealth,

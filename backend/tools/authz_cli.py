@@ -230,8 +230,8 @@ async def _resolve_group_id(name: str) -> str | None:
 async def cmd_seed_builtin(args: argparse.Namespace) -> None:
     """Seed built-in policies, roles, groups, default project, and bootstrap admin user."""
     print(DB_DIRECT_NOTE)
-    from nexus.authz.seed import seed_authz_data
-    from nexus.core.database.session import AsyncSessionLocal
+    from syntara.authz.seed import seed_authz_data
+    from syntara.core.database.session import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
         await seed_authz_data(db)
@@ -661,7 +661,7 @@ async def cmd_clean(args: argparse.Namespace) -> None:
 
     from sqlmodel import text
 
-    from nexus.core.database.session import AsyncSessionLocal
+    from syntara.core.database.session import AsyncSessionLocal
 
     # Tables to clean in FK-safe order, with conditions to preserve system data
     clean_steps = [

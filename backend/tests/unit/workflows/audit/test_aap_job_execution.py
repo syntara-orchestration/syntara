@@ -5,10 +5,10 @@
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.core.models.principal import PrincipalType
-from nexus.workflows.audit.aap_job_execution import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.core.models.principal import PrincipalType
+from syntara.workflows.audit.aap_job_execution import (
     AAPJobCompletedEvent,
     AAPJobCompletedHandler,
     AAPJobFailedEvent,
@@ -51,7 +51,7 @@ class TestAAPJobLaunchedHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "aap_job_launched"
-        assert result.source_component == "nexus.workflows"
+        assert result.source_component == "syntara.workflows"
         assert result.execution_id == EXECUTION_ID
         assert result.actor_id == ACTOR_ID
         assert result.actor_username == "testuser"
@@ -140,7 +140,7 @@ class TestAAPJobCompletedHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "aap_job_completed"
-        assert result.source_component == "nexus.workflows"
+        assert result.source_component == "syntara.workflows"
         assert result.execution_id == EXECUTION_ID
         assert "123" in result.event_message
         assert "successful" in result.event_message
@@ -202,7 +202,7 @@ class TestAAPJobFailedHandler:
         assert result.event_severity == EventSeverity.WARNING
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "aap_job_failed"
-        assert result.source_component == "nexus.workflows"
+        assert result.source_component == "syntara.workflows"
         assert result.execution_id == EXECUTION_ID
         assert "123" in result.event_message
         assert "failed" in result.event_message
@@ -254,7 +254,7 @@ class TestAAPJobFailedHandler:
 
 
 _TEST_UUID = UUID("12345678-1234-5678-1234-567812345678")
-_PATCH_TARGET = "nexus.workflows.audit.aap_job_execution.AuditEventDispatcher"
+_PATCH_TARGET = "syntara.workflows.audit.aap_job_execution.AuditEventDispatcher"
 
 
 class TestIsFailureStatus:

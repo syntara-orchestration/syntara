@@ -987,8 +987,11 @@ describe('Workflows Component', () => {
       // Verify modal is shown
       await waitFor(() => {
         expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
-        expect(screen.getByText(/will be deleted. This cannot be undone/)).toBeInTheDocument()
-        expect(screen.getByText(/This workflow will stop running immediately/)).toBeInTheDocument()
+        expect(
+          screen.getByText(
+            /will be deleted and any in-progress runs will stop immediately. This action cannot be undone/
+          )
+        ).toBeInTheDocument()
       })
     })
 

@@ -9,11 +9,11 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.approvals.models import (
+from syntara.approvals.models import (
     ApprovalRequest,
     ApprovalRequestStatus,
 )
-from nexus.core.constants import FieldLimits
+from syntara.core.constants import FieldLimits
 from tests.unit.fixtures.approval import (
     create_approved_approval_request,
     create_test_approval_request,

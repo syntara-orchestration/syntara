@@ -10,12 +10,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.workers.schedule_reconciliation import (
+from syntara.workflows.workers.schedule_reconciliation import (
     _extract_expected_schedules,
     reconcile_scheduled_triggers,
 )
 
-_PATCH_SVC = "nexus.workflows.workers.schedule_reconciliation.ScheduledTriggerService"
+_PATCH_SVC = "syntara.workflows.workers.schedule_reconciliation.ScheduledTriggerService"
 
 
 def _make_triggers(
@@ -274,7 +274,7 @@ class TestGetScheduleReconciliationWorker:
 
     def test_creates_worker_with_correct_config(self) -> None:
         """Should create a PeriodicWorker with the expected name, interval, and coordinate flag."""
-        from nexus.workflows.workers.schedule_reconciliation import (
+        from syntara.workflows.workers.schedule_reconciliation import (
             get_schedule_reconciliation_worker,
         )
 

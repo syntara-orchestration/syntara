@@ -10,7 +10,7 @@ Covers:
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import WebhookTriggerParameters
+from syntara.workflows.workflow_engine.models.workflow_definition import WebhookTriggerParameters
 
 
 async def test_valid_webhook_path() -> None:

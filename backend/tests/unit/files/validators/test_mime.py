@@ -14,12 +14,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.files.exceptions import FileValidationError
+from syntara.files.exceptions import FileValidationError
 
 if TYPE_CHECKING:
     from fastapi import UploadFile
 
-from nexus.files.file_manager import FileManager
+from syntara.files.file_manager import FileManager
 
 
 @pytest.mark.asyncio

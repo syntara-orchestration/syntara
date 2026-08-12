@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.mark.asyncio

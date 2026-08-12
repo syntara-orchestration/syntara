@@ -36,19 +36,19 @@ class TestWorkflowDeletion:
     These tests focus on edge cases not covered elsewhere.
     """
 
-    def test_delete_nonexistent_workflow(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_delete_nonexistent_workflow(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test deleting a non-existent workflow.
 
         Expected: 404 Not Found
         """
         fake_id = uuid4()
-        response = nexus_api.workflows.delete(workflow_id=fake_id)
+        response = syntara_api.workflows.delete(workflow_id=fake_id)
 
         assert response.status_code == HTTPStatus.NOT_FOUND
 
     def test_delete_already_deleted_workflow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -73,9 +73,9 @@ class TestWorkflowDeletion:
         )
 
         # First deletion
-        first_delete = nexus_api.workflows.delete(workflow_id=workflow.id)
+        first_delete = syntara_api.workflows.delete(workflow_id=workflow.id)
         assert first_delete.status_code == HTTPStatus.NO_CONTENT
 
         # Try to delete again
-        second_delete = nexus_api.workflows.delete(workflow_id=workflow.id)
+        second_delete = syntara_api.workflows.delete(workflow_id=workflow.id)
         assert second_delete.status_code == HTTPStatus.NOT_FOUND

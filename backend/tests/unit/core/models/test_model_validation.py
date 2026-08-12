@@ -13,8 +13,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.models.base.query_params import BaseListParams
-from nexus.core.models.pagination import (
+from syntara.core.models.base.query_params import BaseListParams
+from syntara.core.models.pagination import (
     ResourcesResponse,
     ResourcesResponseBase,
 )

@@ -12,20 +12,20 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from nexus.agent_orchestrator.agents import GenericAgent
-from nexus.agent_orchestrator.exceptions import (
+from syntara.agent_orchestrator.agents import GenericAgent
+from syntara.agent_orchestrator.exceptions import (
     AgentConfigurationError,
     AgentOrchestratorError,
     AgentRateLimitError,
     AgentTimeoutError,
 )
-from nexus.audit.emitter import AuditActorContext
+from syntara.audit.emitter import AuditActorContext
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from contextlib import AbstractContextManager
 
-    from nexus.agent_orchestrator.models.agent_state import AgentState
+    from syntara.agent_orchestrator.models.agent_state import AgentState
     from tests.fixtures.settings import FakeSettingsCache
 
 
@@ -195,6 +195,8 @@ class TestGenericAgentLLMIntegration:
             await agent.execute_as_node(state)
 
         assert exc_info.value.invocation_id == str(invocation_id)
+        assert "did not respond in time" in str(exc_info.value)
+        assert "Request timed out" not in str(exc_info.value)
 
 
 class TestGenericAgentContextInjection:
@@ -270,7 +272,7 @@ class TestGenericAgentContextInjection:
             },
         }
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
 
             async def _passthrough(_recorder: object, fn: object, *, model: object = None) -> object:
                 return await fn()  # type: ignore[operator]
@@ -465,7 +467,7 @@ class TestGenericAgentPromptEngineering:
             "llm_token_usage_log": [],
         }
 
-        with patch("nexus.core.utils.retry.get_settings") as mock_settings:
+        with patch("syntara.core.utils.retry.get_settings") as mock_settings:
             mock_settings.return_value.adapter_max_retries = 0
             mock_settings.return_value.adapter_request_timeout_seconds = 30
             with pytest.raises(AgentOrchestratorError):

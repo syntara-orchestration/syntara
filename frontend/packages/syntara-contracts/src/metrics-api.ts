@@ -188,7 +188,7 @@ export interface components {
     }
     /**
      * MetricType
-     * @description Categories of metrics recorded by Nexus.
+     * @description Categories of metrics recorded by Syntara.
      *
      *     Each value corresponds to a specific measurable quantity exposed via the
      *     metrics REST API and (where applicable) Prometheus endpoint.

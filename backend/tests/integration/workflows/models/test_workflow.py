@@ -18,8 +18,8 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models import Workflow, WorkflowVersion
+from syntara.core.models import User
+from syntara.workflows.models import Workflow, WorkflowVersion
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 

@@ -22,11 +22,11 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.settings.audit.settings import SettingBulkChangeEvent, SettingChangeEvent
-from nexus.settings.exceptions import OptimisticLockError, SettingNotFoundError, SettingValidationError
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
-from nexus.settings.services.settings_service import SettingsService
+from syntara.core.models import User
+from syntara.settings.audit.settings import SettingBulkChangeEvent, SettingChangeEvent
+from syntara.settings.exceptions import OptimisticLockError, SettingNotFoundError, SettingValidationError
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.services.settings_service import SettingsService
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -122,7 +122,7 @@ async def test_get_effective_value_uses_override(test_db_session: AsyncSession) 
 @pytest.mark.asyncio
 async def test_list_categories_returns_seeded_categories(test_db_session: AsyncSession) -> None:
     """list_categories() returns categories from the database."""
-    from nexus.settings.seeder import seed_settings
+    from syntara.settings.seeder import seed_settings
 
     async def _session_factory() -> AsyncGenerator:  # type: ignore[type-arg]
         yield test_db_session
@@ -175,7 +175,7 @@ async def test_list_categories_sorts_group_names(test_db_session: AsyncSession) 
 @pytest.mark.asyncio
 async def test_list_categories_ordered_by_display_order(test_db_session: AsyncSession) -> None:
     """list_categories() returns categories ordered by display_order."""
-    from nexus.settings.seeder import seed_settings
+    from syntara.settings.seeder import seed_settings
 
     async def _session_factory() -> AsyncGenerator:  # type: ignore[type-arg]
         yield test_db_session
@@ -197,7 +197,7 @@ async def test_list_categories_ordered_by_display_order(test_db_session: AsyncSe
 @pytest.mark.asyncio
 async def test_list_returns_seeded_settings(test_db_session: AsyncSession) -> None:
     """list_settings() returns settings from the catalog after seeding."""
-    from nexus.settings.seeder import seed_settings
+    from syntara.settings.seeder import seed_settings
 
     async def _session_factory() -> AsyncGenerator:  # type: ignore[type-arg]
         yield test_db_session
@@ -389,7 +389,7 @@ async def test_update_value_to_empty_string(test_db_session: AsyncSession) -> No
 @pytest.mark.asyncio
 async def test_bulk_update_multiple_settings(test_db_session: AsyncSession) -> None:
     """bulk_update() updates multiple settings."""
-    from nexus.settings.models.api_models import SettingBulkUpdateItem
+    from syntara.settings.models.api_models import SettingBulkUpdateItem
 
     await _insert_setting(test_db_session, key="test.bulk.a", default_value=1)
     await _insert_setting(test_db_session, key="test.bulk.b", default_value=2)
@@ -410,7 +410,7 @@ async def test_bulk_update_multiple_settings(test_db_session: AsyncSession) -> N
 @pytest.mark.asyncio
 async def test_bulk_update_rolls_back_on_failure(test_db_session: AsyncSession) -> None:
     """bulk_update() does not persist earlier updates when a later one fails."""
-    from nexus.settings.models.api_models import SettingBulkUpdateItem
+    from syntara.settings.models.api_models import SettingBulkUpdateItem
 
     await _insert_setting(test_db_session, key="test.bulkfail.a", value=5, default_value=1)
     await _insert_setting(test_db_session, key="test.bulkfail.b", value=6, default_value=2)
@@ -502,7 +502,7 @@ async def test_update_dispatches_setting_change_event(test_db_session: AsyncSess
     user = _make_user()
     service = SettingsService(test_db_session, user)
 
-    with patch("nexus.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
+    with patch("syntara.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
         await service.update(key="test.audit.single", value=99, expected_version=1)
 
     mock_dispatcher.dispatch.assert_called_once()
@@ -522,7 +522,7 @@ async def test_update_uses_effective_value_for_old_value(test_db_session: AsyncS
     await _insert_setting(test_db_session, key="test.audit.default", value=None, default_value=100)
     service = SettingsService(test_db_session, _make_user())
 
-    with patch("nexus.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
+    with patch("syntara.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
         await service.update(key="test.audit.default", value=200, expected_version=1)
 
     event = mock_dispatcher.dispatch.call_args[0][0]
@@ -538,7 +538,7 @@ async def test_update_dispatches_failure_event(test_db_session: AsyncSession) ->
     service = SettingsService(test_db_session, _make_user())
 
     with (
-        patch("nexus.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher,
+        patch("syntara.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher,
         pytest.raises(OptimisticLockError),
     ):
         await service.update(key="test.audit.fail", value=999, expected_version=99)
@@ -555,14 +555,14 @@ async def test_update_dispatches_failure_event(test_db_session: AsyncSession) ->
 @pytest.mark.asyncio
 async def test_bulk_update_dispatches_change_and_bulk_events(test_db_session: AsyncSession) -> None:
     """bulk_update() dispatches N SettingChangeEvents + 1 SettingBulkChangeEvent."""
-    from nexus.settings.models.api_models import SettingBulkUpdateItem
+    from syntara.settings.models.api_models import SettingBulkUpdateItem
 
     await _insert_setting(test_db_session, key="test.audit.bulk.a", default_value=1)
     await _insert_setting(test_db_session, key="test.audit.bulk.b", default_value=2)
     user = _make_user()
     service = SettingsService(test_db_session, user)
 
-    with patch("nexus.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
+    with patch("syntara.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher:
         await service.bulk_update(
             [
                 SettingBulkUpdateItem(key="test.audit.bulk.a", value=10, expected_version=1),
@@ -586,14 +586,14 @@ async def test_bulk_update_dispatches_change_and_bulk_events(test_db_session: As
 @pytest.mark.asyncio
 async def test_bulk_update_dispatches_failure_event(test_db_session: AsyncSession) -> None:
     """bulk_update() dispatches a SettingBulkChangeEvent with error_type on failure."""
-    from nexus.settings.models.api_models import SettingBulkUpdateItem
+    from syntara.settings.models.api_models import SettingBulkUpdateItem
 
     await _insert_setting(test_db_session, key="test.audit.bulkfail.a", default_value=1)
     await _insert_setting(test_db_session, key="test.audit.bulkfail.b", default_value=2)
     service = SettingsService(test_db_session, _make_user())
 
     with (
-        patch("nexus.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher,
+        patch("syntara.settings.services.settings_service.AuditEventDispatcher") as mock_dispatcher,
         pytest.raises(OptimisticLockError),
     ):
         await service.bulk_update(

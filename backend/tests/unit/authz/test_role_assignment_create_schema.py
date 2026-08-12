@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.authz.role_assignment_router import RoleAssignmentCreate
+from syntara.authz.role_assignment_router import RoleAssignmentCreate
 
 
 class TestRoleAssignmentCreateXOR:

@@ -38,10 +38,10 @@ class TestCreateServiceAccount:
     """API-1: Create service account."""
 
     def test_create_returns_201_with_expected_fields(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID
     ) -> None:
         """POST /service_accounts returns 201 with required fields populated."""
-        sa = create_sa(nexus_api, first_project_id, description="E2E test account")
+        sa = create_sa(syntara_api, first_project_id, description="E2E test account")
 
         try:
             assert sa.name.startswith("e2e-sa-")
@@ -53,16 +53,16 @@ class TestCreateServiceAccount:
             assert isinstance(sa.id, UUID)
             assert isinstance(sa.created_by, UUID)
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
     def test_create_credential_returns_client_id_and_secret(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID
     ) -> None:
         """POST /service_accounts/{id}/credentials returns identifier (nx_sa_ prefixed) and high-entropy secret."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
         try:
-            cred_resp = nexus_api.service_account_credentials.create(
+            cred_resp = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -81,80 +81,80 @@ class TestCreateServiceAccount:
             assert cred.service_account_id == sa.id
             assert cred.credential_type == ServiceAccountCredentialType.CLIENT_CREDENTIALS
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestReadServiceAccount:
     """API-2: Read service account — secret not exposed."""
 
-    def test_get_detail_omits_secret(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_get_detail_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id} response has no client_secret field."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
         try:
-            nexus_api.service_account_credentials.create(
+            syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
 
-            detail = nexus_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
+            detail = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
             assert not hasattr(detail, "client_secret") or getattr(detail, "client_secret", None) is None
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-    def test_list_omits_secret(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_list_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts list entries have no client_secret field."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
         try:
-            nexus_api.service_account_credentials.create(
+            syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
 
-            list_resp = nexus_api.service_accounts.list().assert_and_get()
+            list_resp = syntara_api.service_accounts.list().assert_and_get()
             matching = [r for r in list_resp.resources if r.id == sa.id]
             assert len(matching) == 1
             assert not hasattr(matching[0], "client_secret") or getattr(matching[0], "client_secret", None) is None
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-    def test_get_credential_omits_secret(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_get_credential_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id}/credentials/{cred_id} omits client_secret."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
         try:
-            cred = nexus_api.service_account_credentials.create(
+            cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
 
-            read_cred = nexus_api.service_account_credentials.get(
+            read_cred = syntara_api.service_account_credentials.get(
                 service_account_id=sa.id,
                 credential_id=cred.id,
             ).assert_and_get()
 
             assert not hasattr(read_cred, "client_secret") or getattr(read_cred, "client_secret", None) is None
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestUpdateServiceAccount:
     """API-3: Update service account (name/description update, credentials unchanged)."""
 
-    def test_update_name_and_description(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_update_name_and_description(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """PATCH /service_accounts/{id} updates name and description."""
-        sa = create_sa(nexus_api, first_project_id, description="original")
+        sa = create_sa(syntara_api, first_project_id, description="original")
 
         try:
             new_name = unique_name("e2e-sa-updated")
-            updated = nexus_api.service_accounts.update(
+            updated = syntara_api.service_accounts.update(
                 service_account_id=sa.id,
                 body=ServiceAccountUpdate(name=new_name, description="updated"),
             ).assert_and_get()
@@ -164,30 +164,30 @@ class TestUpdateServiceAccount:
             assert updated.id == sa.id
             assert updated.status == ServiceAccountStatus.ACTIVE
 
-            reread = nexus_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
+            reread = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
             assert reread.name == new_name
             assert reread.description == "updated"
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-    def test_update_preserves_credentials(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_update_preserves_credentials(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """PATCH does not alter existing credentials."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
         try:
-            cred = nexus_api.service_account_credentials.create(
+            cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
 
-            nexus_api.service_accounts.update(
+            syntara_api.service_accounts.update(
                 service_account_id=sa.id,
                 body=ServiceAccountUpdate(description="after-update"),
             ).assert_and_get()
 
-            creds_after = nexus_api.service_account_credentials.list(
+            creds_after = syntara_api.service_account_credentials.list(
                 service_account_id=sa.id,
             ).assert_and_get()
 
@@ -195,32 +195,32 @@ class TestUpdateServiceAccount:
             assert creds_after.resources[0].id == cred.id
             assert creds_after.resources[0].identifier == cred.identifier
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestDeleteServiceAccount:
     """API-4: Delete service account — soft delete."""
 
-    def test_delete_returns_204(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_delete_returns_204(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """DELETE /service_accounts/{id} returns 204."""
-        sa = create_sa(nexus_api, first_project_id)
+        sa = create_sa(syntara_api, first_project_id)
 
-        resp = nexus_api.service_accounts.delete(service_account_id=sa.id)
+        resp = syntara_api.service_accounts.delete(service_account_id=sa.id)
         assert resp.status_code == HTTPStatus.NO_CONTENT
 
-    def test_get_after_delete_returns_404(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_get_after_delete_returns_404(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id} returns 404 after soft-delete."""
-        sa = create_sa(nexus_api, first_project_id)
-        nexus_api.service_accounts.delete(service_account_id=sa.id)
+        sa = create_sa(syntara_api, first_project_id)
+        syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-        resp = nexus_api.service_accounts.get(service_account_id=sa.id)
+        resp = syntara_api.service_accounts.get(service_account_id=sa.id)
         assert resp.status_code == HTTPStatus.NOT_FOUND
 
-    def test_deleted_excluded_from_list(self, nexus_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+    def test_deleted_excluded_from_list(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """Soft-deleted service accounts do not appear in list results."""
-        sa = create_sa(nexus_api, first_project_id)
-        nexus_api.service_accounts.delete(service_account_id=sa.id)
+        sa = create_sa(syntara_api, first_project_id)
+        syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-        list_resp = nexus_api.service_accounts.list().assert_and_get()
+        list_resp = syntara_api.service_accounts.list().assert_and_get()
         ids = [r.id for r in list_resp.resources]
         assert sa.id not in ids

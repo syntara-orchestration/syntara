@@ -20,17 +20,17 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.audit.approval import (
+from syntara.approvals.audit.approval import (
     ApprovalDecidedEvent,
     ApprovalDecidedHandler,
     ApprovalRequestedEvent,
     ApprovalRequestedHandler,
 )
-from nexus.approvals.exceptions import (
+from syntara.approvals.exceptions import (
     ApprovalAlreadyDecidedError,
     ApprovalNotFoundError,
 )
-from nexus.approvals.models import (
+from syntara.approvals.models import (
     ActivitySummary,
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -38,9 +38,9 @@ from nexus.approvals.models import (
     ApprovalRequestStatus,
     WorkflowContext,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.core.models import User
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.models import User
 from tests.integration.helpers.workflow import ExecutionsFactory
 
 pytestmark = [pytest.mark.integration]
@@ -269,7 +269,7 @@ class TestApprovalErrorScenarios:
         assert approval.status == ApprovalRequestStatus.PENDING
 
         # Mock workflow client to simulate signal delivery failure
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             # Make workflow signal delivery fail

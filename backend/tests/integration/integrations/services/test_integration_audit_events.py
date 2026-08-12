@@ -11,17 +11,17 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models import User
-from nexus.integrations.exceptions import IntegrationNameConflictError, IntegrationNotFoundError
-from nexus.integrations.models.integration import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models import User
+from syntara.integrations.exceptions import IntegrationNameConflictError, IntegrationNotFoundError
+from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationPatch,
     IntegrationType,
 )
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 
 def _mcp_create(name: str = "Test MCP", **kwargs: object) -> IntegrationCreate:
@@ -49,19 +49,19 @@ class TestIntegrationServiceAuditEvents:
 
     def setup_method(self) -> None:
         """Register integrations audit handlers before each test."""
-        from nexus.integrations.audit.integration_create import (
+        from syntara.integrations.audit.integration_create import (
             IntegrationCreateEvent,
             IntegrationCreateHandler,
         )
-        from nexus.integrations.audit.integration_delete import (
+        from syntara.integrations.audit.integration_delete import (
             IntegrationDeleteEvent,
             IntegrationDeleteHandler,
         )
-        from nexus.integrations.audit.integration_update import (
+        from syntara.integrations.audit.integration_update import (
             IntegrationUpdateEvent,
             IntegrationUpdateHandler,
         )
-        from nexus.integrations.audit.integration_validate import (
+        from syntara.integrations.audit.integration_validate import (
             IntegrationValidateEvent,
             IntegrationValidateHandler,
         )
@@ -76,7 +76,7 @@ class TestIntegrationServiceAuditEvents:
         )
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_integration_success_emits_audit_event(
         self,
         mock_do_emit: object,
@@ -94,7 +94,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.integrations.integration"
+        assert event.source_component == "syntara.integrations.integration"
         assert event.event_message == "Integration created: Slack MCP"
         assert isinstance(event.structured_data, AuditContextData)
         assert event.structured_data.integration_name == "Slack MCP"  # type: ignore[attr-defined]
@@ -102,7 +102,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.structured_data.initial_status == "unknown"  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_integration_duplicate_name_emits_error_event(
         self,
         mock_do_emit: object,
@@ -126,7 +126,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.structured_data.error_type == "IntegrityError"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_patch_integration_success_emits_audit_event(
         self,
         mock_do_emit: object,
@@ -152,7 +152,7 @@ class TestIntegrationServiceAuditEvents:
         assert set(event.structured_data.updated_fields) == {"name", "description"}  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_patch_integration_tracks_only_set_fields(
         self,
         mock_do_emit: object,
@@ -172,7 +172,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.structured_data.updated_fields == ["description"]  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_integration_success_emits_audit_event(
         self,
         mock_do_emit: object,
@@ -196,7 +196,7 @@ class TestIntegrationServiceAuditEvents:
         assert event.structured_data.tools_deleted == 0  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_integration_not_found_emits_error_event(
         self,
         mock_do_emit: object,
@@ -224,7 +224,7 @@ class TestIntegrationServiceAuditEvents:
         """Successful validate_integration should emit IntegrationValidateEvent."""
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        from nexus.integrations.adapters.protocol import ValidateResult
+        from syntara.integrations.adapters.protocol import ValidateResult
 
         success_result = ValidateResult(success=True, checked_at=datetime.now(UTC))
         mock_settings = MagicMock()
@@ -233,13 +233,13 @@ class TestIntegrationServiceAuditEvents:
         created = await integration_service.create_integration(_mcp_create("MCP Server"))
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.integrations.adapters.mcp_server.MCPServerAdapter.validate",
+                "syntara.integrations.adapters.mcp_server.MCPServerAdapter.validate",
                 new=AsyncMock(return_value=success_result),
             ),
             patch(
-                "nexus.integrations.services.integration_service.get_runtime_settings",
+                "syntara.integrations.services.integration_service.get_runtime_settings",
                 return_value=mock_settings,
             ),
         ):
@@ -263,7 +263,7 @@ class TestIntegrationServiceAuditEvents:
         """A failed health check should emit an error audit event."""
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        from nexus.integrations.adapters.protocol import ValidateResult
+        from syntara.integrations.adapters.protocol import ValidateResult
 
         fail_result = ValidateResult(success=False, error="Connection refused", checked_at=datetime.now(UTC))
         mock_settings = MagicMock()
@@ -272,13 +272,13 @@ class TestIntegrationServiceAuditEvents:
         created = await integration_service.create_integration(_mcp_create("Broken MCP"))
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.integrations.adapters.mcp_server.MCPServerAdapter.validate",
+                "syntara.integrations.adapters.mcp_server.MCPServerAdapter.validate",
                 new=AsyncMock(return_value=fail_result),
             ),
             patch(
-                "nexus.integrations.services.integration_service.get_runtime_settings",
+                "syntara.integrations.services.integration_service.get_runtime_settings",
                 return_value=mock_settings,
             ),
         ):
@@ -306,7 +306,7 @@ class TestIntegrationServiceAuditEvents:
         """
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        from nexus.integrations.adapters.protocol import ValidateResult
+        from syntara.integrations.adapters.protocol import ValidateResult
 
         fail_result = ValidateResult(
             success=False,
@@ -319,13 +319,13 @@ class TestIntegrationServiceAuditEvents:
         created = await integration_service.create_integration(_mcp_create("Slow Server"))
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.integrations.adapters.mcp_server.MCPServerAdapter.validate",
+                "syntara.integrations.adapters.mcp_server.MCPServerAdapter.validate",
                 new=AsyncMock(return_value=fail_result),
             ),
             patch(
-                "nexus.integrations.services.integration_service.get_runtime_settings",
+                "syntara.integrations.services.integration_service.get_runtime_settings",
                 return_value=mock_settings,
             ),
         ):

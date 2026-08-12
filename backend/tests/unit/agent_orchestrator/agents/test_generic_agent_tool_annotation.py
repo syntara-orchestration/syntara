@@ -11,10 +11,10 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.agents import GenericAgent
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.agent_orchestrator.utils.keyword_association import HINT_HIGH
-from nexus.audit.emitter import AuditActorContext
+from syntara.agent_orchestrator.agents import GenericAgent
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.agent_orchestrator.utils.keyword_association import HINT_HIGH
+from syntara.audit.emitter import AuditActorContext
 
 
 def _make_state(prompt: str = "search github repos") -> AgentState:
@@ -67,7 +67,7 @@ class TestGenericAgentToolAnnotation:
         agent = GenericAgent(llm=mock_llm, available_tools=[search_tool, calc_tool])
         state = _make_state("search github repos")
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
+        with patch("syntara.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
             await agent._execute_standard(state)
 
         bound_tools = mock_llm.bind_tools.call_args[0][0]
@@ -98,7 +98,7 @@ class TestGenericAgentToolAnnotation:
         agent = GenericAgent(llm=mock_llm, available_tools=tools)
         state = _make_state("search repos")
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
+        with patch("syntara.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
             await agent._execute_standard(state)
 
         bound_tools = mock_llm.bind_tools.call_args[0][0]
@@ -125,7 +125,7 @@ class TestGenericAgentToolAnnotation:
         agent = GenericAgent(llm=mock_llm, available_tools=tools)
         state = _make_state("search github code")
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
+        with patch("syntara.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
             await agent._execute_standard(state)
 
         bound_tools = mock_llm.bind_tools.call_args[0][0]
@@ -158,7 +158,7 @@ class TestGenericAgentToolAnnotation:
             "Session history: user asked about deployment"
         )
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
+        with patch("syntara.agent_orchestrator.agents.generic_agent.AuditEventDispatcher"):
             await agent._execute_standard(state)
 
         bound_tools = mock_llm.bind_tools.call_args[0][0]

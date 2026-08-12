@@ -9,7 +9,7 @@ Tests cover:
 import pytest
 from pydantic import ValidationError
 
-from nexus.identity_providers.models import OIDCConfiguration
+from syntara.identity_providers.models import OIDCConfiguration
 
 
 def _make_oidc_config(**overrides: object) -> OIDCConfiguration:

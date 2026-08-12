@@ -4,8 +4,8 @@
 
 import json
 
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.truncation import DEFAULT_MAX_PAYLOAD_BYTES, enforce_payload_limit
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.truncation import DEFAULT_MAX_PAYLOAD_BYTES, enforce_payload_limit
 
 
 class TestEnforcePayloadLimit:

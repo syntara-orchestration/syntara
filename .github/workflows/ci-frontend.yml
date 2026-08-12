@@ -58,7 +58,7 @@ jobs:
           else
             echo "backend=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^backend/src/nexus/schemas/' <<< "$FILES"; then
+          if grep -qE '^backend/src/syntara/schemas/' <<< "$FILES"; then
             echo "contracts=true" >> "$GITHUB_OUTPUT"
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
@@ -466,7 +466,7 @@ jobs:
         working-directory: backend
         run: |
           cat .secrets/admin-password | podman exec -i nexus-ci_syntara_1 \
-            python3 -m nexus.orchestrator_admin reset-password -u admin --password-stdin --yes
+            python3 -m syntara.orchestrator_admin reset-password -u admin --password-stdin --yes
 
       - name: Read admin password
         run: |

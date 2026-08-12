@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.files.document_conversion.models.conversion_config import (
+from syntara.files.document_conversion.models.conversion_config import (
     ConversionConfig,
 )
 
@@ -73,7 +73,7 @@ class TestConversionConfigSystemIntegration:
         with (
             override_settings(document_conversion_temp_dir="/app/tmp/conversions"),
             patch(
-                "nexus.files.document_conversion.models.conversion_config.get_runtime_settings",
+                "syntara.files.document_conversion.models.conversion_config.get_runtime_settings",
                 return_value=mock_cache,
             ),
         ):
@@ -95,7 +95,7 @@ class TestConversionConfigSystemIntegration:
         with (
             override_settings(document_conversion_temp_dir=tempfile.gettempdir()),
             patch(
-                "nexus.files.document_conversion.models.conversion_config.get_runtime_settings",
+                "syntara.files.document_conversion.models.conversion_config.get_runtime_settings",
                 return_value=mock_cache,
             ),
         ):

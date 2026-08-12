@@ -13,8 +13,8 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.tool_manager.models.rate_limit_config import (
+from syntara.core.models import User
+from syntara.tool_manager.models.rate_limit_config import (
     RateLimit,
     TargetType,
 )

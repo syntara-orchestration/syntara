@@ -5,9 +5,9 @@ from uuid import UUID
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord
-from nexus.core.models import User
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord
+from syntara.core.models import User
 
 
 class TokenUsageFactory:

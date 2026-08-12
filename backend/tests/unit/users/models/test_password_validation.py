@@ -8,8 +8,8 @@ Tests the InfoSec password requirements:
 import pytest
 from pydantic import ValidationError
 
-from nexus.auth.passwords import validate_password_complexity
-from nexus.core.models.user_schemas import UserCreate, UserUpdate
+from syntara.auth.passwords import validate_password_complexity
+from syntara.core.models.user_schemas import UserCreate, UserUpdate
 
 
 class TestPasswordValidation:

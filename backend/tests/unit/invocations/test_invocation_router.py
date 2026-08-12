@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexus.invocations.router import list_invocations
+from syntara.invocations.router import list_invocations
 
 
 class TestListInvocationsVisibility:

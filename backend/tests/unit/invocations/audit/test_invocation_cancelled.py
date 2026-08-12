@@ -2,11 +2,11 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.models import InvocationStatus
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.invocations.audit.invocation_cancelled import (
+from syntara.agent_orchestrator.models import InvocationStatus
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.invocations.audit.invocation_cancelled import (
     InvocationCancellationResult,
     InvocationCancelledEvent,
     InvocationCancelledHandler,
@@ -84,7 +84,7 @@ class TestInvocationCancelledHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "invocation_cancelled"
-        assert result.source_component == "nexus.invocations.cancel"
+        assert result.source_component == "syntara.invocations.cancel"
         assert result.event_message == "Invocation cancelled: User requested cancellation"
         assert result.resource_urn == f"urn:syntara:invocation:{invocation_id}"
         # Without activity context, resource_name should be None

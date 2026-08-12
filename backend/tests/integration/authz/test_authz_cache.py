@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import (
+from syntara.authz.engine import (
     AuthzRequest,
     _hash_authz_input,
     authorize,
@@ -16,7 +16,7 @@ from nexus.authz.engine import (
     init_authz_cache,
     resolve_allowed_projects,
 )
-from nexus.core.models import User
+from syntara.core.models import User
 
 
 @pytest.fixture(autouse=True)
@@ -102,12 +102,12 @@ class TestRegoCacheHitMiss:
         )
         with (
             patch(
-                "nexus.authz.engine.resolve_effective_policies",
+                "syntara.authz.engine.resolve_effective_policies",
                 new_callable=AsyncMock,
                 return_value=[],
             ),
             patch(
-                "nexus.authz.engine.resolve_user_groups",
+                "syntara.authz.engine.resolve_user_groups",
                 new_callable=AsyncMock,
                 return_value=[],
             ),

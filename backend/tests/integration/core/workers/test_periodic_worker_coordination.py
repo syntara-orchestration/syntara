@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.workers.periodic import PeriodicWorker
+from syntara.core.workers.periodic import PeriodicWorker
 
 
 @pytest.mark.asyncio

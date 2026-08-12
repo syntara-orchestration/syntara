@@ -12,8 +12,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.config.base import CredentialEncryptionSettings, validate_encryption_key_at_startup
-from nexus.core.lib.encryption import key_from_string
+from syntara.core.config.base import CredentialEncryptionSettings, validate_encryption_key_at_startup
+from syntara.core.lib.encryption import key_from_string
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -43,7 +43,7 @@ class TestEncryptionKeyRequired:
     def test_startup_validation_rejects_missing_key(self) -> None:
         settings = _build_settings({})
         with (
-            patch("nexus.core.config.base.get_settings", return_value=settings),
+            patch("syntara.core.config.base.get_settings", return_value=settings),
             pytest.raises(RuntimeError, match=r"APP_SECRET_ENCRYPTION_KEY.*is required"),
         ):
             validate_encryption_key_at_startup()

@@ -3,7 +3,7 @@
 import pytest
 from prometheus_client import CollectorRegistry, generate_latest
 
-from nexus.metrics.prometheus import (
+from syntara.metrics.prometheus import (
     LATENCY_BUCKETS_FAST,
     LATENCY_BUCKETS_MEDIUM,
     LATENCY_BUCKETS_SLOW,

@@ -13,11 +13,11 @@ from httpx import AsyncClient
 from sqlalchemy import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.models import RoleAssignment
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.models import RoleAssignment
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 
 
 def _auth_as(user: User) -> None:

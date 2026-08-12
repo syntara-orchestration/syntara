@@ -10,9 +10,9 @@ import pytest
 import pytest_asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
-from nexus.core.models import User
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.core.models import User
 
 
 @pytest_asyncio.fixture

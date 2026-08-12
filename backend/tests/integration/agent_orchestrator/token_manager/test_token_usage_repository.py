@@ -9,12 +9,12 @@ import pytest_asyncio
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.exceptions import UserTokenConfigNotFoundError
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from nexus.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.token_manager.exceptions import UserTokenConfigNotFoundError
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
+from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
 
 if TYPE_CHECKING:
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest.fixture
@@ -267,7 +267,7 @@ async def token_record_with_invocation(
     test_db_session: AsyncSession, test_user: "User", user_config: UserTokenConfig, test_project_id
 ) -> TokenUsageRecord:
     """Create a token usage record with invocation_id set (simulating pre-LLM creation)."""
-    from nexus.agent_orchestrator.models import Invocation, InvocationStatus
+    from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 
     invocation = Invocation(
         prompt="test prompt",
@@ -419,7 +419,7 @@ async def test_record_usage_with_invocation_id(
     test_project_id,
 ) -> None:
     """Test that record_usage stores invocation_id when provided."""
-    from nexus.agent_orchestrator.models import Invocation, InvocationStatus
+    from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 
     invocation = Invocation(
         prompt="test prompt",

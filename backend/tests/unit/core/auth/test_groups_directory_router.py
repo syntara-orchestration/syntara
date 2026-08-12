@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.users.groups_directory_router import (
+from syntara.users.groups_directory_router import (
     GroupDirectoryEntry,
     GroupDirectoryListResponse,
     _GroupDirectoryService,

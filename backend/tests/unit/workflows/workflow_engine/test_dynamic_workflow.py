@@ -16,10 +16,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.workflows.utils.namespace_resolver import NamespaceResolver
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.graph import WorkflowGraph
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.graph import WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -28,8 +28,8 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
     with (
-        patch("nexus.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("nexus.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
@@ -333,7 +333,7 @@ class TestFanInConverge:
         graph = _build_fanin_graph()
         wf._converge_branch_nodes = {"node_a": {"converge_node"}, "node_b": {"converge_node"}}
 
-        with patch("nexus.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_create_task:
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_create_task:
             mock_create_task.return_value = MagicMock()
             wf._handle_converge_timeout("node_a", graph, {})
 
@@ -346,7 +346,7 @@ class TestFanInConverge:
         graph = _build_fanin_graph()
         wf._converge_branch_nodes = {"node_a": {"converge_node"}, "node_b": {"converge_node"}}
 
-        with patch("nexus.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_create_task:
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_create_task:
             mock_task = MagicMock()
             mock_create_task.return_value = mock_task
             wf._handle_converge_timeout("node_a", graph, {})
@@ -536,7 +536,7 @@ class TestFanInConverge:
         graph = _build_fanin_graph()
         wf._converge_branch_nodes = {"node_a": {"converge_node"}, "node_b": {"converge_node"}}
 
-        with patch("nexus.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_ct:
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.asyncio.create_task") as mock_ct:
             mock_ct.return_value = MagicMock()
             wf._handle_converge_timeout("node_a", graph, {})
 
@@ -680,7 +680,7 @@ class TestFanInConverge:
         wf._converge_branch_nodes = {"node_a": {"converge_node"}}
         wf.failed_nodes["converge_node"] = "already failed"
 
-        with patch("nexus.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
             wf._handle_converge_timeout("node_a", graph, {})
 
         mock_ct.assert_not_called()
@@ -693,7 +693,7 @@ class TestFanInConverge:
         wf._converge_branch_nodes = {"node_a": {"converge_node"}}
         wf.skipped_nodes.add("converge_node")
 
-        with patch("nexus.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
             wf._handle_converge_timeout("node_a", graph, {})
 
         mock_ct.assert_not_called()
@@ -704,7 +704,7 @@ class TestFanInConverge:
         graph = _build_fanin_graph()
         wf._converge_branch_nodes = {"node_a": {"converge_node"}}
 
-        with patch("nexus.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_ct:
             wf._handle_converge_timeout("unrelated_node", graph, {})
 
         mock_ct.assert_not_called()
@@ -934,7 +934,7 @@ class TestConvergeAnyStrategy:
 
         loop = asyncio.new_event_loop()
         try:
-            with patch("nexus.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
                 mock_wf.execute_activity = AsyncMock(return_value={"status": "completed"})
                 result = loop.run_until_complete(
                     wf._execute_converge_node(

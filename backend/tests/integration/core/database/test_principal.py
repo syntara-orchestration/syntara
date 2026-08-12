@@ -16,15 +16,15 @@ from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.context_managers import actor_context
-from nexus.audit.outbox.models import AuditOutboxRecord
-from nexus.authz.models.project import Project
-from nexus.core.models.principal import (
+from syntara.audit.context_managers import actor_context
+from syntara.audit.outbox.models import AuditOutboxRecord
+from syntara.authz.models.project import Project
+from syntara.core.models.principal import (
     Principal,
     PrincipalType,
 )
-from nexus.core.models.user import User
-from nexus.service_accounts.models.service_account import ServiceAccount
+from syntara.core.models.user import User
+from syntara.service_accounts.models.service_account import ServiceAccount
 
 
 def _make_user(user_id: UUID | None = None, **overrides: object) -> User:

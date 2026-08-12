@@ -2,8 +2,8 @@
 
 import pytest
 
-from nexus.settings.catalog import SETTINGS_CATALOG, SettingDefinition
-from nexus.settings.models.runtime_setting import SettingCategory, SettingValueType
+from syntara.settings.catalog import SETTINGS_CATALOG, SettingDefinition
+from syntara.settings.models.runtime_setting import SettingCategory, SettingValueType
 
 _NEW_KEYS = [
     "document_conversion.timeout_seconds",

@@ -1,15 +1,15 @@
 """Unit tests for session revocation audit events and handler."""
 
-from nexus.audit.models.audit_event import (
+from syntara.audit.models.audit_event import (
     EventCategory,
     EventSeverity,
     EventStatus,
 )
-from nexus.auth.audit.session_revocation import (
+from syntara.auth.audit.session_revocation import (
     SessionRevocationEvent,
     SessionRevocationHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestSessionRevocationHandler:
@@ -106,7 +106,7 @@ class TestSessionRevocationHandler:
         handler = SessionRevocationHandler()
         audit_event = handler.handle(event)
 
-        assert audit_event.source_component == "nexus.auth.revocation"
+        assert audit_event.source_component == "syntara.auth.revocation"
 
     def test_resource_fields_for_user_target(self) -> None:
         """Resource fields should use user URN pattern for user targets."""

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nexus"
+name = "syntara"
 version = "0.1.0"
 description = "A distributed multi-agent system. Syntara enables coordinated AI agents to work together on complex tasks."
 readme = "README.md"
@@ -135,7 +135,7 @@ orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
 
 [project.scripts]
-orchestrator-admin = "nexus.orchestrator_admin:app"
+orchestrator-admin = "syntara.orchestrator_admin:app"
 
 [project.urls]
 Homepage = "https://github.com/syntara-orchestration/syntara"
@@ -144,10 +144,11 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
-packages = ["src/nexus"]
+packages = ["src/syntara", "src/nexus"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
+    "src/syntara",
     "src/nexus",
     "README.md",
     "LICENSE",
@@ -172,7 +173,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "D104"]
-"src/nexus/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
+"src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
 "tests/**/*.py" = [
@@ -199,15 +200,15 @@ ignore = [
     "SIM117",   # Allow nested with statements (required for SonarQube S5707 — pytest.raises in own block)
 ]
 "tests/performance/conftest.py" = ["E402"]  # pytest_plugins must precede imports
-"src/nexus/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
-"src/nexus/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
+"src/syntara/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
+"src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
 "src/cli/**/*.py" = ["ANN401", "SLF001", "PLC0415"]  # CLI: dynamic types, private access to bundler, deferred imports
-"src/nexus/api/main.py" = ["S104"]  # Binding to all interfaces for development
+"src/syntara/api/main.py" = ["S104"]  # Binding to all interfaces for development
 "tools/ci/check_migrations.py" = [
     "T201",   # print() is intentional CLI output
     "BLE001", # broad Exception needed for external lib error handling
 ]
-"src/nexus/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
+"src/syntara/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
 
 # Pyrefly configuration — used in pre-commit for fast local type checking (~3s).
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
@@ -281,7 +282,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # AuthzEvaluator module may be treated as untyped in some CI environments
-module = "nexus.authz.evaluator"
+module = "syntara.authz.evaluator"
 ignore_missing_imports = true
 
 
@@ -339,7 +340,7 @@ exclude_lines = [
 
 [tool.vulture]
 min_confidence = 100
-paths = ["src/nexus"]
+paths = ["src/syntara"]
 exclude = ["*tests*", "*test_*", "*alembic*", "*migrations*", "*__pycache__*"]
 ignore_decorators = [
     "@app.*",

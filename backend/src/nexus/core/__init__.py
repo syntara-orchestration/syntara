@@ -1,1 +1,1 @@
-"""Nexus Core Resources."""
+"""Compatibility shim — see syntara.core."""

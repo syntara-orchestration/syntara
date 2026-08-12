@@ -7,12 +7,12 @@ from typing import Any
 
 import pytest
 
-from nexus.integrations.adapters.factory import (
+from syntara.integrations.adapters.factory import (
     _clear_registry,
     create_health_check_adapter,
     register_health_check_adapter,
 )
-from nexus.integrations.adapters.protocol import (
+from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
     DiscoveredTool,
     DiscoverResult,
@@ -20,9 +20,9 @@ from nexus.integrations.adapters.protocol import (
     IntegrationAdapter,
     ValidateResult,
 )
-from nexus.integrations.exceptions import AdapterNotRegisteredError
-from nexus.integrations.models.integration import IntegrationType
-from nexus.integrations.models.integration_configuration import (
+from syntara.integrations.exceptions import AdapterNotRegisteredError
+from syntara.integrations.models.integration import IntegrationType
+from syntara.integrations.models.integration_configuration import (
     LLMProviderConfiguration,
     MCPServerConfiguration,
 )

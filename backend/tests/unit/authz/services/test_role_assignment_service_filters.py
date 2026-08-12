@@ -6,7 +6,7 @@ from typing import Any
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-from nexus.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.authz.services.role_assignment_service import RoleAssignmentService
 
 
 def _make_base() -> MagicMock:

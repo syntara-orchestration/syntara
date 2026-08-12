@@ -7,7 +7,7 @@ import pytest
 from temporalio.client import Client, WorkflowHandle
 from temporalio.exceptions import TemporalError
 
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 class TestCancelWorkflow:

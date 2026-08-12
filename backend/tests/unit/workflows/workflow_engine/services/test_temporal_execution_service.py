@@ -11,9 +11,9 @@ from uuid import UUID
 import pytest
 import yaml
 
-from nexus.core.config.base import get_settings
-from nexus.core.exceptions import SafeValueError
-from nexus.workflows.workflow_engine.services.temporal_execution_service import (
+from syntara.core.config.base import get_settings
+from syntara.core.exceptions import SafeValueError
+from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
     create_temporal_execution_service,
 )
@@ -272,7 +272,7 @@ class TestCreateTemporalExecutionService:
         """Test creating execution service with default parameters."""
         mock_client = Mock()
 
-        with patch("nexus.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
+        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
             mock_client_class.connect = AsyncMock(return_value=mock_client)
 
             service = await create_temporal_execution_service()
@@ -292,7 +292,7 @@ class TestCreateTemporalExecutionService:
         """Test creating execution service with custom parameters."""
         mock_client = Mock()
 
-        with patch("nexus.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
+        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
             mock_client_class.connect = AsyncMock(return_value=mock_client)
 
             service = await create_temporal_execution_service(

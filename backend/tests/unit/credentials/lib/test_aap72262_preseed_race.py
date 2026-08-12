@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nexus.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
 
 
 class TestAAP72262PreseedRaceCondition:

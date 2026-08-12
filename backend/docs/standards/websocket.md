@@ -1,6 +1,6 @@
 # WebSocket Standards
 
-Standards for implementing WebSocket endpoints in Nexus.
+Standards for implementing WebSocket endpoints in Syntara.
 
 ## When to Use WebSocket vs REST
 
@@ -17,7 +17,7 @@ Use REST for:
 
 ## Core Framework
 
-All WebSocket functionality is implemented in `src/nexus/core/websocket/`:
+All WebSocket functionality is implemented in `src/syntara/core/websocket/`:
 
 - `base_handler.py` - Template method pattern for streaming handlers
 - `manager.py` - Connection lifecycle manager (singleton)
@@ -68,7 +68,7 @@ Activity timestamps are updated on:
 Use `get_connection_lifecycle_manager()` to access the singleton:
 
 ```python
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
 
 manager = get_connection_lifecycle_manager()
 
@@ -162,7 +162,7 @@ All WebSocket messages must be validated against AsyncAPI 3.0 specifications:
 WebSocket endpoints use convention-based path mapping:
 
 ```
-src/nexus/{component}/ws/{handler}.py -> schemas/{component}/websocket-{handler}.{yaml|yml|json}
+src/syntara/{component}/ws/{handler}.py -> schemas/{component}/websocket-{handler}.{yaml|yml|json}
 ```
 
 Both files are required. Missing either will cause a startup failure.
@@ -214,7 +214,7 @@ components:
 
 ### Bidirectional Channel Handler
 
-Create handler at `src/nexus/{component}/ws/{handler}.py`:
+Create handler at `src/syntara/{component}/ws/{handler}.py`:
 
 ```python
 """WebSocket handler for example channel."""
@@ -251,7 +251,7 @@ For server-initiated streaming (no client messages):
 """WebSocket handler for invocation streaming."""
 
 from fastapi import WebSocket
-from nexus.core.cache.stream import StreamClient
+from syntara.core.cache.stream import StreamClient
 
 async def on_connect_invocations(websocket: WebSocket, connection_id: str) -> None:
     """Start streaming events when client connects.
@@ -288,7 +288,7 @@ For complex streaming with validation, replay, and lifecycle management:
 ```python
 """WebSocket streaming handler for invocations."""
 
-from nexus.core.websocket.base_handler import BaseWebSocketStreamingHandler
+from syntara.core.websocket.base_handler import BaseWebSocketStreamingHandler
 
 class InvocationStreamingHandler(BaseWebSocketStreamingHandler):
     """Stream invocation events to WebSocket clients."""
@@ -370,7 +370,7 @@ Replay parameters:
 
 ### Close Codes (RFC 6455)
 
-Use standardized close codes from `nexus.core.websocket.close_codes`:
+Use standardized close codes from `syntara.core.websocket.close_codes`:
 
 - `NORMAL_CLOSURE = 1000` - Successful operation complete
 - `UNSUPPORTED_DATA = 1003` - Endpoint received data it cannot accept
@@ -379,12 +379,12 @@ Use standardized close codes from `nexus.core.websocket.close_codes`:
 
 ### Exception Handling
 
-Custom exceptions in `nexus.core.websocket.exceptions`:
+Custom exceptions in `syntara.core.websocket.exceptions`:
 
 ```python
-from nexus.core.websocket.exceptions import StreamingValidationError
-from nexus.core.websocket.close_codes import INTERNAL_ERROR
-from nexus.core.models.error import ErrorData
+from syntara.core.websocket.exceptions import StreamingValidationError
+from syntara.core.websocket.close_codes import INTERNAL_ERROR
+from syntara.core.models.error import ErrorData
 
 # Raise in validation methods
 error_data = ErrorData(
@@ -421,7 +421,7 @@ Override default hook behavior in handler modules:
 """Custom hooks for example channel."""
 
 from datetime import UTC, datetime
-from nexus.core.websocket.schema_validator import ValidationError
+from syntara.core.websocket.schema_validator import ValidationError
 
 async def before_receive(data: dict, message_type: str, channel: str) -> dict:
     """Custom validation logic.
@@ -501,7 +501,7 @@ Error hooks:
 Use StreamClient to publish events:
 
 ```python
-from nexus.core.cache.stream import StreamClient
+from syntara.core.cache.stream import StreamClient
 
 async with StreamClient() as client:
     event = {
@@ -560,7 +560,7 @@ Test full streaming flow with Redis and WebSocket:
 ```python
 import pytest
 from fastapi.testclient import TestClient
-from nexus.core.cache.stream import StreamClient
+from syntara.core.cache.stream import StreamClient
 
 @pytest.mark.integration
 async def test_invocation_streaming(test_cache, test_db):
@@ -652,17 +652,17 @@ WebSocket endpoints are automatically discovered and registered at application s
 
 ### Router Setup
 
-In `src/nexus/api/main.py`:
+In `src/syntara/api/main.py`:
 
 ```python
-from nexus.core.websocket.router import build_websocket_router
+from syntara.core.websocket.router import build_websocket_router
 
 # Build router with auto-discovery
 ws_router = build_websocket_router()
 app.include_router(ws_router)
 
 # Start lifecycle monitoring
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
 manager = get_connection_lifecycle_manager()
 manager.start_monitoring()
 
@@ -673,7 +673,7 @@ async def shutdown():
 
 ### Discovery Process
 
-1. Scans `src/nexus/{component}/ws/*.py` for handler files
+1. Scans `src/syntara/{component}/ws/*.py` for handler files
 2. Derives spec paths using convention: `schemas/{component}/websocket-{handler}.{yaml|yml|json}`
 3. Validates handler/spec pairing (fail-fast if either is missing)
 4. Loads AsyncAPI specs
@@ -765,14 +765,14 @@ count = manager.get_active_connection_count_for_resource(invocation_id)
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/websocket/base_handler.py` | `BaseWebSocketStreamingHandler` template method pattern |
-| `src/nexus/core/websocket/manager.py` | Connection lifecycle manager (singleton) |
-| `src/nexus/core/websocket/schema_validator.py` | AsyncAPI 3.0 message validation |
-| `src/nexus/core/websocket/endpoint_factory.py` | Factory for creating WebSocket endpoints |
-| `src/nexus/core/websocket/router.py` | Auto-discovery and route registration |
-| `src/nexus/core/websocket/hooks.py` | Pre/post validation hooks |
-| `src/nexus/core/websocket/close_codes.py` | RFC 6455 close codes |
-| `src/nexus/core/websocket/exceptions.py` | `StreamingValidationError`, `EventsExpiredError`, `WaitForStreamTimeoutError` |
+| `src/syntara/core/websocket/base_handler.py` | `BaseWebSocketStreamingHandler` template method pattern |
+| `src/syntara/core/websocket/manager.py` | Connection lifecycle manager (singleton) |
+| `src/syntara/core/websocket/schema_validator.py` | AsyncAPI 3.0 message validation |
+| `src/syntara/core/websocket/endpoint_factory.py` | Factory for creating WebSocket endpoints |
+| `src/syntara/core/websocket/router.py` | Auto-discovery and route registration |
+| `src/syntara/core/websocket/hooks.py` | Pre/post validation hooks |
+| `src/syntara/core/websocket/close_codes.py` | RFC 6455 close codes |
+| `src/syntara/core/websocket/exceptions.py` | `StreamingValidationError`, `EventsExpiredError`, `WaitForStreamTimeoutError` |
 | `schemas/` | AsyncAPI spec files per component |
 
 Generated By: Claude Code (Claude Opus 4.6)

@@ -42,7 +42,7 @@ DATABASES: list[DatabaseConfig] = [
     DatabaseConfig(
         name="main",
         ini_file="alembic.ini",
-        script_location="src/nexus/core/database/migrations",
+        script_location="src/syntara/core/database/migrations",
     ),
 ]
 

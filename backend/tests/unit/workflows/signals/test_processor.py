@@ -6,10 +6,10 @@ from typing import Any
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.common import (
+from syntara.workflows.workflow_engine.activities.common import (
     ActivityExecutionError,
 )
-from nexus.workflows.workflow_engine.signals.processor import WorkflowSignalProcessor
+from syntara.workflows.workflow_engine.signals.processor import WorkflowSignalProcessor
 
 
 class TestWorkflowSignalProcessorProcessSignal:

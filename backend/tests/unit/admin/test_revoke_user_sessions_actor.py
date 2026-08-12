@@ -7,10 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.admin.services import revoke_user_sessions
-from nexus.audit.emitter import AuditActorContext, actor_context_var
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.admin.services import revoke_user_sessions
+from syntara.audit.emitter import AuditActorContext, actor_context_var
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 @pytest.mark.asyncio
@@ -45,8 +45,8 @@ async def test_api_revoke_preserves_middleware_actor_id() -> None:
 
     try:
         with (
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher.dispatch"),
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher.dispatch"),
         ):
             await revoke_user_sessions(
                 AsyncMock(),
@@ -89,8 +89,8 @@ async def test_cli_revoke_sets_username_when_no_middleware_actor() -> None:
 
     try:
         with (
-            patch("nexus.admin.services.create_session_store", return_value=mock_store),
-            patch("nexus.admin.services.AuditEventDispatcher.dispatch"),
+            patch("syntara.admin.services.create_session_store", return_value=mock_store),
+            patch("syntara.admin.services.AuditEventDispatcher.dispatch"),
         ):
             await revoke_user_sessions(
                 MagicMock(),

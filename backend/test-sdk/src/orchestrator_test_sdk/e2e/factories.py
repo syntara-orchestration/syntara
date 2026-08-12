@@ -82,24 +82,24 @@ def admin_api(nexus_base_url: str) -> SyntaraApiRegistry:
 
 
 @pytest.fixture(scope="session")
-def first_project_id(nexus_api: SyntaraApiRegistry) -> UUID:
+def first_project_id(syntara_api: SyntaraApiRegistry) -> UUID:
     """Return the first available non-builtin project ID.
 
     Tests that need a valid project ID can use this fixture.
     Skips built-in projects since workflow creation is blocked in them.
     """
-    return get_first_non_builtin_project_id(nexus_api)
+    return get_first_non_builtin_project_id(syntara_api)
 
 
 @pytest.fixture
 def integration_factory(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
 ) -> Generator[Callable[[IntegrationCreate], dict[str, Any]], None, None]:
     """Factory that creates integrations via the API with automatic cleanup."""
     created_ids: list[UUID] = []
 
     def _create(body: IntegrationCreate) -> dict[str, Any]:
-        integration = nexus_api.integrations.create(body=body).assert_and_get()
+        integration = syntara_api.integrations.create(body=body).assert_and_get()
         created_ids.append(integration.id)
         result: dict[str, Any] = integration.to_dict()
         return result
@@ -108,18 +108,20 @@ def integration_factory(
 
     for integration_id in created_ids:
         try:
-            nexus_api.integrations.delete(integration_id=integration_id)
+            syntara_api.integrations.delete(integration_id=integration_id)
         except Exception:
             pass
 
 
 @pytest.fixture
-def workflow_factory(nexus_api: SyntaraApiRegistry) -> Generator[Callable[[WorkflowCreate], WorkflowRead], None, None]:
+def workflow_factory(
+    syntara_api: SyntaraApiRegistry,
+) -> Generator[Callable[[WorkflowCreate], WorkflowRead], None, None]:
     """Factory that creates workflows via the API with automatic cleanup."""
     created_workflow_ids: list[UUID] = []
 
     def _create(workflow_data: WorkflowCreate) -> WorkflowRead:
-        workflow: WorkflowRead = nexus_api.workflows.create(body=workflow_data).assert_and_get()
+        workflow: WorkflowRead = syntara_api.workflows.create(body=workflow_data).assert_and_get()
         created_workflow_ids.append(workflow.id)
         return workflow
 
@@ -127,6 +129,6 @@ def workflow_factory(nexus_api: SyntaraApiRegistry) -> Generator[Callable[[Workf
 
     for workflow_id in created_workflow_ids:
         try:
-            nexus_api.workflows.delete(workflow_id=workflow_id)
+            syntara_api.workflows.delete(workflow_id=workflow_id)
         except Exception:
             pass

@@ -10,13 +10,13 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 
-from nexus.authz.models.project import Project
-from nexus.integrations.models.integration import (
+from syntara.authz.models.project import Project
+from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationProjectAssignment,
     IntegrationType,
 )
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.integrations.adapters.protocol import DiscoverResult, ValidateResult
+    from syntara.core.models import User
+    from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
     from tests.integration.helpers.credential import CredentialFactory
 
 BASE_URL = "/api/v1/integrations"
@@ -56,7 +56,7 @@ def integration_service(
 @pytest_asyncio.fixture
 async def llm_credential_id(credential_factory: CredentialFactory) -> UUID:
     """Create an LLM Provider credential with a stored secret and return its ID."""
-    from nexus.core.services.secret_service import create_secret_service
+    from syntara.core.services.secret_service import create_secret_service
 
     ct = await credential_factory.create_type("LLM Provider")
     project = await credential_factory.create_project()
@@ -70,7 +70,7 @@ async def llm_credential_id(credential_factory: CredentialFactory) -> UUID:
 @pytest_asyncio.fixture
 async def aap_credential_id(credential_factory: CredentialFactory) -> UUID:
     """Create an AAP credential with a stored secret and return its ID."""
-    from nexus.core.services.secret_service import create_secret_service
+    from syntara.core.services.secret_service import create_secret_service
 
     ct = await credential_factory.create_type("Ansible Automation Platform")
     project = await credential_factory.create_project()
@@ -113,8 +113,8 @@ def mock_adapter(
     from unittest.mock import patch
 
     with (
-        patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-        patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+        patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+        patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
     ):
         mock_settings.return_value.get = AsyncMock(return_value=10)
         adapter = AsyncMock()
@@ -186,8 +186,8 @@ async def project_scoped_setup(
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator
 
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
 
     return {
         "project_id": project.id,

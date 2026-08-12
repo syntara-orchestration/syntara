@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 import pytest
 
-from nexus.authz.evaluator import RegoEvaluator, evaluate_policy_input, get_default_policy_path
+from syntara.authz.evaluator import RegoEvaluator, evaluate_policy_input, get_default_policy_path
 from tests.unit.authz.conftest import allow_policy, build_opa_input, deny_policy
 
 
@@ -80,7 +80,7 @@ def _evaluate_with_opa_cli(authz_input: dict[str, Any], *, policy_path: Path | N
                 str(policy_file),
                 "--input",
                 input_file.name,
-                "data.nexus.authz",
+                "data.syntara.authz",
             ],
             check=True,
             capture_output=True,

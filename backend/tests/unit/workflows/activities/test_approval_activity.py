@@ -11,8 +11,8 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.clients.approvals_client import ApprovalsApiClientError
-from nexus.workflows.workflow_engine.activities.approval_activity import (
+from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
+from syntara.workflows.workflow_engine.activities.approval_activity import (
     ApprovalActivityError,
     create_approval_request_activity,
 )
@@ -109,7 +109,7 @@ async def test_create_approval_request_success(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -152,7 +152,7 @@ async def test_create_approval_request_with_timeout(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -190,7 +190,7 @@ async def test_create_approval_request_with_rejected_path(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -226,7 +226,7 @@ async def test_create_approval_request_api_error(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(ApprovalActivityError, match="Connection refused"),
@@ -257,7 +257,7 @@ async def test_create_approval_request_unexpected_error(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(ApprovalActivityError, match="Unexpected error creating approval request"),

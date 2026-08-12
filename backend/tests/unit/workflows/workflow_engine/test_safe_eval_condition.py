@@ -6,7 +6,7 @@ string/numeric comparisons, and rejects malicious or unsupported expressions.
 
 import pytest
 
-from nexus.workflows.workflow_engine.expression_resolver import safe_eval_condition
+from syntara.workflows.workflow_engine.expression_resolver import safe_eval_condition
 
 
 class TestBooleanLiterals:

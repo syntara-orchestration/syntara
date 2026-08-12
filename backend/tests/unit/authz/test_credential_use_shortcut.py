@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from nexus.authz.engine import _derive_allowed_projects
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.authz.engine import _derive_allowed_projects
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 def _allow(actions: list[str], scope: str = "any", project: str = "", **kwargs: object) -> dict[str, Any]:

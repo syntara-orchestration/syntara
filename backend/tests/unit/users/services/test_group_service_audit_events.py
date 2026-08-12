@@ -13,15 +13,15 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
-from nexus.core.models import User
-from nexus.core.models.group import Group
-from nexus.users.services.group_service import GroupsService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
+from syntara.core.models import User
+from syntara.core.models.group import Group
+from syntara.users.services.group_service import GroupsService
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestGroupsServiceAddMemberAuditEvents:
@@ -31,7 +31,7 @@ class TestGroupsServiceAddMemberAuditEvents:
         AuditEventDispatcher.register({GroupMembershipEvent: GroupMembershipHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_add_member_emits_group_member_added_security_event(
         self,
         mock_do_emit: AsyncMock,
@@ -56,7 +56,7 @@ class TestGroupsServiceAddMemberAuditEvents:
         with (
             patch.object(service, "get_group_by_id", new_callable=AsyncMock, return_value=group),
             patch(
-                "nexus.users.services.group_service.get_user_by_id",
+                "syntara.users.services.group_service.get_user_by_id",
                 new_callable=AsyncMock,
                 return_value=member,
             ),
@@ -70,7 +70,7 @@ class TestGroupsServiceAddMemberAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Group member added: alice -> group developers"
         assert event.resource_urn == f"urn:syntara:group-membership:{group_id}:{user_id}"
         assert event.structured_data.data_type == "group-membership"
@@ -87,7 +87,7 @@ class TestGroupsServiceRemoveMemberAuditEvents:
         AuditEventDispatcher.register({GroupMembershipEvent: GroupMembershipHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_remove_member_emits_group_member_removed_security_event(
         self,
         mock_do_emit: AsyncMock,
@@ -111,7 +111,7 @@ class TestGroupsServiceRemoveMemberAuditEvents:
         with (
             patch.object(service, "get_group_by_id", new_callable=AsyncMock, return_value=group),
             patch(
-                "nexus.users.services.group_service.get_user_by_id",
+                "syntara.users.services.group_service.get_user_by_id",
                 new_callable=AsyncMock,
                 return_value=member,
             ),
@@ -126,7 +126,7 @@ class TestGroupsServiceRemoveMemberAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Group member removed: alice -> group developers"
         assert event.structured_data.action == "removed"
         assert event.structured_data.user_id == str(user_id)
@@ -139,7 +139,7 @@ class TestGroupsServiceSetUserGroupsAuditEvents:
         AuditEventDispatcher.register({GroupMembershipEvent: GroupMembershipHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_dispatch_membership_diff_emits_added_and_removed_events(
         self,
         mock_do_emit: AsyncMock,
@@ -169,7 +169,7 @@ class TestGroupsServiceSetUserGroupsAuditEvents:
         for call in mock_do_emit.call_args_list:
             event: AuditEvent = call.args[0]
             assert event.event_category == EventCategory.SECURITY_EVENT
-            assert event.source_component == "nexus.authz"
+            assert event.source_component == "syntara.authz"
             assert event.structured_data.username == "alice"
             assert event.structured_data.user_id == str(user_id)
 
@@ -178,7 +178,7 @@ class TestGroupsServiceSetUserGroupsAuditEvents:
         assert by_action["group_member_removed"].structured_data.group_name == "auditors"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_set_user_groups_invokes_diff_dispatch_after_commit(
         self,
         mock_do_emit: AsyncMock,
@@ -210,7 +210,7 @@ class TestGroupsServiceSetUserGroupsAuditEvents:
         service = GroupsService(session=mock_session, user=test_user)
         with (
             patch(
-                "nexus.users.services.group_service.get_user_by_id",
+                "syntara.users.services.group_service.get_user_by_id",
                 new_callable=AsyncMock,
                 return_value=member,
             ),

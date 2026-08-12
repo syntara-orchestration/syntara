@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from nexus.auth.cookies import (
+from syntara.auth.cookies import (
     clear_refresh_cookie,
     get_refresh_token_from_cookie,
     set_refresh_cookie,
@@ -23,7 +23,7 @@ class TestSetRefreshCookie:
 
     def test_sets_cookie_with_correct_attributes(self) -> None:
         response = MagicMock()
-        with patch("nexus.auth.cookies.get_settings", return_value=_mock_settings()):
+        with patch("syntara.auth.cookies.get_settings", return_value=_mock_settings()):
             set_refresh_cookie(response, "my-jwt-token", max_age=28800)
 
         response.set_cookie.assert_called_once_with(
@@ -43,7 +43,7 @@ class TestSetRefreshCookie:
             cookie_secure=False,
             cookie_domain=".example.com",
         )
-        with patch("nexus.auth.cookies.get_settings", return_value=settings):
+        with patch("syntara.auth.cookies.get_settings", return_value=settings):
             set_refresh_cookie(response, "tok", max_age=3600)
 
         response.set_cookie.assert_called_once_with(
@@ -63,7 +63,7 @@ class TestClearRefreshCookie:
 
     def test_deletes_cookie_with_correct_attributes(self) -> None:
         response = MagicMock()
-        with patch("nexus.auth.cookies.get_settings", return_value=_mock_settings()):
+        with patch("syntara.auth.cookies.get_settings", return_value=_mock_settings()):
             clear_refresh_cookie(response)
 
         response.delete_cookie.assert_called_once_with(

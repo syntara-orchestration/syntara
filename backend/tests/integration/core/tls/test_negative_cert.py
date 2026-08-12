@@ -24,8 +24,8 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from nexus.auth.cert_middleware import ClientCertAuthMiddleware, _validate_client_cert
-from nexus.core.tls.protocol import TLSH11Protocol
+from syntara.auth.cert_middleware import ClientCertAuthMiddleware, _validate_client_cert
+from syntara.core.tls.protocol import TLSH11Protocol
 from tests.fixtures.tls import generate_ca, generate_service_cert
 from tests.integration.core.tls.conftest import _health
 
@@ -92,7 +92,7 @@ def neg_server(neg_certs: dict[str, Path]) -> Generator[str, None, None]:
     mock_settings.s2s_tls_cn_allowlist = list(_ALLOWED_CNS)
     mock_settings.s2s_tls_crl_path = None
 
-    with patch("nexus.auth.cert_middleware.get_settings", return_value=mock_settings):
+    with patch("syntara.auth.cert_middleware.get_settings", return_value=mock_settings):
         app = ClientCertAuthMiddleware(inner_app)
 
     config = uvicorn.Config(
@@ -214,7 +214,7 @@ class TestNEG3NoCertificate:
         mock_settings.s2s_tls_cn_allowlist = list(_ALLOWED_CNS)
         mock_settings.s2s_tls_crl_path = None
 
-        with patch("nexus.auth.cert_middleware.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.cert_middleware.get_settings", return_value=mock_settings):
             middleware = ClientCertAuthMiddleware(capture_app)
 
         scope: dict[str, object] = {

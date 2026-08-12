@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.exceptions import WorkflowVersionConflictError
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.exceptions import WorkflowVersionConflictError
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 @pytest.fixture
@@ -121,7 +121,7 @@ class TestGetWebhookSyncDefinition:
         mock_service.session.exec.return_value = result  # type: ignore[attr-defined]
 
         fallback = {"nodes": [{"id": "fallback"}]}
-        with patch("nexus.workflows.services.workflow_service.logger") as mock_logger:
+        with patch("syntara.workflows.services.workflow_service.logger") as mock_logger:
             definition = await mock_service._get_webhook_sync_definition(uuid4(), workflow, fallback)
 
         assert definition == fallback
@@ -216,7 +216,7 @@ class TestRestoreWorkflowVersionSourceLabel:
             ) as mock_create,
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch.object(mock_service.session, "refresh", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
         ):
             await mock_service.restore_workflow_version(workflow_id, version=3)
 
@@ -255,7 +255,7 @@ class TestRestoreWorkflowVersionSourceLabel:
             ) as mock_create,
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch.object(mock_service.session, "refresh", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
         ):
             await mock_service.restore_workflow_version(workflow_id, version=3)
 
@@ -292,7 +292,7 @@ class TestRestoreWorkflowVersionSourceLabel:
             ) as mock_create,
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch.object(mock_service.session, "refresh", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
         ):
             await mock_service.restore_workflow_version(workflow_id, version=3)
 

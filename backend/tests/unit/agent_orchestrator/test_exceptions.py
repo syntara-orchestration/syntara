@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.exceptions import (
+from syntara.agent_orchestrator.exceptions import (
     AgentConfigurationError,
     AgentOrchestratorError,
     AgentRateLimitError,
@@ -12,7 +12,7 @@ from nexus.agent_orchestrator.exceptions import (
     LLMConfigurationError,
     OrchestrationError,
 )
-from nexus.core.exceptions import RetryableError
+from syntara.core.exceptions import RetryableError
 
 
 class TestLLMConfigurationError:

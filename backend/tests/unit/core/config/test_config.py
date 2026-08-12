@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from nexus.core.config.base import Settings
+from syntara.core.config.base import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,7 +40,7 @@ class TestDatabaseSettings:
         assert settings.db_password.get_secret_value() == "admin"
         assert settings.db_host == "localhost"
         assert settings.db_port == 5432
-        assert settings.db_name == "nexus_api"
+        assert settings.db_name == "syntara_api"
         assert settings.db_pool_size == 10
         assert settings.db_max_overflow == 20
         assert settings.db_pool_timeout_seconds == 30.0
@@ -53,7 +53,7 @@ class TestDatabaseSettings:
         assert url.username == "admin"
         assert url.host == "localhost"
         assert url.port == 5432
-        assert url.database == "nexus_api"
+        assert url.database == "syntara_api"
 
     def test_database_url_with_custom_values(
         self,
@@ -62,7 +62,7 @@ class TestDatabaseSettings:
         """Test database_url with custom configuration values."""
         from pydantic import SecretStr
 
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         with override_settings(
             db_user="testuser",
@@ -318,7 +318,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com:8000"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "https://example.com:8000"
 
@@ -330,7 +330,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com/"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "https://example.com"
 
@@ -345,7 +345,7 @@ class TestServerSettings:
             server_host="localhost",
             server_port=9000,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "http://localhost:9000"
 
@@ -358,7 +358,7 @@ class TestServerSettings:
             server_public_url=HttpUrl("https://example.com"),
             oidc_post_logout_redirect_uri="https://custom.example.com",
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().post_logout_redirect_uri == "https://custom.example.com"
 
@@ -370,7 +370,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().post_logout_redirect_uri == "https://example.com"
 
@@ -391,7 +391,7 @@ class TestLoggingSettings:
 
     def test_logging_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test default logging configuration values."""
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         # Clear env vars to test pure defaults
         monkeypatch.delenv("APP_FALLBACK_LOG_LEVEL", raising=False)
@@ -429,7 +429,7 @@ class TestTemporalSettings:
 
     def test_temporal_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test default Temporal configuration values."""
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         # Clear env vars to test pure defaults
         monkeypatch.delenv("APP_TASK_QUEUE", raising=False)

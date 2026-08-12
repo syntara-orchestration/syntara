@@ -95,12 +95,12 @@ Scheduled triggers expose two timestamps: `scheduled_at` (when the schedule was 
 
 | File | Purpose |
 |------|---------|
-| `src/nexus/workflows/services/scheduled_trigger_service.py` | Syncs triggers with Temporal Schedules; cached client |
-| `src/nexus/workflows/workflow_engine/scheduled_launcher.py` | `ScheduledWorkflowLauncher` workflow and `ScheduledExecutionLauncher` activity |
-| `src/nexus/workflows/workflow_engine/activities/scheduled_trigger.py` | Activity: pass-through with output mapping (timing metadata arrives via `input_data`) |
-| `src/nexus/workflows/utils/schedule_parser.py` | `build_schedule_id()`, `config_to_temporal_schedule()` |
-| `src/nexus/workflows/workflow_engine/models/workflow_definition.py` | `ScheduledTriggerConfig` model |
-| `src/nexus/schemas/workflows/v2/triggers/scheduled.schema.json` | JSON Schema for trigger configuration |
+| `src/syntara/workflows/services/scheduled_trigger_service.py` | Syncs triggers with Temporal Schedules; cached client |
+| `src/syntara/workflows/workflow_engine/scheduled_launcher.py` | `ScheduledWorkflowLauncher` workflow and `ScheduledExecutionLauncher` activity |
+| `src/syntara/workflows/workflow_engine/activities/scheduled_trigger.py` | Activity: pass-through with output mapping (timing metadata arrives via `input_data`) |
+| `src/syntara/workflows/utils/schedule_parser.py` | `build_schedule_id()`, `config_to_temporal_schedule()` |
+| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `ScheduledTriggerConfig` model |
+| `src/syntara/schemas/workflows/v2/triggers/scheduled.schema.json` | JSON Schema for trigger configuration |
 
 ## Related Documentation
 

@@ -14,19 +14,19 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import RetrieverServiceError
-from nexus.agent_orchestrator.context_manager.retriever_service.interfaces.document_retriever import DocumentRetriever
-from nexus.agent_orchestrator.context_manager.retriever_service.interfaces.relevancy_checker import RelevancyChecker
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import RetrieverServiceError
+from syntara.agent_orchestrator.context_manager.retriever_service.interfaces.document_retriever import DocumentRetriever
+from syntara.agent_orchestrator.context_manager.retriever_service.interfaces.relevancy_checker import RelevancyChecker
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
-from nexus.agent_orchestrator.context_manager.retriever_service.services.retriever_service import RetrieverService
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.core.constants import CONTEXT_KEY_FILE_IDS
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.services.retriever_service import RetrieverService
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.core.constants import CONTEXT_KEY_FILE_IDS
+from syntara.files.models import FileMetadata, FileStatus
 
 from .conftest import TestUploadedFileRetriever, async_session_generator
 

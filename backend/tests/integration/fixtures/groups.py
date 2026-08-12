@@ -10,14 +10,14 @@ import pytest_asyncio
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.core.models.group import Group
+    from syntara.core.models import User
+    from syntara.core.models.group import Group
 
 
 @pytest_asyncio.fixture
 async def test_group(test_db_session: AsyncSession, test_user: User) -> Group:
     """Create a single test group."""
-    from nexus.core.models.group import Group
+    from syntara.core.models.group import Group
 
     group = Group(
         id=uuid4(),
@@ -41,7 +41,7 @@ async def group_with_members(
     """Create a group with members for membership tests."""
     from sqlalchemy import insert
 
-    from nexus.core.models.group import user_groups
+    from syntara.core.models.group import user_groups
 
     members = multiple_local_users[:3]
     for user in members:
@@ -54,7 +54,7 @@ async def group_with_members(
 @pytest_asyncio.fixture
 async def multiple_test_groups(test_db_session: AsyncSession, test_user: User) -> list[Group]:
     """Create multiple test groups for pagination, filtering, and sorting tests."""
-    from nexus.core.models.group import Group
+    from syntara.core.models.group import Group
 
     groups = [
         Group(id=uuid4(), name="Alpha Group", description="First group", created_by=test_user.id),

@@ -9,8 +9,8 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from nexus.workflows.models.workflow_version import PublishVersionRequest, WorkflowVersionRead
-from nexus.workflows.router import (
+from syntara.workflows.models.workflow_version import PublishVersionRequest, WorkflowVersionRead
+from syntara.workflows.router import (
     get_workflow,
     get_workflow_version,
     list_workflow_versions,
@@ -81,7 +81,7 @@ class TestWorkflowEndpoints:
         workflow_id = uuid4()
 
         with patch(
-            "nexus.workflows.router._build_workflow_with_version_response",
+            "syntara.workflows.router._build_workflow_with_version_response",
             new_callable=AsyncMock,
             return_value=mock_response,
         ) as mock_build:
@@ -111,7 +111,7 @@ class TestWorkflowEndpoints:
         workflow_id = uuid4()
 
         with patch(
-            "nexus.workflows.router._build_workflow_with_version_response",
+            "syntara.workflows.router._build_workflow_with_version_response",
             new_callable=AsyncMock,
             return_value=mock_response,
         ) as mock_build:
@@ -177,7 +177,7 @@ class TestWorkflowEndpoints:
 
         with (
             patch(
-                "nexus.workflows.router.deserialize_workflow_version",
+                "syntara.workflows.router.deserialize_workflow_version",
                 return_value=mock_deserialized,
             ) as mock_deser,
             patch.object(
@@ -230,7 +230,7 @@ class TestWorkflowEndpoints:
         request = PublishVersionRequest()
 
         with patch(
-            "nexus.workflows.router._build_workflow_with_version_response",
+            "syntara.workflows.router._build_workflow_with_version_response",
             new_callable=AsyncMock,
             return_value=mock_response,
         ) as mock_build:
@@ -264,7 +264,7 @@ class TestWorkflowEndpoints:
         workflow_id = uuid4()
 
         with patch(
-            "nexus.workflows.router._build_workflow_with_version_response",
+            "syntara.workflows.router._build_workflow_with_version_response",
             new_callable=AsyncMock,
             return_value=mock_response,
         ) as mock_build:

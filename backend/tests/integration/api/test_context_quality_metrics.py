@@ -11,9 +11,9 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from nexus.agent_orchestrator.context_manager import ContextManagerPlanner
-from nexus.agent_orchestrator.context_manager.models import ContextPackage
-from nexus.core.models import User
+from syntara.agent_orchestrator.context_manager import ContextManagerPlanner
+from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.core.models import User
 from tests.fixtures.settings import FakeSettingsCache
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 

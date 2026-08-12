@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.authz.schemas import PolicyStatementSchema
+from syntara.authz.schemas import PolicyStatementSchema
 
 
 def _make_statement(**overrides: object) -> dict[str, object]:

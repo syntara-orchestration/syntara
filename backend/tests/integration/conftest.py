@@ -31,11 +31,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uvicorn import Config, Server
 
-from nexus.authz.engine import clear_authz_cache, init_authz_cache
-from nexus.authz.models.project import Project
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.models.group import Group
-from nexus.core.websocket.router import build_websocket_router
+from syntara.authz.engine import clear_authz_cache, init_authz_cache
+from syntara.authz.models.project import Project
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.models.group import Group
+from syntara.core.websocket.router import build_websocket_router
 
 pytest_plugins = [
     "tests.integration.fixtures.database",
@@ -72,7 +72,7 @@ async def test_db_template(
         (admin_url, db_name, template_name) used by _restore_from_template.
 
     """
-    from nexus.core.seed import run_seeders
+    from syntara.core.seed import run_seeders
 
     seeder_factory = async_sessionmaker(test_db_engine, class_=AsyncSession, expire_on_commit=False)
     await run_seeders(seeder_factory)
@@ -207,8 +207,8 @@ async def _seed_integration_data(test_db_session: AsyncSession) -> None:
     Not autouse — directories opt in via autouse wrapper fixtures in subdirectory conftest files.
     This avoids inflating workflow/resource counts in pagination and telemetry tests.
     """
-    from nexus.authz.seed import seed_authz_data
-    from nexus.workflows.seed_builtin import seed_builtin_workflows
+    from syntara.authz.seed import seed_authz_data
+    from syntara.workflows.seed_builtin import seed_builtin_workflows
 
     await seed_authz_data(test_db_session)
     await seed_builtin_workflows(test_db_session)
@@ -231,8 +231,8 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     The ``api`` conftest's ``_mock_evaluator`` fixture overrides this one for
     tests in that directory because pytest uses the most-specific conftest.
     """
-    from nexus.api.main import app
-    from nexus.authz.dependencies import get_authz_evaluator
+    from syntara.api.main import app
+    from syntara.authz.dependencies import get_authz_evaluator
 
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(
@@ -247,9 +247,9 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator
 
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.workflows.executions_router.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
 
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
 
@@ -266,7 +266,7 @@ def websocket_example_app(
     """
     # Create directory structure
     project_root = tmp_path / "project"
-    nexus_dir = project_root / "src" / "nexus"
+    nexus_dir = project_root / "src" / "syntara"
     core_dir = nexus_dir / "core" / "websocket"
     core_dir.mkdir(parents=True)
 
@@ -788,18 +788,18 @@ components:
     fake_endpoint_factory = core_dir / "endpoint_factory.py"
     fake_endpoint_factory.touch()
     monkeypatch.setattr(
-        "nexus.core.websocket.endpoint_factory.__file__",
+        "syntara.core.websocket.endpoint_factory.__file__",
         str(fake_endpoint_factory),
     )
 
     # Mock importlib.resources.files to return our temp schemas directory
     def mock_files(package: str) -> Path:
-        if package == "nexus":
+        if package == "syntara":
             return nexus_dir
         msg = f"Package {package} not found"
         raise FileNotFoundError(msg)
 
-    monkeypatch.setattr("nexus.core.websocket.endpoint_factory.files", mock_files)
+    monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", mock_files)
 
     # Create FastAPI app
     app = FastAPI()
@@ -885,8 +885,8 @@ def _moto_s3() -> Generator[None, None, None]:
         conn = boto3.client("s3", region_name=_MOTO_REGION)
         conn.create_bucket(Bucket=_MOTO_BUCKET)
 
-        from nexus.files.file_manager import get_file_manager
-        from nexus.files.retrievers.s3 import S3FileRetriever
+        from syntara.files.file_manager import get_file_manager
+        from syntara.files.retrievers.s3 import S3FileRetriever
 
         retriever = S3FileRetriever(
             endpoint_url=None,

@@ -15,7 +15,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
+from syntara.core.models import User
 
 
 @pytest.mark.asyncio
