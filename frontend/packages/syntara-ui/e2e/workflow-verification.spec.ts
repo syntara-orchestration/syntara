@@ -19,14 +19,13 @@ import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify
 import {
   buildUniqueName,
   createBasicWorkflowViaApi,
-  openBuilderById,
   openWorkflowInBuilder,
   createWorkflowWithTrigger,
   addScriptNode,
   addScriptNodeUnconnected,
   deleteWorkflow,
 } from './helpers/workflows'
-import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
+import { deleteWorkflowViaApi } from './utils/api'
 
 const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 5_000
@@ -332,27 +331,13 @@ test.describe('Variable reference validation', () => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-invalid')
 
-    // Create via API with an http_request node whose URL contains an invalid
-    // variable reference. The backend validator checks all http_request
-    // parameter fields for ${...} expressions (unlike script nodes, whose
-    // `code` field is intentionally excluded from validation).
-    const { id: workflowId } = await createWorkflowViaApi(
-      app,
-      workflowName,
-      [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-      [
-        {
-          id: 'ref_step',
-          type: 'http_request',
-          name: 'Ref step',
-          parameters: { method: 'GET', url: 'https://example.com/${nonexistent_node.result}' },
-        },
-      ],
-      [{ from: 'trigger_manual', to: 'ref_step' }]
-    )
+    await createWorkflowWithTrigger(app, workflowName)
 
     try {
-      await openBuilderById(app, workflowId)
+      await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
+
+      await app.getByRole('button', { name: 'Save' }).click()
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
 
       await triggerVerifyWorkflow(app)
 
@@ -361,7 +346,7 @@ test.describe('Variable reference validation', () => {
       await app.getByRole('button', { name: /alert details/i }).click()
       await expect(app.getByText(/does not exist in this workflow/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
-      await deleteWorkflowViaApi(app, workflowId)
+      await deleteWorkflow(app, workflowName)
     }
   })
 

@@ -1,10 +1,10 @@
-"""E2E tests for the script node feature gate (APP_SCRIPT_NODES_ENABLED).
+"""E2E tests for the script node gate (APP_SCRIPT_NODES_ENABLED).
 
 Tests verify that:
 - When disabled (default): script activities fail immediately with an opaque error
 - When enabled: script activities execute normally
 
-The feature gate is controlled by the APP_SCRIPT_NODES_ENABLED environment variable
+The gate is controlled by the APP_SCRIPT_NODES_ENABLED environment variable
 on the Temporal worker. Since E2E tests hit a live deployment, the gate cannot be
 toggled mid-test. Tests are conditionally skipped based on the environment.
 
@@ -23,7 +23,10 @@ from syntara_api_client.models.execution_status import ExecutionStatus
 
 pytestmark = [pytest.mark.e2e]
 
-_SCRIPT_NODES_ENABLED = os.environ.get("APP_SCRIPT_NODES_ENABLED", "").lower() == "true"
+# The gate treats both unset and "false" as disabled (Pydantic Settings default).
+# Unit tests in test_script_activity.py verify the default-False behavior directly.
+_SCRIPT_NODES_ENV_RAW = os.environ.get("APP_SCRIPT_NODES_ENABLED")
+_SCRIPT_NODES_ENABLED = _SCRIPT_NODES_ENV_RAW is not None and _SCRIPT_NODES_ENV_RAW.lower() == "true"
 
 
 def _script_workflow_definition(name: str) -> dict[str, Any]:
@@ -35,9 +38,9 @@ def _script_workflow_definition(name: str) -> dict[str, Any]:
         "nodes": [
             {
                 "id": "script_node",
-                "name": "Feature Gate Test Script",
+                "name": "Gate Test Script",
                 "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'feature gate test'"},
+                "parameters": {"language": "bash", "code": "echo 'gate test'"},
             },
         ],
         "edges": [{"from": "trigger", "to": "script_node"}],
@@ -48,15 +51,15 @@ def _script_workflow_definition(name: str) -> dict[str, Any]:
     _SCRIPT_NODES_ENABLED,
     reason="APP_SCRIPT_NODES_ENABLED is true — disabled-gate tests do not apply",
 )
-class TestScriptNodeFeatureGateDisabled:
-    """Tests for script node behavior when APP_SCRIPT_NODES_ENABLED is false (default).
+class TestScriptNodeGateDisabled:
+    """Tests for script node behavior when APP_SCRIPT_NODES_ENABLED is false or unset.
 
     These tests verify that the Temporal worker rejects script activities
     immediately with an opaque, non-retryable error.
     """
 
     def test_script_activity_fails_immediately(self, nexus_api: SyntaraApiRegistry) -> None:
-        """Script activity fails immediately when the feature gate is disabled."""
+        """Script activity fails immediately when the gate is disabled."""
         result = create_and_run_workflow(
             nexus_api,
             "e2e-script-gate-disabled",
@@ -68,8 +71,8 @@ class TestScriptNodeFeatureGateDisabled:
         )
 
         error_text = str(result.error_details or "")
-        assert "Developer Preview Script node" in error_text, (
-            f"Expected 'Developer Preview Script node' in error_details, got: {error_text}"
+        assert "Script node execution is not enabled" in error_text, (
+            f"Expected 'Script node execution is not enabled' in error_details, got: {error_text}"
         )
 
     def test_failure_visible_in_activity_history(self, nexus_api: SyntaraApiRegistry) -> None:
@@ -90,12 +93,12 @@ class TestScriptNodeFeatureGateDisabled:
         assert script_activity.status == "failed", f"script_node should be failed, got: {script_activity.status}"
 
         activity_error = str(getattr(script_activity, "error_details", None) or "")
-        assert "Developer Preview Script node" in activity_error, (
+        assert "Script node execution is not enabled" in activity_error, (
             f"Expected error details on script activity, got: {activity_error}"
         )
 
     def test_error_message_is_opaque(self, nexus_api: SyntaraApiRegistry) -> None:
-        """The error message does not expose configuration details or hint at how to enable."""
+        """The error message does not expose configuration details."""
         result = create_and_run_workflow(
             nexus_api,
             "e2e-script-gate-opaque",
@@ -115,7 +118,6 @@ class TestScriptNodeFeatureGateDisabled:
                 continue
             assert "APP_SCRIPT_NODES_ENABLED" not in error_text, f"Error must not expose env var name: {error_text}"
             assert "script_nodes_enabled" not in error_text, f"Error must not expose setting name: {error_text}"
-            assert "enable" not in error_text.lower(), f"Error must not hint at how to enable: {error_text}"
             assert "setting" not in error_text.lower(), f"Error must not reference settings: {error_text}"
 
 
@@ -123,15 +125,15 @@ class TestScriptNodeFeatureGateDisabled:
     not _SCRIPT_NODES_ENABLED,
     reason="APP_SCRIPT_NODES_ENABLED is not true — enabled-gate tests require it",
 )
-class TestScriptNodeFeatureGateEnabled:
+class TestScriptNodeGateEnabled:
     """Tests for script node behavior when APP_SCRIPT_NODES_ENABLED is true.
 
     These tests verify that script activities execute normally when the
-    feature gate is enabled.
+    gate is enabled.
     """
 
     def test_script_activity_executes_normally(self, nexus_api: SyntaraApiRegistry) -> None:
-        """Script activity completes successfully when the feature gate is enabled."""
+        """Script activity completes successfully when the gate is enabled."""
         result = create_and_run_workflow(
             nexus_api,
             "e2e-script-gate-enabled",

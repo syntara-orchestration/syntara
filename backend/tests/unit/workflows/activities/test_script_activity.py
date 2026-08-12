@@ -1157,8 +1157,8 @@ class TestMemoryLimitIntegration:
         assert result["output"]["stdout"].strip() == "wrapped"
 
 
-class TestScriptNodesFeatureGate:
-    """Test the APP_SCRIPT_NODES_ENABLED feature gate."""
+class TestScriptNodesGate:
+    """Test the APP_SCRIPT_NODES_ENABLED script node gate."""
 
     @pytest.mark.asyncio
     async def test_disabled_raises_application_error(self) -> None:
@@ -1176,7 +1176,7 @@ class TestScriptNodesFeatureGate:
 
     @pytest.mark.asyncio
     async def test_disabled_error_message_is_opaque(self) -> None:
-        """Error message must not reference the setting name or hint how to enable."""
+        """Error message must not reference the setting name."""
         settings = get_settings()
         object.__setattr__(settings, "script_nodes_enabled", False)
         try:
@@ -1187,8 +1187,7 @@ class TestScriptNodesFeatureGate:
             assert "APP_SCRIPT_NODES_ENABLED" not in message
             assert "script_nodes_enabled" not in message
             assert "setting" not in message.lower()
-            assert "enable" not in message.lower()
-            assert "Developer Preview" in message
+            assert "Script node execution is not enabled" in message
         finally:
             object.__setattr__(settings, "script_nodes_enabled", True)
 

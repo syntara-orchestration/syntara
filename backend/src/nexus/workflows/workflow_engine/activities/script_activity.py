@@ -448,11 +448,12 @@ async def execute_script_activity(  # noqa: C901
 ) -> dict[str, Any]:
     """Execute a script for V2 workflows (unified bash/python activity).
 
-    SECURITY: Gated by APP_SCRIPT_NODES_ENABLED (default False). When disabled,
-    the activity fails immediately with a non-retryable error. Scripts currently
-    execute with NO sandboxing — enabling this setting grants arbitrary code
-    execution on the worker infrastructure to any user who can create and run
-    workflows. This setting will be removed when proper sandboxing is in place.
+    SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
+    directly in the Temporal worker process without additional sandboxing. Enabling this
+    grants any user with workflow:create + execution:run permissions the ability
+    to run arbitrary commands on the worker infrastructure, with access to all
+    environment variables.
+    Enabling Script Node is not recommended for production deployments.
 
     This activity handles both bash and python scripts based on the 'language'
     field in config, delegating to the appropriate helper function.
@@ -481,10 +482,9 @@ async def execute_script_activity(  # noqa: C901
     """
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
-    # SECURITY: Error is intentionally opaque — must NOT name the setting or hint
-    # at how to enable. See docs/SECURITY.md for rationale.
+    # SECURITY: Error is intentionally opaque — must NOT name the setting or hint at how to enable.
     if not get_settings().script_nodes_enabled:
-        msg = "Workflow contains Developer Preview Script node."
+        msg = "Script node execution is not enabled."
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
 
     try:

@@ -9,7 +9,7 @@
  * - Clicking cancel transitions execution to cancelled status
  * - Cancel button hidden for completed executions
  *
- * Requires a real backend with Temporal — the wait node keeps the execution
+ * Requires a real backend with Temporal — the sleep node keeps the execution
  * in "running" state long enough to interact with the cancel button.
  */
 
@@ -47,13 +47,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'long_wait',
-          type: 'wait',
-          name: 'Long Wait',
-          parameters: { duration: 300 },
+          id: 'sleep_node',
+          type: 'script',
+          name: 'Long Sleep',
+          parameters: { language: 'bash', code: 'sleep 300' },
         },
       ],
-      [{ from: 'trigger_manual', to: 'long_wait' }]
+      [{ from: 'trigger_manual', to: 'sleep_node' }]
     ))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
@@ -72,13 +72,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'quick_wait',
-          type: 'wait',
-          name: 'Quick Wait',
-          parameters: { duration: 1 },
+          id: 'echo_node',
+          type: 'script',
+          name: 'Quick Echo',
+          parameters: { language: 'bash', code: 'echo done' },
         },
       ],
-      [{ from: 'trigger_manual', to: 'quick_wait' }]
+      [{ from: 'trigger_manual', to: 'echo_node' }]
     ))
 
     const echoRunResp = await apiRequest(page, 'post', '/executions', {

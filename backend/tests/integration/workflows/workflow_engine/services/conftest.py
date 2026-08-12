@@ -14,7 +14,7 @@ def _ensure_runtime_settings() -> Generator[None, None, None]:
 
     Activities like ``execute_script_activity`` call ``get_runtime_settings()``
     which raises ``RuntimeError`` if the singleton has not been set.
-    Also enables script nodes since the feature gate defaults to False.
+    Also enables script nodes since the gate defaults to False.
     """
     import nexus.settings.cache.settings_cache as _settings_mod
 
