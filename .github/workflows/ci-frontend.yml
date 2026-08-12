@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: read # checkout code
-  pull-requests: write # gh api needs PR file list + aggregate job posts PR comment
+  pull-requests: read # gh api needs PR file list
   statuses: read # read E2E commit status
 
 concurrency:
@@ -569,11 +569,9 @@ jobs:
       pull-requests: write
     steps:
       - name: Check shard results
-        id: check-shards
         run: |
           RESULT="${{ needs.test-compose-e2e.result }}"
           echo "Shards completed with result: $RESULT"
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
 
       - name: Download all blob reports
         if: always()
@@ -585,7 +583,7 @@ jobs:
 
       - name: Merge blob reports
         if: always()
-        run: npx --yes @playwright/test@1.60.0 merge-reports --reporter=json ./all-blob-reports > merged-results.json
+        run: npx --yes @playwright/test@1.62.1 merge-reports --reporter=json ./all-blob-reports > merged-results.json
 
       - name: Post E2E results to PR
         if: always() && github.event_name == 'pull_request'
