@@ -2,7 +2,7 @@
 
 When a Temporal Schedule fires, it starts the ``ScheduledWorkflowLauncher``
 workflow which delegates DB setup to the ``ScheduledExecutionLauncher``
-activity, then starts ``NexusWorkflow`` as a child workflow and waits for
+activity, then starts ``SyntaraWorkflow`` as a child workflow and waits for
 it to complete. This keeps the launcher alive for the full execution
 lifecycle so Temporal's schedule overlap policy (Skip/Buffer/etc.) applies
 to the actual work, not just the setup phase.
@@ -43,13 +43,13 @@ _LAUNCHER_ACTIVITY_TIMEOUT_SECONDS = 60
 
 @workflow.defn(name="scheduled_workflow_launcher")
 class ScheduledWorkflowLauncher:
-    """Temporal workflow that launches a NexusWorkflow on behalf of a schedule.
+    """Temporal workflow that launches a SyntaraWorkflow on behalf of a schedule.
 
     This is the action target for Temporal Schedules. When a schedule fires,
     Temporal starts this workflow which delegates to a setup activity for DB
-    operations, then starts NexusWorkflow as a child workflow.
+    operations, then starts SyntaraWorkflow as a child workflow.
 
-    The launcher stays alive while NexusWorkflow runs, so Temporal's schedule
+    The launcher stays alive while SyntaraWorkflow runs, so Temporal's schedule
     overlap policy (Skip/Buffer One/Buffer All) correctly detects whether a
     previous execution is still in progress.
     """
@@ -111,7 +111,7 @@ class ScheduledExecutionLauncher:
     2. Prepare execution identity and metadata
     3. Create Execution record in DB
 
-    Starting NexusWorkflow is handled by the launcher workflow via
+    Starting SyntaraWorkflow is handled by the launcher workflow via
     ``execute_child_workflow``.
 
     """
@@ -125,7 +125,7 @@ class ScheduledExecutionLauncher:
 
         Args:
             session_factory: Async SQLModel session factory (e.g., ``AsyncSessionLocal``).
-            task_queue: Temporal task queue name for starting NexusWorkflow.
+            task_queue: Temporal task queue name for starting SyntaraWorkflow.
 
         """
         self._session_factory = session_factory
@@ -137,7 +137,7 @@ class ScheduledExecutionLauncher:
 
         Loads the published workflow version, creates the Execution record in
         the database using the service principal identity, and returns all data
-        needed for the launcher workflow to start NexusWorkflow as a child
+        needed for the launcher workflow to start SyntaraWorkflow as a child
         workflow. Records schedule timing metadata and Prometheus metrics.
 
         Args:
@@ -211,7 +211,7 @@ class ScheduledExecutionLauncher:
         Phase 2: Prepare execution identity and metadata
         Phase 3: Create Execution record in DB (write session)
 
-        Returns all data the launcher workflow needs to start NexusWorkflow
+        Returns all data the launcher workflow needs to start SyntaraWorkflow
         as a child workflow.
         """
         # Phase 1: Load published workflow definition (read-only session)

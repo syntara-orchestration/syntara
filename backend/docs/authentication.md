@@ -478,7 +478,7 @@ The `KeyManager` and `TokenService` are cached as singletons per process for per
 1. **Deploy the new key alongside the old one** — set `APP_JWT_PRIVATE_KEY_PATH` to the new key and add the old key to `APP_JWT_BACKUP_KEYS`. Backup keys are used for **verification only** (they never sign new tokens), so existing tokens remain valid during the transition.
 
     ```
-    APP_JWT_BACKUP_KEYS='[{"key_id":"nexus-old-key","key_path":"/run/secrets/jwt-old.pem"}]'
+    APP_JWT_BACKUP_KEYS='[{"key_id":"orchestrator-old-key","key_path":"/run/secrets/jwt-old.pem"}]'
     ```
 
 2. **Restart all app processes** — the singleton caches are cleared on restart, causing the new key to be loaded. In Kubernetes this is a rolling restart (`kubectl rollout restart`); with systemd it's a service restart.
@@ -866,7 +866,7 @@ When a user authenticates via OIDC, Nexus determines which groups they belong to
 - **Manual mapping** — Admins configure explicit mapping entries that map IdP group values to Nexus groups. Only matched entries grant group membership.
 - **Allow all authenticated** — When `allow_all_authenticated` is enabled, all users from the IdP can log in regardless of group mapping results. They are added to the built-in `users` group and receive the implicit "authenticated" group (added automatically by the authz resolver). Group mappings can still be configured alongside this for more granular access.
 
-Both modes respect the **JMESPath expression** configured on the provider. The expression is evaluated first to extract group values from the token claims, and only the extracted values are used for mapping. This means admins can use JMESPath to filter which groups are considered — for example, `groups[?starts_with(@, 'nexus-')]` would only extract groups prefixed with `nexus-`, ignoring all others in the token.
+Both modes respect the **JMESPath expression** configured on the provider. The expression is evaluated first to extract group values from the token claims, and only the extracted values are used for mapping. This means admins can use JMESPath to filter which groups are considered — for example, `groups[?starts_with(@, 'syntara-')]` would only extract groups prefixed with `syntara-`, ignoring all others in the token.
 
 **JMESPath validation**: Expressions are validated at configuration time — saving an invalid expression (e.g., `[[[bad`) returns a 422 error. If a valid expression fails at runtime (e.g., unexpected token claim structure), the group sync is aborted and login is denied rather than silently removing the user's groups.
 
@@ -1133,7 +1133,7 @@ On success, the response also includes:
 |---|---|---|
 | `APP_JWT_PRIVATE_KEY_PATH` | — | Path to ES256 private key PEM file |
 | `APP_JWT_PRIVATE_KEY_BASE64` | — | Base64-encoded ES256 private key PEM |
-| `APP_JWT_KEY_ID` | `nexus-primary` | Key ID (`kid`) in JWT header |
+| `APP_JWT_KEY_ID` | `orchestrator-primary` | Key ID (`kid`) in JWT header |
 | `APP_JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `15` | Access token lifetime |
 | `APP_JWT_REFRESH_TOKEN_LIFETIME_HOURS` | `8` | Refresh token lifetime |
 | `APP_JWT_BACKUP_KEYS` | — | JSON list of backup keys for rotation |

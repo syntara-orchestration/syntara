@@ -12,10 +12,10 @@ from enum import StrEnum
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
-class AuthError(NexusError):
+class AuthError(SyntaraError):
     """Base exception for all authentication errors."""
 
 
@@ -425,7 +425,7 @@ class OIDCErrorCode(StrEnum):
     EMAIL_ALREADY_LINKED = "email_already_linked"
 
 
-class OIDCCallbackError(NexusError):
+class OIDCCallbackError(SyntaraError):
     """Internal exception for OIDC callback errors that should redirect to the login page."""
 
     def __init__(
@@ -438,7 +438,7 @@ class OIDCCallbackError(NexusError):
         self.redirect_to = redirect_to
 
 
-class MembershipError(NexusError):
+class MembershipError(SyntaraError):
     """Base exception for all membership errors."""
 
 

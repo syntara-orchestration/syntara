@@ -80,13 +80,13 @@ Exception modules (`exceptions.py`) wire themselves to error handlers via the `@
 ```python
 # Correct — string reference, no import of error_handlers needed
 @fastapi_exception(handler="syntara.aap.error_handlers.aap_not_configured_handler")
-class AAPNotConfiguredError(NexusError): ...
+class AAPNotConfiguredError(SyntaraError): ...
 
 # Wrong — direct import creates exceptions ↔ error_handlers cycle
 from syntara.aap.error_handlers import aap_not_configured_handler
 
 @fastapi_exception(handler=aap_not_configured_handler)
-class AAPNotConfiguredError(NexusError): ...
+class AAPNotConfiguredError(SyntaraError): ...
 ```
 
 The `@fastapi_exception` decorator resolves string paths via `importlib` at registration time. See `src/syntara/auth/exceptions.py` for the reference implementation. See `src/syntara/core/exception_registry.py` line 59.

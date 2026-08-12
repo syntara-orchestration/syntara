@@ -67,7 +67,7 @@ The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Tempor
 podman-compose up --build
 
 # Start specific services
-podman-compose up database redis temporal nexus
+podman-compose up database redis temporal syntara
 ```
 
 ## Code Quality

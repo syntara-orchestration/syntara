@@ -281,8 +281,8 @@ The `podman-compose.yml` defines the following services:
 | **temporal** | Temporal workflow engine | 7233 | `temporalio/auto-setup:1.25.1` |
 | **temporal-ui** | Temporal web UI (dev only) | 8081 | `temporalio/ui:2.31.2` |
 | **temporal-worker** | Temporal workflow worker | - | Built from `containers/nexus/Containerfile` |
-| **nexus** | Nexus API service | 8000 | Built from `containers/nexus/Containerfile` |
-| **syntara-ui** | Nexus web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
+| **syntara** | Syntara API service | 8000 | Built from `containers/nexus/Containerfile` |
+| **syntara-ui** | Syntara web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
 
 #### Container Commands
 

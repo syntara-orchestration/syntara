@@ -14,10 +14,10 @@ from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import Group
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.services.base import BaseService
 
-router = NexusRouter(prefix="/groups_directory", tags=["Groups Directory"])
+router = SyntaraRouter(prefix="/groups_directory", tags=["Groups Directory"])
 
 _group_directory_read = PermissionChecker("group-directory", "read")
 

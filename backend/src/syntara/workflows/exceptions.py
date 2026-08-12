@@ -8,11 +8,11 @@ from datetime import datetime
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.workflows.models.validation_finding import ValidationResult
 
 
-class WorkflowError(NexusError):
+class WorkflowError(SyntaraError):
     """Base exception for all workflow errors."""
 
 

@@ -82,7 +82,7 @@ conditional at the Temporal client call:
 
 ```python
 handle = await self.temporal_client.start_workflow(
-    NexusWorkflow.run,
+    SyntaraWorkflow.run,
     args=[...],
     id=temporal_workflow_id,
     task_queue=self.background_task_queue if is_builtin else self.task_queue,
@@ -472,7 +472,7 @@ correct; the CPU trigger just responds to load with some lag rather than immedia
 
 ## Related Documentation
 
-- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `NexusWorkflow` executes both user and built-in workflows identically
+- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `SyntaraWorkflow` executes both user and built-in workflows identically
 - [Execution Runtime](execution-runtime.md) — `POST /executions` API, two-phase creation, live status
 - [Observability Standards](standards/observability.md) — `MetricsRecorder` usage, Prometheus gauge patterns
 - [Configuration Standards](standards/configuration.md) — adding new settings, Pydantic Settings patterns

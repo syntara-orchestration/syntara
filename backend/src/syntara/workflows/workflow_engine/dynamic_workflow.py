@@ -76,7 +76,7 @@ def _parse_items(items: Any) -> Any:  # noqa: ANN401
 
 
 @workflow.defn(name="orchestrator_workflow")
-class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
+class SyntaraWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     """Temporal workflow for executing v2 graph-based workflows."""
 
     @workflow.run

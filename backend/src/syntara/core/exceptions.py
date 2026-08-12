@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 
-class NexusError(Exception):
+class SyntaraError(Exception):
     """Base exception for all Nexus internal errors.
 
     This is the root of the exception hierarchy for all domain-specific
@@ -23,7 +23,7 @@ class NexusError(Exception):
     """
 
     def __init__(self, message: str) -> None:
-        """Initialize NexusError.
+        """Initialize SyntaraError.
 
         Args:
             message: Error message describing the failure
@@ -33,7 +33,7 @@ class NexusError(Exception):
         super().__init__(message)
 
 
-class RetryableError(NexusError):
+class RetryableError(SyntaraError):
     """Marker base class for exceptions that should trigger retry logic.
 
     Mix into domain exceptions via multiple inheritance so retry_with_backoff
@@ -43,13 +43,13 @@ class RetryableError(NexusError):
 
 
 @fastapi_exception(handler="syntara.core.error_handlers.safe_value_error_handler")
-class SafeValueError(ValueError, NexusError):
+class SafeValueError(ValueError, SyntaraError):
     """ValueError subclass for user-safe validation error messages.
 
     Use this instead of ValueError when the error message is safe to expose
     to end users and doesn't contain internal implementation details.
 
-    This extends both ValueError (for isinstance checks) and NexusError
+    This extends both ValueError (for isinstance checks) and SyntaraError
     (for consistent exception handling).
 
     Examples:

@@ -540,12 +540,12 @@ Human-readable console output via structlog's `ConsoleRenderer`. Used in local d
 
 ### JSON Mode (`json`)
 
-Machine-parsable JSON via `NexusLogRecordRenderer` (extends `JSONRenderer`). Used in production.
+Machine-parsable JSON via `SyntaraLogRecordRenderer` (extends `JSONRenderer`). Used in production.
 
 The custom renderer recursively converts non-JSON-serializable objects to strings via `__repr__()`. This prevents serialization failures from crashing the logging pipeline:
 
 ```python
-class NexusLogRecordRenderer(JSONRenderer):
+class SyntaraLogRecordRenderer(JSONRenderer):
     def _make_serializable(self, obj: object) -> object:
         # Primitives pass through
         # Dicts and lists are recursed
@@ -559,7 +559,7 @@ class NexusLogRecordRenderer(JSONRenderer):
 
 ### Shared Processor Pipeline
 
-Both modes share the same processor chain (configured in `build_nexus_shared_formatters()`):
+Both modes share the same processor chain (configured in `build_syntara_shared_formatters()`):
 
 1. `merge_contextvars` — merge thread-local context
 2. `add_log_level` — inject log level
@@ -574,7 +574,7 @@ Both modes share the same processor chain (configured in `build_nexus_shared_for
 - structlog configuration via `configure_structlog()` (centralized, called at startup)
 - Log level filtering (Python logging infrastructure)
 - `make lint` catches f-string usage in log calls (Ruff G004 rule)
-- `NexusLogRecordRenderer` prevents JSON serialization failures via `__repr__` fallback
+- `SyntaraLogRecordRenderer` prevents JSON serialization failures via `__repr__` fallback
 
 **Convention only:**
 
@@ -589,7 +589,7 @@ Both modes share the same processor chain (configured in `build_nexus_shared_for
 
 | File | Purpose |
 |---|---|
-| `src/syntara/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `NexusLogRecordRenderer` |
+| `src/syntara/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `SyntaraLogRecordRenderer` |
 | `src/syntara/__init__.py` | Application startup logging init |
 | `tests/conftest.py` | Test logging setup |
 
