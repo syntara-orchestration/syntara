@@ -4,6 +4,7 @@ import { expect, test as base, type Page, type Request } from '@playwright/test'
 import { APP_TITLE } from './helpers/appTitle'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
+import { type XfailEntry, fetchXfailEntries, matchesXfail } from './xfailFromUrl'
 
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
@@ -68,7 +69,38 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
   ...fixtures.actionFixtures,
 })
 
-export const test = currentsBase.extend<
+// Dynamic xfail from a remote Markdown file (same pattern as backend xfail_from_url.py).
+// Set NEXUS_E2E_XFAIL_URL to enable; the URL is fetched once per worker and matching
+// tests are marked as expected failures via test.fail().
+const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
+  _xfailEntries: [
+    async ({}, use) => {
+      const url = processEnv['NEXUS_E2E_XFAIL_URL']
+      if (!url) {
+        await use([])
+        return
+      }
+      const entries = await fetchXfailEntries(url)
+      if (entries.length > 0) {
+        console.log(`xfail: loaded ${entries.length} pattern(s) from ${url}`)
+      }
+      await use(entries)
+    },
+    { scope: 'worker' },
+  ],
+  _xfailCheck: [
+    async ({ _xfailEntries }, use, testInfo) => {
+      const match = matchesXfail(testInfo, _xfailEntries)
+      if (match) {
+        test.fail(true, `xfail: ${match.reason}`)
+      }
+      await use()
+    },
+    { auto: true },
+  ],
+})
+
+export const test = xfailBase.extend<
   { app: Page; auditorApp: Page; viewerApp: Page; userApp: Page; projectAdminApp: Page },
   { roleSetup: RoleSetupResult | null }
 >({
