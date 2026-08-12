@@ -42,28 +42,28 @@ class TestAPIConcurrentSessionHandling:
 
     def test_concurrent_sessions_independent(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
     ) -> None:
         """Multiple concurrent sessions must be valid simultaneously; revoking one leaves the other."""
         password = admin_password()
-        token_a, cookies_a = local_login_session(nexus_base_url, "admin", password)
-        token_b, cookies_b = local_login_session(nexus_base_url, "admin", password)
+        token_a, cookies_a = local_login_session(syntara_base_url, "admin", password)
+        token_b, cookies_b = local_login_session(syntara_base_url, "admin", password)
 
         assert token_a != token_b, "Expected different access tokens for concurrent sessions"
         assert cookies_a["ao_refresh_token"] != cookies_b["ao_refresh_token"]
 
-        assert_refresh_succeeds(nexus_base_url, cookies_a)
-        assert_refresh_succeeds(nexus_base_url, cookies_b)
+        assert_refresh_succeeds(syntara_base_url, cookies_a)
+        assert_refresh_succeeds(syntara_base_url, cookies_b)
 
-        logout_resp = logout_with_session(nexus_base_url, token_a, cookies_a)
+        logout_resp = logout_with_session(syntara_base_url, token_a, cookies_a)
         assert logout_resp.status_code == HTTPStatus.OK
 
-        assert_refresh_unauthorized(nexus_base_url, cookies_a)
-        refreshed_b = assert_refresh_succeeds(nexus_base_url, cookies_b)
+        assert_refresh_unauthorized(syntara_base_url, cookies_a)
+        refreshed_b = assert_refresh_succeeds(syntara_base_url, cookies_b)
 
         user_b = get_user_sync(
             client=AuthenticatedClient(
-                base_url=f"{nexus_base_url}/api/v1",
+                base_url=f"{syntara_base_url}/api/v1",
                 token=refreshed_b.access_token,
                 verify_ssl=e2e_ssl_context(),
             )
