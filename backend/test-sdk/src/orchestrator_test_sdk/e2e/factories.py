@@ -41,7 +41,7 @@ _ADMIN_TOKEN_READY_TIMEOUT = 20.0
 
 
 @pytest.fixture(scope="module")
-def admin_api(nexus_base_url: str) -> SyntaraApiRegistry:
+def admin_api(syntara_base_url: str) -> SyntaraApiRegistry:
     """Admin API registry with a fresh JWT per test module.
 
     Retries login until the issued token is accepted by the API. This guards
@@ -56,8 +56,8 @@ def admin_api(nexus_base_url: str) -> SyntaraApiRegistry:
     last_status: int | None = None
     while True:
         try:
-            token = _login(nexus_base_url, "admin", password)
-            client = _make_client(nexus_base_url, token)
+            token = _login(syntara_base_url, "admin", password)
+            client = _make_client(syntara_base_url, token)
             api = SyntaraApiRegistry(client)
             resp = api.settings.list(limit=1)
             if resp.status_code == HTTPStatus.OK:

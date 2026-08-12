@@ -56,7 +56,7 @@ class TestProjectScopedPolicy:
 
     def test_policy(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -77,7 +77,7 @@ class TestProjectScopedPolicy:
                 role_name_d = create_project_role(admin_api, project_id, "nopol", case.prereqs)
                 assign_project_role_to_user(admin_api, project_id, user_id_d, role_name_d)
 
-            user_api_d = api_for(nexus_base_url, username_d, password_d)
+            user_api_d = api_for(syntara_base_url, username_d, password_d)
             resp_d = case.action(user_api_d, project_id, ctx)
             _assert_denied(resp_d, case, project_id)
 
@@ -87,6 +87,6 @@ class TestProjectScopedPolicy:
         role_name = create_project_role(admin_api, project_id, "pol", all_policies)
         assign_project_role_to_user(admin_api, project_id, user_id_a, role_name)
 
-        user_api = api_for(nexus_base_url, username_a, password_a)
+        user_api = api_for(syntara_base_url, username_a, password_a)
         resp = case.action(user_api, project_id, ctx)
         assert resp.is_success
