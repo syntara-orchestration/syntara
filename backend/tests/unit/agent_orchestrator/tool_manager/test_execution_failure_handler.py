@@ -1037,7 +1037,7 @@ class TestToolNodeDefaultHandleToolErrorsIntegration:
     """Exercise real ToolNode + default handle_tool_errors + Syntara wrappers."""
 
     @staticmethod
-    def _compile_tools_graph(node: ToolNode) -> Any:
+    def _compile_tools_graph(node: ToolNode) -> object:
         """Compile a minimal graph so ToolNode receives a proper runtime config."""
         from langgraph.graph import END, START, MessagesState, StateGraph
 
@@ -1047,7 +1047,10 @@ class TestToolNodeDefaultHandleToolErrorsIntegration:
         graph.add_edge("tools", END)
         return graph.compile()
 
-    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db", new_callable=AsyncMock)
+    @patch(
+        "syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db",
+        new_callable=AsyncMock,
+    )
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
     async def test_bad_args_do_not_disable_via_tool_node(
@@ -1077,7 +1080,7 @@ class TestToolNodeDefaultHandleToolErrorsIntegration:
         app = self._compile_tools_graph(node)
 
         # Default handle_tool_errors absorbs ToolInvocationError as error ToolMessage.
-        result = await app.ainvoke(
+        result = await app.ainvoke(  # type: ignore[union-attr]
             {
                 "messages": [
                     AIMessage(
@@ -1108,7 +1111,10 @@ class TestToolNodeDefaultHandleToolErrorsIntegration:
         assert mock_persist.call_args[0][2] == ToolExecutionStatus.ERROR
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db", new_callable=AsyncMock)
+    @patch(
+        "syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db",
+        new_callable=AsyncMock,
+    )
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
     async def test_tool_node_outage_still_disables(
@@ -1150,7 +1156,7 @@ class TestToolNodeDefaultHandleToolErrorsIntegration:
         )
         app = self._compile_tools_graph(node)
 
-        result = await app.ainvoke(
+        result = await app.ainvoke(  # type: ignore[union-attr]
             {
                 "messages": [
                     AIMessage(
