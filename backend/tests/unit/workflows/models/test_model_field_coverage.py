@@ -7,11 +7,11 @@ from uuid import uuid4
 
 from sqlalchemy import Index
 
-from nexus.workflows.models.execution import Execution, ExecutionRead
-from nexus.workflows.models.query_params import WorkflowVersionListParams
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
-from nexus.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionRead
+from syntara.workflows.models.query_params import WorkflowVersionListParams
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.models.workflow_version import WorkflowVersion
 
 
 class TestWorkflowPublishEventFields:
@@ -143,7 +143,7 @@ class TestWorkflowVersionListParamsFields:
     """Exercise WorkflowVersionListParams inheritance and structure."""
 
     def test_inherits_base_list_params_fields(self) -> None:
-        from nexus.core.models.base import BaseListParams
+        from syntara.core.models.base import BaseListParams
 
         assert issubclass(WorkflowVersionListParams, BaseListParams)
 

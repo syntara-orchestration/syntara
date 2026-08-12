@@ -65,12 +65,12 @@
 
 # Backend framework layer — the substrate every domain package builds on
 # (router discovery, models, auth, logging, websocket, workers, error handling)
-/backend/src/nexus/core/ @syntara-orchestration/syntara-leads
+/backend/src/syntara/core/ @syntara-orchestration/syntara-leads
 # ...but routine, feature-driven churn inside it stays with the backend team.
 # These two account for ~57% of all core/ changes and are almost never
 # architectural: one Alembic revision per feature, one setting per feature.
-/backend/src/nexus/core/config/ @syntara-orchestration/syntara-backend
-/backend/src/nexus/core/database/migrations/versions/ @syntara-orchestration/syntara-backend
+/backend/src/syntara/core/config/ @syntara-orchestration/syntara-backend
+/backend/src/syntara/core/database/migrations/versions/ @syntara-orchestration/syntara-backend
 
 # Frontend framework — only the API client bootstrap needs leads review.
 /frontend/packages/syntara-ui/src/client.tsx @syntara-orchestration/syntara-leads

@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 import pytest
 from sqlalchemy import text
 
-from nexus.core.logging.logging import apply_runtime_log_level
-from nexus.settings.cache.settings_cache import SettingsCache, set_runtime_settings
+from syntara.core.logging.logging import apply_runtime_log_level
+from syntara.settings.cache.settings_cache import SettingsCache, set_runtime_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Generator
@@ -70,7 +70,7 @@ def _scoped_runtime_cache(
     test_session_factory: Callable[[], object],
 ) -> Generator[None, None, None]:
     """Install a SettingsCache for the test, restore the previous one after."""
-    import nexus.settings.cache.settings_cache as _sc
+    import syntara.settings.cache.settings_cache as _sc
 
     prev = _sc._runtime_settings
     cache = SettingsCache(session_factory=test_session_factory)

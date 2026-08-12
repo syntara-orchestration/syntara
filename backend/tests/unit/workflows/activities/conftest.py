@@ -5,7 +5,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 
-from nexus.core.config.base import Settings, get_settings
+from syntara.core.config.base import Settings, get_settings
 
 
 @pytest.fixture(autouse=True)

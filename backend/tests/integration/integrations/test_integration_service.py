@@ -6,18 +6,18 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.authz.models import Project
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.integrations.exceptions import (
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.models import Project
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
     IntegrationCredentialRequiredError,
     IntegrationCredentialTypeMismatchError,
     IntegrationNameConflictError,
     IntegrationNotFoundError,
 )
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
     IntegrationPatch,
@@ -28,7 +28,7 @@ from nexus.integrations.models.integration import (
     IntegrationTestConnection,  # used by discover() service method
     IntegrationType,
 )
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 _UNRESTRICTED = AllowedProjectsResult(all_projects=True, project_ids=[])
 
@@ -181,7 +181,7 @@ class TestGetIntegration:
     async def test_get_global_visible_to_restricted_caller(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         created = await integration_service.create_integration(
             _mcp_create(name="Global Visible", scope=IntegrationScope.GLOBAL)
@@ -194,8 +194,8 @@ class TestGetIntegration:
     async def test_get_project_scoped_visible_when_assigned(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.authz.models import Project
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.authz.models import Project
 
         project = Project(name="visibility-project")
         test_db_session.add(project)
@@ -215,7 +215,7 @@ class TestGetIntegration:
     async def test_get_project_scoped_not_visible_when_unassigned(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         created = await integration_service.create_integration(
             _mcp_create(name="Unassigned", scope=IntegrationScope.PROJECT)
@@ -331,7 +331,7 @@ class TestListIntegrations:
     async def test_list_scope_filter_global_always_visible(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         await integration_service.create_integration(_mcp_create(name="Global", scope=IntegrationScope.GLOBAL))
         await integration_service.create_integration(_mcp_create(name="Project Scoped", scope=IntegrationScope.PROJECT))
@@ -347,8 +347,8 @@ class TestListIntegrations:
     async def test_list_scope_filter_project_visible_with_assignment(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.authz.models import Project
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.authz.models import Project
 
         project = Project(name="my-project")
         test_db_session.add(project)

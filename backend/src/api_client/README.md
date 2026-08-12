@@ -1,5 +1,5 @@
 # syntara-api-client
-A client library for accessing Nexus API
+A client library for accessing Syntara API
 
 ## Usage
 First, create a client:

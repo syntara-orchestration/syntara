@@ -18,14 +18,14 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.audit.approval import (
+from syntara.approvals.audit.approval import (
     ApprovalDecidedEvent,
     ApprovalDecidedHandler,
     ApprovalRequestedEvent,
     ApprovalRequestedHandler,
 )
-from nexus.approvals.exceptions import ApprovalAlreadyDecidedError
-from nexus.approvals.models import (
+from syntara.approvals.exceptions import ApprovalAlreadyDecidedError
+from syntara.approvals.models import (
     ActivitySummary,
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -33,10 +33,10 @@ from nexus.approvals.models import (
     ApprovalRequestStatus,
     WorkflowContext,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.core.models import User
-from nexus.workflows.models.execution import ExecutionStatus
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.models import User
+from syntara.workflows.models.execution import ExecutionStatus
 from tests.integration.helpers.workflow import ExecutionsFactory
 
 pytestmark = [pytest.mark.integration]
@@ -143,7 +143,7 @@ class TestApprovalEdgeCases:
                 except ApprovalAlreadyDecidedError:
                     return ("already_decided", None)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.send_approval_signal = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)

@@ -2,7 +2,7 @@
 
 import threading
 
-from nexus.telemetry.api_usage_accumulator import APIUsageAccumulator
+from syntara.telemetry.api_usage_accumulator import APIUsageAccumulator
 
 
 class TestAccumulatorRecord:

@@ -19,7 +19,7 @@ from starlette.testclient import TestClient
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -28,9 +28,9 @@ from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
 
 @pytest.fixture
 def auth_client() -> Generator[TestClient, None, None]:
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
-    from nexus.core.models.user import User
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
+    from syntara.core.models.user import User
 
     async def mock_user() -> User:
         return User(username="testuser", email="test@test.com", first_name="Test")
@@ -43,8 +43,8 @@ def auth_client() -> Generator[TestClient, None, None]:
 
 @pytest.fixture
 def unauth_client() -> TestClient:
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
 
     app.dependency_overrides.pop(get_current_user, None)
     return TestClient(app, raise_server_exceptions=False)
@@ -135,7 +135,7 @@ class TestApiV1Version:
         assert data["links"] is None
 
     def test_links_present_when_docs_enabled(self, auth_client: TestClient) -> None:
-        import nexus.api.main as main_module
+        import syntara.api.main as main_module
 
         original = main_module._settings.enable_api_docs
         object.__setattr__(main_module._settings, "enable_api_docs", True)
@@ -165,9 +165,9 @@ class TestDocsAuth:
     def docs_enabled_unauth_client(self) -> Generator[TestClient, None, None]:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.config.base import get_settings
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.config.base import get_settings
 
         monkeypatch = pytest.MonkeyPatch()
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
@@ -203,10 +203,10 @@ class TestDocsAuthHappyPath:
     def docs_enabled_auth_client(self) -> Generator[TestClient, None, None]:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.config.base import get_settings
-        from nexus.core.models.user import User
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.config.base import get_settings
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -252,9 +252,9 @@ class TestApiV1RootWithIncludedRouters:
     def client_with_router(self) -> Generator[TestClient, None, None]:
         from fastapi import APIRouter
 
-        from nexus.api.main import app
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        from syntara.api.main import app
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -289,7 +289,7 @@ class TestOldDocsEndpointsRemoved:
 
     @pytest.fixture
     def client(self) -> TestClient:
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         return TestClient(app, raise_server_exceptions=False)
 
@@ -313,7 +313,7 @@ class TestOldRootEndpointRemoved:
 
     @pytest.fixture
     def client(self) -> TestClient:
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         return TestClient(app, raise_server_exceptions=False)
 

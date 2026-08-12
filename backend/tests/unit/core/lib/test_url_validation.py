@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nexus.core.lib.url_validation import validate_endpoint_url, validate_host_url, validate_url_no_ssrf
+from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url, validate_url_no_ssrf
 
 
 class TestValidateHostUrl:
@@ -288,7 +288,7 @@ class TestValidateUrlNoSsrf:
         with (
             patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.0.0.1")),
             patch(
-                "nexus.core.lib.url_validation.get_settings",
+                "syntara.core.lib.url_validation.get_settings",
                 return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["internal.example.com"]})(),
             ),
         ):
@@ -299,7 +299,7 @@ class TestValidateUrlNoSsrf:
         with (
             patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.0.0.1")),
             patch(
-                "nexus.core.lib.url_validation.get_settings",
+                "syntara.core.lib.url_validation.get_settings",
                 return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["other.example.com"]})(),
             ),
             pytest.raises(ValueError, match="SSRF blocked"),
@@ -311,7 +311,7 @@ class TestValidateUrlNoSsrf:
         with (
             patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.0.0.1")),
             patch(
-                "nexus.core.lib.url_validation.get_settings",
+                "syntara.core.lib.url_validation.get_settings",
                 return_value=type(
                     "S",
                     (),
@@ -344,7 +344,7 @@ class TestValidateUrlNoSsrf:
         with (
             patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("169.254.169.254")),
             patch(
-                "nexus.core.lib.url_validation.get_settings",
+                "syntara.core.lib.url_validation.get_settings",
                 return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["evil.example.com"]})(),
             ),
             pytest.raises(ValueError, match="SSRF blocked"),

@@ -7,14 +7,14 @@ from uuid import UUID, uuid4
 import jmespath
 import pytest
 
-from nexus.auth.services.idp_group_sync import extract_idp_group_values, match_group_entries, sync_idp_groups
-from nexus.core.models import User, UserIdentity
-from nexus.identity_providers.models.identity_provider_configuration import (
+from syntara.auth.services.idp_group_sync import extract_idp_group_values, match_group_entries, sync_idp_groups
+from syntara.core.models import User, UserIdentity
+from syntara.identity_providers.models.identity_provider_configuration import (
     OIDCConfiguration,
     OIDCGroupMappingEntry,
     OIDCIdpType,
 )
-from nexus.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
+from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 
 
 def _make_user() -> User:
@@ -178,7 +178,7 @@ class TestExtractIdpGroupValues:
             msg = "simulated error"
             raise jmespath.exceptions.JMESPathError(msg)
 
-        with patch("nexus.auth.services.idp_group_sync.jmespath.search", side_effect=_search_side_effect):
+        with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=_search_side_effect):
             result = extract_idp_group_values("groups[*]", claims, user_id)
         assert result == set()
 
@@ -236,7 +236,7 @@ class TestSyncIdpGroups:
         db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "admin", nexus_group_id)])
 
         # Simulate a JMESPath runtime error (e.g., corrupted claims object)
-        with patch("nexus.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
+        with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
             result = await sync_idp_groups(db, user, identity, {"groups": ["admin"]}, config)
         assert result is False
         # Should only have the mapping entries query, no sync queries
@@ -396,7 +396,7 @@ class TestAllowAllAuthenticated:
             users_group=users_group,
         )
 
-        with patch("nexus.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
+        with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
             result = await sync_idp_groups(db, user, identity, {"groups": ["admin"]}, config)
         assert result is True
 

@@ -11,14 +11,14 @@ from uuid import uuid4
 import pytest
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.tool_manager import tool_services
-from nexus.integrations.models.integration import (
+from syntara.agent_orchestrator.tool_manager import tool_services
+from syntara.integrations.models.integration import (
     IntegrationRead,
     IntegrationStatus,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
-from nexus.tool_manager.models.tool import ToolWithParameters
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.tool_manager.models.tool import ToolWithParameters
 
 
 def _make_integration(
@@ -65,7 +65,7 @@ class TestToolServices:
         tool_manager_client.get_all_tools.return_value = sample_tools
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -86,7 +86,7 @@ class TestToolServices:
         tool_manager_client.get_all_tools.return_value = sample_tools
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -101,7 +101,7 @@ class TestToolServices:
         tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -127,8 +127,8 @@ class TestToolServices:
         mock_tool.name = "code_search"
 
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             # Setup Tool Manager client
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
@@ -161,8 +161,8 @@ class TestToolServices:
 
         # Patch MockMCPProvider to raise exception
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.get_provider_factory"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.get_provider_factory"),
             patch(
                 "tests.unit.fixtures.mock_mcp_provider.MockMCPProvider.get_base_tools",
                 side_effect=RuntimeError("Connection failed to MCP server"),
@@ -181,7 +181,7 @@ class TestToolServices:
 
         # Patch MockMCPProvider to raise exception
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
             patch(
                 "tests.unit.fixtures.mock_mcp_provider.MockMCPProvider.get_base_tools",
                 side_effect=ValueError("Invalid configuration parameter"),
@@ -209,8 +209,8 @@ class TestToolServices:
         mock_tool.name = "code_search"
 
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             # Setup Tool Manager client
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client

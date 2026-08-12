@@ -3,12 +3,12 @@
 import logging
 from unittest.mock import AsyncMock, patch
 
-from nexus.core.logging.logging import (
+from syntara.core.logging.logging import (
     _set_log_level,
     apply_runtime_log_level,
     build_uvicorn_logging_config,
 )
-from nexus.settings.cache.settings_cache import SettingsCache
+from syntara.settings.cache.settings_cache import SettingsCache
 
 
 class TestSetLogLevel:
@@ -66,7 +66,7 @@ class TestApplyRuntimeLogLevel:
         mock_cache.get_str.return_value = "DEBUG"
 
         with patch(
-            "nexus.settings.cache.settings_cache.get_runtime_settings",
+            "syntara.settings.cache.settings_cache.get_runtime_settings",
             return_value=mock_cache,
         ):
             root = logging.getLogger()
@@ -80,11 +80,11 @@ class TestApplyRuntimeLogLevel:
     async def test_falls_back_to_static_config_on_error(self) -> None:
         with (
             patch(
-                "nexus.settings.cache.settings_cache.get_runtime_settings",
+                "syntara.settings.cache.settings_cache.get_runtime_settings",
                 side_effect=RuntimeError("no cache"),
             ),
             patch(
-                "nexus.core.logging.logging.settings",
+                "syntara.core.logging.logging.settings",
             ) as mock_settings,
         ):
             mock_settings.fallback_log_level = "ERROR"
@@ -101,7 +101,7 @@ class TestApplyRuntimeLogLevel:
         mock_cache.get_str.return_value = "warning"
 
         with patch(
-            "nexus.settings.cache.settings_cache.get_runtime_settings",
+            "syntara.settings.cache.settings_cache.get_runtime_settings",
             return_value=mock_cache,
         ):
             root = logging.getLogger()
@@ -117,7 +117,7 @@ class TestApplyRuntimeLogLevel:
         mock_cache.get_str.return_value = "INFO"
 
         with patch(
-            "nexus.settings.cache.settings_cache.get_runtime_settings",
+            "syntara.settings.cache.settings_cache.get_runtime_settings",
             return_value=mock_cache,
         ):
             await apply_runtime_log_level()

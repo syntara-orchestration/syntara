@@ -34,11 +34,11 @@ COPY tools/ci/sanitize_pyproject_for_hermetic.py /usr/local/bin/sanitize_pyproje
 # Copy application code (excluding ./tools)
 COPY src/ ./src/
 
-# Apply downstream overrides when BRANDING=true (backend/api/templates/ → src/nexus/api/templates/).
+# Apply downstream overrides when BRANDING=true (backend/api/templates/ → src/syntara/api/templates/).
 # Uses --mount instead of COPY so that scratch (empty) override stages don't fail.
 RUN --mount=from=override,source=/,target=/tmp/override \
     if [ "$BRANDING" = "true" ] && [ -d /tmp/override/backend ]; then \
-        cp -r /tmp/override/backend/. src/nexus/; \
+        cp -r /tmp/override/backend/. src/syntara/; \
     fi
 
 # Hermetic Konflux builds: use uv against Hermeto-prefetched sdists.

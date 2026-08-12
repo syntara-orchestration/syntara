@@ -14,14 +14,14 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.outbox.worker import get_outbox_worker
-from nexus.core.models.user import User
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.outbox.worker import get_outbox_worker
+from syntara.core.models.user import User
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +53,7 @@ async def test_middleware_extracts_path_params(
 
     # Patch _build_otel_log_record to capture emitted audit events
     mock_build_otel_log_record = Mock()
-    with patch("nexus.audit.outbox.worker._build_otel_log_record", new=mock_build_otel_log_record):
+    with patch("syntara.audit.outbox.worker._build_otel_log_record", new=mock_build_otel_log_record):
         # POST to signal endpoint with Authorization header (will fail with 404, but that's expected)
         response = await base_client.post(
             signal_url,
@@ -123,7 +123,7 @@ async def test_middleware_captures_request_id_in_structured_data(
 
     # Patch _build_otel_log_record to capture emitted audit events
     mock_build_otel_log_record = Mock()
-    with patch("nexus.audit.outbox.worker._build_otel_log_record", new=mock_build_otel_log_record):
+    with patch("syntara.audit.outbox.worker._build_otel_log_record", new=mock_build_otel_log_record):
         # Make a simple GET request to any endpoint (using /api/v1/users as a valid endpoint)
         response = await base_client.get("/api/v1/users", headers=headers)
         assert response.status_code == 200

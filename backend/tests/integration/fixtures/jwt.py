@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture
@@ -28,8 +28,8 @@ async def jwt_client(
 
     from httpx import ASGITransport, AsyncClient
 
-    from nexus.auth.services.token_service import TokenService
-    from nexus.core.database.session import get_db
+    from syntara.auth.services.token_service import TokenService
+    from syntara.core.database.session import get_db
 
     access_token = TokenService().create_access_token(
         subject_id=test_user.id,
@@ -64,7 +64,7 @@ async def jwt_client(
 @pytest.fixture
 def create_jwt_for_user() -> Callable[[User], str]:
     """Factory fixture to create JWT tokens for any user."""
-    from nexus.auth.services.token_service import TokenService
+    from syntara.auth.services.token_service import TokenService
 
     _svc = TokenService()
 

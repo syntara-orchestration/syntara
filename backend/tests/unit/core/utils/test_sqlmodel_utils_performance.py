@@ -10,14 +10,14 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from nexus.core.models.base import NamedResource
-from nexus.core.utils import matches, parse_filters, parse_label_filter
-from nexus.core.utils.cursor import SortDirection, create_cursor_data, decode_cursor, encode_cursor
-from nexus.core.utils.pagination import PaginationResult, generate_response
-from nexus.core.utils.sorting import parse_sort
+from syntara.core.models.base import NamedResource
+from syntara.core.utils import matches, parse_filters, parse_label_filter
+from syntara.core.utils.cursor import SortDirection, create_cursor_data, decode_cursor, encode_cursor
+from syntara.core.utils.pagination import PaginationResult, generate_response
+from syntara.core.utils.sorting import parse_sort
 
 if TYPE_CHECKING:
-    from nexus.core.utils import CursorData
+    from syntara.core.utils import CursorData
 
 
 class MockResource(NamedResource):

@@ -10,14 +10,14 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.emitter import VERIFIED_ACTOR_STATE_KEY, AuditActorContext, actor_context_var
-from nexus.auth.dependencies import (
+from syntara.audit.emitter import VERIFIED_ACTOR_STATE_KEY, AuditActorContext, actor_context_var
+from syntara.auth.dependencies import (
     _set_verified_actor_context_from_payload,
     _set_verified_actor_context_from_user,
 )
-from nexus.auth.services.token_service import TokenPayload
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.auth.services.token_service import TokenPayload
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 def _make_request() -> MagicMock:

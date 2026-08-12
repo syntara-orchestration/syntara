@@ -2,9 +2,9 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.core.models.principal import PrincipalType
-from nexus.workflows.audit.webhook_auth import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.core.models.principal import PrincipalType
+from syntara.workflows.audit.webhook_auth import (
     WebhookAuthFailureEvent,
     WebhookAuthFailureHandler,
     WebhookAuthSuccessEvent,

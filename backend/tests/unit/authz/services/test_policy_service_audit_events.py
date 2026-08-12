@@ -13,15 +13,15 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.authz.audit.policy_lifecycle import PolicyLifecycleEvent, PolicyLifecycleHandler
-from nexus.authz.models.policy import Policy
-from nexus.authz.services.policy_service import PolicyService
-from nexus.core.models import User
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.authz.audit.policy_lifecycle import PolicyLifecycleEvent, PolicyLifecycleHandler
+from syntara.authz.models.policy import Policy
+from syntara.authz.services.policy_service import PolicyService
+from syntara.core.models import User
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestPolicyServiceCreateAuditEvents:
@@ -31,7 +31,7 @@ class TestPolicyServiceCreateAuditEvents:
         AuditEventDispatcher.register({PolicyLifecycleEvent: PolicyLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_policy_emits_policy_created_event(
         self,
         mock_do_emit: AsyncMock,
@@ -61,7 +61,7 @@ class TestPolicyServiceCreateAuditEvents:
             patch.object(service, "_check_name_conflict", new_callable=AsyncMock),
             patch.object(PolicyService, "_validate_resource_actions"),
             patch.object(PolicyService, "_validate_no_deny_effect"),
-            patch("nexus.authz.services.policy_service.is_builtin_policy", return_value=False),
+            patch("syntara.authz.services.policy_service.is_builtin_policy", return_value=False),
         ):
             await service.create_policy(
                 name="test-policy",
@@ -76,7 +76,7 @@ class TestPolicyServiceCreateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Policy created: test-policy"
         assert event.resource_urn == f"urn:syntara:policy:{policy_id}"
         assert event.structured_data.data_type == "policy-lifecycle"
@@ -84,7 +84,7 @@ class TestPolicyServiceCreateAuditEvents:
         assert event.structured_data.policy_name == "test-policy"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_policy_with_project_emits_event(
         self,
         mock_do_emit: AsyncMock,
@@ -115,8 +115,8 @@ class TestPolicyServiceCreateAuditEvents:
             patch.object(PolicyService, "_validate_resource_actions"),
             patch.object(PolicyService, "_validate_no_deny_effect"),
             patch.object(PolicyService, "_validate_project_statements"),
-            patch("nexus.authz.services.policy_service.is_builtin_policy", return_value=False),
-            patch("nexus.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
+            patch("syntara.authz.services.policy_service.is_builtin_policy", return_value=False),
+            patch("syntara.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
         ):
             await service.create_policy(
                 name="project-policy",
@@ -137,7 +137,7 @@ class TestPolicyServiceUpdateAuditEvents:
         AuditEventDispatcher.register({PolicyLifecycleEvent: PolicyLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_update_policy_emits_policy_updated_event(
         self,
         mock_do_emit: AsyncMock,
@@ -174,7 +174,7 @@ class TestPolicyServiceUpdateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:policy:{policy_id}"
 
 
@@ -185,7 +185,7 @@ class TestPolicyServiceDeleteAuditEvents:
         AuditEventDispatcher.register({PolicyLifecycleEvent: PolicyLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_policy_no_roles_emits_info_event(
         self,
         mock_do_emit: AsyncMock,
@@ -227,7 +227,7 @@ class TestPolicyServiceDeleteAuditEvents:
         assert not hasattr(event.structured_data, "affected_roles_count")
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_policy_with_roles_emits_warning_event(
         self,
         mock_do_emit: AsyncMock,

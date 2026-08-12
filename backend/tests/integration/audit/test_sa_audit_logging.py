@@ -23,7 +23,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.outbox.worker import get_outbox_worker
+from syntara.audit.outbox.worker import get_outbox_worker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
     from httpx import AsyncClient
 
-    from nexus.audit.models.audit_event import AuditEvent
-    from nexus.core.models.user import User
+    from syntara.audit.models.audit_event import AuditEvent
+    from syntara.core.models.user import User
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
@@ -100,7 +100,7 @@ async def _create_credential(
 class TestAuditSACreated:
     """API-26: Audit log — service account created (event present, no secret leakage)."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_create_emits_audit_event_without_secrets(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -135,7 +135,7 @@ class TestAuditSACreated:
 class TestAuditSecretRotated:
     """API-27: Audit log — secret rotated (event present, no secret values in payload)."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_rotate_emits_audit_event_without_secrets(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -178,7 +178,7 @@ class TestAuditSecretRotated:
 class TestAuditAuthSuccessAndFailure:
     """API-28: Audit log — auth success and failure (both event types, no token/secret in payload)."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_auth_success_emits_login_event(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -218,7 +218,7 @@ class TestAuditAuthSuccessAndFailure:
         finally:
             await base_client.delete(f"/api/v1/service_accounts/{sa['id']}", headers=headers)
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_auth_failure_emits_login_event(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -261,7 +261,7 @@ class TestAuditAuthSuccessAndFailure:
 class TestAuditDisableAndDelete:
     """API-29: Audit log — disable and delete (lifecycle event entries)."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_disable_emits_audit_event(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -296,7 +296,7 @@ class TestAuditDisableAndDelete:
         finally:
             await base_client.delete(f"/api/v1/service_accounts/{sa['id']}", headers=headers)
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_delete_emits_audit_event(
         self,
         mock_build_otel_log_record: MagicMock,

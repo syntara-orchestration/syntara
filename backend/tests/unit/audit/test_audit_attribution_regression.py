@@ -24,20 +24,20 @@ import jwt
 import pytest
 from fastapi import FastAPI
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import (
     VERIFIED_ACTOR_STATE_KEY,
     AuditActorContext,
     actor_context_var,
 )
-from nexus.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
-from nexus.audit.middleware import AuditMiddleware
-from nexus.audit.models.audit_event import AuditEvent
-from nexus.audit.utils import sanitize_actor_username
-from nexus.core.auth.jwt_utils import extract_actor_claims
-from nexus.core.models.principal import PrincipalType
+from syntara.audit.events.http_request import HTTPRequestEvent, HTTPRequestHandler
+from syntara.audit.middleware import AuditMiddleware
+from syntara.audit.models.audit_event import AuditEvent
+from syntara.audit.utils import sanitize_actor_username
+from syntara.core.auth.jwt_utils import extract_actor_claims
+from syntara.core.models.principal import PrincipalType
 
-_EMIT_PATCH = "nexus.audit.emitter._do_emit_audit_event"
+_EMIT_PATCH = "syntara.audit.emitter._do_emit_audit_event"
 
 _TEST_JWT_KEY = "test-secret"
 

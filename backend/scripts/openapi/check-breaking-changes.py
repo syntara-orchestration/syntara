@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 
-DEFAULT_SPEC_PATH = "backend/src/nexus/schemas/openapi.yaml"
+DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
 
 
 def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
@@ -53,8 +53,15 @@ def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.Compl
         sys.exit(2)
 
 
-def get_spec_from_git(ref: str, spec_path: str) -> str:
-    """Get OpenAPI spec content from a git reference."""
+def get_spec_from_git(ref: str, spec_path: str) -> Optional[str]:
+    """Get OpenAPI spec content from a git reference.
+
+    Returns None if the path does not exist on the given ref (e.g. file was
+    renamed or added in this branch). Exits with code 2 on other git errors.
+    """
+    exists = run_command(["git", "cat-file", "-e", f"{ref}:{spec_path}"])
+    if exists.returncode != 0:
+        return None
     result = run_command(["git", "show", f"{ref}:{spec_path}"])
     if result.returncode != 0:
         print(f"ERROR: Failed to get spec from git ref '{ref}'", file=sys.stderr)
@@ -195,6 +202,11 @@ def main():
         help="Path to spec within git repo",
         default=DEFAULT_SPEC_PATH,
     )
+    parser.add_argument(
+        "--fallback-spec-path",
+        help="Fallback path within git repo if --spec-path not found on base ref (e.g. after a rename)",
+        default=None,
+    )
 
     # PR body for acknowledgment check
     parser.add_argument(
@@ -222,8 +234,21 @@ def main():
     if args.base_spec:
         base_spec_path = args.base_spec
     elif args.base:
-        # Get spec from git reference - write to temp file
         spec_content = get_spec_from_git(args.base, args.spec_path)
+        if spec_content is None and args.fallback_spec_path:
+            print(
+                f"Spec not found at '{args.spec_path}' on '{args.base}'; "
+                f"trying fallback '{args.fallback_spec_path}'",
+                file=sys.stderr,
+            )
+            spec_content = get_spec_from_git(args.base, args.fallback_spec_path)
+        if spec_content is None:
+            print(
+                f"Spec path not found on base ref '{args.base}' (file is new or renamed). "
+                f"Skipping breaking changes check.",
+                file=sys.stderr,
+            )
+            sys.exit(0)
         import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:

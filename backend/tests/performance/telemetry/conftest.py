@@ -4,7 +4,7 @@ from collections.abc import Generator
 
 import pytest
 
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 
 
 @pytest.fixture(autouse=True)

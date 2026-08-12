@@ -140,7 +140,7 @@ describe('BuilderDialogs', () => {
     renderDialogs({ deleteDialogOpen: true })
 
     expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
-    expect(screen.getByText(/will be deleted/)).toBeInTheDocument()
+    expect(screen.getByText('Test Workflow')).toBeInTheDocument()
   })
 
   it('calls handleRunWorkflow when run modal is confirmed (with input schema)', async () => {

@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.core.websocket.ticket import WebSocketTicketClient
+from syntara.core.websocket.ticket import WebSocketTicketClient
 
 
 def _mock_settings() -> MagicMock:
@@ -22,7 +22,7 @@ def _mock_settings() -> MagicMock:
 
 
 def _make_client() -> tuple[WebSocketTicketClient, AsyncMock]:
-    with patch("nexus.core.cache.base.get_settings", return_value=_mock_settings()):
+    with patch("syntara.core.cache.base.get_settings", return_value=_mock_settings()):
         client = WebSocketTicketClient()
     mock_redis = AsyncMock()
     client._client = mock_redis

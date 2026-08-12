@@ -11,14 +11,14 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.models import (
+from syntara.approvals.models import (
     ActivitySummary,
     ApprovalCreateRequest,
     ApprovalRequestStatus,
     WorkflowContext,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.core.models import Group, User
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.core.models import Group, User
 from tests.integration.helpers.workflow import ExecutionsFactory
 
 

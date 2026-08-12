@@ -1,6 +1,6 @@
 """Mock concrete implementations of shared resource models for testing."""
 
-from nexus.core.models.base import BaseResource, NamedResource, Resource
+from syntara.core.models.base import BaseResource, NamedResource, Resource
 
 
 class MockBaseResource(BaseResource, table=True):

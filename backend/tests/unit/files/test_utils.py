@@ -1,11 +1,11 @@
-"""Unit tests for nexus.files.utils."""
+"""Unit tests for syntara.files.utils."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from nexus.files.utils import cleanup_files
+from syntara.files.utils import cleanup_files
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ class TestCleanupFiles:
         await cleanup_files([missing])
 
     async def test_context_logged_when_provided(self, tmp_files: list[str]) -> None:
-        with patch("nexus.files.utils.logger") as mock_logger:
+        with patch("syntara.files.utils.logger") as mock_logger:
             await cleanup_files(tmp_files, context="after validation failure")
 
             for call in mock_logger.info.call_args_list:

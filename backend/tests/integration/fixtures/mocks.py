@@ -32,15 +32,15 @@ def mock_openrouter_llm() -> Generator[MagicMock, None, None]:
 
     with (
         patch(
-            "nexus.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+            "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
             return_value=(mock_llm, None),
         ),
         patch(
-            "nexus.agent_orchestrator.context_manager.compressor.CompressorService",
+            "syntara.agent_orchestrator.context_manager.compressor.CompressorService",
             return_value=mock_compressor,
         ),
         patch(
-            "nexus.agent_orchestrator.services.orchestration_service.OrchestrationService._get_tools",
+            "syntara.agent_orchestrator.services.orchestration_service.OrchestrationService._get_tools",
             return_value=[],
         ),
     ):

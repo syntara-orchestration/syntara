@@ -19,8 +19,8 @@ from uuid import uuid4
 import pytest
 from pydantic import SecretStr
 
-from nexus.core.config.base import LogLevel
-from nexus.core.logging.logging import (
+from syntara.core.config.base import LogLevel
+from syntara.core.logging.logging import (
     NexusLogRecordRenderer,
     build_nexus_formatter,
     build_nexus_json_formatter,
@@ -271,7 +271,7 @@ class TestFormatterBuilders:
 class TestConfigureAppLogging:
     """Tests for configure_app_logging function."""
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_adds_stdout_handler_to_root_logger(self, mock_create_otel: MagicMock, override_settings) -> None:
         """Test that configure_app_logging adds a stdout handler to root logger."""
         mock_create_otel.return_value = None
@@ -285,7 +285,7 @@ class TestConfigureAppLogging:
             assert len(root_logger.handlers) == 1
             assert isinstance(root_logger.handlers[0], logging.StreamHandler)
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_clears_existing_handlers(self, mock_create_otel: MagicMock, override_settings) -> None:
         """Test that configure_app_logging clears existing handlers before adding new ones."""
         mock_create_otel.return_value = None
@@ -306,8 +306,8 @@ class TestConfigureAppLogging:
             # Should only have the new stdout handler (all previous cleared)
             assert len(root_logger.handlers) == 1
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
-    @patch("nexus.core.logging.logging.settings")
+    @patch("syntara.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.settings")
     def test_sets_root_logger_level_to_fallback(self, mock_settings: MagicMock, mock_create_otel: MagicMock) -> None:
         """Test that configure_app_logging sets root logger level from settings.
 
@@ -324,7 +324,7 @@ class TestConfigureAppLogging:
         root_logger = logging.getLogger()
         assert root_logger.level == logging.DEBUG
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_stdout_handler_has_formatter(self, mock_create_otel: MagicMock, override_settings) -> None:
         """Test that stdout handler has a formatter configured."""
         mock_create_otel.return_value = None
@@ -337,7 +337,7 @@ class TestConfigureAppLogging:
 
             assert stdout_handler.formatter is not None
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_adds_otel_handler_when_enabled(self, mock_exporter_class: MagicMock, override_settings) -> None:
         """Test that configure_app_logging adds OTEL handler when enabled."""
         mock_exporter_instance = MagicMock()
@@ -362,9 +362,9 @@ class TestConfigureAppLogging:
         assert "StreamHandler" in handler_types
         assert "LoggingHandler" in handler_types
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
-    @patch("nexus.core.logging.logging.logging.getLogger")
-    @patch("nexus.core.logging.logging.settings")
+    @patch("syntara.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.logging.getLogger")
+    @patch("syntara.core.logging.logging.settings")
     def test_logs_otel_configuration_when_enabled(
         self,
         mock_settings: MagicMock,
@@ -401,7 +401,7 @@ class TestConfigureAppLogging:
         assert log_call[1]["extra"]["endpoint"] == "https://otlp.example.com/v1/logs"
         assert log_call[1]["extra"]["service_name"] == "nexus-test"
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_does_not_add_otel_handler_when_disabled(self, mock_create_otel: MagicMock, override_settings) -> None:
         """Test that configure_app_logging does not add OTEL handler when disabled."""
         mock_create_otel.return_value = None
@@ -415,7 +415,7 @@ class TestConfigureAppLogging:
             assert len(root_logger.handlers) == 1
             assert isinstance(root_logger.handlers[0], logging.StreamHandler)
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_configures_structlog(self, mock_create_otel: MagicMock, override_settings) -> None:
         """Test that configure_app_logging configures structlog processors."""
         mock_create_otel.return_value = None
@@ -430,7 +430,7 @@ class TestConfigureAppLogging:
             # Should not raise
             assert logger is not None
 
-    @patch("nexus.core.logging.logging.create_otel_handler")
+    @patch("syntara.core.logging.logging.create_otel_handler")
     def test_otel_handler_created_with_correct_logger_name(self, mock_create: MagicMock, override_settings) -> None:
         """Test that OTEL handler is created for root logger."""
         # Create a mock handler with proper level attribute
@@ -450,7 +450,7 @@ class TestConfigureAppLogging:
         # Verify create_otel_handler was called
         mock_create.assert_called_once_with()
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_otel_handler_with_api_key_authentication(self, mock_exporter_class: MagicMock, override_settings) -> None:
         """Test that OTEL handler is configured with API key authentication."""
         mock_exporter_instance = MagicMock()
@@ -479,7 +479,7 @@ class TestConfigureAppLogging:
         assert call_kwargs["endpoint"] == "https://otlp.example.com/v1/logs"
         assert call_kwargs["headers"] == {"X-API-Key": f"Bearer {api_key}"}
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_otel_handler_with_mtls_authentication(self, mock_exporter_class: MagicMock, override_settings) -> None:
         """Test that OTEL handler is configured with mTLS certificate files."""
         mock_exporter_instance = MagicMock()

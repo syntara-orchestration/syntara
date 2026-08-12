@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexus.telemetry.client import TelemetryClientRegistry
-from nexus.telemetry.events.workflow_execution import WorkflowExecutionStartEvent
+from syntara.telemetry.client import TelemetryClientRegistry
+from syntara.telemetry.events.workflow_execution import WorkflowExecutionStartEvent
 
 
 class TestTelemetryClientRegistry:
@@ -20,7 +20,7 @@ class TestTelemetryClientRegistry:
         with pytest.raises(RuntimeError, match="not initialized"):
             registry.get_client()
 
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_initialize_creates_client(self, mock_segment):
         mock_client = MagicMock()
         mock_segment.Client.return_value = mock_client
@@ -29,8 +29,8 @@ class TestTelemetryClientRegistry:
         registry.initialize(write_key="test-key")
         assert registry.is_initialized() is True
 
-    @patch("nexus.telemetry.client.logger")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.logger")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_initialize_idempotent(self, mock_segment, mock_logger):
         mock_segment.Client.return_value = MagicMock()
 
@@ -41,7 +41,7 @@ class TestTelemetryClientRegistry:
         assert mock_segment.Client.call_count == 1
         mock_logger.warning.assert_called_once_with("TelemetryClientRegistry already initialized")
 
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_flush_calls_client_flush(self, mock_segment):
         mock_client = MagicMock()
         mock_segment.Client.return_value = mock_client
@@ -57,7 +57,7 @@ class TestTelemetryClientRegistry:
         registry = TelemetryClientRegistry()
         registry.flush()  # Should not raise
 
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_send_event_calls_track(self, mock_segment):
         mock_client = MagicMock()
         mock_segment.Client.return_value = mock_client
@@ -90,8 +90,8 @@ class TestTelemetryClientRegistry:
             context=expected_context,
         )
 
-    @patch("nexus.telemetry.client.logger")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.logger")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_send_event_fire_and_forget(self, mock_segment, mock_logger):
         mock_client = MagicMock()
         mock_client.track.side_effect = RuntimeError("network error")
@@ -114,7 +114,7 @@ class TestTelemetryClientRegistry:
         assert registry.entitlement_id == ""
 
     def test_error_handler_logs_warning(self):
-        with patch("nexus.telemetry.client.logger") as mock_logger:
+        with patch("syntara.telemetry.client.logger") as mock_logger:
             TelemetryClientRegistry._error_handler(RuntimeError("test"), [{"item": 1}])
             mock_logger.warning.assert_called_once()
 
@@ -122,8 +122,8 @@ class TestTelemetryClientRegistry:
 class TestTelemetryClientRegistryReinitialize:
     """Tests for TelemetryClientRegistry.reinitialize()."""
 
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_reinitialize_creates_new_client(self, mock_segment, mock_get_settings):
         mock_settings = MagicMock()
         mock_settings.segment_endpoint = "https://api.segment.io"
@@ -145,7 +145,7 @@ class TestTelemetryClientRegistryReinitialize:
         assert mock_segment.Client.call_count == 2
         assert registry.is_initialized()
 
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_reinitialize_empty_key_disables(self, mock_segment):
         mock_client = MagicMock()
         mock_segment.Client.return_value = mock_client
@@ -163,8 +163,8 @@ class TestTelemetryClientRegistryReinitialize:
         registry.reinitialize("")
         assert registry.is_initialized() is False
 
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_reinitialize_uses_custom_host(self, mock_segment, mock_get_settings):
         mock_settings = MagicMock()
         mock_settings.segment_endpoint = "https://api.segment.io"
@@ -181,8 +181,8 @@ class TestTelemetryClientRegistryReinitialize:
         assert call_kwargs["host"] == "http://mock-segment:9999"
         assert call_kwargs["write_key"] == "test-key"
 
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_reinitialize_falls_back_to_static_host(self, mock_segment, mock_get_settings):
         mock_settings = MagicMock()
         mock_settings.segment_endpoint = "https://custom.segment.io"
@@ -198,8 +198,8 @@ class TestTelemetryClientRegistryReinitialize:
         call_kwargs = mock_segment.Client.call_args[1]
         assert call_kwargs["host"] == "https://custom.segment.io"
 
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.telemetry.client.segment_analytics")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.segment_analytics")
     def test_reinitialize_flushes_before_replacing(self, mock_segment, mock_get_settings):
         mock_settings = MagicMock()
         mock_settings.segment_endpoint = "https://api.segment.io"

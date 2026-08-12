@@ -219,4 +219,4 @@ Note: `wait` uses `duration` from parameters, not `timeout` from settings.
 - [Workflow Engine Architecture](workflow-engine-overview.md) — how resolved timeouts are applied during dispatch
 - [Retry Policies](retry-policies.md) — retryable error codes, backoff strategies, per-node-type retry behavior
 - [Workflow Definition Guide](workflow-definition-guide.md) — full workflow examples
-- [V2 Schema](../../src/nexus/schemas/workflows/v2/workflow_definition.schema.json) — JSON schema source of truth
+- [V2 Schema](../../src/syntara/schemas/workflows/v2/workflow_definition.schema.json) — JSON schema source of truth

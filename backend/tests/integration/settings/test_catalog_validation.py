@@ -7,8 +7,8 @@ mistakes before they reach production.
 
 from __future__ import annotations
 
-from nexus.settings.catalog import SETTINGS_CATALOG
-from nexus.settings.validators import check_schema_compatibility, validate_setting_value
+from syntara.settings.catalog import SETTINGS_CATALOG
+from syntara.settings.validators import check_schema_compatibility, validate_setting_value
 
 
 def test_all_catalog_schemas_are_compatible_with_value_types() -> None:

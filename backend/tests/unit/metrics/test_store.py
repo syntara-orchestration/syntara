@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
-from nexus.metrics.store import MetricsStore
-from nexus.metrics.types import METRIC_CATEGORIES, MetricRecord, MetricsCategoryType, MetricType
+from syntara.metrics.store import MetricsStore
+from syntara.metrics.types import METRIC_CATEGORIES, MetricRecord, MetricsCategoryType, MetricType
 
 
 def _make_record(

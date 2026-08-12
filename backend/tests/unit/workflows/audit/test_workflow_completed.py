@@ -2,12 +2,12 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.workflows.audit.execution_completed import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.workflows.audit.execution_completed import (
     WorkflowCompletedEvent,
     WorkflowCompletedHandler,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     WorkflowTerminalStatus,
 )
@@ -39,7 +39,7 @@ class TestWorkflowCompletedHandler:
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
         assert audit_event.event_action == "workflow_execution_completed"
-        assert audit_event.source_component == "nexus.workflows"
+        assert audit_event.source_component == "syntara.workflows"
         assert audit_event.execution_id == EXECUTION_ID
 
     def test_produces_error_severity_for_failed_workflow(self) -> None:

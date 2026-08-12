@@ -1,0 +1,642 @@
+---
+openapi: 3.1.0
+info:
+  title: Agent Orchestrator API
+  version: 1.0.0
+  description: |
+    REST and WebSocket API for the Agent Orchestrator - the central agentic intelligence layer of the Syntara platform.
+
+    ## Overview
+    The Agent Orchestrator provides an async-only API that returns invocation IDs immediately and streams all progress and results via WebSocket. This design provides better scalability, lower latency, and bidirectional communication capabilities.
+
+    ## Key Features
+    - Async-only POST /invocations endpoint (returns invocation ID immediately)
+    - List invocations with cursor-based pagination: GET /invocations
+    - Process control: POST /invocations/{id}/pause and POST /invocations/{id}/cancel
+    - Real-time progress and results: WS /ws/invocations/{id} (WebSocket)
+
+    ## Authentication
+    All endpoints require authentication. Include user credentials in headers.
+
+  contact:
+    name: API Support
+    email: support@automation.example.com
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+paths:
+  /invocations:
+    post:
+      summary: Create invocation (async)
+      description: |-
+        Accept async agent invocation request and return invocation ID immediately.
+
+      operationId: create_invocation
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvocationCreateRequest'
+            examples:
+              workflowGeneration:
+                summary: Workflow generation request
+                value:
+                  prompt: Create a workflow to deploy app to production
+                  sessionId: session-001
+      responses:
+        '202':
+          description: Invocation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invocation'
+              examples:
+                invocationAccepted:
+                  summary: Invocation accepted
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    prompt: Create a workflow to deploy app
+                    session_id: session-001
+                    status: running
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      security:
+        - bearerAuth: []
+    get:
+      summary: List invocations
+      description: |-
+        List invocations with cursor-based pagination and filtering
+
+      operationId: list_invocations
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: read
+      parameters:
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/InvocationStatus'
+              - type: 'null'
+            title: Status
+          description: Filter invocations by status (running, paused, cancelled, completed, failed)
+        - name: created_by
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Created By
+          description: Filter by creator UUID
+        - name: session_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Session Id
+          description: Filter by session ID
+        - name: prompt
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Prompt
+          description: Filter by prompt text (substring match)
+      responses:
+        '200':
+          description: List of invocations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvocationListResponse'
+              examples:
+                paginatedList:
+                  summary: Paginated invocation list
+                  value:
+                    resources:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        prompt: Deploy app to production
+                        session_id: session-001
+                        status: running
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /invocations/chat:
+    post:
+      summary: Create invocation with file uploads (async)
+      description: |-
+        Accept async agent invocation request with optional file uploads via multipart/form-data.
+
+      operationId: create_invocation_chat
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: create
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvocationRequestWithFile'
+      responses:
+        '202':
+          description: Invocation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invocation'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      security:
+        - bearerAuth: []
+  /invocations/{invocation_id}:
+    get:
+      summary: Get invocation details (testing/debug)
+      description: |-
+        Retrieve full invocation details including the result. NOTE: This endpoint is for testing and debugging. Production systems should use WebSockets for real-time results.
+
+      operationId: get_invocation
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: read
+      parameters:
+        - name: invocation_id
+          in: path
+          required: true
+          description: UUID of the invocation to retrieve
+          schema:
+            type: string
+            title: Invocation Id
+      responses:
+        '200':
+          description: Invocation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invocation'
+              examples:
+                completedInvocation:
+                  summary: Completed invocation
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    prompt: What deployment tools are available?
+                    session_id: test-session-123
+                    status: completed
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /invocations/{invocation_id}/trace:
+    get:
+      summary: Get invocation trace
+      description: Retrieve the agent execution trace for a completed invocation, including reasoning steps, tool calls, and tool results.
+      operationId: get_invocation_trace
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: read
+      parameters:
+        - name: invocation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Invocation Id
+      responses:
+        '200':
+          description: Agent execution trace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvocationTraceRead'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      security:
+        - bearerAuth: []
+  /invocations/{invocation_id}/cancel:
+    post:
+      summary: Cancel invocation
+      description: |-
+        Cancel a running or pending invocation.
+
+      operationId: cancel_invocation
+      tags:
+        - Invocation
+      x-app-permission:
+        resource: invocation
+        action: cancel
+      parameters:
+        - name: invocation_id
+          in: path
+          required: true
+          description: UUID of the invocation to cancel
+          schema:
+            type: string
+            title: Invocation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvocationCancelRequest'
+            examples:
+              default_reason:
+                summary: Default cancellation reason
+                value:
+                  reason: User cancelled
+      responses:
+        '200':
+          description: Cancellation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvocationCancelResponse'
+              examples:
+                success:
+                  summary: Successful cancellation
+                  value:
+                    success: true
+                    message: Invocation 550e8400-e29b-41d4-a716-446655440000 cancelled successfully
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+components:
+  schemas:
+    InvocationStatus:
+      type: string
+      title: InvocationStatus
+      description: Status enum for invocation lifecycle.
+      enum:
+        - created
+        - running
+        - paused
+        - cancelled
+        - completed
+        - failed
+
+    Invocation:
+      title: Invocation
+      additionalProperties: false
+      description: SQLModel for async workflow invocations.
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
+        - type: object
+          title: Invocation
+          required:
+            - project_id
+            - prompt
+            - session_id
+          properties:
+            project_id:
+              type: string
+              format: uuid
+              title: Project Id
+              description: Project namespace for resource isolation
+            prompt:
+              type: string
+              minLength: 1
+              maxLength: 10000
+              title: Prompt
+              description: Natural language user request
+            session_id:
+              type: string
+              minLength: 1
+              maxLength: 255
+              title: Session Id
+              description: Session identifier for multi-tenant isolation
+            status:
+              $ref: '#/components/schemas/InvocationStatus'
+              default: created
+              description: Current invocation status
+            model_name:
+              title: Model Name
+              description: LLM model name used for the invocation
+              anyOf:
+                - type: string
+                  maxLength: 255
+                - type: 'null'
+            started_at:
+              title: Started At
+              description: Timestamp when workflow execution started
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: 'null'
+            completed_at:
+              title: Completed At
+              description: Timestamp when workflow completed
+              anyOf:
+                - type: string
+                  format: date-time
+                - type: 'null'
+            context_data:
+              type: object
+              title: Context Data
+              description: Additional context for the request, including file_ids array if files uploaded
+              additionalProperties: true
+            result:
+              title: Result
+              description: Workflow result data
+              anyOf:
+                - type: object
+                  additionalProperties: true
+                - type: 'null'
+            error_message:
+              title: Error Message
+              description: Error message if invocation failed
+              anyOf:
+                - type: string
+                - type: 'null'
+            checkpoint_data:
+              title: Checkpoint Data
+              description: Checkpoint data for pause/resume
+              anyOf:
+                - type: object
+                  additionalProperties: true
+                - type: 'null'
+            trace_events:
+              title: Trace Events
+              description: Persisted agent trace steps (reasoning, tool calls, tool results, final answer)
+              anyOf:
+                - type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                - type: 'null'
+
+    InvocationRequestWithFile:
+      type: object
+      title: InvocationRequestWithFile
+      description: Multipart form body for POST /invocations/chat (file upload path).
+      required:
+        - project_id
+      properties:
+        prompt:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prompt
+        session_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Session Id
+        context_data:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Context Data
+        files:
+          anyOf:
+            - items:
+                contentMediaType: application/octet-stream
+                type: string
+              type: array
+            - type: 'null'
+          title: Files
+        project_id:
+          type: string
+          title: Project Id
+
+    InvocationListResponse:
+      allOf:
+        - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase
+        - type: object
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/Invocation'
+              maxItems: 100
+      title: InvocationListResponse
+      description: Paginated list response for invocations.
+
+    InvocationCreateRequest:
+      type: object
+      title: InvocationCreateRequest
+      description: |-
+        Request schema for creating a new invocation.
+
+        Supports multiple field name formats:
+        - snake_case (API contract): session_id, context_data
+        - camelCase (backward compatibility): sessionId, contextData
+
+        Note: created_by is automatically set from authenticated user context.
+      required:
+        - prompt
+        - sessionId
+        - projectId
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          title: Prompt
+          description: Natural language request describing desired automation task
+        sessionId:
+          type: string
+          title: Sessionid
+          description: Session identifier for grouping related invocations
+        contextData:
+          type: object
+          title: Contextdata
+          description: "Optional additional context for the request. Use 'file_ids' (array of UUID strings) to reference uploaded files."
+          additionalProperties: true
+        projectId:
+          type: string
+          format: uuid
+          title: Projectid
+          description: Project to associate this invocation with
+
+    InvocationCancelRequest:
+      type: object
+      title: InvocationCancelRequest
+      description: |-
+        Request schema for cancelling an invocation.
+
+        Supports multiple field name formats:
+        - camelCase (API contract): reason
+        - snake_case (internal): reason
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          default: User cancelled
+          title: Reason
+          description: Optional reason for cancellation
+
+    InvocationCancelResponse:
+      type: object
+      title: InvocationCancelResponse
+      description: |-
+        Response schema for invocation cancellation.
+
+        Indicates whether the cancellation was successful or failed.
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          title: Success
+          description: True if cancellation was successful, False otherwise
+        message:
+          type: string
+          title: Message
+          description: Human-readable message describing the cancellation result
+
+    InvocationTraceRead:
+      description: Read schema for agent execution trace.
+      type: object
+      required:
+        - invocation_id
+        - status
+      properties:
+        invocation_id:
+          type: string
+          format: uuid
+          title: Invocation Id
+          description: Invocation UUID
+        status:
+          $ref: '#/components/schemas/InvocationStatus'
+          description: Current invocation status
+        agent_trace:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          description: Agent execution trace with model, tokens, duration, and steps
+          title: Agent Trace
+      title: InvocationTraceRead
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Invocation
+    description: Agent invocation operations

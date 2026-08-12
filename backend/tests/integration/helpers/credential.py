@@ -5,10 +5,10 @@ from uuid import uuid4
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
 
 
 class CredentialFactory:

@@ -15,9 +15,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from prometheus_client import CollectorRegistry, generate_latest
 
-from nexus.metrics.prometheus import OrchestratorPrometheusMetrics
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.prometheus import OrchestratorPrometheusMetrics
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 
 @pytest.fixture
@@ -201,13 +201,13 @@ class TestAuthzEngineInstrumentation:
     @pytest.mark.asyncio
     async def test_evaluate_authz_policy_records_duration(self) -> None:
         """_evaluate_authz_policy records OPA_REQUEST_DURATION with resource_type and action."""
-        from nexus.authz.engine import _evaluate_authz_policy
+        from syntara.authz.engine import _evaluate_authz_policy
 
         mock_evaluator = MagicMock()
         mock_evaluator.evaluate = MagicMock(return_value={"allow": True})
 
         mock_recorder = MagicMock()
-        with patch("nexus.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
+        with patch("syntara.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
             await _evaluate_authz_policy(
                 mock_evaluator,
                 {"action": "create", "resource": {"type": "workflow"}},
@@ -224,7 +224,7 @@ class TestAuthzEngineInstrumentation:
     @pytest.mark.asyncio
     async def test_evaluate_authz_policy_records_on_cache_miss_only(self) -> None:
         """Eval duration is only recorded on cache miss (actual evaluation), not cache hit."""
-        from nexus.authz.engine import _evaluate_authz_policy, init_authz_cache
+        from syntara.authz.engine import _evaluate_authz_policy, init_authz_cache
 
         init_authz_cache(enabled=True, ttl_seconds=300, maxsize=100)
 
@@ -232,7 +232,7 @@ class TestAuthzEngineInstrumentation:
         mock_evaluator.evaluate = MagicMock(return_value={"allow": True})
 
         mock_recorder = MagicMock()
-        with patch("nexus.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
+        with patch("syntara.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
             await _evaluate_authz_policy(
                 mock_evaluator,
                 {"action": "read", "resource": {"type": "project"}},
@@ -258,12 +258,12 @@ class TestAuthzEngineInstrumentation:
     @pytest.mark.asyncio
     async def test_evaluate_authz_policy_metrics_failure_is_silent(self) -> None:
         """Metrics recording failure does not propagate to the caller."""
-        from nexus.authz.engine import _evaluate_authz_policy
+        from syntara.authz.engine import _evaluate_authz_policy
 
         mock_evaluator = MagicMock()
         mock_evaluator.evaluate = MagicMock(return_value={"allow": False})
 
-        with patch("nexus.metrics.dependencies.get_metrics_recorder", side_effect=RuntimeError("broken")):
+        with patch("syntara.metrics.dependencies.get_metrics_recorder", side_effect=RuntimeError("broken")):
             result = await _evaluate_authz_policy(
                 mock_evaluator,
                 {"action": "delete", "resource": {"type": "workflow"}},
@@ -286,12 +286,12 @@ class TestAuthzDependencyInstrumentation:
         """_record_authz_duration records AUTHZ_DURATION with correct labels."""
         import time
 
-        from nexus.authz.dependencies import _record_authz_duration
+        from syntara.authz.dependencies import _record_authz_duration
 
         mock_recorder = MagicMock()
         start = time.perf_counter() - 0.05
 
-        with patch("nexus.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
+        with patch("syntara.metrics.dependencies.get_metrics_recorder", return_value=mock_recorder):
             _record_authz_duration(start, "credential", "create")
 
         mock_recorder.record.assert_called_once()
@@ -305,10 +305,10 @@ class TestAuthzDependencyInstrumentation:
         """Metrics recording failure does not propagate."""
         import time
 
-        from nexus.authz.dependencies import _record_authz_duration
+        from syntara.authz.dependencies import _record_authz_duration
 
         start = time.perf_counter()
-        with patch("nexus.metrics.dependencies.get_metrics_recorder", side_effect=RuntimeError("broken")):
+        with patch("syntara.metrics.dependencies.get_metrics_recorder", side_effect=RuntimeError("broken")):
             _record_authz_duration(start, "workflow", "read")
 
 

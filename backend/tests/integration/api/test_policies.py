@@ -15,9 +15,9 @@ from httpx import AsyncClient
 from sqlalchemy import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import RoleAssignment
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.authz.models import RoleAssignment
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 from tests.integration.api.conftest import make_user_role
 
 
@@ -203,7 +203,7 @@ async def test_regular_user_cannot_delete_policy(
     A limited user (with 'user' role) cannot delete policies even if they exist.
     We insert one directly to have a target for the DELETE attempt.
     """
-    from nexus.authz.models.policy import Policy
+    from syntara.authz.models.policy import Policy
 
     limited_user = await user_factory(username="limited-pol-d", email="limited-pol-d@test.com")
     await make_user_role(test_db_session, limited_user)

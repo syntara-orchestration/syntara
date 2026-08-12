@@ -6,9 +6,9 @@ from uuid import uuid4
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from nexus.core.models import User
-from nexus.core.models.user_schemas import UserCreate, UserRead, UserUpdate
-from nexus.users.users_router import (
+from syntara.core.models import User
+from syntara.core.models.user_schemas import UserCreate, UserRead, UserUpdate
+from syntara.users.users_router import (
     create_user,
     delete_user,
     get_user,
@@ -122,7 +122,7 @@ class TestUpdateUserEndpoint:
         mock_store = AsyncMock()
 
         request = UserUpdate(first_name="Updated")
-        with patch("nexus.users.users_router.create_session_store", return_value=mock_store):
+        with patch("syntara.users.users_router.create_session_store", return_value=mock_store):
             result = await update_user(updated_user.id, request, service, actor, db)
 
         assert result.first_name == "Updated"
@@ -140,7 +140,7 @@ class TestUpdateUserEndpoint:
 
         request = UserUpdate(password=SecretStr("NewPassword123!"))
 
-        with patch("nexus.users.users_router.create_session_store", return_value=mock_store):
+        with patch("syntara.users.users_router.create_session_store", return_value=mock_store):
             await update_user(user.id, request, service, actor, db)
 
         mock_store.revoke_all_for_user.assert_called_once_with(user.id)
@@ -163,7 +163,7 @@ class TestDeleteUserEndpoint:
         db = AsyncMock()
         mock_store = AsyncMock()
 
-        with patch("nexus.users.users_router.create_session_store", return_value=mock_store):
+        with patch("syntara.users.users_router.create_session_store", return_value=mock_store):
             await delete_user(user_id, service, db)
 
         service.delete_user.assert_called_once_with(user_id)

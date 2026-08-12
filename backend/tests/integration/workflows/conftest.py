@@ -12,8 +12,8 @@ import pytest
 import respx
 from httpx import Response
 
-from nexus.core.config.base import Settings
-from nexus.core.models import User
+from syntara.core.config.base import Settings
+from syntara.core.models import User
 
 
 @pytest.fixture(autouse=True)
@@ -37,11 +37,11 @@ def _bypass_websocket_auth() -> Generator[None, None, None]:
     """Bypass WebSocket auth and authz guards for workflow integration tests."""
     with (
         patch(
-            "nexus.core.websocket.endpoint_factory._authenticate_websocket",
+            "syntara.core.websocket.endpoint_factory._authenticate_websocket",
             AsyncMock(return_value=_FAKE_USER),
         ),
         patch(
-            "nexus.core.websocket.endpoint_factory._check_websocket_authorization",
+            "syntara.core.websocket.endpoint_factory._check_websocket_authorization",
             AsyncMock(return_value=True),
         ),
     ):

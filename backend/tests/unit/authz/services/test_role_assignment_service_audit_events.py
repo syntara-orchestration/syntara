@@ -14,15 +14,15 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.authz.audit.role_assignment import RoleAssignmentEvent, RoleAssignmentHandler
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.services.role_assignment_service import RoleAssignmentService
-from nexus.core.models import User
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.authz.audit.role_assignment import RoleAssignmentEvent, RoleAssignmentHandler
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.core.models import User
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestRoleAssignmentServiceAssignAuditEvents:
@@ -32,7 +32,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         AuditEventDispatcher.register({RoleAssignmentEvent: RoleAssignmentHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_assign_user_role_emits_role_assigned_event(
         self,
         mock_do_emit: AsyncMock,
@@ -80,7 +80,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Role assigned: editor -> user alice"
         assert event.resource_urn == f"urn:syntara:role-assignment:{assignment_id}"
 
@@ -91,7 +91,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         assert event.structured_data.role_name == "editor"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_assign_group_role_emits_role_assigned_event(
         self,
         mock_do_emit: AsyncMock,
@@ -134,7 +134,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         assert event.structured_data.group_name == "developers"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_assign_with_project_includes_project_in_event(
         self,
         mock_do_emit: AsyncMock,
@@ -164,7 +164,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
             patch.object(service, "_validate_role", new_callable=AsyncMock),
             patch.object(service, "_resolve_project_name", new_callable=AsyncMock, return_value="my-project"),
             patch.object(service, "_enrich_with_role_info", new_callable=AsyncMock),
-            patch("nexus.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
+            patch("syntara.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
         ):
             await service.assign(
                 principal_id=principal_id,
@@ -184,7 +184,7 @@ class TestRoleAssignmentServiceRevokeAuditEvents:
         AuditEventDispatcher.register({RoleAssignmentEvent: RoleAssignmentHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_revoke_assignment_emits_role_revoked_event(
         self,
         mock_do_emit: AsyncMock,
@@ -227,7 +227,7 @@ class TestRoleAssignmentServiceRevokeAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:role-assignment:{assignment_id}"
         assert event.event_message == "Role revoked: editor -> user alice"
         assert event.structured_data.action == "revoked"

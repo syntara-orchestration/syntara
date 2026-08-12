@@ -16,14 +16,14 @@ from unittest.mock import AsyncMock
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.api.constants import EXCLUDED_PATHS
-from nexus.metrics.interface_tag import INTERFACE_API, INTERFACE_UI, interface_context_var
-from nexus.metrics.middleware import (
+from syntara.api.constants import EXCLUDED_PATHS
+from syntara.metrics.interface_tag import INTERFACE_API, INTERFACE_UI, interface_context_var
+from syntara.metrics.middleware import (
     MetricsMiddleware,
     classify_error_type,
 )
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 
 @pytest.fixture

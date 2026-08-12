@@ -15,13 +15,13 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.exceptions import BuiltinProtectionError
-from nexus.authz.models.project import Project
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.workflows.exceptions import (
+from syntara.authz.exceptions import BuiltinProtectionError
+from syntara.authz.models.project import Project
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     WorkflowNameConflictError,
@@ -31,14 +31,14 @@ from nexus.workflows.exceptions import (
     WorkflowVersionConflictError,
     WorkflowVersionNotFoundError,
 )
-from nexus.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
-from nexus.workflows.models.validation_finding import (
+from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
     ValidationResult,
     ValidationSeverity,
 )
-from nexus.workflows.services.workflow_service import WorkflowConvertResourceMixin, WorkflowService
+from syntara.workflows.services.workflow_service import WorkflowConvertResourceMixin, WorkflowService
 
 
 def _valid_result() -> ValidationResult:
@@ -294,7 +294,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
         workflow_definition = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             result = await service.create_workflow(
                 name="test-workflow",
                 description="Test description",
@@ -335,7 +335,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         mock_val = MagicMock()
         mock_val.collect_findings.return_value = _invalid_result("Invalid definition")
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val):
             workflow, _version, val_result = await service.create_workflow(
                 name="invalid-workflow",
                 description=None,
@@ -357,7 +357,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         # First, create a workflow with a specific name
         workflow_definition = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             # Create first workflow
             await service.create_workflow(
                 name="duplicate-workflow",
@@ -369,7 +369,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
         # Now try to create another with the same name
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
             pytest.raises(WorkflowNameConflictError),
         ):
             await service.create_workflow(
@@ -393,7 +393,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         await test_db_session.commit()
         await test_db_session.refresh(other_project)
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             wf_a, _, _ = await service.create_workflow(
                 name="cross-project-wf",
                 description=None,
@@ -402,7 +402,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
                 project_id=test_project_id,
             )
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             wf_b, _, _ = await service.create_workflow(
                 name="cross-project-wf",
                 description=None,
@@ -422,7 +422,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_definition = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             await service.create_workflow(
                 name="same-project-wf",
                 description=None,
@@ -432,7 +432,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
             )
 
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
             pytest.raises(WorkflowNameConflictError),
         ):
             await service.create_workflow(
@@ -455,7 +455,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         mock_val = MagicMock()
         mock_val.collect_findings.return_value = _warnings_result()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val):
             workflow, _version, val_result = await service.create_workflow(
                 name="warnings-workflow",
                 description=None,
@@ -479,7 +479,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
         mock_val = MagicMock()
         mock_val.collect_findings.return_value = _invalid_result()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val):
             workflow, _version, val_result = await service.create_workflow(
                 name="errors-save-workflow",
                 description=None,
@@ -500,7 +500,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
         workflow_definition = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _version, _val_result = await service.create_workflow(
                 name="valid-workflow",
                 description=None,
@@ -661,7 +661,7 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
 
         new_definition = self._create_workflow_definition(description="Updated workflow")  # type: ignore[arg-type]
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             result, _val_result = await service.create_workflow_version(
                 workflow,
                 new_definition,
@@ -699,7 +699,7 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
         test_db_session.add(current_version)
         await test_db_session.commit()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             result, _val_result = await service.create_workflow_version(
                 workflow,
                 same_definition,
@@ -729,7 +729,7 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
         mock_val = MagicMock()
         mock_val.collect_findings.return_value = _invalid_result("Invalid definition")
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val):
             version, val_result = await service.create_workflow_version(
                 workflow,
                 invalid_definition,
@@ -786,7 +786,7 @@ class TestWorkflowServiceUpdateWorkflow(TestWorkflowServiceBase):
 
         new_definition = self._create_workflow_definition(description="Updated workflow with new features")  # type: ignore[arg-type]
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             result = await service.update_workflow(
                 workflow.id,
                 name="updated-name",
@@ -1454,7 +1454,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="publish-test",
                 description=None,
@@ -1465,7 +1465,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             result_workflow, result_version, _warning = await service.publish_workflow_version(
                 workflow_id=workflow.id,
                 version=1,
@@ -1493,7 +1493,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _v1, _ = await service.create_workflow(
                 name="demote-test",
                 description=None,
@@ -1504,7 +1504,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             _, _published_v1, _warning = await service.publish_workflow_version(workflow_id=workflow.id, version=1)
 
         first_published_id = workflow.published_version_id
@@ -1512,14 +1512,14 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         # Create update draft (v2)
         v2_def = self._create_workflow_definition()
         v2_def["description"] = "v2"
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             v2, _ = await service.create_workflow_version(workflow, v2_def, "v2 changes")
 
         assert v2 is not None
 
         mock_wh_svc2 = MagicMock()
         mock_wh_svc2.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc2):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc2):
             _, published_v2, _warning = await service.publish_workflow_version(
                 workflow_id=workflow.id, version=v2.version
             )
@@ -1537,7 +1537,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="idempotent-test",
                 description=None,
@@ -1548,7 +1548,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             _, _first_result, _warning = await service.publish_workflow_version(workflow_id=workflow.id, version=1)
             result_workflow, result_version, _warning = await service.publish_workflow_version(
                 workflow_id=workflow.id, version=1
@@ -1564,7 +1564,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="nonexistent-version-test",
                 description=None,
@@ -1593,7 +1593,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="publish-trigger-sync-test",
                 description=None,
@@ -1605,7 +1605,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         mock_wh_svc = MagicMock()
         mock_sync = AsyncMock(return_value=[])
         mock_wh_svc.return_value.sync_webhook_triggers = mock_sync
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             await service.publish_workflow_version(workflow_id=workflow.id, version=1)
 
         # Should have been called once per trigger type
@@ -1624,7 +1624,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="publish-errors-test",
                 description=None,
@@ -1637,7 +1637,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         mock_val.collect_findings.return_value = _invalid_result()
 
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val),
             pytest.raises(WorkflowPublishValidationError),
         ):
             await service.publish_workflow_version(workflow_id=workflow.id, version=1)
@@ -1650,7 +1650,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="publish-warnings-test",
                 description=None,
@@ -1663,7 +1663,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         mock_val.collect_findings.return_value = _warnings_result()
 
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val),
             pytest.raises(WorkflowPublishValidationError),
         ):
             await service.publish_workflow_version(workflow_id=workflow.id, version=1)
@@ -1676,7 +1676,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="publish-preserves-test",
                 description=None,
@@ -1687,14 +1687,14 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             _, published_v2, _warning = await service.publish_workflow_version(workflow_id=workflow.id, version=1)
 
         assert workflow.published_version_id == published_v2.id
 
         v3_def = self._create_workflow_definition()
         v3_def["description"] = "updated definition"
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             v3, _ = await service.create_workflow_version(workflow, v3_def, "update with issues")
         assert v3 is not None
 
@@ -1702,7 +1702,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         mock_val.collect_findings.return_value = _invalid_result()
 
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", mock_val),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", mock_val),
             pytest.raises(WorkflowPublishValidationError),
         ):
             await service.publish_workflow_version(workflow_id=workflow.id, version=v3.version)
@@ -1728,7 +1728,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _v1, _ = await service.create_workflow(
                 name="unpublish-test",
                 description=None,
@@ -1739,7 +1739,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
 
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             await service.publish_workflow_version(workflow_id=workflow.id, version=1)
             result = await service.unpublish_workflow(workflow_id=workflow.id)
 
@@ -1754,7 +1754,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="unpublish-error-test",
                 description=None,
@@ -1783,7 +1783,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         workflow_def = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="unpublish-trigger-sync-test",
                 description=None,
@@ -1795,14 +1795,14 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
         # Publish first (mock webhook service)
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock(return_value=[])
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc):
             await service.publish_workflow_version(workflow_id=workflow.id, version=1)
 
         # Now unpublish and verify trigger sync
         mock_wh_svc2 = MagicMock()
         mock_sync = AsyncMock(return_value=[])
         mock_wh_svc2.return_value.sync_webhook_triggers = mock_sync
-        with patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc2):
+        with patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc2):
             await service.unpublish_workflow(workflow_id=workflow.id)
 
         # Should have been called once per trigger type
@@ -1825,7 +1825,7 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         defn_v1 = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="restore-unit-test",
                 description=None,
@@ -1838,8 +1838,8 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
         with (
-            patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc),
         ):
             await service.update_workflow(
                 workflow_id=workflow.id,
@@ -1867,7 +1867,7 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         defn = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="restore-noop-unit",
                 description=None,
@@ -1891,7 +1891,7 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
         service = WorkflowService(test_db_session, test_user)
         defn = self._create_workflow_definition()
 
-        with patch("nexus.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
             workflow, _, _ = await service.create_workflow(
                 name="restore-404-unit",
                 description=None,
@@ -1917,8 +1917,8 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
 # AAP-79159: Cross-project credential validation
 # ============================================================================
 
-_PATCH_VALIDATOR = "nexus.workflows.services.workflow_service.workflow_validator"
-_PATCH_PROJECT_ALIVE = "nexus.core.queries.project_queries.assert_project_alive"
+_PATCH_VALIDATOR = "syntara.workflows.services.workflow_service.workflow_validator"
+_PATCH_PROJECT_ALIVE = "syntara.core.queries.project_queries.assert_project_alive"
 
 
 def _mock_webhook_service() -> MagicMock:
@@ -2045,7 +2045,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         with (
             patch(_PATCH_VALIDATOR, _mock_validator_valid()),
             patch(_PATCH_PROJECT_ALIVE, new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
         ):
             workflow, version, _ = await service.create_workflow(
                 name=f"same-project-{uuid4().hex[:6]}",
@@ -2095,7 +2095,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         with (
             patch(_PATCH_VALIDATOR, _mock_validator_valid()),
             patch(_PATCH_PROJECT_ALIVE, new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
         ):
             workflow, _version, _ = await service.create_workflow(
                 name=f"no-cred-{uuid4().hex[:6]}",
@@ -2115,7 +2115,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         credential_in_a: Credential,
     ) -> None:
         """Workflow save with a credential fails when opa_client is None (fail-closed)."""
-        from nexus.authz.exceptions import AuthorizationDeniedError
+        from syntara.authz.exceptions import AuthorizationDeniedError
 
         service = WorkflowService(test_db_session, test_user, opa_client=None)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
@@ -2123,7 +2123,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         with (
             patch(_PATCH_VALIDATOR, _mock_validator_valid()),
             patch(_PATCH_PROJECT_ALIVE, new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
         ):
             wf_name = f"no-evaluator-{uuid4().hex[:6]}"
             with pytest.raises(AuthorizationDeniedError, match="Authorization service unavailable"):
@@ -2144,7 +2144,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         credential_in_a: Credential,
     ) -> None:
         """Workflow save raises AuthorizationDeniedError when evaluator denies credential:use."""
-        from nexus.authz.exceptions import AuthorizationDeniedError
+        from syntara.authz.exceptions import AuthorizationDeniedError
 
         mock_evaluator = MagicMock()
         mock_evaluator.evaluate = MagicMock(
@@ -2162,7 +2162,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         with (
             patch(_PATCH_VALIDATOR, _mock_validator_valid()),
             patch(_PATCH_PROJECT_ALIVE, new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", _mock_webhook_service()),
         ):
             wf_name = f"denied-use-{uuid4().hex[:6]}"
             with pytest.raises(AuthorizationDeniedError, match="Not authorized to use"):
@@ -2271,7 +2271,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         credential_in_a: Credential,
     ) -> None:
         """publish_workflow_version with inline workflow_definition runs credential:use check."""
-        from nexus.authz.exceptions import AuthorizationDeniedError
+        from syntara.authz.exceptions import AuthorizationDeniedError
 
         service = WorkflowService(test_db_session, test_user, opa_client=None)
 
@@ -2689,8 +2689,8 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
         mock_wh_svc = MagicMock()
         mock_wh_svc.return_value.sync_webhook_triggers = AsyncMock()
         with (
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc),
-            patch("nexus.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched,
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService", mock_wh_svc),
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched,
         ):
             mock_sched.return_value.sync_scheduled_triggers = AsyncMock()
             result_workflow, _result_version, _warning = await service.publish_workflow_version(

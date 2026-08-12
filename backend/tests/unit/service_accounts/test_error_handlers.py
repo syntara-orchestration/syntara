@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from fastapi import status
 
-from nexus.service_accounts.error_handlers import (
+from syntara.service_accounts.error_handlers import (
     sa_credential_expiration_exceeded_handler,
     sa_credential_expiration_in_past_handler,
     sa_credential_limit_handler,
@@ -14,7 +14,7 @@ from nexus.service_accounts.error_handlers import (
     service_account_name_conflict_handler,
     service_account_not_found_handler,
 )
-from nexus.service_accounts.exceptions import (
+from syntara.service_accounts.exceptions import (
     CredentialExpirationExceededError,
     CredentialExpirationInPastError,
     ServiceAccountCredentialLimitError,

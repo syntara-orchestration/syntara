@@ -10,13 +10,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from orchestrator_test_sdk.e2e import async_poll_for
 
-from nexus.core.workers.periodic import PeriodicWorker
+from syntara.core.workers.periodic import PeriodicWorker
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-ADVISORY_LOCK_PATH = "nexus.core.workers.periodic._try_advisory_xact_lock"
+ADVISORY_LOCK_PATH = "syntara.core.workers.periodic._try_advisory_xact_lock"
 
 
 def _mock_session_factory() -> MagicMock:
@@ -203,7 +203,7 @@ class TestPeriodicWorkerErrorResilience:
             coordinate=False,
         )
 
-        with patch("nexus.core.workers.periodic.logger") as mock_logger:
+        with patch("syntara.core.workers.periodic.logger") as mock_logger:
             worker.start()
             await async_poll_for(
                 lambda: any("periodic_worker_started" in str(c.args) for c in mock_logger.info.call_args_list),
@@ -241,7 +241,7 @@ class TestPeriodicWorkerErrorResilience:
             coordinate=False,
         )
 
-        with patch("nexus.core.workers.periodic.logger") as mock_logger:
+        with patch("syntara.core.workers.periodic.logger") as mock_logger:
             worker.start()
             await async_poll_for(
                 lambda: any(

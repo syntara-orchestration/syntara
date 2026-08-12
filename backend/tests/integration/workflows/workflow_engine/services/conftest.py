@@ -4,7 +4,7 @@ from collections.abc import Generator
 
 import pytest
 
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 from tests.fixtures.settings import FakeSettingsCache
 
 
@@ -16,7 +16,7 @@ def _ensure_runtime_settings() -> Generator[None, None, None]:
     which raises ``RuntimeError`` if the singleton has not been set.
     Also enables script nodes since the gate defaults to False.
     """
-    import nexus.settings.cache.settings_cache as _settings_mod
+    import syntara.settings.cache.settings_cache as _settings_mod
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]

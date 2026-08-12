@@ -250,7 +250,7 @@ We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING
 ### Syntara Contracts (Type Definitions)
 
 - openapi-typescript (type generation)
-- Generated from the backend OpenAPI specs at `../backend/src/nexus/schemas/`
+- Generated from the backend OpenAPI specs at `../backend/src/syntara/schemas/`
 - Shared types for UI and mock API
 
 ### Syntara Mock API (Development Server)

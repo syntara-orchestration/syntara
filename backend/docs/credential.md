@@ -36,10 +36,10 @@ graph TD
     D --> F[(credential_types<br>schema)]
 ```
 
-- **Router** (`src/nexus/credentials/router.py`) — HTTP endpoints with RBAC enforcement via PermissionChecker
-- **CredentialService** (`src/nexus/credentials/services/credential_service.py`) — business logic, input validation, secret masking
-- **SecretService** (`src/nexus/core/services/secret_service.py`) — encryption/decryption via SecretEncryptor (AES-256-GCM)
-- **Preseed** (`src/nexus/credentials/lib/preseed.py`) — upserts 5 GA managed credential types at startup
+- **Router** (`src/syntara/credentials/router.py`) — HTTP endpoints with RBAC enforcement via PermissionChecker
+- **CredentialService** (`src/syntara/credentials/services/credential_service.py`) — business logic, input validation, secret masking
+- **SecretService** (`src/syntara/core/services/secret_service.py`) — encryption/decryption via SecretEncryptor (AES-256-GCM)
+- **Preseed** (`src/syntara/credentials/lib/preseed.py`) — upserts 5 GA managed credential types at startup
 
 ## Credential Types
 
@@ -187,7 +187,7 @@ Credentials are consumed by workflow nodes through the injector resolution syste
 
 ### Credential Scrubbing
 
-The `scrub_credentials()` function (`src/nexus/workflows/workflow_engine/utils/credential_scrubber.py`) replaces values at known credential field names in workflow execution output with `[REDACTED]`. This key-based scrubbing prevents secrets from appearing in activity logs, WebSocket streams, or API responses.
+The `scrub_credentials()` function (`src/syntara/workflows/workflow_engine/utils/credential_scrubber.py`) replaces values at known credential field names in workflow execution output with `[REDACTED]`. This key-based scrubbing prevents secrets from appearing in activity logs, WebSocket streams, or API responses.
 
 ## Key Rotation
 
@@ -199,15 +199,15 @@ The key rotation CLI re-encrypts all stored credentials from an old encryption k
 
 1. **Back up the database** before rotation:
    ```bash
-   pg_dump -U <user> nexus_api > nexus_backup_$(date +%Y%m%d_%H%M%S).sql
+   pg_dump -U <user> syntara_api > nexus_backup_$(date +%Y%m%d_%H%M%S).sql
    ```
 
 2. **Stop the API server** to prevent concurrent access.
 
 3. **Run dry-run first**, then actual rotation:
    ```bash
-   uv run python -m nexus.credentials.cli rotate-keys --old-key <hex> --new-key <hex> --dry-run
-   uv run python -m nexus.credentials.cli rotate-keys --old-key <hex> --new-key <hex>
+   uv run python -m syntara.credentials.cli rotate-keys --old-key <hex> --new-key <hex> --dry-run
+   uv run python -m syntara.credentials.cli rotate-keys --old-key <hex> --new-key <hex>
    ```
 
 4. **Update `APP_SECRET_ENCRYPTION_KEY`** to the new key.

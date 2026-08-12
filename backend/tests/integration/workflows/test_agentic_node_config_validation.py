@@ -20,9 +20,9 @@ from pydantic import ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from nexus.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
 
-SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "nexus" / "schemas" / "workflows" / "v2"
+SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "syntara" / "schemas" / "workflows" / "v2"
 VALID_UUID = "550e8400-e29b-41d4-a716-446655440000"
 
 

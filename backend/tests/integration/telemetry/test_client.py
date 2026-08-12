@@ -15,8 +15,8 @@ from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.telemetry.client import TelemetryClientRegistry, initialize_telemetry
-from nexus.telemetry.events.base import BaseTelemetryEvent
+from syntara.telemetry.client import TelemetryClientRegistry, initialize_telemetry
+from syntara.telemetry.events.base import BaseTelemetryEvent
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -112,7 +112,7 @@ class TestInitializeTelemetry:
         )
 
         with (
-            patch("nexus.telemetry.client._get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.client._get_telemetry_registry", return_value=mock_registry),
             override_settings(
                 segment_write_key=SecretStr("test-write-key"),
                 entitlement_id="test-ent-id",

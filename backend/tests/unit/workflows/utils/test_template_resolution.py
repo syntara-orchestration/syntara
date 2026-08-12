@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.utils.template_resolution import resolve_parameter_templates, resolve_value
-from nexus.workflows.workflow_engine.expression_resolver import ExpressionResolver
+from syntara.workflows.utils.template_resolution import resolve_parameter_templates, resolve_value
+from syntara.workflows.workflow_engine.expression_resolver import ExpressionResolver
 
 
 class TestResolveValue:

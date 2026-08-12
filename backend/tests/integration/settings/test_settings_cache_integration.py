@@ -14,10 +14,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.settings.cache.settings_cache import SettingsCache
-from nexus.settings.catalog import SETTINGS_CATALOG, SettingDefinition
-from nexus.settings.exceptions import SettingTypeError
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.cache.settings_cache import SettingsCache
+from syntara.settings.catalog import SETTINGS_CATALOG, SettingDefinition
+from syntara.settings.exceptions import SettingTypeError
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -47,7 +47,7 @@ def _catalog_with_key(
         value_type=value_type,
         default_value=None,
     )
-    with patch("nexus.settings.catalog.SETTINGS_CATALOG", [*SETTINGS_CATALOG, entry]):
+    with patch("syntara.settings.catalog.SETTINGS_CATALOG", [*SETTINGS_CATALOG, entry]):
         yield
 
 

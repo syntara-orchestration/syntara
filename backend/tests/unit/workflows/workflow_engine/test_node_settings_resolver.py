@@ -1,9 +1,9 @@
 """Tests for node_settings_resolver pure functions."""
 
-from nexus.settings.catalog import SETTINGS_CATALOG
-from nexus.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
-from nexus.workflows.workflow_engine.graph import ActivityNode
-from nexus.workflows.workflow_engine.node_settings_resolver import resolve_max_output_bytes, resolve_retry_policy
+from syntara.settings.catalog import SETTINGS_CATALOG
+from syntara.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
+from syntara.workflows.workflow_engine.graph import ActivityNode
+from syntara.workflows.workflow_engine.node_settings_resolver import resolve_max_output_bytes, resolve_retry_policy
 
 
 def _catalog_defaults() -> dict[str, object]:

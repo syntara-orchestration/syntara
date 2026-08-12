@@ -16,8 +16,8 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.session.session_store import SessionStore
-from nexus.core.models import User
+from syntara.auth.session.session_store import SessionStore
+from syntara.core.models import User
 
 pytestmark = pytest.mark.integration
 

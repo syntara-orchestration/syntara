@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from nexus.approvals.models import ApprovalRequest, ApprovalRequestStatus
+from syntara.approvals.models import ApprovalRequest, ApprovalRequestStatus
 
 # Sentinel value to detect when a parameter was explicitly passed as None
 _NOT_PROVIDED = object()

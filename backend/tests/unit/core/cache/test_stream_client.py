@@ -14,8 +14,8 @@ import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
-from nexus.core.cache.stream import StreamClient
-from nexus.core.exceptions import SafeValueError
+from syntara.core.cache.stream import StreamClient
+from syntara.core.exceptions import SafeValueError
 
 pytestmark = pytest.mark.unit
 
@@ -34,7 +34,7 @@ _SHOULD_NOT_ITERATE = "Should not reach this point - exception expected before i
 )
 async def test_events_input_validation(stream_id: str, replay: int | None, expected_error: str) -> None:
     """Test input validation for events() method."""
-    with patch("nexus.core.cache.base.redis.Redis"):
+    with patch("syntara.core.cache.base.redis.Redis"):
         client = StreamClient()
         with pytest.raises(SafeValueError, match=expected_error):
             await anext(client.events(stream_id, replay=replay))
@@ -42,7 +42,7 @@ async def test_events_input_validation(stream_id: str, replay: int | None, expec
 
 async def test_events_mutually_exclusive_params() -> None:
     """Test that start_id and replay parameters are mutually exclusive."""
-    with patch("nexus.core.cache.base.redis.Redis"):
+    with patch("syntara.core.cache.base.redis.Redis"):
         client = StreamClient()
         with pytest.raises(SafeValueError, match="mutually exclusive"):
             await anext(client.events("test_stream", start_id="123-0", replay=10))
@@ -69,7 +69,7 @@ async def test_events_should_stop_conditional_termination() -> None:
         ]
     )
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             events = []
             async for event in client.events("test_stream", should_stop=lambda e: e.get("type") == "end"):
@@ -100,7 +100,7 @@ async def test_events_malformed_json_skipped() -> None:
         ]
     )
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             events = []
             async for event in client.events("test_stream"):
@@ -139,7 +139,7 @@ async def test_events_replay_calculation() -> None:
         ]
     )
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             events = []
             async for event in client.events("test_stream", replay=3):
@@ -169,7 +169,7 @@ async def test_events_replay_empty_stream() -> None:
         ]
     )
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             events = []
             async for event in client.events("test_stream", replay=10):
@@ -185,7 +185,7 @@ async def test_events_replay_empty_stream() -> None:
 
 async def test_publish_input_validation() -> None:
     """Test input validation for publish() method."""
-    with patch("nexus.core.cache.base.redis.Redis"):
+    with patch("syntara.core.cache.base.redis.Redis"):
         client = StreamClient()
         with pytest.raises(SafeValueError, match="stream_id cannot be empty"):
             await client.publish("", {"key": "value"})
@@ -204,7 +204,7 @@ async def test_publish_error_propagation(exception_type: type[Exception], error_
     mock_client = AsyncMock()
     mock_client.xadd = AsyncMock(side_effect=exception_type(error_message))
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             with pytest.raises(exception_type, match=error_message):
                 await client.publish("test_stream", {"key": "value"})
@@ -215,7 +215,7 @@ async def test_events_connection_error_propagates() -> None:
     mock_client = AsyncMock()
     mock_client.xread = AsyncMock(side_effect=RedisConnectionError("Connection lost"))
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             with pytest.raises(RedisConnectionError, match="Connection lost"):
                 await anext(client.events("test_stream"))
@@ -232,7 +232,7 @@ async def test_info_existing_stream() -> None:
         }
     )
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             info = await client.info("test_stream")
 
@@ -247,7 +247,7 @@ async def test_info_nonexistent_stream() -> None:
     mock_client = AsyncMock()
     mock_client.xinfo_stream = AsyncMock(side_effect=ResponseError("ERR no such key"))
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             info = await client.info("nonexistent_stream")
 
@@ -262,7 +262,7 @@ async def test_info_error_handling() -> None:
     mock_client = AsyncMock()
     mock_client.xinfo_stream = AsyncMock(side_effect=ResponseError("WRONGTYPE"))
 
-    with patch("nexus.core.cache.base.redis.Redis", return_value=mock_client):
+    with patch("syntara.core.cache.base.redis.Redis", return_value=mock_client):
         async with StreamClient() as client:
             with pytest.raises(ResponseError, match="WRONGTYPE"):
                 await client.info("test_stream")

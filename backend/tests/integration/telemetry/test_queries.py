@@ -7,19 +7,19 @@ from datetime import UTC, datetime, timedelta
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.telemetry.events.integration_health import (
+from syntara.telemetry.events.integration_health import (
     CredentialHealth,
     CredentialInfo,
     IdentityProviderHealth,
     IdentityProviderInfo,
 )
-from nexus.telemetry.events.system_analytics import (
+from syntara.telemetry.events.system_analytics import (
     CredentialCounts,
     ExecutionCounts,
     ModelUsage,
     WorkflowCounts,
 )
-from nexus.telemetry.queries import (
+from syntara.telemetry.queries import (
     query_credential_counts,
     query_credential_health,
     query_execution_counts,
@@ -28,7 +28,7 @@ from nexus.telemetry.queries import (
     query_model_usage,
     query_workflow_counts,
 )
-from nexus.workflows.models.execution import ExecutionStatus
+from syntara.workflows.models.execution import ExecutionStatus
 from tests.integration.helpers.credential import CredentialFactory
 from tests.integration.helpers.execution import ExecutionFactory
 from tests.integration.helpers.identity_provider import IdentityProviderCreate

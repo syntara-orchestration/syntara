@@ -13,9 +13,9 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
-from nexus.settings.router import _validate_key
-from nexus.settings.services.settings_service import setting_to_read
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.router import _validate_key
+from syntara.settings.services.settings_service import setting_to_read
 
 
 def _make_setting(

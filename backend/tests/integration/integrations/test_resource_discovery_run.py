@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlmodel import select
 
-from nexus.integrations.models.integration import Integration, IntegrationRefreshStatus, IntegrationType
-from nexus.integrations.services import resource_discovery
+from syntara.integrations.models.integration import Integration, IntegrationRefreshStatus, IntegrationType
+from syntara.integrations.services import resource_discovery
 
 if TYPE_CHECKING:
     from uuid import UUID

@@ -1,8 +1,8 @@
 {
   "description": "Known import cycle edges — accepted as permanent. auth.__init__ re-exports are public API consumed by 20+ modules. csrf.py uses a lazy import from dependencies.py. See docs/standards/static-analysis.md.",
   "known_edges": [
-    ["nexus.auth.__init__", "nexus.auth.csrf"],
-    ["nexus.auth.__init__", "nexus.auth.dependencies"],
-    ["nexus.auth.csrf", "nexus.auth.dependencies"]
+    ["syntara.auth.__init__", "syntara.auth.csrf"],
+    ["syntara.auth.__init__", "syntara.auth.dependencies"],
+    ["syntara.auth.csrf", "syntara.auth.dependencies"]
   ]
 }

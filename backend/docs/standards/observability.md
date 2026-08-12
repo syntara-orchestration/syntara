@@ -15,7 +15,7 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Purpose:** Monitor system performance, resource utilization, and operational health.
 
-**Location:** `src/nexus/metrics/`
+**Location:** `src/syntara/metrics/`
 
 **Endpoint:** `/metrics` (OpenMetrics/Prometheus format)
 
@@ -38,7 +38,7 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Purpose:** Capture product usage patterns for data-driven product improvement.
 
-**Location:** `src/nexus/telemetry/`
+**Location:** `src/syntara/telemetry/`
 
 **Components:**
 - `AuditEventDispatcher` - Routes domain events to registered handlers (shared with audit system)
@@ -46,7 +46,7 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 - `TelemetryClientRegistry` - Singleton registry managing Segment client lifecycle
 - `TelemetryMiddleware` - ASGI middleware for API call telemetry
 - Domain events - Lightweight dataclasses dispatched from business logic
-- Telemetry handlers - Located in `src/nexus/telemetry/handlers/`, auto-discovered at startup
+- Telemetry handlers - Located in `src/syntara/telemetry/handlers/`, auto-discovered at startup
 
 **Events collected:**
 - Workflow execution (start, completion with status/duration/error)
@@ -87,7 +87,7 @@ Observability code MUST follow the fire-and-forget pattern. The audit framework 
 
 ### 1. Define the Metric Type
 
-Add to `src/nexus/metrics/types.py`:
+Add to `src/syntara/metrics/types.py`:
 
 ```python
 class MetricType(str, Enum):
@@ -96,7 +96,7 @@ class MetricType(str, Enum):
 
 ### 2. Register Prometheus Instrument
 
-For component-level metrics, add to `_COMPONENT_METRIC_MAP` in `src/nexus/metrics/recorder.py`:
+For component-level metrics, add to `_COMPONENT_METRIC_MAP` in `src/syntara/metrics/recorder.py`:
 
 ```python
 _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
@@ -107,13 +107,13 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
 Tuple format: `(prometheus_attribute_name, action, extra_label_keys)`
 - Actions: `"gauge"`, `"histogram"`, `"counter"`
 
-For system-wide metrics, add dispatch logic to `_dispatch_prometheus` in `src/nexus/metrics/recorder.py`.
+For system-wide metrics, add dispatch logic to `_dispatch_prometheus` in `src/syntara/metrics/recorder.py`.
 
 ### 3. Record the Metric
 
 ```python
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 recorder = MetricsRecorder()
 
@@ -135,7 +135,7 @@ with recorder.time(MetricType.MY_NEW_METRIC, labels={"component": "tool_manager"
 Use `record_llm_call` wrapper for invoke-style calls:
 
 ```python
-from nexus.metrics.instrumentation import record_llm_call
+from syntara.metrics.instrumentation import record_llm_call
 
 result = await record_llm_call(
     recorder,
@@ -147,7 +147,7 @@ result = await record_llm_call(
 For streaming calls, use `LLMStreamTracker`:
 
 ```python
-from nexus.metrics.instrumentation import LLMStreamTracker
+from syntara.metrics.instrumentation import LLMStreamTracker
 
 tracker = LLMStreamTracker(recorder, model="gpt-4")
 async for event in graph.astream_events(...):
@@ -160,7 +160,7 @@ Telemetry events are emitted through the **Audit Framework**. Business logic dis
 
 ### 1. Define the Domain Event
 
-Create a dataclass in the appropriate `audit/` package (e.g., `src/nexus/workflows/audit/`):
+Create a dataclass in the appropriate `audit/` package (e.g., `src/syntara/workflows/audit/`):
 
 ```python
 from dataclasses import dataclass, field
@@ -185,9 +185,9 @@ This step is only required if you want to produce structured audit log entries (
 Create a handler in the same `audit/` package. It maps the domain event to a normalized `AuditEvent`:
 
 ```python
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
 
 class MyFeatureHandler(AuditEventHandler[MyFeatureEvent]):
     """Maps MyFeatureEvent to an AuditEvent for the audit log."""
@@ -204,7 +204,7 @@ class MyFeatureHandler(AuditEventHandler[MyFeatureEvent]):
             event_status=EventStatus.SUCCESS,
             event_action="my_feature_used",
             event_message=f"Feature used: {event.action}",
-            source_component="nexus.my_feature",
+            source_component="syntara.my_feature",
             structured_data=data,
             resource_urn=f"urn:syntara:feature:{event.feature_id}",
         )
@@ -212,13 +212,13 @@ class MyFeatureHandler(AuditEventHandler[MyFeatureEvent]):
 
 ### 3. Create a Telemetry Handler (for Segment events)
 
-Create a handler in `src/nexus/telemetry/handlers/`. Telemetry handlers are side-effect-only — they return `None`:
+Create a handler in `src/syntara/telemetry/handlers/`. Telemetry handlers are side-effect-only — they return `None`:
 
 ```python
 import structlog
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import AuditEvent
-from nexus.telemetry.client import get_telemetry_registry
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import AuditEvent
+from syntara.telemetry.client import get_telemetry_registry
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -251,7 +251,7 @@ class MyFeatureTelemetryHandler(AuditEventHandler[MyFeatureEvent]):
 From business logic, dispatch the domain event. The framework routes it to all registered handlers:
 
 ```python
-from nexus.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.dispatcher import AuditEventDispatcher
 
 AuditEventDispatcher.dispatch(
     MyFeatureEvent(
@@ -268,11 +268,11 @@ AuditEventDispatcher.dispatch(
 Handlers are discovered automatically at startup. Ensure the handler's package is imported and passed to `discover_handlers()` in the application entrypoint (e.g., `worker.py` or `main.py`):
 
 ```python
-import nexus.telemetry.handlers  # Package scanned by discover_handlers()
-from nexus.audit.discovery import discover_handlers
-from nexus.audit.dispatcher import AuditEventDispatcher
+import syntara.telemetry.handlers  # Package scanned by discover_handlers()
+from syntara.audit.discovery import discover_handlers
+from syntara.audit.dispatcher import AuditEventDispatcher
 
-registry = discover_handlers(nexus.telemetry.handlers)
+registry = discover_handlers(syntara.telemetry.handlers)
 AuditEventDispatcher.register(registry)
 ```
 
@@ -343,10 +343,10 @@ Prometheus labels create a combinatorial explosion of time series:
 
 ### HTTP Metrics Middleware
 
-`MetricsMiddleware` is applied globally in `src/nexus/api/main.py`:
+`MetricsMiddleware` is applied globally in `src/syntara/api/main.py`:
 
 ```python
-from nexus.metrics.middleware import MetricsMiddleware
+from syntara.metrics.middleware import MetricsMiddleware
 
 app.add_middleware(MetricsMiddleware, recorder=metrics_recorder)
 ```
@@ -364,7 +364,7 @@ app.add_middleware(MetricsMiddleware, recorder=metrics_recorder)
 
 Every HTTP request is classified as originating from the **UI** or an **external API consumer** (CLI, CI/CD pipeline, script, MCP client). The detected value is stored in the `interface` label on `REQUEST_DURATION` and `ERROR` metrics, and propagated via a request-scoped `ContextVar` for downstream instrumentation.
 
-**Detection** (`src/nexus/metrics/interface_tag.py`):
+**Detection** (`src/syntara/metrics/interface_tag.py`):
 
 | Condition | Classification |
 |---|---|
@@ -381,7 +381,7 @@ Every HTTP request is classified as originating from the **UI** or an **external
 **Reading the interface downstream:**
 
 ```python
-from nexus.metrics.interface_tag import interface_context_var
+from syntara.metrics.interface_tag import interface_context_var
 
 interface = interface_context_var.get()  # "api" or "ui"
 ```
@@ -395,7 +395,7 @@ interface = interface_context_var.get()  # "api" or "ui"
 For component-specific telemetry, dispatch domain events through the audit framework:
 
 ```python
-from nexus.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.dispatcher import AuditEventDispatcher
 
 class MyFeatureMiddleware:
     def __init__(self, app: ASGIApp) -> None:
@@ -429,7 +429,7 @@ Use isolated Prometheus registry:
 ```python
 import pytest
 from prometheus_client import CollectorRegistry
-from nexus.metrics.recorder import MetricsRecorder
+from syntara.metrics.recorder import MetricsRecorder
 
 @pytest.fixture
 def recorder() -> MetricsRecorder:
@@ -460,7 +460,7 @@ from uuid import uuid4
 def test_my_feature_telemetry_handler():
     event = MyFeatureEvent(feature_id=uuid4(), action="created")
 
-    with patch("nexus.telemetry.handlers.my_feature.get_telemetry_registry") as mock_get:
+    with patch("syntara.telemetry.handlers.my_feature.get_telemetry_registry") as mock_get:
         registry = MagicMock()
         registry.is_initialized.return_value = True
         registry.entitlement_id = "test-entitlement"
@@ -521,7 +521,7 @@ def recorder() -> MetricsRecorder:
 
 ## Component Label Registry
 
-Valid component labels are defined in `src/nexus/metrics/types.py`:
+Valid component labels are defined in `src/syntara/metrics/types.py`:
 
 ```python
 COMPONENT_LABELS: dict[str, str] = {
@@ -581,16 +581,16 @@ When adding a new component:
 
 | File | Purpose |
 |---|---|
-| `src/nexus/metrics/recorder.py` | `MetricsRecorder` central recording API |
-| `src/nexus/metrics/types.py` | `MetricType` enum, `COMPONENT_LABELS` |
-| `src/nexus/metrics/middleware.py` | `MetricsMiddleware` ASGI middleware |
-| `src/nexus/metrics/interface_tag.py` | API-vs-UI interface detection and `interface_context_var` |
-| `src/nexus/metrics/instrumentation.py` | `record_llm_call`, `LLMStreamTracker` |
-| `src/nexus/audit/dispatcher.py` | `AuditEventDispatcher` event routing |
-| `src/nexus/audit/handler.py` | `AuditEventHandler[T]` base class |
-| `src/nexus/audit/discovery.py` | Auto-discovery of handler classes |
-| `src/nexus/telemetry/handlers/` | Telemetry handlers (side-effect-only) |
-| `src/nexus/telemetry/events/` | Telemetry event models (Segment payloads) |
+| `src/syntara/metrics/recorder.py` | `MetricsRecorder` central recording API |
+| `src/syntara/metrics/types.py` | `MetricType` enum, `COMPONENT_LABELS` |
+| `src/syntara/metrics/middleware.py` | `MetricsMiddleware` ASGI middleware |
+| `src/syntara/metrics/interface_tag.py` | API-vs-UI interface detection and `interface_context_var` |
+| `src/syntara/metrics/instrumentation.py` | `record_llm_call`, `LLMStreamTracker` |
+| `src/syntara/audit/dispatcher.py` | `AuditEventDispatcher` event routing |
+| `src/syntara/audit/handler.py` | `AuditEventHandler[T]` base class |
+| `src/syntara/audit/discovery.py` | Auto-discovery of handler classes |
+| `src/syntara/telemetry/handlers/` | Telemetry handlers (side-effect-only) |
+| `src/syntara/telemetry/events/` | Telemetry event models (Segment payloads) |
 | `tests/unit/metrics/` | Metrics test suite |
 | `tests/unit/telemetry/` | Telemetry test suite |
 

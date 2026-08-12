@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.execution import ExecutionInclude
-from nexus.workflows.models.query_params import ExecutionIncludeParams
+from syntara.workflows.models.execution import ExecutionInclude
+from syntara.workflows.models.query_params import ExecutionIncludeParams
 
 
 class TestExecutionIncludeParamsValidation:

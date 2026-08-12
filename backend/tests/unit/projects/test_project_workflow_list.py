@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.projects.router import list_project_workflows
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.projects.router import list_project_workflows
 
 
 class TestListProjectWorkflows:

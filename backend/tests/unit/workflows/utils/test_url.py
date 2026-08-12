@@ -4,8 +4,8 @@ from uuid import UUID
 
 import pytest
 
-from nexus.core.config.base import get_settings
-from nexus.workflows.utils.url import generate_activity_signal_url, get_api_base_url
+from syntara.core.config.base import get_settings
+from syntara.workflows.utils.url import generate_activity_signal_url, get_api_base_url
 
 
 def test_get_api_base_url_with_configured_base_url(monkeypatch: pytest.MonkeyPatch) -> None:

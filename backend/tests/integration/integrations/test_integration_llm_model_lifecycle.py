@@ -20,20 +20,20 @@ import pytest_asyncio
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.adapters.protocol import (
+from syntara.core.models import User
+from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
     DiscoverResult,
     ValidateResult,
 )
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
     IntegrationRefreshStatus,
     IntegrationType,
 )
-from nexus.integrations.models.llm_model import LLMModel, ModelCapabilityProfile
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.models.llm_model import LLMModel, ModelCapabilityProfile
+from syntara.integrations.services.integration_service import IntegrationService
 from tests.integration.integrations.conftest import make_llm_create
 
 
@@ -306,9 +306,9 @@ class TestRefreshLLMModels:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -345,8 +345,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -367,8 +367,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -408,8 +408,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -434,8 +434,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -473,8 +473,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -490,8 +490,8 @@ class TestRefreshLLMModels:
 
         # Second refresh: same models, no default_model_id
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -528,8 +528,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -545,8 +545,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -584,8 +584,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -607,8 +607,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -643,8 +643,8 @@ class TestRefreshLLMModels:
             discovered_models=[_make_discovered_model("model-a", "A")],
         )
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -658,8 +658,8 @@ class TestRefreshLLMModels:
 
         bad = DiscoverResult(success=False, checked_at=datetime.now(UTC), error="upstream down")
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -695,8 +695,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -732,8 +732,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -769,8 +769,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -816,8 +816,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -852,8 +852,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -867,8 +867,8 @@ class TestRefreshLLMModels:
 
         # Second refresh should also populate profile
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -899,9 +899,9 @@ class TestRefreshLLMModels:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -934,9 +934,9 @@ class TestRefreshLLMModels:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -993,8 +993,8 @@ class TestRefreshLLMModels:
         )
 
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -1010,8 +1010,8 @@ class TestRefreshLLMModels:
 
         # Refresh again — no default_model_id, so existing default should be preserved
         with (
-            patch("nexus.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.create_health_check_adapter") as mock_factory,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -1048,9 +1048,9 @@ class TestValidateDoesNotSyncModels:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()

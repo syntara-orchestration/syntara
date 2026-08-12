@@ -13,17 +13,17 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import EventCategory
-from nexus.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
-from nexus.core.models import User
-from nexus.core.models.group import Group, GroupMemberAdd
-from nexus.users.groups_router import add_member
-from nexus.users.services.group_service import GroupsService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import EventCategory
+from syntara.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
+from syntara.core.models import User
+from syntara.core.models.group import Group, GroupMemberAdd
+from syntara.users.groups_router import add_member
+from syntara.users.services.group_service import GroupsService
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestAddMemberRouteAuditEvents:
@@ -38,8 +38,8 @@ class TestAddMemberRouteAuditEvents:
         )
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
-    @patch("nexus.users.groups_router.create_session_store")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
+    @patch("syntara.users.groups_router.create_session_store")
     async def test_add_member_route_emits_security_events_with_target_user_id(
         self,
         mock_create_store: Mock,
@@ -69,7 +69,7 @@ class TestAddMemberRouteAuditEvents:
         with (
             patch.object(service, "get_group_by_id", new_callable=AsyncMock, return_value=group),
             patch(
-                "nexus.users.services.group_service.get_user_by_id",
+                "syntara.users.services.group_service.get_user_by_id",
                 new_callable=AsyncMock,
                 return_value=member,
             ),
@@ -90,7 +90,7 @@ class TestAddMemberRouteAuditEvents:
         domain = by_action["group_member_added"]
         assert domain.event_category == EventCategory.SECURITY_EVENT
         assert domain.structured_data.user_id == str(user_id)
-        assert domain.source_component == "nexus.authz"
+        assert domain.source_component == "syntara.authz"
 
         decorator = by_action["group_member_add"]
         assert decorator.event_category == EventCategory.SECURITY_EVENT

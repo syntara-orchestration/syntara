@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import SecretStr
 
-from nexus.audit.logging import AUDIT_LOGGER_NAME, configure_audit_logging
+from syntara.audit.logging import AUDIT_LOGGER_NAME, configure_audit_logging
 
 MOCK_SECRET_ENCRYPTION_KEY = SecretStr("1" * 64)
 
@@ -87,7 +87,7 @@ class TestOtelEndpointValidation:
 
     def test_localhost_http_endpoint_allowed(self, monkeypatch) -> None:
         """HTTP endpoints are allowed for localhost."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://localhost:4318/v1/logs")
         settings = Settings(secret_encryption_key=MOCK_SECRET_ENCRYPTION_KEY)
@@ -95,7 +95,7 @@ class TestOtelEndpointValidation:
 
     def test_localhost_ip_http_endpoint_allowed(self, monkeypatch) -> None:
         """HTTP endpoints are allowed for 127.0.0.1."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://127.0.0.1:4318/v1/logs")
         settings = Settings(secret_encryption_key=MOCK_SECRET_ENCRYPTION_KEY)
@@ -103,7 +103,7 @@ class TestOtelEndpointValidation:
 
     def test_ipv6_localhost_http_endpoint_allowed(self, monkeypatch) -> None:
         """HTTP endpoints are allowed for IPv6 localhost (::1)."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://[::1]:4318/v1/logs")
         settings = Settings(secret_encryption_key=MOCK_SECRET_ENCRYPTION_KEY)
@@ -111,7 +111,7 @@ class TestOtelEndpointValidation:
 
     def test_cluster_internal_svc_http_endpoint_allowed(self, monkeypatch) -> None:
         """HTTP endpoints are allowed for Kubernetes *.svc.cluster.local service DNS names."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv(
             "APP_OTEL_ENDPOINT",
@@ -122,7 +122,7 @@ class TestOtelEndpointValidation:
 
     def test_cluster_internal_short_svc_http_endpoint_allowed(self, monkeypatch) -> None:
         """HTTP endpoints are allowed for short Kubernetes *.svc service DNS names."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv(
             "APP_OTEL_ENDPOINT",
@@ -133,7 +133,7 @@ class TestOtelEndpointValidation:
 
     def test_remote_https_endpoint_allowed(self, monkeypatch) -> None:
         """HTTPS endpoints are allowed for remote endpoints."""
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "https://otlp.example.com:4318/v1/logs")
         settings = Settings(secret_encryption_key=MOCK_SECRET_ENCRYPTION_KEY)
@@ -144,7 +144,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://otlp.example.com:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -155,7 +155,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://203.0.113.10:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -166,7 +166,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://192.168.1.100:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -177,7 +177,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://localhost.evil.com:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -188,7 +188,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://evil.svc:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -199,7 +199,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://127.0.0.1.namespace.svc:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -210,7 +210,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "http://service-.namespace.svc:4318/v1/logs")
         with pytest.raises(ValidationError, match="Remote OTLP endpoints must use HTTPS"):
@@ -221,7 +221,7 @@ class TestOtelEndpointValidation:
         import pytest
         from pydantic import ValidationError
 
-        from nexus.core.config.base import Settings
+        from syntara.core.config.base import Settings
 
         monkeypatch.setenv("APP_OTEL_ENDPOINT", "ftp://localhost:4318/v1/logs")
         with pytest.raises(ValidationError, match="Unsupported URL scheme"):

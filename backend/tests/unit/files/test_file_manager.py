@@ -18,10 +18,10 @@ import pytest
 if TYPE_CHECKING:
     from fastapi import UploadFile
 
-from nexus.core.exceptions import SafeValueError
-from nexus.files.exceptions import FileStorageUnavailableError
-from nexus.files.file_manager import FileManager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.core.exceptions import SafeValueError
+from syntara.files.exceptions import FileStorageUnavailableError
+from syntara.files.file_manager import FileManager
+from syntara.files.models import FileMetadata, FileStatus
 
 # =============================================================================
 # S3 configuration and graceful degradation
@@ -203,7 +203,7 @@ async def test_file_upload_events_logged() -> None:
     mock_file.read = AsyncMock(return_value=b"content")
     mock_file.seek = AsyncMock()
 
-    with patch("nexus.files.file_manager.logger") as mock_logger:
+    with patch("syntara.files.file_manager.logger") as mock_logger:
         fm = FileManager()
         mock_retriever = AsyncMock()
         mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-logged.pdf")
@@ -280,7 +280,7 @@ async def test_load_file_with_integrity_check_no_hash() -> None:
 @pytest.mark.asyncio
 async def test_load_file_with_integrity_check_hash_mismatch() -> None:
     """Load raises FileIntegrityError when hash doesn't match."""
-    from nexus.files.exceptions import FileIntegrityError
+    from syntara.files.exceptions import FileIntegrityError
 
     file_content = b"tampered content"
 
@@ -460,7 +460,7 @@ async def test_update_file_status_not_found_raises() -> None:
 
 def test_get_file_manager_returns_singleton() -> None:
     """get_file_manager returns a FileManager instance."""
-    from nexus.files.file_manager import get_file_manager
+    from syntara.files.file_manager import get_file_manager
 
     fm = get_file_manager()
     assert isinstance(fm, FileManager)
@@ -468,7 +468,7 @@ def test_get_file_manager_returns_singleton() -> None:
 
 def test_get_file_manager_returns_same_instance() -> None:
     """get_file_manager returns the same cached instance."""
-    from nexus.files.file_manager import get_file_manager
+    from syntara.files.file_manager import get_file_manager
 
     fm1 = get_file_manager()
     fm2 = get_file_manager()
@@ -483,7 +483,7 @@ def test_get_file_manager_returns_same_instance() -> None:
 @pytest.mark.asyncio
 async def test_validate_and_save_files_validation_error_dispatches_audit() -> None:
     """Validation errors dispatch an audit event before raising."""
-    from nexus.files.exceptions import FileValidationError
+    from syntara.files.exceptions import FileValidationError
 
     fm = FileManager()
     mock_retriever = AsyncMock()
@@ -497,9 +497,9 @@ async def test_validate_and_save_files_validation_error_dispatches_audit() -> No
     mock_file.seek = AsyncMock()
 
     with (
-        patch("nexus.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch,
+        patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch,
         patch(
-            "nexus.files.file_manager.validators.validate_files",
+            "syntara.files.file_manager.validators.validate_files",
             side_effect=FileValidationError("File too small"),
         ),
     ):
@@ -525,7 +525,7 @@ async def test_audit_event_storage_backend_is_s3() -> None:
     mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-audit.txt")
     fm._retriever = mock_retriever
 
-    with patch("nexus.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch:
+    with patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch:
         await fm.validate_and_save_files([mock_file], project_id=uuid4())
 
         # The success audit event has file_details with storage_backend

@@ -19,9 +19,9 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.integrations.models.integration import IntegrationProjectAssignment
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.integrations.models.integration import IntegrationProjectAssignment
 from tests.integration.api.conftest import (
     make_admin,
     make_auditor,

@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.outbox.worker import get_outbox_worker
+from syntara.audit.outbox.worker import get_outbox_worker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
     from httpx import AsyncClient
 
-    from nexus.audit.models.audit_event import AuditEvent
-    from nexus.core.models.user import User
+    from syntara.audit.models.audit_event import AuditEvent
+    from syntara.core.models.user import User
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
@@ -90,7 +90,7 @@ async def _obtain_sa_token(
 class TestCredentialDisableTokenInvalidation:
     """Disabling a credential invalidates tokens from that credential."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_disabled_credential_token_rejected(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -119,7 +119,7 @@ class TestCredentialDisableTokenInvalidation:
 
             mock_build_otel_log_record.reset_mock()
 
-            with patch("nexus.auth.middleware._check_cred_status", return_value="disabled"):
+            with patch("syntara.auth.middleware._check_cred_status", return_value="disabled"):
                 me_resp2 = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
             assert me_resp2.status_code == 401, f"Expected 401 after disable, got {me_resp2.status_code}"
             assert me_resp2.json()["code"] == "SA_CREDENTIAL_DISABLED"
@@ -137,7 +137,7 @@ class TestCredentialDisableTokenInvalidation:
 class TestCredentialDeleteTokenInvalidation:
     """Deleting a credential invalidates tokens from that credential."""
 
-    @patch("nexus.audit.outbox.worker._build_otel_log_record")
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
     async def test_deleted_credential_token_rejected(
         self,
         mock_build_otel_log_record: MagicMock,
@@ -166,7 +166,7 @@ class TestCredentialDeleteTokenInvalidation:
 
             mock_build_otel_log_record.reset_mock()
 
-            with patch("nexus.auth.middleware._check_cred_status", return_value=None):
+            with patch("syntara.auth.middleware._check_cred_status", return_value=None):
                 me_resp2 = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
             assert me_resp2.status_code == 401, f"Expected 401 after delete, got {me_resp2.status_code}"
             assert me_resp2.json()["code"] == "SA_CREDENTIAL_DISABLED"

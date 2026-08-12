@@ -14,13 +14,13 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.exceptions import BuiltinProtectionError, RoleNameConflictError, RoleNotFoundError
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.models.role import Role
-from nexus.authz.services.role_service import RoleService
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.models.group import Group
+from syntara.authz.exceptions import BuiltinProtectionError, RoleNameConflictError, RoleNotFoundError
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.role import Role
+from syntara.authz.services.role_service import RoleService
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.models.group import Group
 
 _P_READ = "workflow:read:any"
 _P_WRITE = "workflow:create:any"
@@ -222,7 +222,7 @@ async def test_create_role_empty_policies(test_db_session: AsyncSession, test_us
 @pytest.mark.asyncio
 async def test_name_conflict_scoped_to_project(test_db_session: AsyncSession, test_user: User) -> None:
     """Same name in different project scopes is allowed."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="role-scope-proj", labels={})
     test_db_session.add(project)
@@ -244,8 +244,8 @@ async def test_name_conflict_scoped_to_project(test_db_session: AsyncSession, te
 @pytest.mark.asyncio
 async def test_project_role_rejects_global_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """A project-scoped role cannot reference a global policy."""
-    from nexus.authz.models.policy import Policy
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.policy import Policy
+    from syntara.authz.models.project import Project
 
     project = Project(name="scope-test-proj", labels={})
     test_db_session.add(project)
@@ -269,8 +269,8 @@ async def test_project_role_rejects_global_policy(test_db_session: AsyncSession,
 @pytest.mark.asyncio
 async def test_project_role_rejects_other_project_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """A project-scoped role cannot reference a policy from a different project."""
-    from nexus.authz.models.policy import Policy
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.policy import Policy
+    from syntara.authz.models.project import Project
 
     proj_a = Project(name="proj-a", labels={})
     proj_b = Project(name="proj-b", labels={})
@@ -295,8 +295,8 @@ async def test_project_role_rejects_other_project_policy(test_db_session: AsyncS
 @pytest.mark.asyncio
 async def test_project_role_accepts_same_project_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """A project-scoped role can reference a policy from the same project."""
-    from nexus.authz.models.policy import Policy
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.policy import Policy
+    from syntara.authz.models.project import Project
 
     project = Project(name="same-proj", labels={})
     test_db_session.add(project)
@@ -320,8 +320,8 @@ async def test_project_role_accepts_same_project_policy(test_db_session: AsyncSe
 @pytest.mark.asyncio
 async def test_global_role_rejects_project_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """A system-scoped role cannot reference a project-scoped policy."""
-    from nexus.authz.models.policy import Policy
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.policy import Policy
+    from syntara.authz.models.project import Project
 
     project = Project(name="proj-for-global-test", labels={})
     test_db_session.add(project)
@@ -345,8 +345,8 @@ async def test_global_role_rejects_project_policy(test_db_session: AsyncSession,
 @pytest.mark.asyncio
 async def test_update_role_rejects_cross_project_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """Updating a project role to reference another project's policy is rejected."""
-    from nexus.authz.models.policy import Policy
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.policy import Policy
+    from syntara.authz.models.project import Project
 
     proj_a = Project(name="update-proj-a", labels={})
     proj_b = Project(name="update-proj-b", labels={})
@@ -393,7 +393,7 @@ async def test_system_role_rejects_project_scoped_builtin(test_db_session: Async
 @pytest.mark.asyncio
 async def test_project_role_rejects_system_scoped_builtin(test_db_session: AsyncSession, test_user: User) -> None:
     """A project-scoped role cannot reference a system-scoped builtin policy."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name="builtin-scope-proj", labels={})
     test_db_session.add(project)

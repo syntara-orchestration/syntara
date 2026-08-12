@@ -43,7 +43,7 @@ def _capture_args_values(call: ast.Call) -> set[str]:
 
 def test_group_member_add_audit_is_security_event_and_captures_request() -> None:
     """add_member must be SECURITY_EVENT and capture request (contains user_id)."""
-    router_path = Path(__file__).resolve().parents[3] / "src/nexus/users/groups_router.py"
+    router_path = Path(__file__).resolve().parents[3] / "src/syntara/users/groups_router.py"
     tree = ast.parse(router_path.read_text())
     for node in tree.body:
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "add_member":
@@ -59,7 +59,7 @@ def test_group_member_add_audit_is_security_event_and_captures_request() -> None
 
 def test_group_member_remove_audit_is_security_event() -> None:
     """remove_member must be SECURITY_EVENT (not USER_ACTION)."""
-    router_path = Path(__file__).resolve().parents[3] / "src/nexus/users/groups_router.py"
+    router_path = Path(__file__).resolve().parents[3] / "src/syntara/users/groups_router.py"
     tree = ast.parse(router_path.read_text())
     for node in tree.body:
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "remove_member":
@@ -74,7 +74,7 @@ def test_group_member_remove_audit_is_security_event() -> None:
 
 def test_user_groups_set_audit_is_security_event_and_captures_request() -> None:
     """set_user_groups must be SECURITY_EVENT and capture request body."""
-    router_path = Path(__file__).resolve().parents[3] / "src/nexus/users/users_router.py"
+    router_path = Path(__file__).resolve().parents[3] / "src/syntara/users/users_router.py"
     tree = ast.parse(router_path.read_text())
     for node in tree.body:
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "set_user_groups":

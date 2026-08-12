@@ -12,8 +12,8 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 
-from nexus.aap.auth import AAPConnection
-from nexus.aap.credential_resolver import (
+from syntara.aap.auth import AAPConnection
+from syntara.aap.credential_resolver import (
     AAP_CREDENTIAL_TYPE_NAME,
     _decrypt_credential_inputs,
     _extract_auth_from_extra_vars,
@@ -25,12 +25,12 @@ from nexus.aap.credential_resolver import (
     _validate_credential_type,
     resolve_aap_connection_from_credential,
 )
-from nexus.aap.exceptions import AAPAuthenticationError, AAPNotConfiguredError
-from nexus.core.lib.encryption import EncryptionError
+from syntara.aap.exceptions import AAPAuthenticationError, AAPNotConfiguredError
+from syntara.core.lib.encryption import EncryptionError
 
 if TYPE_CHECKING:
-    from nexus.credentials.models.credential import Credential
-    from nexus.credentials.models.credential_type import CredentialType
+    from syntara.credentials.models.credential import Credential
+    from syntara.credentials.models.credential_type import CredentialType
 
 # Sentinel object for default parameter handling
 _DEFAULT_SENTINEL: object = object()
@@ -283,7 +283,7 @@ class TestResolveCredentialInjectors:
 
         mock_injector_resolver = MagicMock()
         mock_injector_resolver.resolve.return_value = mock_resolved
-        monkeypatch.setattr("nexus.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
         credential = _mock_credential()
 
@@ -406,7 +406,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_secret_service.retrieve_secret.return_value = decrypted_inputs
 
         mock_create_secret_service = MagicMock(return_value=mock_secret_service)
-        monkeypatch.setattr("nexus.aap.credential_resolver.create_secret_service", mock_create_secret_service)
+        monkeypatch.setattr("syntara.aap.credential_resolver.create_secret_service", mock_create_secret_service)
 
         # Mock InjectorResolver
         mock_resolved = MagicMock()
@@ -416,7 +416,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_resolved.extra_vars = extra_vars
         mock_injector_resolver = MagicMock()
         mock_injector_resolver.resolve.return_value = mock_resolved
-        monkeypatch.setattr("nexus.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
         result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
@@ -445,7 +445,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_secret_service.retrieve_secret.return_value = decrypted_inputs
 
         mock_create_secret_service = MagicMock(return_value=mock_secret_service)
-        monkeypatch.setattr("nexus.aap.credential_resolver.create_secret_service", mock_create_secret_service)
+        monkeypatch.setattr("syntara.aap.credential_resolver.create_secret_service", mock_create_secret_service)
 
         mock_resolved = MagicMock()
         extra_vars_basic: dict[str, str | bool | int] = {
@@ -455,7 +455,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_resolved.extra_vars = extra_vars_basic
         mock_injector_resolver = MagicMock()
         mock_injector_resolver.resolve.return_value = mock_resolved
-        monkeypatch.setattr("nexus.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
         result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
@@ -480,7 +480,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_secret_service.retrieve_secret.return_value = decrypted_inputs
 
         mock_create_secret_service = MagicMock(return_value=mock_secret_service)
-        monkeypatch.setattr("nexus.aap.credential_resolver.create_secret_service", mock_create_secret_service)
+        monkeypatch.setattr("syntara.aap.credential_resolver.create_secret_service", mock_create_secret_service)
 
         mock_resolved = MagicMock()
         extra_vars_str: dict[str, str | bool | int] = {
@@ -489,7 +489,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_resolved.extra_vars = extra_vars_str
         mock_injector_resolver = MagicMock()
         mock_injector_resolver.resolve.return_value = mock_resolved
-        monkeypatch.setattr("nexus.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
         # Pass credential_id as string
         result = await resolve_aap_connection_from_credential(mock_session, str(credential_id), user_id)

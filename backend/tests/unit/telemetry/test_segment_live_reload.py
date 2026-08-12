@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.telemetry.client import (
+from syntara.telemetry.client import (
     _on_segment_endpoint_changed,
     _on_segment_write_key_changed,
     _resolve_telemetry_config,
@@ -21,7 +21,7 @@ from nexus.telemetry.client import (
 class TestResolveTelemetryConfig:
     """Tests for _resolve_telemetry_config helper."""
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_runtime_override_takes_precedence(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = "static-key"
@@ -34,7 +34,7 @@ class TestResolveTelemetryConfig:
         assert write_key == "runtime-key"
         assert host == "http://runtime:9999"
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_empty_override_falls_back_to_static(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = "static-key"
@@ -47,7 +47,7 @@ class TestResolveTelemetryConfig:
         assert write_key == "static-key"
         assert host is None
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_none_override_falls_back_to_static(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = "static-key"
@@ -60,7 +60,7 @@ class TestResolveTelemetryConfig:
         assert write_key == "static-key"
         assert host is None
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_whitespace_only_override_treated_as_empty(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = "static-key"
@@ -73,7 +73,7 @@ class TestResolveTelemetryConfig:
         assert write_key == "static-key"
         assert host is None
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_no_static_key_returns_empty(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = ""
@@ -86,7 +86,7 @@ class TestResolveTelemetryConfig:
         assert write_key == ""
         assert host is None
 
-    @patch("nexus.telemetry.client.get_settings")
+    @patch("syntara.telemetry.client.get_settings")
     def test_mixed_override_and_fallback(self, mock_get_settings: MagicMock) -> None:
         mock_settings = MagicMock()
         mock_settings.segment_write_key.get_secret_value.return_value = "static-key"
@@ -103,9 +103,9 @@ class TestResolveTelemetryConfig:
 class TestReinitializeFromRuntime:
     """Tests for _reinitialize_from_runtime via the @watch_setting callbacks."""
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_write_key_change_triggers_reinitialize(
         self,
         mock_get_runtime: MagicMock,
@@ -130,9 +130,9 @@ class TestReinitializeFromRuntime:
 
         mock_registry.reinitialize.assert_called_once_with("new-runtime-key", host=None)
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_endpoint_change_triggers_reinitialize(
         self,
         mock_get_runtime: MagicMock,
@@ -161,9 +161,9 @@ class TestReinitializeFromRuntime:
             host="http://mock:9999",
         )
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_cleared_runtime_key_falls_back_to_static(
         self,
         mock_get_runtime: MagicMock,
@@ -188,9 +188,9 @@ class TestReinitializeFromRuntime:
 
         mock_registry.reinitialize.assert_called_once_with("static-fallback", host=None)
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_no_keys_anywhere_disables_telemetry(
         self,
         mock_get_runtime: MagicMock,
@@ -212,9 +212,9 @@ class TestReinitializeFromRuntime:
 
         mock_registry.reinitialize.assert_called_once_with("")
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_both_settings_from_runtime(
         self,
         mock_get_runtime: MagicMock,
@@ -243,8 +243,8 @@ class TestReinitializeFromRuntime:
             host="http://custom:8080",
         )
 
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_skips_reinitialize_when_not_initialized_and_no_key(
         self,
         mock_get_runtime: MagicMock,
@@ -263,10 +263,10 @@ class TestReinitializeFromRuntime:
 
         mock_registry.reinitialize.assert_not_called()
 
-    @patch("nexus.telemetry.client.asyncio.get_running_loop")
-    @patch("nexus.telemetry.client.get_telemetry_registry")
-    @patch("nexus.telemetry.client.get_settings")
-    @patch("nexus.settings.cache.settings_cache.get_runtime_settings")
+    @patch("syntara.telemetry.client.asyncio.get_running_loop")
+    @patch("syntara.telemetry.client.get_telemetry_registry")
+    @patch("syntara.telemetry.client.get_settings")
+    @patch("syntara.settings.cache.settings_cache.get_runtime_settings")
     def test_schedules_async_init_when_not_initialized_but_key_present(
         self,
         mock_get_runtime: MagicMock,
@@ -302,7 +302,7 @@ class TestPeriodicCollectorRestart:
 
     @pytest.mark.asyncio
     async def test_restart_stops_starts_and_collects_immediately(self) -> None:
-        from nexus.telemetry.periodic_collector import PeriodicCollector
+        from syntara.telemetry.periodic_collector import PeriodicCollector
 
         mock_registry = MagicMock()
         mock_session_factory = MagicMock()
@@ -315,7 +315,7 @@ class TestPeriodicCollectorRestart:
         collector._worker.stop = AsyncMock()
 
         with patch(
-            "nexus.telemetry.periodic_collector._collect_and_send",
+            "syntara.telemetry.periodic_collector._collect_and_send",
             new_callable=AsyncMock,
         ) as mock_collect:
             await collector.restart()

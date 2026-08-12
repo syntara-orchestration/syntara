@@ -1,6 +1,6 @@
 # Service Accounts
 
-This document describes the OAuth 2.0 service accounts feature for machine-to-machine authentication in Nexus. It is intended for developers working on the project and is updated as each piece of the feature lands.
+This document describes the OAuth 2.0 service accounts feature for machine-to-machine authentication in Syntara. It is intended for developers working on the project and is updated as each piece of the feature lands.
 
 For human-user authentication (login, OIDC, sessions, CSRF), see [authentication.md](authentication.md).
 
@@ -36,7 +36,7 @@ Service accounts reuse the same JWT signing infrastructure as human authenticati
 
 ### `service_accounts` table
 
-The `ServiceAccount` model (`src/nexus/service_accounts/models/service_account.py`) inherits from `NamedResource` and `UserOwnedResource`. It uses hard deletion — there are no `deleted_at` or `deleted_by` columns.
+The `ServiceAccount` model (`src/syntara/service_accounts/models/service_account.py`) inherits from `NamedResource` and `UserOwnedResource`. It uses hard deletion — there are no `deleted_at` or `deleted_by` columns.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -64,7 +64,7 @@ The `ServiceAccount` model (`src/nexus/service_accounts/models/service_account.p
 
 ### `service_account_credentials` table
 
-The `ServiceAccountCredential` model (`src/nexus/service_accounts/models/service_account_credential.py`) extends `UserOwnedResource`. Credentials are a sub-resource of service accounts, supporting multiple credentials per account.
+The `ServiceAccountCredential` model (`src/syntara/service_accounts/models/service_account_credential.py`) extends `UserOwnedResource`. Credentials are a sub-resource of service accounts, supporting multiple credentials per account.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -99,7 +99,7 @@ The `service_account_id` FK uses `CASCADE` on delete — when a service account 
 
 ### `webhook_trigger_service_accounts` table
 
-The `WebhookTriggerServiceAccount` model (`src/nexus/workflows/models/webhook_trigger_service_account.py`) is a many-to-many association table that binds service accounts to webhook triggers. Only explicitly bound service accounts can invoke a given trigger.
+The `WebhookTriggerServiceAccount` model (`src/syntara/workflows/models/webhook_trigger_service_account.py`) is a many-to-many association table that binds service accounts to webhook triggers. Only explicitly bound service accounts can invoke a given trigger.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -120,7 +120,7 @@ Both FKs use `CASCADE` on delete — when either a trigger or service account is
 
 ### Secret hashing
 
-Secrets are hashed with **Argon2id** using the same `hash_password` / `verify_password` utilities as user passwords (`src/nexus/auth/passwords.py`). The plaintext secret is displayed exactly once at creation time and cannot be retrieved afterward.
+Secrets are hashed with **Argon2id** using the same `hash_password` / `verify_password` utilities as user passwords (`src/syntara/auth/passwords.py`). The plaintext secret is displayed exactly once at creation time and cannot be retrieved afterward.
 
 ## CRUD API
 
@@ -292,7 +292,7 @@ Service account tokens cannot be exchanged for WebSocket tickets. `POST /auth/ws
 
 ## Auth Middleware Integration
 
-The `StaleTokenMiddleware` (`src/nexus/auth/middleware.py`) handles service account tokens alongside user tokens. When it encounters a JWT with `token_type: "service_account"`, it runs two check phases via `_handle_sa_token()`:
+The `StaleTokenMiddleware` (`src/syntara/auth/middleware.py`) handles service account tokens alongside user tokens. When it encounters a JWT with `token_type: "service_account"`, it runs two check phases via `_handle_sa_token()`:
 
 **Phase 1 — SA identity (`_check_sa_identity`):**
 
@@ -356,11 +356,11 @@ Status checks use in-process `TTLCache` to avoid a DB query on every request:
 
 ### PrincipalType
 
-The `PrincipalType` enum (`src/nexus/core/models/principal.py`) includes `SERVICE_ACCOUNT` as a first-class principal type alongside `USER`, `SERVICE`, and `SYSTEM`.
+The `PrincipalType` enum (`src/syntara/core/models/principal.py`) includes `SERVICE_ACCOUNT` as a first-class principal type alongside `USER`, `SERVICE`, and `SYSTEM`.
 
 ### Resource permissions
 
-Service accounts are registered as an authz resource type in `src/nexus/authz/role_conventions.py`:
+Service accounts are registered as an authz resource type in `src/syntara/authz/role_conventions.py`:
 
 | Permission | Scope | Roles |
 |------------|-------|-------|
@@ -381,9 +381,9 @@ Service accounts are registered as an authz resource type in `src/nexus/authz/ro
 
 ### Role assignments for service accounts
 
-Service accounts can receive role assignments via the standard role assignment API. The `RoleAssignment` model uses `principal_id` (FK → `principals`), which supports both users and service accounts. The authz resolver (`src/nexus/authz/resolver.py`) resolves effective policies generically via `principal_id`.
+Service accounts can receive role assignments via the standard role assignment API. The `RoleAssignment` model uses `principal_id` (FK → `principals`), which supports both users and service accounts. The authz resolver (`src/syntara/authz/resolver.py`) resolves effective policies generically via `principal_id`.
 
-The role assignment service (`src/nexus/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries.
+The role assignment service (`src/syntara/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries.
 
 ## Webhook and EDA Integration
 
@@ -465,8 +465,8 @@ Service account CRUD operations emit standard resource audit events at `AuditLev
 
 | Event | Source | Category | Severity | When |
 |-------|--------|----------|----------|------|
-| `LoginAttemptEvent` (success) | `src/nexus/auth/audit/login_attempt.py` | SECURITY_EVENT | INFO | Successful token issuance via client credentials grant |
-| `LoginAttemptEvent` (failure) | `src/nexus/auth/audit/login_attempt.py` | SECURITY_EVENT | WARNING | Failed authentication (unknown client, bad secret, disabled SA) |
+| `LoginAttemptEvent` (success) | `src/syntara/auth/audit/login_attempt.py` | SECURITY_EVENT | INFO | Successful token issuance via client credentials grant |
+| `LoginAttemptEvent` (failure) | `src/syntara/auth/audit/login_attempt.py` | SECURITY_EVENT | WARNING | Failed authentication (unknown client, bad secret, disabled SA) |
 
 Login attempts include `method=LoginMethod.CLIENT_CREDENTIALS` and `principal_type=PrincipalType.SERVICE_ACCOUNT`. Error reasons include `UNKNOWN_USER`, `BAD_PASSWORD`, `DISABLED_SERVICE_ACCOUNT`, `DELETED_SERVICE_ACCOUNT`.
 
@@ -474,10 +474,10 @@ Login attempts include `method=LoginMethod.CLIENT_CREDENTIALS` and `principal_ty
 
 | Event | Source | Category | Severity | When |
 |-------|--------|----------|----------|------|
-| `DisabledSARejectionEvent` | `src/nexus/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request from deleted or disabled SA rejected by middleware |
-| `StaleSATokenDetectionEvent` | `src/nexus/auth/audit/sa_rejection.py` | SECURITY_EVENT | INFO | Request with revoked (stale) SA token rejected by middleware |
-| `DisabledSACredentialRejectionEvent` | `src/nexus/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request rejected because the SA credential is disabled or deleted |
-| `MissingSACredentialClaimEvent` | `src/nexus/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | SA token rejected for missing the `cred_id` claim |
+| `DisabledSARejectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request from deleted or disabled SA rejected by middleware |
+| `StaleSATokenDetectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | INFO | Request with revoked (stale) SA token rejected by middleware |
+| `DisabledSACredentialRejectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request rejected because the SA credential is disabled or deleted |
+| `MissingSACredentialClaimEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | SA token rejected for missing the `cred_id` claim |
 
 `DisabledSARejectionEvent` includes `is_alive` to distinguish deleted (`False`) from disabled (`True`). `StaleSATokenDetectionEvent` is throttled to at most one event per SA per 60 seconds to prevent audit log flooding. `DisabledSACredentialRejectionEvent` includes `credential_id` and `credential_status`.
 
@@ -485,18 +485,18 @@ Login attempts include `method=LoginMethod.CLIENT_CREDENTIALS` and `principal_ty
 
 | Event | Source | Category | Severity | When |
 |-------|--------|----------|----------|------|
-| `WebhookAuthSuccessEvent` | `src/nexus/workflows/audit/webhook_auth.py` | — | — | SA successfully authorized for a webhook/EDA trigger |
-| `WebhookAuthFailureEvent` | `src/nexus/workflows/audit/webhook_auth.py` | — | — | SA authorization failed for a webhook/EDA trigger |
+| `WebhookAuthSuccessEvent` | `src/syntara/workflows/audit/webhook_auth.py` | — | — | SA successfully authorized for a webhook/EDA trigger |
+| `WebhookAuthFailureEvent` | `src/syntara/workflows/audit/webhook_auth.py` | — | — | SA authorization failed for a webhook/EDA trigger |
 
 Both include `service_account_id`, `webhook_path`, `trigger_type`, and `workflow_id`.
 
 ### Audit actor context
 
-The audit middleware (`src/nexus/audit/middleware.py`) detects `token_type == "service_account"` in JWT claims and sets `actor_type = PrincipalType.SERVICE_ACCOUNT` in the audit context.
+The audit middleware (`src/syntara/audit/middleware.py`) detects `token_type == "service_account"` in JWT claims and sets `actor_type = PrincipalType.SERVICE_ACCOUNT` in the audit context.
 
 ## Telemetry
 
-The API usage accumulator (`src/nexus/telemetry/api_usage_accumulator.py`) tracks requests by `principal_type`. Service account requests are recorded as `"service_account"`.
+The API usage accumulator (`src/syntara/telemetry/api_usage_accumulator.py`) tracks requests by `principal_type`. Service account requests are recorded as `"service_account"`.
 
 ## Configuration
 
@@ -507,7 +507,7 @@ The API usage accumulator (`src/nexus/telemetry/api_usage_accumulator.py`) track
 
 ## Error Handling
 
-### Service account domain exceptions (`src/nexus/service_accounts/exceptions.py`)
+### Service account domain exceptions (`src/syntara/service_accounts/exceptions.py`)
 
 | Exception | HTTP Status | When |
 |-----------|-------------|------|
@@ -557,35 +557,35 @@ The API usage accumulator (`src/nexus/telemetry/api_usage_accumulator.py`) track
 
 | Path | Description |
 |------|-------------|
-| `src/nexus/service_accounts/models/service_account.py` | ServiceAccount SQLModel + ServiceAccountStatus enum |
-| `src/nexus/service_accounts/models/service_account_credential.py` | ServiceAccountCredential SQLModel + enums |
-| `src/nexus/service_accounts/schemas.py` | Service account API request/response schemas |
-| `src/nexus/service_accounts/credential_schemas.py` | Credential API request/response schemas |
-| `src/nexus/service_accounts/router.py` | Service account CRUD endpoints |
-| `src/nexus/service_accounts/credential_router.py` | Credential CRUD endpoints (nested under service accounts) |
-| `src/nexus/service_accounts/services/service_account_service.py` | Service account service layer (includes hard-delete logic) |
-| `src/nexus/service_accounts/services/credential_service.py` | Credential service layer (generation, rotation, expiration enforcement) |
-| `src/nexus/service_accounts/constants.py` | `MAX_CREDENTIALS_PER_SA` constant |
-| `src/nexus/service_accounts/exceptions.py` | Domain exceptions |
-| `src/nexus/service_accounts/error_handlers.py` | RFC 9457 error handlers |
-| `src/nexus/auth/router.py` | Token endpoint (`POST /auth/token`) — client credentials grant |
-| `src/nexus/auth/middleware.py` | StaleTokenMiddleware — disabled/deleted SA and stale token detection |
-| `src/nexus/auth/services/token_service.py` | TokenService — SA-specific token creation (lifetime, claims) |
-| `src/nexus/auth/dependencies.py` | `_user_from_payload()` — builds virtual principal for SA tokens |
-| `src/nexus/auth/audit/sa_rejection.py` | DisabledSARejectionEvent, StaleSATokenDetectionEvent |
-| `src/nexus/auth/audit/login_attempt.py` | LoginAttemptEvent with CLIENT_CREDENTIALS method |
-| `src/nexus/auth/exceptions.py` | ServiceAccountWSTicketError |
-| `src/nexus/auth/passwords.py` | Argon2id `hash_password` / `verify_password` (shared with user passwords) |
-| `src/nexus/authz/models/assignments.py` | RoleAssignment with principal_id FK (supports SA) |
-| `src/nexus/authz/resolver.py` | Policy resolution — generic via principal_id for users and SAs |
-| `src/nexus/authz/services/role_assignment_service.py` | Role assignment CRUD — handles `"service_account"` principal type |
-| `src/nexus/authz/role_conventions.py` | Builtin policies for `service_account` resource |
-| `src/nexus/authz/role_assignment_router.py` | Role assignment API — `principal_type` includes `"service_account"` |
-| `src/nexus/core/models/principal.py` | PrincipalType enum + `for_service_account()` factory |
-| `src/nexus/workflows/webhook_router.py` | Webhook/EDA trigger endpoints with SA auth |
-| `src/nexus/workflows/models/webhook_trigger_service_account.py` | Many-to-many trigger ↔ SA binding table |
-| `src/nexus/workflows/services/webhook_trigger_service.py` | SA authorization verification and binding sync |
-| `src/nexus/workflows/audit/webhook_auth.py` | WebhookAuthSuccessEvent, WebhookAuthFailureEvent |
-| `src/nexus/workflows/exceptions.py` | WebhookAuthenticationRequiredError, WebhookServiceAccountNotAuthorizedError |
-| `src/nexus/telemetry/api_usage_accumulator.py` | API usage tracking by principal_type |
-| `src/nexus/core/config/base.py` | `jwt_sa_access_token_lifetime_minutes`, `sa_credential_max_lifetime_days` settings |
+| `src/syntara/service_accounts/models/service_account.py` | ServiceAccount SQLModel + ServiceAccountStatus enum |
+| `src/syntara/service_accounts/models/service_account_credential.py` | ServiceAccountCredential SQLModel + enums |
+| `src/syntara/service_accounts/schemas.py` | Service account API request/response schemas |
+| `src/syntara/service_accounts/credential_schemas.py` | Credential API request/response schemas |
+| `src/syntara/service_accounts/router.py` | Service account CRUD endpoints |
+| `src/syntara/service_accounts/credential_router.py` | Credential CRUD endpoints (nested under service accounts) |
+| `src/syntara/service_accounts/services/service_account_service.py` | Service account service layer (includes hard-delete logic) |
+| `src/syntara/service_accounts/services/credential_service.py` | Credential service layer (generation, rotation, expiration enforcement) |
+| `src/syntara/service_accounts/constants.py` | `MAX_CREDENTIALS_PER_SA` constant |
+| `src/syntara/service_accounts/exceptions.py` | Domain exceptions |
+| `src/syntara/service_accounts/error_handlers.py` | RFC 9457 error handlers |
+| `src/syntara/auth/router.py` | Token endpoint (`POST /auth/token`) — client credentials grant |
+| `src/syntara/auth/middleware.py` | StaleTokenMiddleware — disabled/deleted SA and stale token detection |
+| `src/syntara/auth/services/token_service.py` | TokenService — SA-specific token creation (lifetime, claims) |
+| `src/syntara/auth/dependencies.py` | `_user_from_payload()` — builds virtual principal for SA tokens |
+| `src/syntara/auth/audit/sa_rejection.py` | DisabledSARejectionEvent, StaleSATokenDetectionEvent |
+| `src/syntara/auth/audit/login_attempt.py` | LoginAttemptEvent with CLIENT_CREDENTIALS method |
+| `src/syntara/auth/exceptions.py` | ServiceAccountWSTicketError |
+| `src/syntara/auth/passwords.py` | Argon2id `hash_password` / `verify_password` (shared with user passwords) |
+| `src/syntara/authz/models/assignments.py` | RoleAssignment with principal_id FK (supports SA) |
+| `src/syntara/authz/resolver.py` | Policy resolution — generic via principal_id for users and SAs |
+| `src/syntara/authz/services/role_assignment_service.py` | Role assignment CRUD — handles `"service_account"` principal type |
+| `src/syntara/authz/role_conventions.py` | Builtin policies for `service_account` resource |
+| `src/syntara/authz/role_assignment_router.py` | Role assignment API — `principal_type` includes `"service_account"` |
+| `src/syntara/core/models/principal.py` | PrincipalType enum + `for_service_account()` factory |
+| `src/syntara/workflows/webhook_router.py` | Webhook/EDA trigger endpoints with SA auth |
+| `src/syntara/workflows/models/webhook_trigger_service_account.py` | Many-to-many trigger ↔ SA binding table |
+| `src/syntara/workflows/services/webhook_trigger_service.py` | SA authorization verification and binding sync |
+| `src/syntara/workflows/audit/webhook_auth.py` | WebhookAuthSuccessEvent, WebhookAuthFailureEvent |
+| `src/syntara/workflows/exceptions.py` | WebhookAuthenticationRequiredError, WebhookServiceAccountNotAuthorizedError |
+| `src/syntara/telemetry/api_usage_accumulator.py` | API usage tracking by principal_type |
+| `src/syntara/core/config/base.py` | `jwt_sa_access_token_lifetime_minutes`, `sa_credential_max_lifetime_days` settings |

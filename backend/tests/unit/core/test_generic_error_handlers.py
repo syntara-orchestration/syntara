@@ -7,7 +7,7 @@ import pytest
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES, generic_exception_handler, value_error_handler
+from syntara.core.error_handlers import PROBLEM_TYPES, generic_exception_handler, value_error_handler
 
 
 class TestValueErrorHandler:

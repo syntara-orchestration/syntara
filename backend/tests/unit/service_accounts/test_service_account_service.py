@@ -9,10 +9,10 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from nexus.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
-from nexus.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
-from nexus.service_accounts.schemas import ServiceAccountListResponse, ServiceAccountRead
-from nexus.service_accounts.services.service_account_service import ServiceAccountService
+from syntara.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
+from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
+from syntara.service_accounts.schemas import ServiceAccountListResponse, ServiceAccountRead
+from syntara.service_accounts.services.service_account_service import ServiceAccountService
 
 
 @pytest.fixture
@@ -487,6 +487,6 @@ class TestServiceAccountServiceInheritance:
     """Tests that ServiceAccountService extends BaseService."""
 
     def test_extends_base_service(self) -> None:
-        from nexus.core.services import BaseService
+        from syntara.core.services import BaseService
 
         assert issubclass(ServiceAccountService, BaseService)

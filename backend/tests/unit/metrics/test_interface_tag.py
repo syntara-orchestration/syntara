@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from nexus.metrics.interface_tag import (
+from syntara.metrics.interface_tag import (
     INTERFACE_API,
     INTERFACE_HEADER,
     INTERFACE_UI,

@@ -6,9 +6,9 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import validation_error_handler
-from nexus.workflows.exceptions import WorkflowValidationError
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import validation_error_handler
+from syntara.workflows.exceptions import WorkflowValidationError
 
 
 class TestValidationErrorHandler:

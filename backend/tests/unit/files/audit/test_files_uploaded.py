@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.models.audit_event import EventSeverity, EventStatus
-from nexus.files.audit.files_uploaded import FilesUploadedEvent, FilesUploadedHandler
+from syntara.audit.models.audit_event import EventSeverity, EventStatus
+from syntara.files.audit.files_uploaded import FilesUploadedEvent, FilesUploadedHandler
 
 
 class TestFilesUploadedHandler:
@@ -45,7 +45,7 @@ class TestFilesUploadedHandler:
         assert audit_event.event_status == EventStatus.SUCCESS
         assert "2 files uploaded and stored for conversion" in audit_event.event_message
         assert "0.00 MB" in audit_event.event_message
-        assert audit_event.source_component == "nexus.files.file_manager"
+        assert audit_event.source_component == "syntara.files.file_manager"
         assert audit_event.resource_urn is None  # Bulk operation
         assert audit_event.resource_name is None  # Bulk operation
 
@@ -64,7 +64,7 @@ class TestFilesUploadedHandler:
         assert audit_event.event_severity == EventSeverity.ERROR
         assert audit_event.event_status == EventStatus.ERROR
         assert audit_event.event_message == "File upload failed"
-        assert audit_event.source_component == "nexus.files.file_manager"
+        assert audit_event.source_component == "syntara.files.file_manager"
         assert audit_event.structured_data.error_type == "FileValidationError"
         assert "Operational Logs" in str(audit_event.structured_data.error_message)
 

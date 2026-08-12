@@ -32,7 +32,7 @@ class TestWorkflowDefinitionUpdates:
 
     def test_add_node_to_workflow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -47,7 +47,7 @@ class TestWorkflowDefinitionUpdates:
         workflow = workflow_factory(workflow_data)
 
         # Get current workflow definition
-        current_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         current_definition = current_workflow.version.workflow_definition.additional_properties
 
         # Add a new node to the definition
@@ -68,7 +68,7 @@ class TestWorkflowDefinitionUpdates:
             change_description="Added script node",
         )
 
-        updated_workflow = nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
         assert updated_workflow.version is not None
 
         updated_def = updated_workflow.version.workflow_definition
@@ -81,7 +81,7 @@ class TestWorkflowDefinitionUpdates:
 
     def test_update_node_configuration(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -121,7 +121,7 @@ class TestWorkflowDefinitionUpdates:
         workflow = workflow_factory(workflow_data)
 
         # Get current workflow definition
-        current_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         current_definition = current_workflow.version.workflow_definition.additional_properties
 
         # Update the AAP job node's configuration
@@ -138,7 +138,7 @@ class TestWorkflowDefinitionUpdates:
             change_description="Updated AAP job template configuration",
         )
 
-        updated_workflow = nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
         # Verify response
         assert updated_workflow.version is not None
@@ -163,7 +163,7 @@ class TestWorkflowDefinitionUpdates:
 
     def test_delete_node_from_workflow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -215,7 +215,7 @@ class TestWorkflowDefinitionUpdates:
         workflow = workflow_factory(workflow_data)
 
         # Get current workflow definition
-        current_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         current_definition = current_workflow.version.workflow_definition.additional_properties
 
         # Verify initial state: 3 nodes and 3 edges
@@ -241,7 +241,7 @@ class TestWorkflowDefinitionUpdates:
             change_description="Removed Node B and its connected edges",
         )
 
-        updated_workflow = nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
         # Verify response is successful (200 OK via assert_and_get)
         assert updated_workflow.version is not None
@@ -270,7 +270,7 @@ class TestWorkflowDefinitionUpdates:
 
     def test_add_and_delete_edges(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -315,14 +315,14 @@ class TestWorkflowDefinitionUpdates:
         workflow = workflow_factory(workflow_data)
 
         # Step 1: Add edge A→B via PATCH
-        current_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         current_definition = current_workflow.version.workflow_definition.additional_properties
 
         # Add the new edge
         current_definition["edges"].append({"from": "node_a", "to": "node_b"})
 
         update_data = WorkflowUpdate(workflow_definition=current_definition, change_description="Added edge A→B")
-        updated_workflow = nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
         # Verify edge creation (200 OK via assert_and_get, not 201)
         assert updated_workflow.current_version == 2
@@ -342,7 +342,7 @@ class TestWorkflowDefinitionUpdates:
         assert len(updated_def["nodes"]) == 2, "Nodes should remain intact after edge addition"
 
         # Step 2: Delete edge A→B via PATCH
-        current_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         current_definition = current_workflow.version.workflow_definition.additional_properties
 
         # Remove the edge A→B
@@ -351,7 +351,7 @@ class TestWorkflowDefinitionUpdates:
         ]
 
         update_data = WorkflowUpdate(workflow_definition=current_definition, change_description="Deleted edge A→B")
-        updated_workflow = nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
         # Verify edge deletion (200 OK via assert_and_get, not 204)
         assert updated_workflow.current_version == 3

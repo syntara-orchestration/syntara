@@ -6,7 +6,7 @@ from uuid import uuid4
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.integrations.models.integration import IntegrationStatus
+from syntara.integrations.models.integration import IntegrationStatus
 from tests.integration.helpers.credential import CredentialFactory
 from tests.integration.helpers.integration import IntegrationFactory
 

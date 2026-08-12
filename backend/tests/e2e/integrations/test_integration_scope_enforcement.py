@@ -38,10 +38,10 @@ if not os.environ.get("APP_BASE_URL"):
 pytestmark = [pytest.mark.e2e]
 
 
-def _create_credential(nexus_api: SyntaraApiRegistry, project_id: UUID) -> UUID:
+def _create_credential(syntara_api: SyntaraApiRegistry, project_id: UUID) -> UUID:
     """Create a bearer-token credential in the given project, return its UUID."""
-    type_id = get_bearer_token_type_id(nexus_api)
-    cred = nexus_api.credentials.create(
+    type_id = get_bearer_token_type_id(syntara_api)
+    cred = syntara_api.credentials.create(
         body=CredentialCreate(
             name=unique_name("e2e-scope-cred"),
             credential_type_id=type_id,
@@ -92,7 +92,7 @@ class TestExecutionTimeScopeViolation:
 
     def test_unassigned_integration_causes_execution_failure(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         integration_factory: Callable[..., dict[str, Any]],
         first_project_id: UUID,
@@ -117,13 +117,13 @@ class TestExecutionTimeScopeViolation:
         )
         integration_id = UUID(integration["id"])
 
-        resp = nexus_api.integrations.assign_project(
+        resp = syntara_api.integrations.assign_project(
             integration_id=integration_id,
             project_id=first_project_id,
         )
         assert resp.status_code in (HTTPStatus.CREATED, HTTPStatus.OK), f"Failed to assign project: {resp.status_code}"
 
-        credential_id = _create_credential(nexus_api, first_project_id)
+        credential_id = _create_credential(syntara_api, first_project_id)
         try:
             workflow_name = unique_name("e2e-scope-violation-wf")
             workflow = workflow_factory(
@@ -137,13 +137,13 @@ class TestExecutionTimeScopeViolation:
                 )
             )
 
-            unassign_resp = nexus_api.integrations.unassign_project(
+            unassign_resp = syntara_api.integrations.unassign_project(
                 integration_id=integration_id,
                 project_id=first_project_id,
             )
             assert unassign_resp.status_code == HTTPStatus.NO_CONTENT
 
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(
                     workflow_id=workflow.id,
                     trigger_node_id="trigger_manual",
@@ -151,7 +151,7 @@ class TestExecutionTimeScopeViolation:
             ).assert_and_get()
 
             result = poll_execution_until_complete(
-                nexus_api,
+                syntara_api,
                 UUID(str(execution.id)),
                 max_polls=30,
                 poll_interval=2,
@@ -164,7 +164,7 @@ class TestExecutionTimeScopeViolation:
             )
         finally:
             try:
-                nexus_api.credentials.delete(credential_id=credential_id)
+                syntara_api.credentials.delete(credential_id=credential_id)
             except Exception:
                 pass
 
@@ -174,7 +174,7 @@ class TestNarrowGlobalToProjectScoped:
 
     def test_narrowing_global_removes_from_excluded_project_and_fails_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         integration_factory: Callable[..., dict[str, Any]],
         first_project_id: UUID,
@@ -203,26 +203,26 @@ class TestNarrowGlobalToProjectScoped:
         )
         integration_id = UUID(integration["id"])
 
-        project_b = nexus_api.projects.create(body=ProjectCreate(name=unique_name("e2e-project-b"))).assert_and_get()
+        project_b = syntara_api.projects.create(body=ProjectCreate(name=unique_name("e2e-project-b"))).assert_and_get()
         project_b_id = UUID(str(project_b.id))
 
         credential_id: UUID | None = None
         try:
-            list_a = nexus_api.integrations.list(
+            list_a = syntara_api.integrations.list(
                 integration_type=IntegrationType.MCP_SERVER,
                 project_id=first_project_id,
             ).assert_and_get()
             ids_a = {str(r.id) for r in list_a.resources}
             assert str(integration_id) in ids_a, "Global integration should be visible in project A"
 
-            list_b = nexus_api.integrations.list(
+            list_b = syntara_api.integrations.list(
                 integration_type=IntegrationType.MCP_SERVER,
                 project_id=project_b_id,
             ).assert_and_get()
             ids_b = {str(r.id) for r in list_b.resources}
             assert str(integration_id) in ids_b, "Global integration should be visible in project B"
 
-            credential_id = _create_credential(nexus_api, project_b_id)
+            credential_id = _create_credential(syntara_api, project_b_id)
 
             workflow_name = unique_name("e2e-narrow-scope-wf")
             workflow = workflow_factory(
@@ -236,30 +236,30 @@ class TestNarrowGlobalToProjectScoped:
                 )
             )
 
-            nexus_api.integrations.update(
+            syntara_api.integrations.update(
                 integration_id=integration_id,
                 body=IntegrationPatch(scope=IntegrationScope.PROJECT),
             ).assert_and_get()
-            nexus_api.integrations.assign_project(
+            syntara_api.integrations.assign_project(
                 integration_id=integration_id,
                 project_id=first_project_id,
             )
 
-            list_b_after = nexus_api.integrations.list(
+            list_b_after = syntara_api.integrations.list(
                 integration_type=IntegrationType.MCP_SERVER,
                 project_id=project_b_id,
             ).assert_and_get()
             ids_b_after = {str(r.id) for r in list_b_after.resources}
             assert str(integration_id) not in ids_b_after, "Integration should no longer be visible in project B"
 
-            list_a_after = nexus_api.integrations.list(
+            list_a_after = syntara_api.integrations.list(
                 integration_type=IntegrationType.MCP_SERVER,
                 project_id=first_project_id,
             ).assert_and_get()
             ids_a_after = {str(r.id) for r in list_a_after.resources}
             assert str(integration_id) in ids_a_after, "Integration should still be visible in project A"
 
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(
                     workflow_id=workflow.id,
                     trigger_node_id="trigger_manual",
@@ -267,7 +267,7 @@ class TestNarrowGlobalToProjectScoped:
             ).assert_and_get()
 
             result = poll_execution_until_complete(
-                nexus_api,
+                syntara_api,
                 UUID(str(execution.id)),
                 max_polls=30,
                 poll_interval=2,
@@ -284,11 +284,11 @@ class TestNarrowGlobalToProjectScoped:
         finally:
             try:
                 if credential_id:
-                    nexus_api.credentials.delete(credential_id=credential_id)
+                    syntara_api.credentials.delete(credential_id=credential_id)
             except Exception:
                 pass
             try:
-                nexus_api.projects.delete(project_id=project_b_id)
+                syntara_api.projects.delete(project_id=project_b_id)
             except Exception:
                 pass
 
@@ -298,7 +298,7 @@ class TestExecutionTimeIntegrationStateErrors:
 
     def test_disabled_integration_produces_disabled_error(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         integration_factory: Callable[..., dict[str, Any]],
         first_project_id: UUID,
@@ -323,13 +323,13 @@ class TestExecutionTimeIntegrationStateErrors:
         )
         integration_id = UUID(integration["id"])
 
-        resp = nexus_api.integrations.assign_project(
+        resp = syntara_api.integrations.assign_project(
             integration_id=integration_id,
             project_id=first_project_id,
         )
         assert resp.status_code in (HTTPStatus.CREATED, HTTPStatus.OK)
 
-        credential_id = _create_credential(nexus_api, first_project_id)
+        credential_id = _create_credential(syntara_api, first_project_id)
         try:
             workflow_name = unique_name("e2e-disabled-integ-wf")
             workflow = workflow_factory(
@@ -343,12 +343,12 @@ class TestExecutionTimeIntegrationStateErrors:
                 )
             )
 
-            nexus_api.integrations.update(
+            syntara_api.integrations.update(
                 integration_id=integration_id,
                 body=IntegrationPatch(enabled=False),
             ).assert_and_get()
 
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(
                     workflow_id=workflow.id,
                     trigger_node_id="trigger_manual",
@@ -356,7 +356,7 @@ class TestExecutionTimeIntegrationStateErrors:
             ).assert_and_get()
 
             result = poll_execution_until_complete(
-                nexus_api,
+                syntara_api,
                 UUID(str(execution.id)),
                 max_polls=30,
                 poll_interval=2,
@@ -371,13 +371,13 @@ class TestExecutionTimeIntegrationStateErrors:
             )
         finally:
             try:
-                nexus_api.credentials.delete(credential_id=credential_id)
+                syntara_api.credentials.delete(credential_id=credential_id)
             except Exception:
                 pass
 
     def test_deleted_integration_produces_not_found_error(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -389,7 +389,7 @@ class TestExecutionTimeIntegrationStateErrors:
         3. Delete the integration
         4. Execute → poll → assert IntegrationNotFoundError
         """
-        integration = nexus_api.integrations.create(
+        integration = syntara_api.integrations.create(
             body=IntegrationCreate(
                 name=unique_name("e2e-deleted-integ"),
                 integration_type=IntegrationType.MCP_SERVER,
@@ -401,13 +401,13 @@ class TestExecutionTimeIntegrationStateErrors:
         ).assert_and_get()
         integration_id = integration.id
 
-        resp = nexus_api.integrations.assign_project(
+        resp = syntara_api.integrations.assign_project(
             integration_id=integration_id,
             project_id=first_project_id,
         )
         assert resp.status_code in (HTTPStatus.CREATED, HTTPStatus.OK)
 
-        credential_id = _create_credential(nexus_api, first_project_id)
+        credential_id = _create_credential(syntara_api, first_project_id)
         try:
             workflow_name = unique_name("e2e-deleted-integ-wf")
             workflow = workflow_factory(
@@ -421,9 +421,9 @@ class TestExecutionTimeIntegrationStateErrors:
                 )
             )
 
-            nexus_api.integrations.delete(integration_id=integration_id)
+            syntara_api.integrations.delete(integration_id=integration_id)
 
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(
                     workflow_id=workflow.id,
                     trigger_node_id="trigger_manual",
@@ -431,7 +431,7 @@ class TestExecutionTimeIntegrationStateErrors:
             ).assert_and_get()
 
             result = poll_execution_until_complete(
-                nexus_api,
+                syntara_api,
                 UUID(str(execution.id)),
                 max_polls=30,
                 poll_interval=2,
@@ -446,6 +446,6 @@ class TestExecutionTimeIntegrationStateErrors:
             )
         finally:
             try:
-                nexus_api.credentials.delete(credential_id=credential_id)
+                syntara_api.credentials.delete(credential_id=credential_id)
             except Exception:
                 pass
