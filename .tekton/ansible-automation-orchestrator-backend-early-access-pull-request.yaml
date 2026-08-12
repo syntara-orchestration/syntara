@@ -31,7 +31,7 @@ spec:
     - name: image-expires-after
       value: 5d
     - name: dockerfile
-      value: backend/containers/nexus/Containerfile
+      value: backend/containers/syntara/Containerfile
     - name: path-context
       value: backend
     - name: build-args

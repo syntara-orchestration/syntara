@@ -149,10 +149,10 @@ RUN chown -R 1001:0 /opt/app-root && \
     chmod -R g=u /opt/app-root
 
 # Copy wrapper scripts for service entry points
-COPY containers/nexus/scripts/start-api /usr/local/bin/start-api
-COPY containers/nexus/scripts/start-worker /usr/local/bin/start-worker
-COPY containers/nexus/scripts/start-background-worker /usr/local/bin/start-background-worker
-COPY containers/nexus/scripts/run-seed /usr/local/bin/run-seed
+COPY containers/syntara/scripts/start-api /usr/local/bin/start-api
+COPY containers/syntara/scripts/start-worker /usr/local/bin/start-worker
+COPY containers/syntara/scripts/start-background-worker /usr/local/bin/start-background-worker
+COPY containers/syntara/scripts/run-seed /usr/local/bin/run-seed
 
 # Verify timezone data is available in the image (AAP-86297)
 RUN python3.12 -c "from zoneinfo import available_timezones; tzs = available_timezones(); assert len(tzs) > 100, f'Expected >100 timezones, got {len(tzs)}'"
