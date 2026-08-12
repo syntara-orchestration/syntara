@@ -82,13 +82,15 @@ test.describe('Settings', () => {
   // Settings tests share backend state — run serially to avoid conflicts
   test.describe.configure({ mode: 'serial' })
 
-  // Cache tab unavailability after the first probe to avoid repeating the 10s
-  // timeout wait in every subsequent test when Settings has no tabs.
   let settingsTabsUnavailable = false
 
-  test.beforeEach(async ({ app }) => {
+  // Guard hook: no fixtures requested, so skipping here avoids the app fixture
+  // (login + page creation) entirely for all subsequent tests once tabs are known unavailable.
+  test.beforeEach(() => {
     test.skip(settingsTabsUnavailable, 'Settings page has no tabs; backend may not have settings configured')
+  })
 
+  test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/settings'))
     const heading = app.getByRole('heading', { level: 1, name: 'Settings' })
     const hasPage = await heading
@@ -96,7 +98,6 @@ test.describe('Settings', () => {
       .then(() => true)
       .catch(() => false)
     test.skip(!hasPage, 'Settings page not available; backend may not be running')
-    // Wait for content to fully load (tabs + save button)
     const hasTabs = await app
       .getByRole('tab', { name: /Context Manager|System|Authentication/i })
       .waitFor({ state: 'visible', timeout: 10_000 })

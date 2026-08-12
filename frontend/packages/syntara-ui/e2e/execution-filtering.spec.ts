@@ -46,6 +46,13 @@ async function switchFieldSelector(app: Page, currentFieldLabel: string, targetF
 }
 
 test.describe('Execution Filtering @pr-check', () => {
+  let executionsUnavailable = false
+
+  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
+  test.beforeEach(() => {
+    test.skip(executionsUnavailable, 'No execution data available; seed data required')
+  })
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/executions'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
@@ -55,6 +62,7 @@ test.describe('Execution Filtering @pr-check', () => {
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) executionsUnavailable = true
     test.skip(!hasTable, 'No execution data available; seed data required')
   })
 
