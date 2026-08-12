@@ -403,6 +403,7 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).
     "credential:update:any",
+    "credential:update:own",
     "credential:delete:any",
     "credential:use:any",
     "credential:use:project",
