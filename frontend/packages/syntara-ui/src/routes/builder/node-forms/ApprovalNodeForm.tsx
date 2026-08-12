@@ -1,4 +1,5 @@
 import {
+  Alert,
   FormGroup,
   HelperText,
   HelperTextItem,
@@ -98,28 +99,42 @@ function ApproverUsersSelect({
   users,
   isLoading,
   validationError,
+  isPermissionDenied,
 }: Readonly<{
   value: readonly string[]
   onChange: (value: string[]) => void
   users: ReadonlyArray<ApproverUser>
   isLoading: boolean
   validationError?: Readonly<{ message?: string }>
+  isPermissionDenied?: boolean
 }>) {
   return (
-    <ApproverMultiSelect<ApproverUser>
-      value={value}
-      onChange={onChange}
-      items={users}
-      isLoading={isLoading}
-      validationError={validationError}
-      getItemId={(item) => item.id}
-      getItemValue={(item) => item.username}
-      getItemLabel={(item) => item.username}
-      placeholderText={APPROVER_USERS_PLACEHOLDER}
-      emptyText={APPROVER_USERS_EMPTY}
-      loadingText={APPROVER_USERS_LOADING}
-      helperText={APPROVER_USERS_HELPER_TEXT}
-    />
+    <Stack hasGutter>
+      <StackItem>
+        <ApproverMultiSelect<ApproverUser>
+          value={value}
+          onChange={onChange}
+          items={users}
+          isLoading={isLoading}
+          validationError={validationError}
+          getItemId={(item) => item.id}
+          getItemValue={(item) => item.username}
+          getItemLabel={(item) => item.username}
+          placeholderText={APPROVER_USERS_PLACEHOLDER}
+          emptyText={isPermissionDenied ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
+          loadingText={APPROVER_USERS_LOADING}
+          helperText={APPROVER_USERS_HELPER_TEXT}
+          allowCustomValue={isPermissionDenied}
+        />
+      </StackItem>
+      {isPermissionDenied && (
+        <StackItem>
+          <Alert variant="warning" title="Dropdown unavailable" isInline isPlain>
+            You don't have permission to list approval users. You can still enter usernames manually.
+          </Alert>
+        </StackItem>
+      )}
+    </Stack>
   )
 }
 
@@ -204,7 +219,11 @@ function ApprovalFormFields({
   const workflowProjectId = useWorkflowStore((state) => state.projectId)
 
   // Fetch users with approval:decide permission and all groups
-  const { users, isLoading: isLoadingUsers } = useApprovalDecideUsers(workflowProjectId)
+  const {
+    users,
+    isLoading: isLoadingUsers,
+    isPermissionDenied: usersPermissionDenied,
+  } = useApprovalDecideUsers(workflowProjectId)
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
@@ -234,6 +253,7 @@ function ApprovalFormFields({
                   users={users}
                   isLoading={isLoadingUsers}
                   validationError={validationErrors?.approver_users}
+                  isPermissionDenied={usersPermissionDenied}
                 />
               )}
             />

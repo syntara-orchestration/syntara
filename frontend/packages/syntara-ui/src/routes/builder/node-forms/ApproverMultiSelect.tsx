@@ -40,6 +40,7 @@ type ApproverMultiSelectProps<T extends SelectableItem> = Readonly<{
   emptyText: string
   loadingText: string
   helperText: string
+  allowCustomValue?: boolean
 }>
 
 export function ApproverMultiSelect<T extends SelectableItem>({
@@ -55,6 +56,7 @@ export function ApproverMultiSelect<T extends SelectableItem>({
   emptyText,
   loadingText,
   helperText,
+  allowCustomValue,
 }: ApproverMultiSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -71,8 +73,24 @@ export function ApproverMultiSelect<T extends SelectableItem>({
         : [...selectedValues, itemValue]
 
       onChange(newValues)
+      setFilterValue('')
     },
     [selectedValues, onChange]
+  )
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!allowCustomValue) return
+      if (e.key === 'Enter' && filterValue.trim()) {
+        e.preventDefault()
+        const customValue = filterValue.trim()
+        if (!selectedValues.includes(customValue)) {
+          onChange([...selectedValues, customValue])
+          setFilterValue('')
+        }
+      }
+    },
+    [allowCustomValue, filterValue, selectedValues, onChange]
   )
 
   const clearAll = useCallback(() => {
@@ -133,6 +151,7 @@ export function ApproverMultiSelect<T extends SelectableItem>({
             onClick={() => {
               if (!isOpen) setIsOpen(true)
             }}
+            onKeyDown={handleKeyDown}
             placeholder={selectedValues.length === 0 ? placeholderText : ''}
             autoComplete="off"
             innerRef={inputRef}

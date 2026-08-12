@@ -6,6 +6,13 @@ import { accessFetchClient } from '../../access/accessClient'
 
 type WhoCanUser = AuthzAPI.components['schemas']['WhoCanUser']
 
+class PermissionDeniedError extends Error {
+  constructor() {
+    super('Permission denied')
+    this.name = 'PermissionDeniedError'
+  }
+}
+
 /**
  * Hook to fetch all users who have approval:decide permission.
  *
@@ -13,10 +20,13 @@ type WhoCanUser = AuthzAPI.components['schemas']['WhoCanUser']
  * When a project is specified, returns users who can approve on that specific project
  * (includes both system-level and project-scoped permissions).
  *
+ * If the endpoint returns 403, the hook surfaces `isPermissionDenied: true` so the
+ * UI can offer a manual-input fallback instead of an empty dropdown.
+ *
  * @param projectId - Optional project ID to scope the permission check to a specific project.
  *                    If provided, returns users with approval:decide permission on that project.
  *                    If omitted, returns only users with system-level approval:decide permission.
- * @returns Object containing users array, loading state, and error
+ * @returns Object containing users array, loading state, permission-denied flag, and error
  */
 export function useApprovalDecideUsers(projectId?: string | null) {
   async function fetchAllApprovalDecideUsers(): Promise<WhoCanUser[]> {
@@ -31,6 +41,10 @@ export function useApprovalDecideUsers(projectId?: string | null) {
           ...(projectId && { resource_project: projectId }),
         },
       })
+
+      if (result.error?.code === 'AUTHORIZATION_DENIED') {
+        throw new PermissionDeniedError()
+      }
 
       // WhoCanResponse already has the correct shape {resources, next} for fetchAllPages
       if (!result.data) {
@@ -54,12 +68,19 @@ export function useApprovalDecideUsers(projectId?: string | null) {
     queryFn: fetchAllApprovalDecideUsers,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
+    retry: (failureCount, err) => {
+      if (err instanceof PermissionDeniedError) return false
+      return failureCount < 3
+    },
   })
+
+  const isPermissionDenied = error instanceof PermissionDeniedError
 
   return {
     users,
     isLoading: isPending,
-    error,
+    isPermissionDenied,
+    error: isPermissionDenied ? null : error,
     refetch,
   }
 }

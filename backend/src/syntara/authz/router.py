@@ -24,6 +24,7 @@ from syntara.auth.dependencies import get_current_user
 from syntara.authz.dependencies import PermissionChecker, get_authz_evaluator
 from syntara.authz.engine import AuthzRequest, authorize, resolve_readable_project_ids
 from syntara.authz.evaluator import AuthzEvaluator
+from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.authz.resolver import resolve_effective_policies, resolve_user_groups
 from syntara.core.constants import NAME_PATTERN, FieldLimits
@@ -627,6 +628,36 @@ def _build_page_cursors(
 
 
 # ============================================================================
+# Authorization Helpers
+# ============================================================================
+
+
+async def _user_has_authz_query_permission(
+    user: User,
+    evaluator: AuthzEvaluator,
+    db: AsyncSession,
+) -> bool:
+    """Check if user has system-level authz:query permission.
+
+    Used as fallback for ad-hoc who_can queries without a resource_id.
+    Only admins (those with system-level authz:query) can make these queries.
+    """
+    result = await authorize(
+        db,
+        evaluator,
+        AuthzRequest(
+            user_id=user.id,
+            action="query",
+            resource_type="authz",
+            resource_id="",
+            user_labels=user.labels,
+            user_metadata=user.authz_metadata,
+        ),
+    )
+    return result.allowed
+
+
+# ============================================================================
 # Endpoints
 # ============================================================================
 
@@ -694,7 +725,7 @@ async def can_i(
 
 @router.post(
     "/who_can",
-    dependencies=[Depends(_authz_query_perm)],
+    dependencies=[NO_PERMISSION],
     operation_id="who_can",
     summary="List users who can perform an action",
     description=(
@@ -704,12 +735,79 @@ async def can_i(
 )
 async def who_can(
     body: WhoCanRequest,
-    _current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
 ) -> WhoCanResponse:
-    """List users who can perform a specific action."""
+    """List users who can perform a specific action.
+
+    Three-tier authorization model:
+    1. resource_id provided — user must be able to read that specific resource.
+    2. resource_project provided (no resource_id) — user must be able to read the
+       queried resource_type within that project.  This is the path hit by the
+       workflow-builder approval-node form.
+    3. Neither provided — system-wide query, requires authz:query (admin).
+
+    Args:
+        body: Query parameters including action, resource_type, optional resource_id.
+        current_user: Authenticated user (permission check happens inside).
+        db: Database session.
+        evaluator: Authorization evaluator.
+
+    Returns:
+        Paginated list of users who can perform the action.
+
+    Raises:
+        AuthorizationDeniedError: If user lacks permission for this query type.
+
+    """
     resource_project = await _resolve_project_input(db, body.resource_project)
+
+    # --- three-tier permission gate ---
+    if body.resource_id:
+        # Tier 1: specific resource — user must be able to read it
+        authz_result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=current_user.id,
+                action="read",
+                resource_type=body.resource_type,
+                resource_id=body.resource_id,
+                resource_labels=body.resource_labels,
+                resource_metadata=body.resource_metadata,
+                resource_project=resource_project,
+                user_labels=current_user.labels,
+                user_metadata=current_user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = f"Not authorized to query {body.resource_type}/{body.resource_id}"
+            raise AuthorizationDeniedError(msg)
+
+    elif resource_project:
+        # Tier 2: project-scoped — user must be able to read the resource type in this project
+        authz_result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=current_user.id,
+                action="read",
+                resource_type=body.resource_type,
+                resource_id="",
+                resource_project=resource_project,
+                user_labels=current_user.labels,
+                user_metadata=current_user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
+            raise AuthorizationDeniedError(msg)
+
+    elif not await _user_has_authz_query_permission(current_user, evaluator, db):
+        # Tier 3: system-wide — admin only
+        msg = "System-wide who_can queries require authz:query permission"
+        raise AuthorizationDeniedError(msg)
 
     if body.cursor:
         cursor_data = decode_cursor(body.cursor)
