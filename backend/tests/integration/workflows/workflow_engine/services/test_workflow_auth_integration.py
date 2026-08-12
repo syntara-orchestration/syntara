@@ -5,11 +5,10 @@ workflow submissions and allows authorized ones.
 """
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import Callable
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -49,25 +48,6 @@ SIMPLE_WORKFLOW = {
 TEST_WORKFLOW_METADATA = {
     "workflow_context": {"workflow": {"project_id": str(uuid4())}},
 }
-
-
-@pytest_asyncio.fixture(scope="module")
-async def temporal_env() -> AsyncGenerator[WorkflowEnvironment, None]:
-    """Provide an embedded Temporal test server for this module."""
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        yield env
-
-
-@pytest.fixture(autouse=True)
-def _ensure_runtime_settings() -> Generator[None, None, None]:
-    """Ensure the SettingsCache singleton is initialised for activities."""
-    import syntara.settings.cache.settings_cache as _settings_mod
-    from tests.fixtures.settings import FakeSettingsCache
-
-    original = _settings_mod._runtime_settings
-    _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
-    yield
-    _settings_mod._runtime_settings = original
 
 
 @pytest.mark.asyncio
