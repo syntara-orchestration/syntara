@@ -1,7 +1,6 @@
 """Project service for business logic."""
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -225,10 +224,9 @@ class ProjectService(BaseService):
         await self.session.commit()
 
     async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:
-        """Remove all project-scoped resources before soft-deleting the project.
+        """Remove all project-scoped resources before hard-deleting the project.
 
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
-        Soft-deletable resources are soft-deleted; others are hard-deleted.
         """
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
         from syntara.authz.models.policy import Policy  # noqa: PLC0415
@@ -237,45 +235,36 @@ class ProjectService(BaseService):
         from syntara.credentials.models.credential import Credential  # noqa: PLC0415
         from syntara.workflows.models.execution import Execution  # noqa: PLC0415
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
-        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
-
-        now = datetime.now(UTC)
-        user_id = self.user.id
 
         # Step 1: Hard-delete approval requests
         await self.session.exec(
             delete(ApprovalRequest).where(ApprovalRequest.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # Step 2: Soft-delete executions
+        # Step 2: Disassociate executions (null out workflow FKs, keep execution rows)
         await self.session.exec(
             update(Execution)
-            .where(
-                Execution.project_id == project_id,  # type: ignore[arg-type]
-                Execution.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
+            .where(Execution.project_id == project_id)  # type: ignore[arg-type]
+            .values(workflow_id=None, workflow_version_id=None)
         )
 
-        # Step 3: Soft-delete workflow versions (no direct project_id, found via workflow)
+        # Step 3: Delete webhook triggers for workflows in this project.
+        from syntara.workflows.models.webhook_trigger import WebhookTrigger  # noqa: PLC0415
+
         workflow_ids_subq = select(Workflow.id).where(Workflow.project_id == project_id).scalar_subquery()
         await self.session.exec(
-            update(WorkflowVersion)
-            .where(
-                WorkflowVersion.workflow_id.in_(workflow_ids_subq),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
+            delete(WebhookTrigger).where(WebhookTrigger.workflow_id.in_(workflow_ids_subq))  # type: ignore[attr-defined]
         )
 
-        # Step 4: Soft-delete workflows
+        # Step 4: Null out published_version_id to avoid self-referential FK issues,
+        # then hard-delete workflows (versions cascade via DB FK ON DELETE CASCADE).
         await self.session.exec(
             update(Workflow)
-            .where(
-                Workflow.project_id == project_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
+            .where(Workflow.project_id == project_id)  # type: ignore[arg-type]
+            .values(published_version_id=None, is_enabled=False)
+        )
+        await self.session.exec(
+            delete(Workflow).where(Workflow.project_id == project_id)  # type: ignore[arg-type]
         )
 
         # Step 5: Collect secret IDs, null FK, delete secrets, then hard-delete credentials

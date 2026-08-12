@@ -314,8 +314,25 @@ describe('Executions Component', () => {
 
     render(<Executions />, { wrapper: TestWrapper })
 
-    const link = screen.getByRole('link', { name: mockExecutions[0].workflow_id })
-    expect(link).toHaveAttribute('href', `/workflow-builder/${mockExecutions[0].workflow_id}`)
+    const workflowId = mockExecutions[0].workflow_id
+    expect(workflowId).toBeTruthy()
+    const link = screen.getByRole('link', { name: workflowId! })
+    expect(link).toHaveAttribute('href', `/workflow-builder/${workflowId}`)
+  })
+
+  it('hides retry action for orphaned executions with null workflow FKs', () => {
+    mockExecutionsQuery([
+      {
+        ...mockExecutions[0],
+        workflow_id: null,
+        workflow_version_id: null,
+        status: 'failed',
+      },
+    ])
+
+    render(<Executions />, { wrapper: TestWrapper })
+
+    expect(screen.queryByText('Retry run')).not.toBeInTheDocument()
   })
 
   it('shows placeholder for null timestamps', () => {

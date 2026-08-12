@@ -34,9 +34,9 @@ type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 
 type Execution = {
   id: string
-  workflow_id?: string
+  workflow_id?: string | null
   workflow_name?: string | null
-  workflow_version_id?: string
+  workflow_version_id?: string | null
   workflow_version?: number | null
   workflow_version_name?: string | null
   workflow_version_created_at?: string | null
@@ -71,7 +71,11 @@ function ExecutionRowActions({
     isCurrentVersion,
     versionLabel: dialogVersionLabel,
     isLoading: isVersionLoading,
-  } = useIsCurrentVersion(execution.workflow_id, execution.workflow_version_id, retryDialogOpen)
+  } = useIsCurrentVersion(
+    execution.workflow_id ?? undefined,
+    execution.workflow_version_id ?? undefined,
+    retryDialogOpen
+  )
   const retry = useRetryExecution(execution.id, (newId) => {
     setRetryDialogOpen(false)
     detachPromise(navigate({ to: AppRoute.Executions.Execution.replace(':executionId', newId) }))
@@ -93,7 +97,7 @@ function ExecutionRowActions({
 
   const kebabActions: KebabAction[] = []
 
-  if (retryable) {
+  if (retryable && execution.workflow_id && execution.workflow_version_id) {
     kebabActions.push({
       key: 'retry',
       title: <IconLabel icon={<RhUiRedoIcon />}>Retry run</IconLabel>,

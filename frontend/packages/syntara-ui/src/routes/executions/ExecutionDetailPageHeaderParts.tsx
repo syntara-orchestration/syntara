@@ -79,19 +79,23 @@ export function ExecutionDetailHeaderToolbar({
         />
       )}
       {isCancellable && <CancelExecutionButton executionId={executionId} />}
-      {isRetryable && execution && (
+      {isRetryable && execution?.workflow_id && execution.workflow_version_id && (
         <RetryExecutionButton
           executionId={executionId}
           workflowId={execution.workflow_id}
           workflowVersionId={execution.workflow_version_id}
         />
       )}
-      <Button variant="secondary" onClick={onCopyToEditor}>
-        Copy to editor
-      </Button>
-      <Button variant={showApprovalActionStrip ? 'secondary' : 'primary'} onClick={onBackToEditor}>
-        Back to editor
-      </Button>
+      {execution?.workflow_id && (
+        <Button variant="secondary" onClick={onCopyToEditor}>
+          Copy to editor
+        </Button>
+      )}
+      {execution?.workflow_id && (
+        <Button variant={showApprovalActionStrip ? 'secondary' : 'primary'} onClick={onBackToEditor}>
+          Back to editor
+        </Button>
+      )}
       <RunHistoryToggleButton onClick={onToggleHistory} isActive={historyCardOpen} />
     </>
   )

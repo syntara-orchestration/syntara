@@ -21,10 +21,14 @@ from syntara.workflows.exceptions import (
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
-from syntara.workflows.models.execution import Execution, ExecutionRead, ExecutionStatus
+from syntara.workflows.models.execution import Execution, ExecutionInclude, ExecutionRead, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.execution_service import ExecutionService, count_active_executions
+from syntara.workflows.services.execution_service import (
+    ExecutionsConvertResourceMixin,
+    ExecutionService,
+    count_active_executions,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
@@ -46,8 +50,6 @@ class TestExecutionServiceBase:
         input_data: dict[str, Any] | None = None,
         error_details: str | None = None,
         labels: dict[str, Any] | None = None,
-        deleted_at: datetime | None = None,
-        deleted_by: UUID | None = None,
         project_id: UUID | None = None,
     ) -> Execution:
         """Create a test Execution object with realistic data.
@@ -66,8 +68,6 @@ class TestExecutionServiceBase:
             input_data: Input data dict (defaults to empty dict if None)
             error_details: Error details string (None by default)
             labels: Labels dict (defaults to empty dict if None)
-            deleted_at: Deletion timestamp (None by default)
-            deleted_by: Deleter user UUID (None by default)
             project_id: Project UUID (generates random if None)
 
         Returns:
@@ -115,8 +115,6 @@ class TestExecutionServiceBase:
             input_data=input_data,
             error_details=error_details,
             labels=labels,
-            deleted_at=deleted_at,
-            deleted_by=deleted_by,
             project_id=project_id or uuid4(),
         )
 
@@ -489,7 +487,6 @@ class TestCreateExecution:
         workflow.published_version = None
         workflow.project_id = uuid4()
         workflow.created_by = user_id
-        workflow.deleted_at = None
 
         version = Mock(spec=WorkflowVersion)
         version.id = version_id
@@ -985,7 +982,6 @@ class TestRetryExecutionTriggerNodeId:
 
         workflow = Mock(spec=Workflow)
         workflow.id = uuid4()
-        workflow.deleted_at = None
 
         original = Mock(spec=Execution)
         original.id = uuid4()
@@ -999,7 +995,6 @@ class TestRetryExecutionTriggerNodeId:
 
         workflow_version = Mock(spec=WorkflowVersion)
         workflow_version.id = original.workflow_version_id
-        workflow_version.deleted_at = None
         workflow_version.workflow_definition = {
             "triggers": [{"id": "t1", "type": "manual_trigger"}],
         }
@@ -1987,3 +1982,45 @@ class TestApplyTriggerSchemaDefaults:
         data: dict[str, Any] = {}
         ExecutionService._apply_trigger_schema_defaults(trigger, data)
         assert data == {"event": "push"}
+
+
+class TestExecutionsConvertResourceMixinNullVersion:
+    """Tests for convert_resource when workflow_version is None (disassociated execution)."""
+
+    def test_include_workflow_definition_with_null_version_returns_none(self) -> None:
+        """When workflow_version is None, include=workflow_definition should not raise."""
+        from syntara.workflows.models.execution import ExecutionMode
+
+        mixin = ExecutionsConvertResourceMixin(include={ExecutionInclude.WORKFLOW_DEFINITION})
+
+        execution = Mock(spec=Execution)
+        execution.id = uuid4()
+        execution.workflow_id = None
+        execution.workflow_version_id = None
+        execution.workflow_version = None
+        execution.workflow = None
+        execution.project_id = uuid4()
+        execution.temporal_workflow_id = "temporal-123"
+        execution.status = ExecutionStatus.COMPLETED
+        execution.created_by = uuid4()
+        execution.created_at = datetime.now(tz=UTC)
+        execution.completed_at = datetime.now(tz=UTC)
+        execution.updated_at = datetime.now(tz=UTC)
+        execution.updated_by = uuid4()
+        execution.input_data = {}
+        execution.trigger_node_id = "trigger-1"
+        execution.error_details = None
+        execution.labels = {}
+        execution.approval_pending = False
+        execution.mode = ExecutionMode.STANDARD
+        execution.execution_metadata = None
+        execution.retried_from_execution_id = None
+        execution.trigger_type = None
+        execution.interface = None
+
+        result = mixin.convert_resource(execution)
+
+        assert isinstance(result, ExecutionRead)
+        assert result.workflow_definition is None
+        assert result.workflow_id is None
+        assert result.workflow_version_id is None

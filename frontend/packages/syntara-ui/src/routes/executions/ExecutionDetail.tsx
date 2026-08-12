@@ -305,7 +305,7 @@ export default function ExecutionDetail() {
   }, [searchParams])
 
   const { executionFilters, handleExecutionFilterChange, executionsQuery, executionPaginationFooterProps } =
-    useExecutionRunHistory(execution?.workflow_id)
+    useExecutionRunHistory(execution?.workflow_id ?? undefined)
 
   const { workflow, activities } = useExecutionWorkflow(execution)
 

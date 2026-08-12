@@ -28,7 +28,7 @@ class WorkflowStartEvent:
     """Domain event fired when a workflow execution begins."""
 
     execution_id: UUID
-    workflow_id: UUID
+    workflow_id: UUID | None
     workflow_name: str
     trigger_type: ActivityName | None = field(default=None)
     interface: str | None = field(default=None)

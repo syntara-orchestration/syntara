@@ -6,10 +6,8 @@ and secret masking in API responses.
 
 import json
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from datetime import datetime
+from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -706,6 +704,37 @@ class CredentialService(BaseService):
             ),
         )
 
+    async def _fetch_latest_executions(self, workflow_ids: list[UUID]) -> dict[UUID, tuple[datetime, str]]:
+        """Batch-fetch the latest execution per workflow. Returns empty dict on failure."""
+        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
+
+        if not workflow_ids:
+            return {}
+        try:
+            latest_exec_stmt = (
+                select(Execution.workflow_id, Execution.created_at, Execution.status)
+                .where(
+                    Execution.workflow_id.in_(workflow_ids),  # type: ignore[union-attr]
+                    Execution.workflow_id.isnot(None),  # type: ignore[union-attr]
+                )
+                .order_by(Execution.workflow_id, Execution.created_at.desc())  # type: ignore[arg-type, attr-defined]
+                .distinct(Execution.workflow_id)  # type: ignore[arg-type]
+            )
+            exec_result = await self.session.exec(latest_exec_stmt)
+            result: dict[UUID, tuple[datetime, str]] = {}
+            for row in exec_result.all():
+                wf_id = row[0]
+                if wf_id is not None:
+                    result[wf_id] = (row[1], row[2])
+            return result
+        except (SQLAlchemyError, OSError):
+            logger.warning(
+                "Failed to fetch execution info for credential workflows",
+                workflow_count=len(workflow_ids),
+                exc_info=True,
+            )
+            return {}
+
     async def get_credential_workflows(self, credential_id: UUID) -> list[CredentialWorkflowRef]:
         """Find workflows that reference a given credential in their definitions.
 
@@ -723,40 +752,11 @@ class CredentialService(BaseService):
             CredentialNotFoundError: If credential does not exist.
 
         """
-        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
-
         await self._get_or_raise(credential_id)
 
         rows = await self._query_workflows_by_credential_ids([credential_id])
         workflow_ids = [row[0] for row in rows]
-
-        # Batch-fetch latest execution per workflow (enrichment — graceful on failure)
-        exec_map: dict[UUID, tuple[datetime, str]] = {}
-        if workflow_ids:
-            try:
-                latest_exec_stmt = (
-                    select(
-                        Execution.workflow_id,
-                        Execution.created_at,
-                        Execution.status,
-                    )
-                    .where(
-                        Execution.workflow_id.in_(workflow_ids),  # type: ignore[attr-defined]
-                        Execution.deleted_at.is_(None),  # type: ignore[union-attr]
-                    )
-                    .order_by(Execution.workflow_id, Execution.created_at.desc())  # type: ignore[arg-type, attr-defined]
-                    .distinct(Execution.workflow_id)  # type: ignore[arg-type]
-                )
-                exec_result = await self.session.exec(latest_exec_stmt)
-                for exec_row in exec_result.all():
-                    exec_map[exec_row[0]] = (exec_row[1], exec_row[2])
-            except (SQLAlchemyError, OSError):
-                logger.warning(
-                    "Failed to fetch execution info for credential workflows",
-                    credential_id=str(credential_id),
-                    workflow_count=len(workflow_ids),
-                    exc_info=True,
-                )
+        exec_map = await self._fetch_latest_executions(workflow_ids)
 
         cred_id_str = str(credential_id)
         refs = []
@@ -796,7 +796,6 @@ class CredentialService(BaseService):
                 WorkflowVersion.workflow_id,
                 func.max(WorkflowVersion.version).label("max_version"),
             )
-            .where(WorkflowVersion.deleted_at.is_(None))  # type: ignore[union-attr]
             .group_by(WorkflowVersion.workflow_id)  # type: ignore[arg-type]
             .subquery()
         )
@@ -851,7 +850,6 @@ class CredentialService(BaseService):
                 (WorkflowVersion.workflow_id == latest_version.c.workflow_id)
                 & (WorkflowVersion.version == latest_version.c.max_version),
             )
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         if project_id is not None:
             stmt = stmt.where(Workflow.project_id == project_id)
@@ -906,7 +904,6 @@ class CredentialService(BaseService):
                 (WorkflowVersion.workflow_id == latest_version.c.workflow_id)
                 & (WorkflowVersion.version == latest_version.c.max_version),
             )
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
 
         # Use jsonb_path_exists for precise credential_id matching (PostgreSQL 12+)

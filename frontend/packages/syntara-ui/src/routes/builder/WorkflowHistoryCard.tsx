@@ -89,7 +89,11 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
     isCurrentVersion,
     versionLabel,
     isLoading: isVersionLoading,
-  } = useIsCurrentVersion(execution.workflow_id, execution.workflow_version_id, retryDialogOpen)
+  } = useIsCurrentVersion(
+    execution.workflow_id ?? undefined,
+    execution.workflow_version_id ?? undefined,
+    retryDialogOpen
+  )
   const retryHook = useRetryExecution(execution.id, (newId) => {
     setRetryDialogOpen(false)
     detachPromise(navigate({ to: `/executions/${newId}` }))
@@ -188,7 +192,7 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
           </Flex>
         </Stack>
       </button>
-      {retryable && (
+      {retryable && execution.workflow_id && execution.workflow_version_id && (
         <div className={styles.historyRowKebab}>
           <HistoryRowRetryAction execution={execution} />
         </div>

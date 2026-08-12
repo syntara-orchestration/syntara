@@ -345,7 +345,15 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('shows "Retry run" for retryable statuses (not cancel)', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'failed', completed_at: '2026-01-01T00:00:00Z' }])
+    renderTable([
+      {
+        id: 'exec-1',
+        workflow_id: 'wf-1',
+        workflow_version_id: 'wfv-1',
+        status: 'failed',
+        completed_at: '2026-01-01T00:00:00Z',
+      },
+    ])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -420,7 +428,15 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('opens retry dialog when "Retry run" is clicked and closes on cancel', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'failed', completed_at: '2026-01-01T00:00:00Z' }])
+    renderTable([
+      {
+        id: 'exec-1',
+        workflow_id: 'wf-1',
+        workflow_version_id: 'wfv-1',
+        status: 'failed',
+        completed_at: '2026-01-01T00:00:00Z',
+      },
+    ])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)

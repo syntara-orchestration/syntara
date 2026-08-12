@@ -1042,7 +1042,7 @@ describe('ExecutionDetail', () => {
       )
     })
 
-    it('does not navigate on replace when workflow_id is missing', async () => {
+    it('hides copy/back to editor buttons when workflow_id is missing', () => {
       vi.mocked(executionsClient.useQuery).mockImplementation((_method: string, endpoint: string) => {
         if (endpoint === '/executions/{execution_id}') {
           return {
@@ -1053,7 +1053,6 @@ describe('ExecutionDetail', () => {
         return mockExecutionsQuery
       })
 
-      const user = userEvent.setup()
       const queryClient = new QueryClient()
       render(
         <QueryClientProvider client={queryClient}>
@@ -1061,15 +1060,8 @@ describe('ExecutionDetail', () => {
         </QueryClientProvider>
       )
 
-      await user.click(screen.getByRole('button', { name: 'Copy to editor' }))
-      mockNavigate.mockClear()
-      await user.click(screen.getByRole('button', { name: 'Replace current workflow' }))
-
-      expect(mockNavigate).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: '/workflow-builder/$workflowId',
-        })
-      )
+      expect(screen.queryByRole('button', { name: 'Copy to editor' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back to editor' })).not.toBeInTheDocument()
     })
 
     it('navigates to forked workflow on successful fork', async () => {

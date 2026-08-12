@@ -544,7 +544,7 @@ class ActivitySyncService:
                 raise RuntimeError(msg)
             workflow_name = workflow.name
 
-        activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)
+        activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)  # type: ignore[arg-type]
 
         await self._create_all_activities_upfront(execution_id, activity_definitions_map)
 

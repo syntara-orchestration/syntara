@@ -24,7 +24,7 @@ class WorkflowCompletedEvent:
     """Domain event fired when a workflow execution reaches a terminal state."""
 
     execution_id: UUID
-    workflow_id: UUID
+    workflow_id: UUID | None
     status: WorkflowTerminalStatus
     duration_ms: int
     node_count: int

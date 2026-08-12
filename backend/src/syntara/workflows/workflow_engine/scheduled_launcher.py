@@ -345,7 +345,6 @@ class ScheduledExecutionLauncher:
                 WorkflowVersion.id == Workflow.published_version_id,  # type: ignore[arg-type]
             )
             .where(Workflow.id == workflow_id)
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
             .where(Workflow.is_enabled == True)  # noqa: E712
         )
         row = result.first()

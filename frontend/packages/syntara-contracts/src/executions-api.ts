@@ -146,16 +146,10 @@ export interface components {
        * Format: uuid
        */
       id: string
-      /**
-       * Workflow Id
-       * Format: uuid
-       */
-      workflow_id: string
-      /**
-       * Workflow Version Id
-       * Format: uuid
-       */
-      workflow_version_id: string
+      /** Workflow Id */
+      workflow_id?: string | null
+      /** Workflow Version Id */
+      workflow_version_id?: string | null
       /**
        * Workflow Name
        * @description Name of the workflow
@@ -243,10 +237,6 @@ export interface components {
        * @description Currently executing activities
        */
       current_activities?: components['schemas']['CurrentActivity'][]
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter. */
       workflow_definition?: components['schemas']['WorkflowDefinition'] | null
       /**

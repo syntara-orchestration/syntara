@@ -37,7 +37,7 @@ class ExecutionLifecycleEvent:
     """Domain event fired when an execution lifecycle action completes."""
 
     execution_id: UUID
-    workflow_id: UUID
+    workflow_id: UUID | None
     workflow_name: str
     action: ExecutionAction
     mode: str | None = field(default=None)

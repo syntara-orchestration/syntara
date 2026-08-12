@@ -1,3 +1,4 @@
+import type { ExecutionsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
@@ -189,6 +190,10 @@ describe('ExecutionDetailPageHeaderParts', () => {
 
   it('renders cancel and approval buttons together when both applicable', () => {
     const queryClient = new QueryClient()
+    const mockExecution = {
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+    } as unknown as ExecutionsAPI.components['schemas']['ExecutionRead']
     render(
       <QueryClientProvider client={queryClient}>
         <ExecutionDetailHeaderToolbar
@@ -201,7 +206,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-123"
-          execution={undefined}
+          execution={mockExecution}
         />
       </QueryClientProvider>
     )
@@ -212,6 +217,10 @@ describe('ExecutionDetailPageHeaderParts', () => {
 
   it('renders copy to editor button', () => {
     const queryClient = new QueryClient()
+    const mockExecution = {
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+    } as unknown as ExecutionsAPI.components['schemas']['ExecutionRead']
     render(
       <QueryClientProvider client={queryClient}>
         <ExecutionDetailHeaderToolbar
@@ -224,7 +233,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-123"
-          execution={undefined}
+          execution={mockExecution}
         />
       </QueryClientProvider>
     )
@@ -234,6 +243,10 @@ describe('ExecutionDetailPageHeaderParts', () => {
   it('calls onCopyToEditor when copy to editor button is clicked', async () => {
     const queryClient = new QueryClient()
     const onCopyToEditor = vi.fn()
+    const mockExecution = {
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+    } as unknown as ExecutionsAPI.components['schemas']['ExecutionRead']
     const user = (await import('@testing-library/user-event')).default.setup()
     render(
       <QueryClientProvider client={queryClient}>
@@ -247,7 +260,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onCopyToEditor={onCopyToEditor}
           isCancellable={false}
           executionId="exec-123"
-          execution={undefined}
+          execution={mockExecution}
         />
       </QueryClientProvider>
     )

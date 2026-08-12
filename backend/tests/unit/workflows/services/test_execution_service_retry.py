@@ -1,6 +1,5 @@
 """Unit tests for ExecutionService.retry_execution method."""
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -33,7 +32,6 @@ def _make_execution(
     execution.temporal_workflow_id = f"temporal-{execution.id}"
     execution.input_data = {"key": "value"}
     execution.trigger_node_id = "trigger-1"
-    execution.deleted_at = None
 
     workflow = Mock(spec=Workflow)
     workflow.id = execution.workflow_id
@@ -41,7 +39,6 @@ def _make_execution(
     workflow.project_id = execution.project_id
     workflow.published_version = 1
     workflow.created_by = uuid4()
-    workflow.deleted_at = None
     execution.workflow = workflow
 
     return execution
@@ -263,10 +260,10 @@ class TestRetryExecution:
         assert "workflow version no longer exists" in exc_info.value.reason
 
     @pytest.mark.asyncio
-    async def test_retry_execution_soft_deleted_workflow(self) -> None:
-        """Test retry when workflow has been soft-deleted."""
+    async def test_retry_execution_deleted_workflow(self) -> None:
+        """Test retry when workflow has been hard-deleted (FK nulled)."""
         execution = _make_execution(ExecutionStatus.FAILED)
-        execution.workflow.deleted_at = datetime.now(UTC)
+        execution.workflow = None  # type: ignore[assignment]
         exec_result = Mock()
         exec_result.one_or_none.return_value = execution
         mock_session = Mock(spec=AsyncSession)

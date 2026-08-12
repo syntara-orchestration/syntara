@@ -119,7 +119,7 @@ export const transformExecutionStatusFilter = (filters: FilterConfig[]): FilterC
   )
 
 type ExecutionWithVersion = {
-  workflow_version_id?: string
+  workflow_version_id?: string | null
   workflow_version_name?: string | null
   workflow_version_created_at?: string | null
 }
