@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.settings.cache.settings_cache import _SENTINEL, SettingsCache
+from syntara.settings.cache.settings_cache import _SENTINEL, SettingsCache
 
 
 def _make_watching_cache() -> SettingsCache:
@@ -40,7 +40,7 @@ class TestOnChange:
 
         cache._catalog_by_key = None
         with (
-            patch("nexus.settings.catalog.SETTINGS_CATALOG", [fake_defn]),
+            patch("syntara.settings.catalog.SETTINGS_CATALOG", [fake_defn]),
             pytest.raises(ValueError, match="requires_restart=True"),
         ):
             cache.on_change("test.restart", lambda _k, _v: None)

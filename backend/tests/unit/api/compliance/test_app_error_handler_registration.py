@@ -30,7 +30,7 @@ def test_app_registers_rfc9457_validation_error_handler():
     compliance for all endpoints with a single test.
     """
     # Read main.py to verify error handler registration
-    main_py = Path(__file__).parents[4] / "src" / "nexus" / "api" / "main.py"
+    main_py = Path(__file__).parents[4] / "src" / "syntara" / "api" / "main.py"
     source = main_py.read_text()
     tree = ast.parse(source)
 

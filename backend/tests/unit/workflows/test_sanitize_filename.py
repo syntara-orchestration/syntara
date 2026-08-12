@@ -1,6 +1,6 @@
 """Unit tests for _sanitize_filename in the workflow router."""
 
-from nexus.workflows.router import _sanitize_filename
+from syntara.workflows.router import _sanitize_filename
 
 
 class TestSanitizeFilename:

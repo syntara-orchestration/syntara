@@ -2,8 +2,8 @@
 
 import pytest
 
-from nexus.agent_orchestrator.token_manager.exceptions import TokenCalculationError
-from nexus.agent_orchestrator.token_manager.services import TokenCalculator
+from syntara.agent_orchestrator.token_manager.exceptions import TokenCalculationError
+from syntara.agent_orchestrator.token_manager.services import TokenCalculator
 
 
 def test_count_tokens_simple_text() -> None:

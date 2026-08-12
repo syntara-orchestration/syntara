@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.lib.consumer_configuration import BaseConsumerConfiguration
-from nexus.core.lib.encryption import ENCRYPTED_SENTINEL
-from nexus.core.services.secret_consumer_mixin import SecretConsumerMixin
+from syntara.core.lib.consumer_configuration import BaseConsumerConfiguration
+from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
+from syntara.core.services.secret_consumer_mixin import SecretConsumerMixin
 
 # ---------------------------------------------------------------------------
 # Test fixtures

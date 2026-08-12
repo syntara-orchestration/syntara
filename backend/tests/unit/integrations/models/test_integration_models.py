@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
     IntegrationPatch,
@@ -16,7 +16,7 @@ from nexus.integrations.models.integration import (
     IntegrationSystemUpdate,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import (
+from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,

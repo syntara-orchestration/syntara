@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from nexus.telemetry.events.system_analytics import (
+from syntara.telemetry.events.system_analytics import (
     ConfigInfo,
     CredentialCounts,
     ExecutionCounts,

@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference
 
 
 def _exec_for_coverage() -> None:
@@ -17,7 +17,7 @@ def _exec_for_coverage() -> None:
     filename makes coverage record those lines without modifying the real
     module or creating duplicate classes.
     """
-    import nexus.core.models.user_reference as _mod
+    import syntara.core.models.user_reference as _mod
 
     if not _mod.__file__:
         return

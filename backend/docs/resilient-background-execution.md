@@ -57,7 +57,7 @@ touches `orchestrator-workflow-queue` and vice versa.
 
 ### The `is_builtin` Flag
 
-`Workflow.is_builtin` (`src/nexus/workflows/models/workflow.py`) is a boolean column on the
+`Workflow.is_builtin` (`src/syntara/workflows/models/workflow.py`) is a boolean column on the
 `Workflow` database table, defaulting `false` and indexed for fast queue-routing lookups:
 
 ```python
@@ -69,14 +69,14 @@ is_builtin: bool = Field(
 ```
 
 Built-in workflows (Document Conversion, Agent Execution) are seeded into the database by
-`seed_builtin_workflows()` (`src/nexus/workflows/seed_builtin.py`) with `is_builtin=True`. The
+`seed_builtin_workflows()` (`src/syntara/workflows/seed_builtin.py`) with `is_builtin=True`. The
 seeder is idempotent — re-running it updates the workflow definition if it changed, and is a
 no-op if nothing changed. It runs at startup, so the database always reflects the latest
 built-in workflow definition without manual intervention.
 
 ### Routing at Dispatch Time
 
-`TemporalExecutionService.start_workflow()` (`src/nexus/workflows/workflow_engine/services/temporal_execution_service.py`)
+`TemporalExecutionService.start_workflow()` (`src/syntara/workflows/workflow_engine/services/temporal_execution_service.py`)
 accepts an `is_builtin: bool = False` keyword argument. The queue selection is a single
 conditional at the Temporal client call:
 
@@ -90,7 +90,7 @@ handle = await self.temporal_client.start_workflow(
 ```
 
 `self.background_task_queue` defaults to `orchestrator-background-queue` (constant
-`TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE` in `src/nexus/core/config/base.py`) but is
+`TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE` in `src/syntara/core/config/base.py`) but is
 overridable via the `APP_BACKGROUND_TASK_QUEUE` environment variable. `create_temporal_execution_service()`
 reads both queue names from settings and wires them into the service at construction time, so
 nothing downstream of the service needs to know about queue names.
@@ -107,14 +107,14 @@ nothing downstream of the service needs to know about queue names.
 
 ### Entrypoint and Lifecycle
 
-`src/nexus/workflows/background_worker.py` is the background worker process entrypoint:
+`src/syntara/workflows/background_worker.py` is the background worker process entrypoint:
 
 ```
-python -m nexus.workflows.background_worker
+python -m syntara.workflows.background_worker
 ```
 
 It calls the same `run_worker()` lifecycle function as the main workflow worker
-(`src/nexus/workflows/worker_lifecycle.py`). `run_worker()` is not a background task or
+(`src/syntara/workflows/worker_lifecycle.py`). `run_worker()` is not a background task or
 a thread — it is the main event loop of the worker process, blocking on
 `asyncio.Event.wait()` until a `SIGTERM` or `SIGINT` arrives, then draining in-flight
 activities before exit.
@@ -133,7 +133,7 @@ The shared `run_worker()` function handles:
 ### Reduced Activity Surface
 
 The background worker runs a smaller activity registry than the main workflow worker
-(`src/nexus/workflows/workflow_engine/activities/registry.py`):
+(`src/syntara/workflows/workflow_engine/activities/registry.py`):
 
 | Registry | Used by | Activities |
 |---|---|---|
@@ -254,7 +254,7 @@ dedicated metrics Service is needed because Temporal's Service already exists.
 
 ### Queue Depth Metric
 
-`src/nexus/metrics/queue_depth_poller.py` runs as a `PeriodicWorker` inside the API server
+`src/syntara/metrics/queue_depth_poller.py` runs as a `PeriodicWorker` inside the API server
 process, polling Temporal's `DescribeTaskQueue` RPC every 5 seconds for both queues:
 
 ```python
@@ -334,7 +334,7 @@ files only.
 
 ### Step 1 — Register an internal operation handler
 
-`execute_internal_activity` (`src/nexus/workflows/workflow_engine/activities/internal_activity.py`)
+`execute_internal_activity` (`src/syntara/workflows/workflow_engine/activities/internal_activity.py`)
 is the single Temporal activity that all built-in workflows dispatch through. It looks up the
 `activity` parameter from the node config in `_DISPATCH`, a plain dict of
 `str → async callable`:
@@ -356,7 +356,7 @@ async def _run_my_operation(operation_input: dict[str, Any]) -> dict[str, Any]:
         raise ApplicationError("my_operation requires 'resource_id'", non_retryable=True)
 
     # Heavy imports go here (lazy, inside the function) to avoid Temporal sandbox warnings
-    from nexus.my_domain.tasks import MyTask  # noqa: PLC0415
+    from syntara.my_domain.tasks import MyTask  # noqa: PLC0415
 
     result = await MyTask().run(UUID(resource_id))
     return {"output": {"status": result.name}}
@@ -376,7 +376,7 @@ Two conventions to follow:
 
 ### Step 2 — Add the workflow definition to the seed
 
-`_BUILTIN_DEFINITIONS` (`src/nexus/workflows/seed_builtin.py`) is a list of V2 workflow
+`_BUILTIN_DEFINITIONS` (`src/syntara/workflows/seed_builtin.py`) is a list of V2 workflow
 definition dicts. Add an entry:
 
 ```python

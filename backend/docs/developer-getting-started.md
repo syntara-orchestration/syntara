@@ -6,10 +6,10 @@ For setup instructions, see [README.md](../README.md).
 
 ## Understanding Base Resource Classes
 
-All domain models should extend the `Resource` base class from `src/nexus/core/models/`. Here's the inheritance hierarchy:
+All domain models should extend the `Resource` base class from `src/syntara/core/models/`. Here's the inheritance hierarchy:
 
 ```python
-# Core hierarchy (from src/nexus/core/models/base/base_resource.py)
+# Core hierarchy (from src/syntara/core/models/base/base_resource.py)
 BaseResource (ABC)          # id, timestamps, labels
 ├─ NamedResource            # + name, description  
 ├─ SoftDeletableResource    # + deleted_at, deleted_by
@@ -21,7 +21,7 @@ BaseResource (ABC)          # id, timestamps, labels
 
 **Complete example:**
 ```python
-from nexus.core.models import Resource
+from syntara.core.models import Resource
 
 class ToolProvider(Resource, table=True):
     """Extends Resource with provider-specific fields."""
@@ -45,8 +45,8 @@ class ToolProvider(Resource, table=True):
 Nexus automatically discovers and registers FastAPI routers following specific conventions:
 
 ### File Locations
-- `src/nexus/{domain}/router.py`
-- `src/nexus/schemas/{domain}/openapi.yaml`
+- `src/syntara/{domain}/router.py`
+- `src/syntara/schemas/{domain}/openapi.yaml`
 
 ### Required Exports
 Your router module must export one of:
@@ -76,11 +76,11 @@ async def list_providers(
     return await service.list_providers()
 ```
 
-The discovery system (`src/nexus/core/router_discovery.py`) automatically scans these locations and registers all routers with the FastAPI app.
+The discovery system (`src/syntara/core/router_discovery.py`) automatically scans these locations and registers all routers with the FastAPI app.
 
 ## Tool Manager Example - Complete Pattern
 
-`src/nexus/tool_manager/` demonstrates the full Nexus architecture pattern:
+`src/syntara/tool_manager/` demonstrates the full Nexus architecture pattern:
 
 ### 1. Models (`tool_manager/models/`)
 
@@ -167,7 +167,7 @@ async def create_provider(
 
 Nexus uses a structured approach to OpenAPI documentation:
 
-### Shared Resources (`src/nexus/schemas/base/shared-resources.openapi.yaml`)
+### Shared Resources (`src/syntara/schemas/base/shared-resources.openapi.yaml`)
 ```yaml
 components:
   schemas:
@@ -187,7 +187,7 @@ components:
         # ... other base fields
 ```
 
-### Domain Schemas (`src/nexus/schemas/tool_manager/openapi.yaml`)
+### Domain Schemas (`src/syntara/schemas/tool_manager/openapi.yaml`)
 ```yaml
 components:
   schemas:
@@ -252,8 +252,8 @@ async def test_provider_crud_operations(db_session):
 ## Next Steps
 
 1. **Examine existing implementations:**
-   - Study `src/nexus/tool_manager/` for the complete pattern
-   - Review `src/nexus/core/models/` for base class usage
+   - Study `src/syntara/tool_manager/` for the complete pattern
+   - Review `src/syntara/core/models/` for base class usage
 
 2. **Try a small change:**
    - Add a field to an existing model
@@ -261,7 +261,7 @@ async def test_provider_crud_operations(db_session):
    - Update the corresponding service and router
 
 3. **Build a new domain:**
-   - Follow the domain structure pattern in `src/nexus/{domain}/`
+   - Follow the domain structure pattern in `src/syntara/{domain}/`
    - Extend `Resource` for your models
    - Implement services with proper error handling
    - Create router with dependency injection

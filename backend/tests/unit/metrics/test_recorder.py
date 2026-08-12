@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import ComponentLabel, MetricType
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import ComponentLabel, MetricType
 
 
 @pytest.fixture
@@ -525,7 +525,7 @@ class TestRecorderPrometheus:
 
     def test_tool_execution_missing_namespaced_name_raises(self, recorder: MetricsRecorder) -> None:
         """Missing namespaced_name label raises ValueError in dispatch."""
-        from nexus.core.exceptions import SafeValueError
+        from syntara.core.exceptions import SafeValueError
 
         with pytest.raises(SafeValueError, match="namespaced_name"):
             recorder._dispatch_tool_execution(

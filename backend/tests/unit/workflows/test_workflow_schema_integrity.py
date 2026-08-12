@@ -18,7 +18,7 @@ from jsonschema import Draft202012Validator, RefResolver
 
 def _load_workflow_schemas() -> dict[str, dict[str, object]]:
     """Load all workflow v2 schema files."""
-    schema_dir = Path("src/nexus/schemas/workflows/v2")
+    schema_dir = Path("src/syntara/schemas/workflows/v2")
     schemas = {}
     for schema_file in schema_dir.glob("*.json"):
         with schema_file.open() as f:

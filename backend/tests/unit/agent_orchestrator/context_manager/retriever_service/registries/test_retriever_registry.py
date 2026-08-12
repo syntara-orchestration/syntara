@@ -9,10 +9,10 @@ from typing import Any
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import RegistryError
-from nexus.agent_orchestrator.context_manager.retriever_service.interfaces.document_retriever import DocumentRetriever
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import RegistryError
+from syntara.agent_orchestrator.context_manager.retriever_service.interfaces.document_retriever import DocumentRetriever
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
 
 
 async def _empty_async_iterator() -> AsyncIterator[RelevantDocument]:

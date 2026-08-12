@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz import resource_actions as _resource_actions
-from nexus.authz.resource_actions import _set_registry
-from nexus.authz.seed import seed_authz_data
+from syntara.authz import resource_actions as _resource_actions
+from syntara.authz.resource_actions import _set_registry
+from syntara.authz.seed import seed_authz_data
 
 # ---------------------------------------------------------------------------
 # Resource-actions registry — integration tests bypass app startup, so we
@@ -68,7 +68,7 @@ def _install_test_resource_actions() -> Generator[None, None, None]:
 
 
 # Path to the rego policy file
-_REGO_POLICY_PATH = Path(__file__).resolve().parents[3] / "src" / "nexus" / "authz" / "rego" / "authz.rego"
+_REGO_POLICY_PATH = Path(__file__).resolve().parents[3] / "src" / "syntara" / "authz" / "rego" / "authz.rego"
 
 # Fields we care about from Rego evaluation
 _Rego_RESULT_FIELDS = {"allow", "deny", "matched_policy", "denial_reason", "denied_by", "allowed_projects"}
@@ -120,7 +120,7 @@ def _opa_evaluate(opa_input: dict[str, Any]) -> dict[str, Any]:
             "-I",
             "--format",
             "json",
-            "data.nexus.authz",
+            "data.syntara.authz",
         ],
         input=json.dumps(opa_input),
         capture_output=True,
@@ -219,7 +219,7 @@ def deny_policy(
 
 def policies_for_role(role_name: str) -> list[dict[str, Any]]:
     """Resolve policy statements for a built-in role without DB access."""
-    from nexus.authz.role_conventions import builtin_role_policy_names, resolve_builtin_policy_statements
+    from syntara.authz.role_conventions import builtin_role_policy_names, resolve_builtin_policy_statements
 
     policy_names = builtin_role_policy_names(role_name)
     if not policy_names:

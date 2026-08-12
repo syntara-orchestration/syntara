@@ -1,15 +1,15 @@
-"""Unit tests for what_can_i helper functions in nexus.authz.router."""
+"""Unit tests for what_can_i helper functions in syntara.authz.router."""
 
 import pytest
 
-from nexus.authz.router import (
+from syntara.authz.router import (
     PermissionEntry,
     WhatCanIResponse,
     _is_cursor_stale,
     _paginate_in_memory,
 )
-from nexus.core.exceptions import SafeValueError
-from nexus.core.utils.cursor import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.cursor import (
     CursorData,
     SortDirection,
 )

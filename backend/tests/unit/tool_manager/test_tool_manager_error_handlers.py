@@ -6,9 +6,9 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.tool_manager.error_handlers import tool_manager_error_handler
-from nexus.tool_manager.exceptions import ToolManagerError
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.tool_manager.error_handlers import tool_manager_error_handler
+from syntara.tool_manager.exceptions import ToolManagerError
 
 
 class TestToolManagerErrorHandler:

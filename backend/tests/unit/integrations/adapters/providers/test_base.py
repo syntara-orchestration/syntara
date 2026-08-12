@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from nexus.integrations.adapters.providers.base import LLMProviderBase
+from syntara.integrations.adapters.providers.base import LLMProviderBase
 
 if TYPE_CHECKING:
-    from nexus.integrations.adapters.protocol import DiscoveredLLMModel
+    from syntara.integrations.adapters.protocol import DiscoveredLLMModel
 
 
 class _ConcreteProvider(LLMProviderBase):

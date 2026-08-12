@@ -13,16 +13,16 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from nexus.authz.exceptions import BuiltinProtectionError
-from nexus.core.lib.encryption import ENCRYPTED_SENTINEL
-from nexus.credentials.exceptions import (
+from syntara.authz.exceptions import BuiltinProtectionError
+from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
+from syntara.credentials.exceptions import (
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
 )
-from nexus.credentials.models.credential import Credential, CredentialCreate, CredentialRead, CredentialUpdate
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.credentials.services.credential_service import (
+from syntara.credentials.models.credential import Credential, CredentialCreate, CredentialRead, CredentialUpdate
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.credentials.services.credential_service import (
     CredentialService,
     _get_secret_field_ids,
     _mask_all_secrets,
@@ -616,7 +616,7 @@ class TestDeleteCredential:
 
         with (
             patch.object(service, "get_workflow_counts", new_callable=AsyncMock, return_value={credential.id: 3}),
-            patch("nexus.credentials.services.credential_service.logger") as mock_logger,
+            patch("syntara.credentials.services.credential_service.logger") as mock_logger,
         ):
             await service.delete_credential(credential.id)
 
@@ -1263,7 +1263,7 @@ class TestAuditEventDispatch:
             project_id=project_id,
         )
 
-        with patch("nexus.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
             await service.create_credential(data)
 
             mock_dispatcher.dispatch.assert_called_once()
@@ -1298,7 +1298,7 @@ class TestAuditEventDispatch:
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         data = CredentialUpdate(name="new-name")
 
-        with patch("nexus.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
             await service.update_credential(existing.id, data)
 
             mock_dispatcher.dispatch.assert_called_once()
@@ -1332,7 +1332,7 @@ class TestAuditEventDispatch:
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         data = CredentialUpdate(enabled=False)
 
-        with patch("nexus.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
             await service.update_credential(existing.id, data)
 
             event = mock_dispatcher.dispatch.call_args[0][0]
@@ -1361,7 +1361,7 @@ class TestAuditEventDispatch:
 
         with (
             patch.object(service, "get_workflow_counts", new_callable=AsyncMock, return_value={cred_id: 2}),
-            patch("nexus.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher,
         ):
             await service.delete_credential(cred_id)
 
@@ -1379,7 +1379,7 @@ class TestAuditEventDispatch:
         mock_secret_service: MagicMock,
         bearer_type: CredentialType,
     ) -> None:
-        from nexus.credentials.exceptions import CredentialDecryptionError
+        from syntara.credentials.exceptions import CredentialDecryptionError
 
         existing = Credential(
             id=uuid4(),
@@ -1399,7 +1399,7 @@ class TestAuditEventDispatch:
             patch.object(
                 service, "_retrieve_or_empty", new_callable=AsyncMock, side_effect=CredentialDecryptionError("fail")
             ),
-            patch("nexus.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher,
         ):
             with pytest.raises(CredentialDecryptionError):
                 await service.get_credential(existing.id)
@@ -1455,7 +1455,7 @@ class TestResolveUserReferences:
     async def test_resolves_uuid_to_user_reference(
         self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
     ) -> None:
-        from nexus.core.models.user_reference import UserReference
+        from syntara.core.models.user_reference import UserReference
 
         uid = uuid4()
         mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
@@ -1496,7 +1496,7 @@ class TestResolveUserReferences:
     async def test_handles_multiple_objects(
         self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
     ) -> None:
-        from nexus.core.models.user_reference import UserReference
+        from syntara.core.models.user_reference import UserReference
 
         uid1, uid2 = uuid4(), uuid4()
         mock_session.exec = AsyncMock(return_value=[(uid1, "alice"), (uid2, "bob")])

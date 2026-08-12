@@ -8,9 +8,9 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models import ActivityExecution, Workflow
-from nexus.workflows.models.execution import Execution, ExecutionStatus
+from syntara.core.models import User
+from syntara.workflows.models import ActivityExecution, Workflow
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 
 @pytest.mark.asyncio

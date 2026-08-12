@@ -47,7 +47,7 @@ class TestAUDIT1SystemUserRemoval:
 
     def test_no_system_user_db_seed(self) -> None:
         """Database seed/migration scripts must not create a system user row."""
-        seed_dir = _SRC_DIR / "nexus"
+        seed_dir = _SRC_DIR / "syntara"
         matches = _grep("system.user", seed_dir, extra_args=["-i"])
         benign_patterns = ("PrincipalType.SYSTEM", "System/User Prompt", "system user")
         filtered = [m for m in matches if not any(bp.lower() in m.lower() for bp in benign_patterns)]
@@ -55,7 +55,7 @@ class TestAUDIT1SystemUserRemoval:
 
     def test_no_internal_bearer_token_minting(self) -> None:
         """Internal HTTP clients must not mint or attach Bearer tokens."""
-        http_client_dir = _SRC_DIR / "nexus" / "core" / "tls"
+        http_client_dir = _SRC_DIR / "syntara" / "core" / "tls"
         matches = _grep("Bearer", http_client_dir)
         assert not matches, "Bearer token usage found in internal TLS/HTTP client code:\n" + "\n".join(
             f"  {m}" for m in matches

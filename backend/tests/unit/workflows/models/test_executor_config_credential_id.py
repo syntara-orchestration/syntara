@@ -1,6 +1,6 @@
 """Tests for credentialId field on executor configs (T055)."""
 
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AgenticExecutorParameters,
     APIExecutorParameters,

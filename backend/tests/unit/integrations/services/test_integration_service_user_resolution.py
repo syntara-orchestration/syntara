@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 
 @pytest.fixture

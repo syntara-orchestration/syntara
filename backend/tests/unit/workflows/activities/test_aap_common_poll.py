@@ -9,7 +9,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from nexus.workflows.workflow_engine.activities.aap_common import (
+from syntara.workflows.workflow_engine.activities.aap_common import (
     MAX_CONSECUTIVE_POLL_ERRORS,
     AAPActivityExecutionError,
     _is_transient_poll_error,
@@ -17,7 +17,7 @@ from nexus.workflows.workflow_engine.activities.aap_common import (
     build_aap_job_url,
     poll_until_complete,
 )
-from nexus.workflows.workflow_engine.activities.common import (
+from syntara.workflows.workflow_engine.activities.common import (
     HEARTBEAT_PARTIAL_OUTPUT_KEY,
     HEARTBEAT_STOP_MONITOR,
 )
@@ -180,7 +180,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = [running_response, successful_response]
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
 
@@ -257,7 +257,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = [running_response, successful_response]
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
 
@@ -337,7 +337,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = [transient_error, successful_response]
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
 
@@ -411,7 +411,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = [transient_500, successful_response]
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
 
@@ -471,7 +471,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = [transient_500] * (MAX_CONSECUTIVE_POLL_ERRORS + 1)
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
             client = httpx.AsyncClient()
@@ -556,7 +556,7 @@ class TestPollUntilCompleteHeartbeat:
         ):
             mock_get.side_effect = responses
 
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             settings = get_settings()
 

@@ -124,8 +124,8 @@ async def workflow_name_conflict_handler(request: Request, exc: Exception) -> JS
 - `WorkflowVersionNotFoundError`
 
 ### Validation Errors (400/422)
-- `nexus.files.validators.ValidationError` → 400 (business logic validation)
-- `nexus.tool_manager.lib.exceptions.ValidationError` → 422 (schema validation)
+- `syntara.files.validators.ValidationError` → 400 (business logic validation)
+- `syntara.tool_manager.lib.exceptions.ValidationError` → 422 (schema validation)
 - `pydantic.ValidationError` → 422 (request validation)
 - `fastapi.exceptions.RequestValidationError` → 422 (request validation)
 
@@ -195,7 +195,7 @@ async def workflow_not_found_handler(request: Request, exc: Exception) -> JSONRe
 
 1. **Create domain exception with decorator** in appropriate domain module:
 ```python
-from nexus.core.exception_registry import fastapi_exception
+from syntara.core.exception_registry import fastapi_exception
 
 @fastapi_exception(handler=my_domain_error_handler)
 class MyDomainError(Exception):

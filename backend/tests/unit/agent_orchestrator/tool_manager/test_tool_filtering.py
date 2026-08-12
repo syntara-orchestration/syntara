@@ -9,9 +9,9 @@ from uuid import uuid4
 
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.tool_manager import tool_filtering
-from nexus.agent_orchestrator.tool_manager.types import NamespacedBaseTool
-from nexus.tool_manager.models.tool import ToolStatus, ToolWithParameters
+from syntara.agent_orchestrator.tool_manager import tool_filtering
+from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+from syntara.tool_manager.models.tool import ToolStatus, ToolWithParameters
 
 
 class TestToolFiltering:

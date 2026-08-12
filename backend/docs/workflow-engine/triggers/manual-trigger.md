@@ -50,16 +50,16 @@ Manual triggers pass through the user-provided `input_data` as their output. Dow
 
 ## Configuration
 
-Manual trigger parameters are defined by the JSON Schema at `src/nexus/schemas/workflows/v2/triggers/manual.schema.json`. The only configurable field is `input_schema` (JSON Schema Draft-07), which defines validation and defaults for user-provided input (with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
+Manual trigger parameters are defined by the JSON Schema at `src/syntara/schemas/workflows/v2/triggers/manual.schema.json`. The only configurable field is `input_schema` (JSON Schema Draft-07), which defines validation and defaults for user-provided input (with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/nexus/workflows/workflow_engine/activities/manual_trigger.py` | Activity: applies output mapping to user input |
-| `src/nexus/workflows/workflow_engine/models/workflow_definition.py` | `resolve_trigger_node()` for trigger selection |
-| `src/nexus/workflows/services/execution_service.py` | Execution creation, schema defaults, validation |
-| `src/nexus/schemas/workflows/v2/triggers/manual.schema.json` | JSON Schema for trigger configuration |
+| `src/syntara/workflows/workflow_engine/activities/manual_trigger.py` | Activity: applies output mapping to user input |
+| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `resolve_trigger_node()` for trigger selection |
+| `src/syntara/workflows/services/execution_service.py` | Execution creation, schema defaults, validation |
+| `src/syntara/schemas/workflows/v2/triggers/manual.schema.json` | JSON Schema for trigger configuration |
 
 ## Related Documentation
 

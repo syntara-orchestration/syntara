@@ -33,7 +33,7 @@ _HASH_MANIFEST = _CONFIG_DIR / "spec-hashes.json"
 # Project root / schemas discovery
 # ---------------------------------------------------------------------------
 
-_SCHEMAS_RELATIVE = Path("src") / "nexus" / "schemas"
+_SCHEMAS_RELATIVE = Path("src") / "syntara" / "schemas"
 
 
 def _find_project_root() -> Path | None:

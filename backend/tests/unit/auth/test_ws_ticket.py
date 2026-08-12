@@ -8,9 +8,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.auth.exceptions import ServiceAccountWSTicketError
-from nexus.auth.router import create_ws_ticket
-from nexus.auth.services.token_service import TokenPayload
+from syntara.auth.exceptions import ServiceAccountWSTicketError
+from syntara.auth.router import create_ws_ticket
+from syntara.auth.services.token_service import TokenPayload
 
 
 def _make_payload(*, token_type: str = "access") -> TokenPayload:  # noqa: S107
@@ -43,7 +43,7 @@ class TestCreateWsTicketServiceAccountRejection:
     @pytest.mark.asyncio
     async def test_regular_user_jwt_accepted(self) -> None:
         payload = _make_payload(token_type="access")  # noqa: S106
-        with patch("nexus.core.websocket.ticket.get_ticket_client") as mock_get:
+        with patch("syntara.core.websocket.ticket.get_ticket_client") as mock_get:
             mock_client = MagicMock()
             mock_client.issue_ticket = AsyncMock(return_value=("ticket-abc", 30))
             mock_get.return_value = mock_client

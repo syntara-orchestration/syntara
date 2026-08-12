@@ -18,11 +18,11 @@ from httpx import AsyncClient
 from sqlalchemy import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.resolver import resolve_effective_policies
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.resolver import resolve_effective_policies
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 
 # ============================================================================
 # Helpers
@@ -268,8 +268,8 @@ async def test_admin_can_delete_default_project(
 
     from sqlmodel import select
 
-    from nexus.authz.models import RoleAssignment
-    from nexus.authz.models.project import Project
+    from syntara.authz.models import RoleAssignment
+    from syntara.authz.models.project import Project
 
     # Create an admin user
     admin_user = await user_factory(username="pt10-admin", email="pt10-admin@example.com")

@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.settings.cache.settings_cache import CachedValue, SettingsCache
+from syntara.settings.cache.settings_cache import CachedValue, SettingsCache
 
 
 def _make_cache(store_return: object = None) -> tuple[SettingsCache, AsyncMock]:
@@ -35,7 +35,7 @@ def _make_cache(store_return: object = None) -> tuple[SettingsCache, AsyncMock]:
 
     cache = SettingsCache(session_factory=session_factory, default_ttl_seconds=60.0)
 
-    with patch("nexus.settings.cache.settings_cache.SettingsStore") as mock_cls:
+    with patch("syntara.settings.cache.settings_cache.SettingsStore") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.get = mock_store_get
         mock_cls.return_value = mock_instance
@@ -55,7 +55,7 @@ async def test_cache_hit_skips_db() -> None:
 
     cache, _ = _make_cache()
 
-    with patch("nexus.settings.cache.settings_cache.SettingsStore") as mock_cls:
+    with patch("syntara.settings.cache.settings_cache.SettingsStore") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.get = AsyncMock(return_value=mock_setting)
         mock_cls.return_value = mock_instance
@@ -80,7 +80,7 @@ async def test_ttl_expiry_triggers_refetch() -> None:
 
     cache, _ = _make_cache()
 
-    with patch("nexus.settings.cache.settings_cache.SettingsStore") as mock_cls:
+    with patch("syntara.settings.cache.settings_cache.SettingsStore") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.get = AsyncMock(return_value=mock_setting)
         mock_cls.return_value = mock_instance
@@ -152,7 +152,7 @@ async def test_invalidate_forces_refetch() -> None:
 
     cache, _ = _make_cache()
 
-    with patch("nexus.settings.cache.settings_cache.SettingsStore") as mock_cls:
+    with patch("syntara.settings.cache.settings_cache.SettingsStore") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.get = AsyncMock(return_value=mock_setting)
         mock_cls.return_value = mock_instance

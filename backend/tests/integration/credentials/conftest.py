@@ -6,8 +6,8 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.credentials.models.credential_type import CredentialType
+from syntara.authz.models import Project
+from syntara.credentials.models.credential_type import CredentialType
 
 
 @pytest_asyncio.fixture(scope="session")

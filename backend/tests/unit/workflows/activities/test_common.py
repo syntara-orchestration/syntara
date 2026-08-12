@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.common import (
+from syntara.workflows.workflow_engine.activities.common import (
     DEFAULT_RETRYABLE_ERROR_CODES,
     ActivityExecutionError,
     extract_error_code,

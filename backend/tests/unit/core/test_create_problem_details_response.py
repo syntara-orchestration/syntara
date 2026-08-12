@@ -5,7 +5,7 @@ import json
 import pytest
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 
 
 class TestCreateProblemDetailsResponse:

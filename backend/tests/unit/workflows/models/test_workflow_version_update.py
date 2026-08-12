@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.workflow_version import WorkflowVersionUpdate
+from syntara.workflows.models.workflow_version import WorkflowVersionUpdate
 
 
 class TestWorkflowVersionUpdate:

@@ -14,10 +14,10 @@ from uuid import UUID
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.tool_manager.lib.providers.base import ToolProviderAdapter
-from nexus.tool_manager.lib.providers.factory import ProviderFactory
-from nexus.tool_manager.lib.providers.mcp import MCPProvider
+from syntara.core.exceptions import SafeValueError
+from syntara.tool_manager.lib.providers.base import ToolProviderAdapter
+from syntara.tool_manager.lib.providers.factory import ProviderFactory
+from syntara.tool_manager.lib.providers.mcp import MCPProvider
 
 
 class TestProviderFactory:

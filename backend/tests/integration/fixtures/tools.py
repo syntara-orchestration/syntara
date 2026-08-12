@@ -7,14 +7,14 @@ from uuid import uuid4
 
 import pytest_asyncio
 
-from nexus.integrations.models.integration import Integration, IntegrationType
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
 from tests.integration.helpers.tool_manager import ToolFactory
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture

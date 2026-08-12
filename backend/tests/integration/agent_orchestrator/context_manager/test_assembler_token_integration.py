@@ -9,15 +9,15 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.assembler_service import (
+from syntara.agent_orchestrator.context_manager.assembler_service import (
     AssemblerService,
     ContextAssemblyError,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
     RelevantDocument,
 )
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.files.models import FileMetadata
 
 
 @pytest.mark.asyncio

@@ -10,8 +10,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.engine import VisibilityResult, _has_direct_system_credential_use, resolve_credential_use_visibility
-from nexus.authz.role_conventions import builtin_roles_with_system_grant
+from syntara.authz.engine import VisibilityResult, _has_direct_system_credential_use, resolve_credential_use_visibility
+from syntara.authz.role_conventions import builtin_roles_with_system_grant
 
 
 def _mock_db(role_names: list[str]) -> AsyncMock:
@@ -132,7 +132,7 @@ class TestResolveCredentialUseVisibilityFastPath:  # noqa: D101
         evaluator = MagicMock()
 
         system_policy = {"effect": "allow", "actions": ["credential:use"], "scope": "any"}
-        with patch("nexus.authz.engine.resolve_effective_policies", return_value=[system_policy]):
+        with patch("syntara.authz.engine.resolve_effective_policies", return_value=[system_policy]):
             result = await resolve_credential_use_visibility(db, evaluator, uuid4())
 
         assert result.unrestricted is True
@@ -147,8 +147,8 @@ class TestResolveCredentialUseVisibilityFastPath:  # noqa: D101
         rego_result = VisibilityResult(unrestricted=True)
 
         with (
-            patch("nexus.authz.engine.resolve_effective_policies", return_value=[deny_policy]),
-            patch("nexus.authz.engine.resolve_visibility", return_value=rego_result) as mock_rego,
+            patch("syntara.authz.engine.resolve_effective_policies", return_value=[deny_policy]),
+            patch("syntara.authz.engine.resolve_visibility", return_value=rego_result) as mock_rego,
         ):
             result = await resolve_credential_use_visibility(db, evaluator, uuid4())
 
@@ -170,8 +170,8 @@ class TestResolveCredentialUseVisibilityFastPath:  # noqa: D101
         }
 
         with (
-            patch("nexus.authz.engine.resolve_effective_policies", return_value=[project_policy]),
-            patch("nexus.authz.engine._resolve_project_ids", return_value=[project_id]) as mock_resolve,
+            patch("syntara.authz.engine.resolve_effective_policies", return_value=[project_policy]),
+            patch("syntara.authz.engine._resolve_project_ids", return_value=[project_id]) as mock_resolve,
         ):
             result = await resolve_credential_use_visibility(db, evaluator, uuid4())
 

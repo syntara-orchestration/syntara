@@ -2,12 +2,12 @@
 
 from uuid import uuid4
 
-from nexus.core.models.principal import (
+from syntara.core.models.principal import (
     Principal,
     PrincipalType,
 )
-from nexus.core.models.user import User
-from nexus.service_accounts.models.service_account import ServiceAccount
+from syntara.core.models.user import User
+from syntara.service_accounts.models.service_account import ServiceAccount
 
 
 class TestPrincipalType:

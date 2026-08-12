@@ -65,7 +65,7 @@ class TestExpressionResolution:
 
     def test_node_output_reference_resolution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -92,7 +92,7 @@ class TestExpressionResolution:
         # Node A produces JSON output with a field "message"
         # Node B uses ${node_a.stdout_json.message} in config.environment to reference that field
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -126,13 +126,13 @@ class TestExpressionResolution:
         )
 
         # Step 2: Execute the workflow
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
         execution_id = execution.id
 
         # Poll until execution completes
-        final_execution = poll_execution_until_complete(nexus_api, execution_id)
+        final_execution = poll_execution_until_complete(syntara_api, execution_id)
 
         # Expected Result 1: Execution completes successfully
         assert final_execution.status == ExecutionStatus.COMPLETED, (
@@ -192,7 +192,7 @@ class TestExpressionResolution:
 
     def test_multiple_expression_references(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -212,7 +212,7 @@ class TestExpressionResolution:
         workflow_name = unique_name("e2e-multi-expression")
 
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -254,10 +254,10 @@ class TestExpressionResolution:
         )
 
         # Execute workflow
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
-        final_execution = poll_execution_until_complete(nexus_api, execution.id)
+        final_execution = poll_execution_until_complete(syntara_api, execution.id)
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
@@ -317,7 +317,7 @@ class TestExpressionResolution:
 
     def test_trigger_input_reference_resolution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -349,7 +349,7 @@ class TestExpressionResolution:
 
         # Create workflow where a script node references trigger inputs
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -377,7 +377,7 @@ class TestExpressionResolution:
         )
 
         # Execute workflow with trigger inputs
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(
                 workflow_id=workflow_id,
                 trigger_node_id="trigger_manual",
@@ -386,7 +386,7 @@ class TestExpressionResolution:
         ).assert_and_get()
 
         # Wait for completion
-        final_execution = poll_execution_until_complete(nexus_api, execution.id)
+        final_execution = poll_execution_until_complete(syntara_api, execution.id)
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
@@ -422,7 +422,7 @@ class TestExpressionResolution:
 
     def test_workflow_context_execution_id_resolves(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -451,7 +451,7 @@ class TestExpressionResolution:
         workflow_name = unique_name("e2e-wf-ctx-exec-id")
 
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -472,11 +472,11 @@ class TestExpressionResolution:
             ),
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
         execution_id = str(execution.id)
-        final = poll_execution_until_complete(nexus_api, execution.id)
+        final = poll_execution_until_complete(syntara_api, execution.id)
 
         assert final.status == ExecutionStatus.COMPLETED, (
             f"Expected completed, got {final.status}: {final.error_details}"
@@ -512,7 +512,7 @@ class TestUnresolvableExpressionError:
 
     def test_unresolvable_field_reference_fails_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -540,7 +540,7 @@ class TestUnresolvableExpressionError:
         workflow_name = unique_name("e2e-unresolvable-expr-fail")
 
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -573,10 +573,10 @@ class TestUnresolvableExpressionError:
             ),
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
-        final = poll_execution_until_complete(nexus_api, execution.id)
+        final = poll_execution_until_complete(syntara_api, execution.id)
 
         assert final.status == ExecutionStatus.FAILED, (
             f"Expected FAILED when expression is unresolvable, got {final.status}: {final.error_details}"
@@ -600,7 +600,7 @@ class TestUnresolvableExpressionError:
 
     def test_unresolvable_expression_with_continue_on_failure(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -629,7 +629,7 @@ class TestUnresolvableExpressionError:
         workflow_name = unique_name("e2e-unresolvable-expr-cof")
 
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=_workflow_definition_with_nodes(
@@ -673,10 +673,10 @@ class TestUnresolvableExpressionError:
             ),
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
-        final = poll_execution_until_complete(nexus_api, execution.id)
+        final = poll_execution_until_complete(syntara_api, execution.id)
 
         assert final.status == ExecutionStatus.COMPLETED_WITH_ERRORS, (
             f"Expected COMPLETED_WITH_ERRORS when COF absorbs resolution failure, "
@@ -706,7 +706,7 @@ class TestUnresolvableExpressionError:
 
     def test_completely_nonexistent_node_namespace_fails_execution(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         create_workflow: WorkflowFactory,
         first_project_id: UUID,
     ):
@@ -766,16 +766,16 @@ class TestUnresolvableExpressionError:
         )
 
         workflow_id, _ = create_workflow(
-            api=nexus_api,
+            api=syntara_api,
             project_id=first_project_id,
             name=workflow_name,
             definition=workflow_def,
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow_id, trigger_node_id="trigger_manual")
         ).assert_and_get()
-        final = poll_execution_until_complete(nexus_api, execution.id)
+        final = poll_execution_until_complete(syntara_api, execution.id)
 
         assert final.status == ExecutionStatus.FAILED, (
             f"Expected FAILED when namespace is nonexistent, got {final.status}: {final.error_details}"

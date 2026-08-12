@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.lib.consumer_configuration import BaseConsumerConfiguration
+from syntara.core.lib.consumer_configuration import BaseConsumerConfiguration
 
 
 class _TestConfig(BaseConsumerConfiguration):

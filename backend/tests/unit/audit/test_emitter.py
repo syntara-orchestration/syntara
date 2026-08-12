@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.emitter import (
+from syntara.audit.emitter import (
     AuditActorContext,
     activity_id_context_var,
     actor_context_var,
@@ -15,11 +15,11 @@ from nexus.audit.emitter import (
     request_id_context_var,
     workflow_id_context_var,
 )
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.sanitization import REDACTED, EventSanitizer, sanitizer
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.sanitization import REDACTED, EventSanitizer, sanitizer
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestEventCaptureSanitizerConfiguration:
@@ -35,7 +35,7 @@ class TestEventCaptureSanitizerConfiguration:
 class TestEventCaptureEmitAuditEvent:
     """Test EventCapture.emit_audit_event method."""
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_basic(self, mock_do_emit: Mock) -> None:
         """Test basic audit event emission."""
         # Create test event
@@ -67,7 +67,7 @@ class TestEventCaptureEmitAuditEvent:
         assert call_args.event_message == "Test message"
         assert call_args.structured_data is not None
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_with_context_injection(self, mock_do_emit: Mock, test_user: User) -> None:
         """Test audit event emission with context injection."""
         test_workflow_id = uuid4()
@@ -115,7 +115,7 @@ class TestEventCaptureEmitAuditEvent:
 
         ctx.run(test_in_context)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_no_context_override(self, mock_do_emit: Mock, test_user: User) -> None:
         """Test that existing event values are not overridden by context."""
         event_workflow_id = uuid4()
@@ -157,7 +157,7 @@ class TestEventCaptureEmitAuditEvent:
 
         ctx.run(test_in_context)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_data_sanitization(self, mock_do_emit: Mock) -> None:
         """Test that structured_data is sanitized before emission."""
         # Create event with sensitive data
@@ -191,7 +191,7 @@ class TestEventCaptureEmitAuditEvent:
         assert context_data.email == "[EMAIL_REDACTED]"  # type: ignore[attr-defined]  # Should be sanitized
         assert context_data.normal_data == "safe_value"  # type: ignore[attr-defined]
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_comprehensive_sensitive_data_sanitization(self, mock_do_emit: Mock) -> None:
         """Test that all sensitive data patterns are properly sanitized."""
         # Create event with various types of sensitive data
@@ -336,7 +336,7 @@ class TestEventCaptureEmitAuditEvent:
             ("ssl_pem", "ssl_certificate_pem", REDACTED, "pem with prefix"),
         ],
     )
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_field_redaction(
         self,
         mock_do_emit: Mock,
@@ -377,7 +377,7 @@ class TestEventCaptureEmitAuditEvent:
             f"for {test_description}, but got '{getattr(base_data, field_name)}'"
         )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_complex_structured_data(self, mock_do_emit: Mock) -> None:
         """Test audit event emission with complex nested structured data."""
         # Create event with complex structured data
@@ -424,7 +424,7 @@ class TestEventCaptureEmitAuditEvent:
         response_data = context_data.response_data  # type: ignore[attr-defined]
         assert response_data["status_code"] == 201
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_with_request_id_injection(self, mock_do_emit: Mock) -> None:
         """Test that request_id from context is injected into structured_data."""
         test_request_id = uuid4()
@@ -460,7 +460,7 @@ class TestEventCaptureEmitAuditEvent:
 
         ctx.run(test_in_context)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_no_request_id_override(self, mock_do_emit: Mock) -> None:
         """Test that existing request_id in structured_data is not overridden."""
         existing_request_id = uuid4()
@@ -501,7 +501,7 @@ class TestEventCaptureEmitAuditEvent:
 
         ctx.run(test_in_context)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_emit_audit_event_without_request_id_context(self, mock_do_emit: Mock) -> None:
         """Test that no request_id is added when context variable is not set."""
         # Create event without setting request_id context variable
@@ -528,7 +528,7 @@ class TestEventCaptureEmitAuditEvent:
 class TestEventCaptureIntegration:
     """Integration tests for EventCapture functionality."""
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_full_emission_flow(self, mock_do_emit: Mock, test_user: User) -> None:
         """Test the complete flow from event creation to emission."""
         test_workflow_id = uuid4()
@@ -594,7 +594,7 @@ class TestEventCaptureIntegration:
 
         ctx.run(test_in_context)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     def test_multiple_events_emission(self, mock_do_emit: Mock) -> None:
         """Test emitting multiple events in sequence."""
         # Create and emit multiple events

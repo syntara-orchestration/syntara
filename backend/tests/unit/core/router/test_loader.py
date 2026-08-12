@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nexus.core.router.loader import (
+from syntara.core.router.loader import (
     EndpointDefinition,
     OpenAPISchema,
     load_openapi_schema,
@@ -328,7 +328,7 @@ class TestOpenAPISchema:
             },
         }
 
-        with patch("nexus.core.router.loader.logger") as mock_logger:
+        with patch("syntara.core.router.loader.logger") as mock_logger:
             schema = OpenAPISchema("test.json", schema_data)
 
         assert len(schema.endpoints) == 1
@@ -392,7 +392,7 @@ class TestLoadOpenAPISchema:
 
     def test_error_handling(self) -> None:
         """Test various error conditions return None with appropriate logging."""
-        with patch("nexus.core.router.loader.logger") as mock_logger:
+        with patch("syntara.core.router.loader.logger") as mock_logger:
             # File not found
             schema = load_openapi_schema("nonexistent_test_file_12345.json")
             assert schema is None
@@ -435,7 +435,7 @@ class TestLoadSchemas:
         assert schemas[0].domain == "projects"
 
         # Partial failures (1 valid, 1 invalid)
-        with patch("nexus.core.router.loader.logger") as mock_logger:
+        with patch("syntara.core.router.loader.logger") as mock_logger:
             schemas = load_schemas(["projects/openapi.yaml", "nonexistent_test_12345.json"])
             assert len(schemas) == 1
 
@@ -447,7 +447,7 @@ class TestLoadSchemas:
             assert call_args[1]["total_count"] == 2  # total
 
         # All failures
-        with patch("nexus.core.router.loader.logger") as mock_logger:
+        with patch("syntara.core.router.loader.logger") as mock_logger:
             schemas = load_schemas(["nonexistent1_test.json", "nonexistent2_test.json"])
             assert schemas == []
 

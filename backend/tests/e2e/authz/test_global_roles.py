@@ -41,7 +41,7 @@ def global_roles_env(
     create_user: UserFactory,
     create_role: RoleFactory,
     assign_system_role: UserRoleAssignmentFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ):
     """Create two projects, a global role, and a user with that role."""
     # Create two projects
@@ -63,7 +63,7 @@ def global_roles_env(
     user_id, name, password = create_user(admin_api, "tc12-global")
     assign_system_role(admin_api, user_id, role_name)
 
-    user_api = api_for(nexus_base_url, name, password)
+    user_api = api_for(syntara_base_url, name, password)
     return {
         "proj_a_id": proj_a_id,
         "proj_b_id": proj_b_id,

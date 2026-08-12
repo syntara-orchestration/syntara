@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory
-from nexus.audit.models.structured_data import AuditContextData
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory
+from syntara.audit.models.structured_data import AuditContextData
 
 
 @dataclass

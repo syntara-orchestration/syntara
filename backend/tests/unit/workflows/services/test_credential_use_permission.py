@@ -14,10 +14,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.evaluator import AuthzEvaluator
-from nexus.authz.exceptions import AuthorizationDeniedError
-from nexus.core.exceptions import SafeValueError
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.authz.evaluator import AuthzEvaluator
+from syntara.authz.exceptions import AuthorizationDeniedError
+from syntara.core.exceptions import SafeValueError
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 def _make_service(
@@ -63,7 +63,7 @@ class TestCheckCredentialUsePermission:  # noqa: D101
         project_id = uuid4()
         svc, _ = _make_service()
 
-        with patch("nexus.workflows.services.workflow_service.authorize") as mock_authorize:
+        with patch("syntara.workflows.services.workflow_service.authorize") as mock_authorize:
             await svc._check_credential_use_permission(
                 {cred_id}, previous_credential_ids={cred_id}, project_id=project_id
             )
@@ -77,7 +77,7 @@ class TestCheckCredentialUsePermission:  # noqa: D101
         cred_ids = {str(uuid4())}
         project_id = uuid4()
 
-        with patch("nexus.workflows.services.workflow_service.authorize", return_value=allowed):
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=allowed):
             await svc._check_credential_use_permission(cred_ids, previous_credential_ids=None, project_id=project_id)
 
     @pytest.mark.asyncio
@@ -88,7 +88,7 @@ class TestCheckCredentialUsePermission:  # noqa: D101
         cred_ids = {str(uuid4())}
         project_id = uuid4()
 
-        with patch("nexus.workflows.services.workflow_service.authorize", return_value=denied):
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=denied):
             with pytest.raises(AuthorizationDeniedError):
                 await svc._check_credential_use_permission(
                     cred_ids, previous_credential_ids=None, project_id=project_id
@@ -103,7 +103,7 @@ class TestCheckCredentialUsePermission:  # noqa: D101
         cred_ids = {str(uuid4()), str(uuid4())}
         project_id = uuid4()
 
-        with patch("nexus.workflows.services.workflow_service.authorize", return_value=denied):
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=denied):
             with pytest.raises(AuthorizationDeniedError):
                 await svc._check_credential_use_permission(
                     cred_ids, previous_credential_ids=None, project_id=project_id
@@ -168,7 +168,7 @@ class TestValidateCredentialProjectScope:  # noqa: D101
 
         allowed = MagicMock()
         allowed.allowed = True
-        with patch("nexus.workflows.services.workflow_service.authorize", return_value=allowed):
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=allowed):
             await svc._validate_credential_project_scope(self._def_with_cred(str(cred_id)), project_id=project_id)
 
 
@@ -218,7 +218,7 @@ class TestPublishWorkflowVersionCredentialCheck:  # noqa: D101
             patch.object(svc, "_get_workflow_for_update", return_value=mock_workflow),
             patch.object(svc, "_check_expected_version"),
             patch.object(svc, "_get_version_or_none", return_value=mock_version),
-            patch("nexus.workflows.services.workflow_service.workflow_validator", mock_validator),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", mock_validator),
             patch.object(svc, "_validate_credential_project_scope", side_effect=sentinel),
             pytest.raises(RuntimeError, match="credential scope check invoked"),
         ):

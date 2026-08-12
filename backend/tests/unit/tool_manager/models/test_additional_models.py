@@ -10,8 +10,8 @@ Tests cover:
 from datetime import UTC, datetime
 from typing import Any
 
-from nexus.tool_manager.models.tool_provider_refresh_result import ToolProviderRefreshResult
-from nexus.tool_manager.models.tool_schema import ToolSchema
+from syntara.tool_manager.models.tool_provider_refresh_result import ToolProviderRefreshResult
+from syntara.tool_manager.models.tool_schema import ToolSchema
 
 
 def test_tool_provider_refresh_result_creation() -> None:

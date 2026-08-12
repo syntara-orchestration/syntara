@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.telemetry.api_usage_accumulator import AccumulatorSnapshot
-from nexus.telemetry.events.integration_health import (
+from syntara.telemetry.api_usage_accumulator import AccumulatorSnapshot
+from syntara.telemetry.events.integration_health import (
     CredentialHealth,
     CredentialInfo,
     IdentityProviderHealth,
@@ -22,7 +22,7 @@ from nexus.telemetry.events.integration_health import (
     IntegrationHealth,
     IntegrationInfo,
 )
-from nexus.telemetry.periodic_collector import PeriodicCollector, _collect_and_send
+from syntara.telemetry.periodic_collector import PeriodicCollector, _collect_and_send
 
 
 def _mock_session_factory() -> MagicMock:
@@ -124,42 +124,42 @@ class TestCollectAndSendFunction:
 
         with (
             patch(
-                "nexus.telemetry.periodic_collector.query_workflow_counts",
+                "syntara.telemetry.periodic_collector.query_workflow_counts",
                 new_callable=AsyncMock,
             ) as mock_wf,
             patch(
-                "nexus.telemetry.periodic_collector.query_execution_counts",
+                "syntara.telemetry.periodic_collector.query_execution_counts",
                 new_callable=AsyncMock,
             ) as mock_exec,
             patch(
-                "nexus.telemetry.periodic_collector.query_credential_counts",
+                "syntara.telemetry.periodic_collector.query_credential_counts",
                 new_callable=AsyncMock,
             ) as mock_creds,
             patch(
-                "nexus.telemetry.periodic_collector.get_enabled_feature_flags",
+                "syntara.telemetry.periodic_collector.get_enabled_feature_flags",
             ) as mock_flags,
             patch(
-                "nexus.telemetry.periodic_collector.query_model_usage",
+                "syntara.telemetry.periodic_collector.query_model_usage",
                 new_callable=AsyncMock,
             ) as mock_model_usage,
             patch(
-                "nexus.telemetry.periodic_collector.query_tool_counts",
+                "syntara.telemetry.periodic_collector.query_tool_counts",
                 new_callable=AsyncMock,
             ) as mock_tool_counts,
             patch(
-                "nexus.telemetry.periodic_collector.query_integration_health",
+                "syntara.telemetry.periodic_collector.query_integration_health",
                 new_callable=AsyncMock,
             ) as mock_tp_health,
             patch(
-                "nexus.telemetry.periodic_collector.query_identity_provider_health",
+                "syntara.telemetry.periodic_collector.query_identity_provider_health",
                 new_callable=AsyncMock,
             ) as mock_idp_health,
             patch(
-                "nexus.telemetry.periodic_collector.query_credential_health",
+                "syntara.telemetry.periodic_collector.query_credential_health",
                 new_callable=AsyncMock,
             ) as mock_cred_health,
             patch(
-                "nexus.telemetry.periodic_collector.get_accumulator",
+                "syntara.telemetry.periodic_collector.get_accumulator",
                 return_value=mock_accumulator,
             ),
         ):
@@ -227,7 +227,7 @@ class TestCollectAndSendFunction:
 
         with (
             patch(
-                "nexus.telemetry.periodic_collector.query_workflow_counts",
+                "syntara.telemetry.periodic_collector.query_workflow_counts",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("db error"),
             ),
@@ -249,7 +249,7 @@ class TestPeriodicCollectorIntegration:
 
         # Patch at module level to intercept the call
         with patch(
-            "nexus.telemetry.periodic_collector._collect_and_send",
+            "syntara.telemetry.periodic_collector._collect_and_send",
             new_callable=AsyncMock,
         ) as mock_collect:
             # Manually invoke the callback that was passed to the worker

@@ -11,19 +11,19 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.audit.approval import (
+from syntara.approvals.audit.approval import (
     ApprovalDecidedEvent,
     ApprovalDecidedHandler,
     ApprovalRequestedEvent,
     ApprovalRequestedHandler,
 )
-from nexus.approvals.exceptions import (
+from syntara.approvals.exceptions import (
     ApprovalAlreadyDecidedError,
     ApprovalAlreadyRequestedError,
     ApprovalNotAuthorizedError,
     ApprovalNotFoundError,
 )
-from nexus.approvals.models import (
+from syntara.approvals.models import (
     ActivitySummary,
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -35,9 +35,9 @@ from nexus.approvals.models import (
     BatchApprovalRequest,
     WorkflowContext,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.core.models import User
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.models import User
 from tests.integration.helpers.approval import ApprovalsFactory
 from tests.integration.helpers.workflow import ExecutionsFactory
 
@@ -392,7 +392,7 @@ class TestApprovalServiceCreate(TestApprovalServiceBase):
         test_user: User,
     ) -> None:
         """Test that creating an approval with a nonexistent execution_id raises ExecutionNotFoundError."""
-        from nexus.workflows.exceptions import ExecutionNotFoundError
+        from syntara.workflows.exceptions import ExecutionNotFoundError
 
         service = self._create_test_service(test_db_session, test_user)
 
@@ -631,7 +631,7 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
         approval = approvals[0]
 
         # Mock workflow client to avoid external dependencies
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -678,7 +678,7 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
         approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=execution_id)
         approval = approvals[0]
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -767,7 +767,7 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
         approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=execution_id)
         approval = approvals[0]
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             # Make workflow signal fail
@@ -819,7 +819,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
         )
 
         # Mock workflow client
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -902,7 +902,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
             count=1, execution_id=execution_id, statuses=[ApprovalRequestStatus.APPROVED], name_prefix="Already Decided"
         )
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -961,7 +961,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
         """Test batch decision with non-existent approval IDs."""
         service = self._create_test_service(test_db_session, test_user)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -1017,7 +1017,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
             count=1, execution_id=execution_id, statuses=[ApprovalRequestStatus.CANCELLED]
         )
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
 
@@ -1066,7 +1066,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
 
         approvals = await approvals_factory.create_pending_approvals(count=3, execution_id=execution_id)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -1111,7 +1111,7 @@ class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
 
         approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=execution_id)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             # Make workflow signal fail

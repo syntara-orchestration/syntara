@@ -1,7 +1,7 @@
 """Shared test helpers for workflow engine unit tests."""
 
-from nexus.settings.catalog import SETTINGS_CATALOG
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.settings.catalog import SETTINGS_CATALOG
+from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:

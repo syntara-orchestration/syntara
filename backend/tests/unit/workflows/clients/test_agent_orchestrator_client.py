@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from nexus.workflows.clients.agent_orchestrator_client import (
+from syntara.workflows.clients.agent_orchestrator_client import (
     AgentOrchestratorClient,
     AgentOrchestratorClientConnectionError,
     AgentOrchestratorClientError,
@@ -204,7 +204,7 @@ class TestAgentOrchestratorClientFileIds:
         # Mock the HTTP client POST method
         mock_post = create_simple_mock_post()
 
-        with patch("nexus.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
+        with patch("syntara.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
             async with AgentOrchestratorClient() as client:
                 # Replace the post method with our mock
                 client.http_client.post = AsyncMock(side_effect=mock_post)  # type: ignore[method-assign]
@@ -232,7 +232,7 @@ class TestAgentOrchestratorClientFileIds:
         # Mock the HTTP client POST method
         mock_post = create_simple_mock_post()
 
-        with patch("nexus.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
+        with patch("syntara.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
             async with AgentOrchestratorClient() as client:
                 # Replace the post method with our mock
                 client.http_client.post = AsyncMock(side_effect=mock_post)  # type: ignore[method-assign]
@@ -917,7 +917,7 @@ class TestAgentOrchestratorClientLogging:
         sensitive_prompt = "SECRET_API_KEY=12345 and PASSWORD=secret"
         mock_post = create_simple_mock_post()
 
-        with patch("nexus.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
+        with patch("syntara.workflows.clients.agent_orchestrator_client.logger") as mock_logger:
             async with AgentOrchestratorClient() as client:
                 client.http_client.post = AsyncMock(side_effect=mock_post)  # type: ignore[method-assign]
 

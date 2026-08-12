@@ -7,13 +7,13 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from nexus.aap.auth import (
+from syntara.aap.auth import (
     _get_auth_headers_from_settings,
     _get_basic_auth_from_settings,
     resolve_aap_connection,
 )
-from nexus.aap.exceptions import AAPNotConfiguredError
-from nexus.core.config.base import get_settings
+from syntara.aap.exceptions import AAPNotConfiguredError
+from syntara.core.config.base import get_settings
 
 
 @pytest.fixture(autouse=True)

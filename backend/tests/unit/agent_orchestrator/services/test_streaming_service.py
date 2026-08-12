@@ -9,15 +9,15 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.models.invocation import InvocationStatus
-from nexus.agent_orchestrator.services.streaming_service import (
+from syntara.agent_orchestrator.models.invocation import InvocationStatus
+from syntara.agent_orchestrator.services.streaming_service import (
     InvocationNotFoundError,
     StreamingService,
     WebSocketStreamingHandler,
     get_invocation_stream_id,
 )
-from nexus.core.websocket.close_codes import POLICY_VIOLATION
-from nexus.core.websocket.exceptions import EventsExpiredError, StreamingValidationError
+from syntara.core.websocket.close_codes import POLICY_VIOLATION
+from syntara.core.websocket.exceptions import EventsExpiredError, StreamingValidationError
 
 
 def mock_db_session_factory(handler: WebSocketStreamingHandler, scalar_result: Any) -> None:  # noqa: ANN401

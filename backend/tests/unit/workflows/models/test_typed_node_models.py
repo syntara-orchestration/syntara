@@ -9,10 +9,10 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.workflow_definition import (
+from syntara.workflows.models.workflow_definition import (
     WorkflowDefinition,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ApprovalNodeParameters,
     ConditionNodeParameters,
     ConvergeNodeParameters,

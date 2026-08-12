@@ -37,7 +37,7 @@ class Settings(
 Settings are accessed via a cached singleton:
 
 ```python
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 
 settings = get_settings()
 model = settings.openrouter_model
@@ -205,7 +205,7 @@ storage_dir: str = Field(
 
 ### Step 1: Create a Domain Settings Class
 
-Create a new `BaseSettings` subclass in `src/nexus/core/config/base.py`:
+Create a new `BaseSettings` subclass in `src/syntara/core/config/base.py`:
 
 ```python
 class MustGatherSettings(BaseSettings):
@@ -296,7 +296,7 @@ def test_timeout_must_be_positive(monkeypatch):
 
 ## Constants Module
 
-All magic numbers and validation limits are centralized in `src/nexus/core/constants.py`. No hardcoded numeric literals in application code.
+All magic numbers and validation limits are centralized in `src/syntara/core/constants.py`. No hardcoded numeric literals in application code.
 
 **Classes:**
 
@@ -310,7 +310,7 @@ All magic numbers and validation limits are centralized in `src/nexus/core/const
 **Usage:**
 
 ```python
-from nexus.core.constants import FieldLimits, ValidationMessages
+from syntara.core.constants import FieldLimits, ValidationMessages
 
 name: str = Field(max_length=FieldLimits.NAME_MAX_LENGTH)
 ```
@@ -350,9 +350,9 @@ The Global Settings Framework (GSF) provides **database-backed runtime settings*
 
 **Key components:**
 
-- `RuntimeSetting` model in `src/nexus/settings/models/` — DB-backed with JSONB value storage
-- Settings catalog in `src/nexus/settings/catalog.py` — declarative registry of settings with defaults and validators
-- Settings store in `src/nexus/settings/store.py` — data access layer
+- `RuntimeSetting` model in `src/syntara/settings/models/` — DB-backed with JSONB value storage
+- Settings catalog in `src/syntara/settings/catalog.py` — declarative registry of settings with defaults and validators
+- Settings store in `src/syntara/settings/store.py` — data access layer
 - REST API at `/api/v1/settings` — list, get, update, bulk update (in progress)
 
 **Access pattern:** Runtime settings are read from the database via the settings store, not through `get_settings()`. The two systems are independent — `get_settings()` remains the correct access path for all environment-based configuration documented in this file.
@@ -363,10 +363,10 @@ See `docs/runtime-settings.md` for the full GSF guide.
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/config/base.py` | Main Settings class and all domain settings |
-| `src/nexus/core/config/__init__.py` | Package exports |
-| `src/nexus/settings/catalog.py` | Runtime settings catalog (GSF) |
-| `src/nexus/settings/store.py` | Runtime settings data access (GSF) |
+| `src/syntara/core/config/base.py` | Main Settings class and all domain settings |
+| `src/syntara/core/config/__init__.py` | Package exports |
+| `src/syntara/settings/catalog.py` | Runtime settings catalog (GSF) |
+| `src/syntara/settings/store.py` | Runtime settings data access (GSF) |
 | `.env.example` | Template for all configuration variables |
 | `tests/unit/core/config/test_config.py` | Configuration test suite |
 

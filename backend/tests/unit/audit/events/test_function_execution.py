@@ -1,15 +1,15 @@
 """Unit tests for FunctionExecutionEvent and FunctionExecutionHandler."""
 
-from nexus.audit.emitter import AuditActorContext
+from syntara.audit.emitter import AuditActorContext
 
 # mypy: disable-error-code="attr-defined"
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.sanitization import REDACTED
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.sanitization import REDACTED
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestFunctionExecutionHandler:

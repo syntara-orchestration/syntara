@@ -5,7 +5,7 @@ from __future__ import annotations
 import ssl
 from unittest.mock import MagicMock
 
-from nexus.api.main import _ssl_context_factory
+from syntara.api.main import _ssl_context_factory
 
 
 class TestSslContextFactory:

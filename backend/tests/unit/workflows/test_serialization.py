@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-from nexus.workflows.utils.serialization import VersionPublishTimestamps, deserialize_workflow_version
+from syntara.workflows.utils.serialization import VersionPublishTimestamps, deserialize_workflow_version
 
 
 class TestDeserializeWorkflowVersion:

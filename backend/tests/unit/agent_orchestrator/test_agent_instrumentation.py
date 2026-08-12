@@ -13,14 +13,14 @@ from uuid import uuid4
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.agent_orchestrator.agents.base_agent import BaseAgent
-from nexus.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
-from nexus.agent_orchestrator.constants import AgentRoutes
-from nexus.agent_orchestrator.exceptions import AgentOrchestratorError
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.audit.emitter import AuditActorContext
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.agent_orchestrator.agents.base_agent import BaseAgent
+from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
+from syntara.agent_orchestrator.constants import AgentRoutes
+from syntara.agent_orchestrator.exceptions import AgentOrchestratorError
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.audit.emitter import AuditActorContext
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 from tests.fixtures.settings import FakeSettingsCache
 
 INVOCATION_ID = uuid4()
@@ -79,7 +79,7 @@ class TestAgentRoutingMetrics:
         state = _make_agent_state()
 
         with patch(
-            "nexus.agent_orchestrator.agents.orchestrator_agent.get_metrics_recorder",
+            "syntara.agent_orchestrator.agents.orchestrator_agent.get_metrics_recorder",
             return_value=recorder,
         ):
             result = agent._route_request(state)
@@ -122,7 +122,7 @@ class TestAgentNodeExecutionMetrics:
         state = _make_agent_state()
 
         with patch(
-            "nexus.agent_orchestrator.agents.base_agent.get_metrics_recorder",
+            "syntara.agent_orchestrator.agents.base_agent.get_metrics_recorder",
             return_value=recorder,
         ):
             await agent.execute_as_node(state)
@@ -141,7 +141,7 @@ class TestAgentNodeExecutionMetrics:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.base_agent.get_metrics_recorder",
+                "syntara.agent_orchestrator.agents.base_agent.get_metrics_recorder",
                 return_value=recorder,
             ),
             pytest.raises(AgentOrchestratorError),

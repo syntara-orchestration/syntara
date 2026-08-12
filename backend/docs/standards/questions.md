@@ -18,7 +18,7 @@ Constitution mandates: pull requests required for all changes, minimum two appro
 
 ### Structured logging output format
 
-No standard for expected JSON field names, required fields per event type, or correlation ID propagation. Should be based on observed patterns in `src/nexus/core/logging/logging.py`.
+No standard for expected JSON field names, required fields per event type, or correlation ID propagation. Should be based on observed patterns in `src/syntara/core/logging/logging.py`.
 
 ### Architecture principles (dependency injection, composition, SOLID)
 

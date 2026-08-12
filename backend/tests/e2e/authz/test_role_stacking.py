@@ -40,7 +40,7 @@ class TestRoleStacking:
 
     def test_group_plus_direct_role_union(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -80,7 +80,7 @@ class TestRoleStacking:
         create_workflow(admin_api, proj_id, "stack-seed")
         create_credential(admin_api, proj_id, "stack-seed")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # -- workflow:read (from group role) --
         user_api.projects.list_workflows(project_id=proj_id).assert_and_get()
@@ -99,7 +99,7 @@ class TestRoleStacking:
 
     def test_group_role_alone_insufficient(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -122,7 +122,7 @@ class TestRoleStacking:
         )
         assign_project_role_to_group(admin_api, proj_id, group_id, group_role)
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # Can read workflows
         user_api.projects.list_workflows(project_id=proj_id).assert_and_get()
@@ -145,7 +145,7 @@ class TestRoleStacking:
 
     def test_direct_role_alone_insufficient(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_project_role: ProjectRoleFactory,
@@ -164,7 +164,7 @@ class TestRoleStacking:
         )
         assign_project_role_to_user(admin_api, proj_id, user_id, direct_role)
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         # Cannot read workflows (no workflow:read:project)
         resp = user_api.projects.list_workflows(project_id=proj_id)

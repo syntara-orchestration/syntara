@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.admin.services import (
+from syntara.admin.services import (
     find_idp_by_name,
     find_user_by_username,
     get_revocation_timestamp,
@@ -17,12 +17,12 @@ from nexus.admin.services import (
     revoke_user_sessions,
     set_global_revocation_timestamp,
 )
-from nexus.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
+from syntara.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 pytestmark = pytest.mark.asyncio
@@ -39,7 +39,7 @@ class TestSetGlobalRevocationTimestamp:
         test_db_session.add(GlobalRevocationTimestamp(id=1, revoked_before=old_time, updated_at=old_time))
         await test_db_session.commit()
 
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             result = await set_global_revocation_timestamp(test_db_session, actor_username="admin", actor_source="api")
             await test_db_session.commit()
 
@@ -53,7 +53,7 @@ class TestSetGlobalRevocationTimestamp:
         self,
         test_db_session: AsyncSession,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             result = await set_global_revocation_timestamp(test_db_session, actor_username="admin", actor_source="cli")
             await test_db_session.commit()
 
@@ -66,7 +66,7 @@ class TestSetGlobalRevocationTimestamp:
         self,
         test_db_session: AsyncSession,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             await set_global_revocation_timestamp(test_db_session, actor_username="testadmin", actor_source="api")
 
         mock_dispatcher.dispatch.assert_called_once()
@@ -79,7 +79,7 @@ class TestSetGlobalRevocationTimestamp:
         self,
         test_db_session: AsyncSession,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             mock_dispatcher.dispatch.side_effect = RuntimeError("audit down")
             result = await set_global_revocation_timestamp(test_db_session, actor_username="admin", actor_source="api")
 
@@ -89,7 +89,7 @@ class TestSetGlobalRevocationTimestamp:
         self,
         test_db_session: AsyncSession,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             result = await set_global_revocation_timestamp(test_db_session, actor_username="admin", actor_source="api")
 
         assert result.tzinfo is UTC
@@ -168,13 +168,13 @@ class TestRevokeUserSessions:
         test_db_session: AsyncSession,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_all_for_user.return_value = 3
             mock_store.increment_token_version.return_value = 2
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher"):
+            with patch("syntara.admin.services.AuditEventDispatcher"):
                 count = await revoke_user_sessions(
                     test_db_session,
                     test_user,
@@ -191,13 +191,13 @@ class TestRevokeUserSessions:
         test_db_session: AsyncSession,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_all_for_user.return_value = 2
             mock_store.increment_token_version.return_value = 1
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+            with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
                 await revoke_user_sessions(
                     test_db_session,
                     test_user,
@@ -218,13 +218,13 @@ class TestRevokeUserSessions:
         test_db_session: AsyncSession,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_all_for_user.return_value = 0
             mock_store.increment_token_version.return_value = 1
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher"):
+            with patch("syntara.admin.services.AuditEventDispatcher"):
                 count = await revoke_user_sessions(
                     test_db_session,
                     test_user,
@@ -239,13 +239,13 @@ class TestRevokeUserSessions:
         test_db_session: AsyncSession,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_all_for_user.return_value = 1
             mock_store.increment_token_version.return_value = 1
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+            with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
                 mock_dispatcher.dispatch.side_effect = RuntimeError("audit broken")
                 count = await revoke_user_sessions(
                     test_db_session,
@@ -265,7 +265,7 @@ class TestFindIdpByName:
         test_db_session: AsyncSession,
         test_user: User,
     ) -> None:
-        from nexus.identity_providers.models.identity_provider import IdentityProvider
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
 
         provider = IdentityProvider(
             id=uuid4(),
@@ -302,12 +302,12 @@ class TestRevokeIdpSessions:
         test_db_session: AsyncSession,
     ) -> None:
         idp_id = uuid4()
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_by_idp.return_value = 5
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher"):
+            with patch("syntara.admin.services.AuditEventDispatcher"):
                 count = await revoke_idp_sessions(
                     test_db_session,
                     idp_id,
@@ -324,12 +324,12 @@ class TestRevokeIdpSessions:
         test_db_session: AsyncSession,
     ) -> None:
         idp_id = uuid4()
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_by_idp.return_value = 4
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+            with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
                 await revoke_idp_sessions(
                     test_db_session,
                     idp_id,
@@ -351,12 +351,12 @@ class TestRevokeIdpSessions:
         test_db_session: AsyncSession,
     ) -> None:
         idp_id = uuid4()
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_by_idp.return_value = 0
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher"):
+            with patch("syntara.admin.services.AuditEventDispatcher"):
                 count = await revoke_idp_sessions(
                     test_db_session,
                     idp_id,
@@ -372,12 +372,12 @@ class TestRevokeIdpSessions:
         test_db_session: AsyncSession,
     ) -> None:
         idp_id = uuid4()
-        with patch("nexus.admin.services.create_session_store") as mock_create:
+        with patch("syntara.admin.services.create_session_store") as mock_create:
             mock_store = AsyncMock()
             mock_store.revoke_by_idp.return_value = 2
             mock_create.return_value = mock_store
 
-            with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+            with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
                 mock_dispatcher.dispatch.side_effect = RuntimeError("audit failed")
                 count = await revoke_idp_sessions(
                     test_db_session,

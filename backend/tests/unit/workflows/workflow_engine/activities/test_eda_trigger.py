@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.eda_trigger import eda_trigger
+from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
 
 
 @pytest.mark.asyncio

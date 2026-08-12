@@ -13,8 +13,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models.installation import Installation
-from nexus.telemetry.client import derive_anonymous_id, get_installation
+from syntara.core.models.installation import Installation
+from syntara.telemetry.client import derive_anonymous_id, get_installation
 
 
 class TestInstallationTableSingleton:

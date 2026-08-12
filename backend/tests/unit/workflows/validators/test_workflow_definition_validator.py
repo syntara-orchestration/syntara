@@ -4,12 +4,12 @@ from typing import Any
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.workflows.models.validation_finding import (
+from syntara.core.exceptions import SafeValueError
+from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationSeverity,
 )
-from nexus.workflows.validators.workflow_definition import WorkflowValidator, _best_branch_messages
+from syntara.workflows.validators.workflow_definition import WorkflowValidator, _best_branch_messages
 
 
 @pytest.fixture
@@ -911,7 +911,7 @@ class TestBestBranchMessages:
             "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "x"}}],
             "edges": [{"from": "t1", "to": "n1", "color": "red"}],
         }
-        from nexus.workflows.validators.workflow_definition import _get_validator
+        from syntara.workflows.validators.workflow_definition import _get_validator
 
         for error in _get_validator().iter_errors(definition):
             if not error.context:

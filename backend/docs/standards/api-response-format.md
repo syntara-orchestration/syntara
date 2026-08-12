@@ -22,7 +22,7 @@ All list/collection endpoints return a `ResourcesResponse[T]`:
 | `prev` | `str \| null` | Opaque cursor for the previous page |
 | `total` | `int \| null` | Total count (only present when `include_total=true`) |
 
-The response model is defined generically in `nexus.core.models.pagination`:
+The response model is defined generically in `syntara.core.models.pagination`:
 
 ```python
 class ResourcesResponse[T](ResourcesResponseBase):
@@ -96,7 +96,7 @@ The resource `id` is always appended as a tiebreaker to the sort order. This pre
 
 ## Constants
 
-Defined in `nexus.core.constants`:
+Defined in `syntara.core.constants`:
 
 | Constant | Value | Description |
 |---|---|---|
@@ -325,7 +325,7 @@ All list/collection endpoints return a `ResourcesResponse[T]`:
 | `prev` | `str \| null` | Opaque cursor for the previous page |
 | `total` | `int \| null` | Total count (only present when `include_total=true`) |
 
-The response model is defined generically in `nexus.core.models.pagination`:
+The response model is defined generically in `syntara.core.models.pagination`:
 
 ```python
 class ResourcesResponse[T](ResourcesResponseBase):
@@ -399,7 +399,7 @@ The resource `id` is always appended as a tiebreaker to the sort order. This pre
 
 ### Constants
 
-Defined in `nexus.core.constants`:
+Defined in `syntara.core.constants`:
 
 | Constant | Value | Description |
 |---|---|---|
@@ -1041,24 +1041,24 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/models/pagination.py` | `ResourcesResponse` and pagination models |
-| `src/nexus/core/models/base/query_params.py` | `BaseListParams` |
-| `src/nexus/core/models/base/` | Base resource model hierarchy |
-| `src/nexus/core/utils/pagination.py` | Cursor pagination implementation |
-| `src/nexus/core/utils/filters.py` | Filter parsing and application |
-| `src/nexus/core/utils/sorting.py` | Sort parsing and application |
-| `src/nexus/core/utils/cursor.py` | Cursor encoding/decoding |
-| `src/nexus/core/constants.py` | Pagination constants |
-| `src/nexus/core/services/base.py` | `BaseService.list_resources()` |
-| `src/nexus/core/models/error.py` | `ErrorData` model (RFC 9457 Problem Details) |
-| `src/nexus/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
-| `src/nexus/core/exceptions.py` | `SafeValueError` definition |
-| `src/nexus/core/exception_registry.py` | `@fastapi_exception` decorator |
-| `src/nexus/aap/router.py` | AAP proxy endpoints (known exception) |
-| `src/nexus/aap/models/responses.py` | `AAPListResponse` model (known exception) |
-| `src/nexus/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
-| `src/nexus/credentials/router.py` | Reference CRUD router implementation |
-| `src/nexus/credentials/services/credential_service.py` | Reference service with `_get_or_raise`, `_find_by_name` |
+| `src/syntara/core/models/pagination.py` | `ResourcesResponse` and pagination models |
+| `src/syntara/core/models/base/query_params.py` | `BaseListParams` |
+| `src/syntara/core/models/base/` | Base resource model hierarchy |
+| `src/syntara/core/utils/pagination.py` | Cursor pagination implementation |
+| `src/syntara/core/utils/filters.py` | Filter parsing and application |
+| `src/syntara/core/utils/sorting.py` | Sort parsing and application |
+| `src/syntara/core/utils/cursor.py` | Cursor encoding/decoding |
+| `src/syntara/core/constants.py` | Pagination constants |
+| `src/syntara/core/services/base.py` | `BaseService.list_resources()` |
+| `src/syntara/core/models/error.py` | `ErrorData` model (RFC 9457 Problem Details) |
+| `src/syntara/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
+| `src/syntara/core/exceptions.py` | `SafeValueError` definition |
+| `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator |
+| `src/syntara/aap/router.py` | AAP proxy endpoints (known exception) |
+| `src/syntara/aap/models/responses.py` | `AAPListResponse` model (known exception) |
+| `src/syntara/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
+| `src/syntara/credentials/router.py` | Reference CRUD router implementation |
+| `src/syntara/credentials/services/credential_service.py` | Reference service with `_get_or_raise`, `_find_by_name` |
 | `tests/unit/api/compliance/test_list_endpoint_compliance.py` | List endpoint compliance validation tests |
 | `tests/unit/api/compliance/test_list_endpoint_discovery.py` | List endpoint discovery mechanism tests |
 | `tests/unit/api/compliance/test_crud_endpoint_compliance.py` | CRUD endpoint compliance validation tests |

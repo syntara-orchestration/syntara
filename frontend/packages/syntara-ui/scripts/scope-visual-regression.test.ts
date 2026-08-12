@@ -4,11 +4,11 @@ import { formatScopeLine, resolveScope } from './scope-visual-regression'
 
 describe('resolveScope', () => {
   it('returns NONE when no VR-relevant files changed', () => {
-    expect(resolveScope(['backend/src/nexus/main.py', 'README.md'])).toEqual({
+    expect(resolveScope(['backend/src/syntara/main.py', 'README.md'])).toEqual({
       full: false,
       sections: [],
     })
-    expect(formatScopeLine(resolveScope(['backend/src/nexus/main.py']))).toBe('SCOPE=NONE')
+    expect(formatScopeLine(resolveScope(['backend/src/syntara/main.py']))).toBe('SCOPE=NONE')
   })
 
   it('scopes an isolated route folder to that section', () => {

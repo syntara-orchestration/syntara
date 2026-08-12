@@ -8,10 +8,10 @@ database resources into a single paginated response.
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.role_conventions import BUILTIN_POLICIES, BUILTIN_ROLES
-from nexus.authz.services.policy_service import PolicyService
-from nexus.authz.services.role_service import RoleService
-from nexus.core.models import User
+from syntara.authz.role_conventions import BUILTIN_POLICIES, BUILTIN_ROLES
+from syntara.authz.services.policy_service import PolicyService
+from syntara.authz.services.role_service import RoleService
+from syntara.core.models import User
 
 _P_READ = "workflow:read:any"
 _P_WRITE = "workflow:create:any"

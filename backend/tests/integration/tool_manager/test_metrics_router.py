@@ -12,11 +12,11 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration
-from nexus.tool_manager.models.tool import Tool
-from nexus.tool_manager.models.tool_execution import ToolExecutionStatus
-from nexus.tool_manager.services.tool_metrics_service import ToolMetricsService
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration
+from syntara.tool_manager.models.tool import Tool
+from syntara.tool_manager.models.tool_execution import ToolExecutionStatus
+from syntara.tool_manager.services.tool_metrics_service import ToolMetricsService
 
 # ============================================================================
 # T013-T016: Summary endpoint tests

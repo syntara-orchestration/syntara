@@ -181,16 +181,18 @@ test.describe('Workflows - Create New Workflow', () => {
       // Verify both workflows exist in the table
       await app.goto(toAppUrl('/workflows'))
       const table = app.getByRole('grid', { name: 'Workflows table' })
+      await expect(table).toBeVisible()
 
       // Check first workflow
       await app.getByPlaceholder('Filter by name').fill(workflow1Name)
       await app.getByRole('button', { name: 'Apply filter' }).click()
       await expect(table.getByRole('row', { name: new RegExp(workflow1Name) })).toBeVisible()
 
-      // Check second workflow
+      // Check second workflow — replace the name filter and wait for table to update
       await app.getByPlaceholder('Filter by name').clear()
       await app.getByPlaceholder('Filter by name').fill(workflow2Name)
       await app.getByRole('button', { name: 'Apply filter' }).click()
+      await expect(table.getByRole('row', { name: new RegExp(workflow1Name) })).toBeHidden()
       await expect(table.getByRole('row', { name: new RegExp(workflow2Name) })).toBeVisible()
     } finally {
       await deleteWorkflow(app, workflow1Name)

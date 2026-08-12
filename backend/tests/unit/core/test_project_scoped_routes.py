@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from sqlmodel import SQLModel
 
-import nexus
+import syntara
 
 # ---------------------------------------------------------------------------
 # Route path segments that correspond to each project-scoped model.
@@ -55,8 +55,8 @@ _MODELS_WITHOUT_LIST_ROUTE: set[str] = {
 
 def _discover_project_models() -> list[tuple[str, type[SQLModel]]]:
     """Find all SQLModel table classes with a project_id FK to projects.id."""
-    base = Path(nexus.__file__).parent
-    for info in pkgutil.walk_packages([str(base)], prefix="nexus."):
+    base = Path(syntara.__file__).parent
+    for info in pkgutil.walk_packages([str(base)], prefix="syntara."):
         try:
             importlib.import_module(info.name)
         except Exception:  # noqa: S112
@@ -100,7 +100,7 @@ def _is_project_scoped_table(cls: type[Any]) -> bool:
 
 def _get_project_router_paths() -> set[str]:
     """Extract all route paths registered on the projects router."""
-    from nexus.projects.router import router
+    from syntara.projects.router import router
 
     paths: set[str] = set()
     for route in router.routes:
@@ -164,8 +164,8 @@ class TestProjectScopedRouteCoverage:
 
     def test_project_routes_have_permission_checker(self) -> None:
         """Every project-scoped route must have a permission dependency."""
-        from nexus.authz.dependencies import PermissionChecker
-        from nexus.projects.router import router
+        from syntara.authz.dependencies import PermissionChecker
+        from syntara.projects.router import router
 
         authz_dep_types = (PermissionChecker,)
         authz_dep_names = {"_NoPermissionSentinel", "VisibilityFilter"}

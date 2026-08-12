@@ -13,7 +13,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
 
 VALID_UUID = "550e8400-e29b-41d4-a716-446655440000"
 VALID_UUID_2 = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
@@ -347,7 +347,7 @@ class TestInvocationMetadataPersistence:
 
     def test_tool_selection_round_trip(self) -> None:
         """Tool selection fields persist through model_validate → model_dump."""
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         input_dict = {
             "tool_selection_strategy": "SELECTED",
@@ -361,7 +361,7 @@ class TestInvocationMetadataPersistence:
 
     def test_response_schema_round_trip(self) -> None:
         """Response schema persists through OpaqueResponseSchema wrapping."""
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         schema = {"type": "object", "properties": {"result": {"type": "string"}}}
         meta = InvocationMetadata.model_validate({"response_schema": schema})
@@ -370,7 +370,7 @@ class TestInvocationMetadataPersistence:
         assert output["response_schema"] == schema
 
     def test_integration_connections_round_trip(self) -> None:
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         connections = [{"integration_id": VALID_UUID, "credential_id": VALID_UUID_2}]
         meta = InvocationMetadata.model_validate({"integration_connections": connections})
@@ -380,7 +380,7 @@ class TestInvocationMetadataPersistence:
         assert output["integration_connections"][0]["integration_id"] == VALID_UUID
 
     def test_all_fields_combined_round_trip(self) -> None:
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         input_dict = {
             "tool_selection_strategy": "ALL",
@@ -400,7 +400,7 @@ class TestInvocationMetadataPersistence:
 
     def test_defaults_round_trip(self) -> None:
         """Omitted fields default correctly."""
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         meta = InvocationMetadata.model_validate({})
         output = meta.model_dump()
@@ -412,7 +412,7 @@ class TestInvocationMetadataPersistence:
 
     def test_jsonb_simulation_round_trip(self) -> None:
         """Simulate JSONB persistence for invocation context_data."""
-        from nexus.agent_orchestrator.models.context_data import InvocationMetadata
+        from syntara.agent_orchestrator.models.context_data import InvocationMetadata
 
         original = {
             "tool_selection_strategy": "SELECTED",

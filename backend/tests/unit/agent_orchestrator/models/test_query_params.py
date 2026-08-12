@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.agent_orchestrator.models.query_params import StreamingQueryParams
+from syntara.agent_orchestrator.models.query_params import StreamingQueryParams
 
 
 class TestStreamingQueryParams:

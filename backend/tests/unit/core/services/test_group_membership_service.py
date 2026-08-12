@@ -3,9 +3,9 @@
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import Group, User
-from nexus.core.models.group import user_groups
-from nexus.core.services import GroupMembershipService
+from syntara.core.models import Group, User
+from syntara.core.models.group import user_groups
+from syntara.core.services import GroupMembershipService
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ async def service(test_db_session: AsyncSession) -> GroupMembershipService:
 @pytest.fixture
 async def test_users(test_db_session: AsyncSession) -> dict[str, User]:
     """Create test users."""
-    from nexus.auth.passwords import hash_password
+    from syntara.auth.passwords import hash_password
 
     users = {
         "alice": User(

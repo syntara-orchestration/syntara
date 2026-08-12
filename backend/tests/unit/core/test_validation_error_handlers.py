@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError as PydanticValidationError
 
-from nexus.core.error_handlers import PROBLEM_TYPES, validation_error_handler
+from syntara.core.error_handlers import PROBLEM_TYPES, validation_error_handler
 
 
 class TestValidationErrorHandler:
@@ -27,7 +27,7 @@ class TestValidationErrorHandler:
             {"loc": (), "msg": "Root level error"},
         ]
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         assert response.status_code == 422
@@ -55,7 +55,7 @@ class TestValidationErrorHandler:
             {"loc": ("query", "page"), "msg": "Not a valid integer"},
         ]
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         assert response.status_code == 422
@@ -71,7 +71,7 @@ class TestValidationErrorHandler:
         exc = Mock(spec=PydanticValidationError)
         exc.errors.return_value = []
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         data = json.loads(bytes(response.body).decode())
@@ -85,7 +85,7 @@ class TestValidationErrorHandler:
         exc = Mock(spec=PydanticValidationError)
         exc.errors.return_value = [{"loc": (), "msg": "Root validation error"}]
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         data = json.loads(bytes(response.body).decode())
@@ -99,7 +99,7 @@ class TestValidationErrorHandler:
         exc = Mock(spec=PydanticValidationError)
         exc.errors.return_value = [{"loc": ("body", "user", "profile", "settings", "theme"), "msg": "Invalid theme"}]
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         data = json.loads(bytes(response.body).decode())
@@ -122,7 +122,7 @@ class TestValidationErrorHandler:
             for i in range(100)
         ]
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         assert response.status_code == 422
@@ -149,7 +149,7 @@ class TestValidationErrorHandler:
         exc = Mock(spec=PydanticValidationError)
         exc.errors.return_value = error_data
 
-        with patch("nexus.core.error_handlers.logger.error"):
+        with patch("syntara.core.error_handlers.logger.error"):
             response = validation_error_handler(request, exc)
 
         data = json.loads(bytes(response.body).decode())

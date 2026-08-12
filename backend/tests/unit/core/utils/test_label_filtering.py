@@ -4,7 +4,7 @@ These tests verify the label functions utility can match resources by label
 key-value pairs using AND logic. Tests will fail until label functions is implemented.
 """
 
-from nexus.core.utils.labels import matches, parse_label_filter
+from syntara.core.utils.labels import matches, parse_label_filter
 
 
 class TestLabelFiltering:

@@ -22,14 +22,14 @@ from uuid import UUID, uuid4
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.authz.models.project import Project
-from nexus.core.models import User
-from nexus.core.websocket.close_codes import POLICY_VIOLATION
-from nexus.core.websocket.connection import get_connection_manager
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.execution import Execution, ExecutionStatus
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.authz.models.project import Project
+from syntara.core.models import User
+from syntara.core.websocket.close_codes import POLICY_VIOLATION
+from syntara.core.websocket.connection import get_connection_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ pytestmark = pytest.mark.integration
 EXECUTION_WS_PATH = "/ws/workflows/v1/executions"
 INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
 
-_PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
+_PATCH_AUTHN = "syntara.core.websocket.endpoint_factory._authenticate_websocket"
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +60,7 @@ def _reset_connection_managers() -> Generator[None, None, None]:
     lifecycle.clear_all()
 
 
-_PATCH_FACTORY_DB = "nexus.core.websocket.endpoint_factory.AsyncSessionLocal"
+_PATCH_FACTORY_DB = "syntara.core.websocket.endpoint_factory.AsyncSessionLocal"
 
 
 async def _create_execution(
@@ -167,7 +167,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
 
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=fake_user)),
-            patch("nexus.core.websocket.endpoint_factory.authorize", mock_authorize),
+            patch("syntara.core.websocket.endpoint_factory.authorize", mock_authorize),
             patch(_PATCH_FACTORY_DB, test_db_session_factory),
             sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution.id}?ticket=valid") as ws,
         ):
@@ -292,7 +292,7 @@ class TestProjectScopedInvocationWebSocketAuthorization:
 
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=fake_user)),
-            patch("nexus.core.websocket.endpoint_factory.authorize", mock_authorize),
+            patch("syntara.core.websocket.endpoint_factory.authorize", mock_authorize),
             patch(_PATCH_FACTORY_DB, test_db_session_factory),
             sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{invocation.id}?ticket=valid") as ws,
         ):

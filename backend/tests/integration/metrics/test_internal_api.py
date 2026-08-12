@@ -15,8 +15,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.dependencies import get_metrics_recorder
-from nexus.metrics.internal_api import (
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.internal_api import (
     _SETTING_KEY,
     metrics_store_component_kpis,
     metrics_store_kpis,
@@ -24,9 +24,9 @@ from nexus.metrics.internal_api import (
     metrics_store_reset,
     metrics_store_summary,
 )
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
-from nexus.settings.cache.settings_cache import SettingsCache, set_runtime_settings
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
+from syntara.settings.cache.settings_cache import SettingsCache, set_runtime_settings
 
 _PREFIX = "/_internal/metrics"
 

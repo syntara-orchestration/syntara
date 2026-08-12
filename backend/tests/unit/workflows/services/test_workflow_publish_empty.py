@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.exceptions import ScheduledTriggerSyncError, WorkflowPublishValidationError
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.exceptions import ScheduledTriggerSyncError, WorkflowPublishValidationError
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 @pytest.fixture
@@ -81,8 +81,8 @@ class TestPublishEmptyWorkflow:
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             workflow, _version, _warning = await mock_service.publish_workflow_version(workflow_id, version=1)
 
@@ -119,8 +119,8 @@ class TestPublishEmptyWorkflow:
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             workflow, version, _warning = await mock_service.publish_workflow_version(
                 workflow_id, version=1, name="Release v1.0", change_description="First release"
@@ -133,7 +133,7 @@ class TestPublishEmptyWorkflow:
         mock_add = mock_service.session.add
         mock_add.assert_called()  # type: ignore[attr-defined]
         added_objects = [call.args[0] for call in mock_add.call_args_list]  # type: ignore[attr-defined]
-        from nexus.workflows.models.workflow_publish_event import WorkflowPublishEvent
+        from syntara.workflows.models.workflow_publish_event import WorkflowPublishEvent
 
         assert any(isinstance(obj, WorkflowPublishEvent) for obj in added_objects)
 
@@ -181,8 +181,8 @@ class TestPublishEmptyWorkflow:
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "flush", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             workflow, published, _warning = await mock_service.publish_workflow_version(
                 workflow_id, version=1, workflow_definition=new_definition
@@ -210,13 +210,13 @@ class TestUnpublishWorkflow:
             patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=None),
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
             patch(
-                "nexus.workflows.services.workflow_service.ScheduledTriggerService",
+                "syntara.workflows.services.workflow_service.ScheduledTriggerService",
                 return_value=MagicMock(delete_triggers_for_workflow=AsyncMock()),
             ),
-            patch("nexus.workflows.services.workflow_service.logger") as mock_logger,
+            patch("syntara.workflows.services.workflow_service.logger") as mock_logger,
         ):
             await mock_service.unpublish_workflow(workflow_id)
 
@@ -244,10 +244,10 @@ class TestUnpublishWorkflow:
             patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=mock_published),
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
             patch(
-                "nexus.workflows.services.workflow_service.ScheduledTriggerService",
+                "syntara.workflows.services.workflow_service.ScheduledTriggerService",
                 return_value=MagicMock(delete_triggers_for_workflow=AsyncMock()),
             ),
         ):
@@ -288,8 +288,8 @@ class TestUnpublishWorkflow:
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             _, version, _warning = await mock_service.publish_workflow_version(workflow_id, version=1)
 
@@ -303,7 +303,7 @@ class TestBuildWorkflowWithVersionResponse:
     @pytest.mark.asyncio
     async def test_builds_response_with_published_version_number(self) -> None:
         """published_version_number is set when current version is the published version."""
-        from nexus.workflows.router import _build_workflow_with_version_response
+        from syntara.workflows.router import _build_workflow_with_version_response
 
         version_id = uuid4()
         mock_service = AsyncMock()
@@ -348,7 +348,7 @@ class TestBuildWorkflowWithVersionResponse:
     @pytest.mark.asyncio
     async def test_builds_response_without_published_version_number(self) -> None:
         """published_version_number stays None when version is not the published one."""
-        from nexus.workflows.router import _build_workflow_with_version_response
+        from syntara.workflows.router import _build_workflow_with_version_response
 
         mock_service = AsyncMock()
         mock_result = MagicMock()
@@ -399,7 +399,7 @@ class TestPopulatePublishedVersionNumber:
     @pytest.mark.asyncio
     async def test_queries_db_when_current_version_differs(self) -> None:
         """When current version != published version, queries DB for published version number."""
-        from nexus.workflows.router import _populate_published_version_number
+        from syntara.workflows.router import _populate_published_version_number
 
         pub_version_id = uuid4()
         mock_session = AsyncMock()
@@ -423,7 +423,7 @@ class TestPopulatePublishedVersionNumber:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_published_version(self) -> None:
         """When workflow has no published version, returns without setting."""
-        from nexus.workflows.router import _populate_published_version_number
+        from syntara.workflows.router import _populate_published_version_number
 
         mock_session = AsyncMock()
         workflow = MagicMock()
@@ -441,7 +441,7 @@ class TestPopulatePublishedVersionNumber:
     @pytest.mark.asyncio
     async def test_sets_version_directly_when_ids_match(self) -> None:
         """When the version is the published version, sets number from version object."""
-        from nexus.workflows.router import _populate_published_version_number
+        from syntara.workflows.router import _populate_published_version_number
 
         version_id = uuid4()
         mock_session = AsyncMock()
@@ -497,12 +497,12 @@ class TestPublishImplicitUnpublishEvent:
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             await mock_service.publish_workflow_version(workflow_id, version=2)
 
-        from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+        from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 
         mock_add = mock_service.session.add
         added_objects = [call.args[0] for call in mock_add.call_args_list]  # type: ignore[attr-defined]
@@ -541,12 +541,12 @@ class TestPublishImplicitUnpublishEvent:
             patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
             patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             await mock_service.publish_workflow_version(workflow_id, version=1)
 
-        from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+        from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 
         mock_add = mock_service.session.add
         added_objects = [call.args[0] for call in mock_add.call_args_list]  # type: ignore[attr-defined]
@@ -597,8 +597,8 @@ class TestPublishImplicitUnpublishEvent:
                 side_effect=ScheduledTriggerSyncError(str(workflow_id), 1),
             ),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
         ):
             workflow, _version, warning = await mock_service.publish_workflow_version(workflow_id, version=1)
 
@@ -626,9 +626,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
             patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
-            patch("nexus.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
             mock_sched_cls.return_value.delete_triggers_for_workflow = AsyncMock(
@@ -650,9 +650,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
-            patch("nexus.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
-            patch("nexus.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.delete_triggers_for_workflow = AsyncMock()
             mock_sched_cls.return_value.delete_triggers_for_workflow = AsyncMock(

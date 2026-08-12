@@ -57,7 +57,7 @@ class TestWorkflowExecution:
 
     def test_execute_workflow_with_script_node(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -100,7 +100,7 @@ class TestWorkflowExecution:
         assert workflow.name == workflow_name
 
         # Step 2: Execute the workflow
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
         ).assert_and_get()
 
@@ -124,7 +124,7 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Query execution status
-            current_execution = nexus_api.executions.get(
+            current_execution = syntara_api.executions.get(
                 execution_id=UUID(str(execution_id)), include="activities"
             ).assert_and_get()
 
@@ -161,7 +161,7 @@ class TestWorkflowExecution:
 
     def test_get_execution_status_with_per_node_details(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -217,7 +217,7 @@ class TestWorkflowExecution:
         workflow = workflow_factory(workflow_data)
 
         # Execute the workflow
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
         ).assert_and_get()
 
@@ -230,7 +230,7 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Step 3: GET execution status with activities included
-            current_execution = nexus_api.executions.get(
+            current_execution = syntara_api.executions.get(
                 execution_id=UUID(str(execution_id)), include="activities"
             ).assert_and_get()
 
@@ -298,7 +298,7 @@ class TestWorkflowExecution:
 
     def test_list_executions_with_filtering(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -344,7 +344,7 @@ class TestWorkflowExecution:
 
         # Create 2 successful executions
         for _ in range(2):
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
             ).assert_and_get()
             execution_ids.append(execution.id)
@@ -362,13 +362,13 @@ class TestWorkflowExecution:
             edges=[{"from": "trigger_manual", "to": "script_node"}],
         )
 
-        nexus_api.workflows.update(
+        syntara_api.workflows.update(
             workflow_id=workflow.id, body=WorkflowUpdate(workflow_definition=failed_workflow_def.to_dict())
         ).assert_and_get()
 
         # Create 2 failed executions
         for _ in range(2):
-            execution = nexus_api.executions.create(
+            execution = syntara_api.executions.create(
                 body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
             ).assert_and_get()
             execution_ids.append(execution.id)
@@ -381,7 +381,7 @@ class TestWorkflowExecution:
 
         for exec_id in execution_ids:
             for _poll in range(max_polls):
-                execution = nexus_api.executions.get(execution_id=UUID(str(exec_id))).assert_and_get()
+                execution = syntara_api.executions.get(execution_id=UUID(str(exec_id))).assert_and_get()
                 if str(execution.status) in terminal_states:
                     break
                 time.sleep(poll_interval)
@@ -392,7 +392,7 @@ class TestWorkflowExecution:
                 )
 
         # Step 2: List all executions for the workflow (no status filter)
-        all_executions_list = nexus_api.executions.list(
+        all_executions_list = syntara_api.executions.list(
             additional_params={"workflow_id": str(workflow.id)}, limit=100
         ).assert_and_get()
 
@@ -415,7 +415,7 @@ class TestWorkflowExecution:
                 assert execution.completed_at is not None, "Terminal executions should have completed_at"
 
         # Step 3: Filter executions by status=failed
-        failed_executions_list = nexus_api.executions.list(
+        failed_executions_list = syntara_api.executions.list(
             additional_params={"workflow_id": str(workflow.id), "status": "failed"}, limit=100
         ).assert_and_get()
 
@@ -433,7 +433,7 @@ class TestWorkflowExecution:
             assert execution.workflow_id == workflow.id, "Should only include executions from this workflow"
 
         # Test filtering by status=completed
-        completed_executions_list = nexus_api.executions.list(
+        completed_executions_list = syntara_api.executions.list(
             additional_params={"workflow_id": str(workflow.id), "status": "completed"}, limit=100
         ).assert_and_get()
 
@@ -460,7 +460,7 @@ class TestWorkflowExecution:
 
     def test_cancel_execution_with_pending_approval(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -509,16 +509,16 @@ class TestWorkflowExecution:
         )
         workflow = workflow_factory(workflow_data)
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
         ).assert_and_get()
         execution_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, execution_id, timeout=30)
+        approval = poll_for_pending_approval(syntara_api, execution_id, timeout=30)
         assert approval.status == ApprovalRequestStatus.PENDING
         approval_id = UUID(str(approval.id))
 
-        cancel_response = nexus_api.executions.cancel(execution_id=execution_id)
+        cancel_response = syntara_api.executions.cancel(execution_id=execution_id)
         assert cancel_response.status_code == HTTPStatus.ACCEPTED, (
             f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
         )
@@ -528,7 +528,7 @@ class TestWorkflowExecution:
         cancelled_execution = None
 
         for _ in range(max_polls):
-            current_execution = nexus_api.executions.get(
+            current_execution = syntara_api.executions.get(
                 execution_id=execution_id, include="activities"
             ).assert_and_get()
 
@@ -544,7 +544,7 @@ class TestWorkflowExecution:
         )
 
         # Verify the approval request was also cancelled
-        approval_after = nexus_api.approvals.get(approval_id=approval_id).assert_and_get()
+        approval_after = syntara_api.approvals.get(approval_id=approval_id).assert_and_get()
         assert approval_after.status == ApprovalRequestStatus.CANCELLED, (
             f"Approval should be cancelled, got {approval_after.status}"
         )
@@ -592,7 +592,7 @@ class TestParallelBranches:
     """
 
     @pytest.mark.skip(reason="Timing-sensitive: CI runner load can push wall-clock past ceiling")
-    def test_two_parallel_wait_branches_run_concurrently(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_two_parallel_wait_branches_run_concurrently(self, syntara_api: SyntaraApiRegistry) -> None:
         """Two parallel wait nodes complete in ~branch_duration, not ~2x."""
         branch_duration = 4  # seconds per branch
         # Sequential worst-case would be 2 * branch_duration = 8s.
@@ -600,7 +600,7 @@ class TestParallelBranches:
         wall_clock_ceiling = branch_duration * 1.8  # 7.2s
 
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-parallel-wait-branches",
             {
                 "name": "parallel-wait",
@@ -676,10 +676,10 @@ class TestParallelBranches:
             f"Each branch waits {branch_duration}s; sequential total would be ~{2 * branch_duration}s."
         )
 
-    def test_three_parallel_branches_all_complete(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_three_parallel_branches_all_complete(self, syntara_api: SyntaraApiRegistry) -> None:
         """Three parallel script branches all complete before the converge node runs."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-three-parallel-branches",
             {
                 "name": "three-parallel",
@@ -764,10 +764,10 @@ class TestNodeFailurePropagation:
     - Overall execution status is "failed"
     """
 
-    def test_failed_node_stops_downstream_execution(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_failed_node_stops_downstream_execution(self, syntara_api: SyntaraApiRegistry) -> None:
         """A failing middle node prevents downstream nodes from executing."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-failure-propagation-linear",
             {
                 "name": "failure-propagation",
@@ -824,10 +824,10 @@ class TestNodeFailurePropagation:
                 f"node_c should NOT have completed after node_b failed, got {activities['node_c'].status}"
             )
 
-    def test_failure_at_first_node_skips_all_downstream(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_failure_at_first_node_skips_all_downstream(self, syntara_api: SyntaraApiRegistry) -> None:
         """A failure in the very first node prevents every downstream node from running."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-failure-propagation-first-node",
             {
                 "name": "failure-at-first",
@@ -875,7 +875,7 @@ class TestNodeFailurePropagation:
                     f"{downstream} should NOT be completed after upstream failure, got {activities[downstream].status}"
                 )
 
-    def test_failure_does_not_affect_independent_branch(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_failure_does_not_affect_independent_branch(self, syntara_api: SyntaraApiRegistry) -> None:
         """A failure in one fork branch does not prevent the sibling branch from executing.
 
         Topology: trigger → [branch_ok, branch_fail] → converge
@@ -883,7 +883,7 @@ class TestNodeFailurePropagation:
         The converge + downstream should reflect the partial failure.
         """
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-failure-propagation-fork",
             {
                 "name": "failure-in-fork",

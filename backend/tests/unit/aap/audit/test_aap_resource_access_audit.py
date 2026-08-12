@@ -4,16 +4,16 @@
 
 from uuid import uuid4
 
-from nexus.aap.audit.aap_resource_access import (
+from syntara.aap.audit.aap_resource_access import (
     AAPAccessAction,
     AAPResourceAccessEvent,
     AAPResourceAccessHandler,
     AAPResourceType,
 )
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
 
 
 class TestAAPResourceAccessEvent:
@@ -78,7 +78,7 @@ class TestAAPResourceAccessHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "aap_organizations_listed"
-        assert result.source_component == "nexus.aap"
+        assert result.source_component == "syntara.aap"
         assert result.resource_urn == "urn:syntara:aap:organizations"
         assert result.actor_id == user_id
         assert result.actor_type == PrincipalType.USER

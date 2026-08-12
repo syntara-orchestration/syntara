@@ -6,9 +6,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.exceptions import WorkflowNotFoundError, WorkflowVersionNotFoundError
-from nexus.workflows.models.workflow_version import WorkflowVersionUpdate
-from nexus.workflows.router import update_workflow_version_metadata
+from syntara.workflows.exceptions import WorkflowNotFoundError, WorkflowVersionNotFoundError
+from syntara.workflows.models.workflow_version import WorkflowVersionUpdate
+from syntara.workflows.router import update_workflow_version_metadata
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ class TestUpdateWorkflowVersionMetadata:
 
         with (
             patch(
-                "nexus.workflows.router.deserialize_workflow_version",
+                "syntara.workflows.router.deserialize_workflow_version",
                 return_value=_make_serialized_version(str(wf_id), name="New Name", change_description="New Desc"),
             ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),
@@ -72,7 +72,7 @@ class TestUpdateWorkflowVersionMetadata:
 
         with (
             patch(
-                "nexus.workflows.router.deserialize_workflow_version",
+                "syntara.workflows.router.deserialize_workflow_version",
                 return_value=_make_serialized_version(str(wf_id), name="Only Name"),
             ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),
@@ -90,7 +90,7 @@ class TestUpdateWorkflowVersionMetadata:
 
         with (
             patch(
-                "nexus.workflows.router.deserialize_workflow_version",
+                "syntara.workflows.router.deserialize_workflow_version",
                 return_value=_make_serialized_version(str(wf_id)),
             ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),

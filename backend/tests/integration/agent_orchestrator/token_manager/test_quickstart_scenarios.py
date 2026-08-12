@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
-from nexus.agent_orchestrator.token_manager.models import (
+from syntara.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
+from syntara.agent_orchestrator.token_manager.models import (
     TokenUsageRecord,
     UserTokenConfig,
 )
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
-from nexus.core.models import User
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.core.models import User
 
 # Configure logger to output to stdout
 logger = logging.getLogger(__name__)

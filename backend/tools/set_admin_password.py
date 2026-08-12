@@ -24,10 +24,10 @@ from sqlmodel import select
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from nexus.auth.passwords import hash_password
-from nexus.core.database.session import AsyncSessionLocal
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.auth.passwords import hash_password
+from syntara.core.database.session import AsyncSessionLocal
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -107,7 +107,7 @@ def main() -> int:
         print("Error: password cannot be empty", file=sys.stderr)
         return 1
 
-    from nexus.auth.passwords import validate_password_complexity
+    from syntara.auth.passwords import validate_password_complexity
 
     try:
         validate_password_complexity(password)
