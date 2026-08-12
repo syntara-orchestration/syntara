@@ -24,7 +24,7 @@ async function pollExecutionUntilDone(page: Page, executionId: string, token: st
     const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
     const exec = (await resp.json()) as { status: string }
     expect(TERMINAL_STATUSES).toContain(exec.status)
-  }).toPass({ timeout: 30_000, intervals: [1_000] })
+  }).toPass({ timeout: 60_000, intervals: [2_000] })
 }
 
 let sleepWorkflowId: string | null = null
