@@ -66,8 +66,12 @@ async def _inject_runtime_settings(input_config: dict[str, Any]) -> None:
     prompt = input_config.get("prompt", "")
     if isinstance(prompt, str):
         max_len = await cache.get_int("workflow_engine.max_prompt_length", default=100000)
-        if len(prompt) > max_len:
-            msg = f"Prompt exceeds maximum length ({len(prompt)} > {max_len} characters)"
+        prompt_len = len(prompt)
+        if prompt_len > max_len:
+            msg = (
+                f"The AI Agent prompt is {prompt_len} characters, which exceeds the limit of "
+                f"{max_len}. Shorten the prompt or pass less data through template expressions."
+            )
             raise ValueError(msg)
 
 
@@ -112,7 +116,7 @@ def _build_agent_metadata(
 
 
 @activity.defn(name=ActivityName.AGENTIC)
-async def execute_agentic_activity(  # noqa: PLR0915
+async def execute_agentic_activity(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,  # noqa: ARG001  # must match Temporal dispatch signature; agentic completes async via callback, not via return value
     execution_id: str = "",
@@ -142,9 +146,9 @@ async def execute_agentic_activity(  # noqa: PLR0915
         try:
             await _inject_runtime_settings(input_config)
         except ValueError as e:
+            # Surface the concrete validation cause (e.g. prompt length) to the user.
             logger.warning("Agentic activity runtime settings validation failed", error=str(e))
-            msg = "Runtime settings validation failed"
-            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
+            raise ApplicationError(str(e), type="ConfigError", non_retryable=True) from None
 
         config = AgenticExecutorParameters.model_validate(input_config)
 

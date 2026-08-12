@@ -38,9 +38,14 @@ class TestInjectRuntimeSettings:
 
     @pytest.mark.asyncio
     async def test_rejects_prompt_exceeding_max_length(self) -> None:
-        config: dict[str, object] = {"prompt": "x" * 200000}
-        with pytest.raises(ValueError, match="exceeds maximum length"):
+        prompt_len = 200000
+        config: dict[str, object] = {"prompt": "x" * prompt_len}
+        with pytest.raises(ValueError, match="exceeds the limit") as exc_info:
             await _inject_runtime_settings(config)
+        message = str(exc_info.value)
+        assert f"The AI Agent prompt is {prompt_len} characters" in message
+        assert "Shorten the prompt or pass less data through template expressions." in message
+        assert "Runtime settings validation failed" not in message
 
     @pytest.mark.asyncio
     async def test_accepts_prompt_within_max_length(self) -> None:
@@ -54,10 +59,17 @@ class TestExecuteAgenticActivitySettingsIntegration:
     @pytest.mark.asyncio
     async def test_prompt_too_long_raises(self) -> None:
         """Activity raises ApplicationError when prompt exceeds max length."""
-        config: dict[str, object] = {"prompt": "x" * 200000, "timeout": 300}
+        prompt_len = 200000
+        config: dict[str, object] = {"prompt": "x" * prompt_len, "timeout": 300}
         with pytest.raises(ApplicationError) as exc_info:
             await execute_agentic_activity(config, None, project_id=str(uuid4()))
         assert exc_info.value.type == "ConfigError"
+        message = exc_info.value.message
+        assert f"The AI Agent prompt is {prompt_len} characters" in message
+        assert "exceeds the limit of" in message
+        assert "Shorten the prompt or pass less data through template expressions." in message
+        assert message != "Runtime settings validation failed"
+        assert "Runtime settings validation failed" not in message
 
     @pytest.mark.asyncio
     async def test_missing_project_id_raises(self) -> None:
