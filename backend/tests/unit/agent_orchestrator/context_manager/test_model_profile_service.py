@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.model_profile_service import (
+from syntara.agent_orchestrator.context_manager.model_profile_service import (
     _MINIMUM_EFFECTIVE_BUDGET,
     ModelProfileService,
     ModelTokenBudget,
@@ -259,7 +259,7 @@ class TestFallbackBehavior:
         service = ModelProfileService()
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.model_profile_service._load_registry",
+            "syntara.agent_orchestrator.context_manager.model_profile_service._load_registry",
             return_value={},
         ):
             budget = await service.get_token_budget("gpt-4o", provider_hint="openai")
@@ -272,7 +272,7 @@ class TestFallbackBehavior:
         service = ModelProfileService()
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.model_profile_service.importlib.import_module",
+            "syntara.agent_orchestrator.context_manager.model_profile_service.importlib.import_module",
             side_effect=AttributeError("module has no attribute '_PROFILES'"),
         ):
             budget = await service.get_token_budget("gpt-4o", provider_hint="openai")

@@ -5,7 +5,11 @@ from typing import Any
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from nexus.agent_orchestrator.models.context_data import InvocationContextData, InvocationMetadata, OpaqueResponseSchema
+from syntara.agent_orchestrator.models.context_data import (
+    InvocationContextData,
+    InvocationMetadata,
+    OpaqueResponseSchema,
+)
 
 
 class TestInvocationMetadata:
@@ -386,7 +390,7 @@ class TestInvocationMetadataIntegrationConnections:
         assert meta.integration_connections is None
 
     def test_integration_connections_round_trip(self) -> None:
-        from nexus.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+        from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
 
         connections = [
             {
@@ -412,7 +416,7 @@ class TestInvocationMetadataIntegrationConnections:
 
     def test_integration_connections_surfaced_via_ctx_metadata(self) -> None:
         """integration_connections in contextData.metadata is accessible via ctx.metadata."""
-        from nexus.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+        from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
 
         connections = [
             {

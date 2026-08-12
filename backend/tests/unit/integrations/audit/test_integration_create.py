@@ -4,12 +4,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_create import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_create import (
     IntegrationCreateEvent,
     IntegrationCreateHandler,
 )
-from nexus.integrations.models.integration import IntegrationStatus
+from syntara.integrations.models.integration import IntegrationStatus
 
 
 class TestIntegrationCreateHandler:
@@ -37,7 +37,7 @@ class TestIntegrationCreateHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.integrations.integration"
+        assert audit_event.source_component == "syntara.integrations.integration"
         assert audit_event.event_message == "Integration created: GitHub MCP"
 
     def test_error_event(self) -> None:

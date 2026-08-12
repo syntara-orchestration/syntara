@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
+from syntara.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
     UploadedFileRetriever,
 )
 

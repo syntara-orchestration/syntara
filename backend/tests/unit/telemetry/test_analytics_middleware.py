@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.events.http_request import HTTPRequestEvent
-from nexus.telemetry.events.api_call import APICallEvent
-from nexus.telemetry.handlers.api_call import APICallTelemetryHandler
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.events.http_request import HTTPRequestEvent
+from syntara.telemetry.events.api_call import APICallEvent
+from syntara.telemetry.handlers.api_call import APICallTelemetryHandler
 
-_SETTINGS_PATH = "nexus.telemetry.handlers.api_call.get_settings"
-_REGISTRY_PATH = "nexus.telemetry.handlers.api_call.get_telemetry_registry"
+_SETTINGS_PATH = "syntara.telemetry.handlers.api_call.get_settings"
+_REGISTRY_PATH = "syntara.telemetry.handlers.api_call.get_telemetry_registry"
 
 
 def _make_http_event(
@@ -185,7 +185,7 @@ class TestAPICallTelemetryHandlerResilience:
         with (
             patch(_SETTINGS_PATH, return_value=_make_settings_mock(enabled=True)),
             patch(_REGISTRY_PATH, return_value=registry),
-            patch("nexus.telemetry.handlers.api_call.logger") as mock_logger,
+            patch("syntara.telemetry.handlers.api_call.logger") as mock_logger,
         ):
             handler.handle(_make_http_event())
             mock_logger.warning.assert_called_once()

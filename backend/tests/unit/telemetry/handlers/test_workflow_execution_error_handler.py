@@ -3,9 +3,9 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.events.workflow_error import TimedOutComponent, WorkflowErrorEvent
-from nexus.telemetry.handlers.workflow_execution_error import WorkflowExecutionErrorTelemetryHandler
-from nexus.workflows.audit.execution_error import WorkflowExecutionErrorEvent
+from syntara.telemetry.events.workflow_error import TimedOutComponent, WorkflowErrorEvent
+from syntara.telemetry.handlers.workflow_execution_error import WorkflowExecutionErrorTelemetryHandler
+from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 
 EXECUTION_ID = uuid4()
 WORKFLOW_ID = uuid4()
@@ -15,7 +15,7 @@ REQUEST_ID = uuid4()
 class TestWorkflowExecutionErrorTelemetryHandler:
     """Tests for the WorkflowExecutionErrorTelemetryHandler."""
 
-    @patch("nexus.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
     def test_emits_activity_timeout(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -46,7 +46,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         assert event.entitlement_id == "ent-123"
         assert event.retry_count == 0
 
-    @patch("nexus.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
     def test_emits_workflow_timeout(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -75,7 +75,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         assert event.request_id is None
         assert event.error_type == "WorkflowTimedOut"
 
-    @patch("nexus.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
     def test_emits_retry_with_reason(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -102,7 +102,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         assert event.error_type == "ConnectionError"
         assert event.retry_reason == "Connection refused"
 
-    @patch("nexus.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = False
@@ -120,7 +120,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         assert result is None
         registry.send_event.assert_not_called()
 
-    @patch("nexus.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_execution_error.get_telemetry_registry")
     def test_does_not_raise_on_exception(self, mock_get_registry: MagicMock) -> None:
         mock_get_registry.side_effect = RuntimeError("boom")
 

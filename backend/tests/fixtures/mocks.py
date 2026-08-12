@@ -27,7 +27,7 @@ def mock_session_factory() -> Callable[[], AsyncGenerator[Any, None]]:
 @pytest.fixture
 def mock_token_calculator() -> Mock:
     """Create a mock TokenCalculator for testing."""
-    from nexus.agent_orchestrator.token_manager.services import TokenCalculator
+    from syntara.agent_orchestrator.token_manager.services import TokenCalculator
 
     return Mock(spec=TokenCalculator)
 

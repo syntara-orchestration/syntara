@@ -51,7 +51,7 @@ class TestWorkflowAPI:
 
     def test_create_workflow_minimal(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -75,7 +75,7 @@ class TestWorkflowAPI:
         assert workflow.is_enabled is False  # Workflows default to disabled until published
         assert workflow.current_version == 1
 
-        workflow_with_version = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        workflow_with_version = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
         assert workflow_with_version.version is not None
         assert workflow_with_version.version.workflow_definition is not None
 
@@ -88,7 +88,7 @@ class TestWorkflowAPI:
 
     def test_get_workflow_with_nodes_and_edges(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -122,7 +122,7 @@ class TestWorkflowAPI:
 
         created_workflow = workflow_factory(workflow_data)
 
-        workflow = nexus_api.workflows.get(workflow_id=created_workflow.id).assert_and_get()
+        workflow = syntara_api.workflows.get(workflow_id=created_workflow.id).assert_and_get()
 
         assert workflow.id == created_workflow.id
         assert workflow.name == workflow_name
@@ -170,16 +170,16 @@ class TestWorkflowAPI:
         assert edge_2["from"] == "script_node_1"
         assert edge_2["to"] == "script_node_2"
 
-    def test_get_workflow_not_found(self, nexus_api: SyntaraApiRegistry):
+    def test_get_workflow_not_found(self, syntara_api: SyntaraApiRegistry):
         """API 2: Verify 404 is returned for non-existent workflow ID."""
         non_existent_id = uuid4()
 
         # Verify 404 Not Found is returned
-        nexus_api.workflows.get(workflow_id=non_existent_id).assert_error()
+        syntara_api.workflows.get(workflow_id=non_existent_id).assert_error()
 
     def test_update_workflow_metadata(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -200,9 +200,9 @@ class TestWorkflowAPI:
         updated_name = unique_name("e2e-updated-metadata")
         update_data = WorkflowUpdate(name=updated_name, description="Updated description")
 
-        nexus_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_successful()
+        syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_successful()
 
-        updated_workflow = nexus_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+        updated_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
 
         assert updated_workflow.name == updated_name
         assert updated_workflow.description == "Updated description"
@@ -214,7 +214,7 @@ class TestWorkflowAPI:
 
     def test_delete_workflow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -240,16 +240,16 @@ class TestWorkflowAPI:
         workflow = workflow_factory(workflow_data)
 
         # Verify workflow exists before deletion
-        nexus_api.workflows.get(workflow_id=workflow.id).assert_successful()
+        syntara_api.workflows.get(workflow_id=workflow.id).assert_successful()
 
-        nexus_api.workflows.delete(workflow_id=workflow.id).assert_successful()
+        syntara_api.workflows.delete(workflow_id=workflow.id).assert_successful()
 
         # Verify workflow no longer exists (404 Not Found)
-        nexus_api.workflows.get(workflow_id=workflow.id).assert_error()
+        syntara_api.workflows.get(workflow_id=workflow.id).assert_error()
 
     def test_list_workflows_with_pagination_filtering_sorting(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -275,12 +275,12 @@ class TestWorkflowAPI:
             workflow_factory(workflow_data)
 
         # Test 1: Pagination with limit
-        wf_list = nexus_api.workflows.list(limit=2).assert_and_get()
+        wf_list = syntara_api.workflows.list(limit=2).assert_and_get()
         assert len(wf_list.resources) <= 2, "Should respect limit parameter"
 
         # Test 2: Filtering by name substring using name[contains]
         # Filter for workflows containing "e2e-list" (should match alpha, beta, gamma but NOT delta)
-        contains_filter_result = nexus_api.workflows.list(
+        contains_filter_result = syntara_api.workflows.list(
             additional_params={"name[contains]": "e2e-list"}
         ).assert_and_get()
 
@@ -301,7 +301,7 @@ class TestWorkflowAPI:
         )
 
         # Test 3: Filtering by enabled status
-        disabled_result = nexus_api.workflows.list(
+        disabled_result = syntara_api.workflows.list(
             additional_params={"is_enabled": "false"}, limit=100
         ).assert_and_get()
 
@@ -315,7 +315,7 @@ class TestWorkflowAPI:
 
         # Test 4: Sorting by name (ascending and descending)
         for sort_param, reverse in [("name", False), ("-name", True)]:
-            sort_result = nexus_api.workflows.list(
+            sort_result = syntara_api.workflows.list(
                 sort=sort_param, limit=100, additional_params={"name[contains]": unique_suffix}
             ).assert_and_get()
 

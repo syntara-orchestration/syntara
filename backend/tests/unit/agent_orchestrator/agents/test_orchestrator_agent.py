@@ -9,14 +9,14 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import HumanMessage
 
-from nexus.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
-from nexus.agent_orchestrator.constants import AgentRoutes
-from nexus.agent_orchestrator.context_manager.models import ContextPackage
-from nexus.audit.emitter import AuditActorContext
+from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
+from syntara.agent_orchestrator.constants import AgentRoutes
+from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.audit.emitter import AuditActorContext
 from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
-    from nexus.agent_orchestrator.models.agent_state import AgentState
+    from syntara.agent_orchestrator.models.agent_state import AgentState
 
 
 @pytest.fixture(autouse=True)
@@ -97,7 +97,7 @@ class TestOrchestratorAgentContextIntegration:
         }
 
         # Act
-        with patch("nexus.agent_orchestrator.agents.orchestrator_agent.logger") as mock_logger:
+        with patch("syntara.agent_orchestrator.agents.orchestrator_agent.logger") as mock_logger:
             result_state = await orchestrator.execute(state)
 
             # Assert
@@ -424,7 +424,7 @@ class TestOrchestratorAgentLogging:
         }
 
         # Act
-        with patch("nexus.agent_orchestrator.agents.orchestrator_agent.logger") as mock_logger:
+        with patch("syntara.agent_orchestrator.agents.orchestrator_agent.logger") as mock_logger:
             await orchestrator.execute(state)
 
             # Assert

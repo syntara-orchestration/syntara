@@ -8,9 +8,9 @@ from uuid import UUID, uuid4
 
 from langchain_core.tools import BaseTool
 
-from nexus.tool_manager.exceptions import ToolNotFoundError, ToolRefreshError
-from nexus.tool_manager.lib.providers.base import ToolProviderAdapter
-from nexus.tool_manager.models import (
+from syntara.tool_manager.exceptions import ToolNotFoundError, ToolRefreshError
+from syntara.tool_manager.lib.providers.base import ToolProviderAdapter
+from syntara.tool_manager.models import (
     Tool,
     ToolParameter,
     ToolParameterType,

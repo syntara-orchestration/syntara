@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.exceptions import WorkflowVersionNotFoundError
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.exceptions import WorkflowVersionNotFoundError
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ class TestGetVersionForExport:
         with (
             patch.object(mock_service, "get_workflow_by_id", return_value=mock_workflow),
             patch.object(mock_service, "_get_version_or_none", return_value=mock_version),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
         ):
             workflow, version = await mock_service.get_version_for_export(workflow_id, 2)
 
@@ -71,7 +71,7 @@ class TestGetVersionForExport:
         with (
             patch.object(mock_service, "get_workflow_by_id", return_value=mock_workflow),
             patch.object(mock_service, "_get_version_or_none", return_value=mock_version),
-            patch("nexus.workflows.services.workflow_service.AuditEventDispatcher") as mock_dispatcher,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher") as mock_dispatcher,
         ):
             await mock_service.get_version_for_export(workflow_id, 3)
 

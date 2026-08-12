@@ -10,8 +10,8 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.core.models.group import Group
+from syntara.core.models import User
+from syntara.core.models.group import Group
 from tests.integration.helpers.error_data import assert_error_data
 
 GROUPS_URL = "/api/v1/groups"

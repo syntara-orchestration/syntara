@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.models import InvocationStatus
-from nexus.agent_orchestrator.models.request import CancellationResult
-from nexus.agent_orchestrator.services.invocation_service import InvocationService
+from syntara.agent_orchestrator.models import InvocationStatus
+from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
 
 
 @pytest.fixture

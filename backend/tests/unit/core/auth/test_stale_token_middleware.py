@@ -18,9 +18,9 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from nexus.auth.exceptions import InvalidTokenError
-from nexus.auth.middleware import StaleTokenMiddleware, _cred_status_cache, _sa_status_cache, _user_status_cache
-from nexus.auth.services.token_service import TokenPayload
+from syntara.auth.exceptions import InvalidTokenError
+from syntara.auth.middleware import StaleTokenMiddleware, _cred_status_cache, _sa_status_cache, _user_status_cache
+from syntara.auth.services.token_service import TokenPayload
 
 
 def _build_app() -> Starlette:
@@ -133,8 +133,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -153,8 +153,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -171,8 +171,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=3)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -189,8 +189,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(error=OSError("connection refused"))
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -205,7 +205,7 @@ class TestStaleTokenMiddleware:
         mock_ts = _mock_token_service(error=InvalidTokenError())
 
         with (
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer not-a-jwt"})
@@ -222,8 +222,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=1, is_enabled=False)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -243,7 +243,7 @@ class TestStaleTokenMiddleware:
         mock_ts = _mock_token_service(payload=payload)
 
         with (
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -259,8 +259,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5, is_enabled=False)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -278,8 +278,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=None)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer some-jwt"})
@@ -295,8 +295,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=1, is_enabled=False)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.post("/api/v1/auth/logout", headers={"Authorization": "Bearer some-jwt"})
@@ -312,8 +312,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.post("/api/v1/auth/logout", headers={"Authorization": "Bearer some-jwt"})
@@ -329,8 +329,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.post("/api/v1/auth/refresh", headers={"Authorization": "Bearer some-jwt"})
@@ -351,8 +351,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=2)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
 
@@ -371,8 +371,8 @@ class TestStaleTokenMiddleware:
         mock_ctx_fresh = _mock_async_session(token_version=2)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx_fresh),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts_fresh),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx_fresh),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts_fresh),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer fresh-jwt"})
@@ -395,8 +395,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get(
@@ -417,8 +417,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.post("/some-other/auth/logout", headers={"Authorization": "Bearer some-jwt"})
@@ -435,8 +435,8 @@ class TestStaleTokenMiddleware:
         mock_ctx = _mock_async_session(token_version=5)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.post("/some-other/auth/refresh", headers={"Authorization": "Bearer some-jwt"})
@@ -502,9 +502,9 @@ class TestStaleTokenMiddlewareSA:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.auth.middleware._check_cred_status", return_value="active"),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value="active"),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -520,8 +520,8 @@ class TestStaleTokenMiddlewareSA:
         mock_ctx = _mock_sa_async_session(sa_status="disabled", token_version=0)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -538,8 +538,8 @@ class TestStaleTokenMiddlewareSA:
         mock_ctx = _mock_sa_async_session(not_found=True)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -556,8 +556,8 @@ class TestStaleTokenMiddlewareSA:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=3)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -575,8 +575,8 @@ class TestStaleTokenMiddlewareSA:
         mock_ctx = _mock_sa_async_session(not_found=True)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -603,9 +603,9 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.auth.middleware._check_cred_status", return_value="disabled"),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value="disabled"),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -622,9 +622,9 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.auth.middleware._check_cred_status", return_value=None),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=None),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -641,9 +641,9 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.auth.middleware._check_cred_status", return_value="active"),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value="active"),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -659,9 +659,9 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.audit.dispatcher.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch") as mock_dispatch,
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -670,7 +670,7 @@ class TestStaleTokenMiddlewareSACredential:
         assert response.json()["code"] == "SA_TOKEN_REVOKED"
         mock_dispatch.assert_called_once()
         dispatched = mock_dispatch.call_args[0][0]
-        from nexus.auth.audit.sa_rejection import MissingSACredentialClaimEvent
+        from syntara.auth.audit.sa_rejection import MissingSACredentialClaimEvent
 
         assert isinstance(dispatched, MissingSACredentialClaimEvent)
         assert dispatched.service_account_id == "sa-456"
@@ -684,9 +684,9 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
-            patch("nexus.auth.middleware._check_cred_status", side_effect=OSError("connection refused")),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", side_effect=OSError("connection refused")),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -702,8 +702,8 @@ class TestStaleTokenMiddlewareSACredential:
         mock_ctx = _mock_sa_async_session(sa_status="disabled", token_version=1)
 
         with (
-            patch("nexus.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
-            patch("nexus.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})

@@ -76,7 +76,7 @@ The validate endpoint requires `workflow:create` permission but does not persist
 
 ### Backend Validation Checks
 
-The `WorkflowValidator` class in `nexus.workflows.validators.workflow_definition` runs these checks in order:
+The `WorkflowValidator` class in `syntara.workflows.validators.workflow_definition` runs these checks in order:
 
 | Check | Category | Description |
 |---|---|---|
@@ -134,7 +134,7 @@ Publishing is gated at two independent layers:
 
 ### Validation Models
 
-For request/response schemas and field definitions, see the OpenAPI spec for `POST /workflows/validate`. The models are defined in `nexus.workflows.models.validation_finding` (`ValidationFinding`, `ValidationResult`, `DetailedValidationProblemDetail`) and `nexus.workflows.models.workflow_validation_result` (`WorkflowValidateRequest`).
+For request/response schemas and field definitions, see the OpenAPI spec for `POST /workflows/validate`. The models are defined in `syntara.workflows.models.validation_finding` (`ValidationFinding`, `ValidationResult`, `DetailedValidationProblemDetail`) and `syntara.workflows.models.workflow_validation_result` (`WorkflowValidateRequest`).
 
 ## Related Documentation
 

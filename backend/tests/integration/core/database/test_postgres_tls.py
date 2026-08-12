@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.core.docker_client import DockerClient
 
-from nexus.core.database.ssl import build_ssl_connect_args
+from syntara.core.database.ssl import build_ssl_connect_args
 from tests.fixtures.tls import generate_ca, generate_server_cert
 
 if TYPE_CHECKING:

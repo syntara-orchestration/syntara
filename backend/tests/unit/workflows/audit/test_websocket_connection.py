@@ -4,11 +4,11 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.workflows.audit.websocket_connection import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.workflows.audit.websocket_connection import (
     WebSocketConnectionAction,
     WebSocketConnectionEvent,
     WebSocketConnectionHandler,
@@ -46,7 +46,7 @@ class TestWebSocketConnectionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "websocket_connected"
         assert result.event_message == f"WebSocket connected: {WORKFLOW_NAME}"
-        assert result.source_component == "nexus.workflows.ws"
+        assert result.source_component == "syntara.workflows.ws"
         assert result.execution_id == EXECUTION_ID
         assert result.workflow_id == WORKFLOW_ID
         assert result.resource_urn == f"urn:syntara:workflow:{WORKFLOW_ID}"

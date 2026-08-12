@@ -6,8 +6,8 @@ the main application pool, addressing connection pool contention issues.
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from nexus.audit.outbox.session import AuditWorkerAsyncSessionLocal, audit_worker_engine
-from nexus.core.database.session import engine as main_engine
+from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal, audit_worker_engine
+from syntara.core.database.session import engine as main_engine
 
 
 def test_audit_worker_has_separate_engine() -> None:

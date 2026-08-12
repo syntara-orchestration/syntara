@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.services.error_handler import (
+from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
 )

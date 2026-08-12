@@ -14,9 +14,9 @@ import pytest
 from httpx import AsyncClient, HTTPStatusError
 from langchain_core.tools import tool
 
-from nexus.integrations.adapters.mcp_server import MCPServerAdapter
-from nexus.integrations.adapters.protocol import ValidateResult
-from nexus.tool_manager.lib.providers.mcp import MCPProvider
+from syntara.integrations.adapters.mcp_server import MCPServerAdapter
+from syntara.integrations.adapters.protocol import ValidateResult
+from syntara.tool_manager.lib.providers.mcp import MCPProvider
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 from tests.integration.helpers.tool_manager import wait_for_tool_status
 
@@ -24,7 +24,7 @@ from tests.integration.helpers.tool_manager import wait_for_tool_status
 @pytest.fixture(autouse=True)
 def mock_tool_manager_client(jwt_client: AsyncClient) -> Generator[None, None, None]:
     """Override ToolManagerClient creation to use test server transport with JWT auth."""
-    from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+    from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
 
     # Store the original ToolManagerClient __init__ method
     original_init = ToolManagerClient.__init__
@@ -573,7 +573,7 @@ class TestToolEventWebSocketStreaming:
         2. Wait for completion
         3. Verify tool_call and tool_result events were published to stream
         """
-        from nexus.core.cache.stream import StreamClient
+        from syntara.core.cache.stream import StreamClient
 
         # Set up MCP Integration and refresh tools with calculator tool
         await _create_mcp_integration_and_refresh(auth_client_with_tool_aware_mocked_llm)

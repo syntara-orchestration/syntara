@@ -346,7 +346,7 @@ export function buildActivityStateMap(
 }
 
 // Wire-format separator for per-iteration composite keys (e.g. "body-1#iter-2").
-// Mirrored in backend: src/nexus/workflows/workflow_engine/services/activity_sync_service.py
+// Mirrored in backend: src/syntara/workflows/workflow_engine/services/activity_sync_service.py
 const COMPOSITE_ITER_SEP = '#iter-'
 
 /**

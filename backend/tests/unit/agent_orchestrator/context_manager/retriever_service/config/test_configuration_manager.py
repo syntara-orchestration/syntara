@@ -2,13 +2,13 @@
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
+from syntara.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
     ConfigurationManager,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
-from nexus.core.constants import RetrieverServiceDefaults
+from syntara.core.constants import RetrieverServiceDefaults
 
 
 class TestConfigurationManager:

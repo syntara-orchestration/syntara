@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from nexus.files.health import check_file_storage_health, validate_file_storage_at_startup
+from syntara.files.health import check_file_storage_health, validate_file_storage_at_startup
 
 # ---------------------------------------------------------------------------
 # check_file_storage_health
@@ -29,7 +29,7 @@ class TestCheckFileStorageHealth:
         type(mock_fm).s3_configured = PropertyMock(return_value=True)
         mock_fm.get_retriever.return_value = mock_retriever
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             result = await check_file_storage_health()
 
         assert result == "ok"
@@ -43,7 +43,7 @@ class TestCheckFileStorageHealth:
         type(mock_fm).s3_configured = PropertyMock(return_value=True)
         mock_fm.get_retriever.return_value = mock_retriever
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             result = await check_file_storage_health()
 
         assert result == "degraded"
@@ -53,14 +53,14 @@ class TestCheckFileStorageHealth:
         mock_fm = MagicMock()
         type(mock_fm).s3_configured = PropertyMock(return_value=False)
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             result = await check_file_storage_health()
 
         assert result == "unconfigured"
 
     @pytest.mark.asyncio
     async def test_returns_error_on_exception(self) -> None:
-        with patch("nexus.files.health.get_file_manager", side_effect=RuntimeError("boom")):
+        with patch("syntara.files.health.get_file_manager", side_effect=RuntimeError("boom")):
             result = await check_file_storage_health()
 
         assert result == "error"
@@ -75,8 +75,8 @@ class TestCheckFileStorageHealth:
         mock_fm.get_retriever.return_value = mock_retriever
 
         with (
-            patch("nexus.files.health.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.health.HEALTH_CHECK_TIMEOUT_SECONDS", 0.001),
+            patch("syntara.files.health.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.health.HEALTH_CHECK_TIMEOUT_SECONDS", 0.001),
         ):
             result = await check_file_storage_health()
 
@@ -97,10 +97,10 @@ class TestStartupValidation:
         type(mock_fm).s3_configured = PropertyMock(return_value=False)
 
         with (
-            patch("nexus.files.health.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.health.logger") as mock_logger,
+            patch("syntara.files.health.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.health.logger") as mock_logger,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             await validate_file_storage_at_startup(get_settings())
 
@@ -117,10 +117,10 @@ class TestStartupValidation:
         mock_fm.get_retriever.return_value = mock_retriever
 
         with (
-            patch("nexus.files.health.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.health.logger") as mock_logger,
+            patch("syntara.files.health.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.health.logger") as mock_logger,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             await validate_file_storage_at_startup(get_settings())
 
@@ -137,10 +137,10 @@ class TestStartupValidation:
         mock_fm.get_retriever.return_value = mock_retriever
 
         with (
-            patch("nexus.files.health.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.health.logger") as mock_logger,
+            patch("syntara.files.health.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.health.logger") as mock_logger,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             await validate_file_storage_at_startup(get_settings())
 
@@ -157,11 +157,11 @@ class TestStartupValidation:
         mock_fm.get_retriever.return_value = mock_retriever
 
         with (
-            patch("nexus.files.health.get_file_manager", return_value=mock_fm),
-            patch("nexus.files.health.HEALTH_CHECK_TIMEOUT_SECONDS", 0.001),
-            patch("nexus.files.health.logger") as mock_logger,
+            patch("syntara.files.health.get_file_manager", return_value=mock_fm),
+            patch("syntara.files.health.HEALTH_CHECK_TIMEOUT_SECONDS", 0.001),
+            patch("syntara.files.health.logger") as mock_logger,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             await validate_file_storage_at_startup(get_settings())
 

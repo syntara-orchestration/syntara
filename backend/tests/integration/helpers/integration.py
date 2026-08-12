@@ -5,9 +5,9 @@ from uuid import uuid4
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration, IntegrationType
-from nexus.integrations.models.integration_configuration import (
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
     IntegrationConfigurationTypes,
     LLMProviderConfiguration,

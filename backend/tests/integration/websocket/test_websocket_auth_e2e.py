@@ -34,14 +34,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
 from starlette.websockets import WebSocketDisconnect
 
-from nexus.auth.services.global_revocation import clear_global_revocation_cache
-from nexus.auth.services.token_service import TokenService
-from nexus.authz.models import RoleAssignment
-from nexus.authz.seed import seed_authz_data
-from nexus.core.models.group import Group, user_groups
-from nexus.core.websocket.close_codes import POLICY_VIOLATION
-from nexus.core.websocket.connection import get_connection_manager
-from nexus.core.websocket.manager import get_connection_lifecycle_manager
+from syntara.auth.services.global_revocation import clear_global_revocation_cache
+from syntara.auth.services.token_service import TokenService
+from syntara.authz.models import RoleAssignment
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models.group import Group, user_groups
+from syntara.core.websocket.close_codes import POLICY_VIOLATION
+from syntara.core.websocket.connection import get_connection_manager
+from syntara.core.websocket.manager import get_connection_lifecycle_manager
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator
@@ -51,12 +51,12 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
     from starlette.testclient import TestClient
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 EXECUTION_WS_PATH = "/ws/workflows/v1/executions"
 INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
 
-_REGO_POLICY_PATH = Path(__file__).resolve().parents[3] / "src" / "nexus" / "authz" / "rego" / "authz.rego"
+_REGO_POLICY_PATH = Path(__file__).resolve().parents[3] / "src" / "syntara" / "authz" / "rego" / "authz.rego"
 _OPA_RESULT_FIELDS = {"allow", "deny", "matched_policy", "denial_reason", "denied_by", "allowed_projects"}
 
 
@@ -76,7 +76,7 @@ def _opa_evaluate_cli(opa_input: dict[str, Any]) -> dict[str, Any]:
             "-I",
             "--format",
             "json",
-            "data.nexus.authz",
+            "data.syntara.authz",
         ],
         input=json.dumps(opa_input),
         capture_output=True,
@@ -129,7 +129,7 @@ pytestmark = [
 @pytest.fixture(autouse=True)
 def _reset_connection_managers() -> Generator[None, None, None]:
     """Clear connection/lifecycle managers and ticket client before and after each test."""
-    import nexus.core.websocket.ticket as ticket_mod
+    import syntara.core.websocket.ticket as ticket_mod
 
     manager = get_connection_manager()
     manager.clear_all()
@@ -176,11 +176,11 @@ def _patch_endpoint_factory_db(test_db_engine: AsyncEngine) -> Generator[None, N
     """Point endpoint_factory's AsyncSessionLocal at the test database.
 
     ``endpoint_factory.py`` imports ``AsyncSessionLocal`` at module level.
-    The ``sync_test_client`` patches ``nexus.core.database.session`` but that
+    The ``sync_test_client`` patches ``syntara.core.database.session`` but that
     doesn't update the already-bound reference in ``endpoint_factory``.
     """
     factory = async_sessionmaker(test_db_engine, class_=_AsyncSession, expire_on_commit=False)
-    with patch("nexus.core.websocket.endpoint_factory.AsyncSessionLocal", factory):
+    with patch("syntara.core.websocket.endpoint_factory.AsyncSessionLocal", factory):
         yield
 
 
@@ -237,7 +237,7 @@ def _create_jwt(user: User) -> str:
     )
 
 
-_PATCH_AUTHN = "nexus.core.websocket.endpoint_factory._authenticate_websocket"
+_PATCH_AUTHN = "syntara.core.websocket.endpoint_factory._authenticate_websocket"
 
 
 # ===========================================================================

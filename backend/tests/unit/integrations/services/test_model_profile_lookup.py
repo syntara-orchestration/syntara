@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nexus.integrations.services.model_profile_lookup import lookup_model_profile
+from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 
 CURATED_OPENAI_MODELS = [
     pytest.param("gpt-5.6-sol", marks=pytest.mark.xfail(reason="Not yet in langchain-openai profiles")),
@@ -121,7 +121,7 @@ def test_registry_error_returns_none() -> None:
     """If the registry lookup raises, lookup returns None gracefully."""
     lookup_model_profile.cache_clear()
     with patch(
-        "nexus.integrations.services.model_profile_lookup._search_registries",
+        "syntara.integrations.services.model_profile_lookup._search_registries",
         side_effect=RuntimeError("broken"),
     ):
         assert lookup_model_profile("gpt-4o") is None

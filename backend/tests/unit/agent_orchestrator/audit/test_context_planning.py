@@ -4,7 +4,7 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.audit.context_planning import (
+from syntara.agent_orchestrator.audit.context_planning import (
     CancellationEvent,
     CancellationHandler,
     ContextPlanningEvent,
@@ -12,12 +12,12 @@ from nexus.agent_orchestrator.audit.context_planning import (
     ContextPlanningPhase,
     ContextPlanningStatus,
 )
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestContextPlanningHandler:
@@ -53,7 +53,7 @@ class TestContextPlanningHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "context_planning"
         assert result.event_message == "Context planning retrieval phase started"
-        assert result.source_component == "nexus.agent_orchestrator.context_manager"
+        assert result.source_component == "syntara.agent_orchestrator.context_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -263,7 +263,7 @@ class TestCancellationHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "cancellation"
         assert result.event_message == "Invocation cancelled during retrieval phase"
-        assert result.source_component == "nexus.agent_orchestrator.context_manager"
+        assert result.source_component == "syntara.agent_orchestrator.context_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username

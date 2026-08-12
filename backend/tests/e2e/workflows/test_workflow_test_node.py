@@ -34,7 +34,7 @@ class TestWorkflowTestNode:
 
     def test_single_step_with_mock_input(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -90,7 +90,7 @@ class TestWorkflowTestNode:
                 },
             }
         )
-        response = nexus_api.workflows.test_node(
+        response = syntara_api.workflows.test_node(
             workflow_id=workflow.id,
             body=TestExecutionCreate(
                 target_node_id="node_b",
@@ -104,7 +104,7 @@ class TestWorkflowTestNode:
         assert execution.workflow_id == workflow.id
 
         # Step 3: Verify the response
-        final_execution = poll_execution_until_complete(nexus_api, execution.id)
+        final_execution = poll_execution_until_complete(syntara_api, execution.id)
 
         # Expected 1: The node executes with the provided mock data
         assert final_execution.activities is not None, "Execution should include activities"
@@ -143,7 +143,7 @@ class TestTestExecutionWithConditionNode:
 
     def test_test_execution_returns_test_mode(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: WorkflowFactory,
         first_project_id: UUID,
     ) -> None:
@@ -156,14 +156,14 @@ class TestTestExecutionWithConditionNode:
             )
         )
 
-        publish_resp = nexus_api.workflows.publish_version(
+        publish_resp = syntara_api.workflows.publish_version(
             workflow_id=workflow.id,
             version=workflow.current_version,
             body=PublishVersionRequest(name="for-testing"),
         )
         assert publish_resp.status_code == HTTPStatus.OK
 
-        test_resp = nexus_api.workflows.test_node(
+        test_resp = syntara_api.workflows.test_node(
             workflow_id=workflow.id,
             body=TestExecutionCreate.from_dict(
                 {
@@ -203,7 +203,7 @@ class TestTestExecutionWithConditionNode:
             f"Expected trigger_inputs to contain test_key=test_value, got: {input_dict}"
         )
 
-        final_execution = poll_execution_until_complete(nexus_api, execution.id)
+        final_execution = poll_execution_until_complete(syntara_api, execution.id)
         assert str(final_execution.status) == "completed", f"Expected completed status, got {final_execution.status}"
 
         assert final_execution.activities is not None, "Execution should include activities"

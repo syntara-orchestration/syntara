@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.tool_manager.models import Tool
+from syntara.tool_manager.models import Tool
 
 
 class TestToolsGetContract:

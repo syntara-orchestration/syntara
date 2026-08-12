@@ -7,9 +7,9 @@ import pytest
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.tool_manager.error_handlers import tool_not_found_handler, tool_refresh_error_handler
-from nexus.tool_manager.exceptions import ToolNotFoundError, ToolRefreshError
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.tool_manager.error_handlers import tool_not_found_handler, tool_refresh_error_handler
+from syntara.tool_manager.exceptions import ToolNotFoundError, ToolRefreshError
 
 
 class TestToolNotFoundHandler:

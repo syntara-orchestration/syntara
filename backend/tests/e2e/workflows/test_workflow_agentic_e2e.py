@@ -90,14 +90,14 @@ def _agentic_node(
 
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_basic_prompt_completion(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Simple prompt completes successfully with non-empty agentic output."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-basic-prompt",
         {
             "name": "agentic-basic",
@@ -133,14 +133,14 @@ def test_basic_prompt_completion(
 
 @pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_output_contains_expected_content(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Prompt for a specific word and verify the output contains it."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-expected-content",
         {
             "name": "agentic-content",
@@ -177,7 +177,7 @@ def test_agentic_output_contains_expected_content(
 
 @pytest.mark.xfail(strict=False, reason="LLM non-determinism: model may skip tool call")
 def test_agentic_with_mcp_tool_call(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     mcp_integration_id: str,  # side-effect: ensures MCP integration is validated so agent discovers tools
     llm_credential_id: str,
     llm_model_id: str,
@@ -187,7 +187,7 @@ def test_agentic_with_mcp_tool_call(
     output: object = None
     for _attempt in range(1, MAX_TOOL_CALL_ATTEMPTS + 1):
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-agentic-mcp-tool",
             {
                 "name": "agentic-mcp-tool",
@@ -236,7 +236,7 @@ def test_agentic_with_mcp_tool_call(
 
 @pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_with_response_schema(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
@@ -250,7 +250,7 @@ def test_agentic_with_response_schema(
         }
     )
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-response-schema",
         {
             "name": "agentic-schema",
@@ -294,7 +294,7 @@ def test_agentic_with_response_schema(
 
 @pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_with_tool_selection_and_response_schema(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
@@ -308,7 +308,7 @@ def test_agentic_with_tool_selection_and_response_schema(
         }
     )
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-tools-and-schema",
         {
             "name": "agentic-tools-schema",
@@ -353,14 +353,14 @@ def test_agentic_with_tool_selection_and_response_schema(
 
 @pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_input_from_upstream_node(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Script node outputs JSON consumed by agentic node via variable reference."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-upstream-input",
         {
             "name": "agentic-upstream",
@@ -411,14 +411,14 @@ def test_agentic_input_from_upstream_node(
 
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_output_consumed_by_downstream(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Agentic node output is consumed by a downstream script node."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-downstream",
         {
             "name": "agentic-downstream",
@@ -468,14 +468,14 @@ def test_agentic_output_consumed_by_downstream(
 
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_with_tool_selection_none(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Agentic node with tool_selection_strategy NONE completes without tools."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-tool-none",
         {
             "name": "agentic-tool-none",
@@ -508,13 +508,13 @@ def test_agentic_with_tool_selection_none(
 
 
 def test_agentic_invalid_credential_fails(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
     llm_model: str,
     worker_id: str,
 ) -> None:
     """Agentic node with an invalid API key results in a failed execution."""
-    types_list = nexus_api.credentials.list_types().assert_and_get()
+    types_list = syntara_api.credentials.list_types().assert_and_get()
     llm_type_id: UUID | None = None
     for ct in types_list.resources:
         if "llm" in ct.name.lower():
@@ -525,7 +525,7 @@ def test_agentic_invalid_credential_fails(
     bad_cred_id: str | None = None
     bad_integration_id: UUID | None = None
     try:
-        bad_cred = nexus_api.credentials.create(
+        bad_cred = syntara_api.credentials.create(
             body=CredentialCreate(
                 name=f"e2e-bad-llm-credential-{worker_id}",
                 credential_type_id=llm_type_id,
@@ -539,7 +539,7 @@ def test_agentic_invalid_credential_fails(
         ).assert_and_get()
         bad_cred_id = str(bad_cred.id)
 
-        bad_integration = nexus_api.integrations.create(
+        bad_integration = syntara_api.integrations.create(
             body=IntegrationCreate(
                 name=f"e2e-bad-llm-provider-{worker_id}",
                 description="LLM provider with invalid credential for E2E test",
@@ -561,13 +561,13 @@ def test_agentic_invalid_credential_fails(
         ).assert_and_get()
         bad_integration_id = bad_integration.id
 
-        models_resp = nexus_api.integrations.list_models(integration_id=bad_integration_id)
+        models_resp = syntara_api.integrations.list_models(integration_id=bad_integration_id)
         models = models_resp.assert_and_get()
         assert models.resources, "Bad LLM provider should still have models"
         bad_model_id = str(models.resources[0].id)
 
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-agentic-invalid-cred",
             {
                 "name": "agentic-invalid-cred",
@@ -596,12 +596,12 @@ def test_agentic_invalid_credential_fails(
     finally:
         if bad_integration_id is not None:
             try:
-                nexus_api.integrations.delete(integration_id=bad_integration_id)
+                syntara_api.integrations.delete(integration_id=bad_integration_id)
             except Exception:
                 pass
         if bad_cred_id is not None:
             try:
-                nexus_api.credentials.delete(credential_id=UUID(bad_cred_id))
+                syntara_api.credentials.delete(credential_id=UUID(bad_cred_id))
             except Exception:
                 pass
 
@@ -612,7 +612,7 @@ def test_agentic_invalid_credential_fails(
 
 
 def test_agentic_short_timeout_reaches_terminal_state(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
@@ -625,7 +625,7 @@ def test_agentic_short_timeout_reaches_terminal_state(
     Temporal cancels the activity. Either outcome (COMPLETED or FAILED) is valid.
     """
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-timeout",
         {
             "name": "agentic-timeout",
@@ -661,14 +661,14 @@ def test_agentic_short_timeout_reaches_terminal_state(
 
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_in_loop(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Loop iterates over items with an agentic node as the loop body."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-in-loop",
         {
             "name": "agentic-loop",
@@ -715,14 +715,14 @@ def test_agentic_in_loop(
 
 @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_in_condition_true_branch(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Condition routes to true branch containing an agentic node."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-condition-true",
         {
             "name": "agentic-condition",
@@ -776,14 +776,14 @@ def test_agentic_in_condition_true_branch(
 
 @pytest.mark.xfail(strict=False, reason="Parallel LLM calls may exceed poll timeout on rate-limited APIs")
 def test_agentic_parallel_paths_converge(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
     """Two parallel agentic nodes converge before a downstream script runs."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-agentic-parallel-converge",
         {
             "name": "agentic-parallel",
@@ -843,7 +843,7 @@ def test_agentic_parallel_paths_converge(
 
 
 def test_agentic_disabled_mcp_credential_fails_eagerly(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     mcp_integration_id: str,
@@ -851,7 +851,7 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
     worker_id: str,
 ) -> None:
     """Agentic node with a disabled MCP credential in integration_connections fails before LLM call."""
-    types_list = nexus_api.credentials.list_types().assert_and_get()
+    types_list = syntara_api.credentials.list_types().assert_and_get()
     bearer_type_id: UUID | None = None
     for ct in types_list.resources:
         if ct.name == "HTTP Bearer Token":
@@ -861,7 +861,7 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
 
     disabled_cred_id: str | None = None
     try:
-        disabled_cred = nexus_api.credentials.create(
+        disabled_cred = syntara_api.credentials.create(
             body=CredentialCreate(
                 name=f"e2e-disabled-mcp-cred-{worker_id}",
                 credential_type_id=bearer_type_id,
@@ -871,13 +871,13 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
         ).assert_and_get()
         disabled_cred_id = str(disabled_cred.id)
 
-        nexus_api.credentials.update(
+        syntara_api.credentials.update(
             credential_id=disabled_cred.id,
             body=CredentialUpdate(enabled=False),
         ).assert_and_get()
 
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-agentic-disabled-mcp-cred",
             {
                 "name": "agentic-disabled-mcp-cred",
@@ -912,7 +912,7 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
     finally:
         if disabled_cred_id is not None:
             try:
-                nexus_api.credentials.delete(credential_id=UUID(disabled_cred_id))
+                syntara_api.credentials.delete(credential_id=UUID(disabled_cred_id))
             except Exception:
                 pass
 
@@ -923,13 +923,13 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
 
 
 def test_unreachable_llm_endpoint_produces_identifiable_error(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
     llm_model: str,
     worker_id: str,
 ) -> None:
     """Workflow execution fails with an identifiable error when the LLM endpoint is unreachable."""
-    types_list = nexus_api.credentials.list_types().assert_and_get()
+    types_list = syntara_api.credentials.list_types().assert_and_get()
     llm_type_id: UUID | None = None
     for ct in types_list.resources:
         if "llm" in ct.name.lower():
@@ -940,7 +940,7 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
     cred_id: str | None = None
     integration_id: UUID | None = None
     try:
-        cred = nexus_api.credentials.create(
+        cred = syntara_api.credentials.create(
             body=CredentialCreate(
                 name=f"e2e-unreachable-llm-cred-{worker_id}",
                 credential_type_id=llm_type_id,
@@ -950,7 +950,7 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
         ).assert_and_get()
         cred_id = str(cred.id)
 
-        integration = nexus_api.integrations.create(
+        integration = syntara_api.integrations.create(
             body=IntegrationCreate(
                 name=f"e2e-unreachable-llm-{worker_id}",
                 description="LLM provider with unreachable endpoint for E2E test",
@@ -972,13 +972,13 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
         ).assert_and_get()
         integration_id = integration.id
 
-        models_resp = nexus_api.integrations.list_models(integration_id=integration_id)
+        models_resp = syntara_api.integrations.list_models(integration_id=integration_id)
         models = models_resp.assert_and_get()
         assert models.resources, "Unreachable LLM provider should still have models"
         model_id = str(models.resources[0].id)
 
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-agentic-unreachable-llm",
             {
                 "name": "agentic-unreachable-llm",
@@ -1014,12 +1014,12 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
     finally:
         if integration_id is not None:
             try:
-                nexus_api.integrations.delete(integration_id=integration_id)
+                syntara_api.integrations.delete(integration_id=integration_id)
             except Exception:
                 pass
         if cred_id is not None:
             try:
-                nexus_api.credentials.delete(credential_id=UUID(cred_id))
+                syntara_api.credentials.delete(credential_id=UUID(cred_id))
             except Exception:
                 pass
 
@@ -1030,14 +1030,14 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
 
 
 def test_model_disabled_after_workflow_saved_fails_execution(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
     llm_model: str,
     worker_id: str,
 ) -> None:
     """Execution fails when a referenced LLM model is disabled after the workflow was saved."""
-    types_list = nexus_api.credentials.list_types().assert_and_get()
+    types_list = syntara_api.credentials.list_types().assert_and_get()
     llm_type_id: UUID | None = None
     for ct in types_list.resources:
         if "llm" in ct.name.lower():
@@ -1052,7 +1052,7 @@ def test_model_disabled_after_workflow_saved_fails_execution(
     cred_id: str | None = None
     integration_id: UUID | None = None
     try:
-        cred = nexus_api.credentials.create(
+        cred = syntara_api.credentials.create(
             body=CredentialCreate(
                 name=f"e2e-model-disable-cred-{worker_id}",
                 credential_type_id=llm_type_id,
@@ -1063,7 +1063,7 @@ def test_model_disabled_after_workflow_saved_fails_execution(
         cred_id = str(cred.id)
 
         model_b = f"{llm_model}-fallback-dummy"
-        integration = nexus_api.integrations.create(
+        integration = syntara_api.integrations.create(
             body=IntegrationCreate(
                 name=f"e2e-model-disable-provider-{worker_id}",
                 description="LLM provider for model disable test",
@@ -1091,7 +1091,7 @@ def test_model_disabled_after_workflow_saved_fails_execution(
         ).assert_and_get()
         integration_id = integration.id
 
-        models_resp = nexus_api.integrations.list_models(integration_id=integration_id)
+        models_resp = syntara_api.integrations.list_models(integration_id=integration_id)
         models = models_resp.assert_and_get()
         assert len(models.resources) >= 2, "Expected at least 2 models"
 
@@ -1123,13 +1123,13 @@ def test_model_disabled_after_workflow_saved_fails_execution(
             )
         )
 
-        nexus_api.integrations.update_model(
+        syntara_api.integrations.update_model(
             integration_id=integration_id,
             model_id=model_a_uuid,
             body=LLMModelUpdate(enabled=False),
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(
                 workflow_id=workflow.id,
                 trigger_node_id="trigger_manual",
@@ -1137,7 +1137,7 @@ def test_model_disabled_after_workflow_saved_fails_execution(
         ).assert_and_get()
 
         result = poll_execution_until_complete(
-            nexus_api,
+            syntara_api,
             UUID(str(execution.id)),
             max_polls=30,
             poll_interval=2,
@@ -1152,11 +1152,11 @@ def test_model_disabled_after_workflow_saved_fails_execution(
     finally:
         if integration_id is not None:
             try:
-                nexus_api.integrations.delete(integration_id=integration_id)
+                syntara_api.integrations.delete(integration_id=integration_id)
             except Exception:
                 pass
         if cred_id is not None:
             try:
-                nexus_api.credentials.delete(credential_id=UUID(cred_id))
+                syntara_api.credentials.delete(credential_id=UUID(cred_id))
             except Exception:
                 pass

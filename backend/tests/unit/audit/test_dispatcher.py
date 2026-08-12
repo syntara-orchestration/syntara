@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 from unittest.mock import patch
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory
-from nexus.audit.models.structured_data import AuditContextData
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory
+from syntara.audit.models.structured_data import AuditContextData
 
 
 @dataclass
@@ -65,7 +65,7 @@ class TestAuditEventDispatcher:
 
     def test_dispatches_to_matching_handler(self) -> None:
         """dispatch() finds the correct handler and calls emit_audit_event."""
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="hello"))
 
         mock_emit.assert_called_once()
@@ -76,7 +76,7 @@ class TestAuditEventDispatcher:
 
     def test_unknown_event_type_does_not_raise(self) -> None:
         """dispatch() silently skips events with no registered handler."""
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_UnknownEvent())
 
         mock_emit.assert_not_called()
@@ -85,7 +85,7 @@ class TestAuditEventDispatcher:
         """dispatch() logs a warning for unhandled event types."""
         AuditEventDispatcher._reset()
 
-        with patch("nexus.audit.dispatcher.logger") as mock_logger:
+        with patch("syntara.audit.dispatcher.logger") as mock_logger:
             AuditEventDispatcher.dispatch(_UnknownEvent())
 
         mock_logger.warning.assert_called_once()
@@ -102,8 +102,8 @@ class TestAuditEventDispatcher:
         AuditEventDispatcher.register({_DispatchEvent: _RaisingHandler()})
 
         with (
-            patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit,
-            patch("nexus.audit.dispatcher.logger") as mock_logger,
+            patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit,
+            patch("syntara.audit.dispatcher.logger") as mock_logger,
         ):
             AuditEventDispatcher.dispatch(_DispatchEvent(message="x"))
 
@@ -116,7 +116,7 @@ class TestAuditEventDispatcher:
         AuditEventDispatcher.register({_DispatchEvent: _DispatchHandler()})
         AuditEventDispatcher.register({_DispatchEvent: side_effect_handler})
 
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="multi"))
 
         # Only the first handler returns an AuditEvent; the side-effect handler returns None
@@ -131,7 +131,7 @@ class TestAuditEventDispatcher:
         side_effect_handler = _SideEffectHandler()
         AuditEventDispatcher.register({_DispatchEvent: side_effect_handler})
 
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="no-audit"))
 
         mock_emit.assert_not_called()
@@ -146,7 +146,7 @@ class TestDispatcherLifecycle:
         AuditEventDispatcher.register({_DispatchEvent: _DispatchHandler()})
         AuditEventDispatcher.register({_OtherEvent: _OtherHandler()})
 
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="hi"))
             AuditEventDispatcher.dispatch(_OtherEvent(value=42))
 
@@ -159,7 +159,7 @@ class TestDispatcherLifecycle:
         AuditEventDispatcher.register({_DispatchEvent: _DispatchHandler()})
         AuditEventDispatcher._reset()
 
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="after reset"))
 
         mock_emit.assert_not_called()
@@ -170,7 +170,7 @@ class TestDispatcherLifecycle:
         AuditEventDispatcher.register({_DispatchEvent: _DispatchHandler()})
         AuditEventDispatcher.register({_DispatchEvent: _DispatchHandler()})
 
-        with patch("nexus.audit.dispatcher.emit_audit_event") as mock_emit:
+        with patch("syntara.audit.dispatcher.emit_audit_event") as mock_emit:
             AuditEventDispatcher.dispatch(_DispatchEvent(message="test"))
 
         # Should only emit once, not twice (no duplicate handlers)

@@ -6,10 +6,10 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.exceptions import IntegrationCredentialTypeMismatchError
-from nexus.integrations.models.integration import IntegrationCreate, IntegrationType
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.core.models import User
+from syntara.integrations.exceptions import IntegrationCredentialTypeMismatchError
+from syntara.integrations.models.integration import IntegrationCreate, IntegrationType
+from syntara.integrations.services.integration_service import IntegrationService
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ class TestCredentialTypeValidation:
     async def test_mcp_with_bearer_token_succeeds(self, integration_service: IntegrationService) -> None:
         mock_type = type("MockType", (), {"name": "HTTP Bearer Token"})()
         with patch(
-            "nexus.integrations.services.integration_service.fetch_credential_with_type",
+            "syntara.integrations.services.integration_service.fetch_credential_with_type",
             new_callable=AsyncMock,
             return_value=(None, mock_type),
         ):
@@ -37,7 +37,7 @@ class TestCredentialTypeValidation:
         credential_id = uuid4()
         with (
             patch(
-                "nexus.integrations.services.integration_service.fetch_credential_with_type",
+                "syntara.integrations.services.integration_service.fetch_credential_with_type",
                 new_callable=AsyncMock,
                 return_value=(None, mock_type),
             ),
@@ -49,7 +49,7 @@ class TestCredentialTypeValidation:
     async def test_llm_with_llm_provider_succeeds(self, integration_service: IntegrationService) -> None:
         mock_type = type("MockType", (), {"name": "LLM Provider"})()
         with patch(
-            "nexus.integrations.services.integration_service.fetch_credential_with_type",
+            "syntara.integrations.services.integration_service.fetch_credential_with_type",
             new_callable=AsyncMock,
             return_value=(None, mock_type),
         ):
@@ -61,7 +61,7 @@ class TestCredentialTypeValidation:
         credential_id = uuid4()
         with (
             patch(
-                "nexus.integrations.services.integration_service.fetch_credential_with_type",
+                "syntara.integrations.services.integration_service.fetch_credential_with_type",
                 new_callable=AsyncMock,
                 return_value=(None, mock_type),
             ),
@@ -73,7 +73,7 @@ class TestCredentialTypeValidation:
     async def test_aap_with_aap_credential_succeeds(self, integration_service: IntegrationService) -> None:
         mock_type = type("MockType", (), {"name": "Ansible Automation Platform"})()
         with patch(
-            "nexus.integrations.services.integration_service.fetch_credential_with_type",
+            "syntara.integrations.services.integration_service.fetch_credential_with_type",
             new_callable=AsyncMock,
             return_value=(None, mock_type),
         ):
@@ -85,7 +85,7 @@ class TestCredentialTypeValidation:
         credential_id = uuid4()
         with (
             patch(
-                "nexus.integrations.services.integration_service.fetch_credential_with_type",
+                "syntara.integrations.services.integration_service.fetch_credential_with_type",
                 new_callable=AsyncMock,
                 return_value=(None, mock_type),
             ),

@@ -11,20 +11,20 @@ import pytest
 from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.metrics.interface_tag import interface_context_var
-from nexus.workflows.exceptions import WorkflowNotFoundError
-from nexus.workflows.models.execution import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.metrics.interface_tag import interface_context_var
+from syntara.workflows.exceptions import WorkflowNotFoundError
+from syntara.workflows.models.execution import (
     ExecutionMode,
     ExecutionStatus,
     PreResolvedNodeOutput,
     TestExecutionCreate,
 )
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_version import WorkflowVersion
-from nexus.workflows.services.execution_service import ExecutionService
-from nexus.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.execution_service import ExecutionService
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
 def _make_mock_workflow(

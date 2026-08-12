@@ -27,7 +27,7 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 
-from nexus.core.cache.stream import StreamClient
+from syntara.core.cache.stream import StreamClient
 
 pytestmark = pytest.mark.integration
 

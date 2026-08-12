@@ -7,15 +7,15 @@ from uuid import UUID
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.integrations.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.integrations.error_handlers import (
     integration_credential_not_found_handler,
     integration_credential_required_handler,
     integration_error_handler,
     integration_name_conflict_handler,
     integration_not_found_handler,
 )
-from nexus.integrations.exceptions import (
+from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
     IntegrationCredentialRequiredError,
     IntegrationError,

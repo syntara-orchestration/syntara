@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nexus.aap.models.responses import (
+from syntara.aap.models.responses import (
     AAPCredential,
     AAPExecutionEnvironment,
     AAPInstanceGroup,
@@ -19,9 +19,9 @@ from nexus.aap.models.responses import (
     AAPListResponse,
     AAPOrganization,
 )
-from nexus.aap.router import router
-from nexus.aap.services.aap_proxy_service import AAPProxyService
-from nexus.core.models import User
+from syntara.aap.router import router
+from syntara.aap.services.aap_proxy_service import AAPProxyService
+from syntara.core.models import User
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ def app(mock_service: AsyncMock, mock_user: User) -> FastAPI:
         return mock_user
 
     # Apply overrides before including router
-    from nexus.aap import router as aap_router
-    from nexus.auth import get_current_user
+    from syntara.aap import router as aap_router
+    from syntara.auth import get_current_user
 
     test_app.dependency_overrides[aap_router._get_aap_proxy_service] = mock_get_service
     test_app.dependency_overrides[get_current_user] = mock_get_user

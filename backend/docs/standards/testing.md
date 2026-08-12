@@ -95,8 +95,8 @@ tests/
 
 **Organization Rules:**
 
-- Test directory structure mirrors `src/nexus/` hierarchy within each test category
-  - Example: `tests/unit/agent_orchestrator/` maps to `src/nexus/agent_orchestrator/`
+- Test directory structure mirrors `src/syntara/` hierarchy within each test category
+  - Example: `tests/unit/agent_orchestrator/` maps to `src/syntara/agent_orchestrator/`
 - Domain-specific conftest files provide domain-specific fixtures at appropriate hierarchy levels
 - Sample test files (PDFs, images, documents) live in `tests/fixtures/files/` and are accessed via `get_fixtures_dir()` from `tests.fixtures.files`
 - Shared unit/integration fixtures live in `tests/fixtures/` (settings, files, encryption, tls, temporal helpers)
@@ -235,23 +235,23 @@ async def test_file_upload_invalid_file_type(base_client: AsyncClient) -> None:
 **API Client Rules (REQUIRED):**
 
 - All API calls MUST use the auto-generated client under `src/api_client/syntara_api_client/` — do NOT call HTTP libraries (e.g., `requests`, `httpx`) directly in test files
-- All API calls MUST go through the `nexus_api` fixture (type: `NexusApiRegistry`)
-- Use the typed property for the relevant API group: `nexus_api.workflows`, `nexus_api.executions`, `nexus_api.approvals`, `nexus_api.invocation`, `nexus_api.tool_manager`, `nexus_api.files`, `nexus_api.default`
+- All API calls MUST go through the `syntara_api` fixture (type: `SyntaraApiRegistry`)
+- Use the typed property for the relevant API group: `syntara_api.workflows`, `syntara_api.executions`, `syntara_api.approvals`, `syntara_api.invocation`, `syntara_api.tool_manager`, `syntara_api.files`, `syntara_api.default`
 
 **Example:**
 ```python
 """E2E tests for GET endpoints: workflows and approvals."""
 
 import pytest
-from syntara_api_client.api import NexusApiRegistry
+from syntara_api_client.api import SyntaraApiRegistry
 
 pytestmark = pytest.mark.e2e
 
 class TestWorkflows:
     """E2E tests for workflow GET endpoints."""
 
-    def test_list_workflows(self, nexus_api: NexusApiRegistry) -> None:
-        workflows = nexus_api.workflows.list().assert_and_get()
+    def test_list_workflows(self, syntara_api: SyntaraApiRegistry) -> None:
+        workflows = syntara_api.workflows.list().assert_and_get()
         assert isinstance(workflows.resources, list)
 ```
 
@@ -383,7 +383,7 @@ import pytest
 
 # Mark a single test for PR checks
 @pytest.mark.pipeline(test_phase="pr-check")
-async def test_workflow_create_minimal(nexus_api):
+async def test_workflow_create_minimal(syntara_api):
     """Test minimal workflow creation - runs on PRs."""
     pass
 
@@ -392,14 +392,14 @@ async def test_workflow_create_minimal(nexus_api):
 class TestWorkflowCRUD:
     """All tests in this class run on PRs."""
 
-    async def test_create(self, nexus_api):
+    async def test_create(self, syntara_api):
         pass
 
-    async def test_delete(self, nexus_api):
+    async def test_delete(self, syntara_api):
         pass
 
 # No marker - runs in full suite only
-async def test_workflow_complex_validation(nexus_api):
+async def test_workflow_complex_validation(syntara_api):
     """Complex test - full suite only."""
     pass
 ```
@@ -456,7 +456,7 @@ Mark tests with `test_phase="pr-check"` if they cover:
 
 ```python
 @pytest.mark.pipeline(test_phase="pr-check")
-async def test_create_workflow_minimal(nexus_api: NexusApiRegistry) -> None:
+async def test_create_workflow_minimal(syntara_api: SyntaraApiRegistry) -> None:
     """Test minimal workflow creation.
 
     Marked for PR checks because:
@@ -465,7 +465,7 @@ async def test_create_workflow_minimal(nexus_api: NexusApiRegistry) -> None:
     - Fast execution (~2s)
     - Catches deployment configuration issues early
     """
-    workflow = await nexus_api.workflows.create(
+    workflow = await syntara_api.workflows.create(
         name="Test Workflow",
         description="E2E test workflow"
     ).assert_and_get()
@@ -583,16 +583,16 @@ This project uses structlog with `cache_logger_on_first_use=True`. Under pytest-
 
 ```python
 import structlog
-from nexus.some_module import target_module
+from syntara.some_module import target_module
 
-@patch("nexus.some_module.emitter._do_emit")
+@patch("syntara.some_module.emitter._do_emit")
 async def test_logs_warning(self, mock_emit: Mock) -> None:
     old_logger = target_module.logger
     try:
         with structlog.testing.capture_logs() as captured:
             # Create fresh logger INSIDE capture_logs() context
             # so it binds to the capture processor chain
-            target_module.logger = structlog.get_logger("nexus.some_module")
+            target_module.logger = structlog.get_logger("syntara.some_module")
             do_something_that_logs()
     finally:
         target_module.logger = old_logger
@@ -726,7 +726,7 @@ All HTML coverage reports are gitignored via the `htmlcov-*/` pattern:
 
 ## Adding Tests for a New Domain
 
-When adding a new domain (e.g., `src/nexus/new_domain/`):
+When adding a new domain (e.g., `src/syntara/new_domain/`):
 
 **Step 1: Create Test Directory Structure**
 
@@ -746,7 +746,7 @@ Only add if domain needs specific fixtures:
 """Domain-specific test fixtures."""
 
 import pytest
-from nexus.new_domain.models import DomainModel
+from syntara.new_domain.models import DomainModel
 
 @pytest.fixture
 def domain_model_data() -> dict[str, Any]:

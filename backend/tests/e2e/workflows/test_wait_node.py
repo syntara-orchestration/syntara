@@ -37,10 +37,10 @@ def _wait_definition(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
 
 
 @pytest.mark.e2e
-def test_wait_node_completes_after_duration(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_completes_after_duration(syntara_api: SyntaraApiRegistry) -> None:
     """A wait node with a short duration completes successfully."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-basic",
         _wait_definition(
             nodes=[
@@ -63,10 +63,10 @@ def test_wait_node_completes_after_duration(nexus_api: SyntaraApiRegistry) -> No
 
 
 @pytest.mark.e2e
-def test_wait_node_downstream_executes_after_wait(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_downstream_executes_after_wait(syntara_api: SyntaraApiRegistry) -> None:
     """Nodes after a wait execute only after the wait completes."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-downstream",
         _wait_definition(
             nodes=[
@@ -101,10 +101,10 @@ def test_wait_node_downstream_executes_after_wait(nexus_api: SyntaraApiRegistry)
 
 
 @pytest.mark.e2e
-def test_wait_node_multiple_in_sequence(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_multiple_in_sequence(syntara_api: SyntaraApiRegistry) -> None:
     """Multiple wait nodes in sequence both complete."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-sequence",
         _wait_definition(
             nodes=[
@@ -141,10 +141,10 @@ def test_wait_node_multiple_in_sequence(nexus_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.mark.e2e
-def test_wait_node_timestamps_correct(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_timestamps_correct(syntara_api: SyntaraApiRegistry) -> None:
     """Wait activity has correct started_at and completed_at with expected duration."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-timestamps",
         _wait_definition(
             nodes=[
@@ -180,10 +180,10 @@ def test_wait_node_timestamps_correct(nexus_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.mark.e2e
-def test_wait_node_in_conditional_branch(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_in_conditional_branch(syntara_api: SyntaraApiRegistry) -> None:
     """Only the wait node on the taken branch executes."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-conditional",
         _wait_definition(
             nodes=[
@@ -228,10 +228,10 @@ def test_wait_node_in_conditional_branch(nexus_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.mark.e2e
-def test_wait_node_zero_duration_fails(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_zero_duration_fails(syntara_api: SyntaraApiRegistry) -> None:
     """A wait node with duration 0 fails validation."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-zero",
         _wait_definition(
             nodes=[
@@ -253,10 +253,10 @@ def test_wait_node_zero_duration_fails(nexus_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.mark.e2e
-def test_wait_node_negative_duration_fails(nexus_api: SyntaraApiRegistry) -> None:
+def test_wait_node_negative_duration_fails(syntara_api: SyntaraApiRegistry) -> None:
     """A wait node with negative duration fails validation."""
     result = create_and_run_workflow(
-        nexus_api,
+        syntara_api,
         "e2e-wait-negative",
         _wait_definition(
             nodes=[

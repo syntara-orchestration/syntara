@@ -9,28 +9,28 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.context_managers import actor_context, audit_context, build_actor_context
-from nexus.audit.decorators import audit
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import (
+from syntara.audit.context_managers import actor_context, audit_context, build_actor_context
+from syntara.audit.decorators import audit
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import (
     activity_id_context_var,
     actor_context_var,
     execution_id_context_var,
     request_id_context_var,
     workflow_id_context_var,
 )
-from nexus.audit.events.audit_context import AuditContextEvent, AuditContextHandler
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import (
+from syntara.audit.events.audit_context import AuditContextEvent, AuditContextHandler
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import (
     AuditEvent,
     EventCategory,
     EventSeverity,
     EventStatus,
 )
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.sanitization import REDACTED
-from nexus.core.models.principal import PrincipalType, service_principal_id
-from nexus.core.models.user import User
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.sanitization import REDACTED
+from syntara.core.models.principal import PrincipalType, service_principal_id
+from syntara.core.models.user import User
 
 
 class TestActorContext:
@@ -233,7 +233,7 @@ class TestBuildActorContextDuckTyping:
 
     def test_service_account_uses_principal_type_and_name(self) -> None:
         """ServiceAccount has __principal_type__ and name but no username."""
-        from nexus.service_accounts.models.service_account import ServiceAccount
+        from syntara.service_accounts.models.service_account import ServiceAccount
 
         sa = ServiceAccount(
             name="my-bot",
@@ -250,7 +250,7 @@ class TestBuildActorContextDuckTyping:
 
     def test_falls_through_to_name_when_username_is_empty(self) -> None:
         """If a principal has username='' the or-chain falls through to name."""
-        from nexus.service_accounts.models.service_account import ServiceAccount
+        from syntara.service_accounts.models.service_account import ServiceAccount
 
         sa = ServiceAccount(
             name="fallback-name",
@@ -294,7 +294,7 @@ class TestAuditContextServicePrincipalClassification:
     def setup_method(self) -> None:
         AuditEventDispatcher.register({AuditContextEvent: AuditContextHandler()})
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_service_principal_classified_as_service_actor(self, mock_emit: Mock) -> None:
         """Test that user with a service principal ID is classified as SERVICE in audit_context."""
         svc_id = service_principal_id("backend.ao.svc")
@@ -324,7 +324,7 @@ class TestAuditContextServicePrincipalClassification:
         assert emitted_event.actor_type == PrincipalType.SERVICE
         assert emitted_event.event_status == EventStatus.SUCCESS
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_regular_user_classified_as_user_actor(self, mock_emit: Mock, test_user: User) -> None:
         """Test that user with a non-service principal ID is classified as USER in audit_context."""
         with audit_context(
@@ -353,7 +353,7 @@ class TestAuditContext:
             {AuditContextEvent: AuditContextHandler(), FunctionExecutionEvent: FunctionExecutionHandler()}
         )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_success_emits_audit_event(self, mock_emit: Mock, test_user: User) -> None:
         """Test that audit_context emits success event when no exception occurs."""
         # Arrange
@@ -389,7 +389,7 @@ class TestAuditContext:
         structured_dict = emitted_event.structured_data.model_dump()
         assert structured_dict["test_field"] == "test_value"
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_with_valid_resource_urn(self, mock_emit: Mock, test_user: User) -> None:
         """Test that audit_context includes valid resource_urn and resource_name in emitted event."""
         # Arrange
@@ -417,12 +417,12 @@ class TestAuditContext:
         assert emitted_event.event_category == EventCategory.USER_ACTION
         assert emitted_event.event_status == EventStatus.SUCCESS
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_with_invalid_resource_urn(self, mock_emit: Mock, test_user: User) -> None:
         """Test that audit_context drops invalid resource_urn with warning."""
         import structlog
 
-        from nexus.audit.models import audit_event as audit_event_module
+        from syntara.audit.models import audit_event as audit_event_module
 
         # Arrange
         invalid_urn = "invalid-urn-format"
@@ -435,7 +435,7 @@ class TestAuditContext:
         old_logger = audit_event_module.logger
         try:
             with structlog.testing.capture_logs() as captured:
-                audit_event_module.logger = structlog.get_logger("nexus.audit.models.audit_event")
+                audit_event_module.logger = structlog.get_logger("syntara.audit.models.audit_event")
                 with audit_context(
                     event_category=EventCategory.USER_ACTION,
                     event_action="test_action",
@@ -458,7 +458,7 @@ class TestAuditContext:
         # Verify warning was logged
         assert any("does not conform to RFC 8141" in entry.get("event", "") for entry in captured)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_error_emits_error_event(self, mock_emit: Mock) -> None:
         """Test that audit_context emits error event when exception occurs."""
         # Arrange
@@ -510,7 +510,7 @@ class TestAuditContext:
         ],
         ids=["password", "token", "api_key", "credentials"],
     )
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_sanitizes_sensitive_data_in_exception_messages(
         self, mock_emit: Mock, exception: Exception, sensitive_pattern: str
     ) -> None:
@@ -552,7 +552,7 @@ class TestAuditContext:
                     f"Sensitive data '{sensitive_pattern}' leaked into field '{field_name}'"
                 )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_with_no_context_data(self, mock_emit: Mock) -> None:
         """Test audit_context with no additional context data."""
         # Act
@@ -618,7 +618,7 @@ class TestAuditContext:
             (EventSeverity.CRITICAL, EventCategory.SYSTEM_OPERATION, "critical_operation", "critical.module"),
         ],
     )
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_custom_severity_success(
         self,
         mock_emit: Mock,
@@ -686,7 +686,7 @@ class TestAuditContext:
             ),
         ],
     )
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_severity_escalated_on_exception(
         self,
         mock_emit: Mock,
@@ -732,7 +732,7 @@ class TestContextManagersWithTrackEventDecorator:
             {AuditContextEvent: AuditContextHandler(), FunctionExecutionEvent: FunctionExecutionHandler()}
         )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_actor_context_with_audit_decorator(self, mock_emit: Mock, test_user: User) -> None:
         """Test that actor_context provides context for @audit decorated function."""
 
@@ -757,7 +757,7 @@ class TestContextManagersWithTrackEventDecorator:
         assert isinstance(emitted_event.structured_data, AuditContextData)
         assert emitted_event.structured_data.function_args == {"param1": "test_value"}
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_with_audit_decorator_success(self, mock_emit: Mock, test_user: User) -> None:
         """Test audit_context with @audit decorated function - success case."""
 
@@ -795,7 +795,7 @@ class TestContextManagersWithTrackEventDecorator:
         assert context_event.actor_type == PrincipalType.USER
         assert context_event.event_status == EventStatus.SUCCESS
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_with_audit_decorator_error(self, mock_emit: Mock) -> None:
         """Test audit_context with @audit decorated function - error case."""
         # Arrange
@@ -837,7 +837,7 @@ class TestContextManagersWithTrackEventDecorator:
         assert context_event.event_status == EventStatus.ERROR
         assert context_event.structured_data.error_type == "RuntimeError"
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_nested_context_managers_with_audit(self, mock_emit: Mock) -> None:
         """Test nested actor_context and audit_context with @audit decorator."""
         # Arrange
@@ -867,7 +867,7 @@ class TestContextManagersWithTrackEventDecorator:
         assert isinstance(emitted_event.structured_data, AuditContextData)
         assert emitted_event.structured_data.function_result == {"result": "processed_test_data"}
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_async_function_with_actor_context(self, mock_emit: Mock) -> None:
         """Test actor_context with async @audit decorated function."""
 
@@ -900,7 +900,7 @@ class TestActorContextSanitizationAndTruncation:
             {AuditContextEvent: AuditContextHandler(), FunctionExecutionEvent: FunctionExecutionHandler()}
         )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_actor_context_emitted_event_has_sanitized_payload(self, mock_emit: Mock, test_user: User) -> None:
         """Test that sensitive data in captured arguments is redacted when using actor_context."""
 
@@ -923,7 +923,7 @@ class TestActorContextSanitizationAndTruncation:
         # Non-sensitive field should be preserved
         assert function_data.function_args["name"] == "alice"
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_actor_context_emitted_event_has_truncated_payload(self, mock_emit: Mock, test_user: User) -> None:
         """Test that oversized captured results are truncated when using actor_context."""
 
@@ -953,7 +953,7 @@ class TestAuditContextSanitizationAndTruncation:
             {AuditContextEvent: AuditContextHandler(), FunctionExecutionEvent: FunctionExecutionHandler()}
         )
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_emitted_event_has_sanitized_payload(self, mock_emit: Mock, test_user: User) -> None:
         """Test that sensitive data in context_data is redacted by audit_context."""
         with audit_context(
@@ -987,7 +987,7 @@ class TestAuditContextSanitizationAndTruncation:
             pytest.param("credentials", "user:pass", id="credentials"),
         ],
     )
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_sanitizes_credential_patterns_in_context_data(
         self,
         mock_emit: Mock,
@@ -1033,7 +1033,7 @@ class TestAuditContextSanitizationAndTruncation:
         # Original sensitive value should not appear anywhere in the structured data
         assert sensitive_value not in str(structured_dict)
 
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_audit_context_emitted_event_has_truncated_payload(self, mock_emit: Mock, test_user: User) -> None:
         """Test that oversized context_data is truncated by audit_context."""
         with audit_context(

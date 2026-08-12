@@ -6,10 +6,10 @@ import pytest
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
-from nexus.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
+from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
 from tests.fixtures.temporal import CompleteAsyncError
 
-SETTINGS_PATH = "nexus.workflows.workflow_engine.activities.wait_activity.get_runtime_settings"
+SETTINGS_PATH = "syntara.workflows.workflow_engine.activities.wait_activity.get_runtime_settings"
 
 
 def _mock_settings(max_wait_seconds: int = 2592000) -> MagicMock:
@@ -158,7 +158,7 @@ class TestCompleteWaitHappyPath:
         mock_service.temporal_client = mock_client
 
         with patch(
-            "nexus.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
+            "syntara.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
             return_value=mock_service,
         ):
             result = await complete_wait("wf-123", "run-456", "node-wait-1")
@@ -190,7 +190,7 @@ class TestCompleteWaitIdempotent:
         mock_service.temporal_client = mock_client
 
         with patch(
-            "nexus.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
+            "syntara.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
             return_value=mock_service,
         ):
             result = await complete_wait("wf-123", "run-456", "node-wait-1")
@@ -212,7 +212,7 @@ class TestCompleteWaitIdempotent:
         mock_service.temporal_client = mock_client
 
         with patch(
-            "nexus.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
+            "syntara.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
             return_value=mock_service,
         ):
             result = await complete_wait("wf-123", "run-456", "node-wait-1")
@@ -239,7 +239,7 @@ class TestCompleteWaitUnexpectedError:
 
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
+                "syntara.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
                 return_value=mock_service,
             ),
             pytest.raises(RPCError, match="internal server error"),
@@ -254,7 +254,7 @@ class TestCompleteWaitServiceUnavailable:
     async def test_raises_when_service_is_none(self) -> None:
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
+                "syntara.workflows.workflow_engine.activities.wait_activity.get_activity_sync_service",
                 return_value=None,
             ),
             pytest.raises(ApplicationError, match="sync service not available"),

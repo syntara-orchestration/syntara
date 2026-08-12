@@ -24,7 +24,7 @@ class TestFileStorageStatusEndpoint:
         mock_retriever.health_check = AsyncMock(return_value=True)
         mock_fm.get_retriever.return_value = mock_retriever
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await auth_client.get(_ENDPOINT)
 
         assert resp.status_code == 200
@@ -36,7 +36,7 @@ class TestFileStorageStatusEndpoint:
         mock_fm = MagicMock()
         type(mock_fm).s3_configured = PropertyMock(return_value=False)
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await auth_client.get(_ENDPOINT)
 
         assert resp.status_code == 200
@@ -50,7 +50,7 @@ class TestFileStorageStatusEndpoint:
         mock_retriever.health_check = AsyncMock(return_value=False)
         mock_fm.get_retriever.return_value = mock_retriever
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await auth_client.get(_ENDPOINT)
 
         assert resp.status_code == 200
@@ -59,7 +59,7 @@ class TestFileStorageStatusEndpoint:
     @pytest.mark.asyncio
     async def test_reports_error_and_never_raises(self, auth_client: AsyncClient) -> None:
         """A broken object store is reported as a status, not a 5xx."""
-        with patch("nexus.files.health.get_file_manager", side_effect=RuntimeError("S3 is down")):
+        with patch("syntara.files.health.get_file_manager", side_effect=RuntimeError("S3 is down")):
             resp = await auth_client.get(_ENDPOINT)
 
         assert resp.status_code == 200

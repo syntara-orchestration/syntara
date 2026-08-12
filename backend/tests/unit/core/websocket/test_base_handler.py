@@ -10,10 +10,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.models.error import ErrorData
-from nexus.core.websocket.base_handler import BaseWebSocketStreamingHandler
-from nexus.core.websocket.close_codes import INTERNAL_ERROR, NORMAL_CLOSURE
-from nexus.core.websocket.exceptions import StreamingValidationError
+from syntara.core.models.error import ErrorData
+from syntara.core.websocket.base_handler import BaseWebSocketStreamingHandler
+from syntara.core.websocket.close_codes import INTERNAL_ERROR, NORMAL_CLOSURE
+from syntara.core.websocket.exceptions import StreamingValidationError
 
 
 class ConcreteHandler(BaseWebSocketStreamingHandler):
@@ -99,8 +99,8 @@ class TestBaseHandlerTemplatePattern:
         stream_id = f"test:{resource_id}:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.StreamClient") as mock_stream_client,
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_client,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_stream_client.return_value.__aenter__.return_value = mock_stream_client_with_no_events
             mock_stream_client.return_value.__aexit__.return_value = None
@@ -124,8 +124,8 @@ class TestBaseHandlerTemplatePattern:
         stream_id = f"test:{resource_id}:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.StreamClient") as mock_stream_client,
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_client,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_stream_client.return_value.__aenter__.return_value = mock_stream_client_with_no_events
             mock_stream_client.return_value.__aexit__.return_value = None
@@ -149,8 +149,8 @@ class TestBaseHandlerTemplatePattern:
         stream_id = f"test:{resource_id}:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.StreamClient") as mock_stream_client,
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_client,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_stream_client.return_value.__aenter__.return_value = mock_stream_client_with_no_events
             mock_stream_client.return_value.__aexit__.return_value = None
@@ -173,7 +173,7 @@ class TestBaseHandlerErrorHandling:
         stream_id = "test:missing:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_lifecycle.return_value = mock_lifecycle_manager
 
@@ -195,7 +195,7 @@ class TestBaseHandlerErrorHandling:
         stream_id = "test:missing:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_lifecycle.return_value = mock_lifecycle_manager
 
@@ -219,7 +219,7 @@ class TestBaseHandlerErrorHandling:
         handler = FailingHandler()
         stream_id = "test:some-id:events"
 
-        with patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle:
+        with patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle:
             mock_lifecycle.return_value = mock_lifecycle_manager
 
             with pytest.raises(RuntimeError):
@@ -245,7 +245,7 @@ class TestBaseHandlerErrorHandling:
         handler = FailingHandler()
         stream_id = "test:some-id:events"
 
-        with patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle:
+        with patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle:
             mock_lifecycle.return_value = mock_lifecycle_manager
 
             with pytest.raises(RuntimeError):
@@ -275,8 +275,8 @@ class TestBaseHandlerStreaming:
         ]
 
         with (
-            patch("nexus.core.websocket.base_handler.StreamClient") as mock_stream_client,
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_client,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             # Mock stream client
             mock_client = AsyncMock()
@@ -314,8 +314,8 @@ class TestBaseHandlerStreaming:
         stream_id = f"test:{resource_id}:events"
 
         with (
-            patch("nexus.core.websocket.base_handler.StreamClient") as mock_stream_client,
-            patch("nexus.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_client,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
         ):
             mock_stream_client.return_value.__aenter__.return_value = mock_stream_client_with_no_events
             mock_stream_client.return_value.__aexit__.return_value = None

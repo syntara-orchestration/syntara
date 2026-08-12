@@ -16,7 +16,7 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-from nexus.core.models import User
+from syntara.core.models import User
 
 _FAKE_USER = User(
     id=uuid4(),
@@ -32,11 +32,11 @@ def _bypass_websocket_auth() -> Generator[None, None, None]:
     """Bypass WebSocket auth and authz guards for example-component tests."""
     with (
         patch(
-            "nexus.core.websocket.endpoint_factory._authenticate_websocket",
+            "syntara.core.websocket.endpoint_factory._authenticate_websocket",
             AsyncMock(return_value=_FAKE_USER),
         ),
         patch(
-            "nexus.core.websocket.endpoint_factory._check_websocket_authorization",
+            "syntara.core.websocket.endpoint_factory._check_websocket_authorization",
             AsyncMock(return_value=True),
         ),
     ):

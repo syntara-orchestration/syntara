@@ -1,7 +1,7 @@
 """Unit tests for IntegrationDiscoverEvent and handler."""
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_discover import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_discover import (
     IntegrationDiscoverEvent,
     IntegrationDiscoverHandler,
 )
@@ -31,7 +31,7 @@ class TestIntegrationDiscoverHandler:
         assert audit_event.event_category == EventCategory.SYSTEM_OPERATION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
-        assert audit_event.source_component == "nexus.integrations.integration"
+        assert audit_event.source_component == "syntara.integrations.integration"
         assert "successful" in audit_event.event_message
         assert "mcp_server" in audit_event.event_message
 

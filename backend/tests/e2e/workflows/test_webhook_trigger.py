@@ -39,7 +39,7 @@ class TestWebhookTrigger:
 
     def test_webhook_trigger_full_flow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
@@ -61,7 +61,7 @@ class TestWebhookTrigger:
         workflow_name = unique_name("e2e-webhook-trigger")
 
         # Step 1: Create SA with credential
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         # Step 2: Create workflow with webhook_trigger bound to the SA
         workflow_data = WorkflowCreate(
@@ -104,7 +104,7 @@ class TestWebhookTrigger:
         assert workflow.id is not None
 
         # Step 3: Publish the workflow
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=workflow.id,
             version=1,
             body=PublishVersionRequest(),
@@ -128,7 +128,7 @@ class TestWebhookTrigger:
         execution_id = response_body["execution_id"]
 
         # Step 5: Poll execution to completion
-        final_execution = poll_execution_until_complete(nexus_api, UUID(execution_id))
+        final_execution = poll_execution_until_complete(syntara_api, UUID(execution_id))
 
         assert str(final_execution.status) == "completed"
         assert final_execution.activities is not None
@@ -152,12 +152,12 @@ class TestWebhookTrigger:
 
     def test_webhook_trigger_404_for_unknown_path(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         first_project_id: UUID,
     ):
         """POST to a nonexistent webhook path returns 404."""
-        _sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        _sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
         access_token = _get_sa_token(nexus_base_url, client_id, client_secret)
 
         unknown_path = unique_name("e2e-wh-nonexistent")
@@ -173,7 +173,7 @@ class TestWebhookTrigger:
 
     def test_webhook_trigger_requires_published_workflow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
@@ -182,7 +182,7 @@ class TestWebhookTrigger:
         webhook_path = unique_name("e2e-wh-unpublished")
         workflow_name = unique_name("e2e-webhook-unpublished")
 
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
         access_token = _get_sa_token(nexus_base_url, client_id, client_secret)
 
         workflow_data = WorkflowCreate(

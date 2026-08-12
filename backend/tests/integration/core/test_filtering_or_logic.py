@@ -10,8 +10,8 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.tool_manager.models.tool import Tool, ToolStatus
+from syntara.core.models import User
+from syntara.tool_manager.models.tool import Tool, ToolStatus
 
 
 @pytest_asyncio.fixture

@@ -4,10 +4,10 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.credentials.audit.credential import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.credentials.audit.credential import (
     CredentialEncryptionFailureEvent,
     CredentialEncryptionFailureHandler,
     CredentialLifecycleEvent,
@@ -62,7 +62,7 @@ class TestCredentialLifecycleHandler:
         assert result.event_severity == EventSeverity.INFO
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "credential_created"
-        assert result.source_component == "nexus.credentials"
+        assert result.source_component == "syntara.credentials"
         assert result.resource_urn == f"urn:syntara:credential:{cred_id}"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "credential-lifecycle"
@@ -260,7 +260,7 @@ class TestCredentialEncryptionFailureHandler:
         assert result.event_severity == EventSeverity.ERROR
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "credential_encryption_failure"
-        assert result.source_component == "nexus.credentials"
+        assert result.source_component == "syntara.credentials"
         assert result.resource_urn == f"urn:syntara:credential:{cred_id}"
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.data_type == "credential-encryption-failure"

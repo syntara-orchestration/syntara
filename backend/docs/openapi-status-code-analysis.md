@@ -182,12 +182,12 @@ content:
 
 ### 3. Use Existing ErrorData Schema
 
-The RFC 9457 compliant schema **already exists** as `ErrorData` in `nexus.core.models.base.error`.
+The RFC 9457 compliant schema **already exists** as `ErrorData` in `syntara.core.models.base.error`.
 
 Our error handlers are already using this model:
 
 ```python
-from nexus.core.models.error import ErrorData
+from syntara.core.models.error import ErrorData
 
 
 def create_problem_details_response(...) -> JSONResponse:

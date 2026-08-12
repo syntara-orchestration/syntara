@@ -17,10 +17,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.models import Workflow, WorkflowVersion, WorkflowVersionRead
-from nexus.workflows.models.execution import ExecutionCreate
-from nexus.workflows.models.query_params import WorkflowVersionListParams
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.models import Workflow, WorkflowVersion, WorkflowVersionRead
+from syntara.workflows.models.execution import ExecutionCreate
+from syntara.workflows.models.query_params import WorkflowVersionListParams
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 # ---------------------------------------------------------------------------

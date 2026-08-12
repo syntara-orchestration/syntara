@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from nexus.files.document_conversion.registry.converter_registry import (
+from syntara.files.document_conversion.registry.converter_registry import (
     ConverterRegistry,
     get_converter_registry,
 )

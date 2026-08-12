@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from nexus.authz.evaluator import evaluate_policy_input
+from syntara.authz.evaluator import evaluate_policy_input
 
 
 def _opa_evaluate(opa_input: dict[str, Any]) -> dict[str, Any]:
@@ -101,7 +101,7 @@ def deny_policy(
 
 def policies_for_role(role_name: str) -> list[dict[str, Any]]:
     """Resolve policy statements for a built-in role without DB access."""
-    from nexus.authz.role_conventions import builtin_role_policy_names, resolve_builtin_policy_statements
+    from syntara.authz.role_conventions import builtin_role_policy_names, resolve_builtin_policy_statements
 
     policy_names = builtin_role_policy_names(role_name)
     if not policy_names:

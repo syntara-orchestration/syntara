@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.service_accounts.models.service_account import ServiceAccountStatus
-from nexus.service_accounts.schemas import (
+from syntara.service_accounts.models.service_account import ServiceAccountStatus
+from syntara.service_accounts.schemas import (
     ServiceAccountCreate,
     ServiceAccountListParams,
     ServiceAccountListResponse,

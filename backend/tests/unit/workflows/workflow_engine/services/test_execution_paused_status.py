@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from nexus.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
 
 
 def _make_activity(status: ActivityStatus, started_at: datetime | None = None) -> Mock:

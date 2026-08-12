@@ -4,8 +4,8 @@ import importlib
 
 import pytest
 
-from nexus.core.config import base as config_module
-from nexus.core.database import session as session_module
+from syntara.core.config import base as config_module
+from syntara.core.database import session as session_module
 
 
 @pytest.mark.asyncio

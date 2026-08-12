@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-from nexus.auth.error_handlers import (
+from syntara.auth.error_handlers import (
     admin_delete_handler,
     admin_disable_no_other_admins_handler,
     admin_modify_handler,
@@ -23,7 +23,7 @@ from nexus.auth.error_handlers import (
     user_not_in_group_handler,
     user_username_conflict_handler,
 )
-from nexus.auth.exceptions import (
+from syntara.auth.exceptions import (
     AdminDeleteError,
     AdminDisableNoOtherAdminsError,
     AdminModifyError,

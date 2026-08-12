@@ -13,9 +13,9 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.credentials.models.credential_type import CredentialType
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.credentials.models.credential_type import CredentialType
 from tests.integration.api.conftest import (
     make_admin,
     make_auditor,

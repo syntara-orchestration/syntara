@@ -12,14 +12,14 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager import (
+from syntara.agent_orchestrator.context_manager import (
     ContextManagerPlanner,
     ContextPackage,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.services import get_retriever_service
-from nexus.agent_orchestrator.models import LLMCredentialConfig
-from nexus.core.database.session import get_db
-from nexus.core.models import User
+from syntara.agent_orchestrator.context_manager.retriever_service.services import get_retriever_service
+from syntara.agent_orchestrator.models import LLMCredentialConfig
+from syntara.core.database.session import get_db
+from syntara.core.models import User
 from tests.fixtures.settings import FakeSettingsCache
 
 
@@ -87,7 +87,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ) as mock_assemble:
@@ -134,7 +134,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ):
@@ -169,7 +169,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ):
@@ -216,7 +216,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ) as mock_assemble:
@@ -254,7 +254,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ) as mock_assemble:
@@ -292,7 +292,7 @@ class TestContextManagerPlanner:
         with (
             override_runtime_settings({"context_manager.max_total_tokens": 8000}),
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ) as mock_assemble,
@@ -337,7 +337,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ) as mock_assemble:
@@ -372,7 +372,7 @@ class TestContextManagerPlanner:
         )
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+            "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
             new_callable=AsyncMock,
             return_value=mock_context_package,
         ) as mock_assemble:
@@ -415,12 +415,12 @@ class TestContextManagerPlanner:
 
         with (
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.ModelProfileService.get_token_budget",
+                "syntara.agent_orchestrator.context_manager.planner.ModelProfileService.get_token_budget",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("Registry import failed"),
             ),
             patch(
-                "nexus.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
+                "syntara.agent_orchestrator.context_manager.planner.AssemblerService.assemble",
                 new_callable=AsyncMock,
                 return_value=mock_context_package,
             ) as mock_assemble,

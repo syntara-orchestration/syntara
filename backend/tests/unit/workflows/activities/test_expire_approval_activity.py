@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.approval_activity import (
+from syntara.workflows.workflow_engine.activities.approval_activity import (
     expire_approval_requests_activity,
 )
 
@@ -50,7 +50,7 @@ async def test_expire_success(
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -72,7 +72,7 @@ async def test_expire_no_pending_approvals(execution_id: str, node_id: str) -> N
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -96,7 +96,7 @@ async def test_expire_filters_by_node_id(execution_id: str, node_id: str) -> Non
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -110,7 +110,7 @@ async def test_expire_filters_by_node_id(execution_id: str, node_id: str) -> Non
 @pytest.mark.asyncio
 async def test_expire_api_error_returns_gracefully(execution_id: str, node_id: str) -> None:
     """API errors are caught and returned as error info, not raised."""
-    from nexus.workflows.clients.approvals_client import ApprovalsApiClientError
+    from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
 
     mock_client = AsyncMock()
     mock_client.list_approvals_by_execution = AsyncMock(
@@ -121,7 +121,7 @@ async def test_expire_api_error_returns_gracefully(execution_id: str, node_id: s
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -141,7 +141,7 @@ async def test_expire_unexpected_error_returns_gracefully(execution_id: str, nod
 
     with (
         patch(
-            "nexus.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):

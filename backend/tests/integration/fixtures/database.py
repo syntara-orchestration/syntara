@@ -9,7 +9,7 @@ import pytest
 import structlog
 from testcontainers.redis import RedisContainer
 
-from nexus.core.config.base import get_settings
+from syntara.core.config.base import get_settings
 
 if TYPE_CHECKING:
     from collections.abc import Generator

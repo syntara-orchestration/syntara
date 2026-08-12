@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.switch import switch
+from syntara.workflows.workflow_engine.activities.switch import switch
 
 CASES_APPROVED_REJECTED = [
     {"port": "case_0", "label": "Approved", "condition": "${status} == 'approved'"},
@@ -213,7 +213,7 @@ class TestSwitchEvaluationFailure:
     async def test_invalid_expression_returns_failed(self) -> None:
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
+                "syntara.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
                 side_effect=ValueError("bad expression"),
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -227,7 +227,7 @@ class TestSwitchEvaluationFailure:
         """Error message should reference the condition that actually failed, not the first one."""
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
+                "syntara.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
                 side_effect=[False, ValueError("fail on case 1")],
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -261,7 +261,7 @@ class TestSwitchEvaluationFailure:
     async def test_evaluation_error_has_no_control(self) -> None:
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
+                "syntara.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
                 side_effect=ValueError("invalid"),
             ),
             pytest.raises(ApplicationError),
@@ -273,7 +273,7 @@ class TestSwitchEvaluationFailure:
     async def test_uncaught_exception_propagates(self) -> None:
         with (
             patch(
-                "nexus.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
+                "syntara.workflows.workflow_engine.activities.switch.safe_eval_with_namespace",
                 side_effect=OSError("disk full"),
             ),
             pytest.raises(OSError, match="disk full"),

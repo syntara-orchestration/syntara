@@ -47,15 +47,15 @@ class TestSecretRotationGracePeriod:
     """API-19: Secret rotation — grace period."""
 
     def test_grace_period_both_secrets_valid(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """During the grace period, both old and new secrets are accepted."""
-        sa = nexus_api.service_accounts.create(
+        sa = syntara_api.service_accounts.create(
             body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=first_project_id),
         ).assert_and_get()
 
         try:
-            cred = nexus_api.service_account_credentials.create(
+            cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
@@ -63,7 +63,7 @@ class TestSecretRotationGracePeriod:
             old_secret = cred.client_secret
             client_id = cred.identifier
 
-            rotated = nexus_api.service_account_credentials.rotate(
+            rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
                 body=SACredentialRotateRequest(grace_period_seconds=3600),
@@ -80,7 +80,7 @@ class TestSecretRotationGracePeriod:
             resp_new = _token_request(nexus_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should work, got {resp_new.status_code}"
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestSecretRotationGraceExpiry:
@@ -91,15 +91,15 @@ class TestSecretRotationGraceExpiry:
     POLL_INTERVAL_SECONDS = 0.5
 
     def test_old_secret_rejected_after_grace(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """After the grace period, only the new secret works."""
-        sa = nexus_api.service_accounts.create(
+        sa = syntara_api.service_accounts.create(
             body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=first_project_id),
         ).assert_and_get()
 
         try:
-            cred = nexus_api.service_account_credentials.create(
+            cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
@@ -107,7 +107,7 @@ class TestSecretRotationGraceExpiry:
             old_secret = cred.client_secret
             client_id = cred.identifier
 
-            rotated = nexus_api.service_account_credentials.rotate(
+            rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
                 body=SACredentialRotateRequest(grace_period_seconds=self.GRACE_PERIOD_SECONDS),
@@ -139,4 +139,4 @@ class TestSecretRotationGraceExpiry:
             resp_new = _token_request(nexus_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should still work, got {resp_new.status_code}"
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)

@@ -110,7 +110,7 @@ def nexus_client(nexus_base_url: str) -> AuthenticatedClient:
 
 
 @pytest.fixture(scope="session")
-def nexus_api(nexus_client: AuthenticatedClient) -> SyntaraApiRegistry:
+def syntara_api(nexus_client: AuthenticatedClient) -> SyntaraApiRegistry:
     """Return a SyntaraApiRegistry bound to the session-scoped authenticated client.
 
     Uses ``nexus_client``, which refreshes the admin JWT via ``_AutoRefreshAuth`` on
@@ -162,7 +162,7 @@ def reset_async_client(nexus_client: AuthenticatedClient) -> Generator[None, Non
 
 
 @pytest.fixture(autouse=True)
-def _wait_for_api(nexus_api: SyntaraApiRegistry) -> None:
+def _wait_for_api(syntara_api: SyntaraApiRegistry) -> None:
     """Wait for the API to be healthy before each test.
 
     The database can become temporarily unreachable in the KinD CI cluster,
@@ -172,7 +172,7 @@ def _wait_for_api(nexus_api: SyntaraApiRegistry) -> None:
     deadline = time.monotonic() + _API_HEALTH_TIMEOUT
     while True:
         try:
-            resp = nexus_api.settings.list(limit=1)
+            resp = syntara_api.settings.list(limit=1)
             if resp.status_code == HTTPStatus.OK:
                 return
         except Exception:
@@ -188,7 +188,7 @@ def _wait_for_api(nexus_api: SyntaraApiRegistry) -> None:
 
 
 @pytest.fixture(scope="session")
-def viewer_client(nexus_base_url: str, nexus_api: SyntaraApiRegistry) -> AuthenticatedClient:
+def viewer_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
     """Return an authenticated client for a non-admin (viewer) user.
 
     Creates the user via the admin client on first use.  The user has no
@@ -197,7 +197,7 @@ def viewer_client(nexus_base_url: str, nexus_api: SyntaraApiRegistry) -> Authent
     username = "e2e-viewer"
     password = "ViewerPass1234!"  # noqa: S105
 
-    resp = nexus_api.users.create(
+    resp = syntara_api.users.create(
         body=UserCreate(
             username=username,
             email="e2e-viewer@example.com",
@@ -225,7 +225,7 @@ def viewer_api(viewer_client: AuthenticatedClient) -> SyntaraApiRegistry:
 
 
 @pytest.fixture(scope="session")
-def auditor_client(nexus_base_url: str, nexus_api: SyntaraApiRegistry) -> AuthenticatedClient:
+def auditor_client(nexus_base_url: str, syntara_api: SyntaraApiRegistry) -> AuthenticatedClient:
     """Return an authenticated client for a user with the auditor role.
 
     Creates the user and assigns the auditor role via the generated API
@@ -235,7 +235,7 @@ def auditor_client(nexus_base_url: str, nexus_api: SyntaraApiRegistry) -> Authen
     username = "e2e-auditor"
     password = "AuditorPass1234!"  # noqa: S105
 
-    resp = nexus_api.users.create(
+    resp = syntara_api.users.create(
         body=UserCreate(
             username=username,
             email="e2e-auditor@example.com",
@@ -247,13 +247,13 @@ def auditor_client(nexus_base_url: str, nexus_api: SyntaraApiRegistry) -> Authen
         pytest.fail(f"Failed to create auditor user: {resp.status_code} {resp.content!r}")
 
     if resp.status_code == HTTPStatus.CONFLICT:
-        users_list = nexus_api.users.list(username=username).assert_and_get()
+        users_list = syntara_api.users.list(username=username).assert_and_get()
         user_id = users_list.resources[0].id
     else:
         user = resp.assert_and_get()
         user_id = user.id
 
-    role_resp = nexus_api.users.create_role_assignment(
+    role_resp = syntara_api.users.create_role_assignment(
         user_id=user_id,
         body=SubResourceRoleAssignmentCreate(role_name="auditor"),
     )
@@ -303,9 +303,9 @@ def worker_base_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def nexus_api_admin_group_id(nexus_api: SyntaraApiRegistry) -> UUID:
+def syntara_api_admin_group_id(syntara_api: SyntaraApiRegistry) -> UUID:
     """Get admin role group ID for Nexus API."""
-    groups_resp = nexus_api.groups.list(additional_params={"name": "admins"}, limit=100)
+    groups_resp = syntara_api.groups.list(additional_params={"name": "admins"}, limit=100)
     if groups_resp.parsed is None or len(groups_resp.parsed.resources) == 0:
         msg = "Unable to retrieve admin group ID."
         raise RuntimeError(msg)
@@ -318,7 +318,7 @@ def nexus_api_admin_group_id(nexus_api: SyntaraApiRegistry) -> UUID:
 
 
 @pytest.fixture(scope="session")
-def mcp_integration_id(nexus_api: SyntaraApiRegistry) -> str:
+def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
     """Return the ID of the shared MCP server Integration used by E2E tests.
 
     Checks that the MCP server is reachable, then either finds an existing
@@ -331,7 +331,7 @@ def mcp_integration_id(nexus_api: SyntaraApiRegistry) -> str:
     except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         pytest.skip(f"MCP server not reachable at {MCP_HEALTH_URL}: {exc}")
 
-    integrations_resp = nexus_api.integrations.list(integration_type=IntegrationType.MCP_SERVER)
+    integrations_resp = syntara_api.integrations.list(integration_type=IntegrationType.MCP_SERVER)
     integrations_list = integrations_resp.assert_and_get()
 
     existing = next(
@@ -341,14 +341,14 @@ def mcp_integration_id(nexus_api: SyntaraApiRegistry) -> str:
 
     if existing is not None:
         integration_id = str(existing.id)
-        nexus_api.integrations.update(
+        syntara_api.integrations.update(
             integration_id=UUID(integration_id),
             body=IntegrationPatch(
                 configuration=MCPServerConfigurationInput(base_url=MCP_PROVIDER_URL, allow_http=True),
             ),
         )
     else:
-        create_resp = nexus_api.integrations.create(
+        create_resp = syntara_api.integrations.create(
             body=IntegrationCreate(
                 name=MCP_PROVIDER_NAME,
                 description="MCP server for E2E tests",
@@ -359,10 +359,10 @@ def mcp_integration_id(nexus_api: SyntaraApiRegistry) -> str:
         integration = create_resp.assert_and_get()
         integration_id = str(integration.id)
 
-    nexus_api.integrations.validate(integration_id=UUID(integration_id))
-    nexus_api.integrations.refresh_resources(integration_id=UUID(integration_id))
+    syntara_api.integrations.validate(integration_id=UUID(integration_id))
+    syntara_api.integrations.refresh_resources(integration_id=UUID(integration_id))
 
-    integration = nexus_api.integrations.get(integration_id=UUID(integration_id)).assert_and_get()
+    integration = syntara_api.integrations.get(integration_id=UUID(integration_id)).assert_and_get()
     if integration.refresh_status != IntegrationRefreshStatus.AVAILABLE:
         pytest.fail(
             f"MCP integration {integration_id} refresh failed: "
@@ -373,9 +373,9 @@ def mcp_integration_id(nexus_api: SyntaraApiRegistry) -> str:
 
 
 @pytest.fixture(scope="session")
-def nexus_admin_user(nexus_api: SyntaraApiRegistry) -> UserInfo:
+def nexus_admin_user(syntara_api: SyntaraApiRegistry) -> UserInfo:
     """Get admin user ID for Nexus API."""
-    return cast("UserInfo", nexus_api.authentication.get_current_user().assert_and_get())
+    return cast("UserInfo", syntara_api.authentication.get_current_user().assert_and_get())
 
 
 # ---------------------------------------------------------------------------
@@ -384,12 +384,14 @@ def nexus_admin_user(nexus_api: SyntaraApiRegistry) -> UserInfo:
 
 
 @pytest.fixture
-def workflow_factory(nexus_api: SyntaraApiRegistry) -> Generator[Callable[[WorkflowCreate], WorkflowRead], None, None]:
+def workflow_factory(
+    syntara_api: SyntaraApiRegistry,
+) -> Generator[Callable[[WorkflowCreate], WorkflowRead], None, None]:
     """Factory that creates workflows with automatic cleanup."""
     created_workflow_ids: list[UUID] = []
 
     def _create(workflow_data: WorkflowCreate) -> WorkflowRead:
-        workflow: WorkflowRead = nexus_api.workflows.create(body=workflow_data).assert_and_get()
+        workflow: WorkflowRead = syntara_api.workflows.create(body=workflow_data).assert_and_get()
         created_workflow_ids.append(workflow.id)
         return workflow
 
@@ -397,21 +399,21 @@ def workflow_factory(nexus_api: SyntaraApiRegistry) -> Generator[Callable[[Workf
 
     for workflow_id in created_workflow_ids:
         try:
-            nexus_api.workflows.delete(workflow_id=workflow_id)
+            syntara_api.workflows.delete(workflow_id=workflow_id)
         except Exception:
             pass  # Best effort cleanup
 
 
 @pytest.fixture
-def cleanup_workflows(nexus_api: SyntaraApiRegistry) -> Generator[list[UUID], None, None]:
+def cleanup_workflows(syntara_api: SyntaraApiRegistry) -> Generator[list[UUID], None, None]:
     """List to register workflow IDs for cleanup after test.
 
-    Use when tests need to call nexus_api.workflows.create() directly
+    Use when tests need to call syntara_api.workflows.create() directly
     (e.g., to validate response status codes) instead of using workflow_factory.
 
     Usage:
-        def test_create_workflow(nexus_api, cleanup_workflows):
-            response = nexus_api.workflows.create(...)
+        def test_create_workflow(syntara_api, cleanup_workflows):
+            response = syntara_api.workflows.create(...)
             if response.status_code == 201:
                 cleanup_workflows.append(response.parsed.id)
             assert response.status_code == 201
@@ -421,7 +423,7 @@ def cleanup_workflows(nexus_api: SyntaraApiRegistry) -> Generator[list[UUID], No
 
     for workflow_id in workflow_ids:
         try:
-            nexus_api.workflows.delete(workflow_id=workflow_id)
+            syntara_api.workflows.delete(workflow_id=workflow_id)
         except Exception:
             pass  # Best effort cleanup
 
@@ -443,7 +445,7 @@ def llm_model() -> str:
 
 @pytest.fixture(scope="session")
 def llm_credential_id(
-    nexus_api: SyntaraApiRegistry, worker_id: str, first_project_id: UUID
+    syntara_api: SyntaraApiRegistry, worker_id: str, first_project_id: UUID
 ) -> Generator[str, None, None]:
     """Create an LLM Provider credential for e2e tests and yield its UUID.
 
@@ -454,7 +456,7 @@ def llm_credential_id(
     if not api_key:
         pytest.skip("APP_OPENROUTER_API_KEY not set — LLM credential required")
 
-    types_list = nexus_api.credentials.list_types().assert_and_get()
+    types_list = syntara_api.credentials.list_types().assert_and_get()
     llm_type_id: UUID | None = None
     for ct in types_list.resources:
         if "llm" in ct.name.lower():
@@ -463,7 +465,7 @@ def llm_credential_id(
     assert llm_type_id is not None, "LLM Provider credential type not found — is the database seeded?"
 
     cred_name = f"e2e-llm-credential-{worker_id}"
-    cred = nexus_api.credentials.create(
+    cred = syntara_api.credentials.create(
         body=CredentialCreate(
             name=cred_name,
             credential_type_id=llm_type_id,
@@ -480,14 +482,14 @@ def llm_credential_id(
     yield cred_id
 
     try:
-        nexus_api.credentials.delete(credential_id=UUID(cred_id))
+        syntara_api.credentials.delete(credential_id=UUID(cred_id))
     except Exception:
         pass
 
 
 @pytest.fixture(scope="session")
 def llm_model_id(
-    nexus_api: SyntaraApiRegistry, llm_credential_id: str, llm_model: str, worker_id: str
+    syntara_api: SyntaraApiRegistry, llm_credential_id: str, llm_model: str, worker_id: str
 ) -> Generator[str, None, None]:
     """Create an LLM provider integration with a model and yield the LLMModel UUID.
 
@@ -496,7 +498,7 @@ def llm_model_id(
     UUID of that LLMModel record.  The integration (and its models) are deleted
     on teardown.
     """
-    integration = nexus_api.integrations.create(
+    integration = syntara_api.integrations.create(
         body=IntegrationCreate(
             name=f"e2e-llm-provider-{worker_id}",
             description="LLM provider for E2E tests",
@@ -518,7 +520,7 @@ def llm_model_id(
     ).assert_and_get()
     integration_id = integration.id
 
-    models_resp = nexus_api.integrations.list_models(integration_id=integration_id)
+    models_resp = syntara_api.integrations.list_models(integration_id=integration_id)
     models = models_resp.assert_and_get()
     assert models.resources, "LLM provider integration has no models after creation"
     model_uuid = str(models.resources[0].id)
@@ -526,7 +528,7 @@ def llm_model_id(
     yield model_uuid
 
     try:
-        nexus_api.integrations.delete(integration_id=integration_id)
+        syntara_api.integrations.delete(integration_id=integration_id)
     except Exception:
         pass
 
@@ -537,13 +539,13 @@ def llm_model_id(
 
 
 @pytest.fixture(scope="session")
-def first_project_id(nexus_api: SyntaraApiRegistry) -> UUID:
+def first_project_id(syntara_api: SyntaraApiRegistry) -> UUID:
     """Return the first available non-builtin project ID.
 
     Tests that need a valid project ID can use this fixture.
     Skips built-in projects since workflow creation is blocked in them.
     """
-    return get_first_non_builtin_project_id(nexus_api)
+    return get_first_non_builtin_project_id(syntara_api)
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +555,7 @@ def first_project_id(nexus_api: SyntaraApiRegistry) -> UUID:
 
 @pytest.fixture
 def local_user_factory(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
 ) -> Generator[Callable[..., tuple[UserRead, str]], None, None]:
     """Factory that creates a local user and cleans up after the test.
 
@@ -575,7 +577,7 @@ def local_user_factory(
         if isinstance(email, Unset):
             email = f"{username}@example.com"
 
-        resp = nexus_api.users.create(
+        resp = syntara_api.users.create(
             body=UserCreate(
                 username=username,
                 email=email,
@@ -594,14 +596,14 @@ def local_user_factory(
 
     for user_id in created_user_ids:
         try:
-            nexus_api.users.delete(user_id=user_id)
+            syntara_api.users.delete(user_id=user_id)
         except Exception:
             logger.warning("Failed to clean up local user %s", user_id, exc_info=True)
 
 
 @pytest.fixture
 def integration_factory(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
 ) -> Generator[Callable[[IntegrationCreate], dict[str, Any]], None, None]:
     """Factory that creates integrations with automatic cleanup.
 
@@ -621,7 +623,7 @@ def integration_factory(
             # Cleanup happens automatically
 
     Args:
-        nexus_api: Admin API client for creating integrations
+        syntara_api: Admin API client for creating integrations
 
     Returns:
         Factory function that creates and tracks integrations
@@ -630,7 +632,7 @@ def integration_factory(
     created_ids: list[UUID] = []
 
     def _create(body: IntegrationCreate) -> dict[str, Any]:
-        integration = nexus_api.integrations.create(body=body).assert_and_get()
+        integration = syntara_api.integrations.create(body=body).assert_and_get()
         created_ids.append(integration.id)
         result: dict[str, Any] = integration.to_dict()
         return result
@@ -639,7 +641,7 @@ def integration_factory(
 
     for integration_id in created_ids:
         try:
-            nexus_api.integrations.delete(integration_id=integration_id)
+            syntara_api.integrations.delete(integration_id=integration_id)
         except Exception:
             pass
 

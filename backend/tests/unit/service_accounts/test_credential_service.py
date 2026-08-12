@@ -13,25 +13,25 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from contextlib import AbstractContextManager
 
-from nexus.service_accounts.constants import MAX_CREDENTIALS_PER_SA
-from nexus.service_accounts.credential_schemas import (
+from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
+from syntara.service_accounts.credential_schemas import (
     SACredentialCreateResponse,
     SACredentialListResponse,
     SACredentialRead,
     SACredentialRotateResponse,
 )
-from nexus.service_accounts.exceptions import (
+from syntara.service_accounts.exceptions import (
     CredentialExpirationExceededError,
     CredentialExpirationInPastError,
     ServiceAccountCredentialLimitError,
     ServiceAccountCredentialNotFoundError,
 )
-from nexus.service_accounts.models.service_account_credential import (
+from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredential,
     ServiceAccountCredentialStatus,
     ServiceAccountCredentialType,
 )
-from nexus.service_accounts.services.credential_service import ServiceAccountCredentialService
+from syntara.service_accounts.services.credential_service import ServiceAccountCredentialService
 
 
 @pytest.fixture
@@ -310,7 +310,7 @@ class TestServiceInheritance:
     """Tests that ServiceAccountCredentialService extends BaseService."""
 
     def test_extends_base_service(self) -> None:
-        from nexus.core.services import BaseService
+        from syntara.core.services import BaseService
 
         assert issubclass(ServiceAccountCredentialService, BaseService)
 

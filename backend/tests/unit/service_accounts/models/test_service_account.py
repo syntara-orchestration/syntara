@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.core.models.base.base_resource import AuditLevel
-from nexus.service_accounts.models.service_account import (
+from syntara.core.models.base.base_resource import AuditLevel
+from syntara.service_accounts.models.service_account import (
     ServiceAccount,
     ServiceAccountStatus,
 )

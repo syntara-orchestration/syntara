@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.workflows.workflow_engine.models.aap_types import AAPResourceType
+from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
 
 class TestAAPResourceType:

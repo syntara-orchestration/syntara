@@ -7,7 +7,7 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from nexus.workflows.exceptions import ExecutionNotFoundError, TemporalUnavailableError
+from syntara.workflows.exceptions import ExecutionNotFoundError, TemporalUnavailableError
 
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ class TestSignalActivity:
 
         # Mock the service method
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ) as mock_send:
@@ -79,7 +79,7 @@ class TestSignalActivity:
         }
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ):
@@ -112,7 +112,7 @@ class TestSignalActivity:
         }
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ):
@@ -136,7 +136,7 @@ class TestSignalActivity:
         payload: dict[str, dict[str, str]] = {"signal_data": {}}
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ):
@@ -202,7 +202,7 @@ class TestSignalActivity:
         payload = {"signal_data": {"status": "completed"}}
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
             side_effect=ExecutionNotFoundError(execution_id),
@@ -229,7 +229,7 @@ class TestSignalActivity:
         payload = {"signal_data": {"status": "completed"}}
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
             side_effect=TemporalUnavailableError("Temporal server unavailable"),
@@ -254,7 +254,7 @@ class TestSignalActivity:
         payload = {"signal_data": {"status": "completed"}}
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ):
@@ -285,7 +285,7 @@ class TestSignalActivity:
         payload = {"signal_data": {"status": "completed"}}
 
         with patch(
-            "nexus.workflows.services.execution_service.ExecutionService.handle_activity_callback",
+            "syntara.workflows.services.execution_service.ExecutionService.handle_activity_callback",
             new_callable=AsyncMock,
             return_value=None,
         ) as mock_send:

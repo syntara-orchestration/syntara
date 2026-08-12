@@ -14,28 +14,28 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.integrations.adapters.protocol import (
+from syntara.core.models import User
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
     DiscoverResult,
     HealthCheckErrorType,
     ValidateResult,
 )
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationRefreshStatus,
     IntegrationStatus,
     IntegrationType,
 )
-from nexus.integrations.models.llm_model import LLMModel
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.models.llm_model import LLMModel
+from syntara.integrations.services.integration_service import IntegrationService
 
 BASE_URL = "/api/v1/integrations"
 
-LLM_VALIDATE_PATCH = "nexus.integrations.adapters.llm_provider.LLMProviderAdapter.validate"
-LLM_DISCOVER_PATCH = "nexus.integrations.adapters.llm_provider.LLMProviderAdapter.discover"
+LLM_VALIDATE_PATCH = "syntara.integrations.adapters.llm_provider.LLMProviderAdapter.validate"
+LLM_DISCOVER_PATCH = "syntara.integrations.adapters.llm_provider.LLMProviderAdapter.discover"
 
 
 async def _create_llm_integration(
@@ -46,8 +46,8 @@ async def _create_llm_integration(
     """Create an llm_provider integration with a minimal fake credential attached."""
     from sqlmodel import select as sql_select
 
-    from nexus.authz.models import Project
-    from nexus.core.services.secret_service import create_secret_service
+    from syntara.authz.models import Project
+    from syntara.core.services.secret_service import create_secret_service
 
     project = Project(name=f"{name_prefix}-proj-{uuid4().hex[:8]}")
     session.add(project)
@@ -332,7 +332,7 @@ class TestLLMProviderCredentialResolution:
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-cred-del")
 
         # Delete the credential out from under the integration
-        from nexus.integrations.models.integration import Integration
+        from syntara.integrations.models.integration import Integration
 
         integration = (
             await test_db_session.exec(select(Integration).where(Integration.id == UUID(integration_id)))
@@ -352,7 +352,7 @@ class TestLLMProviderCredentialResolution:
         """Integration whose credential was deleted after creation fails on refresh."""
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-ref-cred-del")
 
-        from nexus.integrations.models.integration import Integration
+        from syntara.integrations.models.integration import Integration
 
         integration = (
             await test_db_session.exec(select(Integration).where(Integration.id == UUID(integration_id)))
@@ -370,7 +370,7 @@ class TestLLMProviderCredentialResolution:
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
     ) -> None:
         """Creating an LLM integration without a credential raises IntegrationCredentialRequiredError."""
-        from nexus.integrations.exceptions import IntegrationCredentialRequiredError
+        from syntara.integrations.exceptions import IntegrationCredentialRequiredError
 
         service = IntegrationService(test_db_session, test_user)
         create_req = IntegrationCreate(
@@ -389,8 +389,8 @@ class TestLLMProviderCredentialResolution:
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
     ) -> None:
         """Credential without llm_api_key in extra_vars results in auth failure from adapter."""
-        from nexus.authz.models import Project
-        from nexus.core.services.secret_service import create_secret_service
+        from syntara.authz.models import Project
+        from syntara.core.services.secret_service import create_secret_service
 
         project = Project(name=f"llm-incomplete-proj-{uuid4().hex[:8]}")
         test_db_session.add(project)
@@ -468,7 +468,7 @@ async def _create_llm_with_models(session: AsyncSession, user: User, models: lis
     )
 
     with patch(LLM_DISCOVER_PATCH, new=AsyncMock(return_value=discover_result)):
-        from nexus.core.services.secret_service import create_secret_service
+        from syntara.core.services.secret_service import create_secret_service
 
         service = IntegrationService(session, user, secret_service=create_secret_service(session))
         await service.refresh_resources(UUID(integration_id))
@@ -594,7 +594,7 @@ class TestModelEndpointTypeMismatch:
         session: AsyncSession,
         user: User,
     ) -> str:
-        from nexus.authz.models import Project
+        from syntara.authz.models import Project
 
         project = Project(name=f"mcp-proj-{uuid4().hex[:8]}")
         session.add(project)

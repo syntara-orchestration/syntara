@@ -14,9 +14,9 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.tool_manager.models.tool_bulk_update import ToolBulkUpdate
-from nexus.tool_manager.models.tool_provider_validation_result import ToolProviderValidationResult
-from nexus.tool_manager.models.tool_validation import ToolValidationResult
+from syntara.tool_manager.models.tool_bulk_update import ToolBulkUpdate
+from syntara.tool_manager.models.tool_provider_validation_result import ToolProviderValidationResult
+from syntara.tool_manager.models.tool_validation import ToolValidationResult
 
 
 def test_tool_bulk_update_valid_creation() -> None:

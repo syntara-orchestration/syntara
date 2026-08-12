@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that frontend contracts are regenerated when OpenAPI spec changes.
 
-In the monorepo, when backend/src/nexus/schemas/openapi.yaml changes,
+In the monorepo, when backend/src/syntara/schemas/openapi.yaml changes,
 the generated TypeScript contracts in frontend/packages/syntara-contracts/src/
 must also be updated (via `make gen-contracts`).
 
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Dict
 
 
-OPENAPI_SPEC = "backend/src/nexus/schemas/openapi.yaml"
+OPENAPI_SPEC = "backend/src/syntara/schemas/openapi.yaml"
 CONTRACTS_DIR = "frontend/packages/syntara-contracts/src/"
 EXCEPTION_PATTERN = re.compile(
     r"no-(?:contract-regen|ui-pr)\s*:\s*(.+)",
@@ -183,7 +183,7 @@ def _build_contracts_stale_result() -> Dict[str, any]:
     """Build result when contracts are not updated and no exception given."""
     message = (
         "**OpenAPI spec changed — frontend contracts not updated**\n\n"
-        "This PR modifies `backend/src/nexus/schemas/openapi.yaml` but the generated "
+        "This PR modifies `backend/src/syntara/schemas/openapi.yaml` but the generated "
         "TypeScript types in `frontend/packages/syntara-contracts/src/` were not updated.\n\n"
         "### Action Required\n\n"
         "1. **Regenerate frontend contracts** from the updated spec:\n"

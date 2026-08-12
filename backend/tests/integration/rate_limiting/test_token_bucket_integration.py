@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 import pytest
 import pytest_asyncio
 
-from nexus.rate_limiting.redis_client import RateLimitRedisClient
-from nexus.rate_limiting.token_bucket import TokenBucket
+from syntara.rate_limiting.redis_client import RateLimitRedisClient
+from syntara.rate_limiting.token_bucket import TokenBucket
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator

@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from nexus.core.models import User
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
+from syntara.core.models import User
 
 # UserTokenConfig Tests
 
@@ -263,7 +263,7 @@ async def test_token_usage_record_invocation_id(
     test_db_session: AsyncSession, test_user: User, test_project_id
 ) -> None:
     """Test that invocation_id can be set as a UUID referencing an invocation."""
-    from nexus.agent_orchestrator.models import Invocation, InvocationStatus
+    from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 
     invocation = Invocation(
         prompt="test prompt",

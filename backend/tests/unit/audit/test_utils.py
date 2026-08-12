@@ -5,10 +5,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.audit.models.audit_event import EventSeverity
-from nexus.audit.utils import escalate_actor_type, escalate_severity, resolve_actor_type, sanitize_actor_username
-from nexus.core.constants import FieldLimits
-from nexus.core.models.principal import PrincipalType, service_principal_id
+from syntara.audit.models.audit_event import EventSeverity
+from syntara.audit.utils import escalate_actor_type, escalate_severity, resolve_actor_type, sanitize_actor_username
+from syntara.core.constants import FieldLimits
+from syntara.core.models.principal import PrincipalType, service_principal_id
 
 
 class TestEscalateSeverity:

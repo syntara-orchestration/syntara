@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest_asyncio
 
-from nexus.core.models import User
+from syntara.core.models import User
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 @pytest_asyncio.fixture
 async def non_local_user(test_db_session: AsyncSession) -> User:
     """Create a non-local (federated) user without a password hash."""
-    from nexus.core.models.user import AuthType
+    from syntara.core.models.user import AuthType
 
     user = User(
         id=uuid4(),
@@ -35,8 +35,8 @@ async def non_local_user(test_db_session: AsyncSession) -> User:
 @pytest_asyncio.fixture
 async def auth_client_as_admin(base_client: AsyncClient, admin_user: User) -> AsyncClient:
     """Create an authenticated test client with admin user."""
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
 
     async def override_get_current_user() -> User:
         return admin_user
@@ -48,7 +48,7 @@ async def auth_client_as_admin(base_client: AsyncClient, admin_user: User) -> As
 @pytest_asyncio.fixture
 async def multiple_local_users(test_db_session: AsyncSession, test_user: User) -> list[User]:
     """Create multiple test users for pagination, filtering, and sorting tests."""
-    from nexus.auth.passwords import hash_password
+    from syntara.auth.passwords import hash_password
 
     users = [
         User(

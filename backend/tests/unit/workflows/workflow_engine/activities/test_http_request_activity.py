@@ -7,13 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.common import ActivityExecutionError
-from nexus.workflows.workflow_engine.activities.http_request_activity import (
+from syntara.workflows.workflow_engine.activities.common import ActivityExecutionError
+from syntara.workflows.workflow_engine.activities.http_request_activity import (
     _add_credential_auth_headers,
     _apply_authentication,
     execute_http_request_activity,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import APIExecutorParameters
+from syntara.workflows.workflow_engine.models.workflow_definition import APIExecutorParameters
 
 
 @pytest.fixture(autouse=True)

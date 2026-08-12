@@ -1,6 +1,6 @@
 """Tests for credential scrubber (T073)."""
 
-from nexus.workflows.workflow_engine.utils.credential_scrubber import (
+from syntara.workflows.workflow_engine.utils.credential_scrubber import (
     REDACTED,
     scrub_credential_values,
     scrub_credentials,

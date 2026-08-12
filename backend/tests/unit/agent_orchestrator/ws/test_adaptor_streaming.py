@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.ws.adaptor_streaming import on_connect_invocations
-from nexus.core.websocket.close_codes import UNSUPPORTED_DATA
+from syntara.agent_orchestrator.ws.adaptor_streaming import on_connect_invocations
+from syntara.core.websocket.close_codes import UNSUPPORTED_DATA
 
 
 @pytest.fixture
