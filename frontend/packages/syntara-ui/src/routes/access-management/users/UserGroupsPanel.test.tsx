@@ -31,6 +31,17 @@ vi.mock('../../access/useAllGroups', () => ({
   useAllGroups: vi.fn(),
 }))
 
+vi.mock('../useGroupPermissions', () => ({
+  useGroupPermissions: () => ({
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    canManageMembers: true,
+    isLoading: false,
+    tooltips: { create: '', update: '', delete: '', manageMembers: '' },
+  }),
+}))
+
 vi.mock('../../../hooks/routing/useLocation', () => ({
   useLocation: () => '/system-administration/access-management/users/user-123/groups',
 }))

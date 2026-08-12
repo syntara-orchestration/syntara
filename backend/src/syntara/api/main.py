@@ -163,6 +163,11 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     validate_encryption_key_at_startup()
     await validate_file_storage_at_startup(get_settings())
 
+    # Fail fast if timezone data is missing (AAP-86297: ubi-minimal strips zone files)
+    from syntara.workflows.workflow_engine.models.workflow_definition import _get_valid_timezones  # noqa: PLC0415
+
+    _get_valid_timezones()
+
     # Initialize logging and audit subsystems
     start_audit_subsystems()
 

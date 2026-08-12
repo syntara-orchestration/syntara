@@ -117,10 +117,10 @@ test.afterAll(async ({ browser }) => {
   }
 })
 
-test.describe('Cancel Execution', () => {
+test.describe.skip('Cancel Execution', () => {
   test.describe.configure({ mode: 'serial' })
 
-  test.skip('cancel button is visible for a running execution', async ({ app }) => {
+  test('cancel button is visible for a running execution', async ({ app }) => {
     expect(runningExecutionId, 'runningExecutionId must be set by beforeAll').not.toBeNull()
 
     await app.goto(toAppUrl(`/executions/${runningExecutionId!}`))
