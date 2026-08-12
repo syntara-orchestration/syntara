@@ -123,5 +123,8 @@ packages.
 ## Document ownership
 
 Changes to this file require review from `@syntara-orchestration/syntara-leads`.
-Policy questions: raise them in `#wg-ansible-upstream-first` or open a
-GitHub Discussion before sending a large PR.
+For questions about this policy, open a
+[GitHub Discussion](https://github.com/orgs/syntara-orchestration/discussions)
+before sending a large PR. Report bugs via GitHub Issues. Report security
+vulnerabilities to `secalert@redhat.com` (see
+[`.github/SECURITY.md`](.github/SECURITY.md) when present).
