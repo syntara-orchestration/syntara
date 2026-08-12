@@ -22,7 +22,6 @@ def _make_execution(status: ExecutionStatus) -> Execution:
     execution.id = uuid4()
     execution.status = status
     execution.temporal_workflow_id = f"temporal-{execution.id}"
-    execution.deleted_at = None
     return execution
 
 

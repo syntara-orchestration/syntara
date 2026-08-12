@@ -75,7 +75,7 @@ export interface paths {
     post?: never
     /**
      * Delete workflow
-     * @description Soft delete a workflow.
+     * @description Permanently delete a workflow and cascade-delete all its versions and executions.
      */
     delete: operations['delete_workflow']
     options?: never
@@ -285,7 +285,6 @@ export interface components {
      * @description Schema for workflow response (GET /workflows/{id}).
      *
      *     Includes all fields from the database table model.
-     *     Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
      */
     WorkflowRead: {
       /**
@@ -348,10 +347,6 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
     }
@@ -422,10 +417,6 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
@@ -496,10 +487,6 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
@@ -514,9 +501,6 @@ export interface components {
     /**
      * WorkflowVersionRead
      * @description Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-     *     WorkflowVersion entities are read-only and managed automatically by the system.
-     *
-     *     Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
      */
     WorkflowVersionRead: {
       /**
@@ -568,10 +552,6 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
     }
     /**
      * PublishVersionRequest
@@ -962,10 +942,6 @@ export interface components {
        * @description Currently executing activities
        */
       current_activities?: components['schemas']['CurrentActivity'][]
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter. */
       workflow_definition?: components['schemas']['WorkflowDefinition'] | null
       /**
