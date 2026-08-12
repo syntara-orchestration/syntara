@@ -129,9 +129,13 @@ class BaseAgent(ABC):
             AgentOrchestratorError: For all other errors
 
         """
-        # Handle timeout errors
+        # Handle timeout errors (orchestrator/LLM timeout — distinct from Temporal StartToClose)
         if isinstance(error, TimeoutError):
-            msg = "Request timed out"
+            msg = (
+                "The AI Agent did not respond in time. Try again, increase the node "
+                "timeout, or simplify the prompt. If the agent may still be running, "
+                "check execution details before re-running."
+            )
             raise AgentTimeoutError(msg, str(invocation_id)) from error
 
         # Handle configuration and validation errors
