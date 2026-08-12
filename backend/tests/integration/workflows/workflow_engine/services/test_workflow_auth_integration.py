@@ -104,15 +104,16 @@ class TestWorkflowAuthIntegration:
                 task_queue=TASK_QUEUE,
             )
 
-            with pytest.raises(Exception, match="Unauthorized workflow execution"):
+            with pytest.raises(Exception, match="Workflow execution failed") as exc_info:
                 await asyncio.wait_for(handle.result(), timeout=10)
+            assert "Unauthorized" in str(exc_info.value.__cause__)
 
     async def test_schedule_baked_auth_header_accepted(self, temporal_env: WorkflowEnvironment) -> None:
         """A workflow submitted with build_auth_header (schedule path) must execute."""
         init_signing_key()
 
         workflow_id = f"sched-auth-test-{uuid4()}"
-        auth_headers = build_auth_header(workflow_id)
+        auth_headers = build_auth_header(workflow_id, "orchestrator_workflow")
 
         header_client = await Client.connect(
             temporal_env.client.service_client.config.target_host,

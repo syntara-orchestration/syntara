@@ -17,7 +17,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 
-from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, sign_workflow_id
+from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, sign_workflow
 
 
 class _WorkflowAuthOutboundInterceptor(OutboundInterceptor):
@@ -25,7 +25,7 @@ class _WorkflowAuthOutboundInterceptor(OutboundInterceptor):
 
     async def start_workflow(self, input: StartWorkflowInput) -> WorkflowHandle[Any, Any]:  # noqa: A002
         headers = dict(input.headers)
-        headers[HEADER_NAME] = Payload(data=sign_workflow_id(input.id))
+        headers[HEADER_NAME] = Payload(data=sign_workflow(input.id, input.workflow))
         input.headers = headers
         return await self.next.start_workflow(input)
 

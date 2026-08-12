@@ -415,7 +415,7 @@ class ScheduledTriggerService:
             id=schedule_workflow_id,
             task_queue=task_queue,
         )
-        action.headers = build_auth_header(schedule_workflow_id)
+        action.headers = build_auth_header(schedule_workflow_id, "scheduled_workflow_launcher")
 
         schedule = Schedule(
             action=action,

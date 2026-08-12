@@ -89,8 +89,8 @@ class TestReconcileScheduledTriggers:
     """Tests for the reconcile_scheduled_triggers callback."""
 
     @pytest.mark.asyncio
-    async def test_steady_state_updates_existing(self) -> None:
-        """When expected == actual, existing schedules are updated (auth headers) but no deletes happen."""
+    async def test_steady_state_no_mutations(self) -> None:
+        """When expected == actual, no creates or deletes happen."""
         wf_id = str(uuid4())
         triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
         session_factory = _make_session_factory([(wf_id, triggers)])
@@ -106,7 +106,7 @@ class TestReconcileScheduledTriggers:
 
             await reconcile_scheduled_triggers(session_factory)
 
-            mock_svc.create_schedule.assert_called_once()
+            mock_svc.create_schedule.assert_not_called()
             mock_svc_cls.delete_schedule.assert_not_called()
 
     @pytest.mark.asyncio

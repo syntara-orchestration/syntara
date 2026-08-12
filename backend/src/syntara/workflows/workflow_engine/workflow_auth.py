@@ -46,17 +46,18 @@ def _get_signing_key() -> bytes:
     return _signing_key  # type: ignore[return-value]
 
 
-def sign_workflow_id(workflow_id: str) -> bytes:
-    """Compute HMAC-SHA256 over a workflow ID."""
-    return hmac_mod.new(_get_signing_key(), workflow_id.encode(), hashlib.sha256).digest()
+def sign_workflow(workflow_id: str, workflow_type: str) -> bytes:
+    """Compute HMAC-SHA256 over workflow ID and type."""
+    message = f"{workflow_id}\n{workflow_type}".encode()
+    return hmac_mod.new(_get_signing_key(), message, hashlib.sha256).digest()
 
 
-def verify_workflow_id(workflow_id: str, token: bytes) -> bool:
-    """Verify an HMAC-SHA256 token for a workflow ID using constant-time comparison."""
-    expected = sign_workflow_id(workflow_id)
+def verify_workflow(workflow_id: str, workflow_type: str, token: bytes) -> bool:
+    """Verify an HMAC-SHA256 token for a workflow ID + type using constant-time comparison."""
+    expected = sign_workflow(workflow_id, workflow_type)
     return hmac_mod.compare_digest(expected, token)
 
 
-def build_auth_header(workflow_id: str) -> dict[str, Payload]:
-    """Build a Temporal header dict containing the signed workflow ID."""
-    return {HEADER_NAME: Payload(data=sign_workflow_id(workflow_id))}
+def build_auth_header(workflow_id: str, workflow_type: str) -> dict[str, Payload]:
+    """Build a Temporal header dict containing the signed workflow ID + type."""
+    return {HEADER_NAME: Payload(data=sign_workflow(workflow_id, workflow_type))}

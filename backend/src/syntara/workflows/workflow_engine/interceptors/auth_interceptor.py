@@ -19,7 +19,7 @@ from temporalio.worker import (
 )
 
 with workflow.unsafe.imports_passed_through():
-    from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_workflow_id
+    from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_workflow
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -35,7 +35,7 @@ class _WorkflowAuthInboundInterceptor(WorkflowInboundInterceptor):
         # workflow call graph and cannot be faked by an external client.
         if info.parent is None:
             auth_payload = input.headers.get(HEADER_NAME)
-            if auth_payload is None or not verify_workflow_id(info.workflow_id, auth_payload.data):
+            if auth_payload is None or not verify_workflow(info.workflow_id, info.workflow_type, auth_payload.data):
                 logger.warning(
                     "Rejected unauthorized workflow execution",
                     workflow_id=info.workflow_id,

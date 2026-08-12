@@ -16,8 +16,9 @@ from temporalio.worker import WorkflowInboundInterceptor
 _TEST_KEY = os.urandom(32)
 
 
-def _sign(workflow_id: str) -> bytes:
-    return hmac_mod.new(_TEST_KEY, workflow_id.encode(), hashlib.sha256).digest()
+def _sign(workflow_id: str, workflow_type: str = "orchestrator_workflow") -> bytes:
+    message = f"{workflow_id}\n{workflow_type}".encode()
+    return hmac_mod.new(_TEST_KEY, message, hashlib.sha256).digest()
 
 
 # ---------------------------------------------------------------------------
@@ -33,30 +34,40 @@ class TestWorkflowAuth:
             "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow_id, verify_workflow_id
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
 
             workflow_id = "test-workflow-abc123"
-            token = sign_workflow_id(workflow_id)
-            assert verify_workflow_id(workflow_id, token)
+            token = sign_workflow(workflow_id, "orchestrator_workflow")
+            assert verify_workflow(workflow_id, "orchestrator_workflow", token)
 
     def test_wrong_workflow_id_rejected(self) -> None:
         with patch(
             "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow_id, verify_workflow_id
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
 
-            token = sign_workflow_id("workflow-a")
-            assert not verify_workflow_id("workflow-b", token)
+            token = sign_workflow("workflow-a", "orchestrator_workflow")
+            assert not verify_workflow("workflow-b", "orchestrator_workflow", token)
+
+    def test_wrong_workflow_type_rejected(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+
+            token = sign_workflow("workflow-a", "orchestrator_workflow")
+            assert not verify_workflow("workflow-a", "malicious_workflow", token)
 
     def test_invalid_token_rejected(self) -> None:
         with patch(
             "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import verify_workflow_id
+            from syntara.workflows.workflow_engine.workflow_auth import verify_workflow
 
-            assert not verify_workflow_id("workflow-a", b"not-a-valid-hmac")
+            assert not verify_workflow("workflow-a", "orchestrator_workflow", b"not-a-valid-hmac")
 
     def test_build_auth_header_returns_payload(self) -> None:
         with patch(
@@ -65,7 +76,7 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, build_auth_header
 
-            headers = build_auth_header("my-workflow-id")
+            headers = build_auth_header("my-workflow-id", "orchestrator_workflow")
             assert HEADER_NAME in headers
             assert isinstance(headers[HEADER_NAME], Payload)
             assert len(headers[HEADER_NAME].data) == 32  # SHA-256 digest
@@ -112,8 +123,8 @@ class TestWorkflowAuthInboundInterceptor:
         with (
             patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf,
             patch(
-                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow_id",
-                side_effect=lambda wid, tok: hmac_mod.compare_digest(_sign(wid), tok),
+                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow",
+                side_effect=lambda wid, wtype, tok: hmac_mod.compare_digest(_sign(wid, wtype), tok),
             ),
         ):
             mock_wf.info.return_value = info
@@ -146,7 +157,7 @@ class TestWorkflowAuthInboundInterceptor:
         with (
             patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf,
             patch(
-                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow_id",
+                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow",
                 return_value=False,
             ),
         ):
@@ -178,6 +189,7 @@ class TestWorkflowAuthInboundInterceptor:
 @dataclass
 class _FakeStartWorkflowInput:
     id: str = "test-wf-456"
+    workflow: str = "orchestrator_workflow"
     headers: dict[str, Payload] = field(default_factory=dict)
 
 
@@ -196,8 +208,8 @@ class TestWorkflowAuthClientInterceptor:
 
         input_data = _FakeStartWorkflowInput()
         with patch(
-            "syntara.workflows.workflow_engine.client_interceptor.sign_workflow_id",
-            return_value=_sign(input_data.id),
+            "syntara.workflows.workflow_engine.client_interceptor.sign_workflow",
+            return_value=_sign(input_data.id, input_data.workflow),
         ):
             await outbound.start_workflow(input_data)  # type: ignore[arg-type]
 
