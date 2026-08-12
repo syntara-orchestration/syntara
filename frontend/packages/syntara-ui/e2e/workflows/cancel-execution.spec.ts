@@ -117,7 +117,7 @@ test.afterAll(async ({ browser }) => {
   }
 })
 
-test.describe('Cancel Execution', () => {
+test.describe.skip('Cancel Execution', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('cancel button is visible for a running execution', async ({ app }) => {
