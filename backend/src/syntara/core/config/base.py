@@ -1232,7 +1232,18 @@ class TemporalSettings(BaseSettings):
     max_concurrent_activities: int = Field(
         default=50,
         ge=1,
-        description="Maximum concurrent activity executions",
+        description="Maximum concurrent activity executions for the main workflow worker",
+    )
+
+    background_worker_max_concurrent_activities: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Maximum concurrent activity executions for the background worker "
+            "(Agent Execution, Document Conversion). Lower than the main worker default "
+            "because LLM/agent activities are memory-heavy and background-worker pods "
+            "have a smaller memory budget. Set via APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES."
+        ),
     )
 
     max_concurrent_workflows: int = Field(

@@ -448,6 +448,7 @@ class TestTemporalSettings:
             assert settings.max_cached_workflows == 20
             assert settings.max_concurrent_workflow_tasks == 50
             assert settings.max_concurrent_activities == 50
+            assert settings.background_worker_max_concurrent_activities == 10
         finally:
             get_settings.cache_clear()
 
@@ -459,6 +460,7 @@ class TestTemporalSettings:
         monkeypatch.setenv("APP_MAX_CACHED_WORKFLOWS", "100")
         monkeypatch.setenv("APP_MAX_CONCURRENT_WORKFLOW_TASKS", "75")
         monkeypatch.setenv("APP_MAX_CONCURRENT_ACTIVITIES", "25")
+        monkeypatch.setenv("APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES", "8")
         settings = Settings()
         assert settings.temporal_address == "temporal.example.com:7233"
         assert settings.temporal_namespace == "production"
@@ -466,6 +468,7 @@ class TestTemporalSettings:
         assert settings.max_cached_workflows == 100
         assert settings.max_concurrent_workflow_tasks == 75
         assert settings.max_concurrent_activities == 25
+        assert settings.background_worker_max_concurrent_activities == 8
 
     def test_temporal_concurrency_rejects_zero(self) -> None:
         """Test that concurrency controls reject values less than 1."""
@@ -475,6 +478,8 @@ class TestTemporalSettings:
             Settings(_env_file=None, max_concurrent_workflow_tasks=0)
         with pytest.raises(ValidationError):
             Settings(_env_file=None, max_concurrent_activities=0)
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, background_worker_max_concurrent_activities=0)
 
 
 # =============================================================================

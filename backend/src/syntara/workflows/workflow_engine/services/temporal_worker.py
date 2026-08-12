@@ -272,6 +272,8 @@ async def start_worker(
     namespace: str | None = None,
     task_queue: str | None = None,
     activity_registry: dict[ActivityName, Callable[..., Any]] = ACTIVITY_REGISTRY,
+    max_concurrent_activities: int | None = None,
+    max_concurrent_workflow_tasks: int | None = None,
 ) -> TemporalWorkerService:
     """Start the global Temporal worker service.
 
@@ -283,6 +285,11 @@ async def start_worker(
         task_queue: Task queue name (default from settings)
         activity_registry: Activity registry to use (defaults to full ACTIVITY_REGISTRY).
             Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
+        max_concurrent_activities: Override max concurrent activities. Defaults to
+            ``settings.max_concurrent_activities``. Background workers should pass
+            ``settings.background_worker_max_concurrent_activities``.
+        max_concurrent_workflow_tasks: Override max concurrent workflow tasks.
+            Defaults to ``settings.max_concurrent_workflow_tasks``.
 
     Returns:
         TemporalWorkerService instance
@@ -305,8 +312,14 @@ async def start_worker(
         task_queue=task_queue or settings.task_queue,
         activity_registry=activity_registry,
         max_cached_workflows=settings.max_cached_workflows,
-        max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
-        max_concurrent_activities=settings.max_concurrent_activities,
+        max_concurrent_workflow_tasks=(
+            max_concurrent_workflow_tasks
+            if max_concurrent_workflow_tasks is not None
+            else settings.max_concurrent_workflow_tasks
+        ),
+        max_concurrent_activities=(
+            max_concurrent_activities if max_concurrent_activities is not None else settings.max_concurrent_activities
+        ),
     )
 
     logger.info("temporal_worker_service_created")

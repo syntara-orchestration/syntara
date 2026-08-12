@@ -488,6 +488,45 @@ class TestGlobalWorkerManagement:
         syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
 
     @pytest.mark.asyncio
+    async def test_start_worker_respects_activity_concurrency_override(self) -> None:
+        """Background workers pass a lower max_concurrent_activities override."""
+        mock_client = MagicMock()
+        mock_worker = MagicMock()
+
+        async def mock_run() -> None:
+            await asyncio.sleep(0)
+
+        mock_worker.run = mock_run
+
+        original_create_task = asyncio.create_task
+
+        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+            return original_create_task(coro)
+
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                new=AsyncMock(return_value=mock_client),
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+            ) as mock_worker_class,
+            patch("asyncio.create_task", side_effect=mock_create_task),
+        ):
+            worker = await start_worker(
+                temporal_address="test.temporal.io:7233",
+                namespace="test",
+                task_queue="background-queue",
+                max_concurrent_activities=10,
+            )
+
+            assert worker.max_concurrent_activities == 10
+            _, kwargs = mock_worker_class.call_args
+            assert kwargs["max_concurrent_activities"] == 10
+
+        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+
+    @pytest.mark.asyncio
     async def test_start_worker_already_running(self) -> None:
         """Test starting worker when one is already running."""
         # Set up existing worker
