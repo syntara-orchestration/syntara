@@ -143,30 +143,30 @@ test.describe('Table Display and Sorting', () => {
 // Test 4: Cursor-Based Pagination
 // ---------------------------------------------------------------------------
 test.describe('Cursor-Based Pagination', () => {
-  test('pagination footer displays credential count', async ({ app }) => {
-    await goToCredentialsList(app)
+  let credentialsUnavailable = false
 
+  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
+  test.beforeEach(() => {
+    test.skip(credentialsUnavailable, 'No credential data available; seed data required')
+  })
+
+  test.beforeEach(async ({ app }) => {
+    await goToCredentialsList(app)
     const table = app.getByRole('grid', { name: 'Credentials table' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) credentialsUnavailable = true
     test.skip(!hasTable, 'No credential data available; seed data required')
+  })
 
+  test('pagination footer displays credential count', async ({ app }) => {
     const credentialCountText = app.locator('.pf-v6-c-pagination').getByText(/of \d+/)
     await expect(credentialCountText).toBeVisible()
   })
 
   test('next/previous controls navigate between pages when available', async ({ app }) => {
-    await goToCredentialsList(app)
-
-    const table = app.getByRole('grid', { name: 'Credentials table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No credential data available; seed data required')
-
     const pagination = app.locator('.pf-v6-c-pagination')
     const nextButton = pagination.getByRole('button', { name: /next/i })
     const hasNext = await nextButton
@@ -181,6 +181,7 @@ test.describe('Cursor-Based Pagination', () => {
       await expect(prevButton).toBeEnabled()
 
       await prevButton.click()
+      const table = app.getByRole('grid', { name: 'Credentials table' })
       await expect(table).toBeVisible()
     }
   })

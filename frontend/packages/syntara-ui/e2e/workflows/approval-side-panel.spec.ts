@@ -66,10 +66,20 @@ test.describe('Approval Side Panel — list navigation', () => {
 })
 
 test.describe('Approval Side Panel — deep-link', () => {
-  test('side panel displays approval details and action buttons', async ({ app }) => {
-    const hasPanel = await navigateToApprovalPanel(app)
-    test.skip(!hasPanel, 'Approval side panel not available')
+  let panelUnavailable = false
 
+  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
+  test.beforeEach(() => {
+    test.skip(panelUnavailable, 'Approval side panel not available')
+  })
+
+  test.beforeEach(async ({ app }) => {
+    const hasPanel = await navigateToApprovalPanel(app)
+    if (!hasPanel) panelUnavailable = true
+    test.skip(!hasPanel, 'Approval side panel not available')
+  })
+
+  test('side panel displays approval details and action buttons', async ({ app }) => {
     // Decision buttons
     await expect(app.getByRole('button', { name: 'Approve' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Reject' })).toBeVisible()
@@ -83,9 +93,6 @@ test.describe('Approval Side Panel — deep-link', () => {
   })
 
   test('clicking approve shows notes input and submit button', async ({ app }) => {
-    const hasPanel = await navigateToApprovalPanel(app)
-    test.skip(!hasPanel, 'Approval side panel not available')
-
     const approveBtn = app.getByRole('button', { name: 'Approve' })
     await expect(approveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
@@ -101,9 +108,6 @@ test.describe('Approval Side Panel — deep-link', () => {
   })
 
   test('clicking reject shows notes input and submit button', async ({ app }) => {
-    const hasPanel = await navigateToApprovalPanel(app)
-    test.skip(!hasPanel, 'Approval side panel not available')
-
     const rejectBtn = app.getByRole('button', { name: 'Reject' })
     await expect(rejectBtn).not.toHaveAttribute('aria-disabled', 'true')
 
@@ -117,9 +121,6 @@ test.describe('Approval Side Panel — deep-link', () => {
   })
 
   test('run history and approval panel are mutually exclusive', async ({ app }) => {
-    const hasPanel = await navigateToApprovalPanel(app)
-    test.skip(!hasPanel, 'Approval side panel not available')
-
     // History should be closed (deep-link sets history=closed)
     const historyHeading = app.getByRole('heading', { name: 'Run history' })
     await expect(historyHeading).not.toBeVisible()
@@ -135,7 +136,9 @@ test.describe('Approval Side Panel — deep-link', () => {
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible()
     await expect(historyHeading).not.toBeVisible()
   })
+})
 
+test.describe('Approval Side Panel — deep-link (viewer)', () => {
   test('viewer: approve and reject buttons are disabled', async ({ viewerApp }) => {
     await viewerApp.goto(toAppUrl(DEEP_LINK))
     await expect(viewerApp.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })

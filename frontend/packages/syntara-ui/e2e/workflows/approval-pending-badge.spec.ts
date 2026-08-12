@@ -80,6 +80,8 @@ async function applyPendingApprovalStatusFilter(app: Page): Promise<void> {
 }
 
 test.describe('Approval Pending Badge', () => {
+  test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
+
   test('shows "Pending approval" badge in all three locations when execution has pending approval', async ({ app }) => {
     let workflowName: string | undefined
 

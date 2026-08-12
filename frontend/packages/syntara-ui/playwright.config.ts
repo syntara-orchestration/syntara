@@ -21,6 +21,7 @@ const useWebServer = !isSkipWebServerForPlaywrightTests()
 export const VISUAL_REGRESSION_CLOCK = '2026-06-15T10:00:00Z'
 
 export default defineConfig({
+  globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
   testIgnore: [...(useWebServer ? [] : ['**/visual-regression/**']), '**/credential-types.spec.ts'],
   fullyParallel: true,

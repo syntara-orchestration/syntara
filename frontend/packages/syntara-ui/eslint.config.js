@@ -281,7 +281,7 @@ export default tseslint.config(
         'error',
         {
           // XMLHttpRequest required for upload progress (fetch lacks upload progress events)
-          allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts'],
+          allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
         },
       ],
       'syntara/prefer-pf-list-components': 'error',
