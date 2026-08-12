@@ -247,13 +247,13 @@ class TestRealRouterDiscovery:
     def test_discover_real_routers(self) -> None:
         """Test discovery with real routers in the codebase."""
         # This test uses the actual codebase structure
-        nexus_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "syntara"
+        syntara_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "syntara"
 
-        if not nexus_root.exists():
-            pytest.skip("Nexus source directory not found")
+        if not syntara_root.exists():
+            pytest.skip("Syntara source directory not found")
 
         routers = discover_routers(
-            base_paths=[nexus_root],
+            base_paths=[syntara_root],
             exclude_modules={"websocket", "utils", "constants"},
         )
 

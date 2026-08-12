@@ -74,14 +74,14 @@ describe('groupMappingFormUtils', () => {
         )
       ).toEqual({
         expression: 'groups[?@]',
-        entries: [{ idpGroupValue: 'admins', nexusGroupId: 'g1' }],
+        entries: [{ idpGroupValue: 'admins', mappedGroupId: 'g1' }],
       })
     })
 
     it('falls back to default expression when server has none', () => {
       expect(buildGroupMappingFormDefaultValues(null, 'groups[*]')).toEqual({
         expression: 'groups[*]',
-        entries: [{ idpGroupValue: '', nexusGroupId: '' }],
+        entries: [{ idpGroupValue: '', mappedGroupId: '' }],
       })
     })
   })

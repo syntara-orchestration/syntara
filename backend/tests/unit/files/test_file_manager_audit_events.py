@@ -59,7 +59,7 @@ class TestFileManagerAuditEvents:
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="syntara-uuid-test.pdf")
         file_manager._retriever = mock_retriever
 
         # Act
@@ -109,7 +109,7 @@ class TestFileManagerAuditEvents:
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="syntara-uuid-test.pdf")
         file_manager._retriever = mock_retriever
 
         # Act
@@ -175,7 +175,7 @@ class TestDocumentConversionServiceAuditEvents:
         mock_config = MagicMock()
         mock_config.overwrite_existing = True
         mock_config.timeout_seconds = 30
-        mock_config.temp_dir = "/tmp/nexus-test"  # noqa: S108
+        mock_config.temp_dir = "/tmp/syntara-test"  # noqa: S108
         with patch(
             "syntara.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
             return_value=mock_config,

@@ -77,7 +77,7 @@ class TestAgenticActivityExecution:
         """Test that agentic activity invokes Agent Orchestrator asynchronously."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -92,7 +92,7 @@ class TestAgenticActivityExecution:
         """Test that parameters are correctly mapped from config to Agent Orchestrator."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -103,7 +103,7 @@ class TestAgenticActivityExecution:
         call_args = mock_agent_client.invoke_agent_async.call_args
 
         # Check agent
-        assert call_args.kwargs["agent"] == "nexus-agent://default"
+        assert call_args.kwargs["agent"] == "syntara-agent://default"
 
         # Check llm_model_id is forwarded in metadata
         assert call_args.kwargs["metadata"]["llm_model_id"] == "550e8400-e29b-41d4-a716-446655440000"
@@ -116,7 +116,7 @@ class TestAgenticActivityExecution:
         """Test that activity invokes agent async and returns metadata."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 

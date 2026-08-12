@@ -1,7 +1,7 @@
 """Global configuration manager for RetrieverService framework.
 
 This module provides centralized configuration management for the RetrieverService
-framework, integrating with the existing Nexus configuration patterns.
+framework, integrating with the existing Syntara configuration patterns.
 """
 
 import structlog
@@ -22,7 +22,7 @@ class ConfigurationManager:
     providing centralized access to default configuration values loaded from
     application settings.
 
-    The manager integrates with existing Nexus configuration patterns and
+    The manager integrates with existing Syntara configuration patterns and
     provides type-safe access to configuration settings.
 
     Example Usage:

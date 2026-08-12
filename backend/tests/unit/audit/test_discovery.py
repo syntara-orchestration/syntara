@@ -265,7 +265,7 @@ class TestDiscoverySecurityValidation:
 
         fake_pkg = ModuleType("syntara.test_pkg")
         # Set the package path to a different directory
-        safe_dir = mkdtemp(prefix="safe_nexus_")
+        safe_dir = mkdtemp(prefix="safe_syntara_")
         fake_pkg.__path__ = [safe_dir]
         fake_pkg.__name__ = "syntara.test_pkg"
 

@@ -1,6 +1,6 @@
 """AAPResourceAccessEvent and AAPResourceAccessHandler for AAP-domain audit.
 
-Tracks user access to external AAP Controller resources via the Nexus proxy.
+Tracks user access to external AAP Controller resources via the Syntara proxy.
 
 Requirements: AAP-73903
 """

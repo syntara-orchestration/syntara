@@ -556,4 +556,4 @@ class TestFilesAPIMetadata:
         raw = response.text
         assert "file_path" not in raw
         assert "converted_content_path" not in raw
-        assert "/opt/app-root/uploads/nexus-" not in raw
+        assert "/opt/app-root/uploads/syntara-" not in raw

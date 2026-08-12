@@ -491,7 +491,7 @@ class OIDCService:
 
         Args:
             id_token_claims: Decoded ID token claims
-            claim_mapping: Optional mapping of Nexus fields to IdP claim names.
+            claim_mapping: Optional mapping of Syntara fields to IdP claim names.
                 If None, uses default OIDC claim names.
 
         Returns:

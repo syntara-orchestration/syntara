@@ -42,7 +42,7 @@ export type GroupMappingEditPanelState = {
   onDismissSignInAlert: () => void
   control: Control<GroupMappingEditFormValues>
   mappingRows: { rowId: string; index: number }[]
-  nexusGroups: ReturnType<typeof useAllGroups>['groups']
+  mappedGroups: ReturnType<typeof useAllGroups>['groups']
   onRemove: (index: number) => void
   onAdd: () => void
   onCreateGroup: (index: number) => void
@@ -196,7 +196,7 @@ export function useGroupMappingEditForm({
   )
 
   const { groups: allGroupsRaw, refetch: refetchGroups } = useAllGroups()
-  const nexusGroups = useMemo(
+  const mappedGroups = useMemo(
     () => allGroupsRaw.filter((g) => g.name !== BUILTIN_AUTHENTICATED_GROUP_NAME),
     [allGroupsRaw]
   )
@@ -205,11 +205,11 @@ export function useGroupMappingEditForm({
     (claims: Record<string, unknown>) => {
       setRawClaims(JSON.stringify(claims, null, 2))
       const currentEntries = form.getValues('entries')
-      const result = processDiscoveredGroups(claims, form.getValues('expression'), currentEntries, nexusGroups)
+      const result = processDiscoveredGroups(claims, form.getValues('expression'), currentEntries, mappedGroups)
       replace(result.newEntries)
       setSignInAlert({ variant: result.variant, message: result.message })
     },
-    [form, nexusGroups, replace]
+    [form, mappedGroups, replace]
   )
 
   const handleTestError = useCallback(() => {
@@ -253,7 +253,7 @@ export function useGroupMappingEditForm({
       const entry = index !== null ? form.getValues(`entries.${index}`) : undefined
       if (entry && index !== null && newGroups.length > 0) {
         const newest = [...newGroups].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]
-        if (newest?.id) form.setValue(`entries.${index}.nexusGroupId`, newest.id, { shouldDirty: true })
+        if (newest?.id) form.setValue(`entries.${index}.mappedGroupId`, newest.id, { shouldDirty: true })
       }
     } finally {
       setCreateGroupForIndex(null)
@@ -265,9 +265,9 @@ export function useGroupMappingEditForm({
     onDismissSignInAlert: () => setSignInAlert(null),
     control: form.control,
     mappingRows,
-    nexusGroups,
+    mappedGroups,
     onRemove: remove,
-    onAdd: () => append({ idpGroupValue: '', nexusGroupId: '' }),
+    onAdd: () => append({ idpGroupValue: '', mappedGroupId: '' }),
     onCreateGroup: setCreateGroupForIndex,
     onReDiscover: openTestSignIn,
     isListening,

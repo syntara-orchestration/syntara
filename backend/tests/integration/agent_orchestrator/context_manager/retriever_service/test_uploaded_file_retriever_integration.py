@@ -46,7 +46,7 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
 
         file_manager = get_file_manager()
         s3 = file_manager.get_retriever()
-        s3_path = f"nexus-{file_id}-test_document.txt"
+        s3_path = f"syntara-{file_id}-test_document.txt"
         await s3.save_file(test_content.encode("utf-8"), s3_path)
 
         file_metadata = FileMetadata(
@@ -139,9 +139,9 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
             filename="missing_file.txt",
             size_bytes=100,
             mime_type="text/plain",
-            file_path="nexus-nonexistent-original.txt",
+            file_path="syntara-nonexistent-original.txt",
             status=FileStatus.CONVERTED,
-            converted_content_path="nexus-nonexistent-does_not_exist.txt",
+            converted_content_path="syntara-nonexistent-does_not_exist.txt",
             created_by=test_user.id,
             project_id=test_project_id,
         )
@@ -218,7 +218,7 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
 
         file_manager = get_file_manager()
         s3 = file_manager.get_retriever()
-        s3_path = f"nexus-{file_id_1}-converted.txt"
+        s3_path = f"syntara-{file_id_1}-converted.txt"
         await s3.save_file(b"Valid content", s3_path)
 
         file_1 = FileMetadata(

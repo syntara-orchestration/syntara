@@ -482,7 +482,7 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe(MOCK_NEW_GROUP_ID)
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe(MOCK_NEW_GROUP_ID)
     expect(result.current.panel.createGroupForIndex).toBeNull()
   })
 
@@ -515,7 +515,7 @@ describe('useGroupMappingEditForm', () => {
     expect(result.current.form.getValues('entries')).toHaveLength(entryCountBeforeAdd + 1)
     expect(result.current.form.getValues(`entries.${entryCountBeforeAdd}`)).toEqual({
       idpGroupValue: '',
-      nexusGroupId: '',
+      mappedGroupId: '',
     })
   })
 
@@ -575,7 +575,7 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe('')
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe('')
     expect(result.current.panel.createGroupForIndex).toBeNull()
   })
 
@@ -608,7 +608,7 @@ describe('useGroupMappingEditForm', () => {
       { wrapper }
     )
 
-    expect(result.current.panel.nexusGroups.map((group) => group.name)).toEqual(['admin'])
+    expect(result.current.panel.mappedGroups.map((group) => group.name)).toEqual(['admin'])
   })
 
   it('invokes mutation error handler when save fails', async () => {
@@ -673,7 +673,7 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe('')
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe('')
   })
 
   it('clears create-group modal when group creation completes without an active row', async () => {

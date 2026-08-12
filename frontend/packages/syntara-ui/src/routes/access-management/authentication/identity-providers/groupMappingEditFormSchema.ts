@@ -11,7 +11,7 @@ const groupMappingEditEntrySchema = z.object({
   idpGroupValue: z
     .string()
     .max(GROUP_MAPPING_IDP_GROUP_VALUE_MAX_LENGTH, 'IdP group value must be at most 255 characters'),
-  nexusGroupId: z.union([z.literal(''), z.string().uuid(`Select a valid ${APP_TITLE} group`)]),
+  mappedGroupId: z.union([z.literal(''), z.string().uuid(`Select a valid ${APP_TITLE} group`)]),
 })
 
 export const groupMappingEditFormSchema = z
@@ -31,21 +31,21 @@ export const groupMappingEditFormSchema = z
   .superRefine((data, ctx) => {
     data.entries.forEach((entry, index) => {
       const hasIdp = entry.idpGroupValue.trim().length > 0
-      const hasNexus = entry.nexusGroupId.trim().length > 0
+      const hasMappedGroup = entry.mappedGroupId.trim().length > 0
 
-      if (!hasIdp && !hasNexus) {
+      if (!hasIdp && !hasMappedGroup) {
         return
       }
 
-      if (hasIdp && !hasNexus) {
+      if (hasIdp && !hasMappedGroup) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Select a ${APP_TITLE} group`,
-          path: ['entries', index, 'nexusGroupId'],
+          path: ['entries', index, 'mappedGroupId'],
         })
       }
 
-      if (!hasIdp && hasNexus) {
+      if (!hasIdp && hasMappedGroup) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Enter an IdP group value',

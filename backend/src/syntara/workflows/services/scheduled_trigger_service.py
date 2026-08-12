@@ -452,7 +452,7 @@ class ScheduledTriggerService:
         return await self.list_schedules_by_prefix(client, workflow_id)
 
     async def list_all_schedules(self, client: Client) -> set[str]:
-        """List all nexus-managed Temporal Schedule IDs.
+        """List all syntara-managed Temporal Schedule IDs.
 
         Uses server-side filtering via the NexusWorkflowId search attribute
         when available, falling back to client-side prefix scan otherwise.
@@ -485,7 +485,7 @@ class ScheduledTriggerService:
 
     @staticmethod
     async def list_schedules_by_prefix(client: Client, prefix: str = "") -> set[str]:
-        """List nexus-managed Temporal Schedule IDs, optionally narrowed by *prefix*.
+        """List syntara-managed Temporal Schedule IDs, optionally narrowed by *prefix*.
 
         Matches IDs starting with ``nexus-sched-{prefix}-`` when *prefix*
         is given, or ``nexus-sched-`` when omitted.

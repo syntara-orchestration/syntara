@@ -328,7 +328,7 @@ class TestSyncIdpGroups:
         identity = _make_identity(user, provider_id)
         nexus_group_id = uuid4()
         config = _make_config(group_jmespath_expression="groups[*]")
-        db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "nexus-users", nexus_group_id)])
+        db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "syntara-users", mapped_group_id)])
 
         result = await sync_idp_groups(db, user, identity, {"groups": "nexus-users"}, config)
         assert result is False
@@ -410,7 +410,7 @@ class TestAllowAllAuthenticated:
         users_group = _make_builtin_group("users")
         config = _make_config(group_jmespath_expression="groups[*]", allow_all_authenticated=True)
         db = _make_mock_db(
-            mapping_entries=[_make_db_entry(provider_id, "nexus-users", nexus_group_id)],
+            mapping_entries=[_make_db_entry(provider_id, "syntara-users", mapped_group_id)],
             users_group=users_group,
         )
 

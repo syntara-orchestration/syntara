@@ -854,7 +854,7 @@ class TestScriptEnvironmentSanitization:
 
     SENSITIVE_VARS: ClassVar[dict[str, str]] = {
         "APP_SECRET_ENCRYPTION_KEY": "0123456789abcdef" * 4,
-        "APP_DATABASE_URL": "postgresql://admin:secret@db:5432/nexus",
+        "APP_DATABASE_URL": "postgresql://admin:secret@db:5432/syntara",
         "APP_DB_PASSWORD": "super_secret_db_pass",
         "APP_CACHE_PASSWORD": "redis_secret",
         "APP_JWT_PRIVATE_KEY_PATH": "/secrets/jwt.pem",

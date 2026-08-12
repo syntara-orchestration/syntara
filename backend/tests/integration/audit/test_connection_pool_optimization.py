@@ -15,7 +15,7 @@ Evaluates connection pool optimization strategies for the audit subsystem:
    without exhausting the connection pool.
 
 Background:
-    The Nexus audit subsystem uses two connection pools after AAP-79901:
+    The Syntara audit subsystem uses two connection pools after AAP-79901:
     - Main pool (pool_size=10, max_overflow=20): API requests + CRUD trigger writes
     - Worker pool (pool_size=5, max_overflow=2): Drain SELECT/DELETE + async writes
 

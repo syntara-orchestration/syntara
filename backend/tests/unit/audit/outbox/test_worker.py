@@ -1244,7 +1244,7 @@ class TestBuildOtelLogRecordSerialization:
         event_a = _make_event(event_action="project_create")
         event_b = _make_event(event_action="roleassignment_create")
 
-        with override_settings(otel_service_name="nexus-test"):
+        with override_settings(otel_service_name="syntara-test"):
             record_a = _build_otel_log_record(event_a, shared_ts, AuditEventSource.CRUD_EVENT)
             record_b = _build_otel_log_record(event_b, shared_ts, AuditEventSource.CRUD_EVENT)
 

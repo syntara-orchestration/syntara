@@ -117,7 +117,7 @@ async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp)
 export async function selectDefaultProject(page: Page) {
   await page.evaluate(() => {
     localStorage.setItem(
-      'nexus-selected-project',
+      'syntara-selected-project',
       JSON.stringify({
         state: { selectedProjectId: 'p-001', selectedProjectName: 'default', favoriteProjectIds: [] },
         version: 1,

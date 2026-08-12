@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { OIDC_AUTHORIZE_PATH } from '../../../../client'
 import { generateUUID } from '../../../../utils/generateUUID'
 
-export const NONCE_STORAGE_KEY = 'nexus-test-signin-nonce'
-export const RESULT_STORAGE_KEY = 'nexus-test-signin'
+export const NONCE_STORAGE_KEY = 'syntara-test-signin-nonce'
+export const RESULT_STORAGE_KEY = 'syntara-test-signin'
 
 type UseTestSignInOptions = {
   providerId?: string

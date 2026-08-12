@@ -529,7 +529,7 @@ def get_aap_basic_auth(settings: Settings) -> httpx.BasicAuth | None:
 
 @dataclass
 class AAPCredentialAuth:
-    """Resolved AAP authentication from Nexus credentials."""
+    """Resolved AAP authentication from Syntara credentials."""
 
     headers: dict[str, str]
     basic_auth: httpx.BasicAuth | None
@@ -538,7 +538,7 @@ class AAPCredentialAuth:
 def get_aap_auth_from_credentials(
     resolved_creds: dict[str, Any],
 ) -> AAPCredentialAuth:
-    """Extract AAP auth headers from resolved Nexus credentials.
+    """Extract AAP auth headers from resolved Syntara credentials.
 
     Args:
         resolved_creds: Resolved credential data with extra_vars from InjectorResolver.
