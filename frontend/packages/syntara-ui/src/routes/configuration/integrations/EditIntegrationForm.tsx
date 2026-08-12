@@ -354,7 +354,7 @@ export function EditIntegrationForm() {
   const scope = useWatch({ control, name: 'scope' })
   const credentialId = useWatch({ control, name: 'management_credential_id' })
 
-  useDirtyFormGuard({
+  const { dismiss } = useDirtyFormGuard({
     isDirty,
     onDiscard: () => reset(),
     title: 'Discard unsaved changes?',
@@ -413,6 +413,7 @@ export function EditIntegrationForm() {
             variant,
             autoDismiss: true,
           })
+          dismiss()
           detachPromise(navigate({ to: detailPath }))
         } catch (error: unknown) {
           handleError({ title: 'Failed to update integration', context: `Integration "${values.name}"` })(error)

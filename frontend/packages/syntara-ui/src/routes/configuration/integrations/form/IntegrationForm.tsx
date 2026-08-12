@@ -279,13 +279,13 @@ export function IntegrationForm() {
   })
   const handleError = useFormMutationErrorHandler<IntegrationFormData>(setError)
 
-  useDirtyFormGuard({
+  const { dismiss } = useDirtyFormGuard({
     isDirty,
     onDiscard: () => reset(),
     title: 'Discard unsaved changes?',
     body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
   })
-  const createIntegration = useCreateIntegration({ handleError })
+  const createIntegration = useCreateIntegration({ handleError, onBeforeNavigate: dismiss })
   const credentialId = useWatch({ control, name: 'management_credential_id' })
   const integrationTypeValue = useWatch({ control, name: 'integration_type' })
   const scopeValue = useWatch({ control, name: 'scope' })

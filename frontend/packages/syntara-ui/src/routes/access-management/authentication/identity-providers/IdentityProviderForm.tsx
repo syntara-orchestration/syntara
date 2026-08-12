@@ -332,7 +332,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   })
   const handleError = useFormMutationErrorHandler<IdentityProviderFormData>(setError)
 
-  useDirtyFormGuard({
+  const { dismiss } = useDirtyFormGuard({
     isDirty,
     onDiscard: () => reset(),
     title: 'Discard unsaved changes?',
@@ -363,6 +363,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
       const successTitle = isEdit ? 'Identity provider updated' : 'Identity provider created'
       const onSuccess = () => {
         showSuccess({ title: successTitle })
+        dismiss()
         navigateBack()
       }
 
@@ -375,7 +376,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
         createProvider({ body: toCreatePayload(formData) }, { onSuccess, onError: onConflict })
       }
     },
-    [isEdit, providerId, setError, handleError, showSuccess, navigateBack, patchProvider, createProvider]
+    [isEdit, providerId, setError, handleError, showSuccess, dismiss, navigateBack, patchProvider, createProvider]
   )
 
   const normalizeAndSubmit = useCallback(

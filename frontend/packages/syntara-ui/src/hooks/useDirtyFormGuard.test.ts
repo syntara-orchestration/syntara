@@ -151,7 +151,7 @@ describe('useDirtyFormGuard', () => {
     expect(lastRegistration().check()).toBe(false)
   })
 
-  it('does not register exitWithoutSaving when onDiscard is omitted', () => {
+  it('registers exitWithoutSaving even when onDiscard is omitted', () => {
     renderHook(() =>
       useDirtyFormGuard({
         isDirty: true,
@@ -160,7 +160,9 @@ describe('useDirtyFormGuard', () => {
       })
     )
 
-    expect(lastRegistration().exitWithoutSaving).toBeUndefined()
+    expect(lastRegistration().exitWithoutSaving).toBeDefined()
+    lastRegistration().exitWithoutSaving!()
+    expect(lastRegistration().check()).toBe(false)
   })
 
   it('passes saveLabel through to registerDirtyCheck', () => {

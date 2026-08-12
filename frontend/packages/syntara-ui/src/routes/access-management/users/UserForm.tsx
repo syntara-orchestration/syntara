@@ -202,7 +202,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Users }))
 
-  useDirtyFormGuard({
+  const { dismiss } = useDirtyFormGuard({
     isDirty,
     onDiscard: () => reset(),
     title: 'Discard unsaved changes?',
@@ -217,7 +217,10 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
     isFederatedUser,
     isSelf,
     setError,
-    navigateBack,
+    navigateBack: () => {
+      dismiss()
+      navigateBack()
+    },
   })
 
   const passwordValue = useWatch({ control, name: 'password' })

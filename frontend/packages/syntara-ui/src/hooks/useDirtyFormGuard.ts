@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { useUnsavedChanges } from '../app/useUnsavedChanges'
 
@@ -38,8 +38,10 @@ export function useDirtyFormGuard({
   body,
   saveLabel,
   isActive = true,
-}: DirtyFormGuardOptions): void {
+}: DirtyFormGuardOptions): { dismiss: () => void } {
   const { registerDirtyCheck } = useUnsavedChanges()
+
+  const unregisterRef = useRef<(() => void) | null>(null)
 
   const isDirtyRef = useRef(isDirty)
   useEffect(() => {
@@ -57,18 +59,30 @@ export function useDirtyFormGuard({
   })
 
   useEffect(() => {
-    return registerDirtyCheck({
+    const unregister = registerDirtyCheck({
       check: () => isActive && isDirtyRef.current,
       saveAndExit: onSaveRef.current ? () => onSaveRef.current!() : undefined,
-      exitWithoutSaving: onDiscardRef.current
-        ? () => {
-            isDirtyRef.current = false
-            onDiscardRef.current?.()
-          }
-        : undefined,
+      exitWithoutSaving: () => {
+        isDirtyRef.current = false
+        unregisterRef.current?.()
+        unregisterRef.current = null
+        onDiscardRef.current?.()
+      },
       title,
       body,
       saveLabel,
     })
+    unregisterRef.current = unregister
+    return () => {
+      unregisterRef.current = null
+      unregister()
+    }
   }, [registerDirtyCheck, isActive, title, body, saveLabel])
+
+  const dismiss = useCallback(() => {
+    unregisterRef.current?.()
+    unregisterRef.current = null
+  }, [])
+
+  return { dismiss }
 }

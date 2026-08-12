@@ -239,6 +239,7 @@ export function useGroupMappingEditForm({
       {
         onSuccess: () => {
           showSuccess({ title: 'Group mapping saved' })
+          dismiss()
           navigateToTab()
         },
         onError: handleMutationError({ title: 'Failed to save group mapping' }),
@@ -261,7 +262,7 @@ export function useGroupMappingEditForm({
     }
   }, [refetchGroups, createGroupForIndex, form])
 
-  useDirtyFormGuard({
+  const { dismiss } = useDirtyFormGuard({
     isDirty: form.formState.isDirty,
     onDiscard: () => form.reset(),
     title: 'Discard unsaved changes?',
