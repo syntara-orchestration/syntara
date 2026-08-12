@@ -1085,7 +1085,10 @@ class OrchestrationService:
         except RuntimeError:
             loop = None
 
-        # Create ToolNode with both sync and async wrappers for comprehensive failure handling
+        # Create ToolNode with both sync and async wrappers for comprehensive failure handling.
+        # Uses LangGraph's default handle_tool_errors, which converts ToolInvocationError
+        # (malformed LLM tool args) into an error ToolMessage without re-raising. The
+        # wrappers classify those error ToolMessages so shared tools are not auto-disabled.
         return ToolNode(
             tools,
             awrap_tool_call=create_tool_awrapper(

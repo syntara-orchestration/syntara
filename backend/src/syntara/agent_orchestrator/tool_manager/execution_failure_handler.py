@@ -37,18 +37,27 @@ logger = structlog.stdlib.get_logger(__name__)
 # Constants
 MAX_ERROR_MESSAGE_LENGTH = 500
 
-# Caller/LLM argument and schema faults — record the invocation failure but do not
-# auto-disable the shared tool for other users.
-# ToolInvocationError is LangGraph ToolNode's wrap of pydantic ValidationError when
-# the model supplies args that violate the tool schema.
+# Caller/LLM schema faults only — keep this allowlist narrow so unexpected tool
+# failures (including ValueError/TypeError from a broken provider) still
+# auto-disable. ToolInvocationError is LangGraph ToolNode's wrap of pydantic
+# ValidationError when the model supplies args that violate the tool schema.
+#
+# Production note: OrchestrationService uses ToolNode's default
+# ``handle_tool_errors``, which converts ``ToolInvocationError`` into an error
+# ``ToolMessage`` without re-raising. Wrappers therefore classify both raised
+# exceptions *and* returned error ToolMessages.
 _NON_OUTAGE_EXCEPTION_TYPES: tuple[type[BaseException], ...] = (
     ValidationError,
     ToolInvocationError,
-    ValueError,
-    TypeError,
-    KeyError,
-    AttributeError,
 )
+
+
+class _ToolNodeAbsorbedError(Exception):
+    """Sentinel for failures ToolNode already converted to an error ToolMessage.
+
+    Used only for audit/metrics bookkeeping when ``execute()`` returns
+    ``status="error"`` instead of raising (default ``handle_tool_errors`` path).
+    """
 
 
 def _create_error_tool_message(error: Exception, tool_call_id: str, tool_name: str) -> ToolMessage:
@@ -127,15 +136,18 @@ def _resolve_execution_status(error: Exception | None) -> ToolExecutionStatus:
 def _should_auto_disable_tool(error: Exception) -> bool:
     """Return whether a tool execution failure warrants auto-disabling the tool.
 
-    Validation and argument errors are caller/LLM faults and must not flip a
-    shared tool to ``enabled:false`` / ``status:error`` for everyone. Timeouts,
-    connectivity failures, and other unexpected execution errors that survive
-    retries indicate a tool or provider outage and should auto-disable.
+    Only pydantic ``ValidationError`` and LangGraph ``ToolInvocationError`` are
+    treated as caller/LLM schema faults that must not flip a shared tool to
+    ``enabled:false`` / ``status:error`` for everyone. Timeouts, connectivity
+    failures, and other unexpected execution errors (including broad builtins
+    like ``ValueError``) that survive retries indicate a tool or provider
+    outage and should auto-disable.
 
-    Walks the ``__cause__`` chain so explicitly wrapped schema faults (e.g.
-    ``ToolInvocationError`` raised from ``ValidationError``) are not treated as
-    outages. Does not walk ``__context__``, which can attach unrelated prior
-    exceptions during ``except`` handling.
+    Walks the ``__cause__`` chain so an explicit ``raise ... from ValidationError``
+    (or ``ToolInvocationError``) still counts as a schema fault. Does **not**
+    treat ``RuntimeError from ValueError`` as non-outage — ``ValueError`` is
+    intentionally outside the allowlist. Does not walk ``__context__``, which
+    can attach unrelated prior exceptions during ``except`` handling.
 
     Args:
         error: The exception raised during tool execution (after retries).
@@ -280,6 +292,60 @@ def _emit_success_audit(
         activity_id=ctx.activity_id,
         activity_name=ctx.activity_name,
     )
+
+
+def _handle_error_tool_message_result(
+    ctx: _ToolInvocationContext,
+    request: ToolCallRequest,
+    result: ToolMessage,
+) -> Exception:
+    """Bookkeep a ToolNode error ToolMessage returned without raising.
+
+    Default ``handle_tool_errors`` converts ``ToolInvocationError`` (malformed
+    LLM tool args) into an error ``ToolMessage``. That path must record failure
+    audit/metrics but must **not** auto-disable the shared tool.
+
+    Args:
+        ctx: Shared invocation context for audit correlation.
+        request: The original tool call request.
+        result: Error ``ToolMessage`` returned by ``execute``.
+
+    Returns:
+        Sentinel exception used for metrics/DB status labeling.
+
+    """
+    tool_name = request.tool_call["name"]
+    content = result.content if isinstance(result.content, str) else str(result.content)
+    absorbed = _ToolNodeAbsorbedError(content)
+
+    _emit_tool_invocation_audit(
+        tool_name=tool_name,
+        status=ToolInvocationStatus.FAILED,
+        session_id=ctx.session_id,
+        invocation_id=ctx.invocation_id,
+        execution_id=ctx.execution_id,
+        request_id=ctx.request_id,
+        error_type="ToolInvocationError",
+        activity_id=ctx.activity_id,
+        activity_name=ctx.activity_name,
+    )
+
+    tool_id = _extract_tool_id_from_metadata(request.tool, tool_name)
+    if tool_id is not None:
+        logger.info(
+            "Skipping tool auto-disable for non-outage failure",
+            tool_id=tool_id,
+            error_type="ToolInvocationError",
+            source="error_tool_message",
+        )
+    else:
+        logger.info(
+            "Tool execution returned error ToolMessage; skipping auto-disable",
+            tool_name=tool_name,
+            error_type="ToolInvocationError",
+        )
+
+    return absorbed
 
 
 def _handle_tool_execution_error(
@@ -437,6 +503,11 @@ def create_tool_awrapper(
 
         try:
             result = await _execute(request, execute)
+            if isinstance(result, ToolMessage) and result.status == "error":
+                # Production path: ToolNode default handle_tool_errors converts
+                # ToolInvocationError into an error ToolMessage without re-raising.
+                caught_error = _handle_error_tool_message_result(ctx, request, result)
+                return result
             _emit_success_audit(ctx, tool_name, result)
             return result
         except Exception as error:  # noqa: BLE001 - logged inside _handle_tool_execution_error
@@ -549,6 +620,11 @@ def create_tool_wrapper(
 
         try:
             result = _execute_sync(request, execute)
+            if isinstance(result, ToolMessage) and result.status == "error":
+                # Production path: ToolNode default handle_tool_errors converts
+                # ToolInvocationError into an error ToolMessage without re-raising.
+                caught_error = _handle_error_tool_message_result(ctx, request, result)
+                return result
             _emit_success_audit(ctx, tool_name, result)
             return result
         except Exception as error:  # noqa: BLE001 - logged inside _handle_tool_execution_error
