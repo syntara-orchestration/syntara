@@ -257,11 +257,12 @@ async def sync_idp_groups(
             return False
         if result is None and (aap_role_mapping or config.allow_all_authenticated):
             logger.warning(
-                "JMESPath extraction failed but login proceeding",
+                "JMESPath extraction failed but login proceeding — clearing IdP-managed groups",
                 reason="aap_role_mapping" if aap_role_mapping else "allow_all_authenticated",
                 user_id=str(user.id),
                 provider_id=str(provider_id),
             )
+            result = set()  # Clear IdP-managed groups when extraction fails
         if result is not None:
             desired_group_ids = desired_group_ids | result
 
