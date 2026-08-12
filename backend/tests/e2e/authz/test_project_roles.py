@@ -44,7 +44,7 @@ def project_roles_env(
     create_project_role: ProjectRoleFactory,
     create_user: UserFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ) -> dict[str, Any]:
     """Create project, role, user, resources, and assign role."""
     user_id, name, password = create_user(admin_api, "tc11")
@@ -58,7 +58,7 @@ def project_roles_env(
     create_workflow(admin_api, project_id, "tc11")
     create_credential(admin_api, project_id, "tc11")
 
-    limited_api = api_for(nexus_base_url, name, password)
+    limited_api = api_for(syntara_base_url, name, password)
     return {
         "project_id": project_id,
         "role_name": role_name,

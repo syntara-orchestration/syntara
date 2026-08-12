@@ -43,29 +43,6 @@ tests/
 │   ├── users/           # User management tests
 │   ├── websocket/       # WebSocket tests
 │   └── workflows/       # Includes examples/, fixtures/, services/, workflow_engine/
-├── performance/         # Performance tests (opt-in via --run-performance)
-│   ├── agent_orchestration/
-│   ├── agent_orchestrator/
-│   ├── api_service/
-│   ├── audit/
-│   ├── authentication/
-│   ├── chat_window/
-│   ├── cli/
-│   ├── cost_tracking/
-│   ├── database/
-│   ├── e2e_agentic/
-│   ├── execution_service/
-│   ├── files/
-│   ├── invocation_service/
-│   ├── llm_model/
-│   ├── model_management/
-│   ├── routing_service/
-│   ├── system_wide/
-│   ├── telemetry/
-│   ├── temporal_worker/
-│   ├── tool_manager/
-│   ├── websocket/
-│   └── workflow_engine/
 └── unit/                # Unit tests (isolated, no external deps)
     ├── aap/                 # Includes models/, services/
     ├── admin/
@@ -255,28 +232,6 @@ class TestWorkflows:
         assert isinstance(workflows.resources, list)
 ```
 
-### Performance Tests (`tests/performance/`)
-
-**Scope:** Measure and validate performance characteristics.
-
-**Characteristics:**
-- Excluded from default test runs
-- Opt-in via `--run-performance` flag or `make test-performance`
-- Tests response times, throughput, resource usage
-- May use specialized fixtures (performance_db_engine)
-
-**Marker:** `@pytest.mark.performance` (REQUIRED)
-
-**Example:**
-```python
-import pytest
-
-@pytest.mark.performance
-async def test_workflow_execution_performance(base_client: AsyncClient) -> None:
-    """Test workflow execution completes within acceptable time."""
-    # Performance test implementation
-```
-
 ## conftest.py Hierarchy
 
 The project uses a two-level conftest structure. Base fixtures come from the `orchestrator-test-sdk` plugin (installed as a `pytest11` entry point) — no root `tests/conftest.py` is needed.
@@ -287,7 +242,7 @@ The project uses a two-level conftest structure. Base fixtures come from the `or
 - FastAPI test clients (`base_client`, `auth_client`, `jwt_client`, `session_app`)
 - Model factories: users, workflows, groups, tools, credentials, executions
 - Mock fixtures: `mock_openrouter_llm`, `mock_websocket`
-- Pytest hooks: performance test filtering, lock file cleanup, `worker_id`
+- Pytest hooks: lock file cleanup, `worker_id`
 - E2E helpers: `ExecutionsFactory`, `create_minimal_workflow_definition`, `ExampleMCPServer`
 
 **Local shared fixtures (`tests/fixtures/`)** — import directly, no plugin needed:
@@ -328,7 +283,7 @@ The project uses a two-level conftest structure. Base fixtures come from the `or
 
 **Fixture Location Guidelines:**
 
-1. If used by e2e or performance tests (and possibly integration) → `orchestrator-test-sdk` plugin
+1. If used by e2e tests (and possibly integration) → `orchestrator-test-sdk` plugin
 2. If shared between unit and integration tests → `tests/fixtures/` module (import directly)
 3. If only needed by integration tests as a factory helper → `tests/integration/helpers/`
 4. If only needed by unit tests → `tests/unit/fixtures/`
@@ -345,14 +300,12 @@ Configure markers in `pyproject.toml` under `[tool.pytest.ini_options]`.
 - `integration` — Integration tests (inferred by location)
 - `unit` — Unit tests (inferred by location)
 - `mcp` — Tests requiring MCP server infrastructure (deselect with `-m "not mcp"`)
-- `performance` — Performance tests (excluded by default, run with `--run-performance`)
 - `e2e` — End-to-end tests (required for tests in `tests/e2e/`)
 - `pipeline(test_phase=str)` — E2E test phase classification for PR filtering (e.g., `test_phase="pr-check"`)
 
 **When to Apply Markers:**
 
 - `@pytest.mark.e2e` — REQUIRED for all tests in `tests/e2e/`
-- `@pytest.mark.performance` — REQUIRED for all tests in `tests/performance/`
 - `@pytest.mark.mcp` — REQUIRED for tests that start MCP test servers
 - `@pytest.mark.pipeline(test_phase="pr-check")` — Optional, for E2E tests that should run on PRs (see Shift-Left E2E Testing section)
 - `@pytest.mark.slow` — Optional, for any test taking >5 seconds
@@ -621,7 +574,6 @@ async def test_logs_warning(self, mock_emit: Mock) -> None:
 - Strict markers (undefined markers fail)
 - Strict config (invalid config fails)
 - Coverage threshold (80% required, fails under)
-- Performance test filtering (auto-skipped without flag)
 - Async mode (auto-detected)
 - Parallel execution (xdist)
 - Linter rules (S101, ANN001, etc. ignored for tests)
@@ -657,16 +609,15 @@ make test              # Unit tests only (default)
 make test-unit         # Explicit unit tests
 make test-integration  # Integration tests (excludes MCP)
 make test-e2e-mcp      # MCP E2E tests (auto-starts services)
-make test-all          # All tests with coverage (excludes e2e, performance)
+make test-all          # All tests with coverage (excludes e2e)
 make test-e2e          # End-to-end tests (auto-starts services)
-make test-performance  # Performance tests only
 make test-coverage     # Coverage report (XML + terminal)
 make test-fast         # Fail-fast mode with short traceback
 ```
 
 **Test Execution Pattern:**
 
-All test commands (except e2e, performance) use the `run-tests` make function:
+All test commands (except e2e) use the `run-tests` make function:
 1. Detect container runtime (Podman preferred, Docker fallback)
 2. Set environment variables (DOCKER_HOST, TESTCONTAINERS_RYUK_DISABLED, etc.)
 3. Run `uv run pytest` with specified arguments

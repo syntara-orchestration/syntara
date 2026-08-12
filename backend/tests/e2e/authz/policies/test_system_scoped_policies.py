@@ -33,7 +33,7 @@ class TestSystemScopedPolicyAllowed:
 
     def test_allowed(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_role: RoleFactory,
@@ -52,7 +52,7 @@ class TestSystemScopedPolicyAllowed:
         if case.setup:
             case.setup(admin_api, project_id, ctx)
 
-        user_api = api_for(nexus_base_url, username, password)
+        user_api = api_for(syntara_base_url, username, password)
         resp = case.action(user_api, project_id, ctx)
         assert resp.is_success
 
@@ -63,7 +63,7 @@ class TestSystemScopedPolicyDenied:
 
     def test_denied(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_user: UserFactory,
         create_project: ProjectFactory,
@@ -85,7 +85,7 @@ class TestSystemScopedPolicyDenied:
         if case.setup:
             case.setup(admin_api, project_id, ctx)
 
-        user_api = api_for(nexus_base_url, username, password)
+        user_api = api_for(syntara_base_url, username, password)
         resp = case.action(user_api, project_id, ctx)
 
         if resp.status_code == HTTPStatus.FORBIDDEN:

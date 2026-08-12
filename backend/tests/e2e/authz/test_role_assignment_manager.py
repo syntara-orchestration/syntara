@@ -43,7 +43,7 @@ def role_assignment_manager_env(
     create_project_role: ProjectRoleFactory,
     create_user: UserFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ) -> dict[str, Any]:
     """Create project, manager user, target user, and a role to assign."""
     project_id, _ = create_project(admin_api, "rolemgr")
@@ -53,7 +53,7 @@ def role_assignment_manager_env(
 
     mgr_role = create_project_role(admin_api, project_id, "rolemgr", _POLICIES)
     assign_project_role_to_user(admin_api, project_id, mgr_id, mgr_role)
-    mgr_api = api_for(nexus_base_url, mgr_name, mgr_pass)
+    mgr_api = api_for(syntara_base_url, mgr_name, mgr_pass)
 
     # Target user — will receive/lose the "project-user" built-in role
     target_id, target_name, target_pass = create_user(admin_api, "roletgt")
@@ -63,7 +63,7 @@ def role_assignment_manager_env(
         "project_id": project_id,
         "mgr_id": mgr_id,
         "target_id": target_id,
-        "base_url": nexus_base_url,
+        "base_url": syntara_base_url,
         "target_user": target_name,
         "target_pass": target_pass,
     }

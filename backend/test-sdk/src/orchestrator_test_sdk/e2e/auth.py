@@ -1,4 +1,4 @@
-"""Authentication helpers for Nexus E2E tests.
+"""Authentication helpers for Syntara E2E tests.
 
 Provides session management, CSRF utilities, token refresh, and request-ID
 correlation helpers used across E2E and auth-specific test suites.

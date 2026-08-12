@@ -41,13 +41,13 @@ class TestClientCredentialsGrant:
     """API-9: Client credentials grant — happy path."""
 
     def test_happy_path_jwt_issuance(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """POST /auth/token returns 200 with valid ES256 JWT and correct claims."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
 
             assert resp.status_code == HTTPStatus.OK
             body = resp.parsed
@@ -70,13 +70,13 @@ class TestClientCredentialsGrant:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
 
     def test_tampered_token_rejected(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """A token with a tampered payload is rejected by protected endpoints."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
             valid_token = resp.parsed.access_token
 
@@ -89,7 +89,7 @@ class TestClientCredentialsGrant:
             tampered_token = f"{parts[0]}.{payload_bytes.decode()}.{parts[2]}"
 
             tampered_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/auth/me",
+                f"{syntara_base_url}/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {tampered_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -99,7 +99,7 @@ class TestClientCredentialsGrant:
 
             # Confirm the original valid token IS accepted
             valid_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/auth/me",
+                f"{syntara_base_url}/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {valid_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -114,13 +114,13 @@ class TestClientCredentialsBasicAuth:
     """API-10: Client credentials grant — HTTP Basic auth header."""
 
     def test_http_basic_auth(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Credentials via Authorization: Basic header returns a valid token."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret, use_basic_auth=True)
+            resp = token_request(syntara_base_url, client_id, client_secret, use_basic_auth=True)
 
             assert resp.status_code == HTTPStatus.OK
             assert resp.parsed is not None
@@ -134,13 +134,13 @@ class TestClientCredentialsInvalidSecret:
     """API-11: Client credentials grant — invalid secret."""
 
     def test_invalid_secret_returns_401(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Correct client_id with wrong secret returns 401."""
         sa, client_id, _ = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, "wrong-secret")
+            resp = token_request(syntara_base_url, client_id, "wrong-secret")
             assert resp.status_code == HTTPStatus.UNAUTHORIZED
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
@@ -149,9 +149,9 @@ class TestClientCredentialsInvalidSecret:
 class TestClientCredentialsUnknownClientId:
     """API-12: Client credentials grant — unknown client ID."""
 
-    def test_unknown_client_id_returns_401(self, nexus_base_url: str) -> None:
+    def test_unknown_client_id_returns_401(self, syntara_base_url: str) -> None:
         """Fabricated client_id returns 401 with no enumeration leak."""
-        resp = token_request(nexus_base_url, "nx_sa_nonexistent", "any-secret")
+        resp = token_request(syntara_base_url, "nx_sa_nonexistent", "any-secret")
         assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
@@ -159,7 +159,7 @@ class TestClientCredentialsDisabledSA:
     """API-13: Client credentials grant — disabled service account."""
 
     def test_disabled_sa_returns_401(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Disabled SA cannot obtain a token."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
@@ -167,7 +167,7 @@ class TestClientCredentialsDisabledSA:
         try:
             syntara_api.service_accounts.disable(service_account_id=sa.id)
 
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.UNAUTHORIZED
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
@@ -177,27 +177,27 @@ class TestClientCredentialsDeletedSA:
     """API-14: Client credentials grant — deleted service account."""
 
     def test_deleted_sa_returns_401(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Deleted SA cannot obtain a token."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
         syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-        resp = token_request(nexus_base_url, client_id, client_secret)
+        resp = token_request(syntara_base_url, client_id, client_secret)
         assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
 class TestClientCredentialsBuiltinAdminExcluded:
     """API-15: Client credentials grant — built-in admin excluded."""
 
-    def test_builtin_admin_excluded(self, nexus_base_url: str) -> None:
+    def test_builtin_admin_excluded(self, syntara_base_url: str) -> None:
         """Built-in admin credentials are not eligible for client credentials grant.
 
         Uses the real admin password to prove the admin *account type* is excluded,
         not just that a wrong password gets a 401.
         """
         password = admin_password()
-        resp = token_request(nexus_base_url, "admin", password)
+        resp = token_request(syntara_base_url, "admin", password)
         assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
@@ -208,13 +208,13 @@ class TestSATokenLifetime:
     EXPECTED_SA_LIFETIME_SECONDS = 15 * 60  # 900
 
     def test_sa_specific_token_lifetime(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """SA access token exp - iat matches the configured SA-specific lifetime."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
 
             payload = pyjwt.decode(resp.parsed.access_token, options={"verify_signature": False})
@@ -228,18 +228,18 @@ class TestSATokenLifetime:
 class TestUnsupportedGrantType:
     """API-39: Missing/unsupported grant_type."""
 
-    def test_unsupported_grant_type_returns_400(self, nexus_base_url: str) -> None:
+    def test_unsupported_grant_type_returns_400(self, syntara_base_url: str) -> None:
         """grant_type=authorization_code returns 400."""
-        resp = token_request(nexus_base_url, "any", "any", grant_type="authorization_code")
+        resp = token_request(syntara_base_url, "any", "any", grant_type="authorization_code")
         assert resp.status_code == HTTPStatus.BAD_REQUEST
 
-    def test_missing_grant_type_returns_422(self, nexus_base_url: str) -> None:
+    def test_missing_grant_type_returns_422(self, syntara_base_url: str) -> None:
         """Missing grant_type returns 422 (validation error).
 
         BodyToken.grant_type is required, so this case needs raw httpx.
         """
         resp = httpx.post(
-            f"{nexus_base_url}/api/v1/auth/token",
+            f"{syntara_base_url}/api/v1/auth/token",
             data={"client_id": "any", "client_secret": "any"},
             verify=e2e_ssl_context(),
         )

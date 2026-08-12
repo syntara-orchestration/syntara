@@ -1,4 +1,4 @@
-"""Factory fixtures for Nexus E2E tests."""
+"""Factory fixtures for Syntara E2E tests."""
 
 from orchestrator_test_sdk.factories.credentials import (
     CredentialFactory,

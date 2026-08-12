@@ -512,8 +512,8 @@ class AuditOutboxWorker(PeriodicWorker):
                 self._log_non_retryable_error(event, exc)
                 return  # Don't retry constraint violations
 
-            except DatabaseError as exc:
-                # Transient database errors - retry with exponential backoff
+            except (DatabaseError, OSError) as exc:
+                # Transient database/socket errors - retry with exponential backoff
                 if attempt < self._max_retries:
                     delay = self._base_delay * (2**attempt)  # 0.1s, 0.2s, 0.4s
                     self._log_retry(event, attempt + 1, delay, exc)
