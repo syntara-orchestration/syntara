@@ -85,17 +85,16 @@ def _result_envelope(output_dict: dict[str, Any]) -> dict[str, Any]:
     return envelope if isinstance(envelope, dict) else {}
 
 
-def _assert_nonempty_result_content(output_dict: dict[str, Any]) -> Any:
+def _assert_nonempty_result_content(output_dict: dict[str, Any]) -> str | dict[str, Any]:
     """Assert the agent produced a non-empty ``result.content`` (string or dict)."""
     envelope = _result_envelope(output_dict)
     content = envelope.get("content")
-    if isinstance(content, str):
-        assert content.strip(), f"Expected non-empty result content string, got: {output_dict}"
+    if isinstance(content, str) and content.strip():
         return content
-    if isinstance(content, dict):
-        assert content, f"Expected non-empty result content object, got: {output_dict}"
+    if isinstance(content, dict) and content:
         return content
-    pytest.fail(f"Expected non-empty result content (str|dict), got: {output_dict}")
+    msg = f"Expected non-empty result content (str|dict), got: {output_dict}"
+    raise AssertionError(msg)
 
 
 def _extract_used_tools(output_dict: dict[str, Any]) -> list[dict[str, Any]]:
@@ -310,8 +309,7 @@ def test_agentic_with_selected_mcp_tool_completes(
             return
 
     pytest.fail(
-        f"Expected get_greeting in used_tools within {MAX_TOOL_CALL_ATTEMPTS} attempts; "
-        f"last output: {last_output}"
+        f"Expected get_greeting in used_tools within {MAX_TOOL_CALL_ATTEMPTS} attempts; last output: {last_output}"
     )
 
 
