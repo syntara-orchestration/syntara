@@ -81,8 +81,6 @@ class WorkflowVersionRestoredEvent:
     error_type: str | None = field(default=None)
 
 
-_SOURCE_COMPONENT = "syntara.workflows"
-
 # ---------------------------------------------------------------------------
 # Audit handlers
 # ---------------------------------------------------------------------------

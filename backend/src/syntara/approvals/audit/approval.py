@@ -86,8 +86,6 @@ class ApprovalExpiredEvent:
     approval_node_id: str
 
 
-_SOURCE_COMPONENT = "syntara.approvals"
-
 # ---------------------------------------------------------------------------
 # Audit handlers (produce AuditEvent for persistence)
 # ---------------------------------------------------------------------------
