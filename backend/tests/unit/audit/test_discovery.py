@@ -215,7 +215,7 @@ class TestDiscoverHandlers:
 class TestDiscoverySecurityValidation:
     """Tests for security validations that prevent malicious module loading."""
 
-    def test_rejects_non_nexus_package(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_rejects_non_syntara_package(self, caplog: pytest.LogCaptureFixture) -> None:
         """discover_handlers rejects packages outside the syntara.* hierarchy."""
         malicious_pkg = ModuleType("malicious.package")
         malicious_pkg.__path__ = []

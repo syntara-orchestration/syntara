@@ -429,7 +429,7 @@ class TestGroupMappingModels:
         assert entry.idp_group_value == "admin-guid-123"
 
     def test_oidc_config_with_group_jmespath(self):
-        nexus_id = uuid4()
+        mapped_id = uuid4()
         config = OIDCConfiguration(
             provider_type="oidc",
             issuer_url="https://idp.example.com",
@@ -437,7 +437,7 @@ class TestGroupMappingModels:
             client_secret="client-secret",
             redirect_uri="http://localhost:8000/callback",
             group_jmespath_expression="realm_access.roles[*]",
-            group_mapping_entries=[OIDCGroupMappingEntry(idp_group_value="admin", nexus_group_id=nexus_id)],
+            group_mapping_entries=[OIDCGroupMappingEntry(idp_group_value="admin", mapped_group_id=mapped_id)],
         )
         assert config.group_jmespath_expression == "realm_access.roles[*]"
         assert len(config.group_mapping_entries) == 1

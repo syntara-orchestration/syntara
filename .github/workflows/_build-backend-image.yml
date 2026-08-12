@@ -71,7 +71,7 @@ jobs:
           file: backend/containers/nexus/Containerfile
           push: false
           platforms: linux/amd64,linux/arm64
-          outputs: type=oci,dest=/tmp/nexus-image.tar
+          outputs: type=oci,dest=/tmp/syntara-image.tar
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -81,13 +81,13 @@ jobs:
         shell: bash
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: printf '%s\n' "$IMAGE_TAGS" > /tmp/nexus-image-tag.txt
+        run: printf '%s\n' "$IMAGE_TAGS" > /tmp/syntara-image-tag.txt
 
       - name: Upload image artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: backend-nexus-image
+          name: backend-syntara-image
           path: |
-            /tmp/nexus-image.tar
-            /tmp/nexus-image-tag.txt
+            /tmp/syntara-image.tar
+            /tmp/syntara-image-tag.txt
           retention-days: 1

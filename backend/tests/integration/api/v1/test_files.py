@@ -352,7 +352,7 @@ async def _create_file_metadata(
         filename=filename,
         size_bytes=size_bytes,
         mime_type=mime_type,
-        file_path=f"/opt/app-root/uploads/nexus-{uuid4()}-{filename}",
+        file_path=f"/opt/app-root/uploads/syntara-{uuid4()}-{filename}",
         status=file_status,
         project_id=UUID(project_id),
     )
