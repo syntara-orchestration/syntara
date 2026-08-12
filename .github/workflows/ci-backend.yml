@@ -565,28 +565,6 @@ jobs:
           print("CgroupVersion=" + str(h.get("cgroupVersion", h.get("cgroupsVersion", "?"))))
           '
 
-      - name: Pull services with podman-compose
-        timeout-minutes: 10
-        env:
-          APP_SEGMENT_WRITE_KEY: test-e2e-write-key
-          APP_SEGMENT_ENDPOINT: http://mock-segment:9999
-          APP_COLLECTION_INTERVAL_SECONDS: "10"
-          APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
-        run: |
-          ulimit -n 65535
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e pull database redis moto mcp-server mock-segment temporal
-
-      - name: Build services with podman-compose
-        timeout-minutes: 25
-        env:
-          APP_SEGMENT_WRITE_KEY: test-e2e-write-key
-          APP_SEGMENT_ENDPOINT: http://mock-segment:9999
-          APP_COLLECTION_INTERVAL_SECONDS: "10"
-          APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
-        run: |
-          ulimit -n 65535
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e build syntara mcp-server
-
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
@@ -624,31 +602,15 @@ jobs:
             return 1
           }
 
-          # Wave 1: infrastructure (no inter-service dependencies)
-          echo "::group::Wave 1: infrastructure"
-          $COMPOSE up --no-deps -d database redis moto mcp-server mock-segment
-          echo "::endgroup::"
-          wait_healthy syntara-ci_database_1 120
-          wait_healthy syntara-ci_redis_1 60
-          wait_healthy syntara-ci_moto_1 60
-          wait_healthy syntara-ci_mcp-server_1 60
-          wait_healthy syntara-ci_mock-segment_1 60
-          echo "Infrastructure is healthy"
+          # Wave 1: infrastructure (no upstream dependencies)
+          for svc in database redis moto mcp-server mock-segment; do
+            wait_healthy "syntara-ci_${svc}_1" 120
+          done
 
-          # Wave 2: temporal (needs database)
-          echo "::group::Wave 2: temporal"
-          $COMPOSE up --no-deps -d temporal
-          echo "::endgroup::"
-          wait_healthy syntara-ci_temporal_1 120
-          echo "Temporal is healthy"
-
-          # Wave 3: application services (need temporal + infra)
-          echo "::group::Wave 3: application"
-          $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker
-          echo "::endgroup::"
-          wait_healthy syntara-ci_syntara_1 120
-          wait_healthy syntara-ci_temporal-worker_1 120
-          wait_healthy syntara-ci_temporal-background-worker_1 120
+          # Wave 2: services that depend on infrastructure
+          for svc in temporal syntara temporal-worker temporal-background-worker; do
+            wait_healthy "syntara-ci_${svc}_1" 180
+          done
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
