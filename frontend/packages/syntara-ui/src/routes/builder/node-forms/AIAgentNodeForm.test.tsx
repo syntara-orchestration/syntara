@@ -110,6 +110,10 @@ vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({
   })),
 }))
 
+vi.mock('../../../utils/deleteFile', () => ({
+  deleteFileById: vi.fn(() => Promise.resolve()),
+}))
+
 // Mock generateUUID
 vi.mock('../../../utils/generateUUID', () => ({
   generateUUID: vi.fn(() => 'mock-uuid-123'),
@@ -300,12 +304,13 @@ describe('AIAgentNodeForm', () => {
       expect(screen.getByText('test.txt')).toBeInTheDocument()
     })
 
-    // Click remove button
+    // Click remove button (server-backed files delete via API before leaving the UI)
     const removeButton = screen.getByTestId('remove-server-file-123')
     await user.click(removeButton)
 
-    // Verify file is removed
-    expect(screen.queryByText('test.txt')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('test.txt')).not.toBeInTheDocument()
+    })
   })
 
   describe('Response Schema', () => {

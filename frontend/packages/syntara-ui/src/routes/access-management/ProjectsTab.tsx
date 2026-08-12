@@ -166,7 +166,8 @@ function DeleteProjectDialog({
       titleIconVariant="warning"
       destructiveAcknowledgement={{
         checkboxId: 'delete-project-ack',
-        label: 'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
+        label:
+          'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
       }}
     >
       <Stack hasGutter>
@@ -177,6 +178,9 @@ function DeleteProjectDialog({
           <List>
             <ListItem>All workflows in this project will be permanently deleted.</ListItem>
             <ListItem>All project role assignments will be removed.</ListItem>
+            <ListItem>
+              Uploaded files are retained but marked as orphaned; delete them separately if they should not be kept.
+            </ListItem>
           </List>
         </StackItem>
       </Stack>

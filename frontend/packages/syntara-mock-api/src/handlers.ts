@@ -3595,6 +3595,7 @@ export const handlers = [
         mime_type: uploaded.mime_type,
         status: 'converted',
         conversion_error: null,
+        is_project_deleted: false,
       })
     }
     const known = knownFileMetadata[fileId]
@@ -3606,9 +3607,23 @@ export const handlers = [
         mime_type: known.mime_type ?? 'text/plain',
         status: 'converted',
         conversion_error: null,
+        is_project_deleted: false,
       })
     }
     return new HttpResponse(null, { status: 404 })
+  }),
+
+  http.delete('/api/v1/files/:file_id', ({ params }) => {
+    const fileId = String(params.file_id)
+    if (mockUploadedFiles.has(fileId)) {
+      mockUploadedFiles.delete(fileId)
+      return new HttpResponse(null, { status: 204 })
+    }
+    if (knownFileMetadata[fileId]) {
+      delete knownFileMetadata[fileId]
+      return new HttpResponse(null, { status: 204 })
+    }
+    return HttpResponse.json({ detail: 'File not found' }, { status: 404 })
   }),
 
   http.get('/api/v1/files/:file_id/download', ({ params }) => {
