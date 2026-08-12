@@ -133,15 +133,6 @@ else
 	uv run --no-sync pytest tests/ -v -m "mcp"
 endif
 
-.PHONY: test-performance
-test-performance: check-deps ## Run performance tests only (excluded from default test runs)
-ifndef APP_BASE_URL
-	$(call _e2e-run,tests/performance/ -v --run-performance)
-else
-	@echo "🧪 Running performance tests..."
-	uv run --no-sync pytest tests/performance/ -v --run-performance
-endif
-
 
 # Coverage targets - separate and combined
 # ========================================================

@@ -437,19 +437,55 @@ jobs:
         run: |
           ulimit -n 65535
           export PODMAN_BUILD_ARGS="--ulimit nofile=65535:65535"
-          uvx podman-compose -p nexus-ci --profile telemetry-e2e up --build -d \
-            database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment syntara-ui
 
-      - name: Wait for backend services to be healthy
-        timeout-minutes: 5
-        run: |
-          podman wait --condition=healthy \
-            nexus-ci_database_1 \
-            nexus-ci_temporal_1 \
-            nexus-ci_syntara_1 \
-            nexus-ci_temporal-background-worker_1 \
-            nexus-ci_mcp-server_1 \
-            nexus-ci_mock-segment_1
+          COMPOSE="uvx podman-compose -p nexus-ci --profile telemetry-e2e"
+
+          # --no-deps: bypass podman-compose depends_on/service_healthy resolution.
+          # GH Actions runner image 20260810+ ships a podman version where both
+          # podman-compose and `podman wait --condition=healthy` hang indefinitely.
+          # Poll via `podman inspect` instead, which bypasses the broken event system.
+          wait_healthy() {
+            local container="$1" timeout="${2:-120}" elapsed=0 status
+            echo "Waiting for $container to become healthy (timeout: ${timeout}s)..."
+            while [ "$elapsed" -lt "$timeout" ]; do
+              status=$(podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "missing")
+              if [ "$status" = "healthy" ]; then
+                echo "$container is healthy"
+                return 0
+              fi
+              sleep 3
+              elapsed=$((elapsed + 3))
+            done
+            echo "ERROR: $container did not become healthy after ${timeout}s (last status: $status)" >&2
+            podman inspect --format='{{json .State.Health}}' "$container" 2>/dev/null || true
+            return 1
+          }
+
+          # Build locally-built images
+          $COMPOSE build syntara syntara-ui mcp-server
+
+          # Wave 1: infrastructure (no inter-service dependencies)
+          echo "::group::Wave 1: infrastructure"
+          $COMPOSE up --no-deps -d database mcp-server mock-segment
+          echo "::endgroup::"
+          wait_healthy nexus-ci_database_1 120
+          wait_healthy nexus-ci_mcp-server_1 60
+          wait_healthy nexus-ci_mock-segment_1 60
+          echo "Infrastructure is healthy"
+
+          # Wave 2: temporal (needs database)
+          echo "::group::Wave 2: temporal"
+          $COMPOSE up --no-deps -d temporal
+          echo "::endgroup::"
+          wait_healthy nexus-ci_temporal_1 120
+          echo "Temporal is healthy"
+
+          # Wave 3: application services (need temporal + infra)
+          echo "::group::Wave 3: application"
+          $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker syntara-ui
+          echo "::endgroup::"
+          wait_healthy nexus-ci_syntara_1 120
+          wait_healthy nexus-ci_temporal-background-worker_1 120
           echo "All backend services are healthy"
 
       - name: Wait for syntara-ui to be reachable

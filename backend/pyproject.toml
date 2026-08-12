@@ -300,7 +300,6 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "mcp: marks tests that require MCP server infrastructure (deselect with '-m \"not mcp\"')",
-    "performance: marks tests as performance tests (excluded by default, run with '--run-performance')",
     "e2e: marks tests as end-to-end tests requiring full stack (Syntara API, Temporal, MCP server, OpenRouter)",
     "global_revocation: marks tests that set the global revocation timestamp (must run in an isolated pytest session to avoid poisoning other tests)",
     "compliance: marks tests as compliance tests (auth coverage, API contract enforcement)",

@@ -47,7 +47,7 @@ class TestSecretRotationGracePeriod:
     """API-19: Secret rotation — grace period."""
 
     def test_grace_period_both_secrets_valid(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """During the grace period, both old and new secrets are accepted."""
         sa = syntara_api.service_accounts.create(
@@ -72,12 +72,12 @@ class TestSecretRotationGracePeriod:
             new_secret = rotated.client_secret
             assert new_secret != old_secret
 
-            resp_old = _token_request(nexus_base_url, client_id, old_secret)
+            resp_old = _token_request(syntara_base_url, client_id, old_secret)
             assert resp_old.status_code == HTTPStatus.OK, (
                 f"Old secret should work during grace period, got {resp_old.status_code}"
             )
 
-            resp_new = _token_request(nexus_base_url, client_id, new_secret)
+            resp_new = _token_request(syntara_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should work, got {resp_new.status_code}"
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
@@ -91,7 +91,7 @@ class TestSecretRotationGraceExpiry:
     POLL_INTERVAL_SECONDS = 0.5
 
     def test_old_secret_rejected_after_grace(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """After the grace period, only the new secret works."""
         sa = syntara_api.service_accounts.create(
@@ -116,7 +116,7 @@ class TestSecretRotationGraceExpiry:
             new_secret = rotated.client_secret
 
             # Verify old secret still works during grace period
-            resp_during = _token_request(nexus_base_url, client_id, old_secret)
+            resp_during = _token_request(syntara_base_url, client_id, old_secret)
             assert resp_during.status_code == HTTPStatus.OK, (
                 f"Old secret should work during grace period, got {resp_during.status_code}"
             )
@@ -126,7 +126,7 @@ class TestSecretRotationGraceExpiry:
             old_rejected = False
             while time.monotonic() < deadline:
                 time.sleep(self.POLL_INTERVAL_SECONDS)
-                resp_old = _token_request(nexus_base_url, client_id, old_secret)
+                resp_old = _token_request(syntara_base_url, client_id, old_secret)
                 if resp_old.status_code == HTTPStatus.UNAUTHORIZED:
                     old_rejected = True
                     break
@@ -136,7 +136,7 @@ class TestSecretRotationGraceExpiry:
                 f"(grace_period={self.GRACE_PERIOD_SECONDS}s)"
             )
 
-            resp_new = _token_request(nexus_base_url, client_id, new_secret)
+            resp_new = _token_request(syntara_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should still work, got {resp_new.status_code}"
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
