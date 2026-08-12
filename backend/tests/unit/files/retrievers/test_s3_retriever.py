@@ -16,8 +16,8 @@ import pytest
 from botocore.exceptions import ClientError
 from moto import mock_aws
 
-from nexus.files.exceptions import FileContentNotFoundError
-from nexus.files.retrievers.s3 import S3FileRetriever
+from syntara.files.exceptions import FileContentNotFoundError
+from syntara.files.retrievers.s3 import S3FileRetriever
 
 BUCKET_NAME = "nexus-test-files"
 REGION = "us-east-1"
@@ -223,18 +223,18 @@ class TestS3VerifySSL:
     """Tests for S3 TLS verification configuration."""
 
     def test_default_verify_is_true(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(endpoint_url=None, bucket_name=BUCKET_NAME, region_name=REGION)
             mock_client.assert_called_once()
             assert mock_client.call_args.kwargs["verify"] is True
 
     def test_verify_false_passed_through(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(endpoint_url=None, bucket_name=BUCKET_NAME, region_name=REGION, verify_ssl=False)
             assert mock_client.call_args.kwargs["verify"] is False
 
     def test_ca_bundle_used_when_verify_ssl_true(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(
                 endpoint_url=None,
                 bucket_name=BUCKET_NAME,
@@ -244,7 +244,7 @@ class TestS3VerifySSL:
             assert mock_client.call_args.kwargs["verify"] == "/var/run/secrets/ca.crt"
 
     def test_verify_false_takes_precedence_over_ca_bundle(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(
                 endpoint_url=None,
                 bucket_name=BUCKET_NAME,

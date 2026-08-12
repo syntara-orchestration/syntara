@@ -1,0 +1,681 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Authentication API
+  version: 1.0.0
+  description: |
+    Authentication endpoints for the Syntara platform.
+
+    This API provides endpoints for JWT token management, current user
+    information, and identity provider discovery.
+
+    ## Key Features
+    - Login (username/password authentication)
+    - Token refresh (refresh token read from HttpOnly cookie)
+    - Logout (session revocation, clears refresh cookie)
+    - Current user information
+    - Auth providers listing (public, for login page)
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+tags:
+  - name: Authentication
+    description: JWT token management and user identity
+
+paths:
+  # ── Authentication ──────────────────────────────────────────────────
+  /auth/login:
+    post:
+      summary: Login with username and password
+      description: |
+        Authenticate with a username and password to receive a JWT access token.
+
+        On success the response body contains an access token and the
+        `ao_refresh_token` HttpOnly cookie is set.
+      operationId: login
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Invalid username or password
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/token:
+    post:
+      summary: OAuth 2.0 token endpoint
+      description: |
+        Exchange client credentials for an access token (OAuth 2.0 client
+        credentials grant, RFC 6749 Section 4.4).
+
+        Credentials can be provided via HTTP Basic auth header or in the
+        form-encoded request body.  Only `grant_type=client_credentials`
+        is accepted.  No refresh token is issued.
+      operationId: token
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Body_token'
+      responses:
+        '200':
+          description: Access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          description: Unsupported grant type
+        '401':
+          description: Invalid client credentials
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+
+  /auth/csrf_token:
+    post:
+      summary: Get CSRF form token
+      description: |
+        Return the CSRF form token derived from the session's CSRF seed cookie.
+
+        The SPA calls this once after login or OIDC redirect to obtain the
+        form token, which it then sends in the `X-CSRF-Token` header on
+        subsequent state-changing requests (refresh, logout).
+      operationId: get_csrf_token
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: CSRF form token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfTokenResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          description: CSRF cookie missing — not authenticated via cookie flow
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/ws-ticket:
+    post:
+      summary: Exchange JWT for a WebSocket connection ticket
+      description: |
+        Exchange a valid Bearer JWT for a short-lived, single-use opaque ticket.
+        The client then connects to the WebSocket endpoint with ``?ticket=<ticket>``
+        instead of passing the raw JWT in the query string, preventing token leakage
+        in server/proxy logs and browser history.
+      operationId: create_ws_ticket
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: Single-use WebSocket ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebSocketTicketResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Invalid or missing authentication
+        '403':
+          description: Service accounts cannot obtain WebSocket tickets
+          content:
+            application/problem+json:
+              schema:
+                $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ErrorData"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: |
+        Exchange a valid refresh token for a new access token.
+
+        The refresh token is read from the `ao_refresh_token` HttpOnly cookie.
+        It is not rotated — the same refresh token remains valid for its entire
+        lifetime (default 8 hours from login). The cookie is re-set on every
+        successful refresh so the `max-age` counter restarts.
+      operationId: refresh_token
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Invalid or expired refresh token
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/logout:
+    post:
+      summary: Terminate session
+      description: |-
+        Terminate the current session by revoking the refresh token.
+
+        The refresh token is read from the ``ao_refresh_token`` HttpOnly cookie
+        and revoked in the session store.  The cookie is cleared in the response.
+        The associated access token remains valid until it expires (up to 15
+        minutes) since access tokens are stateless JWTs validated without a
+        server round-trip.
+      operationId: logout
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      parameters:
+        - name: post_logout_redirect_uri
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Post Logout Redirect Uri
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Invalid or expired refresh token
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/me:
+    get:
+      summary: Get current user
+      description: |
+        Returns information about the currently authenticated user
+        from the access token claims and session metadata.
+      operationId: get_current_user
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Invalid or missing authentication
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /auth/providers:
+    get:
+      summary: List enabled identity providers
+      description: |
+        Returns a list of enabled identity providers for the login page.
+        This is a public endpoint that does not require authentication.
+        Only returns provider id, name, and type — no secrets or configuration details.
+      operationId: list_auth_providers
+      tags:
+        - Authentication
+      x-app-permission:
+        resource: null
+        action: null
+      responses:
+        '200':
+          description: List of enabled identity providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthProvidersResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/oidc/authorize:
+    get:
+      summary: Initiate OIDC login
+      description: |-
+        Initiates the OIDC authorization code flow. Redirects the user's browser
+        to the identity provider's authorization endpoint.
+
+        This is a public endpoint (no authentication required). On any error it
+        redirects to the frontend login page with an `auth_error` query parameter
+        instead of returning a JSON error response.
+      operationId: oidc_authorize
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authentication
+      parameters:
+        - name: provider_id
+          in: query
+          required: true
+          description: UUID of the identity provider to use
+          schema:
+            type: string
+            format: uuid
+            title: Provider Id
+            description: UUID of the identity provider to use
+        - name: redirect_to
+          in: query
+          required: false
+          description: URL to redirect to after successful login
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Redirect To
+            description: URL to redirect to after successful login
+        - name: flow
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                enum:
+                  - link
+                  - test_signin
+              - type: 'null'
+            title: Flow
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '302':
+          description: Redirect to identity provider or frontend on error
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /auth/oidc/callback:
+    get:
+      summary: OIDC callback
+      description: |-
+        Handles the OIDC callback after the user authenticates at the identity provider.
+        Exchanges the authorization code for tokens, validates the ID token,
+        creates or maps a local user, and establishes a session.
+      operationId: oidc_callback
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authentication
+      parameters:
+        - name: state
+          in: query
+          required: true
+          description: OIDC state parameter for CSRF protection
+          schema:
+            type: string
+            title: State
+        - name: code
+          in: query
+          required: false
+          description: Authorization code from identity provider
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Code
+        - name: error
+          in: query
+          required: false
+          description: Error code from identity provider
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Error
+        - name: error_description
+          in: query
+          required: false
+          description: Human-readable error description from identity provider
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Error Description
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '302':
+          description: Redirect to frontend after successful login
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          description: Authentication failed
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+  schemas:
+    # ── Authentication schemas ──────────────────────────────────────
+    LoginRequest:
+      type: object
+      title: LoginRequest
+      description: Login request with username and password.
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          title: Username
+          description: Username
+        password:
+          type: string
+          title: Password
+          description: Password
+          format: password
+
+    AccessTokenResponse:
+      type: object
+      title: AccessTokenResponse
+      description: Access token response (refresh token is sent via HttpOnly cookie).
+      required:
+        - access_token
+        - expires_in
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+          description: JWT access token
+        token_type:
+          type: string
+          title: Token Type
+          default: Bearer
+          description: Token type
+        expires_in:
+          type: integer
+          title: Expires In
+          description: Access token lifetime in seconds
+
+    CsrfTokenResponse:
+      type: object
+      title: CsrfTokenResponse
+      description: CSRF form token response.
+      required:
+        - csrf_token
+      properties:
+        csrf_token:
+          type: string
+          title: Csrf Token
+          description: CSRF form token for use in X-CSRF-Token header
+
+    WebSocketTicketResponse:
+      type: object
+      title: WebSocketTicketResponse
+      description: Response for the WebSocket ticket exchange endpoint.
+      required:
+        - ticket
+        - expires_in
+      properties:
+        ticket:
+          type: string
+          title: Ticket
+          description: Single-use opaque ticket for WebSocket connection
+        expires_in:
+          type: integer
+          title: Expires In
+          description: Ticket lifetime in seconds
+
+    UserInfo:
+      type: object
+      title: UserInfo
+      description: Current user information derived from access token claims.
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: string
+          description: User UUID
+          title: Id
+        username:
+          type: string
+          description: Username
+          title: Username
+        email:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: User email
+          title: Email
+        groups:
+          type: array
+          items:
+            type: string
+          description: Group memberships
+          title: Groups
+        rp_logout_enabled:
+          type: boolean
+          default: false
+          title: Rp Logout Enabled
+          description: Whether RP-initiated logout is enabled for this user's current session
+
+    AuthProviderInfo:
+      type: object
+      title: AuthProviderInfo
+      description: Public identity provider info for the login page.
+      required:
+        - id
+        - name
+        - provider_type
+      properties:
+        id:
+          type: string
+          title: Id
+          description: Provider UUID
+        name:
+          type: string
+          title: Name
+          description: Provider display name
+        provider_type:
+          type: string
+          title: Provider Type
+          description: "Provider type (e.g. oidc)"
+        provider_template:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Provider Template
+          description: "Provider template (e.g. aap)"
+
+    AuthProvidersResponse:
+      type: object
+      title: AuthProvidersResponse
+      description: Response for the public providers listing endpoint.
+      properties:
+        resources:
+          type: array
+          title: Resources
+          items:
+            $ref: '#/components/schemas/AuthProviderInfo'
+          description: Enabled identity providers
+
+    Body_token:
+      type: object
+      title: Body_token
+      required:
+        - grant_type
+      properties:
+        grant_type:
+          type: string
+          title: Grant Type
+        client_id:
+          type: string
+          title: Client Id
+          default: ''
+        client_secret:
+          type: string
+          format: password
+          title: Client Secret
+          default: ''

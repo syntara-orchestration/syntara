@@ -56,14 +56,14 @@ Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resol
 ```
 
 #### `check-contract-regeneration.py`
-Checks that frontend contracts are regenerated when the OpenAPI spec changes. In the monorepo, when `backend/src/nexus/schemas/openapi.yaml` changes, the TypeScript types in `frontend/packages/syntara-contracts/src/` should also be updated via `make gen-contracts`. If the bundled spec is unchanged, the check is skipped.
+Checks that frontend contracts are regenerated when the OpenAPI spec changes. In the monorepo, when `backend/src/syntara/schemas/openapi.yaml` changes, the TypeScript types in `frontend/packages/syntara-contracts/src/` should also be updated via `make gen-contracts`. If the bundled spec is unchanged, the check is skipped.
 
 ```bash
 # Check against devel branch (auto-detects changed files)
 ./check-contract-regeneration.py --changed-files-from devel
 
 # Check with explicit file list
-./check-contract-regeneration.py --changed-files backend/src/nexus/schemas/openapi.yaml frontend/packages/syntara-contracts/src/index.ts
+./check-contract-regeneration.py --changed-files backend/src/syntara/schemas/openapi.yaml frontend/packages/syntara-contracts/src/index.ts
 
 # Include PR body for exception justification
 ./check-contract-regeneration.py --changed-files-from devel --pr-body "no-contract-regen: description-only change"
@@ -168,18 +168,18 @@ make check-openapi-contracts
 
 # Simulate spec change without contract regen (expect warning)
 ./scripts/openapi/check-contract-regeneration.py \
-  --changed-files backend/src/nexus/schemas/openapi.yaml \
+  --changed-files backend/src/syntara/schemas/openapi.yaml \
   --format text
 
 # Simulate spec + contract update (expect success)
 ./scripts/openapi/check-contract-regeneration.py \
-  --changed-files backend/src/nexus/schemas/openapi.yaml \
+  --changed-files backend/src/syntara/schemas/openapi.yaml \
     frontend/packages/syntara-contracts/src/index.ts \
   --format text
 
 # Spec change with no-contract-regen exception in PR body
 ./scripts/openapi/check-contract-regeneration.py \
-  --changed-files backend/src/nexus/schemas/openapi.yaml \
+  --changed-files backend/src/syntara/schemas/openapi.yaml \
   --pr-body "no-contract-regen: description-only change, no type impact" \
   --format text
 ```
@@ -238,14 +238,14 @@ make check-openapi
 These scripts are used by the monorepo CI workflow (`.github/workflows/ci-backend.yml`):
 
 - **Breaking changes (blocking):** `check-openapi-breaking-pre-commit` pre-commit hook, enforced by the CI `pre-commit` job
-- **PR comments (informational):** `openapi-breaking-changes` CI job posts breaking-change and contract regeneration results on pull requests when `backend/src/nexus/schemas/openapi.yaml` changes
+- **PR comments (informational):** `openapi-breaking-changes` CI job posts breaking-change and contract regeneration results on pull requests when `backend/src/syntara/schemas/openapi.yaml` changes
 
 The CI `pre-commit` job:
 1. Fetches `devel` for OpenAPI baseline comparison
 2. Passes `OPENAPI_PR_BODY` from the pull request for breaking-change acknowledgment
 
 The `openapi-breaking-changes` job:
-1. Detects changes to `backend/src/nexus/schemas/openapi.yaml`
+1. Detects changes to `backend/src/syntara/schemas/openapi.yaml`
 2. Runs `check-breaking-changes.py` and posts results via `post-breaking-changes-comment.py`
 3. Runs `check-contract-regeneration.py` to verify contracts are regenerated and posts results via `post-contract-regeneration-comment.py`
 

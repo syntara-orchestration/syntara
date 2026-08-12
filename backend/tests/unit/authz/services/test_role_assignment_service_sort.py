@@ -6,11 +6,11 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
-from nexus.authz.services.role_assignment_service import (
+from syntara.authz.services.role_assignment_service import (
     RoleAssignmentService,
     _sort_value_from_row,
 )
-from nexus.core.utils.cursor import serialize_sort_value
+from syntara.core.utils.cursor import serialize_sort_value
 
 
 def _make_row(
@@ -191,7 +191,7 @@ class TestResolveSortCol:
         assert result is sentinel
 
     def test_project_name_returns_project_model_col(self) -> None:
-        from nexus.authz.models import Project
+        from syntara.authz.models import Project
 
         result = RoleAssignmentService._resolve_sort_col("project_name", None, None, None)
         assert result is Project.name
@@ -207,7 +207,7 @@ class TestResolveSortCol:
         assert result is sentinel
 
     def test_fallback_returns_model_attribute(self) -> None:
-        from nexus.authz.models import RoleAssignment
+        from syntara.authz.models import RoleAssignment
 
         result = RoleAssignmentService._resolve_sort_col("created_at", None, None, None)
         assert result is RoleAssignment.created_at

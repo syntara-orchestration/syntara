@@ -4,8 +4,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.workflows.audit.workflow_version import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.workflows.audit.workflow_version import (
     WorkflowVersionCreatedEvent,
     WorkflowVersionCreatedHandler,
     WorkflowVersionExportedEvent,

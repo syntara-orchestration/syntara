@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.agent_orchestrator.clients.openrouter_config import get_openrouter_llm
-from nexus.agent_orchestrator.exceptions import LLMConfigurationError
-from nexus.core.config.base import get_settings
+from syntara.agent_orchestrator.clients.openrouter_config import get_openrouter_llm
+from syntara.agent_orchestrator.exceptions import LLMConfigurationError
+from syntara.core.config.base import get_settings
 
 
 @pytest.fixture(scope="module")
@@ -58,7 +58,7 @@ def mock_runtime_settings_unset() -> Generator[AsyncMock, None, None]:
     mock_cache = AsyncMock()
     mock_cache.get_int = AsyncMock(return_value=0)
     with patch(
-        "nexus.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
+        "syntara.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
         return_value=mock_cache,
     ):
         yield mock_cache
@@ -70,7 +70,7 @@ def mock_runtime_settings_with_cap() -> Generator[AsyncMock, None, None]:
     mock_cache = AsyncMock()
     mock_cache.get_int = AsyncMock(return_value=4096)
     with patch(
-        "nexus.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
+        "syntara.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
         return_value=mock_cache,
     ):
         yield mock_cache
@@ -139,7 +139,7 @@ class TestGetOpenRouterLLM:
         mock_cache = AsyncMock()
         mock_cache.get_int = AsyncMock(side_effect=RuntimeError("cache down"))
         with patch(
-            "nexus.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
+            "syntara.agent_orchestrator.clients.openrouter_config.get_runtime_settings",
             return_value=mock_cache,
         ):
             llm, _ = await get_openrouter_llm(api_key="test-key-123")
@@ -179,7 +179,7 @@ class TestGetOpenRouterLLM:
     ) -> None:
         """TLS skip calls build_integration_httpx_verify and wires the result into httpx.AsyncClient."""
         with patch(
-            "nexus.agent_orchestrator.clients.openrouter_config.build_integration_httpx_verify",
+            "syntara.agent_orchestrator.clients.openrouter_config.build_integration_httpx_verify",
             return_value=False,
         ) as mock_build:
             _llm, http_client = await get_openrouter_llm(
@@ -202,7 +202,7 @@ class TestGetOpenRouterLLM:
 
         mock_ctx = ssl.create_default_context()
         with patch(
-            "nexus.agent_orchestrator.clients.openrouter_config.build_integration_httpx_verify",
+            "syntara.agent_orchestrator.clients.openrouter_config.build_integration_httpx_verify",
             return_value=mock_ctx,
         ) as mock_build:
             _llm, http_client = await get_openrouter_llm(

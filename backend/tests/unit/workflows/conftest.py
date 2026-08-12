@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nexus.settings.cache.settings_cache import SettingsCache, set_runtime_settings
-from nexus.settings.catalog import SETTINGS_CATALOG
+from syntara.settings.cache.settings_cache import SettingsCache, set_runtime_settings
+from syntara.settings.catalog import SETTINGS_CATALOG
 
 _catalog_defaults: dict[str, int] = {
     s.key: int(s.default_value)
@@ -23,7 +23,7 @@ def _mock_runtime_settings() -> Generator[None, None, None]:
     cache singleton is not initialised, so we install a mock that returns
     catalog defaults.
     """
-    import nexus.settings.cache.settings_cache as _sc
+    import syntara.settings.cache.settings_cache as _sc
 
     prev = _sc._runtime_settings
 

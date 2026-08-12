@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 from temporalio.service import TLSConfig
 
-from nexus.core.config.base import Settings
-from nexus.core.tls.temporal import build_temporal_tls_config
+from syntara.core.config.base import Settings
+from syntara.core.tls.temporal import build_temporal_tls_config
 
 if TYPE_CHECKING:
     from collections.abc import Callable

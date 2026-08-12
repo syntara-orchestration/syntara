@@ -8,10 +8,10 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration, IntegrationType
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
-from nexus.tool_manager.models.tool import Tool, ToolParameter, ToolParameterType
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.tool_manager.models.tool import Tool, ToolParameter, ToolParameterType
 from tests.integration.helpers.integration import IntegrationFactory
 
 

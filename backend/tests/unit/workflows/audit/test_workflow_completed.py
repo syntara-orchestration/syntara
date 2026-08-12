@@ -2,12 +2,12 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.workflows.audit.execution_completed import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.workflows.audit.execution_completed import (
     WorkflowCompletedEvent,
     WorkflowCompletedHandler,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     WorkflowTerminalStatus,
 )

@@ -1,6 +1,6 @@
 """Tests for credential domain exceptions."""
 
-from nexus.credentials.exceptions import (
+from syntara.credentials.exceptions import (
     CredentialDecryptionError,
     CredentialError,
     CredentialNameConflictError,

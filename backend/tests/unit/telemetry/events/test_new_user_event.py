@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.telemetry.events.new_user import NewUserEvent
+from syntara.telemetry.events.new_user import NewUserEvent
 
 VALID_USER_ID_HASH = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 

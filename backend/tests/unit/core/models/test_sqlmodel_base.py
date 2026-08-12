@@ -11,14 +11,14 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.core.models.base import (
+from syntara.core.models.base import (
     BaseResource,
     NamedResource,
     Resource,
     SoftDeletableResource,
     UserOwnedResource,
 )
-from nexus.core.models.pagination import ResourcesResponse, ResourcesResponseBase
+from syntara.core.models.pagination import ResourcesResponse, ResourcesResponseBase
 from tests.unit.core.models.mock_shared_resources import MockBaseResource, MockNamedResource, MockResource
 
 

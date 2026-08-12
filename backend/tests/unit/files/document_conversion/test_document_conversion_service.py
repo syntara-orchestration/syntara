@@ -10,15 +10,15 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.core.exceptions import SafeValueError
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
-from nexus.files.document_conversion.services import ConversionState
-from nexus.files.document_conversion.services.document_conversion_service import (
+from syntara.files.document_conversion.services import ConversionState
+from syntara.files.document_conversion.services.document_conversion_service import (
     DocumentConversionService,
 )
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +29,7 @@ def mock_conversion_config() -> Generator[MagicMock]:
     mock_config.timeout_seconds = 30
     mock_config.temp_dir = "/tmp/nexus-test"  # noqa: S108
     with patch(
-        "nexus.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
+        "syntara.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
         return_value=mock_config,
     ):
         yield mock_config

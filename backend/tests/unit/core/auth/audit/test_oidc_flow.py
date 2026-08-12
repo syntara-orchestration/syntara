@@ -2,11 +2,11 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.auth.audit.oidc_flow import OIDCFlowEvent, OIDCFlowHandler, OIDCStage
-from nexus.core.models.principal import PrincipalType
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.auth.audit.oidc_flow import OIDCFlowEvent, OIDCFlowHandler, OIDCStage
+from syntara.core.models.principal import PrincipalType
 
 
 class TestOIDCFlowEvent:

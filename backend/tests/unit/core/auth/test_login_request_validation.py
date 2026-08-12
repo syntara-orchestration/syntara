@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nexus.auth.schemas import LoginRequest
+from syntara.auth.schemas import LoginRequest
 
 
 class TestLoginRequestNullByteValidation:

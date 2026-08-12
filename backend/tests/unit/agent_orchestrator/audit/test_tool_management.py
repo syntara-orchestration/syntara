@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.audit.tool_management import (
+from syntara.agent_orchestrator.audit.tool_management import (
     ToolDiscoveryEvent,
     ToolDiscoveryHandler,
     ToolDiscoveryStatus,
@@ -15,12 +15,12 @@ from nexus.agent_orchestrator.audit.tool_management import (
     ToolInvocationHandler,
     ToolInvocationStatus,
 )
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 @dataclass

@@ -3,8 +3,8 @@
 from pathlib import Path
 from uuid import uuid4
 
-from nexus.core.models.user_reference import UserReference
-from nexus.credentials.models.credential import (
+from syntara.core.models.user_reference import UserReference
+from syntara.credentials.models.credential import (
     CredentialCreate,
     CredentialRead,
     CredentialUpdate,
@@ -29,8 +29,8 @@ def _exec_for_coverage() -> None:
 
     import sqlalchemy as sa
 
-    import nexus.credentials.models.credential as _mod
-    import nexus.credentials.models.credential_type as _ct_mod
+    import syntara.credentials.models.credential as _mod
+    import syntara.credentials.models.credential_type as _ct_mod
 
     scratch_meta = sa.MetaData()
 

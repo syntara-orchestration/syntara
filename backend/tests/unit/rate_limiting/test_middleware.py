@@ -10,9 +10,9 @@ from uuid import uuid4
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from nexus.audit.emitter import AuditActorContext, actor_context_var
-from nexus.rate_limiting.middleware import RateLimitMiddleware
-from nexus.rate_limiting.token_bucket import TokenBucketResult
+from syntara.audit.emitter import AuditActorContext, actor_context_var
+from syntara.rate_limiting.middleware import RateLimitMiddleware
+from syntara.rate_limiting.token_bucket import TokenBucketResult
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -145,7 +145,7 @@ class TestRateLimitMiddleware:
         token = actor_context_var.set(None)
         try:
             with patch(
-                "nexus.rate_limiting.middleware.get_runtime_settings",
+                "syntara.rate_limiting.middleware.get_runtime_settings",
                 return_value=mock_settings_cache,
             ):
                 await middleware(scope, AsyncMock(), capture_send)
@@ -178,7 +178,7 @@ class TestRateLimitMiddleware:
         token = actor_context_var.set(actor)
         try:
             with patch(
-                "nexus.rate_limiting.middleware.get_runtime_settings",
+                "syntara.rate_limiting.middleware.get_runtime_settings",
                 return_value=mock_settings_cache,
             ):
                 await middleware(scope, AsyncMock(), capture_send)
@@ -211,7 +211,7 @@ class TestRateLimitMiddleware:
         token = actor_context_var.set(actor)
         try:
             with patch(
-                "nexus.rate_limiting.middleware.get_runtime_settings",
+                "syntara.rate_limiting.middleware.get_runtime_settings",
                 return_value=mock_settings_cache,
             ):
                 await middleware(scope, AsyncMock(), capture_send)
@@ -248,7 +248,7 @@ class TestRateLimitMiddleware:
         token = actor_context_var.set(actor)
         try:
             with patch(
-                "nexus.rate_limiting.middleware.get_runtime_settings",
+                "syntara.rate_limiting.middleware.get_runtime_settings",
                 return_value=mock_settings_cache,
             ):
                 await middleware(scope, AsyncMock(), capture_send)
@@ -273,7 +273,7 @@ class TestRateLimitMiddleware:
         token = actor_context_var.set(actor)
         try:
             with patch(
-                "nexus.rate_limiting.middleware.get_runtime_settings",
+                "syntara.rate_limiting.middleware.get_runtime_settings",
                 return_value=disabled_cache,
             ):
                 await middleware(scope, AsyncMock(), send)

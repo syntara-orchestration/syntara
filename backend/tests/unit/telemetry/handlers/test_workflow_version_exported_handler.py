@@ -3,17 +3,17 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.events.workflow_version import (
+from syntara.telemetry.events.workflow_version import (
     WorkflowVersionExportedEvent as WorkflowVersionExportedTelemetryEvent,
 )
-from nexus.telemetry.handlers.workflow_version_exported import WorkflowVersionExportedTelemetryHandler
-from nexus.workflows.audit.workflow_version import WorkflowVersionExportedEvent
+from syntara.telemetry.handlers.workflow_version_exported import WorkflowVersionExportedTelemetryHandler
+from syntara.workflows.audit.workflow_version import WorkflowVersionExportedEvent
 
 
 class TestWorkflowVersionExportedTelemetryHandler:
     """Tests for the WorkflowVersionExportedTelemetryHandler."""
 
-    @patch("nexus.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
     def test_emits_event_with_correct_fields(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -37,7 +37,7 @@ class TestWorkflowVersionExportedTelemetryHandler:
         assert event.workflow_name == "test-wf"
         assert event.entitlement_id == "ent-test-export"
 
-    @patch("nexus.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = False
@@ -53,7 +53,7 @@ class TestWorkflowVersionExportedTelemetryHandler:
         assert result is None
         registry.send_event.assert_not_called()
 
-    @patch("nexus.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_exported.get_telemetry_registry")
     def test_does_not_raise_on_exception(self, mock_get_registry: MagicMock) -> None:
         mock_get_registry.side_effect = RuntimeError("boom")
 

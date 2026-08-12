@@ -5,10 +5,10 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.credentials.exceptions import CredentialDisabledError
-from nexus.integrations.exceptions import IntegrationCredentialNotFoundError, IntegrationCredentialRequiredError
-from nexus.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
-from nexus.integrations.models.integration import IntegrationType
+from syntara.credentials.exceptions import CredentialDisabledError
+from syntara.integrations.exceptions import IntegrationCredentialNotFoundError, IntegrationCredentialRequiredError
+from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
+from syntara.integrations.models.integration import IntegrationType
 
 
 class TestFetchCredentialWithType:

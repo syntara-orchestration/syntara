@@ -11,10 +11,10 @@ import pytest
 import pytest_asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
-from nexus.agent_orchestrator.token_manager.models import UserTokenConfig
-from nexus.agent_orchestrator.token_manager.repository import TokenUsageRepository
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
+from syntara.agent_orchestrator.token_manager.models import UserTokenConfig
+from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
 
 
 @pytest_asyncio.fixture
@@ -264,7 +264,7 @@ async def test_budget_reflects_actual_tokens_after_update(
     When a record is updated with actual tokens (lower than estimate),
     the budget should reflect the actual total, freeing up capacity.
     """
-    from nexus.agent_orchestrator.models import Invocation, InvocationStatus
+    from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 
     # Create an invocation
     invocation = Invocation(

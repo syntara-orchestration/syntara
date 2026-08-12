@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.websocket.close_codes import UNSUPPORTED_DATA
-from nexus.workflows.ws.execution_streaming import on_connect_executions
+from syntara.core.websocket.close_codes import UNSUPPORTED_DATA
+from syntara.workflows.ws.execution_streaming import on_connect_executions
 
 
 @pytest.fixture

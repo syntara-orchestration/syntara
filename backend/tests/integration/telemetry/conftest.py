@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.database.session import get_db
+from syntara.core.database.session import get_db
 
 
 @pytest.fixture

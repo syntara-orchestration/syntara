@@ -10,15 +10,15 @@ Tests cover:
 
 from __future__ import annotations
 
-from nexus.audit.discovery import discover_handlers
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.settings.audit.settings import (
+from syntara.audit.discovery import discover_handlers
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.settings.audit.settings import (
     SettingBulkChangeEvent,
     SettingBulkChangeHandler,
     SettingChangeEvent,
     SettingChangeHandler,
 )
-from nexus.settings.services.settings_service import _format_setting_value
+from syntara.settings.services.settings_service import _format_setting_value
 
 # ---------------------------------------------------------------------------
 # SettingChangeHandler
@@ -165,18 +165,18 @@ class TestSettingsAuditDiscovery:
     """Tests for automatic discovery of settings audit handlers."""
 
     def test_discovers_both_handlers(self) -> None:
-        import nexus.settings.audit
+        import syntara.settings.audit
 
-        registry = discover_handlers(nexus.settings.audit)
+        registry = discover_handlers(syntara.settings.audit)
 
         assert SettingChangeEvent in registry
         assert SettingBulkChangeEvent in registry
         assert len(registry) == 2
 
     def test_discovered_handler_types(self) -> None:
-        import nexus.settings.audit
+        import syntara.settings.audit
 
-        registry = discover_handlers(nexus.settings.audit)
+        registry = discover_handlers(syntara.settings.audit)
 
         assert isinstance(registry[SettingChangeEvent], SettingChangeHandler)
         assert isinstance(registry[SettingBulkChangeEvent], SettingBulkChangeHandler)

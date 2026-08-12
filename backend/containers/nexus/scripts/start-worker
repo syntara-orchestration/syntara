@@ -1,2 +1,2 @@
 #!/bin/bash
-exec python -m nexus.workflows.worker "$@"
+exec python -m syntara.workflows.worker "$@"

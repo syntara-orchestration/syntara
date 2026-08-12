@@ -606,5 +606,5 @@ Always test:
 
 - [Workflow Engine Architecture](workflow-engine-overview.md) - How a saved definition becomes a running workflow
 - [Retry Policies](retry-policies.md) - Detailed retry policy documentation
-- [V2 Schema](../../src/nexus/schemas/workflows/v2/workflow_definition.schema.json) - V2 workflow definition JSON schema
+- [V2 Schema](../../src/syntara/schemas/workflows/v2/workflow_definition.schema.json) - V2 workflow definition JSON schema
 - [Sample Workflows](../../samples/) - Working V2 workflow examples

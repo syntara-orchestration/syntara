@@ -18,15 +18,15 @@ import pytest_asyncio
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.adapters.protocol import DiscoveredTool, DiscoverResult, ValidateResult
-from nexus.integrations.models.integration import (
+from syntara.core.models import User
+from syntara.integrations.adapters.protocol import DiscoveredTool, DiscoverResult, ValidateResult
+from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationRefreshStatus,
     IntegrationType,
 )
-from nexus.integrations.services.integration_service import IntegrationService
-from nexus.tool_manager.models.tool import Tool
+from syntara.integrations.services.integration_service import IntegrationService
+from syntara.tool_manager.models.tool import Tool
 from tests.integration.integrations.conftest import make_mcp_create
 
 
@@ -167,9 +167,9 @@ class TestValidateIntegration:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
             patch.object(service, "_secret_service", create=True) as mock_secret_svc,
         ):
             mock_secret_svc.retrieve_secret = AsyncMock(return_value={"bearer_token": "token"})
@@ -209,9 +209,9 @@ class TestValidateIntegration:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
             patch.object(service, "_secret_service", create=True) as mock_secret_svc,
         ):
             mock_secret_svc.retrieve_secret = AsyncMock(return_value={"bearer_token": "token"})
@@ -254,9 +254,9 @@ class TestRefreshIntegrationResources:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
 
@@ -293,9 +293,9 @@ class TestRefreshIntegrationResources:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -309,7 +309,7 @@ class TestRefreshIntegrationResources:
         # Verify integration DB state
         from sqlmodel import select as sql_select
 
-        from nexus.integrations.models.integration import Integration
+        from syntara.integrations.models.integration import Integration
 
         integration = (
             await test_db_session.exec(sql_select(Integration).where(Integration.id == integration_id))
@@ -337,9 +337,9 @@ class TestRefreshIntegrationResources:
 
         with (
             patch(
-                "nexus.integrations.services.integration_service.create_health_check_adapter"
+                "syntara.integrations.services.integration_service.create_health_check_adapter"
             ) as mock_adapter_factory,
-            patch("nexus.integrations.services.integration_service.get_runtime_settings") as mock_settings,
+            patch("syntara.integrations.services.integration_service.get_runtime_settings") as mock_settings,
         ):
             mock_settings.return_value.get = AsyncMock(return_value=10)
             mock_adapter = AsyncMock()
@@ -360,7 +360,7 @@ class TestRefreshIntegrationResources:
         aap_credential_id: UUID,
     ) -> None:
         """refresh_resources raises for unsupported integration types (ansible_automation_platform)."""
-        from nexus.integrations.exceptions import IntegrationRefreshNotSupportedError
+        from syntara.integrations.exceptions import IntegrationRefreshNotSupportedError
 
         service = IntegrationService(test_db_session, test_user)
         data = IntegrationCreate(

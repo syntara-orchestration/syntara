@@ -1,0 +1,366 @@
+---
+asyncapi: 3.0.0
+info:
+  title: Execution Visualization WebSocket API
+  version: 1.0.0
+  description: |
+    Real-time WebSocket API for workflow execution visualization.
+
+    **API Version**: v1 (current)
+    **Protocol Version**: 1.0.0
+    **AsyncAPI Version**: 3.0.0
+
+    This API provides real-time activity status updates for workflow executions
+    using Redis Streams for scalable cross-process communication with event replay:
+    - Initial state delivered via WebSocket using ExecutionSnapshotMessage
+    - Real-time updates via Redis Streams -> WebSocket push (JSON Patch format)
+    - Event replay support via `replay` parameter
+
+    ## Architecture
+
+    ```
+    Temporal Worker          Redis Streams       API Server(s)        Client
+    ┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌────────┐
+    │ ActivitySync│      │    XADD      │      │  WebSocket  │      │Frontend│
+    │ Service     │─────>│ execution:   │─────>│  Handler    │─────>│   UI   │
+    │             │      │ {id}:events  │ XREAD│  (XREAD)    │      │        │
+    └─────────────┘      └──────────────┘      └─────────────┘      └────────┘
+    ```
+
+    ## Connection Flow
+
+    **Initial Connection (Running Execution):**
+    1. Client loads workflow structure via `GET /executions/{id}?include=workflow_definition`
+    2. Client connects to `/ws/workflows/v1/executions/{execution_id}?replay=0`
+    3. Server reads from Redis Stream `execution:{id}:events` starting from beginning
+    4. Server sends `ExecutionSnapshotMessage` with type="initial_snapshot" (first message)
+    5. Server sends `ActivityPatchMessage` for subsequent activity updates (JSON Patch format)
+    6. When execution completes, server sends `ExecutionSnapshotMessage` with type="final_snapshot" (last message)
+    7. Server disconnects WebSocket after sending final_snapshot
+    8. Client builds visualization graph from workflow_definition
+    9. Client applies activity state from ExecutionSnapshotMessage
+    10. Client applies JSON Patch operations for real-time updates
+    11. Client derives edge status from node status (client-side computation)
+
+    **Initial Connection (Completed Execution):**
+    1. Client loads execution via `GET /executions/{id}?include=workflow_definition&include=activities`
+    2. Client renders final state from execution.activities (no WebSocket connection needed)
+
+    **Reconnection:**
+    1. Client reconnects to `/ws/workflows/v1/executions/{execution_id}?replay=<last_event_id>`
+    2. Server reads from Redis Stream starting from that event_id
+    3. Client receives missed `ActivityPatchMessage` events
+    4. Server resumes live streaming
+
+    ## Replay Parameter
+
+    - **No parameter**: Live streaming only (new events after connection)
+    - **`replay=0`**: Replay from beginning (includes ExecutionSnapshotMessage + all updates)
+    - **`replay=<event_id>`**: Replay from specific event_id (e.g., `1691431234567-5`)
+
+    ## Edge Status Derivation
+
+    Edge status is computed client-side from source/target node status:
+    - No server broadcast for edge updates (bandwidth optimization)
+    - See data-model.md section 2.4 for derivation rules
+  contact:
+    name: Syntara Team
+  license:
+    name: MIT
+  x-api-version: v1
+  x-protocol-version: 1.0.0
+
+servers:
+  development:
+    host: localhost:8000
+    protocol: ws
+    description: Development WebSocket server (API v1)
+  production:
+    host: api.automation.example.com
+    protocol: wss
+    description: Production WebSocket server (API v1)
+
+defaultContentType: application/json
+
+channels:
+  executions:
+    address: /ws/workflows/v1/executions/{execution_id}
+    title: Activity Status Updates
+    description: |
+      Real-time activity status updates for a specific workflow execution.
+
+      **Connection URL**: `ws://localhost:8000/ws/workflows/v1/executions/{execution_id}?replay=<event_id>`
+
+      **Initial State (Redis Streams Replay)**:
+      Client connects with `replay=0` to receive full execution state:
+      - First message: `ExecutionSnapshotMessage` with type="initial_snapshot"
+      - Subsequent messages: `ActivityPatchMessage` (JSON Patch format) for updates
+      - Last message: `ExecutionSnapshotMessage` with type="final_snapshot" (when execution completes)
+      - Server disconnects WebSocket after sending final_snapshot
+
+      **Message Flow (Redis Streams)**:
+      1. Client connects to WebSocket with optional `replay` parameter
+      2. Server reads from Redis Stream `execution:{id}:events` using XREAD
+      3. If `replay=0`: Server sends ExecutionSnapshotMessage with type="initial_snapshot" + all updates
+      4. If `replay=<event_id>`: Server sends updates from that event_id onwards
+      5. If no replay: Server sends only new events (live streaming)
+      6. Server forwards `ActivityPatchMessage` (JSON Patch) to WebSocket client
+      7. Client applies JSON Patch operations to update activity state
+      8. When execution completes, server sends ExecutionSnapshotMessage with type="final_snapshot"
+      9. Server disconnects WebSocket after sending final_snapshot
+
+      **Event Replay Support**:
+      Clients can reconnect with `replay=<last_event_id>` to catch up on missed events.
+      Event IDs are Redis auto-generated stream IDs (format: `{milliseconds}-{sequence}`).
+
+      **Edge Status Derivation**:
+      Edge status is computed client-side from source/target node status.
+      No server broadcast for edge updates - see data-model.md section 2.4 for rules.
+
+      **UI Behavior for Completed Executions**:
+      When execution status is completed/failed/cancelled, UI should fetch via REST
+      (`GET /executions/{id}?include=activities`) and skip WebSocket connection.
+    parameters:
+      execution_id:
+        $ref: '#/components/parameters/execution_id'
+      replay:
+        $ref: '#/components/parameters/replay'
+    messages:
+      executionSnapshot:
+        $ref: '#/components/messages/executionSnapshot'
+      activityPatch:
+        $ref: '#/components/messages/activityPatch'
+
+operations:
+  receiveActivityUpdates:
+    action: receive
+    channel:
+      $ref: '#/channels/executions'
+    summary: Receive real-time activity status updates for an execution
+    description: |
+      Server reads from Redis Streams and forwards messages to client.
+      - `execution_snapshot`: Full execution state (first message on replay=0)
+      - `activity_patch`: Activity status changes (JSON Patch format)
+    messages:
+      - $ref: '#/channels/executions/messages/executionSnapshot'
+      - $ref: '#/channels/executions/messages/activityPatch'
+
+components:
+  schemas:
+    JsonPatchOperation:
+      type: object
+      description: JSON Patch operation per RFC 6902
+      required:
+        - op
+        - path
+      properties:
+        op:
+          type: string
+          enum: [add, remove, replace, move, copy, test]
+          description: Operation type
+          example: replace
+        path:
+          type: string
+          description: JSON Pointer using activity IDs
+          example: /activities/process_data/status
+        value:
+          description: Value for add, replace, test operations
+          example: completed
+        from:
+          type: string
+          description: Source path for move, copy operations
+          example: /activities/source/status
+
+  messages:
+    executionSnapshot:
+      name: executionSnapshot
+      title: Execution Snapshot
+      summary: |-
+        Full execution snapshot sent as first message (type="initial_snapshot") on replay from beginning,
+        and as last message (type="final_snapshot") when execution completes.
+
+        IMPORTANT: The execution field uses the same Execution schema as the REST API
+        GET /executions/{id}?include=activities response. This allows the UI to use
+        unified processing logic for both WebSocket and REST data sources.
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - type
+          - execution_id
+          - event_id
+          - execution
+          - timestamp
+        properties:
+          type:
+            type: string
+            enum: [initial_snapshot, final_snapshot]
+            description: |-
+              Snapshot type:
+              - "initial_snapshot": First message when replaying from beginning
+              - "final_snapshot": Last message when execution completes, server disconnects after sending
+            example: initial_snapshot
+          execution_id:
+            type: string
+            format: uuid
+            description: Workflow execution ID
+            example: abc-123-def-456
+          event_id:
+            type: string
+            description: Redis stream ID for replay support
+            example: '1691431234567-0'
+          execution:
+            description: |-
+              Execution object with the same structure as REST API GET /executions/{id}?include=activities.
+              This allows unified UI processing logic for both WebSocket and REST data sources.
+              References the ExecutionRead schema from v2/shared-schemas.yaml with activities field populated.
+            allOf:
+              - $ref: v2/shared-schemas.yaml#/components/schemas/ExecutionRead
+          timestamp:
+            type: string
+            format: date-time
+            description: Timestamp when this snapshot was generated
+            example: '2025-12-10T15:00:05Z'
+      examples:
+        - name: Initial Snapshot
+          summary: Initial state sent as first message when replaying from beginning
+          payload:
+            type: initial_snapshot
+            execution_id: abc-123-def-456
+            event_id: '1691431234567-0'
+            timestamp: '2025-12-10T15:00:05Z'
+            execution:
+              execution_id: abc-123-def-456
+              workflow_id: workflow-uuid
+              workflow_version_id: version-uuid
+              status: running
+              created_at: '2025-12-10T15:00:00Z'
+              started_at: '2025-12-10T15:00:05Z'
+              completed_at: null
+              activities:
+                - activity_id: fetch_data
+                  status: completed
+                  error_details: null
+                  started_at: '2025-12-10T15:00:05Z'
+                  completed_at: '2025-12-10T15:00:10Z'
+                - activity_id: process_data
+                  status: running
+                  error_details: null
+                  started_at: '2025-12-10T15:00:10Z'
+                  completed_at: null
+                - activity_id: send_notification
+                  status: pending
+                  error_details: null
+                  started_at: null
+                  completed_at: null
+        - name: Final Snapshot
+          summary: Final state sent as last message when execution completes
+          payload:
+            type: final_snapshot
+            execution_id: abc-123-def-456
+            event_id: '1691431234599-0'
+            timestamp: '2025-12-10T15:05:30Z'
+            execution:
+              execution_id: abc-123-def-456
+              workflow_id: workflow-uuid
+              workflow_version_id: version-uuid
+              status: completed
+              created_at: '2025-12-10T15:00:00Z'
+              started_at: '2025-12-10T15:00:05Z'
+              completed_at: '2025-12-10T15:05:30Z'
+              activities:
+                - activity_id: fetch_data
+                  status: completed
+                  error_details: null
+                  started_at: '2025-12-10T15:00:05Z'
+                  completed_at: '2025-12-10T15:00:10Z'
+                - activity_id: process_data
+                  status: completed
+                  error_details: null
+                  started_at: '2025-12-10T15:00:10Z'
+                  completed_at: '2025-12-10T15:00:25Z'
+                - activity_id: send_notification
+                  status: completed
+                  error_details: null
+                  started_at: '2025-12-10T15:00:25Z'
+                  completed_at: '2025-12-10T15:05:30Z'
+
+    activityPatch:
+      name: activityPatch
+      title: Activity Patch
+      summary: Activity status change using JSON Patch format
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - type
+          - execution_id
+          - event_id
+          - ops
+          - timestamp
+        properties:
+          type:
+            type: string
+            const: activity_patch
+          execution_id:
+            type: string
+            format: uuid
+            description: Workflow execution ID
+            example: abc-123-def-456
+          event_id:
+            type: string
+            description: Redis stream ID for replay support
+            example: '1691431234568-0'
+          ops:
+            type: array
+            description: One or more JSON Patch operations
+            items:
+              $ref: '#/components/schemas/JsonPatchOperation'
+          timestamp:
+            type: string
+            format: date-time
+            description: Timestamp when this patch was generated
+            example: '2025-12-10T15:00:15Z'
+      examples:
+        - name: Activity Status Update
+          summary: Activity transitions to completed status
+          payload:
+            type: activity_patch
+            execution_id: abc-123-def-456
+            event_id: '1691431234568-0'
+            timestamp: '2025-12-10T15:00:15Z'
+            ops:
+              - op: replace
+                path: /activities/1/status
+                value: completed
+        - name: Activity Failed
+          summary: Activity fails with error details
+          payload:
+            type: activity_patch
+            execution_id: abc-123-def-456
+            event_id: '1691431234571-0'
+            timestamp: '2025-12-10T15:00:20Z'
+            ops:
+              - op: replace
+                path: /activities/2/status
+                value: failed
+              - op: add
+                path: /activities/2/error_details
+                value: Connection timeout to external service
+
+  parameters:
+    execution_id:
+      description: Workflow execution ID to stream activity updates for
+      schema:
+        type: string
+        format: uuid
+
+    replay:
+      description: |
+        Optional replay parameter for event replay from Redis Streams.
+        - Not specified: Live streaming only (new events after connection)
+        - `0`: Replay from beginning (includes ExecutionSnapshotMessage)
+        - `<event_id>`: Replay from specific Redis stream ID (e.g., `1691431234567-5`)
+      schema:
+        type: string
+        example: '0'

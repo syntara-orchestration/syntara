@@ -41,7 +41,7 @@ class TestAPI50EmailUniqueness:
 
     def test_duplicate_email_rejected(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """First user with an email succeeds; duplicate email is rejected with 409."""
@@ -49,7 +49,7 @@ class TestAPI50EmailUniqueness:
 
         local_user_factory(email=shared_email)
 
-        second_resp = nexus_api.users.create(
+        second_resp = syntara_api.users.create(
             body=UserCreate(
                 username=unique_name("e2e-dup-second"),
                 first_name="Second",

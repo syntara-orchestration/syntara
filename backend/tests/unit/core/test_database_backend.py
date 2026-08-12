@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.services.storage_backend import DatabaseBackend
-from nexus.core.storage_exceptions import StorageBackendNotFoundError
+from syntara.core.services.storage_backend import DatabaseBackend
+from syntara.core.storage_exceptions import StorageBackendNotFoundError
 
 
 @pytest.fixture

@@ -11,22 +11,22 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventSeverity, EventStatus
-from nexus.files.audit.file_converted import ConversionStateAudit
-from nexus.files.document_conversion.models.conversion_result import ConversionResult
-from nexus.files.document_conversion.services import ConversionState
-from nexus.files.document_conversion.services.document_conversion_service import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventSeverity, EventStatus
+from syntara.files.audit.file_converted import ConversionStateAudit
+from syntara.files.document_conversion.models.conversion_result import ConversionResult
+from syntara.files.document_conversion.services import ConversionState
+from syntara.files.document_conversion.services.document_conversion_service import (
     DocumentConversionService,
 )
-from nexus.files.exceptions import FileValidationError
-from nexus.files.file_manager import FileManager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.exceptions import FileValidationError
+from syntara.files.file_manager import FileManager
+from syntara.files.models import FileMetadata, FileStatus
 
 if TYPE_CHECKING:
     from fastapi import UploadFile
 
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestFileManagerAuditEvents:
@@ -34,7 +34,7 @@ class TestFileManagerAuditEvents:
 
     def setup_method(self) -> None:
         """Register files audit handlers before each test."""
-        from nexus.files.audit.files_uploaded import (
+        from syntara.files.audit.files_uploaded import (
             FilesUploadedEvent,
             FilesUploadedHandler,
         )
@@ -42,7 +42,7 @@ class TestFileManagerAuditEvents:
         AuditEventDispatcher.register({FilesUploadedEvent: FilesUploadedHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -89,7 +89,7 @@ class TestFileManagerAuditEvents:
         assert "file_id" in file_detail
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_multiple_files_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -127,7 +127,7 @@ class TestFileManagerAuditEvents:
         assert len(event.structured_data.file_details) == 3  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_validation_error_emits_error_event(
         self,
         mock_do_emit: AsyncMock,
@@ -177,14 +177,14 @@ class TestDocumentConversionServiceAuditEvents:
         mock_config.timeout_seconds = 30
         mock_config.temp_dir = "/tmp/nexus-test"  # noqa: S108
         with patch(
-            "nexus.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
+            "syntara.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
             return_value=mock_config,
         ):
             yield mock_config
 
     def setup_method(self) -> None:
         """Register files audit handlers before each test."""
-        from nexus.files.audit.file_converted import (
+        from syntara.files.audit.file_converted import (
             FileConvertedEvent,
             FileConvertedHandler,
         )
@@ -192,7 +192,7 @@ class TestDocumentConversionServiceAuditEvents:
         AuditEventDispatcher.register({FileConvertedEvent: FileConvertedHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -255,7 +255,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.structured_data.conversion_state == ConversionStateAudit.SUCCESS  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_failed_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -314,7 +314,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.structured_data.error_type == "ConversionFailureError"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_skipped_emits_warning_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -353,7 +353,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.structured_data.conversion_state == ConversionStateAudit.SKIPPED  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_missing_converter_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,

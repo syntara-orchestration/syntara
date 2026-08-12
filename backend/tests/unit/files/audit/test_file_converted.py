@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.audit.models.audit_event import EventSeverity, EventStatus
-from nexus.files.audit.file_converted import (
+from syntara.audit.models.audit_event import EventSeverity, EventStatus
+from syntara.files.audit.file_converted import (
     ConversionStateAudit,
     FileConvertedEvent,
     FileConvertedHandler,

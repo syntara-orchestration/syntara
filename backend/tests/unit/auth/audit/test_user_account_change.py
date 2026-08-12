@@ -2,16 +2,16 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.user_account_change import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.user_account_change import (
     AccountStatus,
     UserAccountStatusChangedEvent,
     UserAccountStatusChangedHandler,
     UserPasswordChangedEvent,
     UserPasswordChangedHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestUserPasswordChangedHandler:

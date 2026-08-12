@@ -3,16 +3,16 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.events.workflow_execution import WorkflowExecutionCompletedEvent
-from nexus.telemetry.handlers.workflow_completed import WorkflowCompletedTelemetryHandler
-from nexus.workflows.audit.execution_completed import WorkflowCompletedEvent
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
+from syntara.telemetry.events.workflow_execution import WorkflowExecutionCompletedEvent
+from syntara.telemetry.handlers.workflow_completed import WorkflowCompletedTelemetryHandler
+from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
 
 
 class TestWorkflowCompletedTelemetryHandler:
     """Tests for the side-effect telemetry handler."""
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_emits_segment_event(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -46,7 +46,7 @@ class TestWorkflowCompletedTelemetryHandler:
         assert event.entitlement_id == "ent-test-123"
         assert event.request_id == request_id
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_emits_failed_event_with_error_type(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -70,7 +70,7 @@ class TestWorkflowCompletedTelemetryHandler:
         assert event.error_type == "ActivityExecutionError"
         assert event.error_count == 2
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = False
@@ -90,7 +90,7 @@ class TestWorkflowCompletedTelemetryHandler:
         assert result is None
         registry.send_event.assert_not_called()
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_does_not_raise_on_error(self, mock_get_registry: MagicMock) -> None:
         mock_get_registry.side_effect = RuntimeError("boom")
 
@@ -106,7 +106,7 @@ class TestWorkflowCompletedTelemetryHandler:
         result = WorkflowCompletedTelemetryHandler().handle(domain_event)
         assert result is None
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_none_request_id_passes_none(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -127,7 +127,7 @@ class TestWorkflowCompletedTelemetryHandler:
         event = registry.send_event.call_args[0][0]
         assert event.request_id is None
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_passes_trigger_type_and_interface_through(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -151,7 +151,7 @@ class TestWorkflowCompletedTelemetryHandler:
         assert event.trigger_type == ActivityName.SCHEDULED_TRIGGER
         assert event.interface == "api"
 
-    @patch("nexus.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_handles_none_trigger_type_and_interface(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True

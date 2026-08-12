@@ -9,15 +9,15 @@ import pytest
 import respx
 from pydantic import HttpUrl
 
-from nexus.core.config.base import get_settings
-from nexus.identity_providers.exceptions import (
+from syntara.core.config.base import get_settings
+from syntara.identity_providers.exceptions import (
     AAPAuthenticationError,
     AAPConnectionError,
     AAPSetupError,
 )
-from nexus.identity_providers.models.aap_setup import AAPOIDCSetupRequest
-from nexus.identity_providers.models.identity_provider_configuration import OIDCIdpType
-from nexus.identity_providers.services.aap_oidc_setup_service import AAPOIDCSetupService
+from syntara.identity_providers.models.aap_setup import AAPOIDCSetupRequest
+from syntara.identity_providers.models.identity_provider_configuration import OIDCIdpType
+from syntara.identity_providers.services.aap_oidc_setup_service import AAPOIDCSetupService
 
 _AAP_URL = "https://aap.example.com"
 _AAP_API = f"{_AAP_URL}/api/gateway/v1"
@@ -192,7 +192,7 @@ class TestSetupHappyPath:
             MagicMock(status_code=201, json=MagicMock(return_value=_app_response())),
         ]
 
-        with patch("nexus.identity_providers.services.aap_oidc_setup_service.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.identity_providers.services.aap_oidc_setup_service.httpx.AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
@@ -209,7 +209,7 @@ class TestSetupHappyPath:
             MagicMock(status_code=201, json=MagicMock(return_value=_app_response())),
         ]
 
-        with patch("nexus.identity_providers.services.aap_oidc_setup_service.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.identity_providers.services.aap_oidc_setup_service.httpx.AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 

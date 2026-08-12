@@ -13,16 +13,16 @@ from langchain_core.messages import ToolCall
 from langchain_core.messages.tool import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 
-from nexus.agent_orchestrator.audit.tool_management import (
+from syntara.agent_orchestrator.audit.tool_management import (
     ToolInvocationEvent,
     ToolInvocationHandler,
 )
-from nexus.agent_orchestrator.tool_manager.execution_failure_handler import (
+from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     create_tool_awrapper,
     create_tool_wrapper,
 )
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
 
 
 def _make_tool_call_request(tool_name: str, tool_args: dict[str, Any] | None = None) -> ToolCallRequest:
@@ -77,7 +77,7 @@ class TestAsyncToolInvocationEventDispatch:
         async def mock_execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="File content here", tool_call_id=req.tool_call["id"])
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             result = await wrapper(request, mock_execute)
 
         # Verify result
@@ -138,9 +138,9 @@ class TestAsyncToolInvocationEventDispatch:
 
         # Mock the tool disable functionality to avoid side effects
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
+                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
                 new_callable=AsyncMock,
             ),
         ):
@@ -187,7 +187,7 @@ class TestAsyncToolInvocationEventDispatch:
         async def mock_execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="result", tool_call_id=req.tool_call["id"])
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             await wrapper(request, mock_execute)
 
         # Verify all events contain session_id and invocation_id
@@ -234,7 +234,7 @@ class TestSyncToolInvocationEventDispatch:
         def mock_execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="total 128\ndrwxr-xr-x  5 user", tool_call_id=req.tool_call["id"])
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             result = wrapper(request, mock_execute)
 
         # Verify result
@@ -289,9 +289,9 @@ class TestSyncToolInvocationEventDispatch:
 
         # Mock the tool disable functionality to avoid side effects
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "nexus.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
+                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
                 new_callable=AsyncMock,
             ),
         ):
@@ -341,7 +341,7 @@ class TestSyncToolInvocationEventDispatch:
         def mock_execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="transformed", tool_call_id=req.tool_call["id"])
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             wrapper(request, mock_execute)
 
         # Verify complex input preserved in event
@@ -370,7 +370,7 @@ class TestSyncToolInvocationEventDispatch:
         def mock_execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="result", tool_call_id=req.tool_call["id"])
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             wrapper(request, mock_execute)
 
         # Verify all events contain session_id and invocation_id

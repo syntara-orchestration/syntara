@@ -6,7 +6,7 @@ This document defines database patterns for the Nexus project. PostgreSQL is the
 
 ### Engine Configuration
 
-Database connections are managed via SQLAlchemy async engine in `src/nexus/core/database/session.py`:
+Database connections are managed via SQLAlchemy async engine in `src/syntara/core/database/session.py`:
 
 ```python
 engine = create_async_engine(
@@ -20,7 +20,7 @@ engine = create_async_engine(
 )
 ```
 
-All pool parameters except `pool_pre_ping` and `pool_recycle` are configurable via `DatabaseSettings` in `src/nexus/core/config/base.py`.
+All pool parameters except `pool_pre_ping` and `pool_recycle` are configurable via `DatabaseSettings` in `src/syntara/core/config/base.py`.
 
 ### PostgreSQL Server `max_connections`
 
@@ -54,14 +54,14 @@ async def list_resources(db: Annotated[AsyncSession, Depends(get_db)]):
 
 ### Session Factory for Testing
 
-`src/nexus/core/utils/session_factory.py` provides `create_session_factory_from_request()` which respects FastAPI's `dependency_overrides`. This allows tests to substitute a test database session without modifying endpoint code.
+`src/syntara/core/utils/session_factory.py` provides `create_session_factory_from_request()` which respects FastAPI's `dependency_overrides`. This allows tests to substitute a test database session without modifying endpoint code.
 
 ### Single-Database Architecture
 
 Nexus uses a **single PostgreSQL database** for all application data, including the audit outbox. Audit events are written to the outbox table in the main database and asynchronously exported to the OTEL collector by the `AuditOutboxWorker`.
 
 - Use `get_db()` for all database access (domain models, audit outbox, etc.)
-- Schema is managed via a single Alembic migration tree in `src/nexus/core/database/migrations/`
+- Schema is managed via a single Alembic migration tree in `src/syntara/core/database/migrations/`
 
 ## Migrations
 
@@ -77,7 +77,7 @@ and seed:
 # From repo root — destroy the Postgres volume and bring the stack back up
 podman compose -f podman-compose.yml down -v
 # then start services as usual (e.g. make run-all from backend/)
-# nexus startup runs: alembic upgrade head && python -m nexus.seed --all
+# syntara startup runs: alembic upgrade head && python -m syntara.seed --all
 ```
 
 For a database outside Compose, if it is a dedicated local/dev AO database
@@ -87,7 +87,7 @@ migration history.
 
 ```bash
 uv run alembic upgrade head
-uv run python -m nexus.seed --all
+uv run python -m syntara.seed --all
 ```
 
 ### Alembic Workflow
@@ -104,7 +104,7 @@ Migrations use random hexadecimal prefixes (e.g., `2314ee1fbabf_add_approval_req
 
 ### Model Registration
 
-All models must be imported in `src/nexus/core/database/migrations/env.py` to register with SQLModel's metadata. If a model isn't imported there, Alembic won't detect its schema changes.
+All models must be imported in `src/syntara/core/database/migrations/env.py` to register with SQLModel's metadata. If a model isn't imported there, Alembic won't detect its schema changes.
 
 ### Custom SQL in Migrations
 
@@ -146,7 +146,7 @@ Label filtering in `BaseService` uses two PostgreSQL operators:
 | `?labels[env]=prod` | `@>` (contains via `.contains()`) | Match key-value pair |
 | `?labels[env]=` | `has_key()` | Check key exists (any value) |
 
-Implementation in `src/nexus/core/utils/labels.py` and `src/nexus/core/services/base.py`.
+Implementation in `src/syntara/core/utils/labels.py` and `src/syntara/core/services/base.py`.
 
 ## Soft Delete Filtering
 
@@ -173,10 +173,10 @@ Soft-deleted records are excluded from queries by filtering `WHERE deleted_at IS
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/database/session.py` | Engine, session factory, `get_db()` |
-| `src/nexus/core/config/base.py` | `DatabaseSettings` (pool configuration) |
-| `src/nexus/core/database/migrations/env.py` | Alembic migration environment |
-| `src/nexus/core/database/migrations/versions/` | Migration files |
-| `src/nexus/core/utils/session_factory.py` | Test-compatible session factory |
-| `src/nexus/core/utils/labels.py` | Label filter JSONB operations |
-| `src/nexus/core/services/base.py` | Label filter application in queries |
+| `src/syntara/core/database/session.py` | Engine, session factory, `get_db()` |
+| `src/syntara/core/config/base.py` | `DatabaseSettings` (pool configuration) |
+| `src/syntara/core/database/migrations/env.py` | Alembic migration environment |
+| `src/syntara/core/database/migrations/versions/` | Migration files |
+| `src/syntara/core/utils/session_factory.py` | Test-compatible session factory |
+| `src/syntara/core/utils/labels.py` | Label filter JSONB operations |
+| `src/syntara/core/services/base.py` | Label filter application in queries |

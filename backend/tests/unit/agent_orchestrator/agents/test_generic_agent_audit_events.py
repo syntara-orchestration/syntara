@@ -12,24 +12,24 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
-from nexus.agent_orchestrator.agents.generic_agent import GenericAgent
-from nexus.agent_orchestrator.audit.agent_execution import (
+from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
+from syntara.agent_orchestrator.audit.agent_execution import (
     AgentExecutionEvent,
     AgentExecutionHandler,
 )
-from nexus.agent_orchestrator.audit.llm_interaction import (
+from syntara.agent_orchestrator.audit.llm_interaction import (
     LLMInteractionEvent,
     LLMInteractionHandler,
     LLMInteractionStatus,
     LLMInteractionType,
 )
-from nexus.agent_orchestrator.exceptions import EmptyLLMResponseError
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-from nexus.audit.sanitization import REDACTED
+from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+from syntara.audit.sanitization import REDACTED
 
 
 def _make_agent_state(**overrides: object) -> AgentState:
@@ -90,8 +90,8 @@ class TestGenericAgentExecutionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute(state)
 
@@ -141,8 +141,8 @@ class TestGenericAgentExecutionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
             pytest.raises(ValueError),
         ):
             await agent._execute(state)
@@ -186,8 +186,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute_standard(state)
 
@@ -220,8 +220,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
             pytest.raises(EmptyLLMResponseError),
         ):
             await agent._execute_standard(state)
@@ -254,8 +254,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute_structured(state, response_schema)
 
@@ -288,8 +288,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute_structured(state, response_schema)
 
@@ -330,8 +330,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute_structured(state, response_schema)
 
@@ -373,8 +373,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._extract_structured_output(state, response_schema)
 
@@ -400,8 +400,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._extract_structured_output(state, response_schema)
 
@@ -433,8 +433,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             result_state = await agent._extract_structured_output(state, response_schema)
 
@@ -470,8 +470,8 @@ class TestGenericAgentLLMInteractionEvents:
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
-            patch("nexus.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.metrics.instrumentation.record_llm_call", side_effect=lambda _, fn, **__: fn()),
         ):
             await agent._execute_standard(state)
 

@@ -8,14 +8,18 @@ import pytest
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.approvals.error_handlers import (
+from syntara.approvals.error_handlers import (
     approval_already_decided_handler,
     approval_already_requested_handler,
     approval_not_found_handler,
 )
-from nexus.approvals.exceptions import ApprovalAlreadyDecidedError, ApprovalAlreadyRequestedError, ApprovalNotFoundError
-from nexus.approvals.models import ApprovalRequestStatus
-from nexus.core.error_handlers import PROBLEM_TYPES
+from syntara.approvals.exceptions import (
+    ApprovalAlreadyDecidedError,
+    ApprovalAlreadyRequestedError,
+    ApprovalNotFoundError,
+)
+from syntara.approvals.models import ApprovalRequestStatus
+from syntara.core.error_handlers import PROBLEM_TYPES
 
 
 class TestApprovalNotFoundHandler:

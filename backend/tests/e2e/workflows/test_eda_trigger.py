@@ -39,7 +39,7 @@ class TestEdaTrigger:
 
     def test_eda_trigger_full_flow(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
@@ -49,7 +49,7 @@ class TestEdaTrigger:
         webhook_path = unique_name("eda-hook")
 
         # Step 1: Create SA with credential
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         # Step 2: Create workflow with eda_trigger bound to the SA
         workflow_data = WorkflowCreate(
@@ -87,7 +87,7 @@ class TestEdaTrigger:
         assert workflow.id is not None
 
         # Step 3: Publish the workflow
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=workflow.id,
             version=1,
             body=PublishVersionRequest(),
@@ -112,7 +112,7 @@ class TestEdaTrigger:
         # Step 5: Poll to completion
         webhook_body = webhook_response.json()
         execution_id = UUID(webhook_body["execution_id"])
-        execution = poll_execution_until_complete(nexus_api, execution_id)
+        execution = poll_execution_until_complete(syntara_api, execution_id)
 
         assert str(execution.status) == "completed"
         assert execution.activities is not None
@@ -136,12 +136,12 @@ class TestEdaTrigger:
 
     def test_eda_trigger_404_for_unknown_path(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         nexus_base_url: str,
         first_project_id: UUID,
     ):
         """POST to an unknown EDA webhook path returns 404."""
-        _sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        _sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
         access_token = _get_sa_token(nexus_base_url, client_id, client_secret)
 
         unknown_path = unique_name("nonexistent-eda-path")

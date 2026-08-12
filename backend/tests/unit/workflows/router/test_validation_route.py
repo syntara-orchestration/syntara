@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
-from nexus.workflows.router import _ValidationRoute
+from syntara.workflows.router import _ValidationRoute
 
 
 class TestValidationRouteHandler:

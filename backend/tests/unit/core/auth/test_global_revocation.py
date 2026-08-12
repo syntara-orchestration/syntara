@@ -8,16 +8,16 @@ from uuid import uuid4
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
-from nexus.auth.dependencies import get_current_user
-from nexus.auth.exceptions import TokenGloballyRevokedError
-from nexus.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
-from nexus.auth.services.global_revocation import (
+from syntara.auth.dependencies import get_current_user
+from syntara.auth.exceptions import TokenGloballyRevokedError
+from syntara.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
+from syntara.auth.services.global_revocation import (
     _CACHE_TTL,
     clear_global_revocation_cache,
     get_global_revocation_timestamp,
     is_token_globally_revoked,
 )
-from nexus.auth.services.token_service import TokenPayload
+from syntara.auth.services.token_service import TokenPayload
 
 
 def _make_payload(
@@ -237,8 +237,8 @@ class TestGetCurrentUserGlobalRevocation:
         db = _mock_session(row)
 
         with (
-            patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service),
-            patch("nexus.audit.dispatcher.AuditEventDispatcher.dispatch"),
+            patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service),
+            patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch"),
             pytest.raises(TokenGloballyRevokedError),
         ):
             await get_current_user(request, db=db, credentials=credentials)
@@ -259,7 +259,7 @@ class TestGetCurrentUserGlobalRevocation:
         request = MagicMock()
         db = _mock_session(row)
 
-        with patch("nexus.auth.dependencies._get_token_service", return_value=mock_token_service):
+        with patch("syntara.auth.dependencies._get_token_service", return_value=mock_token_service):
             user = await get_current_user(request, db=db, credentials=credentials)
 
         assert user is not None

@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.lib.encryption import KEY_SIZE, SecretEncryptor
-from nexus.core.services.secret_service import SecretService
+from syntara.core.lib.encryption import KEY_SIZE, SecretEncryptor
+from syntara.core.services.secret_service import SecretService
 
 
 @pytest.fixture
@@ -185,7 +185,7 @@ class TestProtocolConformance:
     """Verify DatabaseBackend conforms to StorageBackend Protocol."""
 
     def test_database_backend_is_storage_backend(self, mock_session: MagicMock) -> None:
-        from nexus.core.services.storage_backend import DatabaseBackend, StorageBackend
+        from syntara.core.services.storage_backend import DatabaseBackend, StorageBackend
 
         backend = DatabaseBackend(mock_session)
         assert isinstance(backend, StorageBackend)
@@ -222,7 +222,7 @@ class TestAADBinding:
         assert decrypted == {"token": "test-value"}
 
         # Verify it CANNOT be decrypted with a different ID
-        from nexus.core.lib.encryption import EncryptionError
+        from syntara.core.lib.encryption import EncryptionError
 
         with pytest.raises(EncryptionError):
             encryptor.decrypt_fields(stored_data, str(uuid4()))

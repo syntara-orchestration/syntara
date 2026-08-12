@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.authz.role_conventions import (
+from syntara.authz.role_conventions import (
     BUILTIN_POLICIES,
     BUILTIN_ROLES,
     PolicyInfo,

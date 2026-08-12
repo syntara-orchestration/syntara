@@ -2,8 +2,8 @@
 
 from uuid import UUID, uuid4
 
-from nexus.agent_orchestrator.models.agent_state import AgentStateFactory
-from nexus.audit.emitter import AuditActorContext
+from syntara.agent_orchestrator.models.agent_state import AgentStateFactory
+from syntara.audit.emitter import AuditActorContext
 
 
 class TestAgentStateFactory:

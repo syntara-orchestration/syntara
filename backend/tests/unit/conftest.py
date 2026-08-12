@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 pytest_plugins = [
     "tests.unit.fixtures.mocks",
@@ -34,12 +34,12 @@ pytest_plugins = [
 
 def pytest_configure(config: pytest.Config) -> None:
     """Build the resource-actions registry once, after coverage tracking starts."""
-    from nexus.authz.resource_actions import _registry, build_resource_actions
+    from syntara.authz.resource_actions import _registry, build_resource_actions
 
     if _registry is None:
         from fastapi import FastAPI
 
-        from nexus.core.router_discovery import discover_and_register_routers
+        from syntara.core.router_discovery import discover_and_register_routers
 
         _init_app = FastAPI()
         discover_and_register_routers(app=_init_app, prefix="", enable_validation=False)
@@ -52,7 +52,7 @@ TEST_ENCRYPTION_KEY = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefd
 @pytest.fixture(autouse=True)
 def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Provide a valid encryption key for all unit tests via env var."""
-    from nexus.core.config.base import get_settings
+    from syntara.core.config.base import get_settings
 
     monkeypatch.setenv("APP_SECRET_ENCRYPTION_KEY", TEST_ENCRYPTION_KEY)
     get_settings.cache_clear()
@@ -61,7 +61,7 @@ def _set_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def _reset_opa_cache() -> Generator[None, None, None]:
     """Disable Rego cache between unit tests to prevent cross-test pollution."""
-    from nexus.authz.engine import clear_authz_cache, init_authz_cache
+    from syntara.authz.engine import clear_authz_cache, init_authz_cache
 
     init_authz_cache(enabled=False)
     yield
@@ -72,7 +72,7 @@ def _reset_opa_cache() -> Generator[None, None, None]:
 @pytest_asyncio.fixture
 async def test_project_id(test_db_session: AsyncSession) -> UUID:
     """Create a test project and return its ID."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name=f"unit-test-project-{uuid4().hex[:8]}", description="Unit test project")
     test_db_session.add(project)
@@ -86,8 +86,8 @@ async def users(test_db_session: AsyncSession) -> dict[str, User]:
 
     Returns a dict of users keyed by user_1, user_2, etc.
     """
-    from nexus.auth.passwords import hash_password
-    from nexus.core.models import User
+    from syntara.auth.passwords import hash_password
+    from syntara.core.models import User
 
     test_users = {
         "user_1": User(

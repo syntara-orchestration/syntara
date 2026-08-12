@@ -6,9 +6,9 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.agent_orchestrator.error_handlers import llm_configuration_error_handler
-from nexus.agent_orchestrator.exceptions import LLMConfigurationError
-from nexus.core.error_handlers import PROBLEM_TYPES
+from syntara.agent_orchestrator.error_handlers import llm_configuration_error_handler
+from syntara.agent_orchestrator.exceptions import LLMConfigurationError
+from syntara.core.error_handlers import PROBLEM_TYPES
 
 
 class TestLlmConfigurationErrorHandler:

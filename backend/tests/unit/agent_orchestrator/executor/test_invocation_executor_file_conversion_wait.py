@@ -7,9 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.agent_orchestrator.models.context_data import InvocationContextData
-from nexus.files.models import FileStatus
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.models.context_data import InvocationContextData
+from syntara.files.models import FileStatus
 
 
 def _make_file_metadata(file_id: UUID, status: FileStatus, filename: str = "test.pdf") -> MagicMock:
@@ -72,7 +72,7 @@ class TestWaitForFileConversions:
         )
 
         with patch(
-            "nexus.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock
+            "syntara.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock
         ) as mock_sleep:
             await executor._wait_for_file_conversions(ctx)
 
@@ -114,9 +114,10 @@ class TestWaitForFileConversions:
 
         with (
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.time.monotonic", side_effect=advancing_monotonic
+                "syntara.agent_orchestrator.executor.invocation_executor.time.monotonic",
+                side_effect=advancing_monotonic,
             ),
-            patch("nexus.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock),
         ):
             await executor._wait_for_file_conversions(ctx)
 
@@ -139,7 +140,7 @@ class TestWaitForFileConversions:
         executor.file_manager.get_files_metadata = AsyncMock(side_effect=side_effect)
 
         with patch(
-            "nexus.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock
+            "syntara.agent_orchestrator.executor.invocation_executor.asyncio.sleep", new_callable=AsyncMock
         ) as mock_sleep:
             await executor._wait_for_file_conversions(ctx)
 

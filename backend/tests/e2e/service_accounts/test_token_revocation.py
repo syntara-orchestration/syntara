@@ -39,10 +39,10 @@ class TestDisableTokenInvalidation:
     """API-21: Disable — immediate token invalidation (outstanding tokens rejected)."""
 
     def test_disable_invalidates_outstanding_tokens(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """Outstanding Bearer tokens are rejected after the SA is disabled."""
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
             resp = token_request(nexus_base_url, client_id, client_secret)
@@ -56,7 +56,7 @@ class TestDisableTokenInvalidation:
             )
             assert pre_resp.status_code == HTTPStatus.OK, "Token should work before disable"
 
-            nexus_api.service_accounts.disable(service_account_id=sa.id)
+            syntara_api.service_accounts.disable(service_account_id=sa.id)
 
             rejection = poll_until_status(nexus_base_url, access_token, HTTPStatus.UNAUTHORIZED)
             assert rejection.status_code == HTTPStatus.UNAUTHORIZED, (
@@ -64,20 +64,20 @@ class TestDisableTokenInvalidation:
             )
         finally:
             try:
-                nexus_api.service_accounts.enable(service_account_id=sa.id)
+                syntara_api.service_accounts.enable(service_account_id=sa.id)
             except Exception:
                 pass
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestDeleteTokenInvalidation:
     """API-22: Delete — immediate token invalidation (outstanding tokens rejected)."""
 
     def test_delete_invalidates_outstanding_tokens(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """Outstanding Bearer tokens are rejected after the SA is deleted."""
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         resp = token_request(nexus_base_url, client_id, client_secret)
         assert resp.status_code == HTTPStatus.OK
@@ -90,7 +90,7 @@ class TestDeleteTokenInvalidation:
         )
         assert pre_resp.status_code == HTTPStatus.OK, "Token should work before delete"
 
-        nexus_api.service_accounts.delete(service_account_id=sa.id)
+        syntara_api.service_accounts.delete(service_account_id=sa.id)
 
         rejection = poll_until_status(nexus_base_url, access_token, HTTPStatus.UNAUTHORIZED)
         assert rejection.status_code == HTTPStatus.UNAUTHORIZED, (
@@ -102,26 +102,26 @@ class TestReEnableRestoresAuth:
     """API-23: Re-enable disabled service account (authentication restored)."""
 
     def test_re_enable_restores_authentication(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """After re-enabling a disabled SA, a fresh token grants access again.
 
         The old token remains revoked (token_version was incremented on disable).
         The SA must re-authenticate via client credentials to get a new token.
         """
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
             resp = token_request(nexus_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
             old_token = resp.parsed.access_token
 
-            nexus_api.service_accounts.disable(service_account_id=sa.id)
+            syntara_api.service_accounts.disable(service_account_id=sa.id)
 
             rejection = poll_until_status(nexus_base_url, old_token, HTTPStatus.UNAUTHORIZED)
             assert rejection.status_code == HTTPStatus.UNAUTHORIZED, "Old token should be rejected after disable"
 
-            nexus_api.service_accounts.enable(service_account_id=sa.id)
+            syntara_api.service_accounts.enable(service_account_id=sa.id)
 
             new_resp = token_request(nexus_base_url, client_id, client_secret)
             assert new_resp.status_code == HTTPStatus.OK, "Client credentials grant should succeed after re-enable"
@@ -139,20 +139,20 @@ class TestReEnableRestoresAuth:
                 "Old token should remain revoked after re-enable (token_version incremented on disable)"
             )
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestCredentialDisableTokenInvalidation:
     """Disabling a credential invalidates only that credential's tokens."""
 
     def test_disable_credential_invalidates_its_tokens_only(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """Token from credential A is rejected after disable; token from credential B still works."""
-        sa, client_id_a, client_secret_a = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id_a, client_secret_a = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            cred_b = nexus_api.service_account_credentials.create(
+            cred_b = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
                 body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
@@ -167,10 +167,10 @@ class TestCredentialDisableTokenInvalidation:
             )
             assert pre_a.status_code == HTTPStatus.OK, "Token A should work before disable"
 
-            creds = nexus_api.service_account_credentials.list(service_account_id=sa.id).assert_and_get()
+            creds = syntara_api.service_account_credentials.list(service_account_id=sa.id).assert_and_get()
             cred_a_id = next(c.id for c in creds.resources if c.identifier == client_id_a)
 
-            nexus_api.service_account_credentials.disable(
+            syntara_api.service_account_credentials.disable(
                 service_account_id=sa.id,
                 credential_id=cred_a_id,
             )
@@ -187,13 +187,13 @@ class TestCredentialDisableTokenInvalidation:
             )
             assert me_b.status_code == HTTPStatus.OK, "Token B should still work — only credential A was disabled"
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
     def test_delete_credential_invalidates_its_tokens(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """Token from a deleted credential is rejected."""
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
             access_token = token_request(nexus_base_url, client_id, client_secret).parsed.access_token
@@ -205,10 +205,10 @@ class TestCredentialDisableTokenInvalidation:
             )
             assert pre.status_code == HTTPStatus.OK, "Token should work before delete"
 
-            creds = nexus_api.service_account_credentials.list(service_account_id=sa.id).assert_and_get()
+            creds = syntara_api.service_account_credentials.list(service_account_id=sa.id).assert_and_get()
             cred_id = next(c.id for c in creds.resources if c.identifier == client_id)
 
-            nexus_api.service_account_credentials.delete(
+            syntara_api.service_account_credentials.delete(
                 service_account_id=sa.id,
                 credential_id=cred_id,
             )
@@ -218,4 +218,4 @@ class TestCredentialDisableTokenInvalidation:
                 f"Expected 401 after credential delete, got {rejection.status_code}"
             )
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)

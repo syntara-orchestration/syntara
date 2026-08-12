@@ -1,14 +1,14 @@
 """Unit tests for AuditContextEvent and AuditContextHandler."""
 
-from nexus.audit.emitter import AuditActorContext
+from syntara.audit.emitter import AuditActorContext
 
 # mypy: disable-error-code="attr-defined"
-from nexus.audit.events.audit_context import AuditContextEvent, AuditContextHandler
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.events.audit_context import AuditContextEvent, AuditContextHandler
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestAuditContextHandler:

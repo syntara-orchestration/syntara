@@ -28,11 +28,11 @@ from uuid import uuid4
 import pytest
 from sqlmodel import col, select
 
-from nexus.core.config.base import get_settings
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.core.config.base import get_settings
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession

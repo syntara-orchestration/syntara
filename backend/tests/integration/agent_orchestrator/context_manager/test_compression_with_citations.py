@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.compressor import CompressorService
+from syntara.agent_orchestrator.context_manager.compressor import CompressorService
 from tests.fixtures.settings import FakeSettingsCache
 
 

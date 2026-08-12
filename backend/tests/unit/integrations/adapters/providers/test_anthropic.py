@@ -1,6 +1,6 @@
 """Tests for AnthropicProvider."""
 
-from nexus.integrations.adapters.providers.anthropic import AnthropicProvider
+from syntara.integrations.adapters.providers.anthropic import AnthropicProvider
 
 
 class TestAnthropicProvider:

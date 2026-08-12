@@ -24,7 +24,7 @@ def _clear_db_probe_cache() -> Iterator[None]:
     a test that primes the cache with "ok" would mask the next test's
     simulated outage.
     """
-    with patch("nexus.api.main._db_probe_cache", None):
+    with patch("syntara.api.main._db_probe_cache", None):
         yield
 
 
@@ -45,7 +45,7 @@ class TestHealthEndpointFileStorage:
         mock_fm = MagicMock()
         type(mock_fm).s3_configured = PropertyMock(return_value=False)
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await base_client.get("/health")
 
         assert resp.status_code == 200
@@ -64,7 +64,7 @@ class TestHealthEndpointFileStorage:
         mock_retriever.health_check = AsyncMock(return_value=True)
         mock_fm.get_retriever.return_value = mock_retriever
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await base_client.get("/health")
 
         assert resp.status_code == 200
@@ -90,7 +90,7 @@ class TestLivenessEndpoint:
         Liveness failures restart the container, so a transient database
         blip would otherwise cascade into a restart storm across replicas.
         """
-        with patch("nexus.api.main.AsyncSessionLocal", side_effect=ConnectionError("database is unreachable")):
+        with patch("syntara.api.main.AsyncSessionLocal", side_effect=ConnectionError("database is unreachable")):
             resp = await base_client.get("/healthz/live")
 
         assert resp.status_code == 200
@@ -119,7 +119,7 @@ class TestReadinessEndpoint:
     @pytest.mark.asyncio
     async def test_returns_503_when_database_unreachable(self, base_client: AsyncClient) -> None:
         """A database outage must drop the pod out of the Service endpoints."""
-        with patch("nexus.api.main.AsyncSessionLocal", side_effect=ConnectionError("database is unreachable")):
+        with patch("syntara.api.main.AsyncSessionLocal", side_effect=ConnectionError("database is unreachable")):
             resp = await base_client.get("/healthz/ready")
 
         assert resp.status_code == 503
@@ -147,8 +147,8 @@ class TestReadinessEndpoint:
                 return None
 
         with (
-            patch("nexus.api.main.DB_PROBE_TIMEOUT_SECONDS", 0.05),
-            patch("nexus.api.main.AsyncSessionLocal", _HangingSession),
+            patch("syntara.api.main.DB_PROBE_TIMEOUT_SECONDS", 0.05),
+            patch("syntara.api.main.AsyncSessionLocal", _HangingSession),
         ):
             start = time.monotonic()
             resp = await base_client.get("/healthz/ready")
@@ -191,8 +191,8 @@ class TestReadinessEndpoint:
         # TTL of 0 disables the memo so both phases really open a session.
         # Success path — where the leak actually was.
         with (
-            patch("nexus.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0),
-            patch("nexus.api.main.AsyncSessionLocal", lambda: _TrackedSession(hang=False)),
+            patch("syntara.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0),
+            patch("syntara.api.main.AsyncSessionLocal", lambda: _TrackedSession(hang=False)),
         ):
             resp = await base_client.get("/healthz/ready")
 
@@ -202,9 +202,9 @@ class TestReadinessEndpoint:
         # Timeout path.
         closed.clear()
         with (
-            patch("nexus.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0),
-            patch("nexus.api.main.DB_PROBE_TIMEOUT_SECONDS", 0.05),
-            patch("nexus.api.main.AsyncSessionLocal", lambda: _TrackedSession(hang=True)),
+            patch("syntara.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0),
+            patch("syntara.api.main.DB_PROBE_TIMEOUT_SECONDS", 0.05),
+            patch("syntara.api.main.AsyncSessionLocal", lambda: _TrackedSession(hang=True)),
         ):
             resp = await base_client.get("/healthz/ready")
 
@@ -222,7 +222,7 @@ class TestReadinessEndpoint:
         mock_fm = MagicMock()
         type(mock_fm).s3_configured = PropertyMock(return_value=False)
 
-        with patch("nexus.files.health.get_file_manager", return_value=mock_fm):
+        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
             resp = await base_client.get("/healthz/ready")
 
         assert resp.status_code == 200
@@ -231,7 +231,7 @@ class TestReadinessEndpoint:
     @pytest.mark.asyncio
     async def test_stays_ready_when_file_storage_is_unavailable(self, base_client: AsyncClient) -> None:
         """A broken object store must never take a replica out of rotation."""
-        with patch("nexus.files.health.get_file_manager", side_effect=RuntimeError("S3 is down")):
+        with patch("syntara.files.health.get_file_manager", side_effect=RuntimeError("S3 is down")):
             resp = await base_client.get("/healthz/ready")
 
         assert resp.status_code == 200
@@ -265,7 +265,7 @@ class TestReadinessProbeCache:
         """
         opened: list[int] = []
 
-        with patch("nexus.api.main.AsyncSessionLocal", self._counting_session_factory(opened)):
+        with patch("syntara.api.main.AsyncSessionLocal", self._counting_session_factory(opened)):
             first = await base_client.get("/healthz/ready")
             second = await base_client.get("/healthz/ready")
             third = await base_client.get("/health")
@@ -279,8 +279,8 @@ class TestReadinessProbeCache:
         opened: list[int] = []
 
         with (
-            patch("nexus.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0.05),
-            patch("nexus.api.main.AsyncSessionLocal", self._counting_session_factory(opened)),
+            patch("syntara.api.main.DB_PROBE_CACHE_TTL_SECONDS", 0.05),
+            patch("syntara.api.main.AsyncSessionLocal", self._counting_session_factory(opened)),
         ):
             await base_client.get("/healthz/ready")
             await asyncio.sleep(0.1)
@@ -299,7 +299,7 @@ class TestReadinessProbeCache:
             msg = "database is unreachable"
             raise ConnectionError(msg)
 
-        with patch("nexus.api.main.AsyncSessionLocal", _failing_factory):
+        with patch("syntara.api.main.AsyncSessionLocal", _failing_factory):
             first = await base_client.get("/healthz/ready")
             second = await base_client.get("/healthz/ready")
 
@@ -310,13 +310,13 @@ class TestReadinessProbeCache:
     @pytest.mark.asyncio
     async def test_recovery_is_seen_within_one_probe_interval(self, base_client: AsyncClient) -> None:
         """A cached failure must clear on its own, without a restart."""
-        with patch("nexus.api.main.AsyncSessionLocal", side_effect=ConnectionError("db down")):
+        with patch("syntara.api.main.AsyncSessionLocal", side_effect=ConnectionError("db down")):
             failed = await base_client.get("/healthz/ready")
 
         assert failed.status_code == 503
 
         # The cached failure lapses; the next probe reaches a healthy database.
-        with patch("nexus.api.main._db_probe_cache", None):
+        with patch("syntara.api.main._db_probe_cache", None):
             recovered = await base_client.get("/healthz/ready")
 
         assert recovered.status_code == 200

@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 
 from langchain_core.tools import BaseTool
 
-from nexus.tool_manager.lib.providers.base import ToolProviderAdapter
-from nexus.tool_manager.lib.providers.mcp import MCPProvider
-from nexus.tool_manager.models import ToolProviderValidationResult, ToolSchema, ToolValidationResult
-from nexus.tool_manager.models.tool import Tool
+from syntara.tool_manager.lib.providers.base import ToolProviderAdapter
+from syntara.tool_manager.lib.providers.mcp import MCPProvider
+from syntara.tool_manager.models import ToolProviderValidationResult, ToolSchema, ToolValidationResult
+from syntara.tool_manager.models.tool import Tool
 
 
 def test_tool_provider_adapter_is_runtime_checkable() -> None:

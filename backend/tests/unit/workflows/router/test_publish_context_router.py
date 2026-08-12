@@ -8,8 +8,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.models.workflow_publish_event import PublishAction
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.models.workflow_publish_event import PublishAction
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 @pytest.fixture

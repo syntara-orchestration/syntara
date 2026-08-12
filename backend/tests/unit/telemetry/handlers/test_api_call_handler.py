@@ -7,11 +7,11 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.events.http_request import HTTPRequestEvent
-from nexus.core.models.principal import PrincipalType
-from nexus.telemetry.api_usage_accumulator import APIUsageAccumulator
-from nexus.telemetry.handlers.api_call import APICallTelemetryHandler
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.events.http_request import HTTPRequestEvent
+from syntara.core.models.principal import PrincipalType
+from syntara.telemetry.api_usage_accumulator import APIUsageAccumulator
+from syntara.telemetry.handlers.api_call import APICallTelemetryHandler
 
 
 @pytest.fixture
@@ -61,8 +61,8 @@ class TestRecordUsage:
         event = _make_event(actor_id=actor_id, actor_type=PrincipalType.USER)
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -76,8 +76,8 @@ class TestRecordUsage:
         event = _make_event(actor_id=None)
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -93,8 +93,8 @@ class TestRecordUsage:
         )
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -110,8 +110,8 @@ class TestRecordUsage:
         )
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -126,8 +126,8 @@ class TestRecordUsage:
         )
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -142,8 +142,8 @@ class TestRecordUsage:
         )
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -157,8 +157,8 @@ class TestRecordUsage:
         mock_acc.record.side_effect = RuntimeError("boom")
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=mock_acc),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=mock_acc),
         ):
             APICallTelemetryHandler._record_usage(event)
 
@@ -166,7 +166,7 @@ class TestRecordUsage:
         event = _make_event(actor_id=uuid4(), actor_type=PrincipalType.USER)
 
         with patch(
-            "nexus.telemetry.handlers.api_call.get_telemetry_registry",
+            "syntara.telemetry.handlers.api_call.get_telemetry_registry",
             side_effect=RuntimeError("registry down"),
         ):
             APICallTelemetryHandler._record_usage(event)
@@ -175,8 +175,8 @@ class TestRecordUsage:
         event = _make_event(actor_id=uuid4(), actor_type=None)
 
         with (
-            patch("nexus.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
-            patch("nexus.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
+            patch("syntara.telemetry.handlers.api_call.get_telemetry_registry", return_value=mock_registry),
+            patch("syntara.telemetry.handlers.api_call.get_accumulator", return_value=fresh_accumulator),
         ):
             APICallTelemetryHandler._record_usage(event)
 

@@ -21,10 +21,10 @@ config:
   googleCloudStorage:
     keyFile: "/opt/rapidast/gcs-key.json"
     bucketName: secaut-bucket
-    directory: ansible/nexus
+    directory: ansible/syntara
 
 application:
-  shortName: "nexus-api"
+  shortName: "syntara-api"
   url: "http://localhost:8000"
 
 general:

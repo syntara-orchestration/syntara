@@ -3,10 +3,10 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.events.node_execution import NodeExecutionEvent
-from nexus.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from nexus.workflows.audit.node_execution import NodeExecutedEvent as NodeExecutedDomainEvent
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.telemetry.events.node_execution import NodeExecutionEvent
+from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
+from syntara.workflows.audit.node_execution import NodeExecutedEvent as NodeExecutedDomainEvent
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
 )
@@ -16,7 +16,7 @@ from tests.unit.telemetry.conftest import SAMPLE_NODE_DEF
 class TestNodeExecutedTelemetryHandler:
     """Tests for the NodeExecutedTelemetryHandler."""
 
-    @patch("nexus.telemetry.handlers.node_execution.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_emits_event_with_correct_fields(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -46,7 +46,7 @@ class TestNodeExecutedTelemetryHandler:
         assert event.entitlement_id == "ent-test-789"
         assert event.request_id == request_id
 
-    @patch("nexus.telemetry.handlers.node_execution.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_emits_failed_event_with_error_type(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -67,7 +67,7 @@ class TestNodeExecutedTelemetryHandler:
         assert event.status == ActivityTerminalStatus.FAILED
         assert event.error_type == "ActivityExecutionError"
 
-    @patch("nexus.telemetry.handlers.node_execution.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = False
@@ -84,7 +84,7 @@ class TestNodeExecutedTelemetryHandler:
         assert result is None
         registry.send_event.assert_not_called()
 
-    @patch("nexus.telemetry.handlers.node_execution.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_does_not_raise_on_exception(self, mock_get_registry: MagicMock) -> None:
         mock_get_registry.side_effect = RuntimeError("boom")
 

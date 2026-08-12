@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.models.workflow import PublishWorkflowVersionResponse, WorkflowReadWithVersion
-from nexus.workflows.models.workflow_version import PublishVersionRequest
-from nexus.workflows.router import _build_workflow_with_version_response, publish_workflow_version
+from syntara.workflows.models.workflow import PublishWorkflowVersionResponse, WorkflowReadWithVersion
+from syntara.workflows.models.workflow_version import PublishVersionRequest
+from syntara.workflows.router import _build_workflow_with_version_response, publish_workflow_version
 
 
 def _make_mock_workflow() -> MagicMock:

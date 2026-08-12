@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.models.visualization import (
+from syntara.workflows.models.visualization import (
     ActivityPatchMessage,
     ExecutionSnapshotMessage,
     JsonPatchOperation,

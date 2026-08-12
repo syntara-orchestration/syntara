@@ -3,15 +3,17 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.events.workflow_version import WorkflowVersionCreatedEvent as WorkflowVersionCreatedTelemetryEvent
-from nexus.telemetry.handlers.workflow_version_created import WorkflowVersionCreatedTelemetryHandler
-from nexus.workflows.audit.workflow_version import WorkflowVersionCreatedEvent
+from syntara.telemetry.events.workflow_version import (
+    WorkflowVersionCreatedEvent as WorkflowVersionCreatedTelemetryEvent,
+)
+from syntara.telemetry.handlers.workflow_version_created import WorkflowVersionCreatedTelemetryHandler
+from syntara.workflows.audit.workflow_version import WorkflowVersionCreatedEvent
 
 
 class TestWorkflowVersionCreatedTelemetryHandler:
     """Tests for the WorkflowVersionCreatedTelemetryHandler."""
 
-    @patch("nexus.telemetry.handlers.workflow_version_created.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_created.get_telemetry_registry")
     def test_emits_event_with_correct_fields(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = True
@@ -30,7 +32,7 @@ class TestWorkflowVersionCreatedTelemetryHandler:
         assert event.version == 5
         assert event.entitlement_id == "ent-test-456"
 
-    @patch("nexus.telemetry.handlers.workflow_version_created.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_created.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:
         registry = MagicMock()
         registry.is_initialized.return_value = False
@@ -42,7 +44,7 @@ class TestWorkflowVersionCreatedTelemetryHandler:
         assert result is None
         registry.send_event.assert_not_called()
 
-    @patch("nexus.telemetry.handlers.workflow_version_created.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.workflow_version_created.get_telemetry_registry")
     def test_does_not_raise_on_exception(self, mock_get_registry: MagicMock) -> None:
         mock_get_registry.side_effect = RuntimeError("boom")
 

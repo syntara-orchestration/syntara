@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from nexus.core.error_handlers import PROBLEM_TYPES, integrity_error_handler
+from syntara.core.error_handlers import PROBLEM_TYPES, integrity_error_handler
 
 
 class MockIntegrityError(IntegrityError):

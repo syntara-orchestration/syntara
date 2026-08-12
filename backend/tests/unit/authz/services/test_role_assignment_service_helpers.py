@@ -13,11 +13,11 @@ from sqlalchemy import String, TypeDecorator, column
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.services.role_assignment_service import RoleAssignmentService
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.utils.cursor import (
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.utils.cursor import (
     PaginationDirection,
     SortDirection,
     create_cursor_data,

@@ -28,9 +28,9 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from nexus.core.models.base.query_params import BaseListParams
-from nexus.core.models.pagination import ResourcesResponse
-from nexus.core.utils.filters import FilterOperator
+from syntara.core.models.base.query_params import BaseListParams
+from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.utils.filters import FilterOperator
 from tests.unit.api.compliance.conftest import (
     MIN_EXCLUSION_REASON_LENGTH,
     check_passes,

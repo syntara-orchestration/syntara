@@ -12,7 +12,7 @@ Task T026 from AAP-64408 acceptance criteria.
 import pytest
 from httpx import AsyncClient
 
-from nexus.approvals.models import ApprovalRequestStatus
+from syntara.approvals.models import ApprovalRequestStatus
 from tests.integration.helpers.approval import ApprovalsFactory
 from tests.integration.helpers.error_data import assert_error_data
 from tests.integration.helpers.workflow import ExecutionsFactory

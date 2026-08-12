@@ -43,10 +43,10 @@ class TestTokenValidationAuthorized:
     """API-16: Token validation — authorized API access (Bearer token grants access)."""
 
     def test_bearer_token_grants_api_access(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """SA Bearer token is accepted by protected endpoints and returns SA identity."""
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
             resp = token_request(nexus_base_url, client_id, client_secret)
@@ -63,7 +63,7 @@ class TestTokenValidationAuthorized:
             assert me_body["id"] == str(sa.id)
             assert me_body["username"] == sa.name
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestTokenValidationUnauthorized:
@@ -101,14 +101,14 @@ class TestExpiredTokenRejected:
     """API-18: Token validation — expired token rejected, no refresh flow."""
 
     def test_token_has_correct_expiry_and_no_refresh(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """SA token has 15-min lifetime, and there is no refresh endpoint for SAs.
 
         Full expiry enforcement is tested at the JWT library level. This test
         verifies the token structure and that no refresh flow exists.
         """
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
             resp = token_request(nexus_base_url, client_id, client_secret)
@@ -124,7 +124,7 @@ class TestExpiredTokenRejected:
             )
             assert "refresh_token" not in resp.parsed.to_dict()
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
     def test_malformed_bearer_token_returns_401(self, nexus_base_url: str) -> None:
         """A completely invalid Bearer token is rejected with 401."""
@@ -186,13 +186,13 @@ class TestConcurrentServiceAccounts:
     CONCURRENT_SA_COUNT = 100
 
     def test_100_concurrent_sa_auth(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """100 concurrent SAs can all authenticate and access the API simultaneously."""
         sa_data: list[tuple[Any, str]] = []
         try:
             for _ in range(self.CONCURRENT_SA_COUNT):
-                sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+                sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
                 resp = token_request(nexus_base_url, client_id, client_secret)
                 assert resp.status_code == HTTPStatus.OK
                 sa_data.append((sa, resp.parsed.access_token))
@@ -218,7 +218,7 @@ class TestConcurrentServiceAccounts:
         finally:
             for sa, _ in sa_data:
                 try:
-                    nexus_api.service_accounts.delete(service_account_id=sa.id)
+                    syntara_api.service_accounts.delete(service_account_id=sa.id)
                 except Exception:
                     pass
 
@@ -227,13 +227,13 @@ class TestLastAuthenticatedTimestamp:
     """API-38: Last authenticated timestamp updated on successful auth."""
 
     def test_last_authenticated_updated_on_auth(
-        self, nexus_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
     ) -> None:
         """last_authenticated_at is null before first auth, then set after token issuance."""
-        sa, client_id, client_secret = create_sa_with_credential(nexus_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            before = nexus_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
+            before = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
             assert before.last_authenticated_at is None, (
                 f"Expected null before first auth, got {before.last_authenticated_at}"
             )
@@ -241,7 +241,7 @@ class TestLastAuthenticatedTimestamp:
             resp = token_request(nexus_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
 
-            after = nexus_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
+            after = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()
             assert after.last_authenticated_at is not None, "last_authenticated_at should be set after auth"
         finally:
-            nexus_api.service_accounts.delete(service_account_id=sa.id)
+            syntara_api.service_accounts.delete(service_account_id=sa.id)

@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_delete import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_delete import (
     IntegrationDeleteEvent,
     IntegrationDeleteHandler,
 )

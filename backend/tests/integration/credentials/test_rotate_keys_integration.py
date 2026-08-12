@@ -18,23 +18,23 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.lib.encryption import EncryptionError, SecretEncryptor
-from nexus.core.models import User
-from nexus.core.models.secret import EncryptedSecret
-from nexus.core.services.secret_service import SecretService
-from nexus.core.services.storage_backend import DatabaseBackend
-from nexus.credentials.cli import rotate_keys as rotate_keys_module
-from nexus.credentials.cli.rotate_keys import (
+from syntara.core.lib.encryption import EncryptionError, SecretEncryptor
+from syntara.core.models import User
+from syntara.core.models.secret import EncryptedSecret
+from syntara.core.services.secret_service import SecretService
+from syntara.core.services.storage_backend import DatabaseBackend
+from syntara.credentials.cli import rotate_keys as rotate_keys_module
+from syntara.credentials.cli.rotate_keys import (
     EXIT_FATAL,
     EXIT_PARTIAL_FAILURE,
     EXIT_SUCCESS,
     rotate_keys,
 )
-from nexus.credentials.cli.rotate_keys import (
+from syntara.credentials.cli.rotate_keys import (
     _session_factory as original_session_factory,
 )
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
 from tests.fixtures.encryption import (
     NEW_KEY,
     NEW_KEY_HEX,

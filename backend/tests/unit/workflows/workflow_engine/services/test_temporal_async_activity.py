@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from temporalio.service import RPCError, RPCStatusCode
 
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _make_rpc_error(message: str) -> RPCError:

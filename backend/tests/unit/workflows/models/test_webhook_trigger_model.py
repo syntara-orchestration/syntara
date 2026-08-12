@@ -11,8 +11,8 @@ from uuid import uuid4
 
 from sqlalchemy import CheckConstraint
 
-from nexus.workflows.models.webhook_trigger import WebhookTrigger, WebhookTriggerRead
-from nexus.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES
+from syntara.workflows.models.webhook_trigger import WebhookTrigger, WebhookTriggerRead
+from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES
 
 
 async def test_webhook_trigger_creation() -> None:

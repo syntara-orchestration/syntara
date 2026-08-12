@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.utils.workflow_metadata import build_workflow_metadata
+from syntara.workflows.utils.workflow_metadata import build_workflow_metadata
 
 
 def _build(**overrides: Any) -> dict[str, Any]:  # noqa: ANN401

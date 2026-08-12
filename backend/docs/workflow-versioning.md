@@ -59,13 +59,13 @@ graph TD
     J --> C
 ```
 
-- **Router** (`src/nexus/workflows/router.py`) — publish, unpublish, restore, export, list versions, get version endpoints with RBAC enforcement. Calls `WorkflowService.get_publish_context()` to compute version status and timestamps for responses.
-- **WorkflowService** (`src/nexus/workflows/services/workflow_service.py`) — all version lifecycle business logic: publish (with empty-nodes validation and event creation), unpublish, restore, create version, export. The `get_publish_context()` method batch-queries `workflow_publish_events` to derive status and timestamps for version responses.
-- **ExecutionService** (`src/nexus/workflows/services/execution_service.py`) — resolves the correct version at execution start time; exposes version metadata in list queries via `ExecutionsEnrichQueryMixin`
-- **WebhookTriggerService** (`src/nexus/workflows/services/webhook_trigger_service.py`) — syncs webhook trigger registrations on publish/unpublish and draft updates (not on restore — see Restore Flow)
-- **AuditEventDispatcher** (`src/nexus/audit/`) — dispatches domain events to registered handlers; events are stored in the `audit_events` table (same database) and routed to the OTEL Collector
-- **Domain Events** (`src/nexus/workflows/audit/workflow_version.py`) — dataclasses for created, restored, published, unpublished, and exported events
-- **Telemetry Handlers** (`src/nexus/telemetry/handlers/workflow_version_*.py`) — emit Segment events for all version lifecycle operations; auto-discovered at startup
+- **Router** (`src/syntara/workflows/router.py`) — publish, unpublish, restore, export, list versions, get version endpoints with RBAC enforcement. Calls `WorkflowService.get_publish_context()` to compute version status and timestamps for responses.
+- **WorkflowService** (`src/syntara/workflows/services/workflow_service.py`) — all version lifecycle business logic: publish (with empty-nodes validation and event creation), unpublish, restore, create version, export. The `get_publish_context()` method batch-queries `workflow_publish_events` to derive status and timestamps for version responses.
+- **ExecutionService** (`src/syntara/workflows/services/execution_service.py`) — resolves the correct version at execution start time; exposes version metadata in list queries via `ExecutionsEnrichQueryMixin`
+- **WebhookTriggerService** (`src/syntara/workflows/services/webhook_trigger_service.py`) — syncs webhook trigger registrations on publish/unpublish and draft updates (not on restore — see Restore Flow)
+- **AuditEventDispatcher** (`src/syntara/audit/`) — dispatches domain events to registered handlers; events are stored in the `audit_events` table (same database) and routed to the OTEL Collector
+- **Domain Events** (`src/syntara/workflows/audit/workflow_version.py`) — dataclasses for created, restored, published, unpublished, and exported events
+- **Telemetry Handlers** (`src/syntara/telemetry/handlers/workflow_version_*.py`) — emit Segment events for all version lifecycle operations; auto-discovered at startup
 
 ---
 
@@ -90,11 +90,11 @@ Version status is **computed server-side**, not stored on the model. The computa
 | `previously_published` | Version has at least one PUBLISHED event in `workflow_publish_events` but is not the current published version |
 | `draft` | Version has never been published (no publish events) |
 
-This logic lives in `deserialize_workflow_version()` (`src/nexus/workflows/utils/serialization.py`), which takes `workflow_published_version_id` and `ever_published_version_ids` (a set derived from the events table) as inputs.
+This logic lives in `deserialize_workflow_version()` (`src/syntara/workflows/utils/serialization.py`), which takes `workflow_published_version_id` and `ever_published_version_ids` (a set derived from the events table) as inputs.
 
 ### WorkflowVersion Table
 
-For field-level details, see `WorkflowVersion` in `src/nexus/workflows/models/workflow_version.py`.
+For field-level details, see `WorkflowVersion` in `src/syntara/workflows/models/workflow_version.py`.
 
 ### Workflow Table (versioning fields)
 
@@ -159,7 +159,7 @@ erDiagram
 
 ## Publish Events
 
-The `workflow_publish_events` table (`src/nexus/workflows/models/workflow_publish_event.py`) provides an immutable audit trail of publish/unpublish actions. Each row records a single action with `PublishAction` enum (`PUBLISHED` or `UNPUBLISHED`).
+The `workflow_publish_events` table (`src/syntara/workflows/models/workflow_publish_event.py`) provides an immutable audit trail of publish/unpublish actions. Each row records a single action with `PublishAction` enum (`PUBLISHED` or `UNPUBLISHED`).
 
 **Why a separate events table instead of `published_at` on the version**: The original design stored `published_at` as a timestamp on `WorkflowVersion`. This had two problems: (1) it couldn't distinguish between "never published" and "published then unpublished" — both would have a null `published_at` once the pointer moved away, and (2) it lost history when a version was re-published. The events table captures the full lifecycle: first publish, unpublish, re-publish, with actor and timestamp for each action.
 
@@ -345,7 +345,7 @@ All events include `entitlement_id` from the telemetry registry.
 
 ### Adding New Telemetry Events
 
-All version lifecycle operations dispatch audit events via `AuditEventDispatcher`. See `docs/standards/observability.md` for the event framework and handler pattern. Event names and fields are authoritative in the handler files under `src/nexus/telemetry/handlers/workflow_version_*.py`.
+All version lifecycle operations dispatch audit events via `AuditEventDispatcher`. See `docs/standards/observability.md` for the event framework and handler pattern. Event names and fields are authoritative in the handler files under `src/syntara/telemetry/handlers/workflow_version_*.py`.
 
 ---
 

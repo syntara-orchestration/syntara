@@ -1,15 +1,15 @@
 """Unit tests for session revocation audit events and handler."""
 
-from nexus.audit.models.audit_event import (
+from syntara.audit.models.audit_event import (
     EventCategory,
     EventSeverity,
     EventStatus,
 )
-from nexus.auth.audit.session_revocation import (
+from syntara.auth.audit.session_revocation import (
     SessionRevocationEvent,
     SessionRevocationHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestSessionRevocationHandler:

@@ -2,10 +2,10 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.invocations.audit.invocation_created import InvocationCreatedEvent, InvocationCreatedHandler
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.invocations.audit.invocation_created import InvocationCreatedEvent, InvocationCreatedHandler
 
 
 class TestInvocationCreatedEvent:
@@ -183,7 +183,7 @@ class TestInvocationCreatedHandler:
 
     def test_sensitive_metadata_fields_excluded(self) -> None:
         """Sensitive fields are excluded via audit_safe_metadata() at the emit site."""
-        from nexus.agent_orchestrator.models.context_data import InvocationContextData
+        from syntara.agent_orchestrator.models.context_data import InvocationContextData
 
         invocation_id = uuid4()
         ctx = InvocationContextData.model_validate(

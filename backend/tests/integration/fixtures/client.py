@@ -17,9 +17,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.dependencies import get_current_user
-from nexus.core.database.session import get_db
-from nexus.workflows.services.execution_streaming_service import ExecutionStreamingService
+from syntara.auth.dependencies import get_current_user
+from syntara.core.database.session import get_db
+from syntara.workflows.services.execution_streaming_service import ExecutionStreamingService
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from temporalio.testing import WorkflowEnvironment
     from temporalio.worker import Worker
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -52,7 +52,7 @@ async def session_app(
     test_session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[FastAPI, None]:
     """Create a session-scoped app with routers discovered once per worker."""
-    from nexus.api.main import app
+    from syntara.api.main import app
 
     mock_evaluator = AsyncMock()
     mock_evaluator.health = AsyncMock(return_value=True)
@@ -61,16 +61,16 @@ async def session_app(
     mock_evaluator.evaluate = AsyncMock(return_value={"allow": True})
 
     with (
-        patch("nexus.core.database.session.engine", test_db_engine),
-        patch("nexus.core.database.session.AsyncSessionLocal", test_session_factory),
-        patch("nexus.api.main.engine", test_db_engine),
-        patch("nexus.api.main.AsyncSessionLocal", test_session_factory),
-        patch("nexus.audit.outbox.worker.AsyncSessionLocal", test_session_factory),
-        patch("nexus.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
-        patch("nexus.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
-        patch("nexus.api.main.RegoEvaluator", return_value=mock_evaluator),
+        patch("syntara.core.database.session.engine", test_db_engine),
+        patch("syntara.core.database.session.AsyncSessionLocal", test_session_factory),
+        patch("syntara.api.main.engine", test_db_engine),
+        patch("syntara.api.main.AsyncSessionLocal", test_session_factory),
+        patch("syntara.audit.outbox.worker.AsyncSessionLocal", test_session_factory),
+        patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
+        patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
+        patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
     ):
-        from nexus.core.seed import run_seeders
+        from syntara.core.seed import run_seeders
 
         await run_seeders(test_session_factory)
 
@@ -123,8 +123,8 @@ def _override_temporal(
     temporal_worker: Worker,
 ) -> None:
     """Add Temporal execution service to dependency overrides."""
-    from nexus.workflows.executions_router import get_temporal_execution_service
-    from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+    from syntara.workflows.executions_router import get_temporal_execution_service
+    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
     _svc = TemporalExecutionService(temporal_env.client, "test-workflow-queue", "test-workflow-queue")
     session_app.dependency_overrides[get_temporal_execution_service] = lambda: _svc
@@ -141,7 +141,7 @@ async def base_client_with_mocked_llm(
 @pytest_asyncio.fixture
 async def auth_client(base_client: AsyncClient, test_user: User) -> AsyncClient:
     """Create an authenticated test client with test_user."""
-    from nexus.api.main import app
+    from syntara.api.main import app
 
     async def override_get_current_user() -> User:
         return test_user
@@ -153,7 +153,7 @@ async def auth_client(base_client: AsyncClient, test_user: User) -> AsyncClient:
 @pytest_asyncio.fixture
 async def auth_client_with_mocked_llm(base_client_with_mocked_llm: AsyncClient, test_user: User) -> AsyncClient:
     """Create an authenticated test client with mocked OpenRouter LLM."""
-    from nexus.api.main import app
+    from syntara.api.main import app
 
     async def override_get_current_user() -> User:
         return test_user
@@ -169,7 +169,7 @@ def sync_test_client(
     test_db_engine: AsyncEngine,
 ) -> Generator[TestClient, None, None]:
     """Create a synchronous test client with DB and streaming overrides."""
-    from nexus.api.main import app
+    from syntara.api.main import app
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield test_db_session
@@ -193,14 +193,14 @@ def sync_test_client(
 
     try:
         with (
-            patch("nexus.core.database.session.engine", test_db_engine),
-            patch("nexus.core.database.session.AsyncSessionLocal", session_factory),
-            patch("nexus.api.main.engine", test_db_engine),
-            patch("nexus.api.main.AsyncSessionLocal", session_factory),
-            patch("nexus.audit.outbox.worker.AsyncSessionLocal", session_factory),
-            patch("nexus.audit.outbox.worker.AuditWorkerAsyncSessionLocal", session_factory),
-            patch("nexus.audit.outbox.session.AuditWorkerAsyncSessionLocal", session_factory),
-            patch("nexus.api.main.RegoEvaluator", return_value=mock_evaluator),
+            patch("syntara.core.database.session.engine", test_db_engine),
+            patch("syntara.core.database.session.AsyncSessionLocal", session_factory),
+            patch("syntara.api.main.engine", test_db_engine),
+            patch("syntara.api.main.AsyncSessionLocal", session_factory),
+            patch("syntara.audit.outbox.worker.AsyncSessionLocal", session_factory),
+            patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", session_factory),
+            patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", session_factory),
+            patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
         ):
             client = TestClient(app)
             try:

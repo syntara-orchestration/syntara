@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.models.audit_event import EventSeverity, EventStatus
-from nexus.files.audit.files_uploaded import FilesUploadedEvent, FilesUploadedHandler
+from syntara.audit.models.audit_event import EventSeverity, EventStatus
+from syntara.files.audit.files_uploaded import FilesUploadedEvent, FilesUploadedHandler
 
 
 class TestFilesUploadedHandler:

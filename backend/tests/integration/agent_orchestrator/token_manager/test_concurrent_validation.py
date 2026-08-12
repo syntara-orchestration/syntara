@@ -19,17 +19,17 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
-from nexus.agent_orchestrator.token_manager.models import (
+from syntara.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
+from syntara.agent_orchestrator.token_manager.models import (
     TokenUsageRecord,
     UserTokenConfig,
 )
-from nexus.agent_orchestrator.token_manager.repository import TokenUsageRepository
-from nexus.agent_orchestrator.token_manager.services import (
+from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.token_manager.services import (
     TokenCalculator,
     TokenValidationService,
 )
-from nexus.core.models import User
+from syntara.core.models import User
 
 if TYPE_CHECKING:
     from uuid import UUID

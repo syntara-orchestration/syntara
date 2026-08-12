@@ -11,7 +11,7 @@ import uuid
 
 from sqlmodel import SQLModel
 
-from nexus.core.models.installation import Installation
+from syntara.core.models.installation import Installation
 
 
 class TestInstallationModel:

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nexus.core.cache.stream import StreamClient
+from syntara.core.cache.stream import StreamClient
 
 pytestmark = pytest.mark.unit
 
@@ -20,7 +20,7 @@ async def test_events_stops_on_terminal_event() -> None:
 
     Note: The terminal event IS yielded before stopping.
     """
-    with patch("nexus.core.cache.base.redis.Redis") as mock_redis:
+    with patch("syntara.core.cache.base.redis.Redis") as mock_redis:
         mock_response = [
             [
                 "test:stream",
@@ -56,7 +56,7 @@ async def test_events_stops_on_terminal_event() -> None:
 
 async def test_events_handles_malformed_json() -> None:
     """Test that malformed JSON events are skipped with warning."""
-    with patch("nexus.core.cache.base.redis.Redis") as mock_redis:
+    with patch("syntara.core.cache.base.redis.Redis") as mock_redis:
         mock_response = [
             [
                 "test:stream",
@@ -91,7 +91,7 @@ async def test_events_handles_malformed_json() -> None:
 
 async def test_info_existing_stream() -> None:
     """Test getting stream info for existing stream."""
-    with patch("nexus.core.cache.base.redis.Redis") as mock_redis:
+    with patch("syntara.core.cache.base.redis.Redis") as mock_redis:
         mock_info = {
             "length": 42,
             "first-entry": ["1234567890-0", {"data": "..."}],

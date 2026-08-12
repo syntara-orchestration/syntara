@@ -6,9 +6,9 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import scheduled_trigger_not_found_handler, scheduled_trigger_sync_handler
-from nexus.workflows.exceptions import ScheduledTriggerNotFoundError, ScheduledTriggerSyncError
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import scheduled_trigger_not_found_handler, scheduled_trigger_sync_handler
+from syntara.workflows.exceptions import ScheduledTriggerNotFoundError, ScheduledTriggerSyncError
 
 
 class TestScheduledTriggerSyncHandler:

@@ -8,13 +8,13 @@ Three layers handle cert-based authentication:
 
 ### 1. TLS Protocol — Certificate Extraction
 
-Uvicorn does not natively expose client certificates in the ASGI scope. A custom HTTP protocol subclass (`nexus.core.tls.protocol.TLSAutoProtocol`) overrides `connection_made()` to extract the peer certificate from the asyncio transport's `ssl_object` and injects it into the ASGI scope at `scope["extensions"]["tls"]["peercert"]`.
+Uvicorn does not natively expose client certificates in the ASGI scope. A custom HTTP protocol subclass (`syntara.core.tls.protocol.TLSAutoProtocol`) overrides `connection_made()` to extract the peer certificate from the asyncio transport's `ssl_object` and injects it into the ASGI scope at `scope["extensions"]["tls"]["peercert"]`.
 
 `TLSAutoProtocol` auto-selects between httptools and h11 backends, matching uvicorn's own detection. The injection point differs per backend — `on_headers_complete()` for httptools, `handle_events()` for h11 — but the result is the same: the parsed peercert dict is available before any ASGI middleware runs.
 
 ### 2. Certificate Middleware — CN Validation
 
-`ClientCertAuthMiddleware` (`nexus.auth.cert_middleware`) is registered as the outermost ASGI middleware. It reads the peercert from the scope extension and performs validation in order:
+`ClientCertAuthMiddleware` (`syntara.auth.cert_middleware`) is registered as the outermost ASGI middleware. It reads the peercert from the scope extension and performs validation in order:
 
 1. **CN extraction** — missing CN → 403
 2. **CRL revocation check** — revoked serial → 403
@@ -29,11 +29,11 @@ On success, the middleware sets two values in `scope["state"]`:
 
 For non-service-identity requests (no cert, or CN not on allowlist), the middleware strips the `X-On-Behalf-Of` header to prevent spoofing.
 
-The middleware is a no-op when `APP_S2S_TLS_ENABLED=false` and skips paths in `EXCLUDED_PATHS` and `EXCLUDED_PATH_PREFIXES` (defined in `nexus.api.constants`).
+The middleware is a no-op when `APP_S2S_TLS_ENABLED=false` and skips paths in `EXCLUDED_PATHS` and `EXCLUDED_PATH_PREFIXES` (defined in `syntara.api.constants`).
 
 ### 3. Auth Dependencies — User Resolution
 
-`get_current_user()` (`nexus.auth.dependencies`) checks for a JWT Bearer token first. If absent, it falls back to cert authentication by reading `request.state.is_cert_authenticated`.
+`get_current_user()` (`syntara.auth.dependencies`) checks for a JWT Bearer token first. If absent, it falls back to cert authentication by reading `request.state.is_cert_authenticated`.
 
 For cert-authenticated requests, `_user_from_cert()` builds a synthetic `User`:
 
@@ -54,7 +54,7 @@ Each service has a distinct CN matching the production naming convention:
 
 The UI CN is deliberately excluded from the allowlist. The UI's nginx proxy presents a client cert for transport trust (proving it's the real UI pod), but user requests through nginx must fall through to JWT auth. Without this exclusion, the UI cert would grant service identity — bypassing OPA authorization and logging all user requests as a service actor.
 
-The canonical list of service CNs is defined in `nexus.core.models.principal.KNOWN_SERVICE_CNS` and validated against the cert generation tool at import time.
+The canonical list of service CNs is defined in `syntara.core.models.principal.KNOWN_SERVICE_CNS` and validated against the cert generation tool at import time.
 
 ## Certificate Requirements
 

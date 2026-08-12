@@ -1,5 +1,5 @@
 #!/bin/bash
-exec uvicorn nexus.api.main:app \
+exec uvicorn syntara.api.main:app \
   --host 0.0.0.0 --port 8000 \
-  --http nexus.core.tls.protocol:TLSAutoProtocol \
+  --http syntara.core.tls.protocol:TLSAutoProtocol \
   "$@"

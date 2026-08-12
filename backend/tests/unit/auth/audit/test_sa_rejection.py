@@ -2,9 +2,9 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.sa_rejection import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.sa_rejection import (
     DisabledSACredentialRejectionEvent,
     DisabledSACredentialRejectionHandler,
     DisabledSARejectionEvent,
@@ -14,7 +14,7 @@ from nexus.auth.audit.sa_rejection import (
     StaleSATokenDetectionEvent,
     StaleSATokenDetectionHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestDisabledSARejectionHandler:

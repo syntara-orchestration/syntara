@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from nexus.auth.services.token_service import TokenService
+from syntara.auth.services.token_service import TokenService
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest.fixture

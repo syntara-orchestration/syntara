@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.agentic_activity import (
+from syntara.workflows.workflow_engine.activities.agentic_activity import (
     _inject_runtime_settings,
     execute_agentic_activity,
 )

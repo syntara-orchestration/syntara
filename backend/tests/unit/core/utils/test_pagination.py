@@ -14,10 +14,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.core.constants import FieldLimits
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models.base import NamedResource
-from nexus.core.utils.cursor import (
+from syntara.core.constants import FieldLimits
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models.base import NamedResource
+from syntara.core.utils.cursor import (
     PaginationDirection,
     SortDirection,
     create_cursor_data,
@@ -25,12 +25,12 @@ from nexus.core.utils.cursor import (
     encode_cursor,
     get_pagination_direction,
 )
-from nexus.core.utils.pagination import (
+from syntara.core.utils.pagination import (
     generate_response,
 )
 
 if TYPE_CHECKING:
-    from nexus.core.utils.cursor import CursorData
+    from syntara.core.utils.cursor import CursorData
 
 
 class MockResource(NamedResource):

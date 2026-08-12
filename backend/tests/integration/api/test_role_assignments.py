@@ -17,12 +17,12 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.models.project import Project
-from nexus.core.models import User
-from nexus.core.models.group import Group
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.project import Project
+from syntara.core.models import User
+from syntara.core.models.group import Group
 
 USERS_URL = "/api/v1/users"
 GROUPS_URL = "/api/v1/groups"

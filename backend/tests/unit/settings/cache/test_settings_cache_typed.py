@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from nexus.settings.exceptions import SettingTypeError
+from syntara.settings.exceptions import SettingTypeError
 
 # FakeSettingsCache mirrors SettingsCache's typed getter interface.
 from tests.fixtures.settings import FakeSettingsCache

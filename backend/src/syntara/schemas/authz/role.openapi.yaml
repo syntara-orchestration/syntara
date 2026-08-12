@@ -1,0 +1,492 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Roles API
+  version: 1.0.0
+  description: |
+    Role management endpoints for the Syntara authorization system.
+
+    Roles are collections of policies that can be assigned to users or groups.
+    Builtin roles (e.g., admin, viewer) cannot be modified or deleted.
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: Roles
+    description: Role CRUD operations
+
+paths:
+  /roles:
+    post:
+      summary: Create role
+      description: |-
+        Create a custom role. Requires: role:create permission.
+      operationId: create_role
+      x-app-permission:
+        resource: role
+        action: create
+      tags:
+        - Roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleCreate"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    get:
+      summary: List roles
+      description: List roles with filtering and pagination.
+      operationId: list_roles
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Roles
+      parameters:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: "null"
+            title: Name
+          description: Filter by role name
+        - name: is_builtin
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: "null"
+            title: Is Builtin
+          description: Filter by builtin status
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: "null"
+            title: Project Id
+          description: Filter by project scope
+        - in: query
+          name: scope
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Scope
+        - name: policy_name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Policy Name
+          description: Filter by policy name
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleListResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /roles/{role_id}:
+    get:
+      summary: Get role
+      description: Get a role by ID.
+      operationId: get_role
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Roles
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Role Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update role
+      description: |-
+        Patch a role. Builtin roles cannot be modified. Requires: role:update permission.
+      operationId: update_role
+      x-app-permission:
+        resource: role
+        action: update
+      tags:
+        - Roles
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Role Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    put:
+      summary: Replace role
+      description: |-
+        Replace a role. Builtin roles cannot be modified. Requires: role:update permission.
+      operationId: replace_role
+      x-app-permission:
+        resource: role
+        action: update
+      tags:
+        - Roles
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Role Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRead"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete role
+      description: |-
+        Delete a role. Builtin roles cannot be deleted. Requires: role:delete permission.
+      operationId: delete_role
+      x-app-permission:
+        resource: role
+        action: delete
+      tags:
+        - Roles
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Role Id
+      responses:
+        "204":
+          description: Successful Response
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+components:
+  schemas:
+    RoleCreate:
+      type: object
+      title: RoleCreate
+      description: Request body for creating a role.
+      required:
+        - name
+        - policies
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        policies:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          title: Policies
+        labels:
+          type: object
+          default: {}
+          additionalProperties:
+            type: string
+          title: Labels
+        project_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          title: Project Id
+
+    RoleUpdate:
+      type: object
+      title: RoleUpdate
+      description: Request body for updating a role (partial).
+      properties:
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 255
+              pattern: ^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$
+            - type: "null"
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        policies:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: "null"
+          title: Policies
+        labels:
+          anyOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: "null"
+          title: Labels
+
+    RoleRead:
+      type: object
+      title: RoleRead
+      description: Response body for a role.
+      required:
+        - id
+        - name
+        - is_system_scoped
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Description
+        policies:
+          type: array
+          default: []
+          items:
+            type: string
+          title: Policies
+        is_builtin:
+          type: boolean
+          default: false
+          title: Is Builtin
+        is_system_scoped:
+          type: boolean
+          readOnly: true
+          description: True when the role is not scoped to a specific project.
+          title: Is System Scoped
+        project_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          title: Project Id
+        scope:
+          type: string
+          default: system
+          title: Scope
+        labels:
+          type: object
+          default: {}
+          additionalProperties: true
+          title: Labels
+        created_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+          title: Updated At
+
+    RoleListResponse:
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: "#/components/schemas/RoleRead"
+          required:
+            - resources
+      title: RoleListResponse
+      description: Paginated list response for roles.
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

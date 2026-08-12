@@ -8,16 +8,16 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.models.secret import Secret
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.services.credential_service import CredentialService
-from nexus.integrations.models.integration import Integration, IntegrationScope, IntegrationType
+from syntara.core.models.secret import Secret
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.services.credential_service import CredentialService
+from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationType
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.credentials.models.credential_type import CredentialType
+    from syntara.core.models import User
+    from syntara.credentials.models.credential_type import CredentialType
 
 
 async def _create_credential(

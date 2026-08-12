@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING
 import pytest
 from sqlmodel import select
 
-from nexus.settings.catalog import SETTINGS_CATALOG, SettingDefinition
-from nexus.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
-from nexus.settings.seeder import _check_depends_on_cycles, _validate_catalog, seed_settings
+from syntara.settings.catalog import SETTINGS_CATALOG, SettingDefinition
+from syntara.settings.models.runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
+from syntara.settings.seeder import _check_depends_on_cycles, _validate_catalog, seed_settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -83,7 +83,7 @@ def test_validate_catalog_rejects_depends_on_non_boolean(monkeypatch: pytest.Mon
         _int_setting("test.target"),
         _int_setting("test.child", depends_on="test.target"),
     ]
-    monkeypatch.setattr("nexus.settings.seeder.SETTINGS_CATALOG", bad_catalog)
+    monkeypatch.setattr("syntara.settings.seeder.SETTINGS_CATALOG", bad_catalog)
     with pytest.raises(ValueError, match="not boolean"):
         _validate_catalog()
 
@@ -91,7 +91,7 @@ def test_validate_catalog_rejects_depends_on_non_boolean(monkeypatch: pytest.Mon
 def test_validate_catalog_rejects_depends_on_unknown_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """_validate_catalog raises if depends_on references a nonexistent key."""
     bad_catalog = [_int_setting("test.child", depends_on="test.nonexistent")]
-    monkeypatch.setattr("nexus.settings.seeder.SETTINGS_CATALOG", bad_catalog)
+    monkeypatch.setattr("syntara.settings.seeder.SETTINGS_CATALOG", bad_catalog)
     with pytest.raises(ValueError, match="unknown key"):
         _validate_catalog()
 
@@ -99,7 +99,7 @@ def test_validate_catalog_rejects_depends_on_unknown_key(monkeypatch: pytest.Mon
 def test_validate_catalog_rejects_self_referential_depends_on(monkeypatch: pytest.MonkeyPatch) -> None:
     """_validate_catalog raises if a setting depends on itself."""
     bad_catalog = [_bool_setting("test.self", depends_on="test.self")]
-    monkeypatch.setattr("nexus.settings.seeder.SETTINGS_CATALOG", bad_catalog)
+    monkeypatch.setattr("syntara.settings.seeder.SETTINGS_CATALOG", bad_catalog)
     with pytest.raises(ValueError, match="cannot depend on itself"):
         _validate_catalog()
 
@@ -110,7 +110,7 @@ def test_validate_catalog_rejects_circular_depends_on(monkeypatch: pytest.Monkey
         _bool_setting("test.a", depends_on="test.b"),
         _bool_setting("test.b", depends_on="test.a"),
     ]
-    monkeypatch.setattr("nexus.settings.seeder.SETTINGS_CATALOG", bad_catalog)
+    monkeypatch.setattr("syntara.settings.seeder.SETTINGS_CATALOG", bad_catalog)
     with pytest.raises(ValueError, match="Circular depends_on"):
         _validate_catalog()
 
@@ -121,7 +121,7 @@ def test_validate_catalog_accepts_valid_depends_on(monkeypatch: pytest.MonkeyPat
         _bool_setting("test.toggle"),
         _int_setting("test.child", depends_on="test.toggle"),
     ]
-    monkeypatch.setattr("nexus.settings.seeder.SETTINGS_CATALOG", good_catalog)
+    monkeypatch.setattr("syntara.settings.seeder.SETTINGS_CATALOG", good_catalog)
     _validate_catalog()
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import structlog
 
-from nexus.core.logging.logging import configure_app_logging
+from syntara.core.logging.logging import configure_app_logging
 
 configure_app_logging()
 

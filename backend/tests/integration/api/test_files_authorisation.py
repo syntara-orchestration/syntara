@@ -8,7 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
+from syntara.core.models import User
 from tests.fixtures.files import get_fixtures_dir
 from tests.integration.helpers.error_data import assert_error_data
 
@@ -36,8 +36,8 @@ async def authenticated_only_user(
 @pytest_asyncio.fixture
 async def authenticated_only_client(base_client: AsyncClient, authenticated_only_user: User) -> AsyncClient:
     """Authenticated client with only the 'authenticated' role (no 'user' role)."""
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
 
     async def override() -> User:
         return authenticated_only_user

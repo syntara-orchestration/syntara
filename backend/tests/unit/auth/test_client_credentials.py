@@ -10,13 +10,13 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.auth.passwords import hash_password
-from nexus.auth.router import _extract_basic_credentials, token
-from nexus.auth.schemas import AccessTokenResponse
-from nexus.auth.services.token_service import TokenService
-from nexus.core.models.principal import PrincipalType
-from nexus.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
-from nexus.service_accounts.models.service_account_credential import (
+from syntara.auth.passwords import hash_password
+from syntara.auth.router import _extract_basic_credentials, token
+from syntara.auth.schemas import AccessTokenResponse
+from syntara.auth.services.token_service import TokenService
+from syntara.core.models.principal import PrincipalType
+from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
+from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredential,
     ServiceAccountCredentialStatus,
     ServiceAccountCredentialType,
@@ -139,9 +139,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt.token.here"
             response = await token(
@@ -165,9 +165,9 @@ class TestTokenEndpoint:
 
         req = _mock_request(basic_auth=(cred.identifier, secret))
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt.token.here"
             response = await token(
@@ -188,9 +188,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             await token(
@@ -216,7 +216,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -227,7 +227,7 @@ class TestTokenEndpoint:
                 client_secret="any",  # noqa: S106
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -239,7 +239,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -250,7 +250,7 @@ class TestTokenEndpoint:
                 client_secret="wrong-secret",  # noqa: S106
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -262,7 +262,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -273,7 +273,7 @@ class TestTokenEndpoint:
                 client_secret=secret,
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -284,7 +284,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -295,7 +295,7 @@ class TestTokenEndpoint:
                 client_secret="any-secret",  # noqa: S106
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -306,7 +306,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -317,7 +317,7 @@ class TestTokenEndpoint:
                 client_secret="admin-password",  # noqa: S106
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -329,9 +329,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             mock_ts.return_value.create_refresh_token = MagicMock()
@@ -358,9 +358,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             response = await token(
@@ -395,7 +395,7 @@ class TestTokenEndpoint:
         """No credentials in header or body returns 401."""
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -406,7 +406,7 @@ class TestTokenEndpoint:
                 client_secret="",
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -420,9 +420,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             await token(
@@ -445,7 +445,7 @@ class TestTokenEndpoint:
         /auth/token has no Bearer JWT for audit middleware; without actor_context,
         last_authenticated_at / last_used_at CRUD events stay null-actor.
         """
-        from nexus.audit.emitter import actor_context_var
+        from syntara.audit.emitter import actor_context_var
 
         cred, sa, secret = _make_sa_and_credential()
         self._setup_db_result(mock_db, (cred, sa))
@@ -466,9 +466,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             await token(
@@ -491,7 +491,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -502,7 +502,7 @@ class TestTokenEndpoint:
                 client_secret=secret,
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -520,9 +520,9 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._get_token_service") as mock_ts,
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._get_token_service") as mock_ts,
+            patch("syntara.auth.router.AuditEventDispatcher"),
         ):
             mock_ts.return_value.create_access_token.return_value = "jwt"
             response = await token(
@@ -549,7 +549,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -560,7 +560,7 @@ class TestTokenEndpoint:
                 client_secret=old_secret,
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -573,7 +573,7 @@ class TestTokenEndpoint:
 
         req = _mock_request()
         with (
-            patch("nexus.auth.router.AuditEventDispatcher"),
+            patch("syntara.auth.router.AuditEventDispatcher"),
             pytest.raises(Exception) as exc_info,
         ):
             await token(
@@ -584,7 +584,7 @@ class TestTokenEndpoint:
                 client_secret=secret,
             )
 
-        from nexus.auth.exceptions import AuthenticationRequiredError
+        from syntara.auth.exceptions import AuthenticationRequiredError
 
         assert isinstance(exc_info.value, AuthenticationRequiredError)
 
@@ -600,7 +600,7 @@ class TestTokenServiceExtension:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-        from nexus.auth.services.token_service import KeyManager
+        from syntara.auth.services.token_service import KeyManager
 
         key_manager = MagicMock(spec=KeyManager)
         private_key = ec.generate_private_key(ec.SECP256R1())
@@ -614,7 +614,7 @@ class TestTokenServiceExtension:
         settings.jwt_sa_access_token_lifetime_minutes = 30
         settings.jwt_issuer = "https://orchestrator.test"
 
-        with patch("nexus.auth.services.token_service.get_settings", return_value=settings):
+        with patch("syntara.auth.services.token_service.get_settings", return_value=settings):
             return TokenService(key_manager=key_manager)
 
     def test_sa_token_contains_service_account_type(self, token_service: TokenService) -> None:
@@ -753,8 +753,8 @@ class TestUserFromPayloadPrincipalType:
         """SA token produces a User with __principal_type__ = SERVICE_ACCOUNT."""
         from datetime import UTC, datetime
 
-        from nexus.auth.dependencies import _user_from_payload
-        from nexus.auth.services.token_service import TokenPayload
+        from syntara.auth.dependencies import _user_from_payload
+        from syntara.auth.services.token_service import TokenPayload
 
         payload = TokenPayload(
             sub=str(uuid4()),
@@ -771,8 +771,8 @@ class TestUserFromPayloadPrincipalType:
         """User token keeps the default __principal_type__ = USER."""
         from datetime import UTC, datetime
 
-        from nexus.auth.dependencies import _user_from_payload
-        from nexus.auth.services.token_service import TokenPayload
+        from syntara.auth.dependencies import _user_from_payload
+        from syntara.auth.services.token_service import TokenPayload
 
         payload = TokenPayload(
             sub=str(uuid4()),

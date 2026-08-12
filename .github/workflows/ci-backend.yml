@@ -70,7 +70,7 @@ jobs:
           fi
 
           # Detect schema changes
-          if grep -qE '^backend/src/nexus/schemas/' <<< "$FILES"; then
+          if grep -qE '^backend/src/syntara/schemas/' <<< "$FILES"; then
             echo "backend_schema=true" >> "$GITHUB_OUTPUT"
           else
             echo "backend_schema=false" >> "$GITHUB_OUTPUT"
@@ -122,15 +122,15 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --exit-code -- backend/src/nexus/schemas/openapi.yaml 2>/dev/null; then
+          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml 2>/dev/null; then
             echo "::error::Bundled OpenAPI spec has uncommitted changes. Run 'make -C backend api-spec-bundle' locally and commit the changes."
             exit 1
           fi
 
       - name: Verify CLI openapi.yaml is in sync with schemas copy
         run: |
-          diff -q backend/src/nexus/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml || {
-            echo "::error::CLI-bundled openapi.yaml is out of sync with schemas/openapi.yaml. Copy the file and commit: cp backend/src/nexus/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml"
+          diff -q backend/src/syntara/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml || {
+            echo "::error::CLI-bundled openapi.yaml is out of sync with schemas/openapi.yaml. Copy the file and commit: cp backend/src/syntara/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml"
             exit 1
           }
 
@@ -560,24 +560,48 @@ jobs:
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
         run: |
           ulimit -n 65535
-          # Start core services + mock-segment (exclude syntara-ui which is private)
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment
 
-      - name: Verify services are healthy
-        timeout-minutes: 5
-        run: |
-          echo "Waiting for services to become healthy..."
-          # Use exact container names (with _1 suffix) to avoid substring
-          # matches — e.g. "syntara-ci_temporal" would also match
-          # "syntara-ci_temporal-worker_1", causing podman wait to block on
-          # a container we don't intend to check here.
+          COMPOSE="uvx podman-compose -p syntara-ci --profile telemetry-e2e"
+
+          # --no-deps: start services without waiting for compose's
+          # depends_on/service_healthy resolution. GH Actions runner image
+          # 20260810+ ships a podman version where podman-compose hangs
+          # indefinitely during dependency health resolution. We start in
+          # waves and use podman wait --condition=healthy between them.
+
+          # Build locally-built images (syntara image is shared by workers)
+          $COMPOSE build syntara mcp-server
+
+          # Wave 1: infrastructure (no inter-service dependencies)
+          echo "::group::Wave 1: infrastructure"
+          $COMPOSE up --no-deps -d database redis moto mcp-server mock-segment
+          echo "::endgroup::"
+          echo "Waiting for infrastructure..."
           podman wait --condition=healthy \
             syntara-ci_database_1 \
-            syntara-ci_temporal_1 \
-            syntara-ci_syntara_1 \
-            syntara-ci_temporal-background-worker_1 \
+            syntara-ci_redis_1 \
+            syntara-ci_moto_1 \
             syntara-ci_mcp-server_1 \
             syntara-ci_mock-segment_1
+          echo "Infrastructure is healthy"
+
+          # Wave 2: temporal (needs database)
+          echo "::group::Wave 2: temporal"
+          $COMPOSE up --no-deps -d temporal
+          echo "::endgroup::"
+          echo "Waiting for temporal..."
+          podman wait --condition=healthy syntara-ci_temporal_1
+          echo "Temporal is healthy"
+
+          # Wave 3: application services (need temporal + infra)
+          echo "::group::Wave 3: application"
+          $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker
+          echo "::endgroup::"
+          echo "Waiting for application services..."
+          podman wait --condition=healthy \
+            syntara-ci_syntara_1 \
+            syntara-ci_temporal-worker_1 \
+            syntara-ci_temporal-background-worker_1
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)

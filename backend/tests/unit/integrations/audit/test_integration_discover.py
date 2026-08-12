@@ -1,7 +1,7 @@
 """Unit tests for IntegrationDiscoverEvent and handler."""
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_discover import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_discover import (
     IntegrationDiscoverEvent,
     IntegrationDiscoverHandler,
 )

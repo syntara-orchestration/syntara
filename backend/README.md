@@ -1,6 +1,6 @@
-# Nexus
+# Syntara
 
-A distributed multi-agent system. Nexus enables coordinated AI agents to work together on complex tasks.
+A distributed multi-agent system. Syntara enables coordinated AI agents to work together on complex tasks.
 [![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/syntara-orchestration/syntara/graphs/commit-activity)
 [![CI](https://github.com/syntara-orchestration/syntara/actions/workflows/ci.yml/badge.svg)](https://github.com/syntara-orchestration/syntara/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://pypi.python.org/pypi/)
@@ -55,13 +55,13 @@ Each domain represents a set of related functionality and follows a consistent s
 - **workflows** - Temporal workflow definitions and execution
 
 ```
-src/nexus/{domain}/
+src/syntara/{domain}/
 ├── router.py              # FastAPI routes (auto-discovered)
 ├── models/                # SQLModel classes
 └── services/              # Business logic
 ```
 
-**Router Discovery**: Routers in `src/nexus/{domain}/router.py` or `src/nexus/api/v1/{module}.py` are automatically discovered and registered.
+**Router Discovery**: Routers in `src/syntara/{domain}/router.py` or `src/syntara/api/v1/{module}.py` are automatically discovered and registered.
 
 ## Developer Workflow
 
@@ -150,7 +150,7 @@ make test-all
 make lint
 ```
 
-> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/nexus/authz/rego/authz.rego`.
+> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
 
 ### Database Setup
 
@@ -179,7 +179,7 @@ The application uses these environment variables (with defaults):
 - `APP_DB_PASSWORD` (default: `admin`)
 - `APP_DB_HOST` (default: `localhost`)
 - `APP_DB_PORT` (default: `5432`)
-- `APP_DB_NAME` (default: `nexus_api`)
+- `APP_DB_NAME` (default: `syntara_api`)
 - `APP_DB_POOL_SIZE` (default: `10`)
 - `APP_DB_MAX_OVERFLOW` (default: `20`)
 - `APP_DB_POOL_TIMEOUT_SECONDS` (default: `30`)
@@ -201,7 +201,7 @@ export APP_DATABASE_URL="postgresql+asyncpg://user:pass@host:port/dbname?sslmode
 Most domain models should extend the `Resource` base class:
 
 ```python
-from nexus.core.models import Resource
+from syntara.core.models import Resource
 
 class ToolProvider(Resource, table=True):
     """Extends Resource with provider-specific fields."""
@@ -232,7 +232,7 @@ make services-run
 
 **Run Temporal worker separately** (for development without containers):
 ```bash
-uv run python -m nexus.workflows.worker
+uv run python -m syntara.workflows.worker
 # Or use: make worker-run
 ```
 
@@ -298,7 +298,7 @@ make run-all
 # - API: http://localhost:8000
 # - UI: http://localhost:8080
 # - Temporal UI: http://localhost:8081
-# - Database: postgresql://admin:admin@localhost:5432/nexus_api
+# - Database: postgresql://admin:admin@localhost:5432/syntara_api
 ```
 
 **Start all services** (background):
@@ -372,7 +372,7 @@ APP_DB_HOST=localhost
 APP_DB_PORT=5432
 APP_DB_USER=admin
 APP_DB_PASSWORD=admin
-APP_DB_NAME=nexus_api
+APP_DB_NAME=syntara_api
 APP_DB_POOL_SIZE=10
 APP_DB_MAX_OVERFLOW=20
 APP_DB_POOL_TIMEOUT_SECONDS=30

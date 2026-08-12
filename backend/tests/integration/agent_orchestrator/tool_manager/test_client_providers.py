@@ -5,10 +5,10 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration, IntegrationRead, IntegrationType
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration, IntegrationRead, IntegrationType
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
 
 
 @pytest_asyncio.fixture

@@ -12,13 +12,13 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.audit.tool_management import (
+from syntara.agent_orchestrator.audit.tool_management import (
     ToolDiscoveryEvent,
     ToolDiscoveryHandler,
 )
-from nexus.agent_orchestrator.tool_manager.tool_services import ToolRetriever
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.agent_orchestrator.tool_manager.tool_services import ToolRetriever
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
 
 
 @pytest.fixture
@@ -79,23 +79,23 @@ def mock_tool_sync_internals() -> Callable[..., Any]:
 
         patches = [
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services._discover_mcp_integrations",
+                "syntara.agent_orchestrator.tool_manager.tool_services._discover_mcp_integrations",
                 **_get_patch_config("discover_providers", [], is_async=True),
             ),
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services._discover_tools",
+                "syntara.agent_orchestrator.tool_manager.tool_services._discover_tools",
                 **_get_patch_config("discover_tools", ([], []), is_async=True),
             ),
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
                 **_get_patch_config("retrieve_base_tools", [], is_async=True),
             ),
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services._filter_enabled_tools",
+                "syntara.agent_orchestrator.tool_manager.tool_services._filter_enabled_tools",
                 **_get_patch_config("filter_enabled", [], is_async=False),
             ),
             patch(
-                "nexus.agent_orchestrator.tool_manager.tool_services._enhance_tools_with_metadata",
+                "syntara.agent_orchestrator.tool_manager.tool_services._enhance_tools_with_metadata",
                 **_get_patch_config("enhance_metadata", [], is_async=False),
             ),
         ]
@@ -154,7 +154,7 @@ class TestToolDiscoveryEventDispatch:
         ]
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             mock_tool_sync_internals(
                 {
                     "discover_providers": mock_providers,
@@ -215,7 +215,7 @@ class TestToolDiscoveryEventDispatch:
 
         # Mock _discover_mcp_integrations to raise exception
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             mock_tool_sync_internals(
                 {"discover_providers": {"side_effect": ConnectionError("Tool Manager unavailable")}}
             ),
@@ -261,7 +261,7 @@ class TestToolDiscoveryEventDispatch:
 
         # Mock minimal successful retrieval (defaults provide empty lists)
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             mock_tool_sync_internals(),
         ):
             await retriever.retrieve_tools()
@@ -291,7 +291,7 @@ class TestToolDiscoveryEventDispatch:
 
         # Mock retrieval that finds no tools (defaults provide empty lists)
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             mock_tool_sync_internals(),
         ):
             result = await retriever.retrieve_tools()

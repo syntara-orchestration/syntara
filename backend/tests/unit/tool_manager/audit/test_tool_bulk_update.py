@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.tool_manager.audit.tool_bulk_update import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.tool_manager.audit.tool_bulk_update import (
     ToolBulkUpdateEvent,
     ToolBulkUpdateHandler,
 )

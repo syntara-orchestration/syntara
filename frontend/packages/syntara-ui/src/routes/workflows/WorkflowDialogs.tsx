@@ -14,6 +14,7 @@ import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
 
 import { ImportWorkflowDialog } from './ImportWorkflowDialog'
 import { resolveWorkflowRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { WorkflowDeleteDialog } from './WorkflowDeleteDialog'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -165,8 +166,9 @@ export function WorkflowDialogs({
         workflowId={pendingRunInput?.workflow.id}
       />
 
-      <NxConfirmationDialog
+      <WorkflowDeleteDialog
         isOpen={deleteDialog.isOpen}
+        workflowName={deleteDialog.item?.name ?? ''}
         onClose={deleteDialog.close}
         onConfirm={() => {
           if (deleteDialog.item) {
@@ -174,30 +176,8 @@ export function WorkflowDialogs({
           }
           // Dialog closes in onSettled callback passed to useWorkflowActions
         }}
-        title="Delete workflow?"
-        confirmLabel="Delete"
-        confirmVariant="danger"
-        titleIconVariant="warning"
         confirmLoading={isDeleting}
-        destructiveAcknowledgement={{
-          checkboxId: 'delete-workflow-ack',
-          label: 'I understand this workflow and any dependent workflows will be affected by this deletion.',
-        }}
-      >
-        <Stack hasGutter>
-          <StackItem>
-            The workflow <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-          </StackItem>
-          <StackItem>
-            <List>
-              <ListItem>This workflow will stop running immediately.</ListItem>
-              <ListItem>
-                Any other workflows that use this one as a step will also become invalid and stop running.
-              </ListItem>
-            </List>
-          </StackItem>
-        </Stack>
-      </NxConfirmationDialog>
+      />
 
       <ImportWorkflowDialog
         isOpen={importDialogOpen}

@@ -212,7 +212,7 @@ The AAP integration stores the API URL and TLS configuration. It does not discov
 
 ## TLS and Security
 
-All adapters, the AAP proxy, and the agent orchestrator share `build_integration_httpx_verify()` (in `src/nexus/core/lib/tls_utils.py`) which maps `IntegrationSecurityMixin` fields to `httpx.AsyncClient` verification:
+All adapters, the AAP proxy, and the agent orchestrator share `build_integration_httpx_verify()` (in `src/syntara/core/lib/tls_utils.py`) which maps `IntegrationSecurityMixin` fields to `httpx.AsyncClient` verification:
 
 | `insecure_skip_tls_verify` | `ca_certificate` | Result |
 |---|---|---|
@@ -266,7 +266,7 @@ Files to touch:
 ## File Layout
 
 ```
-src/nexus/integrations/
+src/syntara/integrations/
 ├── adapters/
 │   ├── protocol.py              # IntegrationAdapter protocol, result types, HealthCheckErrorType
 │   ├── factory.py               # Registry + create_health_check_adapter()
@@ -295,7 +295,7 @@ src/nexus/integrations/
 ├── exceptions.py                # Domain exceptions — see error_handlers.py for HTTP mapping
 └── error_handlers.py            # RFC 9457 error responses
 
-src/nexus/tool_manager/          # Tool records discovered from MCP integrations
+src/syntara/tool_manager/          # Tool records discovered from MCP integrations
 ├── models/tool.py               # Tool table (integration_id FK, namespaced_name, status)
 └── lib/providers/mcp/           # MCPProvider — MCP SDK client for tool discovery and execution
 ```

@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.files.audit.file_integrity_failed import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.files.audit.file_integrity_failed import (
     FileIntegrityFailedEvent,
     FileIntegrityFailedHandler,
 )

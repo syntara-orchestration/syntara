@@ -21,8 +21,8 @@ import pytest_asyncio
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models import Execution, ExecutionStatus, Workflow, WorkflowVersion
+from syntara.core.models import User
+from syntara.workflows.models import Execution, ExecutionStatus, Workflow, WorkflowVersion
 
 
 @pytest_asyncio.fixture

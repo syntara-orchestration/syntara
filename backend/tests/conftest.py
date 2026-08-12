@@ -1,7 +1,7 @@
 """Shared pytest fixtures for all backend tests.
 
 App-level fixtures are loaded here (not via the pytest11 entry point) so that
-nexus.* imports happen AFTER pytest-cov starts its coverage tracer.
+syntara.* imports happen AFTER pytest-cov starts its coverage tracer.
 """
 
 pytest_plugins = [
@@ -18,6 +18,6 @@ pytest_plugins = [
     # which are consumed by both unit and integration tests.
     "tests.integration.fixtures.workflows",
     "tests.integration.fixtures.tools",
-    # Live-deployment fixtures (nexus_base_url, nexus_api, ...) for performance/e2e tests.
+    # Live-deployment fixtures (nexus_base_url, syntara_api, ...) for performance/e2e tests.
     "orchestrator_test_sdk.app.live",
 ]

@@ -10,10 +10,10 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError, RPCStatusCode
 
-from nexus.core.models import User
-from nexus.workflows.models import Workflow
-from nexus.workflows.models.execution import Execution
-from nexus.workflows.workflow_engine.services.temporal_execution_service import (
+from syntara.core.models import User
+from syntara.workflows.models import Workflow
+from syntara.workflows.models.execution import Execution
+from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
 )
 
@@ -177,7 +177,7 @@ async def test_create_execution_temporal_connection_failure_graceful_degradation
     """
     # Mock create_temporal_execution_service to raise the exception
     with patch(
-        "nexus.workflows.executions_router.create_temporal_execution_service",
+        "syntara.workflows.executions_router.create_temporal_execution_service",
         side_effect=exception,
     ):
         response = await auth_client.post(
@@ -250,7 +250,7 @@ async def test_create_execution_temporal_workflow_start_failure(
         return mock_temporal_service
 
     with patch(
-        "nexus.workflows.executions_router.create_temporal_execution_service",
+        "syntara.workflows.executions_router.create_temporal_execution_service",
         side_effect=mock_create_service,
     ):
         response = await auth_client.post(

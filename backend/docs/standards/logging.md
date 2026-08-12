@@ -30,19 +30,19 @@ logger = structlog.stdlib.get_logger(__name__)
 - Place the logger at module level, never inside functions.
 - Never use `logging.getLogger()` directly (use structlog's stdlib wrapper).
 
-**Exception:** `BaseAgent` (`src/nexus/agent_orchestrator/agents/base_agent.py`) uses `self.logger = structlog.stdlib.get_logger(self.__class__.__name__)` to bind the concrete agent class name rather than the module name. This is the only sanctioned class-level logger pattern. Do not replicate it in other domains without justification.
+**Exception:** `BaseAgent` (`src/syntara/agent_orchestrator/agents/base_agent.py`) uses `self.logger = structlog.stdlib.get_logger(self.__class__.__name__)` to bind the concrete agent class name rather than the module name. This is the only sanctioned class-level logger pattern. Do not replicate it in other domains without justification.
 
 **Example:**
 
 ```python
-# src/nexus/workflows/services/execution_service.py
+# src/syntara/workflows/services/execution_service.py
 """Execution service for managing workflow executions."""
 
 from uuid import UUID
 
 import structlog
 
-from nexus.workflows.models import Execution
+from syntara.workflows.models import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -55,10 +55,10 @@ class ExecutionService:
 
 ## Configuration
 
-Logging is configured centrally in `src/nexus/core/logging/logging.py` via `configure_structlog()`.
+Logging is configured centrally in `src/syntara/core/logging/logging.py` via `configure_structlog()`.
 
 This function is called:
-- At application startup in `src/nexus/__init__.py`
+- At application startup in `src/syntara/__init__.py`
 - In test setup in `tests/conftest.py`
 
 **Do not configure structlog in individual modules.** Use the global configuration.
@@ -391,12 +391,12 @@ When adding a new domain or module to Nexus, follow these steps:
 In the main service or handler file:
 
 ```python
-# src/nexus/my_domain/services/my_service.py
+# src/syntara/my_domain/services/my_service.py
 """My service for doing domain operations."""
 
 import structlog
 
-from nexus.my_domain.models import MyEntity
+from syntara.my_domain.models import MyEntity
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -589,8 +589,8 @@ Both modes share the same processor chain (configured in `build_nexus_shared_for
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `NexusLogRecordRenderer` |
-| `src/nexus/__init__.py` | Application startup logging init |
+| `src/syntara/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `NexusLogRecordRenderer` |
+| `src/syntara/__init__.py` | Application startup logging init |
 | `tests/conftest.py` | Test logging setup |
 
 **External:**

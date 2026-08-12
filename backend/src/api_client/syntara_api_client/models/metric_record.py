@@ -29,7 +29,7 @@ class MetricRecord:
     memory from ~4.1KB to ~72 bytes.  This record never touches a database.
 
       Attributes:
-          metric_type (MetricType): Categories of metrics recorded by Nexus.
+          metric_type (MetricType): Categories of metrics recorded by Syntara.
 
               Each value corresponds to a specific measurable quantity exposed via the
               metrics REST API and (where applicable) Prometheus endpoint.

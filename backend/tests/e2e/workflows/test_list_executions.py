@@ -9,6 +9,6 @@ pytestmark = [pytest.mark.e2e]
 class TestExecutions:
     """E2E tests for execution GET endpoints."""
 
-    def test_list_executions(self, nexus_api: SyntaraApiRegistry) -> None:
-        executions = nexus_api.executions.list().assert_and_get()
+    def test_list_executions(self, syntara_api: SyntaraApiRegistry) -> None:
+        executions = syntara_api.executions.list().assert_and_get()
         assert isinstance(executions.resources, list)

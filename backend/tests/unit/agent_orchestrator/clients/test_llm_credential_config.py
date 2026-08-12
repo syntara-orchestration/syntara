@@ -3,7 +3,7 @@
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from nexus.agent_orchestrator.models.llm_credential_config import LLMCredentialConfig
+from syntara.agent_orchestrator.models.llm_credential_config import LLMCredentialConfig
 
 
 class TestLLMCredentialConfig:
@@ -50,6 +50,6 @@ class TestLLMCredentialConfig:
 
     def test_importable_from_models_package(self) -> None:
         """LLMCredentialConfig is re-exported from the models package."""
-        from nexus.agent_orchestrator.models import LLMCredentialConfig as Imported
+        from syntara.agent_orchestrator.models import LLMCredentialConfig as Imported
 
         assert Imported is LLMCredentialConfig

@@ -1,14 +1,14 @@
 """Unit tests for AccountEnableEvent/Handler and PasswordResetEvent/Handler."""
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.account_management import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.account_management import (
     AccountEnableEvent,
     AccountEnableHandler,
     PasswordResetEvent,
     PasswordResetHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestAccountEnableHandler:

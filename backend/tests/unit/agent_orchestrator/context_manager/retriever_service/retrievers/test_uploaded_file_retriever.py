@@ -11,12 +11,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
     UploadedFileRetriever,
 )
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.models import FileMetadata, FileStatus
 
 
 class TestUploadedFileRetriever:

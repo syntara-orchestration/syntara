@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexus.core.logging.lifecycle import OtelLoggingState, start_loggers, stop_loggers
+from syntara.core.logging.lifecycle import OtelLoggingState, start_loggers, stop_loggers
 
 # ------------------------------------------------------------------ #
 # Fixtures
@@ -26,8 +26,8 @@ from nexus.core.logging.lifecycle import OtelLoggingState, start_loggers, stop_l
 @pytest.fixture(autouse=True)
 def _reset_logging_state() -> Generator[None, None, None]:
     """Reset logging state and handlers between tests to ensure isolation."""
-    import nexus.core.logging.lifecycle as lifecycle_module
-    from nexus.audit.logging import AUDIT_LOGGER_NAME
+    import syntara.core.logging.lifecycle as lifecycle_module
+    from syntara.audit.logging import AUDIT_LOGGER_NAME
 
     # Reset state before test
     with lifecycle_module._logging_state_lock:
@@ -63,7 +63,7 @@ def _reset_logging_state() -> Generator[None, None, None]:
 
 def _reset_lifecycle_state() -> None:
     """Reset module-level lifecycle state to UNCONFIGURED (for test isolation)."""
-    import nexus.core.logging.lifecycle as lifecycle_module
+    import syntara.core.logging.lifecycle as lifecycle_module
 
     with lifecycle_module._logging_state_lock:
         lifecycle_module._logging_state = OtelLoggingState.UNCONFIGURED
@@ -77,8 +77,8 @@ def _reset_lifecycle_state() -> None:
 class TestStartLoggers:
     """Test start_loggers function."""
 
-    @patch("nexus.core.logging.lifecycle.configure_audit_logging")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_audit_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_configures_app_and_audit_logging(
         self,
         mock_configure_app: MagicMock,
@@ -90,16 +90,16 @@ class TestStartLoggers:
         mock_configure_app.assert_called_once()
         mock_configure_audit.assert_called_once()
 
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_sets_configured_state(self, mock_configure_app: MagicMock) -> None:
         """Test that start_loggers transitions state to CONFIGURED."""
         start_loggers()
 
-        import nexus.core.logging.lifecycle as lifecycle_module
+        import syntara.core.logging.lifecycle as lifecycle_module
 
         assert lifecycle_module._logging_state == OtelLoggingState.CONFIGURED
 
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_idempotent_when_already_configured(self, mock_configure_app: MagicMock) -> None:
         """Test that calling start_loggers when already configured is a no-op."""
         start_loggers()
@@ -108,16 +108,16 @@ class TestStartLoggers:
         start_loggers()
         assert mock_configure_app.call_count == 1
 
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_logs_already_configured(self, mock_configure_app: MagicMock) -> None:
         """Test that calling start_loggers when configured logs a debug message."""
-        with patch("nexus.core.logging.lifecycle.logger") as mock_logger:
+        with patch("syntara.core.logging.lifecycle.logger") as mock_logger:
             start_loggers()
             start_loggers()
 
             mock_logger.debug.assert_called_with("logging.already_configured", state=OtelLoggingState.CONFIGURED)
 
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_thread_safe_concurrent_calls(self, mock_configure_app: MagicMock) -> None:
         """Test that concurrent start_loggers calls are thread-safe (only one configures)."""
         barrier = threading.Barrier(2)
@@ -137,10 +137,10 @@ class TestStartLoggers:
 
         assert mock_configure_app.call_count == 1
 
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_logs_success_message(self, mock_configure_app: MagicMock) -> None:
         """Test that start_loggers logs a success message."""
-        with patch("nexus.core.logging.lifecycle.logger") as mock_logger:
+        with patch("syntara.core.logging.lifecycle.logger") as mock_logger:
             start_loggers()
 
             mock_logger.info.assert_called_with("logging.configured")
@@ -154,8 +154,8 @@ class TestStartLoggers:
 class TestStopLoggers:
     """Test stop_loggers function."""
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_flushes_root_logger(
         self,
         mock_configure_app: MagicMock,
@@ -170,8 +170,8 @@ class TestStopLoggers:
         root_logger = logging.getLogger()
         mock_flush.assert_called_with(root_logger)
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_removes_root_logger_handlers(
         self,
         mock_configure_app: MagicMock,
@@ -190,8 +190,8 @@ class TestStopLoggers:
 
         assert len(root_logger.handlers) == 0
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_sets_unconfigured_state(
         self,
         mock_configure_app: MagicMock,
@@ -201,36 +201,36 @@ class TestStopLoggers:
         start_loggers()
         stop_loggers()
 
-        import nexus.core.logging.lifecycle as lifecycle_module
+        import syntara.core.logging.lifecycle as lifecycle_module
 
         assert lifecycle_module._logging_state == OtelLoggingState.UNCONFIGURED
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
     def test_idempotent_when_already_stopped(self, mock_flush: MagicMock) -> None:
         """Test that calling stop_loggers when already stopped is a no-op."""
         stop_loggers()
 
         mock_flush.assert_not_called()
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
     def test_logs_already_stopped(self, mock_flush: MagicMock) -> None:
         """Test that calling stop_loggers when stopped logs a debug message."""
-        with patch("nexus.core.logging.lifecycle.logger") as mock_logger:
+        with patch("syntara.core.logging.lifecycle.logger") as mock_logger:
             stop_loggers()
 
             mock_logger.debug.assert_called_with(
                 "logging.flush_skipped_not_configured", state=OtelLoggingState.UNCONFIGURED
             )
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_logs_success_message(
         self,
         mock_configure_app: MagicMock,
         mock_flush: MagicMock,
     ) -> None:
         """Test that stop_loggers logs shutdown messages."""
-        with patch("nexus.core.logging.lifecycle.logger") as mock_logger:
+        with patch("syntara.core.logging.lifecycle.logger") as mock_logger:
             start_loggers()
             stop_loggers()
 
@@ -240,8 +240,8 @@ class TestStopLoggers:
             assert "logging.removing_root_handlers" in stop_messages
             assert "logging.removing_audit_handlers" in stop_messages
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_flush_before_handler_removal(
         self,
         mock_configure_app: MagicMock,
@@ -283,8 +283,8 @@ class TestStopLoggers:
 class TestRestartLoggers:
     """Test restarting the logging system after shutdown."""
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_can_restart_after_stop(
         self,
         mock_configure_app: MagicMock,
@@ -300,8 +300,8 @@ class TestRestartLoggers:
         start_loggers()
         assert mock_configure_app.call_count == 2
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_multiple_start_stop_cycles(
         self,
         mock_configure_app: MagicMock,
@@ -315,7 +315,7 @@ class TestRestartLoggers:
             stop_loggers()
             assert mock_flush.call_count == i + 1
 
-            import nexus.core.logging.lifecycle as lifecycle_module
+            import syntara.core.logging.lifecycle as lifecycle_module
 
             assert lifecycle_module._logging_state == OtelLoggingState.UNCONFIGURED
 
@@ -328,8 +328,8 @@ class TestRestartLoggers:
 class TestThreadSafety:
     """Test thread safety of lifecycle operations."""
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_state_transitions_are_atomic(
         self,
         mock_configure_app: MagicMock,
@@ -346,12 +346,12 @@ class TestThreadSafety:
 
         assert mock_configure_app.call_count == 1
 
-        import nexus.core.logging.lifecycle as lifecycle_module
+        import syntara.core.logging.lifecycle as lifecycle_module
 
         assert lifecycle_module._logging_state == OtelLoggingState.CONFIGURED
 
-    @patch("nexus.core.logging.lifecycle.flush_otel_handler")
-    @patch("nexus.core.logging.lifecycle.configure_app_logging")
+    @patch("syntara.core.logging.lifecycle.flush_otel_handler")
+    @patch("syntara.core.logging.lifecycle.configure_app_logging")
     def test_stop_waits_for_lock(
         self,
         mock_configure_app: MagicMock,
@@ -361,6 +361,6 @@ class TestThreadSafety:
         start_loggers()
         stop_loggers()
 
-        import nexus.core.logging.lifecycle as lifecycle_module
+        import syntara.core.logging.lifecycle as lifecycle_module
 
         assert lifecycle_module._logging_state == OtelLoggingState.UNCONFIGURED

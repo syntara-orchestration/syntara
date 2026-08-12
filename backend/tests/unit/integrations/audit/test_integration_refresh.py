@@ -2,12 +2,12 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.integrations.audit.integration_refresh import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.integrations.audit.integration_refresh import (
     IntegrationRefreshEvent,
     IntegrationRefreshHandler,
 )
-from nexus.integrations.models.integration import IntegrationRefreshStatus
+from syntara.integrations.models.integration import IntegrationRefreshStatus
 
 
 class TestIntegrationRefreshHandler:

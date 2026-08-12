@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.service_accounts.credential_router import (
+from syntara.service_accounts.credential_router import (
     create_credential,
     delete_credential,
     disable_credential,
@@ -14,14 +14,14 @@ from nexus.service_accounts.credential_router import (
     get_credential_service,
     rotate_credential,
 )
-from nexus.service_accounts.credential_schemas import (
+from syntara.service_accounts.credential_schemas import (
     SACredentialCreate,
     SACredentialCreateResponse,
     SACredentialRead,
     SACredentialRotateRequest,
     SACredentialRotateResponse,
 )
-from nexus.service_accounts.models.service_account_credential import (
+from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredential,
     ServiceAccountCredentialStatus,
     ServiceAccountCredentialType,

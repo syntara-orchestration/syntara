@@ -7,16 +7,16 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.exceptions import (
+from syntara.core.models import User
+from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
 )
-from nexus.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_version import WorkflowVersion
-from nexus.workflows.services.execution_service import ExecutionService
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.execution_service import ExecutionService
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _make_execution(
@@ -117,7 +117,7 @@ class TestRetryExecution:
 
         with (
             patch(
-                "nexus.workflows.services.execution_service.resolve_user_display_name",
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
                 new_callable=AsyncMock,
                 return_value="Author",
             ),
@@ -230,7 +230,7 @@ class TestRetryExecution:
 
         with (
             patch(
-                "nexus.workflows.services.execution_service.resolve_user_display_name",
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
                 new_callable=AsyncMock,
                 return_value="Author",
             ),
@@ -318,7 +318,7 @@ class TestRetryExecution:
 
         with (
             patch(
-                "nexus.workflows.services.execution_service.resolve_user_display_name",
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
                 new_callable=AsyncMock,
                 return_value="Author",
             ),

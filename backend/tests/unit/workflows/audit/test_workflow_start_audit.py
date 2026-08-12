@@ -4,11 +4,11 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.workflows.audit.execution_started import WorkflowStartEvent, WorkflowStartHandler
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.workflows.audit.execution_started import WorkflowStartEvent, WorkflowStartHandler
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 EXECUTION_ID = uuid4()
 WORKFLOW_ID = uuid4()

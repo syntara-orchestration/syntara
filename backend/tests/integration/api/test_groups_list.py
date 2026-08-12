@@ -6,7 +6,7 @@ Tests cursor-based pagination, bracket filter notation, sorting, and response fo
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.models.group import Group
+from syntara.core.models.group import Group
 
 GROUPS_URL = "/api/v1/groups"
 

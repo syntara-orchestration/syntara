@@ -91,36 +91,36 @@ The recommended approach is using the automated gen script (see below). For manu
 ```bash
 cd packages/syntara-contracts
 
-# Replace /path/to/nexus with your local backend clone path
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/workflows/openapi.yaml \
+# Replace /path/to/syntara with your local backend clone path
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/openapi.yaml \
   --output ./src/workflow-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/tool_manager/openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/tool_manager/openapi.yaml \
   --output ./src/tool-manager.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/files/openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/files/openapi.yaml \
   --output ./src/files-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/approvals/openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/approvals/openapi.yaml \
   --output ./src/approvals-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/workflows/executions_openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/executions_openapi.yaml \
   --output ./src/executions-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/workflows/activity_types_openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/activity_types_openapi.yaml \
   --output ./src/activity-types-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/invocations/openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/invocations/openapi.yaml \
   --output ./src/invocations-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/metrics/openapi.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/metrics/openapi.yaml \
   --output ./src/metrics-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/nexus/src/nexus/schemas/tool_manager/metrics.yaml \
+npx openapi-typescript /path/to/syntara/src/syntara/schemas/tool_manager/metrics.yaml \
   --output ./src/tool-manager-metrics.ts --default-non-nullable false
 
 # Copy example workflows to mock API
-cp -r /path/to/nexus/tests/integration/workflow/examples ../syntara-mock-api/src/
+cp -r /path/to/syntara/tests/integration/workflow/examples ../syntara-mock-api/src/
 
 # Format the generated files
 cd ../..

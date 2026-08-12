@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.models import ApprovalRequest, ApprovalRequestStatus
-from nexus.core.models import User
+from syntara.approvals.models import ApprovalRequest, ApprovalRequestStatus
+from syntara.core.models import User
 
 
 class ApprovalsFactory:

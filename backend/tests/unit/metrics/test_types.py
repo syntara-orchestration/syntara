@@ -6,8 +6,8 @@ from uuid import UUID
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.metrics.types import (
+from syntara.core.exceptions import SafeValueError
+from syntara.metrics.types import (
     METRIC_CATEGORIES,
     AuthFailureType,
     ComponentLabel,

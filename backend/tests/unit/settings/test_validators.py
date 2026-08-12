@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from nexus.settings.exceptions import SettingValidationError
-from nexus.settings.models.runtime_setting import SettingValueType
-from nexus.settings.validators import check_schema_compatibility, validate_setting_value
+from syntara.settings.exceptions import SettingValidationError
+from syntara.settings.models.runtime_setting import SettingValueType
+from syntara.settings.validators import check_schema_compatibility, validate_setting_value
 
 # ---------------------------------------------------------------------------
 # None bypass
