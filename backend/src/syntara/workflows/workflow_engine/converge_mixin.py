@@ -106,7 +106,7 @@ class WorkflowConvergeMixin:
         converge_ids = self._converge_branch_nodes.get(scheduled_node_id)
         if not converge_ids:
             return
-        for converge_id in converge_ids:
+        for converge_id in sorted(converge_ids):
             if converge_id in self._timeout_tasks:
                 continue
             if converge_id in self.failed_nodes or converge_id in self.skipped_nodes:
