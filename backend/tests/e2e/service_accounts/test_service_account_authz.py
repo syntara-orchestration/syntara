@@ -47,7 +47,7 @@ class TestProjectAdminCRUD:
 
     def test_project_admin_full_crud_lifecycle(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -57,7 +57,7 @@ class TestProjectAdminCRUD:
         user_id, username, password = create_user(admin_api, "pa-crud")
         assign_project_role_to_user(admin_api, project_id, user_id, "project-admin")
 
-        user_api = api_for(nexus_base_url, username, password)
+        user_api = api_for(syntara_base_url, username, password)
 
         # Create
         sa = create_sa(user_api, project_id)
@@ -93,7 +93,7 @@ class TestCrossProjectDenied:
 
     def test_project_admin_cannot_access_other_project_sas(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -106,7 +106,7 @@ class TestCrossProjectDenied:
 
         beta_sa = create_sa(admin_api, beta_id)
 
-        user_api = api_for(nexus_base_url, username, password)
+        user_api = api_for(syntara_base_url, username, password)
 
         try:
             # Create in beta → 403
@@ -167,7 +167,7 @@ class TestCRUDPolicyEnforcement:
 
     def test_auditor_can_read_but_not_write(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -179,7 +179,7 @@ class TestCRUDPolicyEnforcement:
 
         sa = create_sa(admin_api, project_id)
 
-        auditor_api = api_for(nexus_base_url, username, password)
+        auditor_api = api_for(syntara_base_url, username, password)
 
         try:
             # Read detail → 200
@@ -262,7 +262,7 @@ class TestCrossProjectVisibility:
 
     def test_sa_visible_only_after_role_grant(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -277,7 +277,7 @@ class TestCrossProjectVisibility:
 
         alpha_sa = create_sa(admin_api, alpha_id)
 
-        user_api = api_for(nexus_base_url, username, password)
+        user_api = api_for(syntara_base_url, username, password)
 
         try:
             # Alpha SA should NOT be visible
@@ -289,7 +289,7 @@ class TestCrossProjectVisibility:
             assign_project_role_to_user(admin_api, alpha_id, user_id, "project-admin")
 
             # Re-authenticate to pick up new permissions
-            user_api = api_for(nexus_base_url, username, password)
+            user_api = api_for(syntara_base_url, username, password)
 
             # Alpha SA should now be visible
             list_after = user_api.service_accounts.list().assert_and_get()

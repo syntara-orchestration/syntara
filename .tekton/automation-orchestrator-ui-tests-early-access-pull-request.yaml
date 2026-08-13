@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
       event == "pull_request" && target_branch == "early-access" &&
-      (files.all.exists(x, x.startsWith("frontend/")) ||
+      (files.all.exists(x, x.startsWith("frontend/")) || files.all.exists(x, x.startsWith("backend/")) ||
       ".tekton/automation-orchestrator-ui-tests-early-access-pull-request.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -22,8 +22,8 @@ metadata:
   namespace: nexus-tenant
 spec:
   timeouts:
-    pipeline: "8h"
-    tasks: "6h"
+    pipeline: "10h"
+    tasks: "8h"
     finally: "2h"
   params:
     - name: git-url
@@ -41,7 +41,7 @@ spec:
       - name: name
         value: ao-ui-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:946bc72c83a3d831f3e45ccabd81bc4395fc65a08a7e50e7182ca7c4ef84cd7f
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:84b17fd102a04132817641b9fca960aeed681007c0b5d8da488a08e004f599ae
       - name: kind
         value: pipeline
       - name: secret

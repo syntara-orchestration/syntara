@@ -1144,8 +1144,8 @@ class TestAuditEventStdoutLogging:
             mock_audit_logger.info.assert_called_once()
             call_args, call_kwargs = mock_audit_logger.info.call_args
 
-            # Body is the OTEL log record body
-            assert call_args[0] == "audit_event"
+            # Body includes event_id so Loki does not collapse co-timestamped siblings
+            assert call_args[0] == f"audit_event:{event.event_id}"
 
             # Attributes contain the serialised event fields
             assert call_kwargs["event_action"] == "credential_create"
@@ -1233,10 +1233,25 @@ class TestBuildOtelLogRecordSerialization:
         attrs = record.log_record.attributes
         assert attrs is not None
         assert attrs["audit.event_source"] == "business_event"
-        assert record.log_record.body == "audit_event"
+        assert record.log_record.body == f"audit_event:{event.event_id}"
 
         # Must not raise TypeError — no UUID objects, datetimes, etc.
         json.dumps(dict(attrs))
+
+    def test_sibling_events_get_distinct_bodies(self, override_settings) -> None:
+        """Same timestamp must not produce identical export bodies (log-store dedup)."""
+        shared_ts = datetime.now(UTC)
+        event_a = _make_event(event_action="project_create")
+        event_b = _make_event(event_action="roleassignment_create")
+
+        with override_settings(otel_service_name="nexus-test"):
+            record_a = _build_otel_log_record(event_a, shared_ts, AuditEventSource.CRUD_EVENT)
+            record_b = _build_otel_log_record(event_b, shared_ts, AuditEventSource.CRUD_EVENT)
+
+        assert record_a.log_record.timestamp == record_b.log_record.timestamp
+        assert record_a.log_record.body != record_b.log_record.body
+        assert record_a.log_record.body == f"audit_event:{event_a.event_id}"
+        assert record_b.log_record.body == f"audit_event:{event_b.event_id}"
 
     def test_uuid_subclass_in_extra_fields_coerced(self, override_settings) -> None:
         """UUID subclasses (e.g. asyncpg UUID) in extra fields become strings."""

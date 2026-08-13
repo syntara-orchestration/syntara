@@ -3,17 +3,15 @@
 #
 # Called as a rulebook action to fire an EDA trigger endpoint.
 # Obtains an OAuth token via client credentials, then POSTs the
-# event payload to the webhook.
+# entire event payload (as-is) to the webhook.
 #
 # Usage:
 #   ansible-playbook eda-trigger-webhook.yml \
 #     -e webhook_base_url=https://syntara.example.com \
 #     -e webhook_path=my-eda-trigger \
-#     -e webhook_client_id=nx_sa_abc123 \
-#     -e webhook_client_secret=<secret> \
-#     -e alert_name=high_cpu \
-#     -e instance=web-server-01 \
-#     -e severity=critical
+#     -e client_id=nx_sa_abc123 \
+#     -e client_secret=<secret> \
+#     -e '{"event_payload": {"alert_name": "high_cpu", "instance": "web-server-01"}}'
 
 - name: Trigger EDA webhook
   hosts: localhost
@@ -21,13 +19,11 @@
   gather_facts: false
 
   vars:
-    webhook_base_url: "https://localhost:8000"
+    base_url: "https://localhost:8000"
     webhook_path: ""
-    webhook_client_id: ""
-    webhook_client_secret: ""
-    alert_name: "test_alert"
-    instance: "localhost"
-    severity: "info"
+    client_id: ""
+    client_secret: ""
+    event_payload: {}
 
   tasks:
     - name: Obtain OAuth token
@@ -51,12 +47,7 @@
         headers:
           Authorization: "Bearer {{ token_response.json.access_token }}"
           Content-Type: application/json
-        body:
-          event: "{{ alert_name }}"
-          payload:
-            instance: "{{ instance }}"
-            severity: "{{ severity }}"
-            timestamp: "{{ ansible_date_time.iso8601 | default(omit) }}"
+        body: "{{ event_payload }}"
         status_code: 202
         validate_certs: "{{ webhook_validate_certs | default(true) }}" # set to false for local dev with self-signed certs
       register: webhook_response

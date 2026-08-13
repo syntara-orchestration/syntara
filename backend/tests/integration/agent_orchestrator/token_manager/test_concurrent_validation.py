@@ -8,6 +8,7 @@ Tests that token validation meets performance targets under concurrent load:
 
 import asyncio
 import logging
+import os
 import statistics
 import sys
 import time
@@ -44,7 +45,12 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-@pytest.mark.performance
+# Latency thresholds (ms). Defaults are production SLOs; CI sets higher values
+# via env vars to accommodate shared runner variability with 8 parallel workers.
+_SINGLE_USER_P95_THRESHOLD_MS = float(os.environ.get("TOKEN_CONCURRENT_P95_THRESHOLD_MS", "3000"))
+_CAPACITY_P95_THRESHOLD_MS = float(os.environ.get("TOKEN_CONCURRENT_CAPACITY_P95_THRESHOLD_MS", "5000"))
+
+
 class TestConcurrentRequestPerformance:
     """Performance tests for concurrent request handling."""
 
@@ -151,9 +157,9 @@ class TestConcurrentRequestPerformance:
             logger.info("  Performance note: p95 latency under concurrency: %.2fms", p95)
             logger.info("  (Higher latency expected due to SELECT FOR UPDATE locking)")
 
-            # Verify acceptable performance (allow up to 3000ms for 50 concurrent requests)
-            # Note: CI environments are slower than local, threshold accounts for this
-            assert p95 < 3000.0, f"p95 latency {p95:.2f}ms exceeds acceptable threshold of 3000ms"
+            assert p95 < _SINGLE_USER_P95_THRESHOLD_MS, (
+                f"p95 latency {p95:.2f}ms exceeds acceptable threshold of {_SINGLE_USER_P95_THRESHOLD_MS:.0f}ms"
+            )
             logger.info("✅ Concurrent request latency within acceptable range")
 
             # Verify data consistency (no race conditions)
@@ -302,9 +308,9 @@ class TestConcurrentRequestPerformance:
             logger.info("  Performance note: Overall p95 latency: %.2fms", p95_overall)
             logger.info("  (Higher latency expected with concurrent requests and database locking)")
 
-            # Verify acceptable performance (allow up to 5000ms for high concurrent load)
-            # Note: CI environments are slower than local, threshold accounts for this
-            assert p95_overall < 5000.0, f"Overall p95 latency {p95_overall:.2f}ms exceeds threshold"
+            assert p95_overall < _CAPACITY_P95_THRESHOLD_MS, (
+                f"Overall p95 latency {p95_overall:.2f}ms exceeds threshold of {_CAPACITY_P95_THRESHOLD_MS:.0f}ms"
+            )
             logger.info("✅ System handles %d concurrent requests within acceptable latency", total_requests)
 
             # Verify no excessive errors (allow up to 5% error rate for transient issues)

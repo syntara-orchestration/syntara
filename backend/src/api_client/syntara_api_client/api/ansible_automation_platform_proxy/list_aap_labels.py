@@ -6,13 +6,12 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.aap_job_template_detail import AAPJobTemplateDetail
+from ...models.aap_list_response_aap_label import AAPListResponseAAPLabel
 from ...models.error_data import ErrorData
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    job_template_id: int,
     *,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
@@ -55,7 +54,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/aap/job_templates/{job_template_id}",
+        "url": "/proxies/aap/labels",
         "params": params,
     }
 
@@ -64,9 +63,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> AAPJobTemplateDetail | ErrorData | None:
+) -> AAPListResponseAAPLabel | ErrorData | None:
     if response.status_code == 200:
-        response_200 = AAPJobTemplateDetail.from_dict(response.json())
+        response_200 = AAPListResponseAAPLabel.from_dict(response.json())
 
         return response_200
 
@@ -118,7 +117,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[AAPJobTemplateDetail | ErrorData]:
+) -> Response[AAPListResponseAAPLabel | ErrorData]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -130,7 +129,6 @@ def _build_response(
 
 
 def sync_detailed(
-    job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
@@ -138,13 +136,12 @@ def sync_detailed(
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[AAPJobTemplateDetail | ErrorData]:
-    """Get job template
+) -> Response[AAPListResponseAAPLabel | ErrorData]:
+    """List labels
 
-     Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
+     List Ansible Automation Platform labels.
 
     Args:
-        job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -155,11 +152,10 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPJobTemplateDetail | ErrorData]
+        Response[AAPListResponseAAPLabel | ErrorData]
     """
 
     kwargs = _get_kwargs(
-        job_template_id=job_template_id,
         search=search,
         page_size=page_size,
         credential_id=credential_id,
@@ -175,20 +171,18 @@ def sync_detailed(
 
 
 def sync(
-    job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> AAPJobTemplateDetail | ErrorData | None:
-    """Get job template
+) -> AAPListResponseAAPLabel | ErrorData | None:
+    """List labels
 
-     Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
+     List Ansible Automation Platform labels.
 
     Args:
-        job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -199,11 +193,10 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPJobTemplateDetail | ErrorData
+        AAPListResponseAAPLabel | ErrorData
     """
 
     return sync_detailed(
-        job_template_id=job_template_id,
         client=client,
         search=search,
         page_size=page_size,
@@ -213,20 +206,18 @@ def sync(
 
 
 async def asyncio_detailed(
-    job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> Response[AAPJobTemplateDetail | ErrorData]:
-    """Get job template
+) -> Response[AAPListResponseAAPLabel | ErrorData]:
+    """List labels
 
-     Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
+     List Ansible Automation Platform labels.
 
     Args:
-        job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -237,11 +228,10 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPJobTemplateDetail | ErrorData]
+        Response[AAPListResponseAAPLabel | ErrorData]
     """
 
     kwargs = _get_kwargs(
-        job_template_id=job_template_id,
         search=search,
         page_size=page_size,
         credential_id=credential_id,
@@ -254,20 +244,18 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> AAPJobTemplateDetail | ErrorData | None:
-    """Get job template
+) -> AAPListResponseAAPLabel | ErrorData | None:
+    """List labels
 
-     Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
+     List Ansible Automation Platform labels.
 
     Args:
-        job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -278,12 +266,11 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPJobTemplateDetail | ErrorData
+        AAPListResponseAAPLabel | ErrorData
     """
 
     return (
         await asyncio_detailed(
-            job_template_id=job_template_id,
             client=client,
             search=search,
             page_size=page_size,

@@ -182,6 +182,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await filterCredentialByName(app, name)
 
       const updatedRow = app.getByRole('row', { name: new RegExp(name) })
+      await updatedRow.waitFor({ state: 'visible', timeout: 10_000 })
       await expect(listRowToggle(updatedRow)).not.toBeChecked()
     } finally {
       await deleteCredentialByName(app, name)
