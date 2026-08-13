@@ -25,14 +25,13 @@ from sqlmodel import select
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from syntara.auth.passwords import hash_password
+from syntara.authz.seed import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_FIRST_NAME, BOOTSTRAP_ADMIN_USERNAME
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
 
 logger = structlog.stdlib.get_logger(__name__)
 
-BOOTSTRAP_ADMIN_USERNAME = "admin"
-BOOTSTRAP_ADMIN_FULL_NAME = "Administrator"
 ADMINS_GROUP_NAME = "admins"
 
 
@@ -52,16 +51,19 @@ async def set_admin_password(password: str) -> None:
             admin = User(
                 id=uuid4(),
                 username=BOOTSTRAP_ADMIN_USERNAME,
-                full_name=BOOTSTRAP_ADMIN_FULL_NAME,
+                first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+                email=BOOTSTRAP_ADMIN_EMAIL,
                 password_hash=password_hash,
                 is_enabled=True,
                 is_builtin=True,
             )
             session.add(admin)
             await session.flush()
-            logger.info("Created admin user", user_id=str(admin.id))
+            logger.info("Created admin user", user_id=str(admin.id), email=BOOTSTRAP_ADMIN_EMAIL)
         else:
             admin.password_hash = password_hash
+            if admin.email is None:
+                admin.email = BOOTSTRAP_ADMIN_EMAIL
             logger.info("Updated admin password", user_id=str(admin.id))
 
         admin_group = (

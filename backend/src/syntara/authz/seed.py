@@ -22,6 +22,11 @@ from syntara.core.models.group import Group, user_groups
 
 logger = structlog.stdlib.get_logger(__name__)
 
+BOOTSTRAP_ADMIN_USERNAME = "admin"
+BOOTSTRAP_ADMIN_FIRST_NAME = "Administrator"
+# Placeholder only — operators should change this after install (self email update is allowed).
+BOOTSTRAP_ADMIN_EMAIL = "admin@example.com"
+
 
 async def seed_groups_project_admin(session: AsyncSession) -> None:
     """Seed built-in groups, default project, and admin user.
@@ -219,21 +224,30 @@ async def _seed_assignments_and_admin(
             logger.info("Service principal created", cn=cn, principal_id=str(sp_id))
 
     # Bootstrap admin user
-    existing_admin_user = await session.exec(select(User).where(User.username == "admin"))
+    existing_admin_user = await session.exec(select(User).where(User.username == BOOTSTRAP_ADMIN_USERNAME))
     admin_user = existing_admin_user.one_or_none()
     if not admin_user:
         password_hash = _read_admin_password_hash()
         admin_user = User(
             id=uuid4(),
-            username="admin",
-            first_name="Administrator",
+            username=BOOTSTRAP_ADMIN_USERNAME,
+            first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+            email=BOOTSTRAP_ADMIN_EMAIL,
             is_enabled=True,
             is_builtin=True,
             password_hash=password_hash,
         )
         session.add(admin_user)
         await session.flush()
-        logger.info("Bootstrap admin user created", user_id=str(admin_user.id))
+        logger.info("Bootstrap admin user created", user_id=str(admin_user.id), email=BOOTSTRAP_ADMIN_EMAIL)
+    elif admin_user.email is None:
+        # Existing installs seeded before AAP-87627 had email=NULL in JWTs.
+        admin_user.email = BOOTSTRAP_ADMIN_EMAIL
+        logger.info(
+            "Backfilled bootstrap admin email placeholder",
+            user_id=str(admin_user.id),
+            email=BOOTSTRAP_ADMIN_EMAIL,
+        )
 
     await _ensure_group_membership(session, admin_user, auth_group)
     await _ensure_group_membership(session, admin_user, admin_group)
