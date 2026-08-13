@@ -273,7 +273,7 @@ I am building [what]. Verify my implementation matches the design system.
 [PASTE SCREENSHOT]
 ```
 
-The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.claude/skills/patternfly-ux-design-system.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
+The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
 
 ---
 
@@ -504,13 +504,13 @@ The command lives at `.claude/commands/build-ui-feature.md`. It uses the project
 
 | Topic                       | Document                                                                                            |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |
-| Coding standards            | [`.claude/skills/coding_standards.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)                       |
-| Testing standards           | [`.claude/skills/testing_guidelines.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md)                   |
-| PR review process           | [`.claude/skills/pr_review.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                                     |
-| Playwright E2E              | [`.claude/skills/playwright_e2e.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)                           |
-| PatternFly UX design system | [`.claude/skills/patternfly-ux-design-system.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md) |
-| Frontend specialist         | [`.claude/skills/frontend_specialist.md`](../../.claude/skills/frontend-specialist/SKILL.md)                 |
-| Library references          | [`.claude/skills/library_references.md`](../../.claude/skills/frontend-library-references/SKILL.md)                   |
+| Coding standards            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)                       |
+| Testing standards           | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md)                   |
+| PR review process           | [`.claude/skills/frontend-pr-review/SKILL.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                                     |
+| Playwright E2E              | [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)                           |
+| PatternFly UX design system | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md) |
+| Frontend specialist         | [`.claude/skills/frontend-specialist/SKILL.md`](../../.claude/skills/frontend-specialist/SKILL.md)                 |
+| Library references          | [`.claude/skills/frontend-library-references/SKILL.md`](../../.claude/skills/frontend-library-references/SKILL.md)                   |
 | Architecture overview       | [`architecture.md`](./architecture.md)                                                              |
 | Error handling              | [`error-handling.md`](./error-handling.md)                                                          |
 | Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                             |
