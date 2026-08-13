@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import pytest
 
+from syntara.authz.models import Project
 from tests.helpers.workflow import create_minimal_workflow_definition
+from tests.integration.api.conftest import make_project_user
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from httpx import AsyncClient
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from syntara.core.models import User
 
 
 @pytest.mark.asyncio
@@ -402,3 +410,51 @@ async def test_validate_converge_valid(jwt_client: AsyncClient) -> None:
     data = response.json()
     assert data["is_valid"] is True
     assert data["findings"] == []
+
+
+class TestValidateProjectScopedUser:
+    """Regression test for AAP-87629.
+
+    Before the fix, ``/workflows/validate`` was gated by a PermissionChecker
+    that could never resolve a project scope from the request body (it has
+    no ``project_id``/``workflow_id``), so it silently required a
+    system-wide grant that project-scoped-only users never have — this is
+    what produced "Not authorized to perform create on workflow" for
+    Builder users with only project-scoped roles.
+    """
+
+    @pytest.mark.asyncio
+    async def test_project_scoped_user_can_validate(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        user_factory: Callable[..., Awaitable[User]],
+        auth_as: Callable[[User], None],
+    ) -> None:
+        """A user with only a project-scoped role (no system-wide grant) can validate."""
+        project = Project(name=f"validate-test-{uuid4().hex[:8]}", description="")
+        test_db_session.add(project)
+        await test_db_session.commit()
+        await test_db_session.refresh(project)
+
+        user = await user_factory(
+            username=f"proj-user-{uuid4().hex[:6]}", email=f"proj-user-{uuid4().hex[:6]}@test.com"
+        )
+        await make_project_user(test_db_session, user, project)
+        auth_as(user)
+
+        payload = {
+            "workflow_definition": create_minimal_workflow_definition(
+                name="project-scoped-validate",
+                description="Validated by a project-scoped-only user",
+            ),
+        }
+
+        response = await auth_client.post("/api/v1/workflows/validate", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_valid"] is True
+        assert data["findings"] == []
+        assert data["error_count"] == 0
+        assert data["warning_count"] == 0

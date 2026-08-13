@@ -5,7 +5,12 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.exceptions import ScheduledTriggerSyncError, WorkflowPublishValidationError
+from syntara.workflows.exceptions import (
+    ScheduledTriggerSyncError,
+    TriggerValidationError,
+    WorkflowPublishValidationError,
+)
+from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.workflow_service import WorkflowService
 
 
@@ -659,3 +664,185 @@ class TestScheduledTriggerSyncGracefulDegradation:
                 side_effect=ScheduledTriggerSyncError(str(workflow_id), 0)
             )
             await mock_service.delete_workflow(workflow_id)
+
+
+class TestAAP87629RegressionPublishInvalidTimezone:
+    """Regression tests for AAP-87629: publish with invalid scheduled trigger config.
+
+    Validates that invalid timezone in a scheduled trigger causes publish to
+    fail BEFORE the DB commit, rather than after (which would leave the workflow
+    published in the DB while the user sees an error).
+    """
+
+    @pytest.mark.asyncio
+    async def test_publish_rejects_invalid_timezone_before_commit(self, mock_service: WorkflowService) -> None:
+        """Publish must raise TriggerValidationError before committing when timezone is invalid."""
+        workflow_id = uuid4()
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.is_builtin = False
+        mock_workflow.published_version_id = None
+        mock_workflow.current_version = 1
+        mock_workflow.name = "scheduled-wf"
+        mock_workflow.project_id = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "name": "timezone-test",
+            "triggers": [
+                {
+                    "id": "sched-1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 9 * * *",
+                        "timezone": "Invalid/Not_A_Real_Zone",
+                    },
+                },
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched-1", "to": "n1"}],
+        }
+
+        mock_validation_result = MagicMock()
+        mock_validation_result.error_count = 0
+        mock_validation_result.warning_count = 0
+        mock_validation_result.findings = []
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service, "_get_version_or_none", return_value=mock_version),
+            patch("syntara.workflows.services.workflow_service.workflow_validator") as mock_validator,
+            patch.object(mock_service, "_flush_with_duplicate_check", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
+            pytest.raises(TriggerValidationError, match=r"Invalid.*scheduled trigger config"),
+        ):
+            mock_validator.collect_findings.return_value = mock_validation_result
+            await mock_service.publish_workflow_version(workflow_id, version=1)
+
+        mock_commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_publish_succeeds_with_valid_timezone(self, mock_service: WorkflowService) -> None:
+        """Publish succeeds when scheduled trigger has a valid IANA timezone."""
+        workflow_id = uuid4()
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.is_builtin = False
+        mock_workflow.published_version_id = None
+        mock_workflow.current_version = 1
+        mock_workflow.name = "scheduled-wf"
+        mock_workflow.project_id = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "name": "timezone-test",
+            "triggers": [
+                {
+                    "id": "sched-1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 9 * * *",
+                        "timezone": "America/New_York",
+                    },
+                },
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched-1", "to": "n1"}],
+        }
+
+        mock_validation_result = MagicMock()
+        mock_validation_result.error_count = 0
+        mock_validation_result.warning_count = 0
+        mock_validation_result.findings = []
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service, "_get_version_or_none", return_value=mock_version),
+            patch("syntara.workflows.services.workflow_service.workflow_validator") as mock_validator,
+            patch.object(mock_service, "_flush_with_duplicate_check", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
+        ):
+            mock_validator.collect_findings.return_value = mock_validation_result
+            workflow, _version, _warning = await mock_service.publish_workflow_version(workflow_id, version=1)
+
+        assert workflow.published_version_id == mock_version.id
+
+
+class TestAAP87629RegressionValidateTriggerConfigs:
+    """Unit tests for ScheduledTriggerService.validate_trigger_configs static method."""
+
+    def test_valid_timezone_passes(self) -> None:
+        definition = {
+            "triggers": [
+                {
+                    "id": "t1",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 * * * *", "timezone": "UTC"},
+                }
+            ]
+        }
+        ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_invalid_timezone_raises(self) -> None:
+        definition = {
+            "triggers": [
+                {
+                    "id": "t1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 * * * *",
+                        "timezone": "Fake/Timezone",
+                    },
+                }
+            ]
+        }
+        with pytest.raises(TriggerValidationError, match=r"Invalid.*scheduled trigger config"):
+            ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_no_scheduled_triggers_passes(self) -> None:
+        definition = {
+            "triggers": [
+                {"id": "t1", "type": "manual_trigger", "parameters": {}},
+            ]
+        }
+        ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_missing_trigger_id_skipped(self) -> None:
+        definition = {
+            "triggers": [
+                {
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 * * * *", "timezone": "Fake/Tz"},
+                }
+            ]
+        }
+        ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_null_timezone_passes(self) -> None:
+        definition = {
+            "triggers": [
+                {
+                    "id": "t1",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 * * * *", "timezone": None},
+                }
+            ]
+        }
+        ScheduledTriggerService.validate_trigger_configs(definition)
