@@ -1199,7 +1199,7 @@ class TestScriptNodesGate:
         try:
             with (
                 patch(
-                    "nexus.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                    "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
                 ) as mock_exec,
                 pytest.raises(ApplicationError),
             ):
