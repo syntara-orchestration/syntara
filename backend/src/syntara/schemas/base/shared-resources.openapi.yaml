@@ -320,6 +320,7 @@ components:
       name: name
       in: query
       required: false
+      x-spec-only: true
       style: deepObject
       explode: true
       schema:
@@ -366,6 +367,7 @@ components:
       name: created_at
       in: query
       required: false
+      x-spec-only: true
       style: deepObject
       explode: true
       schema:
@@ -405,6 +407,7 @@ components:
       name: updated_at
       in: query
       required: false
+      x-spec-only: true
       style: deepObject
       explode: true
       schema:

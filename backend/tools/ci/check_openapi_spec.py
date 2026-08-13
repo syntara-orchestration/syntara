@@ -63,6 +63,16 @@ def _strip_schema_description(param: dict) -> dict:
     return param
 
 
+def _is_spec_only(obj: object) -> bool:
+    """Return True if a parameter object is marked as spec-only."""
+    return isinstance(obj, dict) and obj.get("x-spec-only") is True
+
+
+def _strip_spec_only_params(items: list) -> list:
+    """Remove parameters marked with x-spec-only from a parameter list."""
+    return [item for item in items if not _is_spec_only(item)]
+
+
 def _normalize_for_display(obj: object) -> object:
     """Strip ignored fields from parameter objects before rendering the diff.
 
@@ -76,7 +86,7 @@ def _normalize_for_display(obj: object) -> object:
             obj = _strip_schema_description(obj)
         return {k: _normalize_for_display(v) for k, v in obj.items() if k not in _EXCLUDED_OPERATION_KEYS}
     if isinstance(obj, list):
-        return [_normalize_for_display(item) for item in obj]
+        return [_normalize_for_display(item) for item in _strip_spec_only_params(obj)]
     return obj
 
 
@@ -91,7 +101,7 @@ def _normalize_for_comparison(obj: object) -> object:
             if k not in _EXCLUDED_OPERATION_KEYS
         }
     if isinstance(obj, list):
-        return [_normalize_for_comparison(item) for item in obj]
+        return [_normalize_for_comparison(item) for item in _strip_spec_only_params(obj)]
     return obj
 
 
