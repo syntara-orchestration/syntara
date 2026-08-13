@@ -19,7 +19,7 @@ from temporalio.worker import (
 )
 
 with workflow.unsafe.imports_passed_through():
-    from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, HEADER_SIGNED_ID, verify_workflow
+    from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_workflow
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -35,14 +35,8 @@ class _WorkflowAuthInboundInterceptor(WorkflowInboundInterceptor):
         # workflow call graph and cannot be faked by an external client.
         if info.parent is None:
             auth_payload = input.headers.get(HEADER_NAME)
-            # Use the signed base ID from the header if present.  Temporal
-            # Schedules append a timestamp suffix to the action's workflow ID,
-            # so info.workflow_id won't match the ID that was signed at publish
-            # time.  For direct starts the signed ID equals info.workflow_id.
-            signed_id_payload = input.headers.get(HEADER_SIGNED_ID)
-            signed_id = signed_id_payload.data.decode() if signed_id_payload else info.workflow_id
             if auth_payload is None or not verify_workflow(
-                signed_id, info.workflow_type, input.args, auth_payload.data
+                info.workflow_id, info.workflow_type, input.args, auth_payload.data
             ):
                 logger.warning(
                     "Rejected unauthorized workflow execution",
