@@ -225,8 +225,8 @@ class TestSyncIdpGroups:
 
     @pytest.mark.asyncio
     async def test_denies_login_on_jmespath_runtime_error(self):
-        """Should return False when JMESPath extraction fails at runtime."""
-        from unittest.mock import patch
+        """Should return False and clear stale memberships when JMESPath extraction fails."""
+        from unittest.mock import AsyncMock, patch
 
         user = _make_user()
         provider_id = uuid4()
@@ -235,12 +235,14 @@ class TestSyncIdpGroups:
         config = _make_config(group_jmespath_expression="groups[*]")
         db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "admin", nexus_group_id)])
 
-        # Simulate a JMESPath runtime error (e.g., corrupted claims object)
-        with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
+        mock_diff = AsyncMock()
+        with (
+            patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")),
+            patch("syntara.auth.services.idp_group_sync._apply_group_membership_diff", mock_diff),
+        ):
             result = await sync_idp_groups(db, user, identity, {"groups": ["admin"]}, config)
         assert result is False
-        # Mapping entries query + _apply_group_membership_diff (clears stale IdP groups)
-        assert db.exec.call_count >= 2
+        mock_diff.assert_awaited_once_with(db, user.id, provider_id, set(), username=user.username)
 
     @pytest.mark.asyncio
     async def test_processes_matching_groups(self):

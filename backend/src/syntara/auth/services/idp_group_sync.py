@@ -275,6 +275,12 @@ async def sync_idp_groups(
     if aap_role_mapping:
         aap_group_ids = await _resolve_aap_role_groups(db, raw_merged_claims, user.id, config)
         if aap_group_ids is None:
+            logger.warning(
+                "AAP role validation failed — clearing stale IdP-managed groups before denying login",
+                user_id=str(user.id),
+                provider_id=str(provider_id),
+            )
+            await _apply_group_membership_diff(db, user.id, provider_id, desired_group_ids, username=user.username)
             return False
         desired_group_ids = desired_group_ids | aap_group_ids
         aap_validated = True

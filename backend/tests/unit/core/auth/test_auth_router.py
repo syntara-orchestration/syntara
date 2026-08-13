@@ -1287,18 +1287,22 @@ class TestVerifyIdpTestPermission:
 
 
 @pytest.mark.usefixtures("_mock_audit_dispatcher", "_mock_audit_emission")
-class TestResolveAndLoginUserRollback:
-    """Tests for rollback behavior when group matching denies login."""
+class TestResolveAndLoginUserDenyPath:
+    """Tests for commit behavior when group matching denies login.
+
+    Membership revocation must be committed (not rolled back) so stale
+    IdP-managed groups do not survive a denied login attempt.
+    """
 
     @pytest.mark.asyncio
     @patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock)
     @patch("syntara.auth.router._resolve_oidc_user", new_callable=AsyncMock)
-    async def test_rollback_on_no_group_match(
+    async def test_commits_membership_revocation_on_no_group_match(
         self,
         mock_resolve: AsyncMock,
         mock_sync: AsyncMock,
     ) -> None:
-        """Should call db.rollback() when no groups matched and user has no other groups."""
+        """Should call db.commit() when no groups matched so membership clear persists."""
         from syntara.auth.router import _resolve_and_login_user
         from syntara.identity_providers.models.identity_provider import IdentityProvider
 
@@ -1326,7 +1330,8 @@ class TestResolveAndLoginUserRollback:
         with pytest.raises(OIDCCallbackError):
             await _resolve_and_login_user(db, {"email": "t@t.com", "sub": "sub-1"}, {}, provider, None)
 
-        db.rollback.assert_called_once()
+        db.commit.assert_awaited_once()
+        db.rollback.assert_not_called()
 
 
 class TestLoginAuditEvents:
