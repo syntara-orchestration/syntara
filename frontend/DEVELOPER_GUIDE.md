@@ -81,7 +81,7 @@ The `syntara-contracts` package contains auto-generated TypeScript types from th
 
 ### Backend Access
 
-- Local clone of the [nexus backend](https://github.com/syntara-orchestration/syntara) repository
+- Local clone of the [syntara backend](https://github.com/syntara-orchestration/syntara) repository
 - The backend repo should be at a sibling path or you'll need to adjust the paths below
 
 ### Updating Contracts

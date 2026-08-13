@@ -159,7 +159,7 @@ npm run tsc                # Type check only
 
 ## Connecting to Real Backend
 
-To use the real Nexus backend instead of the mock API:
+To use the real backend instead of the mock API:
 
 1. The backend is available at `../backend/` in this monorepo
 2. Follow the backend README (`../backend/README.md`) to start the API server

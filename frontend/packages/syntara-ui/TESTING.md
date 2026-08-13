@@ -273,7 +273,7 @@ SYNTARA_E2E_PORT=5174 SYNTARA_E2E_API_PORT=3301 npm run e2e
 
 ### Real Backend Mode
 
-To test against the real Nexus backend instead of the mock API:
+To test against the real backend instead of the mock API:
 
 1. Start the real backend (see backend repo README)
 2. Run tests:

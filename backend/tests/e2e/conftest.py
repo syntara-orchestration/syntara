@@ -2,7 +2,7 @@
 
 Loads orchestrator_test_sdk.e2e.fixtures which provides:
 - autouse fixtures: reset_async_client, _wait_for_api
-- session fixtures: nexus_client (with _AutoRefreshAuth), syntara_api, viewer_*, auditor_*
+- session fixtures: syntara_client (with _AutoRefreshAuth), syntara_api, viewer_*, auditor_*
 - factory fixtures: integration_factory, workflow_factory, cleanup_workflows, local_user_factory
 - helper fixtures: first_project_id, mcp_integration_id, syntara_api_admin_group_id, etc.
 

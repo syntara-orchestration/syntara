@@ -53,7 +53,7 @@ def mixed_scopes_env(
     create_user: UserFactory,
     assign_system_role: UserRoleAssignmentFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ):
     """Two projects; user gets global read + project-a create."""
     # Create projects
@@ -80,7 +80,7 @@ def mixed_scopes_env(
     assign_system_role(admin_api, user_id, global_role)
     assign_project_role_to_user(admin_api, proj_a_id, user_id, project_role_name)
 
-    user_api = api_for(nexus_base_url, name, password)
+    user_api = api_for(syntara_base_url, name, password)
     return {
         "proj_a_id": proj_a_id,
         "proj_b_id": proj_b_id,
