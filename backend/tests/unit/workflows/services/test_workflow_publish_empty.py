@@ -670,10 +670,10 @@ class TestAAP87629RegressionPublishInvalidTimezone:
     """Regression tests for AAP-87629: publish with invalid scheduled trigger config.
 
     Invalid IANA timezones are rejected by ``workflow_validator.collect_findings``
-    (via the module-level ``_collect_scheduled_trigger_config_findings`` helper in
-    ``workflow_definition.py``, which independently applies the same
-    ``ScheduledTriggerConfig`` checks as ``ScheduledTriggerService.validate_trigger_configs``)
-    before any publish mutation — so verify and publish share one semantic contract.
+    (via ``_collect_scheduled_trigger_config_findings``) before any publish
+    mutation. ``ScheduledTriggerService.validate_trigger_configs`` is a
+    raise-first wrapper over that same helper, so verify, publish, and
+    Temporal sync share one semantic contract.
     """
 
     @pytest.mark.asyncio
@@ -770,7 +770,10 @@ class TestAAP87629RegressionPublishInvalidTimezone:
 
 
 class TestAAP87629RegressionValidateTriggerConfigs:
-    """Unit tests for ScheduledTriggerService.validate_trigger_configs static method."""
+    """Unit tests for ScheduledTriggerService.validate_trigger_configs static method.
+
+    This method is a raise-first wrapper over ``_collect_scheduled_trigger_config_findings``.
+    """
 
     def test_valid_timezone_passes(self) -> None:
         definition = {
@@ -821,6 +824,52 @@ class TestAAP87629RegressionValidateTriggerConfigs:
         }
         with pytest.raises(TriggerValidationError, match=r"Invalid.*scheduled trigger config.*<missing id>"):
             ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_non_string_trigger_id_uses_missing_id_placeholder(self) -> None:
+        """Non-string ids share the same display policy as collect_findings."""
+        definition = {
+            "triggers": [
+                {
+                    "id": 123,
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 * * * *", "timezone": "Fake/Tz"},
+                }
+            ]
+        }
+        with pytest.raises(TriggerValidationError, match=r"<missing id>"):
+            ScheduledTriggerService.validate_trigger_configs(definition)
+
+    def test_raise_message_matches_collect_findings(self) -> None:
+        """Raise-first wrapper must surface the same message as the shared helper."""
+        from syntara.workflows.validators import workflow_validator
+        from syntara.workflows.validators.workflow_definition import _collect_scheduled_trigger_config_findings
+
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "shared-path-wf",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 * * * *",
+                        "timezone": "Fake/Timezone",
+                    },
+                }
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        }
+        findings = _collect_scheduled_trigger_config_findings(definition)
+        assert findings
+        with pytest.raises(TriggerValidationError) as exc_info:
+            ScheduledTriggerService.validate_trigger_configs(definition)
+        assert exc_info.value.message == findings[0].message
+        result = workflow_validator.collect_findings(definition)
+        scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]
+        assert scheduled
+        assert scheduled[0].message == findings[0].message
 
     def test_null_timezone_passes(self) -> None:
         definition = {

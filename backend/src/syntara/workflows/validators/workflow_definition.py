@@ -390,10 +390,11 @@ def _collect_scheduled_trigger_config_findings(
 ) -> list[ValidationFinding]:
     """Validate scheduled trigger configs beyond JSON Schema (e.g. IANA timezones).
 
-    Uses the same ``ScheduledTriggerConfig`` model as Temporal sync so
-    ``/workflows/validate`` and publish share one semantic contract.
-    Accumulates one finding per invalid trigger (with ``node_id`` /
-    ``field_path`` for Builder highlighting).
+    Single owner of the scheduled-trigger ``ScheduledTriggerConfig`` walk.
+    Used by ``WorkflowValidator.collect_findings`` (accumulate all findings
+    with ``node_id`` / ``field_path`` for Builder) and by
+    ``ScheduledTriggerService.validate_trigger_configs`` (raise on the first
+    finding) so verify, publish, and Temporal sync cannot drift.
     """
     findings: list[ValidationFinding] = []
     for trigger in workflow_definition.get("triggers", []):
@@ -401,8 +402,9 @@ def _collect_scheduled_trigger_config_findings(
             continue
         if trigger.get("type") != NodeType.SCHEDULED_TRIGGER:
             continue
-        node_id = trigger.get("id")
-        display_id = node_id if isinstance(node_id, str) and node_id else "<missing id>"
+        raw_id = trigger.get("id")
+        node_id = raw_id if isinstance(raw_id, str) and raw_id else None
+        display_id = node_id or "<missing id>"
         config = trigger.get("parameters") or {}
         if not isinstance(config, dict):
             config = {}
@@ -420,7 +422,7 @@ def _collect_scheduled_trigger_config_findings(
                     severity=ValidationSeverity.error,
                     category=ValidationCategory.schema_violation,
                     message=f"Invalid scheduled trigger config for node '{display_id}': {exc}",
-                    node_id=node_id if isinstance(node_id, str) and node_id else None,
+                    node_id=node_id,
                     field_path=field_path,
                 )
             )

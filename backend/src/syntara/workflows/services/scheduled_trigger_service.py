@@ -38,6 +38,7 @@ from syntara.workflows.utils.schedule_parser import (
     build_schedule_id,
     config_to_temporal_schedule,
 )
+from syntara.workflows.validators.workflow_definition import _collect_scheduled_trigger_config_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -200,29 +201,20 @@ class ScheduledTriggerService:
     def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
         """Pre-validate all scheduled trigger configs without contacting Temporal.
 
-        Enforces semantic constraints the JSON schema does not (e.g. IANA
-        timezone names). ``WorkflowValidator.collect_findings`` applies the
-        same ``ScheduledTriggerConfig`` checks (accumulating findings); this
-        method remains the raise-first guard used by ``sync_scheduled_triggers``.
+        Raise-first wrapper around
+        ``_collect_scheduled_trigger_config_findings`` so Temporal sync and
+        ``WorkflowValidator.collect_findings`` share one walk / one id and
+        config-handling policy. Used by ``sync_scheduled_triggers`` as a
+        defense-in-depth guard after publish's pre-mutation
+        ``collect_findings`` check.
 
         Raises:
             TriggerValidationError: If any scheduled trigger config is invalid.
 
         """
-        triggers = workflow_definition.get("triggers", [])
-        for trigger in triggers:
-            if not isinstance(trigger, dict):
-                continue
-            if trigger.get("type") == NodeType.SCHEDULED_TRIGGER:
-                node_id = trigger.get("id") or "<missing id>"
-                config = trigger.get("parameters") or {}
-                if not isinstance(config, dict):
-                    config = {}
-                try:
-                    ScheduledTriggerConfig.model_validate(config)
-                except ValidationError as e:
-                    msg = f"Invalid scheduled trigger config for node '{node_id}': {e}"
-                    raise TriggerValidationError(msg) from e
+        findings = _collect_scheduled_trigger_config_findings(workflow_definition)
+        if findings:
+            raise TriggerValidationError(findings[0].message)
 
     async def sync_scheduled_triggers(
         self,
