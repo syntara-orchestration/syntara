@@ -287,8 +287,8 @@ IdentityProviderConfiguration = Annotated[
 ]
 
 
-class OIDCConfigurationPatch(BaseConsumerConfiguration):
-    """Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
+class OIDCConfigurationUpdate(BaseConsumerConfiguration):
+    """Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
 
     provider_type: Literal["oidc"] = "oidc"
 
@@ -383,9 +383,9 @@ class OIDCConfigurationPatch(BaseConsumerConfiguration):
         return frozenset({"client_secret"})
 
 
-IdentityProviderConfigurationPatchTypes = OIDCConfigurationPatch
-IdentityProviderConfigurationPatch = Annotated[
-    IdentityProviderConfigurationPatchTypes,
+IdentityProviderConfigurationUpdateTypes = OIDCConfigurationUpdate
+IdentityProviderConfigurationUpdate = Annotated[
+    IdentityProviderConfigurationUpdateTypes,
     Field(discriminator="provider_type"),
 ]
 

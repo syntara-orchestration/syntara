@@ -77,7 +77,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -120,7 +120,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -142,9 +142,9 @@ paths:
       security:
         - bearerAuth: []
     patch:
-      summary: Patch identity provider
-      description: Patch an identity provider.
-      operationId: patch_identity_provider
+      summary: Update identity provider
+      description: Update an identity provider.
+      operationId: update_identity_provider
       x-app-permission:
         resource: identity-provider
         action: update
@@ -161,14 +161,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IdentityProviderPatch'
+              $ref: '#/components/schemas/IdentityProviderUpdate'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -249,7 +249,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -628,10 +628,10 @@ components:
           title: Disable Tls Verify
           description: Disable TLS certificate verification for requests to this identity provider (insecure)
 
-    OIDCConfigurationPatch:
+    OIDCConfigurationUpdate:
       type: object
-      title: OIDCConfigurationPatch
-      description: "Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted)."
+      title: OIDCConfigurationUpdate
+      description: "Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."
       additionalProperties: false
       required:
         - issuer_url
@@ -803,9 +803,9 @@ components:
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
 
-    IdentityProviderPatch:
+    IdentityProviderUpdate:
       type: object
-      title: IdentityProviderPatch
+      title: IdentityProviderUpdate
       description: Schema for partially updating an identity provider.
       additionalProperties: false
       properties:
@@ -831,9 +831,9 @@ components:
             - discriminator:
                 propertyName: provider_type
                 mapping:
-                  oidc: '#/components/schemas/OIDCConfigurationPatch'
+                  oidc: '#/components/schemas/OIDCConfigurationUpdate'
               oneOf:
-                - $ref: '#/components/schemas/OIDCConfigurationPatch'
+                - $ref: '#/components/schemas/OIDCConfigurationUpdate'
             - type: 'null'
         enabled:
           title: Enabled
@@ -842,15 +842,15 @@ components:
             - type: boolean
             - type: 'null'
 
-    IdentityProviderResponse:
-      title: IdentityProviderResponse
+    IdentityProviderRead:
+      title: IdentityProviderRead
       description: Schema for IdentityProvider response with configuration details (excludes secrets).
       additionalProperties: false
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
         - type: object
-          title: IdentityProviderResponse
+          title: IdentityProviderRead
           required:
             - configuration
           properties:
@@ -875,7 +875,7 @@ components:
             resources:
               type: array
               items:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
       title: IdentityProviderListResponse
       description: Paginated list response for identity providers.
 

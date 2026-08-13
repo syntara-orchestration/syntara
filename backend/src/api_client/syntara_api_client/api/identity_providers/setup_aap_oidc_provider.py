@@ -7,7 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.aapoidc_setup_request import AAPOIDCSetupRequest
 from ...models.error_data import ErrorData
-from ...models.identity_provider_response import IdentityProviderResponse
+from ...models.identity_provider_read import IdentityProviderRead
 from ...types import Response
 
 
@@ -32,9 +32,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     if response.status_code == 201:
-        response_201 = IdentityProviderResponse.from_dict(response.json())
+        response_201 = IdentityProviderRead.from_dict(response.json())
 
         return response_201
 
@@ -86,7 +86,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -101,7 +101,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: AAPOIDCSetupRequest,
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     """Setup Ansible Automation Platform OIDC provider
 
      Push-button setup: connects to Ansible Automation Platform, creates an OAuth2 application, and
@@ -116,7 +116,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -134,7 +134,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: AAPOIDCSetupRequest,
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     """Setup Ansible Automation Platform OIDC provider
 
      Push-button setup: connects to Ansible Automation Platform, creates an OAuth2 application, and
@@ -149,7 +149,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return sync_detailed(
@@ -162,7 +162,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: AAPOIDCSetupRequest,
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     """Setup Ansible Automation Platform OIDC provider
 
      Push-button setup: connects to Ansible Automation Platform, creates an OAuth2 application, and
@@ -177,7 +177,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -193,7 +193,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: AAPOIDCSetupRequest,
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     """Setup Ansible Automation Platform OIDC provider
 
      Push-button setup: connects to Ansible Automation Platform, creates an OAuth2 application, and
@@ -208,7 +208,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return (

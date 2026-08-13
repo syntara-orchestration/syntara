@@ -20,9 +20,9 @@ from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.integration_create import IntegrationCreate
-from syntara_api_client.models.integration_patch import IntegrationPatch
 from syntara_api_client.models.integration_scope import IntegrationScope
 from syntara_api_client.models.integration_type import IntegrationType
+from syntara_api_client.models.integration_update import IntegrationUpdate
 from syntara_api_client.models.mcp_server_configuration_input import MCPServerConfigurationInput
 from syntara_api_client.models.project_create import ProjectCreate
 
@@ -238,7 +238,7 @@ class TestNarrowGlobalToProjectScoped:
 
             syntara_api.integrations.update(
                 integration_id=integration_id,
-                body=IntegrationPatch(scope=IntegrationScope.PROJECT),
+                body=IntegrationUpdate(scope=IntegrationScope.PROJECT),
             ).assert_and_get()
             syntara_api.integrations.assign_project(
                 integration_id=integration_id,
@@ -345,7 +345,7 @@ class TestExecutionTimeIntegrationStateErrors:
 
             syntara_api.integrations.update(
                 integration_id=integration_id,
-                body=IntegrationPatch(enabled=False),
+                body=IntegrationUpdate(enabled=False),
             ).assert_and_get()
 
             execution = syntara_api.executions.create(

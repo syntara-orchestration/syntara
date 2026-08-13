@@ -13,11 +13,11 @@ from ..models.service_account_credential_status import ServiceAccountCredentialS
 from ..models.service_account_credential_type import ServiceAccountCredentialType
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="SACredentialRead")
+T = TypeVar("T", bound="ServiceAccountCredentialRead")
 
 
 @_attrs_define
-class SACredentialRead:
+class ServiceAccountCredentialRead:
     """Schema for credential responses (excludes secrets).
 
     Attributes:
@@ -217,7 +217,7 @@ class SACredentialRead:
 
         updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
-        sa_credential_read = cls(
+        service_account_credential_read = cls(
             id=id,
             service_account_id=service_account_id,
             credential_type=credential_type,
@@ -233,8 +233,8 @@ class SACredentialRead:
             updated_by=updated_by,
         )
 
-        sa_credential_read.additional_properties = d
-        return sa_credential_read
+        service_account_credential_read.additional_properties = d
+        return service_account_credential_read
 
     @property
     def additional_keys(self) -> list[str]:

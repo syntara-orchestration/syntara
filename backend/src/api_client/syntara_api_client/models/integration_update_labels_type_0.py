@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="IntegrationPatchLabelsType0")
+T = TypeVar("T", bound="IntegrationUpdateLabelsType0")
 
 
 @_attrs_define
-class IntegrationPatchLabelsType0:
+class IntegrationUpdateLabelsType0:
     """ """
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
@@ -24,10 +24,10 @@ class IntegrationPatchLabelsType0:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        integration_patch_labels_type_0 = cls()
+        integration_update_labels_type_0 = cls()
 
-        integration_patch_labels_type_0.additional_properties = d
-        return integration_patch_labels_type_0
+        integration_update_labels_type_0.additional_properties = d
+        return integration_update_labels_type_0
 
     @property
     def additional_keys(self) -> list[str]:
