@@ -63,7 +63,7 @@ export const CommitSchema = z.object({
  */
 export const EnvironmentSchema = z.object({
   githubToken: z.string().min(1, 'GITHUB_TOKEN is required'),
-  slackWebhookUrl: z.string().url('SLACK_WEBHOOK_URL must be a valid URL'),
+  slackWebhookUrl: z.string().url('SLACK_CI_MONITORING_WEBHOOK_URL must be a valid URL'),
   repository: z.string().min(1, 'GITHUB_REPOSITORY is required'),
   runId: z.number().int().positive('GITHUB_RUN_ID must be a positive integer'),
   headRef: z.string().optional(),

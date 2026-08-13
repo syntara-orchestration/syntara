@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getEnvironment } from '../env.js';
 
 describe('getEnvironment', () => {
@@ -16,7 +16,7 @@ describe('getEnvironment', () => {
 
   it('returns validated environment when all required vars are present', () => {
     process.env.GITHUB_TOKEN = 'test-token';
-    process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.com/test-webhook';
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test-webhook';
     process.env.GITHUB_REPOSITORY = 'owner/repo';
     process.env.GITHUB_RUN_ID = '12345';
     process.env.GITHUB_HEAD_REF = 'gh-readonly-queue/devel/pr-123-abc';
@@ -34,7 +34,7 @@ describe('getEnvironment', () => {
 
   it('throws when GITHUB_TOKEN is missing', () => {
     delete process.env.GITHUB_TOKEN;
-    process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.com/test';
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test';
     process.env.GITHUB_REPOSITORY = 'owner/repo';
     process.env.GITHUB_RUN_ID = '12345';
 
@@ -42,9 +42,9 @@ describe('getEnvironment', () => {
     expect(() => getEnvironment()).toThrow('githubToken');
   });
 
-  it('throws when SLACK_WEBHOOK_URL is missing', () => {
+  it('throws when SLACK_CI_MONITORING_WEBHOOK_URL is missing', () => {
     process.env.GITHUB_TOKEN = 'test-token';
-    delete process.env.SLACK_WEBHOOK_URL;
+    delete process.env.SLACK_CI_MONITORING_WEBHOOK_URL;
     process.env.GITHUB_REPOSITORY = 'owner/repo';
     process.env.GITHUB_RUN_ID = '12345';
 
@@ -54,7 +54,7 @@ describe('getEnvironment', () => {
 
   it('throws when GITHUB_REPOSITORY is missing', () => {
     process.env.GITHUB_TOKEN = 'test-token';
-    process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.com/test';
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test';
     delete process.env.GITHUB_REPOSITORY;
     process.env.GITHUB_RUN_ID = '12345';
 
@@ -64,7 +64,7 @@ describe('getEnvironment', () => {
 
   it('throws when GITHUB_RUN_ID is missing', () => {
     process.env.GITHUB_TOKEN = 'test-token';
-    process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.com/test';
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test';
     process.env.GITHUB_REPOSITORY = 'owner/repo';
     delete process.env.GITHUB_RUN_ID;
 
@@ -74,7 +74,7 @@ describe('getEnvironment', () => {
 
   it('allows missing GITHUB_HEAD_REF for queue health poll workflow', () => {
     process.env.GITHUB_TOKEN = 'test-token';
-    process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.com/test';
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test';
     process.env.GITHUB_REPOSITORY = 'owner/repo';
     process.env.GITHUB_RUN_ID = '12345';
     delete process.env.GITHUB_HEAD_REF;

@@ -1,4 +1,4 @@
-import { beforeAll, afterEach, afterAll, beforeEach } from 'vitest';
+import { beforeAll, afterEach, afterAll } from 'vitest';
 import { http, HttpResponse, graphql } from 'msw';
 import { setupServer } from 'msw/node';
 
@@ -9,7 +9,7 @@ import { setupServer } from 'msw/node';
  */
 const mockEnv = {
   GITHUB_TOKEN: 'test-token-not-real',
-  SLACK_WEBHOOK_URL: 'https://hooks.example.com/slack-webhook-test',
+  SLACK_CI_MONITORING_WEBHOOK_URL: 'https://hooks.example.com/slack-webhook-test',
   GITHUB_REPOSITORY: 'owner/repo',
   GITHUB_RUN_ID: '12345',
   GITHUB_HEAD_REF: 'gh-readonly-queue/devel/pr-42-abc123',
