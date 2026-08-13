@@ -13,12 +13,12 @@ from ..models.service_account_credential_status import ServiceAccountCredentialS
 from ..models.service_account_credential_type import ServiceAccountCredentialType
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="SACredentialCreateResponse")
+T = TypeVar("T", bound="ServiceAccountCredentialRotateResponse")
 
 
 @_attrs_define
-class SACredentialCreateResponse:
-    """Schema for the create response — includes one-time plaintext secret(s).
+class ServiceAccountCredentialRotateResponse:
+    """Schema for the rotate response — same shape as create response.
 
     Attributes:
         id (UUID):
@@ -236,7 +236,7 @@ class SACredentialCreateResponse:
 
         client_secret = _parse_client_secret(d.pop("client_secret", UNSET))
 
-        sa_credential_create_response = cls(
+        service_account_credential_rotate_response = cls(
             id=id,
             service_account_id=service_account_id,
             credential_type=credential_type,
@@ -253,8 +253,8 @@ class SACredentialCreateResponse:
             client_secret=client_secret,
         )
 
-        sa_credential_create_response.additional_properties = d
-        return sa_credential_create_response
+        service_account_credential_rotate_response.additional_properties = d
+        return service_account_credential_rotate_response
 
     @property
     def additional_keys(self) -> list[str]:

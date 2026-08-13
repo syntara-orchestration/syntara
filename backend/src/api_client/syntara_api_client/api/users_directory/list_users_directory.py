@@ -52,7 +52,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/users_directory",
+        "url": "/users/directory",
         "params": params,
     }
 

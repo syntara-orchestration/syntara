@@ -55,7 +55,9 @@ jobs:
   build:
     needs: prepare
     uses: ./.github/workflows/_build-backend-image.yml
-    secrets: inherit
+    secrets:
+      RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
+      RH_REGISTRY_TOKEN: ${{ secrets.RH_REGISTRY_TOKEN }}
     with:
       ref: ${{ needs.prepare.outputs.ref }}
       pr_number: ${{ needs.prepare.outputs.pr_number }}

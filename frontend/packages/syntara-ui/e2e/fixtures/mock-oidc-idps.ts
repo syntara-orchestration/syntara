@@ -7,7 +7,7 @@
  */
 import type { AuthAPI, IdentityProvidersAPI } from '@syntara/contracts'
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 type AuthProviderInfo = AuthAPI.components['schemas']['AuthProviderInfo']
 
 export const KEYCLOAK_OIDC_IDP: IdentityProvider = {

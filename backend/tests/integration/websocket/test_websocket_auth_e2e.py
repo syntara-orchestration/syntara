@@ -350,7 +350,7 @@ class TestWebSocketAuthorizationE2E:
 
 # NOTE: Global revocation E2E tests were removed from this file.
 # With ticket-based auth, global revocation is enforced at ticket issuance
-# time (POST /auth/ws-ticket) via the standard auth middleware, which has
+# time (POST /auth/ws_ticket) via the standard auth middleware, which has
 # its own comprehensive test suite. Testing the middleware's revocation
 # check here is redundant and causes pytest-asyncio/sync_test_client
 # event-loop conflicts (sync HTTP calls within async DB fixture context).

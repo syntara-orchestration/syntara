@@ -984,11 +984,13 @@ jobs:
 
   snyk-sast:
     uses: ./.github/workflows/sast-snyk.yml
-    secrets: inherit
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   snyk-sca:
     uses: ./.github/workflows/sca-snyk.yml
-    secrets: inherit
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   required-checks:
     name: (Backend) Required Checks

@@ -14,13 +14,13 @@ from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.nexus_router import NexusRouter
 from syntara.service_accounts.credential_schemas import (
-    SACredentialCreate,
-    SACredentialCreateResponse,
-    SACredentialListParams,
-    SACredentialListResponse,
-    SACredentialRead,
-    SACredentialRotateRequest,
-    SACredentialRotateResponse,
+    ServiceAccountCredentialCreate,
+    ServiceAccountCredentialCreateResponse,
+    ServiceAccountCredentialListParams,
+    ServiceAccountCredentialListResponse,
+    ServiceAccountCredentialRead,
+    ServiceAccountCredentialRotateRequest,
+    ServiceAccountCredentialRotateResponse,
 )
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.service_accounts.services.credential_service import ServiceAccountCredentialService
@@ -78,8 +78,8 @@ def get_credential_service(
 
 @router.post(
     "",
-    summary="Create credential",
-    response_model=SACredentialCreateResponse,
+    summary="Create service account credential",
+    response_model=ServiceAccountCredentialCreateResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(_sa_update)],
     operation_id="create_service_account_credential",
@@ -88,9 +88,9 @@ def get_credential_service(
 @audit(EventCategory.USER_ACTION, event_action="sa_credential_create")
 async def create_credential(
     service_account_id: UUID,
-    request: SACredentialCreate,
+    request: ServiceAccountCredentialCreate,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-) -> SACredentialCreateResponse:
+) -> ServiceAccountCredentialCreateResponse:
     """Create a new credential for a service account; returns the one-time plaintext secret."""
     credential, plaintext_secret = await service.create_credential(
         service_account_id=service_account_id,
@@ -103,7 +103,7 @@ async def create_credential(
 
 @router.get(
     "",
-    summary="List credentials",
+    summary="List service account credentials",
     dependencies=[Depends(_sa_read)],
     operation_id="list_service_account_credentials",
     response_description="List of credentials",
@@ -112,8 +112,8 @@ async def list_credentials(
     service_account_id: UUID,
     request: Request,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-    params: Annotated[SACredentialListParams, Query()],
-) -> SACredentialListResponse:
+    params: Annotated[ServiceAccountCredentialListParams, Query()],
+) -> ServiceAccountCredentialListResponse:
     """List credentials for a service account with pagination."""
     return await service.list_credentials(
         service_account_id=service_account_id,
@@ -127,7 +127,7 @@ async def list_credentials(
 
 @router.get(
     "/{credential_id}",
-    summary="Get credential",
+    summary="Get service account credential",
     dependencies=[Depends(_sa_read)],
     operation_id="get_service_account_credential",
     response_description="Credential details",
@@ -136,7 +136,7 @@ async def get_credential(
     service_account_id: UUID,
     credential_id: UUID,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-) -> SACredentialRead:
+) -> ServiceAccountCredentialRead:
     """Get a credential by ID (secret is never included)."""
     credential = await service.get_credential(credential_id, service_account_id=service_account_id)
     return service.to_read(credential)
@@ -144,7 +144,7 @@ async def get_credential(
 
 @router.delete(
     "/{credential_id}",
-    summary="Delete credential",
+    summary="Delete service account credential",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(_sa_delete)],
     operation_id="delete_service_account_credential",
@@ -162,7 +162,7 @@ async def delete_credential(
 
 @router.post(
     "/{credential_id}/rotate",
-    summary="Rotate credential",
+    summary="Rotate service account credential",
     dependencies=[Depends(_sa_rotate_secret)],
     operation_id="rotate_service_account_credential",
     response_description="Credential rotated",
@@ -171,9 +171,9 @@ async def delete_credential(
 async def rotate_credential(
     service_account_id: UUID,
     credential_id: UUID,
-    request: SACredentialRotateRequest,
+    request: ServiceAccountCredentialRotateRequest,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-) -> SACredentialRotateResponse:
+) -> ServiceAccountCredentialRotateResponse:
     """Rotate a credential's secret; returns the new one-time plaintext secret."""
     credential, plaintext_secret = await service.rotate_credential(
         credential_id,
@@ -185,7 +185,7 @@ async def rotate_credential(
 
 @router.post(
     "/{credential_id}/disable",
-    summary="Disable credential",
+    summary="Disable service account credential",
     dependencies=[Depends(_sa_disable)],
     operation_id="disable_service_account_credential",
     response_description="Credential disabled",
@@ -195,7 +195,7 @@ async def disable_credential(
     service_account_id: UUID,
     credential_id: UUID,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-) -> SACredentialRead:
+) -> ServiceAccountCredentialRead:
     """Set a credential's status to disabled."""
     credential = await service.disable_credential(credential_id, service_account_id=service_account_id)
     return service.to_read(credential)
@@ -203,7 +203,7 @@ async def disable_credential(
 
 @router.post(
     "/{credential_id}/enable",
-    summary="Enable credential",
+    summary="Enable service account credential",
     dependencies=[Depends(_sa_enable)],
     operation_id="enable_service_account_credential",
     response_description="Credential enabled",
@@ -213,7 +213,7 @@ async def enable_credential(
     service_account_id: UUID,
     credential_id: UUID,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-) -> SACredentialRead:
+) -> ServiceAccountCredentialRead:
     """Set a credential's status to active."""
     credential = await service.enable_credential(credential_id, service_account_id=service_account_id)
     return service.to_read(credential)
