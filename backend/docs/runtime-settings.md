@@ -1,5 +1,7 @@
 # Runtime Settings
 
+> **Not for sensitive data.** Runtime settings are stored unencrypted in PostgreSQL. Sensitive application data (e.g. API keys, tokens) belongs in the credential storage system. Sensitive system configuration (e.g. database connection passwords) must be secured at the infrastructure level, not stored as a runtime setting.
+
 ## Overview
 
 Runtime settings are database-backed configuration values that can be changed without redeploying the application. Settings are stored in PostgreSQL and accessible to other backend code via `SettingsCache`, and manageable by administrators through the REST API and Settings UI page.
@@ -13,7 +15,7 @@ Since Runtime settings may be written by multiple clients, they employ a version
 Key design points:
 
 - **No migration needed for new settings** -- add a `SettingDefinition` to the catalog and run the post-migration seeder
-- **JSONB storage** -- values are stored as native Python types, not strings
+- **JSONB storage** -- values are stored as native Python types, not strings, and are not encrypted -- not suitable for sensitive data like passwords or API keys
 - **Optimistic locking** -- concurrent writes are safe; version conflicts are detected
 - **Two-tier caching** -- L1 in-process dict (zero-latency) plus optional L2 Redis cache (shared across processes), with TTL-based expiry and stale-value fallback
 - **Change notification** -- Redis Pub/Sub for near-real-time propagation, with polling fallback when Redis is unavailable
@@ -54,15 +56,17 @@ Use the typed getter methods to ensure values are validated at read time:
 | `get_bool()` | `bool`  |                                                          |
 | `get()`      | `Any`   | Untyped; use for JSON-type settings or when type is mixed|
 
-Each typed method accepts an optional `default` keyword argument. If the setting is missing or `None` and no default is provided, a `SettingTypeError` is raised. If the stored value has the wrong type, a `SettingTypeError` is also raised.
+Typed getters automatically resolve to the setting's catalog `default_value` when no user-set `value` is present, so call sites don't need to specify a fallback or guard against `None`:
 
 ```python
-# With a fallback default
-timeout = await self.settings.get_int("context_manager.request_timeout_seconds", default=30)
+# Typed getter, returns current value if set, otherwise the catalog default
+timeout = await self.settings.get_int("context_manager.request_timeout_seconds")
 
 # For JSON-type settings, use the untyped get()
 priority_order = await self.settings.get("context_manager.priority_order")
 ```
+
+Prefer this simple, type-safe form over patterns like `timeout = await self.settings.get_int(key) or 30` — the catalog default already covers that case. If the stored value has the wrong type, a `SettingTypeError` is raised.
 
 > **Important**: Always access settings through `get_runtime_settings()`. Using `SettingsCache` ensures your code benefits from two-tier caching and change notification automatically.
 
