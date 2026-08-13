@@ -528,7 +528,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend/packages/syntara-ui
-        run: npx pwc-p run --key="${CURRENTS_RECORD_KEY}" --project-id="${CURRENTS_PROJECT_ID}" --ci-build-id="${CURRENTS_CI_BUILD_ID}" --pwc-batch-size 5 --reporter blob --timeout 120000
+        run: npx pwc-p run --key="${CURRENTS_RECORD_KEY}" --project-id="${CURRENTS_PROJECT_ID}" --ci-build-id="${CURRENTS_CI_BUILD_ID}" --pwc-batch-size 3 --reporter blob --timeout 120000
         env:
           NEXUS_E2E_SKIP_WEB_SERVER: '1'
           NEXUS_E2E_BASE_URL: http://localhost:8080
