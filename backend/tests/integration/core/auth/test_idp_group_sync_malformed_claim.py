@@ -8,7 +8,7 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
-from sqlmodel import col, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.services.idp_group_sync import sync_idp_groups
@@ -16,6 +16,7 @@ from syntara.core.models import Group, User
 from syntara.core.models.group import user_groups, user_idp_groups
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import UserIdentity
+from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 
@@ -52,22 +53,42 @@ async def test_group(test_db_session: AsyncSession, test_user: User) -> Group:
 
 
 @pytest.fixture
-async def users_group(test_db_session: AsyncSession) -> Group:
-    """Load the built-in users group."""
-    result = await test_db_session.exec(
-        select(Group).where(
-            col(Group.name) == "users",
-            col(Group.is_builtin) == True,  # noqa: E712
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
-        )
+async def users_group(test_db_session: AsyncSession, test_user: User) -> Group:
+    """Create the built-in users group required by sync_idp_groups."""
+    group = Group(
+        name="users",
+        description="Built-in users group",
+        is_builtin=True,
+        created_by=test_user.id,
     )
-    return result.one()
+    test_db_session.add(group)
+    await test_db_session.flush()
+    return group
 
 
 @pytest.fixture
-async def provider_id() -> UUID:
+async def identity_provider(test_db_session: AsyncSession, test_user: User) -> IdentityProvider:
+    """Create an identity provider in the database."""
+    provider = IdentityProvider(
+        name=f"test-idp-{uuid4().hex[:8]}",
+        enabled=True,
+        created_by=test_user.id,
+        configuration={
+            "provider_type": "oidc",
+            "issuer_url": "https://idp.example.com",
+            "client_id": f"client-{uuid4().hex[:8]}",
+            "redirect_uri": "http://localhost:8000/callback",
+        },
+    )
+    test_db_session.add(provider)
+    await test_db_session.flush()
+    return provider
+
+
+@pytest.fixture
+async def provider_id(identity_provider: IdentityProvider) -> UUID:
     """Identity provider ID."""
-    return uuid4()
+    return identity_provider.id
 
 
 @pytest.fixture
