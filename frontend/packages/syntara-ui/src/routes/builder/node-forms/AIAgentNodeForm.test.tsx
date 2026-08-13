@@ -313,6 +313,42 @@ describe('AIAgentNodeForm', () => {
     })
   })
 
+  it('after submit, removing a persisted upload detaches without DELETE', async () => {
+    const user = userEvent.setup()
+    const { deleteFileById } = await import('../../../utils/deleteFile')
+    vi.mocked(deleteFileById).mockClear()
+
+    renderWithHeader(
+      <AIAgentNodeForm
+        onSubmit={mockOnSubmit}
+        projectId="project-789"
+        initialData={{ name: 'Agent', llm_model_id: 'model-1', prompt: 'Do stuff' }}
+      />
+    )
+
+    await user.click(screen.getByTestId('upload-files'))
+    await waitFor(() => {
+      expect(screen.getByText('test.txt')).toBeInTheDocument()
+    })
+
+    fireEvent.submit(screen.getByTestId('ai-agent-node-form'))
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileIds: ['server-file-123'],
+        })
+      )
+    })
+
+    vi.mocked(deleteFileById).mockClear()
+    await user.click(screen.getByTestId('remove-server-file-123'))
+
+    await waitFor(() => {
+      expect(screen.queryByText('test.txt')).not.toBeInTheDocument()
+    })
+    expect(deleteFileById).not.toHaveBeenCalled()
+  })
+
   describe('Response Schema', () => {
     it('renders response schema editor', () => {
       renderWithHeader(<AIAgentNodeForm onSubmit={mockOnSubmit} />)

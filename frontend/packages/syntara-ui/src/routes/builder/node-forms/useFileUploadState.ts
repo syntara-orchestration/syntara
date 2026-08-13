@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
 import { useAlerts } from '../../../providers/alerts'
@@ -32,6 +32,10 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
    * After persist, membership is cleared so remove becomes detach-only (like hydrated).
    */
   const [sessionUploadedIds, setSessionUploadedIds] = useState<Set<string>>(() => new Set())
+  /** Synchronous in-flight DELETE guard — state alone can miss double-clicks before re-render. */
+  const deletingFileIdsRef = useRef<Set<string>>(new Set())
+  /** Prevent overlapping select/replace pipelines from interleaving DELETEs and UI clears. */
+  const selectionInFlightRef = useRef(false)
   const { uploadFiles, progress, error } = useFileUploadWithProgress()
   const { showSuccess, showError } = useAlerts()
 
@@ -48,7 +52,15 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
     }),
   ]
 
+  const beginDeleting = useCallback((fileId: string): boolean => {
+    if (deletingFileIdsRef.current.has(fileId)) return false
+    deletingFileIdsRef.current.add(fileId)
+    setDeletingFileIds((prev) => new Set(prev).add(fileId))
+    return true
+  }, [])
+
   const clearDeletingState = useCallback((fileId: string) => {
+    deletingFileIdsRef.current.delete(fileId)
     setDeletingFileIds((prev) => {
       if (!prev.has(fileId)) return prev
       const next = new Set(prev)
@@ -93,7 +105,9 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
   /** Awaitable DELETE for a session blob. Returns true only on success. */
   const deleteSessionBlob = useCallback(
     async (fileId: string, fileName: string): Promise<boolean> => {
-      setDeletingFileIds((prev) => new Set(prev).add(fileId))
+      if (!beginDeleting(fileId)) {
+        return false
+      }
       try {
         await deleteFileById(fileId)
         return true
@@ -104,68 +118,92 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
         clearDeletingState(fileId)
       }
     },
-    [showError, clearDeletingState]
+    [showError, beginDeleting, clearDeletingState]
   )
 
   const handleFilesSelected = useCallback(
     (files: File[]) => {
+      if (selectionInFlightRef.current) return
+      selectionInFlightRef.current = true
+
       detachPromise(
         (async () => {
-          const reUploadNames = new Set(files.map((f) => f.name))
+          try {
+            const reUploadNames = new Set(files.map((f) => f.name))
 
-          // Same-name replace: await DELETE for session uploads before touching UI / starting upload.
-          // Hydrated attachments with the same name are detached locally only (no DELETE).
-          const sessionReplacements = completedFiles.filter(
-            (file) => reUploadNames.has(file.file.name) && file.status === 'success' && sessionUploadedIds.has(file.id)
-          )
+            // Same-name replace: await DELETE for session uploads before touching UI / starting upload.
+            // Hydrated / persisted attachments with the same name are detached locally only (no DELETE).
+            const sessionReplacements = completedFiles.filter(
+              (file) => reUploadNames.has(file.file.name) && file.status === 'success' && sessionUploadedIds.has(file.id)
+            )
 
-          for (const file of sessionReplacements) {
-            const deleted = await deleteSessionBlob(file.id, file.file.name)
-            if (!deleted) {
-              // Keep the old chip and session tracking; do not start replacement upload.
+            // Avoid racing a remove-in-flight DELETE (would double-DELETE / confuse UI).
+            if (sessionReplacements.some((file) => deletingFileIdsRef.current.has(file.id))) {
+              showError({
+                title: 'A file delete is already in progress. Please try again.',
+              })
               return
             }
-            removeLocalFile(file.id)
-          }
 
-          removeFilesByName(reUploadNames)
-          for (const file of completedFiles) {
-            if (reUploadNames.has(file.file.name)) {
-              clearSessionUploadId(file.id)
+            // Sequential DELETEs; defer all UI clears until the batch succeeds.
+            // On first failure: stop further DELETEs, clear only successes (no zombie chips), abort upload.
+            const deletedSuccessfully: UploadedFile[] = []
+            for (const file of sessionReplacements) {
+              const deleted = await deleteSessionBlob(file.id, file.file.name)
+              if (!deleted) {
+                for (const removed of deletedSuccessfully) {
+                  removeLocalFile(removed.id)
+                }
+                return
+              }
+              deletedSuccessfully.push(file)
             }
-          }
 
-          const newFiles: UploadedFile[] = files.map((file) => ({
-            id: generateUUID(),
-            file,
-            progress: 0,
-            status: 'uploading' as const,
-          }))
-          setUploadingFiles(newFiles)
+            for (const file of deletedSuccessfully) {
+              removeLocalFile(file.id)
+            }
 
-          try {
-            const response = await uploadFiles(files, projectId)
-            const successFiles = newFiles.map((f, i) => ({
-              ...f,
-              id: response.files?.[i]?.file_id ?? f.id,
-              progress: 100,
-              status: 'success' as const,
+            removeFilesByName(reUploadNames)
+            for (const file of completedFiles) {
+              if (reUploadNames.has(file.file.name)) {
+                clearSessionUploadId(file.id)
+              }
+            }
+
+            const newFiles: UploadedFile[] = files.map((file) => ({
+              id: generateUUID(),
+              file,
+              progress: 0,
+              status: 'uploading' as const,
             }))
-            addFiles(successFiles)
-            setSessionUploadedIds((prev) => {
-              const next = new Set(prev)
-              for (const f of successFiles) next.add(f.id)
-              return next
-            })
-            setUploadingFiles([])
-          } catch {
-            const errorFiles = newFiles.map((f) => ({
-              ...f,
-              status: 'error' as const,
-              errorMessage: 'Upload failed. Please try again.',
-            }))
-            addFiles(errorFiles)
-            setUploadingFiles([])
+            setUploadingFiles(newFiles)
+
+            try {
+              const response = await uploadFiles(files, projectId)
+              const successFiles = newFiles.map((f, i) => ({
+                ...f,
+                id: response.files?.[i]?.file_id ?? f.id,
+                progress: 100,
+                status: 'success' as const,
+              }))
+              addFiles(successFiles)
+              setSessionUploadedIds((prev) => {
+                const next = new Set(prev)
+                for (const f of successFiles) next.add(f.id)
+                return next
+              })
+              setUploadingFiles([])
+            } catch {
+              const errorFiles = newFiles.map((f) => ({
+                ...f,
+                status: 'error' as const,
+                errorMessage: 'Upload failed. Please try again.',
+              }))
+              addFiles(errorFiles)
+              setUploadingFiles([])
+            }
+          } finally {
+            selectionInFlightRef.current = false
           }
         })()
       )
@@ -180,12 +218,14 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
       deleteSessionBlob,
       clearSessionUploadId,
       removeLocalFile,
+      showError,
     ]
   )
 
   const handleFileRemove = useCallback(
     (fileId: string) => {
-      if (deletingFileIds.has(fileId)) return
+      // Sync ref guard — do not rely on deletingFileIds state (stale until re-render).
+      if (deletingFileIdsRef.current.has(fileId)) return
 
       const target = completedFiles.find((f) => f.id === fileId) ?? uploadingFiles.find((f) => f.id === fileId)
       // Only hard-delete blobs still in the session set (uploaded here, not yet persisted).
@@ -207,15 +247,7 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
         })()
       )
     },
-    [
-      completedFiles,
-      uploadingFiles,
-      deletingFileIds,
-      sessionUploadedIds,
-      removeLocalFile,
-      deleteSessionBlob,
-      showSuccess,
-    ]
+    [completedFiles, uploadingFiles, sessionUploadedIds, removeLocalFile, deleteSessionBlob, showSuccess]
   )
 
   return { uploadedFiles, handleFilesSelected, handleFileRemove, deletingFileIds, markPersisted }
