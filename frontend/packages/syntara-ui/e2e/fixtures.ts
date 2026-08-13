@@ -71,7 +71,7 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
 
 const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
   _xfailEntries: [
-    async (_deps, use) => {
+    async ({}, use) => {
       const base = processEnv['SYNTARA_XFAIL_SOURCE']
       if (!base) {
         await use([])
