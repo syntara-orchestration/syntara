@@ -16,8 +16,6 @@ npm install
 npm run tsc
 ```
 
-These scripts are part of the frontend workspace. Running `npm run check` from `/frontend` will type-check them.
-
 ### Run Locally
 
 Set environment variables and run the scripts:
