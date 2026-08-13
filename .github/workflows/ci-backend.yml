@@ -555,6 +555,16 @@ jobs:
           RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
         run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
 
+      - name: Diagnose podman environment
+        run: |
+          podman --version
+          podman info --format json | python3 -c '
+          import sys, json
+          h = json.load(sys.stdin)["host"]
+          print("EventLogger=" + str(h.get("eventLogger", "?")))
+          print("CgroupVersion=" + str(h.get("cgroupVersion", h.get("cgroupsVersion", "?"))))
+          '
+
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
@@ -564,59 +574,43 @@ jobs:
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
         run: |
           ulimit -n 65535
+          # --no-deps: start all containers immediately without health dependency ordering.
+          # On Podman 5.x (events_logger=file), healthcheck timers are never created,
+          # so compose would hang waiting for depends_on service_healthy conditions.
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d --no-deps \
+            database redis moto mcp-server mock-segment \
+            temporal syntara temporal-worker temporal-background-worker
 
-          COMPOSE="uvx podman-compose -p syntara-ci --profile telemetry-e2e"
-
-          # --no-deps: start services without waiting for compose's
-          # depends_on/service_healthy resolution. GH Actions runner image
-          # 20260810+ ships a podman version where both podman-compose and
-          # `podman wait --condition=healthy` hang indefinitely. Poll via
-          # `podman inspect` instead, which bypasses the broken event system.
+      - name: Verify services are healthy
+        timeout-minutes: 5
+        run: |
           wait_healthy() {
-            local container="$1" timeout="${2:-120}" elapsed=0 status
-            echo "Waiting for $container to become healthy (timeout: ${timeout}s)..."
-            while [ "$elapsed" -lt "$timeout" ]; do
-              status=$(podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "missing")
+            local ctr=$1 timeout=${2:-120} elapsed=0
+            echo "Waiting for $ctr (timeout: ${timeout}s)..."
+            while [ $elapsed -lt $timeout ]; do
+              podman healthcheck run "$ctr" >/dev/null 2>&1 || true
+              status=$(podman inspect --format '{{.State.Health.Status}}' "$ctr" 2>/dev/null || echo "unknown")
               if [ "$status" = "healthy" ]; then
-                echo "$container is healthy"
+                echo "  $ctr is healthy (${elapsed}s)"
                 return 0
               fi
-              sleep 3
-              elapsed=$((elapsed + 3))
+              sleep 5
+              elapsed=$((elapsed + 5))
             done
-            echo "ERROR: $container did not become healthy after ${timeout}s (last status: $status)" >&2
-            podman inspect --format='{{json .State.Health}}' "$container" 2>/dev/null || true
+            echo "ERROR: $ctr not healthy after ${timeout}s (status: $status)"
+            podman inspect --format '{{json .State.Health}}' "$ctr" 2>&1 || true
             return 1
           }
 
-          # Build locally-built images (syntara image is shared by workers)
-          $COMPOSE build syntara mcp-server
+          # Wave 1: infrastructure (no upstream dependencies)
+          for svc in database redis moto mcp-server mock-segment; do
+            wait_healthy "syntara-ci_${svc}_1" 120
+          done
 
-          # Wave 1: infrastructure (no inter-service dependencies)
-          echo "::group::Wave 1: infrastructure"
-          $COMPOSE up --no-deps -d database redis moto mcp-server mock-segment
-          echo "::endgroup::"
-          wait_healthy syntara-ci_database_1 120
-          wait_healthy syntara-ci_redis_1 60
-          wait_healthy syntara-ci_moto_1 60
-          wait_healthy syntara-ci_mcp-server_1 60
-          wait_healthy syntara-ci_mock-segment_1 60
-          echo "Infrastructure is healthy"
-
-          # Wave 2: temporal (needs database)
-          echo "::group::Wave 2: temporal"
-          $COMPOSE up --no-deps -d temporal
-          echo "::endgroup::"
-          wait_healthy syntara-ci_temporal_1 120
-          echo "Temporal is healthy"
-
-          # Wave 3: application services (need temporal + infra)
-          echo "::group::Wave 3: application"
-          $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker
-          echo "::endgroup::"
-          wait_healthy syntara-ci_syntara_1 120
-          wait_healthy syntara-ci_temporal-worker_1 120
-          wait_healthy syntara-ci_temporal-background-worker_1 120
+          # Wave 2: services that depend on infrastructure
+          for svc in temporal syntara temporal-worker temporal-background-worker; do
+            wait_healthy "syntara-ci_${svc}_1" 180
+          done
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
