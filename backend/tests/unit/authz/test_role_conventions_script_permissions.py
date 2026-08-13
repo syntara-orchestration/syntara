@@ -1,10 +1,11 @@
 """Unit tests for script permission registration in BUILTIN_POLICIES."""
-import pytest
 
 from syntara.authz.role_conventions import BUILTIN_POLICIES, builtin_role_policy_names
 
 
 class TestScriptPermissions:
+    """Test script permissions in builtin roles."""
+
     def test_script_edit_system_scope_exists(self) -> None:
         names = {p.name for p in BUILTIN_POLICIES}
         assert "script:edit:any" in names
