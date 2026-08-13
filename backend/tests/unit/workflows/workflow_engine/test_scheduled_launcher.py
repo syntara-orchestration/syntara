@@ -222,7 +222,7 @@ class TestSetupActivityNoTemporalStart:
     """Tests that the setup activity does NOT start workflows via TemporalExecutionService.
 
     After the child-workflow refactor (AAP-82536), the activity only handles
-    DB operations. Starting NexusWorkflow is the launcher workflow's
+    DB operations. Starting OrchestratorWorkflow is the launcher workflow's
     responsibility via execute_child_workflow.
     """
 
