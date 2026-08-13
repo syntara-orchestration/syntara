@@ -61,7 +61,9 @@ class TemporalWorkerService:
                 Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
             max_cached_workflows: Maximum workflow states cached in memory for replay.
             max_concurrent_workflow_tasks: Maximum concurrent workflow task executions.
-            max_concurrent_activities: Maximum concurrent activity executions.
+            max_concurrent_activities: Maximum concurrent activity executions. When the limit is
+                reached, new activity tasks queue in Temporal and wait for a slot. Standard
+                Temporal queuing behavior — no failures, just backpressure.
 
         """
         self.temporal_address = temporal_address

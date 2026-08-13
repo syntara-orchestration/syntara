@@ -463,6 +463,13 @@ out-of-memory pod restarts. The fix involves two coordinated changes:
 1. **Activity concurrency cap**: `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES` (default: 10)
    controls the maximum concurrent Temporal activities per pod. This is the primary knob. LLM activities
    consume ~200-500MB each; 10 concurrent activities fit within a 1Gi pod budget.
+   
+   **Behavior when cap is reached**: Activities do not fail when the concurrency limit is reached. Instead,
+   incoming activity tasks queue in the Temporal task queue until a worker slot becomes available. The
+   worker polls the queue and processes tasks in FIFO order. This is standard Temporal behavior — the queue
+   acts as a backpressure mechanism. If demand consistently exceeds per-pod capacity (10 activities), the
+   Kubernetes HPA scales the background worker deployment horizontally by adding replicas, distributing
+   load across multiple pods. This allows the system to handle arbitrarily high sustained load.
 
 2. **Pod memory limit**: Kubernetes pod memory limit should be **1Gi minimum** for background workers
    (configured in the operator via `spec.backgroundWorker.resources.limits.memory`). The previous
