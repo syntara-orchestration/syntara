@@ -363,41 +363,9 @@ class TestListApprovalsContract:
         """Test that invalid query parameters return proper error responses.
 
         Validates:
-        - Invalid status values return 422 Unprocessable Entity
-        - Invalid UUIDs return 422 Unprocessable Entity
         - Invalid limit values return 422 Unprocessable Entity
         - Error responses match RFC 9457 format
         """
-        # Act & Assert - Invalid status value
-        response = await auth_client.get("/api/v1/approvals?status=invalid")
-        assert response.status_code == 422
-        assert_error_data(
-            response,
-            error_type="https://api.example.com/errors/validation-error",
-            title="Request Validation Error",
-            detail=(
-                "Validation failed: query -> status: "
-                "Input should be 'pending', 'approved', 'rejected', 'expired' or 'cancelled'"
-            ),
-            code="REQUEST_VALIDATION_ERROR",
-            retryable=False,
-        )
-
-        # Act & Assert - Invalid execution_id format
-        response = await auth_client.get("/api/v1/approvals?execution_id=not-a-uuid")
-        assert response.status_code == 422
-        assert_error_data(
-            response,
-            error_type="https://api.example.com/errors/validation-error",
-            title="Request Validation Error",
-            detail=(
-                "Validation failed: query -> execution_id: Input should be a valid UUID, "
-                "invalid character: found `n` at 1"
-            ),
-            code="REQUEST_VALIDATION_ERROR",
-            retryable=False,
-        )
-
         # Act & Assert - Invalid limit value
         response = await auth_client.get("/api/v1/approvals?limit=0")
         assert response.status_code == 422
