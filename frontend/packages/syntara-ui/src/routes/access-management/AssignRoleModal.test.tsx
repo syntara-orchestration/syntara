@@ -565,8 +565,8 @@ describe('AssignRoleModal', () => {
         expect(screen.getByText('Failed to assign roles')).toBeInTheDocument()
       })
 
-      // onSuccess is still called (component always calls onSuccess + onClose after Promise.allSettled)
-      expect(mockOnSuccess).toHaveBeenCalled()
+      // onSuccess is NOT called when all assignments fail
+      expect(mockOnSuccess).not.toHaveBeenCalled()
     })
   })
 

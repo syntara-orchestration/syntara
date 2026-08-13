@@ -33,7 +33,7 @@ import { PrincipalField } from './PrincipalField'
 import { PrincipalTypeSelect } from './PrincipalTypeSelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
-import { useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
+import { PRINCIPAL_ID_FIELD, useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 const PAGE_SIZE = 20
 
@@ -299,15 +299,8 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const principalType = useWatch({ control, name: 'principalType' })
   const scope = useWatch({ control, name: 'scope' })
   const selectedProjectId = useWatch({ control, name: 'projectId' })
-  const watchedUserId = useWatch({ control, name: 'userId' })
-  const watchedGroupId = useWatch({ control, name: 'groupId' })
-  const watchedSaId = useWatch({ control, name: 'serviceAccountId' })
+  const selectedPrincipalId = useWatch({ control, name: PRINCIPAL_ID_FIELD[principalType] })
   const isProjectScoped = scope === 'project'
-  const selectedPrincipalId = {
-    [RolePrincipalType.USER]: watchedUserId,
-    [RolePrincipalType.GROUP]: watchedGroupId,
-    [RolePrincipalType.SERVICE_ACCOUNT]: watchedSaId,
-  }[principalType]
 
   const { projects: allProjects, isLoading: isProjectsLoading } = useSelectableProjects()
   const projectOptions = useMemo(

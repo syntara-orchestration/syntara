@@ -35,13 +35,14 @@ export function useAlreadyAssignedRoles(
     { enabled: principalType === RolePrincipalType.SERVICE_ACCOUNT && !!principalId }
   )
 
+  const activeData = {
+    [RolePrincipalType.USER]: userAssignmentsQuery.data,
+    [RolePrincipalType.GROUP]: groupAssignmentsQuery.data,
+    [RolePrincipalType.SERVICE_ACCOUNT]: saAssignmentsQuery.data,
+  }[principalType]
+
   return useMemo(() => {
-    const queryMap = {
-      [RolePrincipalType.USER]: userAssignmentsQuery,
-      [RolePrincipalType.GROUP]: groupAssignmentsQuery,
-      [RolePrincipalType.SERVICE_ACCOUNT]: saAssignmentsQuery,
-    }
-    const assignments = queryMap[principalType].data?.resources ?? []
+    const assignments = activeData?.resources ?? []
     const assigned = new Set<string>()
     for (const a of assignments) {
       const aIsProject = !!a.project_id
@@ -52,5 +53,5 @@ export function useAlreadyAssignedRoles(
       }
     }
     return assigned
-  }, [userAssignmentsQuery, groupAssignmentsQuery, saAssignmentsQuery, principalType, isProjectScoped, projectId])
+  }, [activeData, isProjectScoped, projectId])
 }

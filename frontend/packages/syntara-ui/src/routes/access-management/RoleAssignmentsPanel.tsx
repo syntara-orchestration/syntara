@@ -311,7 +311,9 @@ function computeAssignedRoles(rows: RoleAssignmentRow[]): AssignedRolesByScope {
         }
         projectSet.add(row.roleName)
       } else {
-        // Defensive: project-scoped role missing projectId (data inconsistency). Hide from all scopes.
+        // Defensive: project-scoped role missing projectId (data inconsistency).
+        // Filter from system-scope dropdown; project-scope filtering is best-effort
+        // since we cannot enumerate all projects here.
         system.add(row.roleName)
       }
     }

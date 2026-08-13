@@ -19,7 +19,8 @@ import { FormFieldError } from '../../components/FormFieldError'
 import { NxSelect } from '../../components/NxSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAlerts } from '../../providers/alerts'
-import { getErrorMessage } from '../../utils/apiErrors'
+import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
+import { batchedAllSettled } from '../../utils/batchedSettled'
 import { accessClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
 
@@ -48,6 +49,7 @@ const assignRoleSchema = z.discriminatedUnion('scope', [
 type AssignRoleFormData = z.infer<typeof assignRoleSchema>
 
 const ROLE_PAGE_SIZE = 20
+const EMPTY_SET = new Set<string>()
 
 type AssignRoleModalProps = {
   principalType: RolePrincipalType
@@ -117,7 +119,7 @@ function SingleSelect({
 function showAssignmentResult(
   results: PromiseSettledResult<unknown>[],
   showAlert: ReturnType<typeof useAlerts>['showAlert']
-) {
+): number {
   const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
   const successCount = results.length - failures.length
 
@@ -135,13 +137,15 @@ function showAssignmentResult(
       autoDismiss: true,
     })
   } else {
+    const variant = isServiceUnavailableError(failures[0].reason) ? 'warning' : 'danger'
     showAlert({
       title: 'Failed to assign roles',
       description: getErrorMessage(failures[0].reason),
-      variant: 'error',
+      variant,
       autoDismiss: true,
     })
   }
+  return successCount
 }
 
 export function AssignRoleModal({
@@ -153,10 +157,7 @@ export function AssignRoleModal({
   assignedRoles,
 }: Readonly<AssignRoleModalProps>) {
   const { showAlert } = useAlerts()
-  const defaultScope = useMemo(
-    () => (principalType === RolePrincipalType.SERVICE_ACCOUNT ? 'project' : 'system'),
-    [principalType]
-  )
+  const defaultScope = principalType === RolePrincipalType.SERVICE_ACCOUNT ? 'project' : 'system'
 
   const { control, handleSubmit, setValue, reset } = useForm<AssignRoleFormData>({
     resolver: zodResolver(assignRoleSchema, undefined, { mode: 'sync' }),
@@ -185,10 +186,10 @@ export function AssignRoleModal({
   })
 
   const alreadyAssigned = useMemo((): Set<string> => {
-    if (!assignedRoles) return new Set()
+    if (!assignedRoles) return EMPTY_SET
     if (scope === 'system') return assignedRoles.system
-    if (projectId) return assignedRoles.byProject.get(projectId) ?? new Set()
-    return new Set()
+    if (projectId) return assignedRoles.byProject.get(projectId) ?? EMPTY_SET
+    return EMPTY_SET
   }, [scope, projectId, assignedRoles])
 
   const roleOptions = useMemo((): RoleOption[] => {
@@ -200,10 +201,6 @@ export function AssignRoleModal({
 
   const hasMoreRoles = !!rolesQuery.data?.next
   const isRolesLoading = rolesQuery.isFetching
-
-  const handleRoleSearchChange = (term: string) => {
-    setRoleSearch(term)
-  }
 
   const projectOptions = useMemo(() => {
     return allProjects
@@ -228,21 +225,21 @@ export function AssignRoleModal({
   }
 
   const onSubmit = handleSubmit(async (data) => {
-    const results = await Promise.allSettled(
-      data.roleIds.map((roleKey) => {
-        const body = buildAssignmentBody(principalType, principalId, roleKey)
-        if (data.scope === 'system') {
-          return createRoleAssignment({ body })
-        }
-        return createProjectRoleAssignment({
-          params: { path: { project_id: data.projectId } },
-          body,
-        })
+    const results = await batchedAllSettled(data.roleIds, (roleKey) => {
+      const body = buildAssignmentBody(principalType, principalId, roleKey)
+      if (data.scope === 'system') {
+        return createRoleAssignment({ body })
+      }
+      return createProjectRoleAssignment({
+        params: { path: { project_id: data.projectId } },
+        body,
       })
-    )
-    showAssignmentResult(results, showAlert)
+    })
+    const successCount = showAssignmentResult(results, showAlert)
     handleClose()
-    onSuccess()
+    if (successCount > 0) {
+      onSuccess()
+    }
   })
 
   const roleIds = useWatch({ control, name: 'roleIds' })
@@ -253,16 +250,6 @@ export function AssignRoleModal({
       reset({ scope: defaultScope, projectId: '', roleIds: [] })
     }
   }, [isOpen, reset, defaultScope])
-
-  // Clear selected roles that become assigned externally
-  useEffect(() => {
-    if (roleIds.length > 0) {
-      const stillAvailable = roleIds.filter((id) => !alreadyAssigned.has(id))
-      if (stillAvailable.length !== roleIds.length) {
-        setValue('roleIds', stillAvailable, { shouldValidate: true })
-      }
-    }
-  }, [alreadyAssigned, roleIds, setValue])
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="medium">
@@ -328,7 +315,7 @@ export function AssignRoleModal({
                     options={roleOptions}
                     selected={field.value}
                     onChange={field.onChange}
-                    onSearchChange={handleRoleSearchChange}
+                    onSearchChange={setRoleSearch}
                     hasMore={hasMoreRoles}
                     isLoading={isRolesLoading}
                     hasError={!!fieldState.error}

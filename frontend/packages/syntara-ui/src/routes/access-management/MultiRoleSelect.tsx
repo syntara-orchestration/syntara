@@ -24,7 +24,7 @@ function renderSelectOptions(options: RoleOption[], filterValue: string, hasMore
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
   }
-  if (options.length === 0) {
+  if (options.length === 0 && !hasMore) {
     return (
       <SelectOption isDisabled>{filterValue ? `No results match "${filterValue}"` : 'No roles available'}</SelectOption>
     )
