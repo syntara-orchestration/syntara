@@ -364,7 +364,7 @@ APP_API_PORT=8000
 # UI Configuration
 APP_API_URL=http://localhost:8000
 APP_UI_PORT=8080
-APP_UI_IMAGE=ghcr.io/syntara-orchestration/syntara-ui
+APP_UI_IMAGE=localhost/syntara-ui
 APP_UI_VERSION=latest
 
 # Database Configuration

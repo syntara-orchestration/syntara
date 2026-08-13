@@ -404,7 +404,6 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
 - **Authentication**: Basic (demo/coffee)
 - **Separate containers**: UI and Mock API
-- **Build script**: `./build-multiarch.sh` for multi-arch Podman builds
 
 ### Container Commands
 
@@ -418,8 +417,4 @@ npm run podman:build:mock-api     # Build mock API container only
 npm run podman:run                # Run all containers
 npm run podman:run:ui             # Run UI on port 4000
 npm run podman:run:mock-api       # Run API on port 3000
-
-# Multi-arch builds
-./build-multiarch.sh              # Build for AMD64 + ARM64
-./build-multiarch.sh push         # Build and push to registry
 ```

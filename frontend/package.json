@@ -33,11 +33,11 @@
     "gen": "npm run gen:local --prefix packages/syntara-contracts",
     "mutate": "npm run mutate --prefix packages/syntara-ui",
     "podman:build": "concurrently npm:podman:build:* -c auto",
-    "podman:build:ui": "podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest -t ghcr.io/syntara-orchestration/syntara-ui:latest .",
-    "podman:build:mock-api": "podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest -t ghcr.io/syntara-orchestration/syntara-mock-api:latest .",
+    "podman:build:ui": "podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest -t localhost/syntara-ui:latest .",
+    "podman:build:mock-api": "podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest -t localhost/syntara-mock-api:latest .",
     "podman:run": "concurrently npm:podman:run:* -c auto",
-    "podman:run:ui": "podman run --rm -p 4000:80 --name syntara-ui ghcr.io/syntara-orchestration/syntara-ui:latest",
-    "podman:run:mock-api": "podman run --rm -p 3000:3000 --name syntara-mock-api ghcr.io/syntara-orchestration/syntara-mock-api:latest"
+    "podman:run:ui": "podman run --rm -p 4000:80 --name syntara-ui localhost/syntara-ui:latest",
+    "podman:run:mock-api": "podman run --rm -p 3000:3000 --name syntara-mock-api localhost/syntara-mock-api:latest"
   },
   "workspaces": [
     "packages/*"
