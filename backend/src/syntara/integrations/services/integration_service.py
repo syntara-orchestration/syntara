@@ -46,7 +46,7 @@ from syntara.integrations.exceptions import (
     IntegrationScopeError,
 )
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
-from syntara.integrations.lib.url_validation import validate_integration_url_no_ssrf
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
@@ -388,19 +388,19 @@ class IntegrationService(BaseService):
     def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
         """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
 
-        Called at write time (create/patch) and again immediately before each outbound
-        request (discover/validate/refresh) as defense in depth against DNS re-pointing.
-        Loopback and other private hosts are rejected unless allowlisted via
+        Called at write time (create/patch) and again in this service's outbound
+        entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
+        The same policy is re-run at the runtime outbound boundaries that read the stored
+        base_url directly (AAP proxy, workflow AAP resolution, LLM invocation, MCP tool
+        connect); all boundaries route through the shared
+        :func:`validate_integration_configuration_no_ssrf` choke point so the policy cannot
+        drift. Loopback and other private hosts are rejected unless allowlisted via
         integration_url_allowed_hosts. The DNS-resolving SSRF check cannot live in the
         configuration model validators because those also run when configurations are
         deserialized from the database on every read.
         """
-        base_url = getattr(configuration, "base_url", None)
-        if not base_url:
-            return
-        allow_http = getattr(configuration, "allow_http", False)
         try:
-            validate_integration_url_no_ssrf(base_url, allow_http=allow_http)
+            validate_integration_configuration_no_ssrf(configuration)
         except ValueError as e:
             msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e

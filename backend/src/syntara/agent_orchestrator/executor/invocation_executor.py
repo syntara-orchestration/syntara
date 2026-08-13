@@ -60,6 +60,7 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.models import FILE_TERMINAL_STATUSES, FileStatus
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import LLMProviderConfiguration
 from syntara.integrations.models.llm_model import LLMModel
@@ -1048,6 +1049,14 @@ class InvocationExecutor:
                 raise LLMConfigurationError(msg)
 
             config = integration.configuration
+            # Re-run the integration SSRF policy at request time: the stored base_url may
+            # have been re-pointed to a private/metadata address (DNS rebinding) since write
+            # time. No-op when base_url is unset (provider default endpoint).
+            try:
+                validate_integration_configuration_no_ssrf(config)
+            except ValueError as e:
+                msg = f"LLM provider integration '{integration_id}' base_url is not permitted by SSRF policy."
+                raise LLMConfigurationError(msg) from e
             base_url = str(config.base_url) if config.base_url else None
             provider_hint = config.provider_hint.value if config.provider_hint else None
             logger.debug(
