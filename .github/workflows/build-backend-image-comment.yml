@@ -79,7 +79,7 @@ jobs:
             const success = process.env.BUILD_RESULT === 'success';
             const prNumber = process.env.PR_NUMBER;
             const runUrl = process.env.RUN_URL;
-            const tag = `quay.io/ansible/nexus:pr-${prNumber}`;
+            const tag = `quay.io/ansible/syntara:pr-${prNumber}`;
             const body = success
               ? `Image built and queued for push.\n\nTag: \`${tag}\`\n\n[View run](${runUrl})`
               : `Image build failed. [View run](${runUrl})`;
