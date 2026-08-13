@@ -27,7 +27,7 @@ const mockPOST = vi.mocked(accessFetchClient.POST)
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { retry: false, retryDelay: 0 },
     },
   })
   return ({ children }: { children: React.ReactNode }) =>

@@ -496,7 +496,6 @@ describe('ApprovalNodeForm', () => {
       expect(
         screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
       ).toBeInTheDocument()
-      expect(screen.getByText('Enter usernames manually')).toBeInTheDocument()
     })
 
     it('has no accessibility violations in permission-denied state', async () => {

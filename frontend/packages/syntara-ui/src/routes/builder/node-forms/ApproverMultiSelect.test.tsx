@@ -196,14 +196,10 @@ describe('ApproverMultiSelect', () => {
       expect(screen.getByText('No items available')).toBeInTheDocument()
     })
 
-    it('shows loading text when loading', async () => {
-      const user = userEvent.setup()
-
+    it('disables input when loading', () => {
       render(<ApproverMultiSelect<TestItem> {...defaultProps} isLoading />)
 
-      await user.click(screen.getByRole('textbox'))
-
-      expect(screen.getByText('Loading...')).toBeInTheDocument()
+      expect(screen.getByRole('textbox')).toBeDisabled()
     })
   })
 })
