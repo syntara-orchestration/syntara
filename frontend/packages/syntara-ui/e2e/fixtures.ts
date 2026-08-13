@@ -90,7 +90,7 @@ const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: Xf
     async ({ _xfailEntries }, use, testInfo) => {
       const match = matchesXfail(testInfo, _xfailEntries)
       if (match) {
-        test.fail(true, `xfail: ${match.reason}`)
+        testInfo.fail(true, `xfail: ${match.reason}`)
       }
       await use()
     },

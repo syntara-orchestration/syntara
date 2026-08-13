@@ -16,7 +16,7 @@ export function parseXfailEntries(content: string): XfailEntry[] {
 
   function flush(): void {
     if (currentPattern !== null) {
-      const reason = reasonLines.join(' ').trim() || 'listed in xfail list'
+      const reason = reasonLines.join('\n').trim() || 'listed in xfail list'
       entries.push({ pattern: currentPattern, reason })
     }
   }
@@ -73,18 +73,32 @@ function buildTestId(testInfo: TestInfo): string {
   return [relPath, ...titles].join(' > ')
 }
 
+export function matchPattern(testId: string, pattern: string): boolean {
+  const colonIdx = pattern.indexOf(': ')
+  if (colonIdx !== -1) {
+    const filePrefix = pattern.slice(0, colonIdx)
+    if (filePrefix.includes('/') || filePrefix.endsWith('.ts') || filePrefix.endsWith('.js')) {
+      const titlePart = pattern.slice(colonIdx + 2)
+      if (!titlePart) {
+        return testId.startsWith(filePrefix)
+      }
+      const fullPattern = `${filePrefix} > ${titlePart}`
+      return testId === fullPattern || (testId.startsWith(`${filePrefix} > `) && testId.endsWith(` > ${titlePart}`))
+    }
+  }
+
+  if (pattern.includes(' > ')) {
+    return testId === pattern || testId.endsWith(` > ${pattern}`)
+  }
+  return testId.startsWith(pattern)
+}
+
 export function matchesXfail(testInfo: TestInfo, entries: XfailEntry[]): XfailEntry | null {
   if (entries.length === 0) return null
   const testId = buildTestId(testInfo)
   for (const entry of entries) {
-    if (entry.pattern.includes(' > ')) {
-      if (testId === entry.pattern || testId.endsWith(entry.pattern)) {
-        return entry
-      }
-    } else {
-      if (testId.startsWith(entry.pattern)) {
-        return entry
-      }
+    if (matchPattern(testId, entry.pattern)) {
+      return entry
     }
   }
   return null
