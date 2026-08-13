@@ -116,8 +116,7 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
           // Same-name replace: await DELETE for session uploads before touching UI / starting upload.
           // Hydrated attachments with the same name are detached locally only (no DELETE).
           const sessionReplacements = completedFiles.filter(
-            (file) =>
-              reUploadNames.has(file.file.name) && file.status === 'success' && sessionUploadedIds.has(file.id)
+            (file) => reUploadNames.has(file.file.name) && file.status === 'success' && sessionUploadedIds.has(file.id)
           )
 
           for (const file of sessionReplacements) {
