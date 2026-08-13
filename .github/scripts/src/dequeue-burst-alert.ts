@@ -24,11 +24,16 @@ async function main() {
 
   // Get workflow runs from the last 30 minutes
   const thirtyMinsAgo = new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000);
-  const recentRuns = await github.getWorkflowRuns(
-    'merge-queue-dequeue-alert.yml',
-    thirtyMinsAgo,
-    env.runId
-  );
+  let recentRuns = [];
+  try {
+    recentRuns = await github.getWorkflowRuns(
+      'merge-queue-dequeue-alert.yml',
+      thirtyMinsAgo,
+      env.runId
+    );
+  } catch (error) {
+    console.log('Could not fetch workflow runs (workflow may not exist yet)');
+  }
 
   const completedCount = recentRuns.length;
   console.log(`Found ${completedCount} completed runs in the last ${TIME_WINDOW_MINUTES} minutes`);
