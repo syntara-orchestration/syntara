@@ -7,10 +7,7 @@ import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 import { resolveStepDocKey } from './resolveStepDocKey'
 
-function makeNode(
-  type: string,
-  data: Record<string, unknown> = {}
-): Node<NodeType['data']> {
+function makeNode(type: string, data: Record<string, unknown> = {}): Node<NodeType['data']> {
   return {
     id: 'node-1',
     type,
