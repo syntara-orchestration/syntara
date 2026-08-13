@@ -957,7 +957,9 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
                 integration_type=IntegrationType.LLM_PROVIDER,
                 configuration=LLMProviderConfiguration(
                     provider_hint=LLMProviderHint.CUSTOM,
-                    base_url="https://unreachable-llm-endpoint.invalid:9999",
+                    # Resolvable host (passes write-time SSRF check) with a closed port so
+                    # the endpoint is unreachable at execution time.
+                    base_url="https://example.com:9999",
                 ),
                 management_credential_id=UUID(cred_id),
                 discovered_models=[

@@ -105,11 +105,11 @@ def e2e_aap_credential_id(syntara_api: SyntaraApiRegistry, first_project_id: UUI
 # ---------------------------------------------------------------------------
 
 
-def _mcp_create(name: str | None = None) -> IntegrationCreate:
+def _mcp_create(name: str | None = None, base_url: str = "https://example.com") -> IntegrationCreate:
     return IntegrationCreate(
         name=name or unique_name("e2e-mcp"),
         integration_type=IntegrationType.MCP_SERVER,
-        configuration=MCPServerConfigurationInput(base_url="https://mcp.example.com"),
+        configuration=MCPServerConfigurationInput(base_url=base_url),
     )
 
 
@@ -130,7 +130,7 @@ def _aap_create(name: str | None = None, management_credential_id: UUID | None =
         name=name or unique_name("e2e-aap"),
         integration_type=IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
         configuration=AAPConfiguration(
-            base_url="https://gateway.example.com",
+            base_url="https://example.org",
             insecure_skip_tls_verify=False,
         ),
         management_credential_id=management_credential_id,
@@ -143,7 +143,7 @@ class TestCreateIntegration:
     def test_create_mcp_server(self, integration_factory: Callable[..., dict[str, Any]]) -> None:
         result = integration_factory(_mcp_create())
         assert result["integration_type"] == "mcp_server"
-        assert result["configuration"]["base_url"] == "https://mcp.example.com"
+        assert result["configuration"]["base_url"] == "https://example.com"
         assert result["validation_status"] == "unknown"
         assert result["enabled"] is True
         assert result["scope"] == "global"
@@ -222,7 +222,7 @@ class TestListIntegrations:
             IntegrationCreate(
                 name=unique_name("e2e-disabled"),
                 integration_type=IntegrationType.MCP_SERVER,
-                configuration=MCPServerConfigurationInput(base_url="https://mcp.example.com"),
+                configuration=MCPServerConfigurationInput(base_url="https://example.com"),
                 enabled=False,
             )
         )
@@ -328,12 +328,14 @@ class TestValidateIntegration:
     ) -> None:
         """Validate returns 200 OK with success=False and connection_error/timeout when MCP server is unreachable.
 
-        The integration is properly configured (valid URL, no credential required),
-        but the external MCP server at https://mcp.example.com does not exist.
+        The integration is properly configured (valid, resolvable URL, no credential
+        required), but nothing is listening on https://example.com:9999, so the connection
+        fails. A resolvable host is required so the write-time SSRF check accepts it; the
+        closed port is what makes the server unreachable at validation time.
         This is not a client error (4xx) — the request is valid. It's an external
         service failure, communicated via the success/error/error_type fields in the response.
         """
-        created = integration_factory(_mcp_create())
+        created = integration_factory(_mcp_create(base_url="https://example.com:9999"))
         integration_id = UUID(created["id"])
         resp = syntara_api.integrations.validate(integration_id=integration_id)
 
