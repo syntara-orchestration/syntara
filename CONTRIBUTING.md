@@ -78,9 +78,9 @@ All changes require review before merging. Backend-only changes need backend rev
 
 ## Software Bill of Materials (SBOM)
 
-Container image SBOMs are produced by Konflux `.tekton` builds (AAP catalog
-`build/container`), not by GitHub Actions or Renovate/MintMaker. See
-[docs/sbom.md](docs/sbom.md) for where artifacts are published and how to
+Container image SBOMs are produced by Konflux `.tekton` builds (Konflux /
+Tekton catalog `build/container`), not by GitHub Actions or Renovate/MintMaker.
+See [docs/sbom.md](docs/sbom.md) for where artifacts are published and how to
 inspect them (Conforma, Konflux UI, `cosign download sbom`).
 
 ## Getting Help

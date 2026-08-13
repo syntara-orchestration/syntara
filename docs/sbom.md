@@ -7,7 +7,7 @@ Renovate, or MintMaker.
 ## Produced by
 
 Konflux Pipelines-as-Code (PAC) builds under [`.tekton/`](../.tekton/) invoke the
-AAP Tekton catalog pipeline `build/container`
+Konflux / Tekton catalog build pipeline `build/container`
 (`quay.io/aap-ci/tekton-catalog/pipeline/build/container`).
 
 That catalog pipeline generates and publishes an SBOM by default (alongside the
@@ -20,8 +20,9 @@ Relevant examples:
 - UI push (devel): `.tekton/ansible-automation-orchestrator-ui-devel-push.yaml`
 - Matching pull-request PipelineRuns under `.tekton/` for the same components
 
-Built images are pushed to Quay under
-`quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/`.
+Built images are pushed to Quay under the Konflux `redhat-user-workloads`
+registry. Exact image refs are defined by each PipelineRun’s `output-image`
+parameter (and appear on successful PipelineRun results in the Konflux UI).
 
 ## Consumed by
 
@@ -42,12 +43,12 @@ Built images are pushed to Quay under
    `pipeline/build/container` and do not disable SBOM generation.
 2. **Konflux UI:** After a successful image build, open the PipelineRun →
    **View SBOM**.
-3. **CLI (requires Quay access):**
+3. **CLI (requires Quay access):** Copy a digest image reference from the
+   PipelineRun / Konflux UI, then:
 
    ```bash
-   cosign download sbom \
-     quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/<image>@sha256:<digest>
+   cosign download sbom <image-ref>@sha256:<digest>
    ```
 
-   Registry access to `redhat-user-workloads` is restricted; unauthenticated
-   downloads return `UNAUTHORIZED`.
+   Registry access to Konflux `redhat-user-workloads` images is restricted;
+   unauthenticated downloads return `UNAUTHORIZED`.
