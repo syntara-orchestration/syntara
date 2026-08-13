@@ -9,7 +9,7 @@ Follow the steps in `.claude/skills/frontend-pr-review/SKILL.md` to conduct a th
 
 Start by:
 
-1. Reading `frontend/CLAUDE.md` (especially the "Common PR Mistakes" section) and relevant project guidelines
+1. Reading `frontend/AGENTS.md` (especially the "Common PR Mistakes" section) and relevant project guidelines
 2. Checking what files have changed (git diff or user-provided context)
 3. Following all 9 steps from the PR review skill
 

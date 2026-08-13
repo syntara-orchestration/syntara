@@ -202,7 +202,7 @@ test('user creates a workflow', async ({ app }) => {
 
 For more examples and guidance, see:
 
-- [Testing Guidelines in CLAUDE.md](../../CLAUDE.md#testing-guidelines)
+- [Testing Guidelines in AGENTS.md](../../CLAUDE.md#testing-guidelines)
 - [Comprehensive Playwright E2E Skill](../../.claude/skills/playwright_e2e.md)
 
 ## Visual Regression Testing

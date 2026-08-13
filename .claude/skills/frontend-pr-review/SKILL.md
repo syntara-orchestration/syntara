@@ -57,7 +57,7 @@ If the numbers don't match the GitHub PR page (e.g., GitHub shows 3 files but gi
 
 Before reviewing the PR, read:
 
-- `frontend/CLAUDE.md` (global instructions)
+- `frontend/AGENTS.md` (global instructions)
 - Any relevant project guidelines: architecture, naming, lint, testing
 - Any domain-specific instructions (e.g., Django, React, PatternFly, SOLID)
 
@@ -87,7 +87,7 @@ Check whether the changes follow:
 
 ### 3a. Recurring Issues Checklist (MANDATORY)
 
-**Run through every item in frontend/CLAUDE.md's "Common PR Mistakes -- Quick Checklist" (items 1-35).** That checklist is the single source of truth. Items enforced by ESLint at error level are omitted from this table -- ESLint is the source of truth for those. Below are review-specific verification tips for patterns ESLint cannot catch:
+**Run through every item in frontend/AGENTS.md's "Common PR Mistakes -- Quick Checklist" (items 1-35).** That checklist is the single source of truth. Items enforced by ESLint at error level are omitted from this table -- ESLint is the source of truth for those. Below are review-specific verification tips for patterns ESLint cannot catch:
 
 | Search for...                                               | Flags violation of checklist item...                                            |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |

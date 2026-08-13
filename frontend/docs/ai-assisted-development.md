@@ -183,7 +183,7 @@ npm run test:ui # unit tests with coverage
 
 Run two checks after implementation:
 
-**1. Code quality** — type `/review-pr` in the agent chat. It scans changed files against the [quality checklist](../CLAUDE.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
+**1. Code quality** — type `/review-pr` in the agent chat. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
 
 **2. Visual / UX** — paste a screenshot and ask the agent to verify against the `patternfly-ux-design-system` skill.
 
@@ -219,7 +219,7 @@ Always check in a browser before opening a PR. Run `npm start` (UI at http://loc
 
 ## 5. Code Review (PR Review)
 
-Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](../CLAUDE.md), flags missing tests, and produces a draft PR description.
+Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](../AGENTS.md), flags missing tests, and produces a draft PR description.
 
 ```text
 /review-pr
@@ -286,7 +286,7 @@ npm run e2e     # Playwright integration tests
 ```
 
 - Walk through all states in the browser ([§4](#4-review-your-changes-locally))
-- The quality checklist lives in [`CLAUDE.md`](../CLAUDE.md) — "Common PR Mistakes"
+- The quality checklist lives in [`AGENTS.md`](../AGENTS.md) — "Common PR Mistakes"
 - PR description guidelines are in the [PR template](../.github/pull_request_template.md)
 
 ---
@@ -356,8 +356,8 @@ Skills are detailed reference guides the agent consults while working. You can a
 | **PR Review**                   | `pr_review.md` (234 lines)                   | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                             | Before opening a PR. Type `/review-pr` and the agent runs the full checklist.                                                                |
 | **Playwright E2E**              | `playwright_e2e.md` (772 lines)              | E2E test writing: page objects, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                  | Writing browser-level tests for user flows. Say "use the playwright_e2e skill" to write E2E tests.                                           |
 | **PatternFly UX Design System** | `patternfly-ux-design-system.md` (898 lines) | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                                   | Verifying that your UI matches the design system. Paste a screenshot and say "use the patternfly-ux-design-system skill to check this."      |
-| **Frontend Specialist**         | `frontend_specialist.md`                     | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                             | Any implementation, review, or refactoring task. Triggered automatically via CLAUDE.md.                                                      |
-| **Library References**          | `library_references.md` (30 lines)           | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                              | Before writing code that uses any of these libraries. Triggered automatically via CLAUDE.md.                                                 |
+| **Frontend Specialist**         | `frontend_specialist.md`                     | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                             | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
+| **Library References**          | `library_references.md` (30 lines)           | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                              | Before writing code that uses any of these libraries. Triggered automatically via AGENTS.md.                                                 |
 
 ### Commands (`.claude/commands/`)
 

@@ -96,7 +96,7 @@ npm run gen
 - Run `npm ci` instead of `npm install`
 - Check that all dependencies are installed correctly
 - Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
-- Check out [CLAUDE.md](CLAUDE.md) for comprehensive development information
+- Check out [AGENTS.md](AGENTS.md) for comprehensive development information
 
 ## Project Documentation
 
@@ -109,7 +109,7 @@ npm run gen
 - [Workflow Loading & Saving](docs/workflow-loading-saving.md)
 - [Execution Visualizer Protocol](docs/execution-visualizer-protocol.md)
 - [Error Handling](docs/error-handling.md)
-- [Developer Quick Reference](CLAUDE.md)
+- [Developer Quick Reference](AGENTS.md)
 
 ## Project Structure
 
