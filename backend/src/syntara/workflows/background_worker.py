@@ -38,6 +38,10 @@ start_loggers()
 async def main() -> None:
     """Run the Temporal background worker."""
     validate_encryption_key_at_startup()
+    # Fail fast if timezone data is missing (AAP-86297)
+    from syntara.workflows.workflow_engine.models.workflow_definition import _get_valid_timezones  # noqa: PLC0415
+
+    _get_valid_timezones()
     settings = get_settings()
 
     async def _start() -> TemporalWorkerService:
