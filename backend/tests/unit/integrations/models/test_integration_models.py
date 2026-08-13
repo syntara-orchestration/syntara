@@ -45,7 +45,7 @@ def sample_ca_cert() -> str:
                 "1",
                 "-nodes",
                 "-subj",
-                "/CN=test-syntara-ca",
+                "/CN=test-nexus-ca",
             ],
             capture_output=True,
             check=True,

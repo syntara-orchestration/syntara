@@ -24,7 +24,7 @@ def sanitize_filename(filename: str, max_length: int = 200) -> str:
         Sanitized filename safe for filesystem storage
 
     Note:
-        Files are saved with pattern: syntara-{36-char-uuid}-{filename}
+        Files are saved with pattern: nexus-{36-char-uuid}-{filename}
         Total prefix length is ~43 chars, so we limit filename to 200 chars
         to ensure total path stays well under the 255-byte filesystem limit.
 
@@ -58,7 +58,7 @@ async def save_file(
 ) -> str:
     """Save uploaded file to storage using the configured retriever.
 
-    Files are saved with the naming pattern: syntara-{file_id}-{sanitized_filename}
+    Files are saved with the naming pattern: nexus-{file_id}-{sanitized_filename}
 
     Args:
         file_content: File content as bytes
@@ -80,7 +80,7 @@ async def save_file(
     safe_filename = sanitize_filename(safe_filename)
 
     # Generate file path with naming pattern
-    file_path = f"syntara-{file_id}-{safe_filename}"
+    file_path = f"nexus-{file_id}-{safe_filename}"
 
     # Save using retriever
     try:

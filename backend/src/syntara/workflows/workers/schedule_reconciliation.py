@@ -100,7 +100,7 @@ async def reconcile_scheduled_triggers(
     expected_ids = set(lookup)
 
     # -- Step 2: Build actual state (1 Temporal list_schedules call) --
-    # Use SyntaraWorkflowId search attribute for server-side filtering when
+    # Use NexusWorkflowId search attribute for server-side filtering when
     # available, falling back to client-side prefix scan otherwise.
     service = ScheduledTriggerService()
     client = await service.get_client()

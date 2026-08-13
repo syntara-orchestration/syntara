@@ -51,7 +51,7 @@ pytest_plugins = [
     "tests.integration.fixtures.users",
 ]
 
-_MOTO_BUCKET = "syntara-integration-test"
+_MOTO_BUCKET = "nexus-integration-test"
 _MOTO_REGION = "us-east-1"
 
 
@@ -266,19 +266,19 @@ def websocket_example_app(
     """
     # Create directory structure
     project_root = tmp_path / "project"
-    syntara_dir = project_root / "src" / "syntara"
-    core_dir = syntara_dir / "core" / "websocket"
+    nexus_dir = project_root / "src" / "syntara"
+    core_dir = nexus_dir / "core" / "websocket"
     core_dir.mkdir(parents=True)
 
-    component_dir = syntara_dir / "testcomp"
+    component_dir = nexus_dir / "testcomp"
     ws_dir = component_dir / "ws"
     ws_dir.mkdir(parents=True)
 
-    schemas_dir = syntara_dir / "schemas" / "testcomp"
+    schemas_dir = nexus_dir / "schemas" / "testcomp"
     schemas_dir.mkdir(parents=True)
 
     # Create __init__.py files
-    (syntara_dir / "__init__.py").touch()
+    (nexus_dir / "__init__.py").touch()
     (component_dir / "__init__.py").touch()
     (ws_dir / "__init__.py").touch()
     (core_dir / "__init__.py").touch()
@@ -782,7 +782,7 @@ components:
     (schemas_dir / "websocket-handlers2.yaml").write_text(handlers2_spec)
 
     # Add project to Python path
-    sys.path.insert(0, str(syntara_dir.parent))
+    sys.path.insert(0, str(nexus_dir.parent))
 
     # Mock __file__ to point to our temporary structure
     fake_endpoint_factory = core_dir / "endpoint_factory.py"
@@ -795,7 +795,7 @@ components:
     # Mock importlib.resources.files to return our temp schemas directory
     def mock_files(package: str) -> Path:
         if package == "syntara":
-            return syntara_dir
+            return nexus_dir
         msg = f"Package {package} not found"
         raise FileNotFoundError(msg)
 
@@ -809,7 +809,7 @@ components:
     yield project_root, app
 
     # Cleanup
-    sys.path.remove(str(syntara_dir.parent))
+    sys.path.remove(str(nexus_dir.parent))
 
 
 async def _wait_for_server(host: str, port: int) -> None:

@@ -56,7 +56,7 @@ class TestDocumentConversionTaskConvert:
         return FileMetadata(
             id=sample_file_id,
             filename="test.pdf",
-            file_path=f"/uploads/syntara-{sample_file_id}-test.pdf",
+            file_path=f"/uploads/nexus-{sample_file_id}-test.pdf",
             mime_type="application/pdf",
             size_bytes=1024,
             status=FileStatus.PENDING_CONVERSION,

@@ -1,7 +1,7 @@
 """Minimal runtime for the regopy interpreter.
 
 regopy's C extension leaks native memory (~6 MB per ``set_input``/``query``
-cycle) when the process has imported heavy packages such as the full syntara
+cycle) when the process has imported heavy packages such as the full nexus
 application.  The leak is in the native layer and cannot be fixed from
 Python.  To bound total memory growth, the interpreter is automatically
 recycled after a configurable number of evaluations.
