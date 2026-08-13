@@ -456,13 +456,21 @@ surfaced in the Nexus UI for administrators with the builtin toggle enabled.
 
 ## Constraints and Known Gaps
 
-**OOM under sustained load**: the background worker Temporal SDK caches workflow state in
-memory. Under high invocation rates (~10/sec), `max_cached_workflows` (default: 1000) fills
-the cache faster than entries expire, causing heap growth and eventual OOM restart. The fix is
-to cap `max_cached_workflows=50` in the worker constructor call in `background_worker.py`. This
-is not yet in place — the background worker's built-in workflow footprint is small enough that
-cache entries are short-lived, so OOM requires a specific combination of high rate and
-long-running internal activities.
+**OOM under sustained LLM load**: The background worker executes memory-heavy LLM/agent activities
+(Document Conversion, Agent Execution). Under sustained load, uncapped activity concurrency can cause
+out-of-memory pod restarts. The fix involves two coordinated changes:
+
+1. **Activity concurrency cap**: `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES` (default: 10)
+   controls the maximum concurrent Temporal activities per pod. This is the primary knob. LLM activities
+   consume ~200-500MB each; 10 concurrent activities fit within a 1Gi pod budget.
+
+2. **Pod memory limit**: Kubernetes pod memory limit should be **1Gi minimum** for background workers
+   (configured in the operator via `spec.backgroundWorker.resources.limits.memory`). The previous
+   512Mi default was insufficient even with concurrency capping.
+
+Note: `max_cached_workflows` (default: 1000) caps workflow history caching in Temporal SDK, not activity
+concurrency. These are separate tuning knobs — do not confuse them when diagnosing OOM. For high activity
+concurrency load, tune `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES`, not `max_cached_workflows`.
 
 **No CPU-independent HPA metric**: the HPA scales on CPU utilization. This works for CPU-bound
 activities but is a weak proxy for queue backlog depth. A better HPA trigger would be the

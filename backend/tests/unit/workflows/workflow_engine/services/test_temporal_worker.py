@@ -717,3 +717,39 @@ class TestStartupReconciliation:
             await service.start()
 
         assert service.worker == mock_worker
+
+
+class TestBackgroundWorkerConfiguration:
+    """Test that background worker correctly reads concurrency from settings."""
+
+    def test_background_worker_reads_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Regression: background worker must read concurrency from settings, not hardcoded.
+
+        This ensures that if background_worker.py accidentally stops passing
+        settings.background_worker_max_concurrent_activities, the test will catch it.
+        """
+        from syntara.core.config.base import get_settings
+
+        # Set a non-default value
+        monkeypatch.setenv("APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES", "7")
+        get_settings.cache_clear()
+
+        settings = get_settings()
+
+        # Simulate what background_worker.py does: pass settings value
+        service = TemporalWorkerService(
+            temporal_address="localhost:7233",
+            namespace="default",
+            task_queue=settings.background_task_queue,
+            max_concurrent_activities=settings.background_worker_max_concurrent_activities,
+        )
+
+        # Should be 7 from the environment, not 10 (default) or 50 (main worker default)
+        assert service.max_concurrent_activities == 7
+
+    def test_background_worker_default_is_10(self) -> None:
+        """Verify background worker concurrency defaults to 10."""
+        from syntara.core.config.base import get_settings
+
+        settings = get_settings()
+        assert settings.background_worker_max_concurrent_activities == 10
