@@ -332,6 +332,7 @@ test.describe('Variable reference validation', () => {
     const workflowName = buildUniqueName('e2e-varref-invalid')
 
     await createWorkflowWithTrigger(app, workflowName)
+    const workflowId = getWorkflowIdFromUrl(app)
 
     try {
       await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
@@ -346,7 +347,7 @@ test.describe('Variable reference validation', () => {
       await app.getByRole('button', { name: /alert details/i }).click()
       await expect(app.getByText(/does not exist in this workflow/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
-      await deleteWorkflow(app, workflowName)
+      await deleteWorkflowViaApi(app, workflowId)
     }
   })
 
