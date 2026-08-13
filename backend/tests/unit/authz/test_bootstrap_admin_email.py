@@ -19,6 +19,8 @@ from syntara.users.services.user_service import UNSET, UsersService
 
 
 class TestBootstrapAdminEmailConstants:
+    """Sanity checks for bootstrap admin placeholder constants."""
+
     def test_placeholder_email_is_example_dot_com(self) -> None:
         assert BOOTSTRAP_ADMIN_EMAIL == "admin@example.com"
         assert BOOTSTRAP_ADMIN_USERNAME == "admin"
@@ -26,6 +28,8 @@ class TestBootstrapAdminEmailConstants:
 
 
 class TestGuardBuiltinUpdateEmail:
+    """Builtin admin may replace email on self; name fields stay protected."""
+
     def test_self_may_update_email(self) -> None:
         UsersService._guard_builtin_update(
             is_self=True,
