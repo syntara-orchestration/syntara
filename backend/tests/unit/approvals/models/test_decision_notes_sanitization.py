@@ -4,6 +4,7 @@ Validates that HTML tags are stripped from notes in both single and batch
 approval decision request models.
 """
 
+import re
 from uuid import uuid4
 
 import pytest
@@ -14,6 +15,8 @@ from syntara.approvals.models.api_models import (
     BatchApprovalDecision,
 )
 
+_TAG_LIKE_RE = re.compile(r"</?[a-zA-Z]")
+
 
 class TestDecisionNotesSanitization:
     """Test HTML tag stripping on approval decision notes."""
@@ -21,19 +24,28 @@ class TestDecisionNotesSanitization:
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
-            ("<script>alert('xss')</script>", "alert('xss')"),
+            ("<script>alert('xss')</script>", ""),
             ('<img src=x onerror="alert(1)">', ""),
             ("<b>bold</b> text", "bold text"),
             ("<div><p>nested</p></div>", "nested"),
             ("clean text", "clean text"),
-            ("a < b and c > d", "a < b and c > d"),
+            ("a < b and c > d", "a &lt; b and c &gt; d"),
             ("", ""),
             ('<a href="javascript:alert(1)">click</a>', "click"),
-            ("Hello<script>document.cookie</script>World", "Hellodocument.cookieWorld"),
-            ("<SCRIPT>alert('case')</SCRIPT>", "alert('case')"),
+            ("Hello<script>document.cookie</script>World", "HelloWorld"),
+            ("<SCRIPT>alert('case')</SCRIPT>", ""),
             ('<svg onload="alert(1)">', ""),
             ("<iframe src=evil></iframe>", ""),
             ("&lt;script&gt;alert(1)&lt;/script&gt;", "&lt;script&gt;alert(1)&lt;/script&gt;"),
+            # Nested/obfuscated tag bypass (single-pass regex failure)
+            ("<<script>script>alert(1)</script>", "&lt;"),
+            ("<<<script>>script>alert(1)</script>", "&lt;&lt;"),
+            # Unclosed tags
+            ("<script", ""),
+            ("<img src=x onerror=alert(1)", ""),
+            ("<div", ""),
+            # Mixed nested and normal
+            ("<b>hello</b> <<b>b>world</b>", "hello &lt;b&gt;world"),
         ],
         ids=[
             "script-tag",
@@ -49,6 +61,12 @@ class TestDecisionNotesSanitization:
             "svg-onload",
             "iframe",
             "html-entities-passthrough",
+            "nested-obfuscated-script",
+            "triple-nested-obfuscated",
+            "unclosed-script",
+            "unclosed-img-onerror",
+            "unclosed-div",
+            "mixed-nested-normal",
         ],
     )
     def test_single_decision_strips_html(self, raw: str, expected: str) -> None:
@@ -56,13 +74,40 @@ class TestDecisionNotesSanitization:
         assert request.notes == expected
 
     @pytest.mark.parametrize(
+        "raw",
+        [
+            "<script>alert(1)</script>",
+            "<<script>script>alert(1)</script>",
+            "<<<script>>script>alert(1)</script>",
+            '<img src=x onerror="alert(1)">',
+            "<script",
+            "<b>text</b>",
+            '<svg onload="alert(1)">',
+        ],
+        ids=[
+            "script",
+            "nested-script",
+            "triple-nested",
+            "img-onerror",
+            "unclosed",
+            "bold",
+            "svg",
+        ],
+    )
+    def test_result_contains_no_tag_like_sequences(self, raw: str) -> None:
+        """Post-condition: sanitized output must not contain tag-like sequences."""
+        request = ApprovalDecisionRequest(status="approved", notes=raw)
+        assert not _TAG_LIKE_RE.search(request.notes or "")
+
+    @pytest.mark.parametrize(
         ("raw", "expected"),
         [
-            ("<script>alert('xss')</script>", "alert('xss')"),
+            ("<script>alert('xss')</script>", ""),
             ('<img src=x onerror="alert(1)">', ""),
             ("clean text", "clean text"),
+            ("<<script>script>alert(1)</script>", "&lt;"),
         ],
-        ids=["script-tag", "img-onerror", "clean-text"],
+        ids=["script-tag", "img-onerror", "clean-text", "nested-obfuscated"],
     )
     def test_batch_decision_strips_html(self, raw: str, expected: str) -> None:
         decision = BatchApprovalDecision(approval_id=uuid4(), status="approved", notes=raw)
