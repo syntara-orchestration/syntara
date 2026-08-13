@@ -4,6 +4,7 @@ This module contains SQLModel classes corresponding to the OpenAPI specification
 components for type-safe API operations.
 """
 
+import html
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
@@ -19,7 +20,11 @@ from syntara.core.constants import FieldLimits
 def _sanitize_notes(v: str | None) -> str | None:
     if not isinstance(v, str):
         return v
-    return nh3.clean(v, tags=set())
+    # Strip HTML tags then restore entity-encoded plain-text characters.
+    # Two passes: entity-encoded HTML (e.g. &lt;script&gt;) becomes real
+    # tags after the first unescape and is stripped by the second pass.
+    first_pass = html.unescape(nh3.clean(v, tags=set()))
+    return html.unescape(nh3.clean(first_pass, tags=set()))
 
 
 class ApproverUserSummary(SQLModel):
