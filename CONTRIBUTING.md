@@ -76,6 +76,13 @@ By signing off, you agree to the [Developer Certificate of Origin](https://devel
 
 All changes require review before merging. Backend-only changes need backend reviewer approval; frontend-only changes need frontend reviewer approval. Cross-cutting changes need both.
 
+## Software Bill of Materials (SBOM)
+
+Container image SBOMs are produced by Konflux `.tekton` builds (AAP catalog
+`build/container`), not by GitHub Actions or Renovate/MintMaker. See
+[docs/sbom.md](docs/sbom.md) for where artifacts are published and how to
+inspect them (Conforma, Konflux UI, `cosign download sbom`).
+
 ## Getting Help
 
 Have a question or need guidance? Start a conversation in [GitHub Discussions](https://github.com/orgs/syntara-orchestration/discussions) before opening an issue.

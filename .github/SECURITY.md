@@ -40,3 +40,9 @@ For the complete security policy, including what qualifies as a reportable vulne
 This project is stewarded by **Red Hat, Inc.**, an open-source software steward as defined in Article 3(14) of the [EU Cyber Resilience Act (Regulation 2024/2847)](https://eur-lex.europa.eu/eli/reg/2024/2847/oj/eng).
 
 Contact: [cra-steward@redhat.com](mailto:cra-steward@redhat.com)
+
+## Software Bill of Materials (SBOM)
+
+Container image SBOMs for this repository are generated on the Konflux build
+path. See [docs/sbom.md](../docs/sbom.md) for production and consumption
+details.
