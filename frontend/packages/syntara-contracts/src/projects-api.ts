@@ -1852,10 +1852,29 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by approval status */
-        status?: components['schemas']['ApprovalRequestStatus'] | null
-        /** @description Filter by parent workflow execution ID */
-        execution_id?: string | null
+        /**
+         * @description Filter by approval status.
+         *     - Exact match: `status=pending` or `status[eq]=pending`
+         */
+        status?: components['schemas']['ApprovalRequestStatus'] & {
+          /**
+           * Equals
+           * @description Exact match of the approval status. ?status[eq]=pending
+           */
+          eq?: components['schemas']['ApprovalRequestStatus']
+        }
+        /**
+         * @description Filter by parent execution ID.
+         *     - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
+         */
+        execution_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           * @description Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
+           */
+          eq?: string
+        }
       }
       header?: never
       path: {
