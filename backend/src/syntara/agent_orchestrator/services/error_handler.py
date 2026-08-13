@@ -6,6 +6,7 @@ RFC 9457 Problem Details format for WebSocket error events.
 
 from uuid import UUID
 
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.core.models.error import ErrorData
 
 # Base URI for error types
@@ -62,6 +63,30 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
     """
     error_msg = str(exception).lower()
     instance = _build_instance_uri(invocation_id)
+
+    # Tool discovery/selection failures must be classified by type before message
+    # heuristics. Discovery errors often embed cause type names like
+    # ``ConnectionError``, which would otherwise match as retryable LLM network
+    # failures and mislead stream clients into pointless retries.
+    if isinstance(exception, ToolDiscoveryError):
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/tool-discovery-error",
+            title="Tool Discovery Failed",
+            detail=str(exception) or "Required tools could not be discovered or provisioned.",
+            code="TOOL_DISCOVERY_FAILED",
+            retryable=False,
+            instance=instance,
+        )
+
+    if isinstance(exception, ToolSelectionUnavailableError):
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/tool-selection-unavailable",
+            title="Selected Tools Unavailable",
+            detail=str(exception) or "None of the requested tools could be provisioned.",
+            code="TOOL_SELECTION_UNAVAILABLE",
+            retryable=False,
+            instance=instance,
+        )
 
     # Handle timeout errors
     if isinstance(exception, TimeoutError):

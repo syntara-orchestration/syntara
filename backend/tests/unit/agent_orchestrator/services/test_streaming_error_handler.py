@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
@@ -38,6 +39,30 @@ pytestmark = pytest.mark.unit
         (Exception("Connection refused by host"), "CONNECTION_ERROR", True),
         (Exception("Network unreachable"), "CONNECTION_ERROR", True),
         (Exception("Network connection timeout"), "CONNECTION_ERROR", True),
+        # Tool discovery/selection — classified by type, not message heuristics
+        (
+            ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError"),
+            "TOOL_DISCOVERY_FAILED",
+            False,
+        ),
+        (
+            ToolDiscoveryError("Failed to discover tools from Tool Manager: ConnectionError"),
+            "TOOL_DISCOVERY_FAILED",
+            False,
+        ),
+        (
+            ToolDiscoveryError(
+                "Enabled tools were discovered but none could be provisioned "
+                "from MCP integrations; refusing to continue without tools"
+            ),
+            "TOOL_DISCOVERY_FAILED",
+            False,
+        ),
+        (
+            ToolSelectionUnavailableError("None of the requested tools could be provisioned"),
+            "TOOL_SELECTION_UNAVAILABLE",
+            False,
+        ),
         # Unknown errors
         (ValueError("Invalid input format"), "UNKNOWN_ERROR", False),
         (Exception("Something went wrong"), "UNKNOWN_ERROR", False),
@@ -56,6 +81,10 @@ pytestmark = pytest.mark.unit
         "network_refused",
         "network_unreachable",
         "network_timeout",
+        "tool_discovery_connection_error",
+        "tool_discovery_manager_connection_error",
+        "tool_discovery_zero_provision",
+        "tool_selection_unavailable",
         "unknown_value_error",
         "unknown_generic",
         "unknown_empty",
@@ -104,6 +133,29 @@ def test_mixed_error_signals_priority() -> None:
 
     # Rate limit should match first (comes before connection check)
     assert error.code == "RATE_LIMIT_EXCEEDED"
+
+
+def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
+    """ToolDiscoveryError with ConnectionError in the message must not look like LLM network failure."""
+    exception = ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError")
+    error = classify_streaming_error(exception, uuid4())
+
+    assert error.code == "TOOL_DISCOVERY_FAILED"
+    assert error.retryable is False
+    assert error.title == "Tool Discovery Failed"
+    assert "LLM" not in error.title
+    assert "ConnectionError" in (error.detail or "")
+
+
+def test_tool_selection_not_default_llm_streaming_error() -> None:
+    """ToolSelectionUnavailableError must not fall through to UNKNOWN_ERROR / LLM Streaming Error."""
+    exception = ToolSelectionUnavailableError("None of the requested tools could be provisioned")
+    error = classify_streaming_error(exception, uuid4())
+
+    assert error.code == "TOOL_SELECTION_UNAVAILABLE"
+    assert error.retryable is False
+    assert error.title == "Selected Tools Unavailable"
+    assert error.code != "UNKNOWN_ERROR"
 
 
 def test_multiple_invocations_independent() -> None:

@@ -319,6 +319,7 @@ class TestOrchestrationServiceErrorHandling:
 
         `_setup_graph()` (and thus `_get_tools()`) runs inside the StreamClient try so
         WebSocket clients get a terminal error and workflow failure signals fire.
+        Connection-like cause names must not be classified as retryable LLM network errors.
         """
         from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
 
@@ -329,12 +330,13 @@ class TestOrchestrationServiceErrorHandling:
         invocation_id = uuid4()
         callback_url = "http://localhost/signal/activity/1"
         ctx = InvocationContextData.model_validate({"callback_url": callback_url})
+        discovery_error = ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError")
 
         with (
             patch.object(
                 service,
                 "_setup_graph",
-                side_effect=ToolDiscoveryError("discovery failed"),
+                side_effect=discovery_error,
             ),
             patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
             patch(
@@ -345,7 +347,7 @@ class TestOrchestrationServiceErrorHandling:
             mock_client_instance = AsyncMock()
             mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
 
-            with pytest.raises(ToolDiscoveryError, match="discovery failed"):
+            with pytest.raises(ToolDiscoveryError, match="ConnectionError"):
                 await service.execute(
                     prompt="Test",
                     session_id="test-session",
@@ -356,6 +358,11 @@ class TestOrchestrationServiceErrorHandling:
 
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
+            error_event = error_calls[0].args[1]
+            assert error_event["event_type"] == "error"
+            assert error_event["data"]["code"] == "TOOL_DISCOVERY_FAILED"
+            assert error_event["data"]["retryable"] is False
+            assert "LLM" not in error_event["data"]["title"]
             mock_failure_signal.assert_awaited_once()
             assert mock_failure_signal.await_args is not None
             assert mock_failure_signal.await_args.args[0] == callback_url
@@ -401,6 +408,10 @@ class TestOrchestrationServiceErrorHandling:
 
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
+            error_event = error_calls[0].args[1]
+            assert error_event["event_type"] == "error"
+            assert error_event["data"]["code"] == "TOOL_SELECTION_UNAVAILABLE"
+            assert error_event["data"]["retryable"] is False
             mock_failure_signal.assert_awaited_once()
             assert mock_failure_signal.await_args is not None
             assert mock_failure_signal.await_args.args[0] == callback_url
