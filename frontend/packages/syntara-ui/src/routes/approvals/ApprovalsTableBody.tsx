@@ -16,6 +16,7 @@ import groupedTableStyles from '../../components/groupedTable.module.css'
 import { DateCell } from '../../components/table/DateCell'
 import { LinkCell } from '../../components/table/LinkCell'
 import type { ProjectRead } from '../access/types'
+import { UserTimestamp } from '../configuration/credentials/UserTimestamp'
 
 import { getNotesLabel, hasExpandableNotes } from './approvalNotes'
 import type { ApprovalWithDetails } from './Approvals'
@@ -27,24 +28,11 @@ import { isApprovalSelectable } from './isApprovalSelectable'
 import { useCanDecideApproval } from './useCanDecideApproval'
 
 function DecidedCell({ approval }: Readonly<{ approval: ApprovalWithDetails }>) {
-  const decidedAt = approval.decided_at
-  const decidedBy = approval.decided_by
-
-  if (!decidedAt) {
+  if (!approval.decided_at) {
     return <DateCell dateString={null} />
   }
 
-  return (
-    <>
-      {decidedBy ? (
-        <>
-          <LinkCell href={`/users/${decidedBy.id}`}>{decidedBy.name}</LinkCell>
-          {' at '}
-        </>
-      ) : null}
-      <DateCell dateString={decidedAt} />
-    </>
-  )
+  return <UserTimestamp user={approval.decided_by} timestamp={approval.decided_at} inline />
 }
 
 function SelectCheckboxCell({

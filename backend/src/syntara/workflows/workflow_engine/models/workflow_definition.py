@@ -1105,7 +1105,11 @@ def _get_valid_timezones() -> frozenset[str]:
     """Return the set of valid IANA timezone names, cached after first call."""
     global _VALID_TIMEZONES  # noqa: PLW0603
     if _VALID_TIMEZONES is None:
-        _VALID_TIMEZONES = frozenset(available_timezones())
+        tzs = frozenset(available_timezones())
+        if not tzs:
+            msg = "No IANA timezone data found. Install the 'tzdata' package: pip install tzdata"
+            raise RuntimeError(msg)
+        _VALID_TIMEZONES = tzs
     return _VALID_TIMEZONES
 
 

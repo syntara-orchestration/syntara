@@ -16,7 +16,7 @@ import {
   StackItem,
   Truncate,
 } from '@patternfly/react-core'
-import { PlusIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
@@ -25,6 +25,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxPageBody } from '../../../components/layout/NxPage'
@@ -48,6 +49,7 @@ import { getGroupDetailPath } from '../accessManagementPaths'
 import { BUILTIN_AUTHENTICATED_GROUP_NAME } from '../adminConstants'
 import { MembershipSourceLabels } from '../MembershipSourceLabels'
 import { getMembershipSources } from '../membershipSourceUtils'
+import { useGroupPermissions } from '../useGroupPermissions'
 
 const filterFieldDefinitions: FilterFieldDefinition[] = [
   {
@@ -208,12 +210,18 @@ function applyGroupFilters<T extends { name: string; description?: string | null
   return result
 }
 
-function getGroupActions(group: Group, onRemove: (g: GroupInfo) => void): IAction[] {
+function getGroupActions(
+  group: Group,
+  onRemove: (g: GroupInfo) => void,
+  permissions: ReturnType<typeof useGroupPermissions>
+): IAction[] {
   if (group.name === BUILTIN_AUTHENTICATED_GROUP_NAME) return []
   return [
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
-      onClick: () => onRemove({ id: group.id, name: group.name }),
+      isAriaDisabled: !permissions.canManageMembers,
+      tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
+      onClick: permissions.canManageMembers ? () => onRemove({ id: group.id, name: group.name }) : undefined,
     },
   ]
 }
@@ -259,6 +267,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [groupToRemove, setGroupToRemove] = useState<GroupInfo | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
+  const groupPermissions = useGroupPermissions()
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
   const { showAlert } = useAlerts()
@@ -308,7 +317,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
           title="No groups"
           description="This user is not a member of any groups."
           buttonText="Add to group"
-          addData={() => setAddModalOpen(true)}
+          addData={groupPermissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
         />
         <AddToGroupModal
           userId={userId}
@@ -339,9 +348,19 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
               />
             </FlexItem>
             <FlexItem>
-              <Button variant="primary" icon={<PlusIcon />} onClick={() => setAddModalOpen(true)}>
-                Add to group
-              </Button>
+              <DisabledWithTooltip
+                isDisabled={!groupPermissions.canManageMembers}
+                content={groupPermissions.tooltips.manageMembers}
+              >
+                <Button
+                  variant="primary"
+                  icon={<RhUiAddIcon />}
+                  isAriaDisabled={!groupPermissions.canManageMembers}
+                  onClick={groupPermissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
+                >
+                  Add to group
+                </Button>
+              </DisabledWithTooltip>
             </FlexItem>
           </Flex>
         </StackItem>
@@ -404,7 +423,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                   </Td>
                   <Td isActionCell>
                     {group.name !== BUILTIN_AUTHENTICATED_GROUP_NAME && (
-                      <ActionsColumn items={getGroupActions(group as Group, setGroupToRemove)} />
+                      <ActionsColumn items={getGroupActions(group as Group, setGroupToRemove, groupPermissions)} />
                     )}
                   </Td>
                 </Tr>

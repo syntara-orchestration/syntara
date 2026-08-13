@@ -91,7 +91,7 @@ function useAAPQueries(
 ) {
   const orgsQuery = aapClient.useQuery(
     'get',
-    '/aap/organizations',
+    '/proxies/aap/organizations',
     { params: { query: buildSearchParams(state.orgSearch, credentialId, undefined, integrationId) } },
     { enabled: isActive }
   )
@@ -99,14 +99,14 @@ function useAAPQueries(
   // Job templates query
   const jobTemplatesQuery = aapClient.useQuery(
     'get',
-    '/aap/job_templates',
+    '/proxies/aap/job_templates',
     { params: { query: buildSearchParams(state.templateSearch, credentialId, state.selectedOrg, integrationId) } },
     { enabled: isActive && templateType === 'job' }
   )
 
   const jobTemplateDetailQuery = aapClient.useQuery(
     'get',
-    '/aap/job_templates/{job_template_id}',
+    '/proxies/aap/job_templates/{job_template_id}',
     {
       params: {
         path: { job_template_id: state.selectedTemplateId ?? 0 },
@@ -119,14 +119,14 @@ function useAAPQueries(
   // Workflow templates query
   const workflowTemplatesQuery = aapClient.useQuery(
     'get',
-    '/aap/workflow_job_templates',
+    '/proxies/aap/workflow_job_templates',
     { params: { query: buildSearchParams(state.templateSearch, credentialId, state.selectedOrg, integrationId) } },
     { enabled: isActive && templateType === 'workflow' }
   )
 
   const workflowTemplateDetailQuery = aapClient.useQuery(
     'get',
-    '/aap/workflow_job_templates/{workflow_job_template_id}',
+    '/proxies/aap/workflow_job_templates/{workflow_job_template_id}',
     {
       params: {
         path: { workflow_job_template_id: state.selectedTemplateId ?? 0 },
@@ -138,35 +138,35 @@ function useAAPQueries(
 
   const inventoriesQuery = aapClient.useQuery(
     'get',
-    '/aap/inventories',
+    '/proxies/aap/inventories',
     { params: { query: buildSearchParams(state.inventorySearch, credentialId, state.selectedOrg, integrationId) } },
     { enabled: isActive }
   )
 
   const execEnvsQuery = aapClient.useQuery(
     'get',
-    '/aap/execution_environments',
+    '/proxies/aap/execution_environments',
     { params: { query: buildSearchParams(state.execEnvSearch, credentialId, state.selectedOrg, integrationId) } },
     { enabled: isActive && templateType === 'job' } // Only needed for job templates
   )
 
   const credentialsQuery = aapClient.useQuery(
     'get',
-    '/aap/credentials',
+    '/proxies/aap/credentials',
     { params: { query: buildSearchParams(state.credentialSearch, credentialId, undefined, integrationId) } },
     { enabled: isActive && templateType === 'job' } // Only needed for job templates
   )
 
   const instanceGroupsQuery = aapClient.useQuery(
     'get',
-    '/aap/instance_groups',
+    '/proxies/aap/instance_groups',
     { params: { query: buildSearchParams(state.instanceGroupSearch, credentialId, undefined, integrationId) } },
     { enabled: isActive && templateType === 'job' } // Only needed for job templates
   )
 
   const labelsQuery = aapClient.useQuery(
     'get',
-    '/aap/labels',
+    '/proxies/aap/labels',
     { params: { query: buildSearchParams(state.labelSearch, credentialId, state.selectedOrg, integrationId) } },
     { enabled: isActive }
   )
