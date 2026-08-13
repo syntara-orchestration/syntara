@@ -1,20 +1,9 @@
-"""Unit tests for deterministic activity scheduling (AAP-87141).
+"""Unit tests for deterministic activity scheduling in parallel workflows.
 
-Temporal requires workflow code to be fully deterministic: the same sequence of
-commands (ScheduleActivity, etc.) must be produced on every replay.  Any
-non-deterministic ordering of ``asyncio.create_task`` calls causes
-``[TMPRL1100] Nondeterminism error``.
-
-The tests here verify two sources of ordering that must be stable:
-
-1. ``_process_pending_tasks`` — ``wait_tasks`` passed to ``workflow.wait`` must
-   be in sorted node-ID order.  Temporal's ``workflow.wait`` preserves input
-   order in its ``done`` list, so sorting the input is sufficient to guarantee
-   that completed tasks are processed in a deterministic order on every replay.
-
-2. ``_process_pending_tasks`` — ``_timed_out_converge_nodes`` is a ``set``; its
-   iteration order must be deterministic when multiple converge nodes time out
-   simultaneously.
+Temporal requires workflow code to produce identical command sequences on
+every replay.  These tests verify that parallel task scheduling, converge
+timeout draining, and converge timeout creation all follow a stable,
+sorted node-ID order.
 """
 
 import asyncio
@@ -83,6 +72,26 @@ def _build_parallel_graph(branch_ids: list[str]) -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _build_shared_branch_graph() -> WorkflowGraph:
+    """Build a graph where one node feeds two converge nodes.
+
+    trigger -> shared_node -> conv_alpha
+                           -> conv_beta
+
+    ``shared_node`` is a predecessor of both converge nodes, so
+    ``_converge_branch_nodes["shared_node"]`` contains two IDs.
+    """
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("shared_node", {"id": "shared_node", "type": "script", "parameters": {}})
+    backend.add_node("conv_alpha", {"id": "conv_alpha", "type": "converge", "parameters": {}})
+    backend.add_node("conv_beta", {"id": "conv_beta", "type": "converge", "parameters": {}})
+    backend.add_edge("trigger", "shared_node", None)
+    backend.add_edge("shared_node", "conv_alpha", None)
+    backend.add_edge("shared_node", "conv_beta", None)
+    return WorkflowGraph(backend)
+
+
 def _build_two_converge_graph() -> WorkflowGraph:
     """Build two independent converge nodes fed by four branches.
 
@@ -123,12 +132,7 @@ def _make_capturing_wait(
     pending: dict[str, asyncio.Task[Any]],
     captured: list[list[asyncio.Task[Any]]],
 ) -> object:
-    """Return a ``workflow.wait`` replacement that records ``wait_tasks`` once then exits.
-
-    On the first call it records the argument and clears ``pending`` so the
-    ``_process_pending_tasks`` while-loop terminates.  Subsequent calls (which
-    should not occur in these tests) raise ``AssertionError``.
-    """
+    """Record ``wait_tasks`` on the first call and drain ``pending`` to exit the processing loop."""
     called = False
 
     async def _wait(wait_tasks: list[asyncio.Task[Any]], **_kwargs: object) -> tuple[list, list]:
@@ -136,7 +140,6 @@ def _make_capturing_wait(
         assert not called, "workflow.wait called more than once"
         called = True
         captured.append(list(wait_tasks))
-        # Drain pending so the while-loop exits after this iteration.
         pending.clear()
         return [], []
 
@@ -144,23 +147,16 @@ def _make_capturing_wait(
 
 
 # ---------------------------------------------------------------------------
-# TestWaitTasksOrdering — wait_tasks passed to workflow.wait is sorted by node ID
+# TestWaitTasksOrdering — pending tasks arrive at workflow.wait in sorted node-ID order
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.usefixtures("_mock_temporal_workflow")
 class TestWaitTasksOrdering:
-    """Verify that ``workflow.wait`` is called with pending tasks in sorted node-ID order.
-
-    Temporal's ``workflow.wait`` preserves input order in its ``done`` list
-    (it rebuilds done/pending by iterating the original ``fs`` list).  Sorting
-    ``wait_tasks`` by node ID therefore guarantees that completed tasks are
-    always processed in the same deterministic order on every replay, preventing
-    ``TMPRL1100`` nondeterminism errors.
-    """
+    """Pending tasks are passed to workflow.wait in sorted node-ID order."""
 
     def test_two_pending_tasks_sorted_by_node_id(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """With two pending tasks inserted in reverse-alpha order, wait_tasks is alpha-sorted."""
+        """Two pending tasks are passed to workflow.wait in sorted node-ID order."""
         wf = _make_workflow()
         graph = _build_parallel_graph(["node_z", "node_a"])
         captured: list[list[asyncio.Task[Any]]] = []
@@ -171,20 +167,18 @@ class TestWaitTasksOrdering:
 
             task_z = asyncio.create_task(instant())
             task_a = asyncio.create_task(instant())
-            # Deliberately insert in reverse-alpha order.
             pending: dict[str, asyncio.Task[Any]] = {"node_z": task_z, "node_a": task_a}
 
             _mock_temporal_workflow.wait = _make_capturing_wait(pending, captured)
             await wf._process_pending_tasks(pending, graph)
 
-            assert captured[0][0] is task_a, "node_a must be first in wait_tasks"
-            assert captured[0][1] is task_z, "node_z must be second in wait_tasks"
+            assert captured[0][0] is task_a
+            assert captured[0][1] is task_z
 
         _run_loop(run())
 
     def test_five_pending_tasks_sorted_by_node_id(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """Five pending tasks inserted in arbitrary order arrive at workflow.wait sorted."""
-        # IDs matching the Jira bug report error evidence.
+        """Five pending tasks are passed to workflow.wait in sorted node-ID order."""
         branch_ids = ["b4_s1", "b2_s1", "b0_s1", "b1_s1", "b3_s1"]
         wf = _make_workflow()
         graph = _build_parallel_graph(branch_ids)
@@ -226,7 +220,7 @@ class TestWaitTasksOrdering:
         _run_loop(run())
 
     def test_timeout_tasks_appended_after_sorted_pending_tasks(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """Timeout tasks are appended after the sorted pending tasks in wait_tasks."""
+        """Timeout tasks are appended after pending tasks in wait_tasks."""
         wf = _make_workflow()
         graph = _build_parallel_graph(["node_b", "node_a"])
         captured: list[list[asyncio.Task[Any]]] = []
@@ -240,7 +234,6 @@ class TestWaitTasksOrdering:
 
             task_b = asyncio.create_task(instant())
             task_a = asyncio.create_task(instant())
-            # Inserted in reverse-alpha order.
             pending: dict[str, asyncio.Task[Any]] = {"node_b": task_b, "node_a": task_a}
 
             timeout_task = asyncio.create_task(timeout_coro())
@@ -252,7 +245,6 @@ class TestWaitTasksOrdering:
             finally:
                 timeout_task.cancel()
 
-            # Pending tasks sorted (node_a, node_b), then the timeout task.
             assert captured[0][0] is task_a
             assert captured[0][1] is task_b
             assert captured[0][2] is timeout_task
@@ -260,7 +252,7 @@ class TestWaitTasksOrdering:
         _run_loop(run())
 
     def test_wait_called_with_list_not_set(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """workflow.wait receives a list — sets have undefined iteration order."""
+        """workflow.wait receives a list, not a set."""
         wf = _make_workflow()
         graph = _build_parallel_graph(["node_a", "node_b"])
 
@@ -283,26 +275,21 @@ class TestWaitTasksOrdering:
             _mock_temporal_workflow.wait = type_capturing_wait
             await wf._process_pending_tasks(pending, graph)
 
-            assert captured_type[0] is list, f"workflow.wait must receive a list, got {captured_type[0].__name__}"
+            assert captured_type[0] is list
 
         _run_loop(run())
 
 
 # ---------------------------------------------------------------------------
-# TestTimedOutConvergeOrdering — _timed_out_converge_nodes iterated in sorted order
+# TestTimedOutConvergeOrdering — timed-out converge nodes drained in sorted order
 # ---------------------------------------------------------------------------
 
 
 class TestTimedOutConvergeOrdering:
-    """Verify ``_timed_out_converge_nodes`` is drained in sorted node-ID order.
-
-    When multiple converge nodes time out simultaneously the set must be
-    iterated deterministically so that downstream ``_schedule_successors``
-    calls are always issued in the same order on every Temporal replay.
-    """
+    """Simultaneously timed-out converge nodes schedule successors in sorted node-ID order."""
 
     def test_two_timed_out_converges_scheduled_in_node_id_order(self) -> None:
-        """Two simultaneously timed-out converge nodes are scheduled in alpha order."""
+        """Two timed-out converge nodes schedule successors in sorted node-ID order."""
         wf = _make_workflow()
         graph = _build_two_converge_graph()
 
@@ -320,11 +307,10 @@ class TestTimedOutConvergeOrdering:
         with patch.object(wf, "_schedule_successors", new_callable=AsyncMock, side_effect=fake_schedule_successors):
             _run_loop(wf._process_pending_tasks({}, graph))
 
-        # conv_alpha < conv_beta alphabetically — must be scheduled first.
         assert schedule_order == ["conv_alpha", "conv_beta"]
 
     def test_five_timed_out_converges_scheduled_in_node_id_order(self) -> None:
-        """Five simultaneously timed-out converge nodes are drained in sorted order."""
+        """Five timed-out converge nodes schedule successors in sorted node-ID order."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         converge_ids = ["conv_e", "conv_c", "conv_a", "conv_b", "conv_d"]
@@ -368,3 +354,64 @@ class TestTimedOutConvergeOrdering:
             _run_loop(wf._process_pending_tasks({}, graph))
 
         assert len(wf._timed_out_converge_nodes) == 0
+
+
+# ---------------------------------------------------------------------------
+# TestConvergeTimeoutCreationOrder — timeout tasks started in sorted converge-ID order
+# ---------------------------------------------------------------------------
+
+
+class TestConvergeTimeoutCreationOrder:
+    """Converge timeout tasks are started in sorted converge-node-ID order."""
+
+    def test_five_converge_timeouts_created_in_sorted_order(self) -> None:
+        """Five converge timeout tasks are started in sorted converge-node-ID order."""
+        converge_ids = ["conv_e", "conv_c", "conv_a", "conv_b", "conv_d"]
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("shared_node", {"id": "shared_node", "type": "script", "parameters": {}})
+        for cid in converge_ids:
+            backend.add_node(cid, {"id": cid, "type": "converge", "parameters": {}})
+            backend.add_edge("shared_node", cid, None)
+        backend.add_edge("trigger", "shared_node", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf._converge_branch_nodes = {"shared_node": set(converge_ids)}
+
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+            mock_create.return_value = MagicMock(spec=asyncio.Task)
+            wf._handle_converge_timeout("shared_node", graph, {})
+
+        created_order = list(wf._timeout_tasks.keys())
+        assert created_order == sorted(created_order)
+
+    def test_already_started_timeout_not_duplicated(self) -> None:
+        """A converge node whose timeout is already running is not started again."""
+        wf = _make_workflow()
+        graph = _build_shared_branch_graph()
+        wf._converge_branch_nodes = {"shared_node": {"conv_alpha", "conv_beta"}}
+
+        existing_task: MagicMock = MagicMock(spec=asyncio.Task)
+        wf._timeout_tasks["conv_alpha"] = existing_task
+
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+            mock_create.return_value = MagicMock(spec=asyncio.Task)
+            wf._handle_converge_timeout("shared_node", graph, {})
+
+        mock_create.assert_called_once()
+        assert wf._timeout_tasks["conv_alpha"] is existing_task
+
+    def test_failed_converge_does_not_get_timeout(self) -> None:
+        """A converge node already in ``failed_nodes`` does not get a timeout task."""
+        wf = _make_workflow()
+        graph = _build_shared_branch_graph()
+        wf._converge_branch_nodes = {"shared_node": {"conv_alpha", "conv_beta"}}
+        wf.failed_nodes["conv_alpha"] = "upstream failure"
+
+        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+            mock_create.return_value = MagicMock(spec=asyncio.Task)
+            wf._handle_converge_timeout("shared_node", graph, {})
+
+        mock_create.assert_called_once()
+        assert "conv_alpha" not in wf._timeout_tasks
