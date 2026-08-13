@@ -16,8 +16,8 @@ from syntara.authz.router import (
     _check_batch_authorization,
     _check_user_authorized,
     _count_batch_authorized,
+    _enforce_who_can_permission,
     _user_has_authz_query_permission,
-    who_can,
 )
 from syntara.core.models.user import User
 from syntara.core.utils.cursor import PaginationDirection, SortDirection
@@ -486,7 +486,7 @@ class TestUserHasAuthzQueryPermission:
 
 
 class TestWhoCanPermissionGate:
-    """Tests for the three-tier authorization gate in the who_can endpoint."""
+    """Tests for the three-tier authorization gate in _enforce_who_can_permission."""
 
     def _make_user(self) -> MagicMock:
         user = MagicMock(spec=User)
@@ -511,10 +511,9 @@ class TestWhoCanPermissionGate:
 
         with (
             patch("syntara.authz.router.authorize", return_value=mock_result),
-            patch("syntara.authz.router._resolve_project_input", return_value=""),
             pytest.raises(AuthorizationDeniedError, match="Not authorized to query approval/res-123"),
         ):
-            await who_can(body, user, db, evaluator)
+            await _enforce_who_can_permission(body, user, db, evaluator, resource_project="")
 
     @pytest.mark.asyncio
     async def test_tier1_allows_when_user_can_read_resource(self) -> None:
@@ -530,13 +529,8 @@ class TestWhoCanPermissionGate:
         mock_result = MagicMock()
         mock_result.allowed = True
 
-        with (
-            patch("syntara.authz.router.authorize", return_value=mock_result),
-            patch("syntara.authz.router._resolve_project_input", return_value=""),
-            patch("syntara.authz.router._scan_authorized_users", return_value=([], set())),
-        ):
-            result = await who_can(body, user, db, evaluator)
-            assert result.resources == []
+        with patch("syntara.authz.router.authorize", return_value=mock_result):
+            await _enforce_who_can_permission(body, user, db, evaluator, resource_project="")
 
     @pytest.mark.asyncio
     async def test_tier2_denies_when_user_cannot_read_resource_type_in_project(self) -> None:
@@ -554,10 +548,9 @@ class TestWhoCanPermissionGate:
 
         with (
             patch("syntara.authz.router.authorize", return_value=mock_result),
-            patch("syntara.authz.router._resolve_project_input", return_value="my-project"),
             pytest.raises(AuthorizationDeniedError, match="Not authorized to query approval in project my-project"),
         ):
-            await who_can(body, user, db, evaluator)
+            await _enforce_who_can_permission(body, user, db, evaluator, resource_project="my-project")
 
     @pytest.mark.asyncio
     async def test_tier2_allows_when_user_can_read_resource_type_in_project(self) -> None:
@@ -573,10 +566,5 @@ class TestWhoCanPermissionGate:
         mock_result = MagicMock()
         mock_result.allowed = True
 
-        with (
-            patch("syntara.authz.router.authorize", return_value=mock_result),
-            patch("syntara.authz.router._resolve_project_input", return_value="my-project"),
-            patch("syntara.authz.router._scan_authorized_users", return_value=([], set())),
-        ):
-            result = await who_can(body, user, db, evaluator)
-            assert result.resources == []
+        with patch("syntara.authz.router.authorize", return_value=mock_result):
+            await _enforce_who_can_permission(body, user, db, evaluator, resource_project="my-project")

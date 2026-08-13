@@ -657,6 +657,63 @@ async def _user_has_authz_query_permission(
     return result.allowed
 
 
+async def _enforce_who_can_permission(
+    body: WhoCanRequest,
+    current_user: User,
+    db: AsyncSession,
+    evaluator: AuthzEvaluator,
+    resource_project: str,
+) -> None:
+    """Enforce three-tier authorization gate for who_can queries.
+
+    Tier 1: resource_id provided — user must be able to read that specific resource.
+    Tier 2: resource_project provided (no resource_id) — user must be able to read
+            the resource type within that project.
+    Tier 3: Neither provided — system-wide query, requires authz:query (admin).
+    """
+    if body.resource_id:
+        authz_result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=current_user.id,
+                action="read",
+                resource_type=body.resource_type,
+                resource_id=body.resource_id,
+                resource_labels=body.resource_labels,
+                resource_metadata=body.resource_metadata,
+                resource_project=resource_project,
+                user_labels=current_user.labels,
+                user_metadata=current_user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = f"Not authorized to query {body.resource_type}/{body.resource_id}"
+            raise AuthorizationDeniedError(msg)
+
+    elif resource_project:
+        authz_result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=current_user.id,
+                action="read",
+                resource_type=body.resource_type,
+                resource_id="",
+                resource_project=resource_project,
+                user_labels=current_user.labels,
+                user_metadata=current_user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
+            raise AuthorizationDeniedError(msg)
+
+    elif not await _user_has_authz_query_permission(current_user, evaluator, db):
+        msg = "System-wide who_can queries require authz:query permission"
+        raise AuthorizationDeniedError(msg)
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
@@ -759,52 +816,7 @@ async def who_can(
 
     """
     resource_project = await _resolve_project_input(db, body.resource_project)
-
-    # --- three-tier permission gate ---
-    if body.resource_id:
-        # Tier 1: specific resource — user must be able to read it
-        authz_result = await authorize(
-            db,
-            evaluator,
-            AuthzRequest(
-                user_id=current_user.id,
-                action="read",
-                resource_type=body.resource_type,
-                resource_id=body.resource_id,
-                resource_labels=body.resource_labels,
-                resource_metadata=body.resource_metadata,
-                resource_project=resource_project,
-                user_labels=current_user.labels,
-                user_metadata=current_user.authz_metadata,
-            ),
-        )
-        if not authz_result.allowed:
-            msg = f"Not authorized to query {body.resource_type}/{body.resource_id}"
-            raise AuthorizationDeniedError(msg)
-
-    elif resource_project:
-        # Tier 2: project-scoped — user must be able to read the resource type in this project
-        authz_result = await authorize(
-            db,
-            evaluator,
-            AuthzRequest(
-                user_id=current_user.id,
-                action="read",
-                resource_type=body.resource_type,
-                resource_id="",
-                resource_project=resource_project,
-                user_labels=current_user.labels,
-                user_metadata=current_user.authz_metadata,
-            ),
-        )
-        if not authz_result.allowed:
-            msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
-            raise AuthorizationDeniedError(msg)
-
-    elif not await _user_has_authz_query_permission(current_user, evaluator, db):
-        # Tier 3: system-wide — admin only
-        msg = "System-wide who_can queries require authz:query permission"
-        raise AuthorizationDeniedError(msg)
+    await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project)
 
     if body.cursor:
         cursor_data = decode_cursor(body.cursor)
