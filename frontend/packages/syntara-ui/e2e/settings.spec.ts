@@ -79,9 +79,8 @@ async function resetAllToDefaults(app: import('@playwright/test').Page) {
 }
 
 test.describe('Settings', () => {
-  // Settings tests share backend state — run serially to avoid conflicts
-  test.describe.configure({ mode: 'serial' })
-
+  // Settings tests share backend state — run serially to avoid conflicts.
+  // mode: 'serial' is set by createUnavailableGuard below.
   const guard = createUnavailableGuard('Settings page has no tabs; backend may not have settings configured')
 
   test.beforeEach(async ({ app }) => {
