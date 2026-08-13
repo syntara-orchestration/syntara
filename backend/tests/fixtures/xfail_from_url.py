@@ -12,6 +12,7 @@ anything (fail-open).
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import httpx
 import pytest
@@ -25,17 +26,29 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--xfail-from-url",
         default=None,
-        help="URL of a Markdown file listing tests to mark as xfail",
+        help="URL or file path of a Markdown file listing tests to mark as xfail",
     )
 
 
-def _fetch_xfail_file(url: str) -> str | None:
-    """Fetch the xfail Markdown file from a URL."""
+def _is_file_path(source: str) -> bool:
+    return source.startswith(("/", "./", "../"))
+
+
+def _load_xfail_file(source: str) -> str | None:
+    """Load the xfail Markdown file from a URL or local path."""
+    if _is_file_path(source):
+        path = Path(source)
+        try:
+            return path.read_text()
+        except OSError as exc:
+            logger.warning("url_xfail: failed to read file", path=str(path), error=str(exc))
+            return None
+
     try:
-        response = httpx.get(url, timeout=30, follow_redirects=True)
+        response = httpx.get(source, timeout=30, follow_redirects=True)
         response.raise_for_status()
     except httpx.HTTPError as exc:
-        logger.warning("url_xfail: failed to fetch file", url=url, error=str(exc))
+        logger.warning("url_xfail: failed to fetch file", url=source, error=str(exc))
         return None
 
     return response.text
@@ -82,10 +95,10 @@ def _matches(nodeid: str, pattern: str) -> bool:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    url: str | None = config.getoption("--xfail-from-url")
-    if not url:
+    source: str | None = config.getoption("--xfail-from-url")
+    if not source:
         return
-    content = _fetch_xfail_file(url)
+    content = _load_xfail_file(source)
     if content is None:
         return
 

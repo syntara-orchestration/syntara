@@ -69,17 +69,15 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
   ...fixtures.actionFixtures,
 })
 
-// Dynamic xfail from a remote Markdown file (same pattern as backend xfail_from_url.py).
-// Set NEXUS_E2E_XFAIL_URL to enable; the URL is fetched once per worker and matching
-// tests are marked as expected failures via test.fail().
 const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
   _xfailEntries: [
     async (_deps, use) => {
-      const source = processEnv['SYNTARA_PLAYWRIGHT_XFAIL_SOURCE']
-      if (!source) {
+      const base = processEnv['SYNTARA_XFAIL_SOURCE']
+      if (!base) {
         await use([])
         return
       }
+      const source = base.endsWith('/') ? `${base}playwright.md` : `${base}/playwright.md`
       const entries = await loadXfailEntries(source)
       if (entries.length > 0) {
         process.stderr.write(`xfail: loaded ${entries.length} pattern(s) from ${source}\n`)

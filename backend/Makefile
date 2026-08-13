@@ -19,8 +19,7 @@ REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
-XFAIL_URL ?=
-XFAIL_ARGS := $(if $(XFAIL_URL),--xfail-from-url $(XFAIL_URL),)
+XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
 ifeq ($(shell uname -s),Darwin)
 # macOS: try podman machine inspect first (works for any machine name),
 # then the standard symlink, then Homebrew's common location
