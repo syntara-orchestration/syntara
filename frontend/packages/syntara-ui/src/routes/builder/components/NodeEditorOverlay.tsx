@@ -6,6 +6,7 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import { NodeDetailsPanel } from '../NodeDetailsPanel'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
+import { resolveStepDocKey } from '../utils/resolveStepDocKey'
 import { useIsVersionView } from '../VersionViewContext'
 
 type NodeEditorOverlayProps = {
@@ -29,7 +30,6 @@ type NodeEditorOverlayProps = {
 }
 
 export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEditorOverlayProps) {
-  const builderDocLink = useDocLink('builder')
   const isVersionView = useIsVersionView()
   const {
     isOpen,
@@ -50,6 +50,9 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
     onRunStep,
     onNodeAdded,
   } = props
+
+  const stepDocKey = resolveStepDocKey({ mode, nodeTypeId, nodeSubtypeId, selectedNode })
+  const stepDocLink = useDocLink(stepDocKey)
 
   if (!isOpen) return null
 
@@ -76,7 +79,7 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
           projectId={projectId}
           onNavigateToNode={onNavigateToNode}
           onAddStep={onAddStep}
-          docLink={builderDocLink}
+          docLink={stepDocLink}
           workflowMetadata={workflowMetadata}
           onRunStep={isVersionView ? undefined : onRunStep}
           readOnly={isVersionView}
