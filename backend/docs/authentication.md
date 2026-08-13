@@ -527,7 +527,7 @@ On first application startup, an `admin` user is seeded with the password from `
 
 The bootstrap admin is also given a **placeholder email** of `admin@example.com` so JWT access tokens (and audit / approval attribution that keys on email) are never `null`. **Change this email after install** — the built-in admin may update its own email via `PATCH /users/{id}` (self). Username and display name remain protected.
 
-If an existing deployment still has `email=NULL` on the builtin admin, the next seed run backfills `admin@example.com` without overwriting a non-null email.
+If an existing deployment still has `email=NULL` on the builtin admin, the next seed run (and `set_admin_password`) backfills `admin@example.com` without overwriting a non-null email. If that placeholder is already taken by another user, the conflict is logged and the admin email is left unchanged so seeding / password reset can still complete.
 
 If the password file is not configured or missing, the application still starts but logs a warning — the admin user will be created without a password (unable to log in locally).
 
