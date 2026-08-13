@@ -1,7 +1,7 @@
 """E2E tests for the script node gate (APP_SCRIPT_NODES_ENABLED).
 
 Tests verify that:
-- When disabled (default): script activities fail immediately with an opaque error
+- When disabled (default): script activities fail immediately with an error
 - When enabled: script activities execute normally
 
 The gate is controlled by the APP_SCRIPT_NODES_ENABLED environment variable

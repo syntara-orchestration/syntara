@@ -482,7 +482,6 @@ async def execute_script_activity(  # noqa: C901
     """
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
-    # SECURITY: Error is intentionally opaque — must NOT name the setting or hint at how to enable.
     if not get_settings().script_nodes_enabled:
         msg = "Script node execution is not enabled."
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
