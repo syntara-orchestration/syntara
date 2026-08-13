@@ -205,6 +205,40 @@ describe('GitHubClient', () => {
     });
   });
 
+  describe('getDefaultBranch', () => {
+    it('fetches the default branch from repository info', async () => {
+      server.use(
+        http.get('https://api.github.com/repos/owner/repo', () => {
+          return HttpResponse.json({
+            name: 'repo',
+            full_name: 'owner/repo',
+            default_branch: 'devel',
+          });
+        })
+      );
+
+      const branch = await client.getDefaultBranch();
+
+      expect(branch).toBe('devel');
+    });
+
+    it('handles repositories with main as default branch', async () => {
+      server.use(
+        http.get('https://api.github.com/repos/owner/repo', () => {
+          return HttpResponse.json({
+            name: 'repo',
+            full_name: 'owner/repo',
+            default_branch: 'main',
+          });
+        })
+      );
+
+      const branch = await client.getDefaultBranch();
+
+      expect(branch).toBe('main');
+    });
+  });
+
   describe('URL builders', () => {
     it('builds merge queue URL', () => {
       const url = client.getQueueUrl('devel');

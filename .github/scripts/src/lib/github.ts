@@ -122,6 +122,19 @@ export class GitHubClient {
   }
 
   /**
+   * Fetches the default branch name for the repository.
+   * Returns the branch name (e.g., 'main', 'devel', 'master').
+   */
+  async getDefaultBranch(): Promise<string> {
+    const response = await this.octokit.repos.get({
+      owner: this.owner,
+      repo: this.repo,
+    });
+
+    return response.data.default_branch;
+  }
+
+  /**
    * Builds a URL to the GitHub merge queue page for a branch.
    */
   getQueueUrl(branch: string): string {

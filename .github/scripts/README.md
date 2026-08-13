@@ -51,11 +51,12 @@ npm run check-queue-health
 3. Stops alerting after 30 minutes
 
 **Queue Health Poll:**
-1. Checks the merge queue for waiting PRs
-2. If empty, the queue is healthy
-3. If PRs are waiting, checks if anything merged to `devel` in the last 60 minutes
-4. Sends alert when the queue becomes unhealthy (PRs waiting + no merges)
-5. Sends recovery notification when the queue becomes healthy again
+1. Fetches the repository's default branch
+2. Checks the merge queue for waiting PRs
+3. If empty, the queue is healthy
+4. If PRs are waiting, checks if anything merged to the default branch in the last 60 minutes
+5. Sends alert when the queue becomes unhealthy (PRs waiting + no merges)
+6. Sends recovery notification when the queue becomes healthy again
 
 ## Dependencies
 

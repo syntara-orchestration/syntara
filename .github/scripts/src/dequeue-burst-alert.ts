@@ -18,6 +18,10 @@ async function main() {
 
   console.log('Checking for dequeue burst...');
 
+  // Fetch default branch dynamically
+  const defaultBranch = await github.getDefaultBranch();
+  console.log(`Monitoring dequeues for branch: ${defaultBranch}`);
+
   // Get workflow runs from the last 30 minutes
   const thirtyMinsAgo = new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000);
   const recentRuns = await github.getWorkflowRuns(
@@ -36,7 +40,7 @@ async function main() {
     // Extract PR number from merge group ref
     const prNumber = env.headRef?.match(/pr-(\d+)/)?.[1] ?? 'unknown';
     const prUrl = github.getPrUrl(parseInt(prNumber, 10));
-    const queueUrl = github.getQueueUrl('devel');
+    const queueUrl = github.getQueueUrl(defaultBranch);
 
     await slack.sendDequeueBurstAlert(
       DEQUEUE_THRESHOLD,

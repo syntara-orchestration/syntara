@@ -5,16 +5,15 @@ import { getEnvironment } from './lib/env.js';
 import type { HealthState } from './lib/types.js';
 
 const MERGE_TIMEOUT_MINUTES = 60;
-const BRANCH = 'devel';
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
  * Returns unhealthy if the queue has entries but no merges in 60+ minutes.
  */
-async function assessHealth(github: GitHubClient): Promise<HealthState> {
+async function assessHealth(github: GitHubClient, branch: string): Promise<HealthState> {
   console.log('Querying merge queue status...');
 
-  const entries = await github.getMergeQueueEntries(BRANCH);
+  const entries = await github.getMergeQueueEntries(branch);
   const queueDepth = entries.length;
 
   console.log(`Queue depth: ${queueDepth}`);
@@ -30,15 +29,15 @@ async function assessHealth(github: GitHubClient): Promise<HealthState> {
 
   // Check for recent merges
   const sixtyMinsAgo = new Date(Date.now() - MERGE_TIMEOUT_MINUTES * 60 * 1000);
-  const recentCommits = await github.getRecentCommits(BRANCH, sixtyMinsAgo);
+  const recentCommits = await github.getRecentCommits(branch, sixtyMinsAgo);
 
-  console.log(`Recent commits to ${BRANCH}: ${recentCommits.length}`);
+  console.log(`Recent commits to ${branch}: ${recentCommits.length}`);
 
   // If queue has entries but no merges in 60 min, unhealthy
   if (recentCommits.length === 0) {
     // Calculate time since last merge
     const allCommits = await github.getRecentCommits(
-      BRANCH,
+      branch,
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last week
     );
 
@@ -133,8 +132,12 @@ async function main() {
   const github = new GitHubClient(env.githubToken, env.repository);
   const slack = new SlackNotifier(env.slackWebhookUrl);
 
+  // Fetch default branch dynamically
+  const defaultBranch = await github.getDefaultBranch();
+  console.log(`Monitoring merge queue for branch: ${defaultBranch}`);
+
   // Assess current health
-  const currentState = await assessHealth(github);
+  const currentState = await assessHealth(github, defaultBranch);
   console.log(`Current health: ${currentState.health} (${currentState.reason})`);
 
   // Get previous health state
@@ -142,7 +145,7 @@ async function main() {
   console.log(`Previous health: ${previousHealth}`);
 
   // Detect transitions and alert
-  const queueUrl = github.getQueueUrl(BRANCH);
+  const queueUrl = github.getQueueUrl(defaultBranch);
 
   if (
     currentState.health === 'unhealthy' &&
