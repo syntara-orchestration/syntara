@@ -677,6 +677,19 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         validation_schema={"min": 256, "max": 2048},
     ),
     SettingDefinition(
+        key="workflow_engine.script_nodes_enabled",
+        name="Script nodes enabled",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.BOOLEAN,
+        default_value=True,
+        description=(
+            "When disabled, script nodes cannot be added to workflow definitions "
+            "and existing script nodes will not execute. Applies to all projects."
+        ),
+        helper_text="Disable to prevent arbitrary code execution in workflows.",
+        group=WorkflowEngineGroup.EXECUTION,
+    ),
+    SettingDefinition(
         key="workflow_engine.agentic_timeout_seconds",
         name="Agentic timeout (seconds)",
         category=SettingCategory.WORKFLOW_EXECUTION,
