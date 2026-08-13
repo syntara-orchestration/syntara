@@ -92,19 +92,47 @@ export class GitHubClient {
   }
 
   /**
-   * Fetches commits to a branch created after a specific time.
-   * Used to check if merges have occurred recently.
+   * Fetches recently merged PRs to a branch.
+   * Uses PR merge time, not commit timestamps, for accurate merge activity detection.
+   */
+  async getRecentMerges(branch: string, since: Date): Promise<Array<{ number: number; mergedAt: string; title: string }>> {
+    const response = await this.octokit.pulls.list({
+      owner: this.owner,
+      repo: this.repo,
+      state: 'closed',
+      base: branch,
+      sort: 'updated',
+      direction: 'desc',
+      per_page: 30,
+    });
+
+    return response.data
+      .filter((pr) => pr.merged_at !== null)
+      .filter((pr) => new Date(pr.merged_at!) >= since)
+      .map((pr) => ({
+        number: pr.number,
+        mergedAt: pr.merged_at!,
+        title: pr.title,
+      }));
+  }
+
+  /**
+   * Fetches commits to a branch (used for fallback time-since-merge calculation).
    */
   async getRecentCommits(branch: string, since: Date): Promise<Commit[]> {
     const response = await this.octokit.repos.listCommits({
       owner: this.owner,
       repo: this.repo,
       sha: branch,
-      since: since.toISOString(),
-      per_page: 10,
+      per_page: 30,
     });
 
-    return z.array(CommitSchema).parse(response.data);
+    const allCommits = z.array(CommitSchema).parse(response.data);
+
+    return allCommits.filter((commit) => {
+      const committerDate = new Date(commit.commit.committer.date);
+      return committerDate >= since;
+    });
   }
 
   /**

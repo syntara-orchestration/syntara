@@ -29,23 +29,23 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 
   // Check for recent merges
   const sixtyMinsAgo = new Date(Date.now() - MERGE_TIMEOUT_MINUTES * 60 * 1000);
-  const recentCommits = await github.getRecentCommits(branch, sixtyMinsAgo);
+  const recentMerges = await github.getRecentMerges(branch, sixtyMinsAgo);
 
-  console.log(`Recent commits to ${branch}: ${recentCommits.length}`);
+  console.log(`Recent merges to ${branch}: ${recentMerges.length}`);
 
   // If queue has entries but no merges in 60 min, unhealthy
-  if (recentCommits.length === 0) {
+  if (recentMerges.length === 0) {
     // Calculate time since last merge
-    const allCommits = await github.getRecentCommits(
+    const allMerges = await github.getRecentMerges(
       branch,
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last week
     );
 
-    const lastCommitDate = allCommits[0]
-      ? new Date(allCommits[0].commit.committer.date)
+    const lastMergeDate = allMerges[0]
+      ? new Date(allMerges[0].mergedAt)
       : new Date();
     const minutesSinceMerge = Math.floor(
-      (Date.now() - lastCommitDate.getTime()) / (60 * 1000)
+      (Date.now() - lastMergeDate.getTime()) / (60 * 1000)
     );
 
     return {
