@@ -1,0 +1,18 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability report
+    url: https://github.com/syntara-orchestration/syntara/blob/devel/.github/SECURITY.md
+    about: Report security vulnerabilities via secalert@redhat.com. DO NOT open a public issue.
+
+  - name: Code of Conduct
+    url: https://github.com/syntara-orchestration/syntara/blob/devel/.github/CODE_OF_CONDUCT.md
+    about: Please review and follow the community Code of Conduct.
+
+  - name: Contributing guide
+    url: https://github.com/syntara-orchestration/syntara/blob/devel/CONTRIBUTING.md
+    about: Read the contributing guide before submitting changes.
+
+  - name: Discussions
+    url: https://github.com/orgs/syntara-orchestration/discussions
+    about: Ask questions, share ideas, or start a conversation with the community.
