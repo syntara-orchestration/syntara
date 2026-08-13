@@ -27,6 +27,7 @@ from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.credentials.models.credential import Credential
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
 from syntara.workflows.audit.workflow_version import (
     WorkflowVersionCreatedEvent,
@@ -39,6 +40,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    ScriptNodesDisabledError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -284,6 +286,58 @@ class WorkflowService(BaseService):
                     cred_ids.add(cred_id)
         return cred_ids
 
+    @staticmethod
+    def _definition_contains_script_nodes(workflow_definition: dict[str, Any]) -> bool:
+        """Return True if any node in the definition has type 'script'."""
+        return any(node.get("type") == "script" for node in workflow_definition.get("nodes", []))
+
+    async def _check_script_edit_permission(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+    ) -> None:
+        """Check script:edit permission if the definition contains script nodes.
+
+        Also checks the workflow_engine.script_nodes_enabled runtime setting.
+
+        Raises:
+            ScriptNodesDisabledError: If script nodes are disabled org-wide.
+            AuthorizationDeniedError: If the user lacks script:edit.
+
+        """
+        if not self._definition_contains_script_nodes(workflow_definition):
+            return
+
+        cache = get_runtime_settings()
+        if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
+            raise ScriptNodesDisabledError()
+
+        if self.opa_client is None:
+            msg = "Authorization service unavailable; cannot verify script:edit permission"
+            raise AuthorizationDeniedError(msg)
+
+        proj_result = await self.session.exec(
+            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
+        )
+        project_name = proj_result.first() or ""
+
+        authz_result = await authorize(
+            self.session,
+            self.opa_client,
+            AuthzRequest(
+                user_id=self.user.id,
+                action="edit",
+                resource_type="script",
+                resource_id="",
+                resource_project=project_name,
+                user_labels=self.user.labels,
+                user_metadata=self.user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = "Not authorized to create or modify workflows containing script nodes"
+            raise AuthorizationDeniedError(msg)
+
     async def _validate_credential_project_scope(
         self,
         workflow_definition: dict[str, Any],
@@ -471,6 +525,7 @@ class WorkflowService(BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
+        await self._check_script_edit_permission(workflow_definition, project_id)
         ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1015,6 +1070,7 @@ class WorkflowService(BaseService):
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
+            await self._check_script_edit_permission(workflow_definition, workflow.project_id)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
+        ScriptNodesDisabledError,
         TemporalUnavailableError,
         TriggerValidationError,
         WebhookAuthenticationRequiredError,
@@ -290,6 +291,20 @@ def builtin_workflow_missing_handler(request: Request, exc: "BuiltinWorkflowMiss
         detail="A required system workflow is missing. Contact your administrator.",
         code="BUILTIN_WORKFLOW_MISSING",
         retryable=True,
+        instance=str(request.url),
+    )
+
+
+def script_nodes_disabled_handler(request: Request, exc: "ScriptNodesDisabledError") -> JSONResponse:
+    """Handle ScriptNodesDisabledError with RFC 9457 format."""
+    logger.warning("Script nodes disabled by administrator", exc_info=exc)
+    return create_problem_details_response(
+        status_code=status.HTTP_403_FORBIDDEN,
+        problem_type=PROBLEM_TYPES["forbidden"],
+        title="Script Nodes Disabled",
+        detail=str(exc),
+        code="SCRIPT_NODES_DISABLED",
+        retryable=False,
         instance=str(request.url),
     )
 
