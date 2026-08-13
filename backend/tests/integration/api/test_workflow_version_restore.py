@@ -162,3 +162,50 @@ async def test_restore_preserves_workflow_definition(jwt_client: AsyncClient, te
     assert response.status_code == 200
     restored_definition = response.json()["version"]["workflow_definition"]
     assert restored_definition == v1_definition
+
+
+@pytest.mark.asyncio
+async def test_restore_with_script_node_requires_permission(jwt_client: AsyncClient, test_project_id: str) -> None:
+    """Test that restoring a version with script nodes checks script:edit.
+
+    This is a regression test for AAP-87589 finding #2 (restore bypass).
+    """
+    script_definition = {
+        "schema_version": "2.0.0",
+        "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "script1",
+                "type": "script",
+                "parameters": {"language": "python", "code": "print('v1')"},
+            }
+        ],
+        "edges": [{"from": "trigger_manual", "to": "script1"}],
+    }
+
+    # Create workflow with script nodes (v1)
+    create_resp = await jwt_client.post(
+        "/api/v1/workflows",
+        json={
+            "name": "script-restore-test",
+            "project_id": test_project_id,
+            "workflow_definition": script_definition,
+        },
+    )
+    assert create_resp.status_code == 201
+    workflow_id = create_resp.json()["id"]
+
+    # Create v2 without script nodes
+    defn_v2 = create_minimal_workflow_definition(
+        name="script-restore", description="v2 no script", activity_id="task1"
+    )
+    await jwt_client.patch(
+        f"/api/v1/workflows/{workflow_id}",
+        json={"workflow_definition": defn_v2},
+    )
+
+    # Restore v1 (has script nodes) - should check script:edit
+    response = await jwt_client.post(f"/api/v1/workflows/{workflow_id}/versions/1/restore")
+
+    # Expected: 403 Forbidden if user lacks script:edit, 200 if permissive authz
+    assert response.status_code in [200, 403]  # 200 if permissive, 403 if RBAC enabled

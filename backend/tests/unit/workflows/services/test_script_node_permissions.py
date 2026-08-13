@@ -1,4 +1,4 @@
-"""Unit tests for script node permission checks in WorkflowService."""
+"""Unit tests for script node permission checks in WorkflowService and ExecutionService."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -7,6 +7,7 @@ import pytest
 
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
+from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.services.workflow_service import WorkflowService
 
 
@@ -116,3 +117,68 @@ class TestCheckScriptEditPermission:
             mock_settings.return_value = cache
             with pytest.raises(ScriptNodesDisabledError):
                 await svc._check_script_edit_permission(_def_with_script(), uuid4())
+
+
+class TestCheckScriptExecutePermission:
+    """Test script:execute permission enforcement in execution service."""
+
+    @pytest.mark.asyncio
+    async def test_no_script_nodes_skips_check(self) -> None:
+        svc = _make_execution_service()
+        with patch("syntara.workflows.services.execution_service.authorize") as mock_authorize:
+            await svc._check_script_execute_permission(_def_without_script(), uuid4())
+        mock_authorize.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_script_nodes_allowed(self) -> None:
+        svc = _make_execution_service()
+        allowed = MagicMock()
+        allowed.allowed = True
+        with patch("syntara.workflows.services.execution_service.authorize", return_value=allowed):
+            await svc._check_script_execute_permission(_def_with_script(), uuid4())
+
+    @pytest.mark.asyncio
+    async def test_script_nodes_denied_raises(self) -> None:
+        svc = _make_execution_service()
+        denied = MagicMock()
+        denied.allowed = False
+        with patch("syntara.workflows.services.execution_service.authorize", return_value=denied):
+            with pytest.raises(AuthorizationDeniedError):
+                await svc._check_script_execute_permission(_def_with_script(), uuid4())
+
+    @pytest.mark.asyncio
+    async def test_no_opa_client_raises(self) -> None:
+        svc = _make_execution_service(with_opa=False)
+        with pytest.raises(AuthorizationDeniedError):
+            await svc._check_script_execute_permission(_def_with_script(), uuid4())
+
+    @pytest.mark.asyncio
+    async def test_script_nodes_disabled_setting_raises(self) -> None:
+        from syntara.workflows.exceptions import ScriptNodesDisabledError
+
+        svc = _make_execution_service()
+        with patch("syntara.workflows.services.execution_service.get_runtime_settings") as mock_settings:
+            cache = AsyncMock()
+            cache.get_bool.return_value = False
+            mock_settings.return_value = cache
+            with pytest.raises(ScriptNodesDisabledError):
+                await svc._check_script_execute_permission(_def_with_script(), uuid4())
+
+
+def _make_execution_service(*, with_opa: bool = True) -> ExecutionService:
+    """Create ExecutionService mock for testing."""
+    session = AsyncMock()
+    proj_result = MagicMock()
+    proj_result.first.return_value = "test-project"
+    session.exec.return_value = proj_result
+
+    user = MagicMock()
+    user.id = uuid4()
+    user.labels = {}
+    user.authz_metadata = {}
+
+    svc = ExecutionService.__new__(ExecutionService)
+    svc.session = session
+    svc.user = user
+    svc.opa_client = MagicMock(spec=AuthzEvaluator) if with_opa else None
+    return svc

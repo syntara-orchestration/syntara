@@ -12,6 +12,7 @@ from temporalio.service import RPCError
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
 from syntara.authz.engine import AuthzRequest, VisibilityResult, authorize
+from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
@@ -79,6 +80,7 @@ def get_execution_service(
         TemporalExecutionService | None,
         Depends(get_temporal_execution_service),
     ],
+    opa_client: Annotated[AuthzEvaluator | None, Depends(get_authz_evaluator)],
 ) -> ExecutionService:
     """Dependency provider for ExecutionService.
 
@@ -89,12 +91,13 @@ def get_execution_service(
         db: Database session (injected by FastAPI)
         current_user: Current authenticated user
         temporal_service: Temporal service (injected by FastAPI, may be None)
+        opa_client: Authorization evaluator (injected by FastAPI, may be None)
 
     Returns:
         ExecutionService configured with database and optional Temporal integration
 
     """
-    return ExecutionService(db, current_user, temporal_service=temporal_service)
+    return ExecutionService(db, current_user, temporal_service=temporal_service, opa_client=opa_client)
 
 
 @router.get(

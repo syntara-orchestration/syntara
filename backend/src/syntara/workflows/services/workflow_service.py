@@ -338,6 +338,53 @@ class WorkflowService(BaseService):
             msg = "Not authorized to create or modify workflows containing script nodes"
             raise AuthorizationDeniedError(msg)
 
+    async def _check_script_execute_permission(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+    ) -> None:
+        """Check script:execute permission if the definition contains script nodes.
+
+        Also checks the workflow_engine.script_nodes_enabled runtime setting.
+
+        Raises:
+            ScriptNodesDisabledError: If script nodes are disabled org-wide.
+            AuthorizationDeniedError: If the user lacks script:execute.
+
+        """
+        if not self._definition_contains_script_nodes(workflow_definition):
+            return
+
+        cache = get_runtime_settings()
+        if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
+            raise ScriptNodesDisabledError
+
+        if self.opa_client is None:
+            msg = "Authorization service unavailable; cannot verify script:execute permission"
+            raise AuthorizationDeniedError(msg)
+
+        proj_result = await self.session.exec(
+            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
+        )
+        project_name = proj_result.first() or ""
+
+        authz_result = await authorize(
+            self.session,
+            self.opa_client,
+            AuthzRequest(
+                user_id=self.user.id,
+                action="execute",
+                resource_type="script",
+                resource_id="",
+                resource_project=project_name,
+                user_labels=self.user.labels,
+                user_metadata=self.user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = "Not authorized to execute workflows containing script nodes"
+            raise AuthorizationDeniedError(msg)
+
     async def _validate_credential_project_scope(
         self,
         workflow_definition: dict[str, Any],
@@ -1261,6 +1308,7 @@ class WorkflowService(BaseService):
             await self._validate_credential_project_scope(
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
+            await self._check_script_edit_permission(workflow_definition, workflow.project_id)
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )
@@ -1464,6 +1512,10 @@ class WorkflowService(BaseService):
         # Capture current definition for audit change summary
         current_version_record = await self._get_version_or_none(workflow.id, workflow.current_version)
         old_definition = current_version_record.workflow_definition if current_version_record else None
+
+        # Check script:edit permission if restoring a definition with script nodes
+        if workflow.project_id is not None:
+            await self._check_script_edit_permission(target_version.workflow_definition, workflow.project_id)
 
         date_iso = target_version.created_at.isoformat() if target_version.created_at else None
         source_label = target_version.name or date_iso or f"version {version}"
