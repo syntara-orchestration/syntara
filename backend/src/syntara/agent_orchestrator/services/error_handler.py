@@ -43,31 +43,13 @@ def _is_network_error(error_msg: str) -> bool:
     return _contains_any(error_msg, ["connection", "network", "unreachable"])
 
 
-def classify_streaming_error(exception: Exception, invocation_id: UUID | None = None) -> ErrorData:
-    """Classify streaming exception into RFC 9457 Problem Details format.
+def _classify_by_exception_type(exception: Exception, instance: str | None) -> ErrorData | None:
+    """Classify exceptions by type before message heuristics.
 
-    Args:
-        exception: Exception raised during streaming
-        invocation_id: Optional invocation ID for the instance field
-
-    Returns:
-        ErrorData model with RFC 9457 fields: type, title, detail, code, retryable, instance
-
-    Examples:
-        >>> error = classify_streaming_error(TimeoutError())
-        >>> error.type
-        'https://api.example.com/errors/timeout-error'
-        >>> error.retryable
-        True
-
+    Tool discovery/selection failures and timeouts are classified here so their
+    embedded cause names (e.g. ``ConnectionError``) are not mismatched by the
+    message-based heuristics downstream.
     """
-    error_msg = str(exception).lower()
-    instance = _build_instance_uri(invocation_id)
-
-    # Tool discovery/selection failures must be classified by type before message
-    # heuristics. Discovery errors often embed cause type names like
-    # ``ConnectionError``, which would otherwise match as retryable LLM network
-    # failures and mislead stream clients into pointless retries.
     if isinstance(exception, ToolDiscoveryError):
         return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/tool-discovery-error",
@@ -88,7 +70,6 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
             instance=instance,
         )
 
-    # Handle timeout errors
     if isinstance(exception, TimeoutError):
         return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/timeout-error",
@@ -98,6 +79,35 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
             retryable=True,
             instance=instance,
         )
+
+    return None
+
+
+def classify_streaming_error(exception: Exception, invocation_id: UUID | None = None) -> ErrorData:
+    """Classify streaming exception into RFC 9457 Problem Details format.
+
+    Args:
+        exception: Exception raised during streaming
+        invocation_id: Optional invocation ID for the instance field
+
+    Returns:
+        ErrorData model with RFC 9457 fields: type, title, detail, code, retryable, instance
+
+    Examples:
+        >>> error = classify_streaming_error(TimeoutError())
+        >>> error.type
+        'https://api.example.com/errors/timeout-error'
+        >>> error.retryable
+        True
+
+    """
+    instance = _build_instance_uri(invocation_id)
+
+    typed = _classify_by_exception_type(exception, instance)
+    if typed is not None:
+        return typed
+
+    error_msg = str(exception).lower()
 
     # Rate limiting (429 status)
     if _is_rate_limit_error(error_msg):
