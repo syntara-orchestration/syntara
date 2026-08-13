@@ -304,7 +304,7 @@ def worker_base_url() -> str:
 
 @pytest.fixture(scope="session")
 def syntara_api_admin_group_id(syntara_api: SyntaraApiRegistry) -> UUID:
-    """Get admin role group ID for Syntara API."""
+    """Get admin role group ID."""
     groups_resp = syntara_api.groups.list(additional_params={"name": "admins"}, limit=100)
     if groups_resp.parsed is None or len(groups_resp.parsed.resources) == 0:
         msg = "Unable to retrieve admin group ID."
@@ -374,7 +374,7 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
 
 @pytest.fixture(scope="session")
 def syntara_admin_user(syntara_api: SyntaraApiRegistry) -> UserInfo:
-    """Get admin user ID for Syntara API."""
+    """Get admin user ID."""
     return cast("UserInfo", syntara_api.authentication.get_current_user().assert_and_get())
 
 

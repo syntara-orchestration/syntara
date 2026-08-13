@@ -16,7 +16,7 @@ HERMETO_IMAGE="${HERMETO_IMAGE:-quay.io/konflux-ci/hermeto:0.55.0@sha256:27936b0
 KBC_IMAGE="${KBC_IMAGE:-quay.io/konflux-ci/konflux-build-cli:latest}"
 OUTPUT_DIR="${BACKEND_ROOT}/.hermeto-output"
 PREFETCH_OUTPUT_DIR="${OUTPUT_DIR}/output"
-IMAGE_TAG="${IMAGE_TAG:-localhost/nexus-local:hermetic}"
+IMAGE_TAG="${IMAGE_TAG:-localhost/syntara-local:hermetic}"
 PREFETCH_MODE="${PREFETCH_MODE:-permissive}"
 ENABLE_PACKAGE_REGISTRY_PROXY="${ENABLE_PACKAGE_REGISTRY_PROXY:-false}"
 PREFETCH_INPUT_DEFAULT='[{"type":"pip","path":"backend"},{"type":"rpm","path":"backend"},{"type":"generic","path":"backend"}]'
@@ -252,7 +252,7 @@ konflux-build-cli --loglevel debug prefetch-dependencies \
 }
 
 collect_base_images() {
-	local containerfile="${BACKEND_ROOT}/containers/nexus/Containerfile"
+	local containerfile="${BACKEND_ROOT}/containers/syntara/Containerfile"
 	local -a base_images
 	local image=""
 
@@ -337,7 +337,7 @@ build_with_kbc() {
 
 	local -a kbc_args=(
 		image build
-		-f /workspace/backend/containers/nexus/Containerfile
+		-f /workspace/backend/containers/syntara/Containerfile
 		-t "${IMAGE_TAG}"
 		--source /workspace
 		--context backend

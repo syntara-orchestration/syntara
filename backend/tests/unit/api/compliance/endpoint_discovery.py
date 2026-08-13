@@ -28,7 +28,7 @@ _ACTION_OPERATION_PREFIXES = (
 )
 
 # OpenAPI tag for AAP Controller BFF proxy endpoints (locked to upstream response shape).
-_AAP_PROXY_TAG = "Ansible Automation Platform"
+_AAP_PROXY_TAG = "Ansible Automation Platform Proxy"
 
 EXCLUSIONS_FILE = Path(__file__).parent / "list_compliance_exclusions.yaml"
 CRUD_EXCLUSIONS_FILE = Path(__file__).parent / "crud_compliance_exclusions.yaml"
@@ -288,7 +288,7 @@ def discover_testable_list_endpoints() -> list[EndpointInfo]:
     """Discover list endpoints that should be tested for compliance.
 
     Filters out:
-    - AAP proxy endpoints (tagged "Ansible Automation Platform" in OpenAPI spec, locked to upstream format)
+    - AAP proxy endpoints (tagged "Ansible Automation Platform Proxy" in OpenAPI spec, locked to upstream format)
     - Explicitly excluded endpoints from list_compliance_exclusions.yaml
 
     Includes:

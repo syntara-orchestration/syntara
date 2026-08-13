@@ -36,7 +36,7 @@ def _is_retryable(exc: Exception) -> bool:
 
 
 def _generate_live_token(base_url: str) -> str:
-    """Obtain a JWT access token for tests that hit a live deployment.
+    """Obtain a JWT access token for tests that hit a live Syntara deployment.
 
     Resolution order:
     1. SYNTARA_API_TOKEN env var (pre-generated token for remote deployments)

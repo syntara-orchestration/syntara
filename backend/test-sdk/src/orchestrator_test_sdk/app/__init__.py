@@ -4,7 +4,7 @@ SDK fixtures (e2e + performance — require a live deployment):
   - live.py        syntara_base_url, syntara_client, syntara_api, auth_headers
 
 Pytest hooks (global infrastructure for all test types):
-  - _hooks.py      worker_id, --run-performance flag, collection filtering, cleanup
+  - _hooks.py      worker_id, lock-file cleanup
 
 Support utilities (no pytest fixtures — importable from any test context):
   - mock_mcp_provider    MockMCPProvider class

@@ -48,6 +48,7 @@ dependencies = [
     "filelock>=3.20.0",
     "pypandoc>=1.14",
     "tiktoken>=0.5.0",
+    "tzdata>=2024.1",
     "scikit-learn>=1.7.2",
     "rapidfuzz>=3.14.3",
     "spacy>=3.8.11",
@@ -300,7 +301,6 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "mcp: marks tests that require MCP server infrastructure (deselect with '-m \"not mcp\"')",
-    "performance: marks tests as performance tests (excluded by default, run with '--run-performance')",
     "e2e: marks tests as end-to-end tests requiring full stack (Syntara API, Temporal, MCP server, OpenRouter)",
     "global_revocation: marks tests that set the global revocation timestamp (must run in an isolated pytest session to avoid poisoning other tests)",
     "compliance: marks tests as compliance tests (auth coverage, API contract enforcement)",
@@ -320,6 +320,8 @@ omit = [
     "tools/*",  # Manual utilities, not production code
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
+    "src/syntara/workflows/worker.py",  # Entrypoint scripts, not unit-testable
+    "src/syntara/workflows/background_worker.py",
 ]
 
 [tool.coverage.report]

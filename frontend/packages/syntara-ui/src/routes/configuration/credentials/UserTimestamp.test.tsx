@@ -114,10 +114,11 @@ describe('UserTimestamp', () => {
   })
 
   describe('inline mode', () => {
-    it('renders user and timestamp on one line with separator', () => {
+    it('renders timestamp and user on one line with "by" separator', () => {
       const { container } = render(<UserTimestamp user={userRef} timestamp={timestamp} inline />)
       expect(screen.getByText('alice')).toBeInTheDocument()
-      expect(container.textContent).toContain('·')
+      expect(container.textContent).toContain('by')
+      expect(container.textContent).not.toContain('·')
     })
 
     it('renders UserReference object inline', () => {
@@ -132,7 +133,7 @@ describe('UserTimestamp', () => {
 
     it('renders only timestamp inline when user is null', () => {
       const { container } = render(<UserTimestamp user={null} timestamp={timestamp} inline />)
-      expect(container.textContent).not.toContain('·')
+      expect(container.textContent).not.toContain('by')
     })
 
     it('applies neutral timestamp color when subtleTimestamp is false', () => {
@@ -142,7 +143,7 @@ describe('UserTimestamp', () => {
 
     it('renders only timestamp inline when user is undefined', () => {
       const { container } = render(<UserTimestamp timestamp={timestamp} inline />)
-      expect(container.textContent).not.toContain('·')
+      expect(container.textContent).not.toContain('by')
     })
 
     it('renders plain string user inline with neutral timestamp', () => {
@@ -152,7 +153,7 @@ describe('UserTimestamp', () => {
 
     it('renders only timestamp inline with neutral timestamp when user is null', () => {
       const { container } = render(<UserTimestamp user={null} timestamp={timestamp} inline subtleTimestamp={false} />)
-      expect(container.textContent).not.toContain('·')
+      expect(container.textContent).not.toContain('by')
     })
 
     it('renders with explicit inline=true and subtleTimestamp=true', () => {
@@ -173,7 +174,67 @@ describe('UserTimestamp', () => {
 
     it('renders inline with undefined user and explicit subtleTimestamp=false', () => {
       const { container } = render(<UserTimestamp inline={true} subtleTimestamp={false} />)
-      expect(container.textContent).not.toContain('·')
+      expect(container.textContent).not.toContain('by')
+    })
+  })
+
+  describe('user rendering mode', () => {
+    it('renders plain string user as text (not a link) in stacked mode', () => {
+      render(<UserTimestamp user="bob" timestamp={timestamp} />)
+      expect(screen.getByText('bob')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'bob' })).not.toBeInTheDocument()
+    })
+
+    it('renders plain string user as text (not a link) in inline mode', () => {
+      render(<UserTimestamp user="bob" timestamp={timestamp} inline />)
+      expect(screen.getByText('bob')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'bob' })).not.toBeInTheDocument()
+    })
+
+    it('renders UserReference as a link in stacked mode', () => {
+      render(<UserTimestamp user={userRef} timestamp={timestamp} />)
+      const link = screen.getByRole('link', { name: 'alice' })
+      expect(link).toHaveAttribute('href', expectedHref)
+    })
+
+    it('renders UserReference as a link in inline mode', () => {
+      render(<UserTimestamp user={userRef} timestamp={timestamp} inline />)
+      const link = screen.getByRole('link', { name: 'alice' })
+      expect(link).toHaveAttribute('href', expectedHref)
+    })
+  })
+
+  describe('"by" separator rendering', () => {
+    it('renders "by" prefix before username in stacked mode', () => {
+      const { container } = render(<UserTimestamp user={userRef} timestamp={timestamp} />)
+      expect(container.textContent).toContain('by')
+    })
+
+    it('renders "by" prefix before username in inline mode', () => {
+      const { container } = render(<UserTimestamp user={userRef} timestamp={timestamp} inline />)
+      expect(container.textContent).toContain('by')
+    })
+
+    it('does not render "by" when user is null in stacked mode', () => {
+      const { container } = render(<UserTimestamp user={null} timestamp={timestamp} />)
+      expect(container.textContent).not.toContain('by')
+    })
+
+    it('does not render "by" when user is undefined in stacked mode', () => {
+      const { container } = render(<UserTimestamp timestamp={timestamp} />)
+      expect(container.textContent).not.toContain('by')
+    })
+
+    it('renders "by" prefix before plain string user in stacked mode', () => {
+      const { container } = render(<UserTimestamp user="bob" timestamp={timestamp} />)
+      expect(container.textContent).toContain('by')
+      expect(container.textContent).toContain('bob')
+    })
+
+    it('renders "by" prefix before plain string user in inline mode', () => {
+      const { container } = render(<UserTimestamp user="bob" timestamp={timestamp} inline />)
+      expect(container.textContent).toContain('by')
+      expect(container.textContent).toContain('bob')
     })
   })
 
