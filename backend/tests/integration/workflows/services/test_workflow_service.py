@@ -2454,6 +2454,36 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         assert result.published_version_id is None
 
     @pytest.mark.asyncio
+    async def test_update_version_metadata_non_builtin_workflow_succeeds(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, project_id=test_project_id)
+        version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
+        test_db_session.add(workflow)
+        test_db_session.add(version)
+        await test_db_session.flush()
+
+        service = WorkflowService(test_db_session, test_user)
+        result = await service.update_version_metadata(workflow.id, version=1, change_description="valid edit")
+        assert result.change_description == "valid edit"
+
+    @pytest.mark.asyncio
+    async def test_update_version_metadata_builtin_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        workflow = self._create_test_workflow(
+            name="Builtin WF", created_by=test_user.id, is_builtin=True, project_id=test_project_id
+        )
+        version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
+        test_db_session.add(workflow)
+        test_db_session.add(version)
+        await test_db_session.flush()
+
+        service = WorkflowService(test_db_session, test_user)
+        with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
+            await service.update_version_metadata(workflow.id, version=1, change_description="sneaky edit")
+
+    @pytest.mark.asyncio
     async def test_create_workflow_in_builtin_project_raises(
         self, test_db_session: AsyncSession, test_user: User
     ) -> None:

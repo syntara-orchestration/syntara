@@ -71,10 +71,6 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
             error=str(exc),
         )
 
-    # Ensure @watch_setting("telemetry.segment_write_key") is registered before
-    # start_watching() applies pending watchers.
-    import syntara.telemetry.client  # noqa: F401, PLC0415
-
     get_runtime_settings().start_watching()
     discover_and_register_all_handlers()
 

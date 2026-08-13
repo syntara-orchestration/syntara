@@ -163,6 +163,11 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     validate_encryption_key_at_startup()
     await validate_file_storage_at_startup(get_settings())
 
+    # Fail fast if timezone data is missing (AAP-86297: ubi-minimal strips zone files)
+    from syntara.workflows.workflow_engine.models.workflow_definition import _get_valid_timezones  # noqa: PLC0415
+
+    _get_valid_timezones()
+
     # Initialize logging and audit subsystems
     start_audit_subsystems()
 
@@ -185,10 +190,6 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     # Apply runtime log level (overrides the startup static config if a
     # runtime override has been set by an operator).
     await apply_runtime_log_level()
-
-    # Import telemetry watcher so @watch_setting("telemetry.segment_write_key")
-    # is registered before start_watching() applies pending watchers.
-    import syntara.telemetry.client  # noqa: F401, PLC0415
 
     # Watch for runtime log level changes and start polling
     runtime_settings.start_watching()
@@ -246,7 +247,6 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     # Initialize periodic analytics collector
     periodic_collector = PeriodicCollector(
         registry=get_telemetry_registry(),
-        settings_cache=runtime_settings,
     )
 
     completion_poller = get_completion_poller()
