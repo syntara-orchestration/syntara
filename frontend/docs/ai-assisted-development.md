@@ -273,7 +273,7 @@ I am building [what]. Verify my implementation matches the design system.
 [PASTE SCREENSHOT]
 ```
 
-The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.claude/skills/patternfly-ux-design-system.md`](../.claude/skills/patternfly-ux-design-system.md). The agent reads it automatically.
+The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.claude/skills/patternfly-ux-design-system.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
 
 ---
 
@@ -287,7 +287,7 @@ npm run e2e     # Playwright integration tests
 
 - Walk through all states in the browser ([§4](#4-review-your-changes-locally))
 - The quality checklist lives in [`AGENTS.md`](../AGENTS.md) — "Common PR Mistakes"
-- PR description guidelines are in the [PR template](../.github/pull_request_template.md)
+- PR description guidelines are in the [PR template](../../.github/pull_request_template.md)
 
 ---
 
@@ -504,14 +504,14 @@ The command lives at `.claude/commands/build-ui-feature.md`. It uses the project
 
 | Topic                       | Document                                                                                            |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |
-| Coding standards            | [`.claude/skills/coding_standards.md`](../.claude/skills/coding_standards.md)                       |
-| Testing standards           | [`.claude/skills/testing_guidelines.md`](../.claude/skills/testing_guidelines.md)                   |
-| PR review process           | [`.claude/skills/pr_review.md`](../.claude/skills/pr_review.md)                                     |
-| Playwright E2E              | [`.claude/skills/playwright_e2e.md`](../.claude/skills/playwright_e2e.md)                           |
-| PatternFly UX design system | [`.claude/skills/patternfly-ux-design-system.md`](../.claude/skills/patternfly-ux-design-system.md) |
-| Frontend specialist         | [`.claude/skills/frontend_specialist.md`](../.claude/skills/frontend_specialist.md)                 |
-| Library references          | [`.claude/skills/library_references.md`](../.claude/skills/library_references.md)                   |
+| Coding standards            | [`.claude/skills/coding_standards.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)                       |
+| Testing standards           | [`.claude/skills/testing_guidelines.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md)                   |
+| PR review process           | [`.claude/skills/pr_review.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                                     |
+| Playwright E2E              | [`.claude/skills/playwright_e2e.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)                           |
+| PatternFly UX design system | [`.claude/skills/patternfly-ux-design-system.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md) |
+| Frontend specialist         | [`.claude/skills/frontend_specialist.md`](../../.claude/skills/frontend-specialist/SKILL.md)                 |
+| Library references          | [`.claude/skills/library_references.md`](../../.claude/skills/frontend-library-references/SKILL.md)                   |
 | Architecture overview       | [`architecture.md`](./architecture.md)                                                              |
 | Error handling              | [`error-handling.md`](./error-handling.md)                                                          |
 | Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                             |
-| PR template                 | [`.github/pull_request_template.md`](../.github/pull_request_template.md)                           |
+| PR template                 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md)                           |
