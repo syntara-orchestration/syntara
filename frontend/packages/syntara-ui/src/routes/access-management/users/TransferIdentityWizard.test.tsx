@@ -329,6 +329,7 @@ describe('TransferIdentityWizard', () => {
 
       expect(screen.getByText('No identities')).toBeInTheDocument()
       expect(screen.getByText('This user has no federated identities to attach.')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 2, name: 'Select an identity' })).not.toBeInTheDocument()
       expect(screen.queryByText(/Choose one of/i)).not.toBeInTheDocument()
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
       expect(screen.queryByRole('columnheader', { name: /Provider/i })).not.toBeInTheDocument()
