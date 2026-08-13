@@ -14,6 +14,11 @@ on:
         type: string
         required: false
         default: ''
+    secrets:
+      RH_REGISTRY_USER:
+        required: true
+      RH_REGISTRY_TOKEN:
+        required: true
 
 jobs:
   build:
