@@ -4,15 +4,24 @@ This module contains SQLModel classes corresponding to the OpenAPI specification
 components for type-safe API operations.
 """
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
+
+_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+
+
+def _sanitize_notes(v: str | None) -> str | None:
+    if not isinstance(v, str):
+        return v
+    return _HTML_TAG_RE.sub("", v)
 
 
 class ApproverUserSummary(SQLModel):
@@ -170,6 +179,12 @@ class ApprovalDecisionRequest(SQLModel):
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
     )
 
+    @field_validator("notes", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v: str | None) -> str | None:
+        """Strip HTML tags to prevent stored XSS."""
+        return _sanitize_notes(v)
+
 
 class BatchApprovalDecision(SQLModel):
     """Single decision within a batch approval request."""
@@ -181,6 +196,12 @@ class BatchApprovalDecision(SQLModel):
     notes: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
     )
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v: str | None) -> str | None:
+        """Strip HTML tags to prevent stored XSS."""
+        return _sanitize_notes(v)
 
 
 class BatchApprovalRequest(SQLModel):
