@@ -28,7 +28,7 @@ jobs:
       - name: Download image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: backend-nexus-image
+          name: backend-syntara-image
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -44,24 +44,24 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event.workflow_run.event }}
         run: |
-          mapfile -t ALL_TAGS < nexus-image-tag.txt
+          mapfile -t ALL_TAGS < syntara-image-tag.txt
 
           if [ "$EVENT_NAME" = "issue_comment" ]; then
             # For PRs: only push the pr-[number] tag, overwriting on each update
             for tag in "${ALL_TAGS[@]}"; do
               if [[ "$tag" == *:pr-* ]]; then
                 # buildkit stores only the tag portion in the OCI archive index
-                # e.g. quay.io/ansible/nexus:devel -> devel
+                # e.g. quay.io/ansible/syntara:devel -> devel
                 local_ref="${tag##*:}"
-                skopeo copy --all "oci-archive:nexus-image.tar:${local_ref}" docker://"$tag"
+                skopeo copy --all "oci-archive:syntara-image.tar:${local_ref}" docker://"$tag"
               fi
             done
           else
             # For devel branch pushes and tags: push all tags
             for tag in "${ALL_TAGS[@]}"; do
               # buildkit stores only the tag portion in the OCI archive index
-              # e.g. quay.io/ansible/nexus:devel -> devel
+              # e.g. quay.io/ansible/syntara:devel -> devel
               local_ref="${tag##*:}"
-              skopeo copy --all "oci-archive:nexus-image.tar:${local_ref}" docker://"$tag"
+              skopeo copy --all "oci-archive:syntara-image.tar:${local_ref}" docker://"$tag"
             done
           fi
