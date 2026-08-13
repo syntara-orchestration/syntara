@@ -95,6 +95,10 @@ def parse_iso8601_interval(interval: str, tz: str | None = None) -> ScheduleSpec
             time_zone_name=tz or "UTC",
         )
 
+    if parsed.duration is None:
+        msg = f"Invalid ISO 8601 repeating interval: '{interval}'"
+        raise SafeValueError(msg)
+
     return ScheduleSpec(
         intervals=[ScheduleIntervalSpec(every=parsed.duration)],
         start_at=parsed.start_at,

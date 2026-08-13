@@ -6,7 +6,8 @@ Covers:
 - Cron expression format validation
 - Timezone validation (IANA timezone names)
 - MissedSchedulePolicy defaults
-- Template expression bypass
+- Template expression rejection on schedule-shape fields
+- Inactive schedule field (interval on a cron config, or vice versa) is not validated
 """
 
 import pytest
@@ -435,37 +436,73 @@ class TestIntervalValidation:
         assert config.interval is None
 
 
-class TestTemplateExpressionBypass:
-    """Tests for template expression bypass in validated fields."""
+class TestTemplateScheduleFieldsRejected:
+    """Schedule-shape fields (schedule_type/interval/cron/timezone) reject templates.
 
-    async def test_template_cron_bypasses_validation(self) -> None:
-        """Template expression in cron field should bypass validation."""
-        config = ScheduledTriggerConfig(
-            schedule_type=ScheduleType.CRON,
-            cron="${input.cron_expression}",
-        )
-        assert config.cron == "${input.cron_expression}"
+    Unlike other node parameters, these fields are materialized into a
+    Temporal Schedule once at publish time -- there is no runtime execution
+    context to resolve ``${...}`` against later. Letting the generic
+    TemplateAwareBaseModel bypass wave these through would let verify and
+    pre-mutation publish accept a config that can never become a schedule,
+    then fail post-commit in ``config_to_temporal_schedule``.
+    """
 
-    async def test_template_timezone_bypasses_validation(self) -> None:
-        """Template expression in timezone field should bypass validation."""
+    async def test_template_cron_is_rejected(self) -> None:
+        """Template expression in cron field is rejected, not bypassed."""
+        with pytest.raises(ValidationError, match="does not support template expressions"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.CRON,
+                cron="${input.cron_expression}",
+            )
+
+    async def test_template_timezone_is_rejected(self) -> None:
+        """Template expression in timezone field is rejected, not bypassed."""
+        with pytest.raises(ValidationError, match="does not support template expressions"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.CRON,
+                cron="0 9 * * *",
+                timezone="${input.timezone}",
+            )
+
+    async def test_template_schedule_type_is_rejected(self) -> None:
+        """Template expression in schedule_type field is rejected, not bypassed."""
+        with pytest.raises(ValidationError, match="does not support template expressions"):
+            ScheduledTriggerConfig(
+                schedule_type="${input.schedule_type}",  # type: ignore[arg-type]
+            )
+
+    async def test_template_interval_is_rejected(self) -> None:
+        """Template expression in interval field is rejected, not bypassed."""
+        with pytest.raises(ValidationError, match="does not support template expressions"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="${input.interval}",
+            )
+
+
+class TestInactiveScheduleFieldIgnored:
+    """The field that doesn't match schedule_type is not validated.
+
+    ``config_to_temporal_schedule`` only ever reads ``interval`` for an
+    interval schedule and ``cron`` for a cron schedule, so a stale/invalid
+    leftover value in the inactive field (e.g. left over from switching
+    schedule_type in the Builder) must not block verify or publish.
+    """
+
+    async def test_invalid_interval_ignored_when_schedule_type_is_cron(self) -> None:
+        """An invalid interval string does not block a cron config."""
         config = ScheduledTriggerConfig(
             schedule_type=ScheduleType.CRON,
             cron="0 9 * * *",
-            timezone="${input.timezone}",
+            interval="not-an-interval",
         )
-        assert config.timezone == "${input.timezone}"
+        assert config.interval == "not-an-interval"
 
-    async def test_template_schedule_type_bypasses_required_check(self) -> None:
-        """Template expression in schedule_type should bypass required field checks."""
-        config = ScheduledTriggerConfig(
-            schedule_type="${input.schedule_type}",  # type: ignore[arg-type]
-        )
-        assert config.schedule_type == "${input.schedule_type}"
-
-    async def test_template_interval_bypasses_validation(self) -> None:
-        """Template expression in interval field should bypass validation."""
+    async def test_invalid_cron_ignored_when_schedule_type_is_interval(self) -> None:
+        """An invalid cron string does not block an interval config."""
         config = ScheduledTriggerConfig(
             schedule_type=ScheduleType.INTERVAL,
-            interval="${input.interval}",
+            interval="R/2024-01-01T10:00:00Z/P1D",
+            cron="not-a-cron",
         )
-        assert config.interval == "${input.interval}"
+        assert config.cron == "not-a-cron"
