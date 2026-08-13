@@ -448,6 +448,9 @@ jobs:
             local container="$1" timeout="${2:-120}" elapsed=0 status
             echo "Waiting for $container to become healthy (timeout: ${timeout}s)..."
             while [ "$elapsed" -lt "$timeout" ]; do
+              # Manually trigger healthcheck — needed for Podman 5.x where
+              # events_logger=file prevents systemd timer scheduling.
+              podman healthcheck run "$container" >/dev/null 2>&1 || true
               status=$(podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "missing")
               if [ "$status" = "healthy" ]; then
                 echo "$container is healthy"

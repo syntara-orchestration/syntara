@@ -3,6 +3,9 @@ services:
   syntara-mock-api:
     container_name: syntara-mock-api
     image: ghcr.io/syntara-orchestration/syntara-mock-api:latest
+    build:
+      context: .
+      dockerfile: packages/syntara-mock-api/Containerfile
     ports:
       - 3000:3000
     environment:
@@ -14,6 +17,9 @@ services:
   syntara-ui:
     container_name: syntara-ui
     image: ghcr.io/syntara-orchestration/syntara-ui:latest
+    build:
+      context: .
+      dockerfile: packages/syntara-ui/Containerfile
     ports:
       - 4000:80
     environment:

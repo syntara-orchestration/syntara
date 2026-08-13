@@ -1,4 +1,4 @@
-"""ansible_automation_platform API endpoints."""
+"""ansible_automation_platform_proxy API endpoints."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ class _EndpointModule(Protocol):
     async def asyncio_detailed(self, *, client: AuthenticatedClient, **kwargs: Any) -> Response[Any]: ...
 
 
-class AnsibleAutomationPlatformApi:
-    """Registry for ansible_automation_platform API endpoints."""
+class AnsibleAutomationPlatformProxyApi:
+    """Registry for ansible_automation_platform_proxy API endpoints."""
 
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
