@@ -54,7 +54,7 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
         return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/tool-discovery-error",
             title="Tool Discovery Failed",
-            detail=str(exception) or "Required tools could not be discovered or provisioned.",
+            detail="Required tools could not be discovered or provisioned. Check integration connectivity and tool configuration.",
             code="TOOL_DISCOVERY_FAILED",
             retryable=False,
             instance=instance,
@@ -64,7 +64,7 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
         return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/tool-selection-unavailable",
             title="Selected Tools Unavailable",
-            detail=str(exception) or "None of the requested tools could be provisioned.",
+            detail="None of the requested tools could be provisioned. Verify tool availability and integration status.",
             code="TOOL_SELECTION_UNAVAILABLE",
             retryable=False,
             instance=instance,

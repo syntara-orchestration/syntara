@@ -168,7 +168,7 @@ class TestToolServices:
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
             with pytest.raises(
                 ToolDiscoveryError,
-                match=r"none could be provisioned from MCP integrations \(enabled=",
+                match=r"none could be provisioned from their owning MCP integrations \(enabled=",
             ):
                 await retriever.retrieve_tools()
 
@@ -185,10 +185,13 @@ class TestToolServices:
         tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
         tool_manager_client.get_all_tools.return_value = sample_tools
 
+        # Use an owning integration ID so the scoped count is >0 (drift scenario).
+        from tests.unit.agent_orchestrator.tool_manager.conftest import INTEGRATION_1_ID
+
         unmatched = [
             NamespacedBaseTool(
-                integration_id=uuid4(),
-                integration_name="other_integration",
+                integration_id=INTEGRATION_1_ID,
+                integration_name="dev_tools",
                 tool_name="unrelated_tool",
                 base_tool=MagicMock(spec=BaseTool),
             )
@@ -208,21 +211,24 @@ class TestToolServices:
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
             with pytest.raises(
                 ToolDiscoveryError,
-                match=r"MCP returned 1 tool\(s\) but none matched enabled Tool Manager entries \(enabled=",
+                match=r"Owning integrations returned 1 tool\(s\) but none matched",
             ):
                 await retriever.retrieve_tools()
 
     def test_require_provisioned_tools_distinguishes_empty_mcp_vs_zero_match(self) -> None:
         """Guard messages must distinguish MCP emptiness from post-filter zero-match."""
         from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
 
+        owning_integration_id = uuid4()
+        other_integration_id = uuid4()
         enabled = [
             ToolWithParameters(
                 id=uuid4(),
                 name="code_search",
                 namespaced_name="dev_tools::code_search",
                 description="Search",
-                integration_id=uuid4(),
+                integration_id=owning_integration_id,
                 enabled=True,
                 status="available",
                 parameters=[],
@@ -230,17 +236,40 @@ class TestToolServices:
             )
         ]
 
-        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from MCP"):
-            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_count=0)
+        # No MCP tools at all → connectivity/provisioning blame
+        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from their owning MCP"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=[])
 
-        with pytest.raises(ToolDiscoveryError, match=r"MCP returned 3 tool\(s\) but none matched"):
-            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_count=3)
+        # Owning integration returned tools but none matched → registry drift blame
+        owning_tools = [
+            NamespacedBaseTool(
+                integration_id=owning_integration_id,
+                integration_name="dev_tools",
+                tool_name="unmatched_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+            for _ in range(3)
+        ]
+        with pytest.raises(ToolDiscoveryError, match=r"Owning integrations returned 3 tool\(s\) but none matched"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=owning_tools)
+
+        # Only unrelated integration returned tools → still connectivity blame (owning count = 0)
+        unrelated_tools = [
+            NamespacedBaseTool(
+                integration_id=other_integration_id,
+                integration_name="other_mcp",
+                tool_name="some_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from their owning MCP"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=unrelated_tools)
 
         # No enabled tools → no raise
-        tool_services._require_provisioned_tools_when_enabled([], [], namespaced_count=0)
+        tool_services._require_provisioned_tools_when_enabled([], [], namespaced_tools=[])
 
         # Provisioned tools present → no raise
-        tool_services._require_provisioned_tools_when_enabled(enabled, [MagicMock(spec=BaseTool)], namespaced_count=1)
+        tool_services._require_provisioned_tools_when_enabled(enabled, [MagicMock(spec=BaseTool)], namespaced_tools=owning_tools)
 
     async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
         self,

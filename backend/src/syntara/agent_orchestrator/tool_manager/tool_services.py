@@ -329,31 +329,38 @@ def _require_provisioned_tools_when_enabled(
     enabled_tools: list[ToolWithParameters],
     provisioned_tools: list[BaseTool],
     *,
-    namespaced_count: int,
+    namespaced_tools: list[NamespacedBaseTool],
 ) -> None:
     """Fail closed when enabled tools exist but none survived provisioning/filter.
 
     Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
     (and SELECTED) would continue toolless and the LLM may fabricate results.
 
-    Distinguishes MCP returning nothing (connectivity / soft-skip) from MCP
-    returning tools that failed ``(integration_id, name)`` matching against
-    enabled Tool Manager entries (registry drift).
+    Scopes the MCP-returned count to integrations that own enabled tools so
+    that tools from unrelated integrations do not mask a connectivity failure
+    on the owning integration.
     """
     if not enabled_tools or provisioned_tools:
         return
 
     enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
-    if namespaced_count == 0:
+
+    # Count only MCP tools from integrations that own at least one enabled tool.
+    owning_integration_ids = {tool.integration_id for tool in enabled_tools}
+    owning_namespaced_count = sum(
+        1 for t in namespaced_tools if t.integration_id in owning_integration_ids
+    )
+
+    if owning_namespaced_count == 0:
         msg = (
             "Enabled tools were discovered but none could be provisioned "
-            f"from MCP integrations (enabled={enabled_names}); "
+            f"from their owning MCP integrations (enabled={enabled_names}); "
             "refusing to continue without tools"
         )
     else:
         msg = (
-            f"MCP returned {namespaced_count} tool(s) but none matched enabled "
-            f"Tool Manager entries (enabled={enabled_names}); "
+            f"Owning integrations returned {owning_namespaced_count} tool(s) but none matched "
+            f"enabled Tool Manager entries (enabled={enabled_names}); "
             "refusing to continue without tools — check registry name/integration_id drift"
         )
     raise ToolDiscoveryError(msg)
@@ -442,7 +449,7 @@ class ToolRetriever:
             _require_provisioned_tools_when_enabled(
                 self.enabled_tools,
                 enhanced_tools,
-                namespaced_count=len(self.namespaced_tools),
+                namespaced_tools=self.namespaced_tools,
             )
 
             logger.info("Tool retrieval completed", invocation_id=self.invocation_id)

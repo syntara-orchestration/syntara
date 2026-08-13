@@ -53,7 +53,7 @@ pytestmark = pytest.mark.unit
         (
             ToolDiscoveryError(
                 "Enabled tools were discovered but none could be provisioned "
-                "from MCP integrations (enabled=['dev_tools::code_search']); "
+                "from their owning MCP integrations (enabled=['dev_tools::code_search']); "
                 "refusing to continue without tools"
             ),
             "TOOL_DISCOVERY_FAILED",
@@ -61,9 +61,9 @@ pytestmark = pytest.mark.unit
         ),
         (
             ToolDiscoveryError(
-                "MCP returned 2 tool(s) but none matched enabled Tool Manager entries "
-                "(enabled=['dev_tools::code_search']); refusing to continue without tools "
-                "— check registry name/integration_id drift"
+                "Owning integrations returned 2 tool(s) but none matched enabled "
+                "Tool Manager entries (enabled=['dev_tools::code_search']); "
+                "refusing to continue without tools — check registry name/integration_id drift"
             ),
             "TOOL_DISCOVERY_FAILED",
             False,
@@ -159,8 +159,10 @@ def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
     assert error.retryable is False
     assert error.title == "Tool Discovery Failed"
     assert "LLM" not in error.title
-    assert "ConnectionError" in (error.detail or "")
-    assert "Tool Manager unavailable" in (error.detail or "")
+    # Stream detail uses a client-safe string; raw exception text stays in logs only.
+    assert "ConnectionError" not in (error.detail or "")
+    assert "Tool Manager unavailable" not in (error.detail or "")
+    assert "could not be discovered" in (error.detail or "")
 
 
 def test_tool_selection_not_default_llm_streaming_error() -> None:
@@ -176,20 +178,23 @@ def test_tool_selection_not_default_llm_streaming_error() -> None:
     assert error.retryable is False
     assert error.title == "Selected Tools Unavailable"
     assert error.code != "UNKNOWN_ERROR"
-    assert "uuid-missing" in (error.detail or "")
+    # Stream detail uses a client-safe string; raw exception text (incl. UUIDs) stays in logs only.
+    assert "uuid-missing" not in (error.detail or "")
+    assert "Verify tool availability" in (error.detail or "")
 
 
-def test_tool_discovery_zero_match_detail_preserved_for_operators() -> None:
-    """Zero-match ToolDiscoveryError detail must reach stream clients unchanged."""
-    detail = (
-        "MCP returned 4 tool(s) but none matched enabled Tool Manager entries "
+def test_tool_discovery_zero_match_uses_client_safe_detail() -> None:
+    """Stream detail must use a stable client-safe string, not raw exception text."""
+    raw_detail = (
+        "Owning integrations returned 4 tool(s) but none matched enabled Tool Manager entries "
         "(enabled=['a::t1', 'b::t2']); refusing to continue without tools "
-        "— check registry name/integration_id drift"
+        "-- check registry name/integration_id drift"
     )
-    error = classify_streaming_error(ToolDiscoveryError(detail), uuid4())
+    error = classify_streaming_error(ToolDiscoveryError(raw_detail), uuid4())
 
     assert error.code == "TOOL_DISCOVERY_FAILED"
-    assert error.detail == detail
+    # Client-safe detail, not the raw exception text with internal names.
+    assert error.detail == "Required tools could not be discovered or provisioned. Check integration connectivity and tool configuration."
     assert error.retryable is False
 
 
