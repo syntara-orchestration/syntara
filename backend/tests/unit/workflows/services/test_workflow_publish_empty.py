@@ -670,8 +670,10 @@ class TestAAP87629RegressionPublishInvalidTimezone:
     """Regression tests for AAP-87629: publish with invalid scheduled trigger config.
 
     Invalid IANA timezones are rejected by ``workflow_validator.collect_findings``
-    (via ``ScheduledTriggerService.validate_trigger_configs``) before any publish
-    mutation — so verify and publish share one semantic contract.
+    (via the module-level ``_collect_scheduled_trigger_config_findings`` helper in
+    ``workflow_definition.py``, which independently applies the same
+    ``ScheduledTriggerConfig`` checks as ``ScheduledTriggerService.validate_trigger_configs``)
+    before any publish mutation — so verify and publish share one semantic contract.
     """
 
     @pytest.mark.asyncio

@@ -211,9 +211,13 @@ class ScheduledTriggerService:
         """
         triggers = workflow_definition.get("triggers", [])
         for trigger in triggers:
+            if not isinstance(trigger, dict):
+                continue
             if trigger.get("type") == NodeType.SCHEDULED_TRIGGER:
                 node_id = trigger.get("id") or "<missing id>"
-                config = trigger.get("parameters", {})
+                config = trigger.get("parameters") or {}
+                if not isinstance(config, dict):
+                    config = {}
                 try:
                     ScheduledTriggerConfig.model_validate(config)
                 except ValidationError as e:
