@@ -246,3 +246,72 @@ class TestMalformedClaimClearsGroups:
         group_ids = set(memberships.all())
         assert test_group.id not in group_ids, "Stale group should be cleared on scalar mismatch"
         assert users_group.id in group_ids, "Fallback group should remain"
+
+    @pytest.mark.asyncio
+    async def test_malformed_claim_clears_groups_without_allow_all(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """Malformed claim without allow_all must clear stale IdP groups and deny login."""
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+            allow_all_authenticated=False,
+        )
+
+        # First login: healthy claim grants test_group via mapping
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {"groups": ["admin"]},
+            config,
+        )
+        await test_db_session.flush()
+        assert result is True
+
+        # Verify test_group granted and tracked as IdP-managed
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        assert test_group.id in set(memberships.all())
+
+        idp_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+        )
+        assert test_group.id in set(idp_tracking.all())
+
+        # Second login: malformed claim — JMESPath raises
+        with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
+            result = await sync_idp_groups(
+                test_db_session,
+                test_user,
+                test_identity,
+                {"groups": "admin"},
+                config,
+            )
+        await test_db_session.flush()
+        assert result is False, "Login must be denied when extraction fails without fallback"
+
+        # Critical: stale IdP-managed group must be cleared even though login is denied
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        group_ids = set(memberships.all())
+        assert test_group.id not in group_ids, "Stale IdP-managed group must be cleared on extraction failure"
+
+        # IdP tracking table must be empty
+        idp_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+        )
+        assert set(idp_tracking.all()) == set(), "IdP tracking must be cleared on extraction failure"

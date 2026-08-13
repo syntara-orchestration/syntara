@@ -88,7 +88,7 @@ from syntara.core.database.session import get_db
 from syntara.core.lib.encryption import SecretEncryptor, key_from_string
 from syntara.core.lib.sanitization import strip_control_chars
 from syntara.core.models import Group, User, UserIdentity
-from syntara.core.models.group import user_groups
+from syntara.core.models.group import user_groups, user_idp_groups
 from syntara.core.models.principal import PrincipalType
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import SUBJECT_MAX_LENGTH
@@ -2115,6 +2115,13 @@ async def _resolve_and_login_user(
             # or extraction failed) — check if the user has any group
             # memberships from other sources (manually assigned),
             # excluding the authenticated group which all users have.
+            # Subquery: group IDs tracked as IdP-managed (already cleared by sync)
+            idp_managed_subq = (
+                select(user_idp_groups.c.group_id)
+                .where(user_idp_groups.c.user_id == user.id)
+                .correlate(user_groups)
+                .scalar_subquery()
+            )
             other_groups = await db.exec(
                 select(user_groups.c.group_id)
                 .join(Group, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
@@ -2122,6 +2129,7 @@ async def _resolve_and_login_user(
                     user_groups.c.user_id == user.id,
                     Group.name != AUTHENTICATED_GROUP_NAME,
                     Group.deleted_at.is_(None),  # type: ignore[union-attr]
+                    user_groups.c.group_id.notin_(idp_managed_subq),
                 )
                 .limit(1)
             )

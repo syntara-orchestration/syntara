@@ -254,15 +254,20 @@ async def sync_idp_groups(
     if has_claim_based:
         result = _resolve_claim_based_groups(user, raw_merged_claims, config, provider_id, mapping_entries)
         if result is None and not aap_role_mapping and not config.allow_all_authenticated:
+            logger.warning(
+                "JMESPath extraction failed — clearing stale IdP-managed groups before denying login",
+                user_id=str(user.id),
+                provider_id=str(provider_id),
+            )
+            await _apply_group_membership_diff(db, user.id, provider_id, set(), username=user.username)
             return False
-        if result is None and (aap_role_mapping or config.allow_all_authenticated):
+        if result is None:
             logger.warning(
                 "JMESPath extraction failed but login proceeding — clearing IdP-managed groups",
                 reason="aap_role_mapping" if aap_role_mapping else "allow_all_authenticated",
                 user_id=str(user.id),
                 provider_id=str(provider_id),
             )
-            result = set()  # Clear IdP-managed groups when extraction fails
         if result is not None:
             desired_group_ids = desired_group_ids | result
 
