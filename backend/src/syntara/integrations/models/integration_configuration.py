@@ -14,7 +14,6 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlmodel import SQLModel
 
 from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url
-from syntara.integrations.lib.url_validation import validate_url_no_ssrf as validate_integration_ssrf
 
 
 class LLMProviderHint(StrEnum):
@@ -89,7 +88,6 @@ class MCPServerConfigurationInput(IntegrationSecurityMixin):
     def validate_base_url_scheme(self) -> Self:
         """Validate MCP endpoint URL (paths allowed, e.g. /mcp)."""
         self.base_url = validate_endpoint_url(self.base_url, allow_http=self.allow_http)
-        validate_integration_ssrf(self.base_url, allow_http=self.allow_http)
         return self
 
 
@@ -115,7 +113,6 @@ class LLMProviderConfiguration(IntegrationSecurityMixin):
         """Validate URL (when present) and require base_url for certain providers."""
         if self.base_url and self.base_url.strip():
             self.base_url = validate_endpoint_url(self.base_url, allow_http=self.allow_http)
-            validate_integration_ssrf(self.base_url, allow_http=self.allow_http)
         elif not self.base_url or not self.base_url.strip():
             if self.provider_hint in (LLMProviderHint.RED_HAT_AI, LLMProviderHint.CUSTOM):
                 msg = f"base_url is required for {self.provider_hint} provider"
@@ -141,7 +138,6 @@ class AAPConfiguration(IntegrationSecurityMixin):
     def validate_base_url_scheme(self) -> Self:
         """Validate and normalize URL to prevent SSRF."""
         self.base_url = validate_host_url(self.base_url, allow_http=self.allow_http)
-        validate_integration_ssrf(self.base_url, allow_http=self.allow_http)
         return self
 
 

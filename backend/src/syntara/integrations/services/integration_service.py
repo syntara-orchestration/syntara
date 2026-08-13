@@ -46,6 +46,7 @@ from syntara.integrations.exceptions import (
     IntegrationScopeError,
 )
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
+from syntara.integrations.lib.url_validation import validate_url_no_ssrf
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
@@ -63,6 +64,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -383,6 +385,23 @@ class IntegrationService(BaseService):
             include_total=include_total,
         )
 
+    def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
+        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+
+        Runs at write time only (create/patch). The DNS-resolving SSRF check cannot live in
+        the configuration model validators because those also run when configurations are
+        deserialized from the database on every read.
+        """
+        base_url = getattr(configuration, "base_url", None)
+        if not base_url:
+            return
+        allow_http = getattr(configuration, "allow_http", False)
+        try:
+            validate_url_no_ssrf(base_url, allow_http=allow_http)
+        except ValueError as e:
+            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            raise SafeValueError(msg) from e
+
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:
         """Create a new integration.
 
@@ -397,6 +416,8 @@ class IntegrationService(BaseService):
             await self._validate_credential_type(data.integration_type, data.management_credential_id)
         elif data.integration_type in CREDENTIAL_REQUIRED_TYPES:
             raise IntegrationCredentialRequiredError(data.integration_type.value)
+
+        self._validate_configuration_ssrf(data.configuration)
 
         integration = Integration(
             name=data.name,
@@ -576,7 +597,27 @@ class IntegrationService(BaseService):
             return project_ids
         return list(set(rbac_ids) & set(project_ids))
 
-    async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
+    async def _validate_patch(self, integration: Integration, data: IntegrationPatch) -> None:
+        """Validate a patch payload against the existing integration before applying updates."""
+        if data.configuration is not None:
+            if data.configuration.integration_type != integration.integration_type.value:
+                msg = (
+                    f"configuration.integration_type '{data.configuration.integration_type}' "
+                    f"does not match integration type '{integration.integration_type.value}'"
+                )
+                raise SafeValueError(msg)
+            self._validate_configuration_ssrf(data.configuration)
+
+        if "management_credential_id" in data.model_fields_set:
+            if data.management_credential_id is not None:
+                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
+                raise IntegrationCredentialRequiredError(integration.integration_type.value)
+
+        if data.name is not None and data.name != integration.name:
+            await self._raise_if_name_exists(data.name)
+
+    async def update_integration(self, integration_id: UUID, data: IntegrationPatch) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
             integration = await self._get_or_raise(integration_id)
@@ -590,21 +631,7 @@ class IntegrationService(BaseService):
             )
             raise
 
-        if data.configuration is not None and data.configuration.integration_type != integration.integration_type.value:
-            msg = (
-                f"configuration.integration_type '{data.configuration.integration_type}' "
-                f"does not match integration type '{integration.integration_type.value}'"
-            )
-            raise SafeValueError(msg)
-
-        if "management_credential_id" in data.model_fields_set:
-            if data.management_credential_id is not None:
-                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
-            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
-                raise IntegrationCredentialRequiredError(integration.integration_type.value)
-
-        if data.name is not None and data.name != integration.name:
-            await self._raise_if_name_exists(data.name)
+        await self._validate_patch(integration, data)
 
         if data.scope == IntegrationScope.GLOBAL and integration.scope == IntegrationScope.PROJECT:
             stmt = delete(IntegrationProjectAssignment).where(

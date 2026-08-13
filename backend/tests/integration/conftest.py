@@ -15,7 +15,7 @@ import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import boto3
@@ -899,3 +899,21 @@ def _moto_s3() -> Generator[None, None, None]:
         fm._retriever = retriever
         yield
         fm._retriever = original_retriever
+
+
+@pytest.fixture(autouse=True)
+def _skip_ssrf_validation(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Bypass write-time SSRF base_url validation for tests using placeholder hostnames.
+
+    Integration configs in tests use non-resolvable hosts (e.g. gateway.example.com), so the
+    DNS-resolving SSRF check at the create/patch boundary would reject them. Tests that
+    exercise the SSRF check itself opt out with ``@pytest.mark.ssrf_enforced``.
+    """
+    if request.node.get_closest_marker("ssrf_enforced"):
+        yield
+        return
+    with patch(
+        "syntara.integrations.services.integration_service.validate_url_no_ssrf",
+        return_value=None,
+    ):
+        yield

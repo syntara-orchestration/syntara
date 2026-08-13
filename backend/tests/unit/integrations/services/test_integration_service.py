@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models import Project
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.integrations.exceptions import (
     IntegrationNameConflictError,
@@ -699,3 +700,59 @@ class TestDeleteIntegration:
     ) -> None:
         with pytest.raises(IntegrationNotFoundError):
             await integration_service.delete_integration(uuid4())
+
+
+@pytest.mark.ssrf_enforced
+class TestIntegrationSsrfValidation:
+    """Write-time SSRF rejection at the create/patch boundary (autouse bypass disabled)."""
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_cloud_metadata(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://169.254.169.254",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_private_ip(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://10.0.0.1",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_allows_loopback(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # Loopback is always permitted so local integrations work without allowlist config.
+        result = await integration_service.create_integration(_mcp_create())
+        assert result.configuration.base_url == "http://localhost:8080"
+
+    @pytest.mark.asyncio
+    async def test_patch_rejects_cloud_metadata(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        created = await integration_service.create_integration(_mcp_create())
+        patch_data = IntegrationPatch(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://169.254.169.254",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.patch_integration(created.id, patch_data)
