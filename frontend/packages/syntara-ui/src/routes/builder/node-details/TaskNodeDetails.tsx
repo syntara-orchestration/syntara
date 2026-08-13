@@ -282,8 +282,7 @@ function buildAAPWorkflowInitialData(
     organization_id: (c.organization_id ?? c.organizationId) as number | undefined,
     organization_name: getField(c.organization_name, c.organization, '') as string | undefined,
     workflow_job_template_name: getField(c.workflow_job_template_name, c.workflowJobTemplateName, '') as
-      | string
-      | undefined,
+      string | undefined,
     workflow_job_template_id: (c.workflow_job_template_id ?? c.workflowJobTemplateId) as number | undefined,
     inventory_name: getField(c.inventory_name, c.inventoryName, '') as string | undefined,
     inventory_id: (c.inventory_id ?? c.inventory) as number | undefined,

@@ -37,8 +37,7 @@ import { useUserIdentityPermissions } from './useUserIdentityPermissions'
 type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
 
 type IdentityTableRow =
-  | { kind: 'connected'; identity: UserIdentity }
-  | { kind: 'disconnected'; provider: AuthProvider; issuerUrl: string }
+  { kind: 'connected'; identity: UserIdentity } | { kind: 'disconnected'; provider: AuthProvider; issuerUrl: string }
 
 function getIdentitySortKey(sortIndex: number, row: IdentityTableRow): string {
   if (row.kind === 'connected') {

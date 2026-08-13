@@ -92,8 +92,8 @@ from syntara.core.models.group import user_groups
 from syntara.core.models.principal import PrincipalType
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import SUBJECT_MAX_LENGTH
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.services.secret_service import create_secret_service
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.identity_provider_configuration import (
     IdentityProviderConfigurationTypes,

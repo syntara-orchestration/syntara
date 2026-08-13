@@ -457,11 +457,9 @@ export function BuilderFlow(props: BuilderFlowProps) {
   const applyEnrichedData = useCallback(
     (node: NodeType, enriched: Record<string, unknown>, anyChangedRef: { current: boolean }): NodeType => {
       const currentState = (node.data as Record<string, unknown>).__executionState as
-        | { status?: string; started_at?: string; completed_at?: string }
-        | undefined
+        { status?: string; started_at?: string; completed_at?: string } | undefined
       const newState = enriched.__executionState as
-        | { status?: string; started_at?: string; completed_at?: string }
-        | undefined
+        { status?: string; started_at?: string; completed_at?: string } | undefined
       if (hasExecutionStateChanged(currentState, newState)) {
         anyChangedRef.current = true
         return { ...node, data: enriched } as unknown as NodeType

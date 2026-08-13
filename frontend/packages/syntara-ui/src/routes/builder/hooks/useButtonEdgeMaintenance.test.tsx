@@ -354,8 +354,7 @@ describe('useButtonEdgeMaintenance', () => {
     // Regression test: Verify loop handle yOffset is 30
     const allNodes = nodesCalls.flat()
     const loopPlaceholder = allNodes.find((n) => (n as { id: string }).id === 'placeholder-loop-1-loop') as
-      | { position: { x: number; y: number } }
-      | undefined
+      { position: { x: number; y: number } } | undefined
     expect(loopPlaceholder).toBeDefined()
     expect(loopPlaceholder?.position.y).toBe(130) // node.y (100) + yOffset (30)
   })

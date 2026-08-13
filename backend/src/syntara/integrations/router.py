@@ -20,8 +20,8 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.models.group import user_groups
-from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.services.secret_service import create_secret_service
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
 from syntara.integrations.exceptions import IntegrationNotFoundError, IntegrationTypeMismatchError
 from syntara.integrations.models import (

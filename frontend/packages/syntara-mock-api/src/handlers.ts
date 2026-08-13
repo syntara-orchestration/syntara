@@ -507,8 +507,7 @@ export const handlers = [
     const integrationId = uuidv4()
 
     const discoveredTools = body.discovered_tools as
-      | Array<{ name: string; description?: string; enabled?: boolean }>
-      | undefined
+      Array<{ name: string; description?: string; enabled?: boolean }> | undefined
     let enabledToolCount = 0
     if (discoveredTools && discoveredTools.length > 0) {
       for (const dt of discoveredTools) {

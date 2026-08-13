@@ -17,8 +17,8 @@ from syntara.authz.engine import VisibilityResult, resolve_credential_use_visibi
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.services.secret_service import create_secret_service
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
 from syntara.credentials.models import (
     CredentialCreate,

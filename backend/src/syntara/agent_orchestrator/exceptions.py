@@ -1,7 +1,7 @@
 """Custom exceptions for agent orchestration system."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import SyntaraError, RetryableError
+from syntara.core.exceptions import RetryableError, SyntaraError
 
 
 class AgentOrchestratorError(SyntaraError):

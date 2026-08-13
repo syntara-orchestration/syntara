@@ -297,8 +297,7 @@ describe('useGroupMappingEditForm', () => {
     })
 
     const patchArgs = mockMutate.mock.calls[0]?.[0] as
-      | { body?: { configuration?: { group_mapping_entries?: unknown[] } } }
-      | undefined
+      { body?: { configuration?: { group_mapping_entries?: unknown[] } } } | undefined
     expect(patchArgs?.body?.configuration?.group_mapping_entries).toEqual([])
   })
 

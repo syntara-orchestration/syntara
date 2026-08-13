@@ -32,8 +32,8 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models.base.query_params import BasePaginatedRequest
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.services.base import BaseService
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.utils.cursor import (
     CursorData,
     PaginationDirection,
