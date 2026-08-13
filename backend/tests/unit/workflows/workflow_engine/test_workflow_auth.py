@@ -2,7 +2,9 @@
 
 import hashlib
 import hmac as hmac_mod
+import json
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,8 +18,19 @@ from temporalio.worker import WorkflowInboundInterceptor
 _TEST_KEY = os.urandom(32)
 
 
-def _sign(workflow_id: str, workflow_type: str = "orchestrator_workflow") -> bytes:
-    message = f"{workflow_id}\n{workflow_type}".encode()
+_DEFAULT_ARGS: list[Any] = [{"schema_version": "2.0.0"}, "exec-1", "trigger_manual"]
+
+
+def _fingerprint(args: Sequence[Any]) -> str:
+    return hashlib.sha256(json.dumps(list(args), sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _sign(
+    workflow_id: str,
+    workflow_type: str = "orchestrator_workflow",
+    args: Sequence[Any] = _DEFAULT_ARGS,
+) -> bytes:
+    message = f"{workflow_id}\n{workflow_type}\n{_fingerprint(args)}".encode()
     return hmac_mod.new(_TEST_KEY, message, hashlib.sha256).digest()
 
 
@@ -36,9 +49,9 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
 
-            workflow_id = "test-workflow-abc123"
-            token = sign_workflow(workflow_id, "orchestrator_workflow")
-            assert verify_workflow(workflow_id, "orchestrator_workflow", token)
+            args = [{"key": "value"}, "exec-1"]
+            token = sign_workflow("wf-1", "orchestrator_workflow", args)
+            assert verify_workflow("wf-1", "orchestrator_workflow", args, token)
 
     def test_wrong_workflow_id_rejected(self) -> None:
         with patch(
@@ -47,8 +60,9 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
 
-            token = sign_workflow("workflow-a", "orchestrator_workflow")
-            assert not verify_workflow("workflow-b", "orchestrator_workflow", token)
+            args = ["a", "b"]
+            token = sign_workflow("workflow-a", "orchestrator_workflow", args)
+            assert not verify_workflow("workflow-b", "orchestrator_workflow", args, token)
 
     def test_wrong_workflow_type_rejected(self) -> None:
         with patch(
@@ -57,8 +71,19 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
 
-            token = sign_workflow("workflow-a", "orchestrator_workflow")
-            assert not verify_workflow("workflow-a", "malicious_workflow", token)
+            args = ["a", "b"]
+            token = sign_workflow("workflow-a", "orchestrator_workflow", args)
+            assert not verify_workflow("workflow-a", "malicious_workflow", args, token)
+
+    def test_wrong_args_rejected(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+
+            token = sign_workflow("wf-1", "orchestrator_workflow", ["legit-wf", "trigger"])
+            assert not verify_workflow("wf-1", "orchestrator_workflow", ["evil-wf", "trigger"], token)
 
     def test_invalid_token_rejected(self) -> None:
         with patch(
@@ -67,7 +92,7 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import verify_workflow
 
-            assert not verify_workflow("workflow-a", "orchestrator_workflow", b"not-a-valid-hmac")
+            assert not verify_workflow("wf-1", "orchestrator_workflow", [], b"not-a-valid-hmac")
 
     def test_build_auth_header_returns_payload(self) -> None:
         with patch(
@@ -76,7 +101,7 @@ class TestWorkflowAuth:
         ):
             from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, build_auth_header
 
-            headers = build_auth_header("my-workflow-id", "orchestrator_workflow")
+            headers = build_auth_header("my-workflow-id", "orchestrator_workflow", ["a", "b"])
             assert HEADER_NAME in headers
             assert isinstance(headers[HEADER_NAME], Payload)
             assert len(headers[HEADER_NAME].data) == 32  # SHA-256 digest
@@ -115,8 +140,10 @@ class TestWorkflowAuthInboundInterceptor:
     async def test_valid_hmac_allows_execution(self) -> None:
         interceptor = self._make_interceptor()
         info = _FakeWorkflowInfo()
-        token = _sign(info.workflow_id)
+        test_args: list[Any] = ["wf-def", "exec-1", "trigger"]
+        token = _sign(info.workflow_id, info.workflow_type, test_args)
         input_data = _FakeExecuteWorkflowInput(
+            args=test_args,
             headers={"x-workflow-auth": Payload(data=token)},
         )
 
@@ -124,7 +151,7 @@ class TestWorkflowAuthInboundInterceptor:
             patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf,
             patch(
                 "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow",
-                side_effect=lambda wid, wtype, tok: hmac_mod.compare_digest(_sign(wid, wtype), tok),
+                side_effect=lambda wid, wtype, args, tok: hmac_mod.compare_digest(_sign(wid, wtype, args), tok),
             ),
         ):
             mock_wf.info.return_value = info
@@ -190,6 +217,7 @@ class TestWorkflowAuthInboundInterceptor:
 class _FakeStartWorkflowInput:
     id: str = "test-wf-456"
     workflow: str = "orchestrator_workflow"
+    args: list[Any] = field(default_factory=lambda: list(_DEFAULT_ARGS))
     headers: dict[str, Payload] = field(default_factory=dict)
 
 

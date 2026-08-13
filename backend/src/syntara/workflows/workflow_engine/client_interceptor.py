@@ -25,7 +25,7 @@ class _WorkflowAuthOutboundInterceptor(OutboundInterceptor):
 
     async def start_workflow(self, input: StartWorkflowInput) -> WorkflowHandle[Any, Any]:  # noqa: A002
         headers = dict(input.headers)
-        headers[HEADER_NAME] = Payload(data=sign_workflow(input.id, input.workflow))
+        headers[HEADER_NAME] = Payload(data=sign_workflow(input.id, input.workflow, input.args))
         input.headers = headers
         return await self.next.start_workflow(input)
 

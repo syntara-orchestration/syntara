@@ -113,7 +113,18 @@ class TestWorkflowAuthIntegration:
         init_signing_key()
 
         workflow_id = f"sched-auth-test-{uuid4()}"
-        auth_headers = build_auth_header(workflow_id, "orchestrator_workflow")
+        workflow_args: list[object] = [
+            SIMPLE_WORKFLOW,
+            str(uuid4()),
+            "trigger_manual",
+            {},
+            False,
+            None,
+            None,
+            None,
+            TEST_WORKFLOW_METADATA,
+        ]
+        auth_headers = build_auth_header(workflow_id, "orchestrator_workflow", workflow_args)
 
         header_client = await Client.connect(
             temporal_env.client.service_client.config.target_host,
@@ -130,17 +141,7 @@ class TestWorkflowAuthIntegration:
         ):
             handle = await header_client.start_workflow(
                 "orchestrator_workflow",
-                args=[
-                    SIMPLE_WORKFLOW,
-                    str(uuid4()),
-                    "trigger_manual",
-                    {},
-                    False,
-                    None,
-                    None,
-                    None,
-                    TEST_WORKFLOW_METADATA,
-                ],
+                args=workflow_args,
                 id=workflow_id,
                 task_queue=TASK_QUEUE,
             )
