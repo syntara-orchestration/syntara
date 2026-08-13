@@ -310,7 +310,7 @@ class WorkflowService(BaseService):
 
         cache = get_runtime_settings()
         if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
-            raise ScriptNodesDisabledError()
+            raise ScriptNodesDisabledError
 
         if self.opa_client is None:
             msg = "Authorization service unavailable; cannot verify script:edit permission"

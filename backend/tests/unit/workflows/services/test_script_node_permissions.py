@@ -1,4 +1,5 @@
 """Unit tests for script node permission checks in WorkflowService."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -58,6 +59,8 @@ def _def_without_script() -> dict[str, object]:
 
 
 class TestDefinitionContainsScriptNodes:
+    """Test script node detection helper."""
+
     def test_detects_script_node(self) -> None:
         assert WorkflowService._definition_contains_script_nodes(_def_with_script()) is True
 
@@ -70,6 +73,8 @@ class TestDefinitionContainsScriptNodes:
 
 
 class TestCheckScriptEditPermission:
+    """Test script:edit permission enforcement in workflow service."""
+
     @pytest.mark.asyncio
     async def test_no_script_nodes_skips_check(self) -> None:
         svc = _make_service()
@@ -105,9 +110,7 @@ class TestCheckScriptEditPermission:
         from syntara.workflows.exceptions import ScriptNodesDisabledError
 
         svc = _make_service()
-        with patch(
-            "syntara.workflows.services.workflow_service.get_runtime_settings"
-        ) as mock_settings:
+        with patch("syntara.workflows.services.workflow_service.get_runtime_settings") as mock_settings:
             cache = AsyncMock()
             cache.get_bool.return_value = False
             mock_settings.return_value = cache

@@ -17,6 +17,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.workflow_engine import constants
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
@@ -441,7 +442,7 @@ async def _execute_script_common(
 
 
 @activity.defn(name=ActivityName.SCRIPT)
-async def execute_script_activity(
+async def execute_script_activity(  # noqa: C901
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
 ) -> dict[str, Any]:
@@ -473,6 +474,15 @@ async def execute_script_activity(
 
     """
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
+
+    cache = get_runtime_settings()
+    if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
+        msg = "Script nodes are disabled by the administrator"
+        raise ApplicationError(
+            msg,
+            type="ScriptNodesDisabledError",
+            non_retryable=True,
+        )
 
     try:
         # Validate config via Pydantic model
