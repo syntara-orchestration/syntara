@@ -7,11 +7,15 @@ Delegates SSRF IP/hostname checks to langchain-core's validate_safe_url.
 from __future__ import annotations
 
 import ipaddress
+from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, urlparse
 
 from langchain_core._security._ssrf_protection import validate_safe_url
 
 from syntara.core.config.base import get_settings
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 _ALLOWED_SCHEMES = frozenset({"https", "http"})
 _HTTPS_ONLY = frozenset({"https"})
@@ -138,25 +142,40 @@ def validate_endpoint_url(url: str, *, allow_http: bool = False) -> str:
     return url
 
 
-def validate_url_no_ssrf(url: str) -> None:
+def validate_url_no_ssrf(
+    url: str,
+    *,
+    allowed_hosts: Iterable[str] | None = None,
+    allow_http: bool = True,
+) -> None:
     """Validate a URL to mitigate SSRF attacks.
 
-    Delegates to langchain-core's validate_safe_url which resolves the hostname
-    and rejects private, loopback, link-local, reserved, cloud metadata, and
-    Kubernetes internal DNS addresses. Hosts in the
-    workflow_http_request_allowed_hosts setting bypass the private IP check
-    (allowing RFC1918 addresses) but cloud metadata endpoints are always blocked
-    regardless of the allowlist.
+    Shared SSRF policy for all domains. Delegates to langchain-core's validate_safe_url
+    which resolves the hostname and rejects private, loopback, link-local, reserved,
+    cloud metadata, and Kubernetes internal DNS addresses. Hosts in *allowed_hosts*
+    bypass the private/loopback check (allowing RFC1918 and loopback targets) but cloud
+    metadata endpoints are always blocked regardless of the allowlist.
+
+    Args:
+        url: The URL to validate.
+        allowed_hosts: Hostnames permitted to resolve to private/loopback addresses.
+            Defaults to the ``workflow_http_request_allowed_hosts`` setting so existing
+            workflow HTTP callers keep their policy; other domains (e.g. integrations)
+            pass their own allowlist explicitly via a domain-specific wrapper such as
+            ``validate_integration_url_no_ssrf``.
+        allow_http: If True, allow the http scheme in addition to https.
 
     Raises:
         ValueError: If the URL fails validation.
 
     """
-    allowed = {h.lower() for h in get_settings().workflow_http_request_allowed_hosts}
+    if allowed_hosts is None:
+        allowed_hosts = get_settings().workflow_http_request_allowed_hosts
+    allowed = {h.lower() for h in allowed_hosts}
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").lower()
 
     if hostname in allowed:
-        validate_safe_url(url, allow_private=True, allow_http=True)
+        validate_safe_url(url, allow_private=True, allow_http=allow_http)
     else:
-        validate_safe_url(url, allow_private=False, allow_http=True)
+        validate_safe_url(url, allow_private=False, allow_http=allow_http)

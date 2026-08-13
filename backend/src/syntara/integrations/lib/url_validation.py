@@ -1,21 +1,22 @@
 """URL validation for integration base_url fields with SSRF protection."""
 
-from urllib.parse import urlparse
-
-from langchain_core._security._ssrf_protection import validate_safe_url
-
 from syntara.core.config.base import get_settings
-from syntara.core.lib.url_validation import _is_loopback
+from syntara.core.lib.url_validation import validate_url_no_ssrf
 
 
-def validate_url_no_ssrf(url: str, *, allow_http: bool = False) -> None:
-    """Validate an integration URL to mitigate SSRF attacks.
+def validate_integration_url_no_ssrf(url: str, *, allow_http: bool = False) -> None:
+    """Validate an integration base_url to mitigate SSRF attacks.
 
-    Loopback addresses (127.0.0.0/8, ::1, localhost) are always permitted so that
-    local integrations (e.g. a local MCP server on localhost) work without config.
-    Other private/reserved IPs are rejected unless the hostname is listed in the
-    integration_url_allowed_hosts setting. Cloud metadata endpoints are always
-    blocked regardless of the allowlist.
+    Thin wrapper over the shared core SSRF policy (:func:`validate_url_no_ssrf`) bound to
+    the ``integration_url_allowed_hosts`` allowlist — no policy logic is duplicated here,
+    so the two domains cannot drift. Private, reserved, and loopback addresses
+    (127.0.0.0/8, ::1, localhost) are rejected unless the hostname is allowlisted, so a
+    local integration (e.g. an MCP server on localhost) is an explicit opt-in rather than
+    an always-on bypass. Cloud metadata endpoints are always blocked.
+
+    The distinct name (vs. the workflow-oriented core ``validate_url_no_ssrf``) keeps the
+    policy difference — a different allowlist setting and https-by-default — explicit at
+    call sites.
 
     Args:
         url: The URL to validate.
@@ -25,14 +26,8 @@ def validate_url_no_ssrf(url: str, *, allow_http: bool = False) -> None:
         ValueError: If the URL fails validation.
 
     """
-    parsed = urlparse(url)
-    hostname = (parsed.hostname or "").lower()
-
-    if _is_loopback(hostname):
-        return
-
-    allowed = {h.lower() for h in get_settings().integration_url_allowed_hosts}
-    if hostname in allowed:
-        validate_safe_url(url, allow_private=True, allow_http=allow_http)
-    else:
-        validate_safe_url(url, allow_private=False, allow_http=allow_http)
+    validate_url_no_ssrf(
+        url,
+        allowed_hosts=get_settings().integration_url_allowed_hosts,
+        allow_http=allow_http,
+    )

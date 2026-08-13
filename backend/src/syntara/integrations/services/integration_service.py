@@ -46,7 +46,7 @@ from syntara.integrations.exceptions import (
     IntegrationScopeError,
 )
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
-from syntara.integrations.lib.url_validation import validate_url_no_ssrf
+from syntara.integrations.lib.url_validation import validate_integration_url_no_ssrf
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
@@ -388,8 +388,11 @@ class IntegrationService(BaseService):
     def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
         """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
 
-        Runs at write time only (create/patch). The DNS-resolving SSRF check cannot live in
-        the configuration model validators because those also run when configurations are
+        Called at write time (create/patch) and again immediately before each outbound
+        request (discover/validate/refresh) as defense in depth against DNS re-pointing.
+        Loopback and other private hosts are rejected unless allowlisted via
+        integration_url_allowed_hosts. The DNS-resolving SSRF check cannot live in the
+        configuration model validators because those also run when configurations are
         deserialized from the database on every read.
         """
         base_url = getattr(configuration, "base_url", None)
@@ -397,7 +400,7 @@ class IntegrationService(BaseService):
             return
         allow_http = getattr(configuration, "allow_http", False)
         try:
-            validate_url_no_ssrf(base_url, allow_http=allow_http)
+            validate_integration_url_no_ssrf(base_url, allow_http=allow_http)
         except ValueError as e:
             msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e
@@ -838,6 +841,9 @@ class IntegrationService(BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+        # Re-check at call time (defense in depth): the stored base_url passed the write-time
+        # check, but DNS could have been re-pointed to a private/metadata target since.
+        self._validate_configuration_ssrf(integration.configuration)
         adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
@@ -886,6 +892,10 @@ class IntegrationService(BaseService):
         Resolves the credential, creates an adapter from the provided
         configuration, and runs discover(). No database writes.
         """
+        # Reject SSRF-prone base_url before any outbound request. discover() bypasses
+        # create/patch, so without this the adapter would hit private/metadata targets.
+        self._validate_configuration_ssrf(data.configuration)
+
         if data.credential_id is None and data.integration_type in CREDENTIAL_REQUIRED_TYPES:
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
@@ -972,6 +982,9 @@ class IntegrationService(BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+        # Re-check at call time (defense in depth): the stored base_url passed the write-time
+        # check, but DNS could have been re-pointed to a private/metadata target since.
+        self._validate_configuration_ssrf(integration.configuration)
         adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0

@@ -329,13 +329,13 @@ class TestValidateIntegration:
         """Validate returns 200 OK with success=False and connection_error/timeout when MCP server is unreachable.
 
         The integration is properly configured (valid URL, no credential required), but
-        nothing is listening on localhost:9999, so the connection is refused. Loopback is
-        permitted by the write-time SSRF check, and the closed port makes the server
-        unreachable at validation time (fast, deterministic connection error).
-        This is not a client error (4xx) — the request is valid. It's an external
-        service failure, communicated via the success/error/error_type fields in the response.
+        nothing is listening on mcp-server:9999. mcp-server is allowlisted via
+        integration_url_allowed_hosts, so it passes the write-time SSRF check, while the
+        closed port makes the server unreachable at validation time (fast, deterministic
+        connection error). This is not a client error (4xx) — the request is valid. It's an
+        external service failure, communicated via the success/error/error_type fields in the response.
         """
-        created = integration_factory(_mcp_create(base_url="https://localhost:9999"))
+        created = integration_factory(_mcp_create(base_url="https://mcp-server:9999"))
         integration_id = UUID(created["id"])
         resp = syntara_api.integrations.validate(integration_id=integration_id)
 
