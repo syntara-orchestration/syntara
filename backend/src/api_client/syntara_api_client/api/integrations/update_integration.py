@@ -7,15 +7,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.integration_patch import IntegrationPatch
 from ...models.integration_read import IntegrationRead
+from ...models.integration_update import IntegrationUpdate
 from ...types import Response
 
 
 def _get_kwargs(
     integration_id: UUID,
     *,
-    body: IntegrationPatch,
+    body: IntegrationUpdate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -103,7 +103,7 @@ def sync_detailed(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IntegrationPatch,
+    body: IntegrationUpdate,
 ) -> Response[ErrorData | IntegrationRead]:
     """Update integration
 
@@ -111,7 +111,7 @@ def sync_detailed(
 
     Args:
         integration_id (UUID):
-        body (IntegrationPatch): Schema for partially updating an integration (user-facing).
+        body (IntegrationUpdate): Schema for partially updating an integration (user-facing).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -137,7 +137,7 @@ def sync(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IntegrationPatch,
+    body: IntegrationUpdate,
 ) -> ErrorData | IntegrationRead | None:
     """Update integration
 
@@ -145,7 +145,7 @@ def sync(
 
     Args:
         integration_id (UUID):
-        body (IntegrationPatch): Schema for partially updating an integration (user-facing).
+        body (IntegrationUpdate): Schema for partially updating an integration (user-facing).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -166,7 +166,7 @@ async def asyncio_detailed(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IntegrationPatch,
+    body: IntegrationUpdate,
 ) -> Response[ErrorData | IntegrationRead]:
     """Update integration
 
@@ -174,7 +174,7 @@ async def asyncio_detailed(
 
     Args:
         integration_id (UUID):
-        body (IntegrationPatch): Schema for partially updating an integration (user-facing).
+        body (IntegrationUpdate): Schema for partially updating an integration (user-facing).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -198,7 +198,7 @@ async def asyncio(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IntegrationPatch,
+    body: IntegrationUpdate,
 ) -> ErrorData | IntegrationRead | None:
     """Update integration
 
@@ -206,7 +206,7 @@ async def asyncio(
 
     Args:
         integration_id (UUID):
-        body (IntegrationPatch): Schema for partially updating an integration (user-facing).
+        body (IntegrationUpdate): Schema for partially updating an integration (user-facing).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

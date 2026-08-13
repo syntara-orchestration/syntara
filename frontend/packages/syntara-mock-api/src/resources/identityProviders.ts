@@ -1,6 +1,6 @@
 import type * as IdentityProvidersAPI from '@syntara/contracts/src/identity-providers-api.js'
 
-export type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+export type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 export const identityProviders: IdentityProvider[] = [
   {

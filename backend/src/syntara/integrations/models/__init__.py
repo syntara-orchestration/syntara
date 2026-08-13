@@ -5,7 +5,6 @@ from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
     IntegrationListResponse,
-    IntegrationPatch,
     IntegrationProjectAssignment,
     IntegrationProjectAssignmentListParams,
     IntegrationProjectAssignmentListResponse,
@@ -16,6 +15,7 @@ from syntara.integrations.models.integration import (
     IntegrationStatus,
     IntegrationSystemUpdate,
     IntegrationType,
+    IntegrationUpdate,
     RefreshResult,
 )
 from syntara.integrations.models.integration_configuration import (
@@ -48,7 +48,6 @@ __all__ = [
     "IntegrationCreate",
     "IntegrationListParams",
     "IntegrationListResponse",
-    "IntegrationPatch",
     "IntegrationProjectAssignment",
     "IntegrationProjectAssignmentListParams",
     "IntegrationProjectAssignmentListResponse",
@@ -60,6 +59,7 @@ __all__ = [
     "IntegrationStatus",
     "IntegrationSystemUpdate",
     "IntegrationType",
+    "IntegrationUpdate",
     "LLMModel",
     "LLMModelBulkUpdate",
     "LLMModelListResponse",

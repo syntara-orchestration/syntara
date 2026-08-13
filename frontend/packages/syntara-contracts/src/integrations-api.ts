@@ -480,10 +480,10 @@ export interface components {
       is_default?: boolean
     }
     /**
-     * IntegrationPatch
+     * IntegrationUpdate
      * @description Schema for partially updating an integration (user-facing).
      */
-    IntegrationPatch: {
+    IntegrationUpdate: {
       /**
        * Name
        * @description Human-readable name for the integration
@@ -1680,7 +1680,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['IntegrationPatch']
+        'application/json': components['schemas']['IntegrationUpdate']
       }
     }
     responses: {

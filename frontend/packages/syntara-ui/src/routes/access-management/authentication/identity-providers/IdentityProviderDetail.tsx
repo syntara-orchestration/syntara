@@ -67,7 +67,7 @@ import { IdentityProviderDeleteDialog } from './IdentityProviderDeleteDialog'
 import { identityProviderGroupMappingEditPath } from './identityProviderPaths'
 import { IdpTypeKey, IDP_TYPE_PRESETS } from './idpTypePresets'
 
-type ProviderData = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type ProviderData = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 type ProviderConfig = NonNullable<ProviderData['configuration']>
 
 function identityProviderTypeDisplayLabel(idpType: string | null | undefined): string {
