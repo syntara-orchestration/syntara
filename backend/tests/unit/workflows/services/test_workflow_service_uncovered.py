@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.exceptions import WorkflowVersionConflictError
+from syntara.workflows.exceptions import BuiltinWorkflowModifyError, WorkflowVersionConflictError
 from syntara.workflows.services.workflow_service import WorkflowService
 
 
@@ -136,7 +136,8 @@ class TestUpdateVersionMetadata:
         """Verify name is set when included in default fields_set."""
         workflow_id = uuid4()
         version_record = MagicMock()
-        mock_service.get_workflow_by_id = AsyncMock()  # type: ignore[method-assign]
+        mock_workflow = MagicMock(is_builtin=False)
+        mock_service.get_workflow_by_id = AsyncMock(return_value=mock_workflow)  # type: ignore[method-assign]
         mock_service._get_version_or_none = AsyncMock(return_value=version_record)  # type: ignore[method-assign]
 
         result = await mock_service.update_version_metadata(workflow_id, 1, name="New Name")
@@ -149,7 +150,8 @@ class TestUpdateVersionMetadata:
         """Verify change_description is set when included in default fields_set."""
         workflow_id = uuid4()
         version_record = MagicMock()
-        mock_service.get_workflow_by_id = AsyncMock()  # type: ignore[method-assign]
+        mock_workflow = MagicMock(is_builtin=False)
+        mock_service.get_workflow_by_id = AsyncMock(return_value=mock_workflow)  # type: ignore[method-assign]
         mock_service._get_version_or_none = AsyncMock(return_value=version_record)  # type: ignore[method-assign]
 
         await mock_service.update_version_metadata(workflow_id, 1, change_description="Updated")
@@ -162,7 +164,8 @@ class TestUpdateVersionMetadata:
         workflow_id = uuid4()
         version_record = MagicMock()
         version_record.change_description = "Original"
-        mock_service.get_workflow_by_id = AsyncMock()  # type: ignore[method-assign]
+        mock_workflow = MagicMock(is_builtin=False)
+        mock_service.get_workflow_by_id = AsyncMock(return_value=mock_workflow)  # type: ignore[method-assign]
         mock_service._get_version_or_none = AsyncMock(return_value=version_record)  # type: ignore[method-assign]
 
         await mock_service.update_version_metadata(workflow_id, 1, name="Only Name", fields_set={"name"})
@@ -175,13 +178,24 @@ class TestUpdateVersionMetadata:
         """Empty fields_set means no mutations and no commit."""
         workflow_id = uuid4()
         version_record = MagicMock()
-        mock_service.get_workflow_by_id = AsyncMock()  # type: ignore[method-assign]
+        mock_workflow = MagicMock(is_builtin=False)
+        mock_service.get_workflow_by_id = AsyncMock(return_value=mock_workflow)  # type: ignore[method-assign]
         mock_service._get_version_or_none = AsyncMock(return_value=version_record)  # type: ignore[method-assign]
 
         result = await mock_service.update_version_metadata(workflow_id, 1, fields_set=set())
 
         assert result is version_record
         mock_service.session.commit.assert_not_called()  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_builtin_workflow_raises(self, mock_service: WorkflowService) -> None:
+        """Built-in workflows must not allow version metadata updates."""
+        workflow_id = uuid4()
+        mock_workflow = MagicMock(is_builtin=True, name="Builtin WF")
+        mock_service.get_workflow_by_id = AsyncMock(return_value=mock_workflow)  # type: ignore[method-assign]
+
+        with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
+            await mock_service.update_version_metadata(workflow_id, 1, change_description="sneaky edit")
 
 
 class TestRestoreWorkflowVersionSourceLabel:
