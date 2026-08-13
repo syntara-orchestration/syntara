@@ -20,6 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
+from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
 from syntara.workflows.utils.output_mapping import apply_output_mapping
 from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
@@ -1155,6 +1156,24 @@ class ScheduledTriggerConfig(TemplateAwareBaseModel):
         default=MissedSchedulePolicy.SKIP,
         description="How to handle overlapping schedule executions",
     )
+
+    @field_validator("interval")
+    @classmethod
+    def validate_interval_expression(cls, v: str | None) -> str | None:
+        """Validate that interval is a well-formed ISO 8601 repeating interval.
+
+        Delegates to ``iso8601_interval.parse_iso8601_repeating_interval``,
+        the same parser ``schedule_parser.parse_iso8601_interval`` uses to
+        build Temporal Schedule objects, so this model, ``/workflows/validate``,
+        publish, and Temporal sync all reject the same set of interval strings.
+        """
+        if v is None:
+            return v
+        # Template expressions bypass validation
+        if isinstance(v, str) and TEMPLATE_PATTERN.search(v):
+            return v
+        parse_iso8601_repeating_interval(v)
+        return v
 
     @field_validator("cron")
     @classmethod

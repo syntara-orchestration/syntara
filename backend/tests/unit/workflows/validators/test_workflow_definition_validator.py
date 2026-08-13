@@ -914,6 +914,35 @@ class TestScheduledTriggerConfigFindings:
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
+    def _interval_definition(self, *, interval: str) -> dict[str, Any]:
+        return {
+            "schema_version": "2.0.0",
+            "name": "interval-wf",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "interval", "interval": interval},
+                }
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        }
+
+    def test_invalid_interval_is_error(self, validator: WorkflowValidator) -> None:
+        """AAP-87629 follow-up: an unparseable interval must fail collect_findings, not just publish."""
+        result = validator.collect_findings(self._interval_definition(interval="not-an-interval"))
+        assert result.is_valid is False
+        scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]
+        assert len(scheduled) == 1
+        assert scheduled[0].node_id == "sched_1"
+        assert scheduled[0].field_path == "parameters.interval"
+
+    def test_valid_interval_passes(self, validator: WorkflowValidator) -> None:
+        result = validator.collect_findings(self._interval_definition(interval="R/2024-01-01T10:00:00Z/P1D"))
+        assert result.is_valid is True
+        assert result.findings == []
+
     def test_invalid_iana_timezone_is_error(self, validator: WorkflowValidator) -> None:
         result = validator.collect_findings(self._scheduled_definition(timezone="Invalid/Not_A_Real_Zone"))
         assert result.is_valid is False

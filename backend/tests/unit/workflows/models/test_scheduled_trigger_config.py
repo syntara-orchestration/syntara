@@ -336,6 +336,105 @@ class TestTimezoneValidation:
             assert config.timezone == tz, f"Timezone {tz} should be accepted"
 
 
+class TestIntervalValidation:
+    """Tests for interval field validation (AAP-87629 follow-up).
+
+    ``interval`` previously had no semantic validation beyond "non-empty",
+    so ``ScheduledTriggerConfig.model_validate`` (used by ``/workflows/validate``,
+    publish, and Temporal sync) accepted malformed intervals that only failed
+    later in ``schedule_parser.parse_iso8601_interval`` — after publish had
+    already committed. These tests lock the same semantics at the model layer.
+    """
+
+    async def test_valid_daily_interval(self) -> None:
+        """Daily interval should be accepted."""
+        config = ScheduledTriggerConfig(
+            schedule_type=ScheduleType.INTERVAL,
+            interval="R/2024-01-01T10:00:00Z/P1D",
+        )
+        assert config.interval == "R/2024-01-01T10:00:00Z/P1D"
+
+    async def test_valid_interval_with_end_date(self) -> None:
+        """Interval with an end date should be accepted."""
+        config = ScheduledTriggerConfig(
+            schedule_type=ScheduleType.INTERVAL,
+            interval="R/2024-01-01T10:00:00Z/P1D/2024-12-31T23:59:59Z",
+        )
+        assert config.interval == "R/2024-01-01T10:00:00Z/P1D/2024-12-31T23:59:59Z"
+
+    async def test_valid_monthly_interval(self) -> None:
+        """Calendar-representable monthly interval (P1M) should be accepted."""
+        config = ScheduledTriggerConfig(
+            schedule_type=ScheduleType.INTERVAL,
+            interval="R/2024-01-15T09:00:00Z/P1M",
+        )
+        assert config.interval == "R/2024-01-15T09:00:00Z/P1M"
+
+    async def test_rejects_not_an_interval(self) -> None:
+        """Non-interval text (AAP-87629 regression) should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="Invalid ISO 8601 repeating interval"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="not-an-interval",
+            )
+
+    async def test_rejects_finite_repetition_count(self) -> None:
+        """Finite repetition counts (e.g. R1/...) should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="not supported"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R1/2024-01-01T10:00:00Z/P1D",
+            )
+
+    async def test_rejects_start_datetime_without_timezone(self) -> None:
+        """Start datetime lacking timezone info should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="timezone info"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R/2024-01-01T10:00:00/P1D",
+            )
+
+    async def test_rejects_invalid_duration(self) -> None:
+        """Malformed ISO 8601 duration (starts with P but invalid shape) should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="Invalid ISO 8601 duration"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R/2024-01-01T10:00:00Z/PXYZ",
+            )
+
+    async def test_rejects_mixed_calendar_and_fixed_duration(self) -> None:
+        """Mixed calendar (months) and fixed (days) components should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="Mixed calendar and fixed"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R/2024-01-01T00:00:00Z/P1M2D",
+            )
+
+    async def test_rejects_unrepresentable_month_step(self) -> None:
+        """Month steps that cannot be expressed as a calendar spec (e.g. P5M) should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="cannot be represented"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R/2024-01-01T00:00:00Z/P5M",
+            )
+
+    async def test_rejects_day_29_monthly(self) -> None:
+        """Day-of-month 29 with a monthly interval should be rejected."""
+        with pytest.raises((ValidationError, ValueError), match="Day-of-month 29"):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.INTERVAL,
+                interval="R/2024-01-29T10:00:00Z/P1M",
+            )
+
+    async def test_interval_none_passes(self) -> None:
+        """interval=None (e.g. cron schedule_type) should bypass validation."""
+        config = ScheduledTriggerConfig(
+            schedule_type=ScheduleType.CRON,
+            cron="0 9 * * *",
+        )
+        assert config.interval is None
+
+
 class TestTemplateExpressionBypass:
     """Tests for template expression bypass in validated fields."""
 
@@ -362,3 +461,11 @@ class TestTemplateExpressionBypass:
             schedule_type="${input.schedule_type}",  # type: ignore[arg-type]
         )
         assert config.schedule_type == "${input.schedule_type}"
+
+    async def test_template_interval_bypasses_validation(self) -> None:
+        """Template expression in interval field should bypass validation."""
+        config = ScheduledTriggerConfig(
+            schedule_type=ScheduleType.INTERVAL,
+            interval="${input.interval}",
+        )
+        assert config.interval == "${input.interval}"

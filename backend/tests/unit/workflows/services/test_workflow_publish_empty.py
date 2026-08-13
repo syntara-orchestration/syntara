@@ -669,11 +669,13 @@ class TestScheduledTriggerSyncGracefulDegradation:
 class TestAAP87629RegressionPublishInvalidTimezone:
     """Regression tests for AAP-87629: publish with invalid scheduled trigger config.
 
-    Invalid IANA timezones are rejected by ``workflow_validator.collect_findings``
-    (via ``_collect_scheduled_trigger_config_findings``) before any publish
-    mutation. ``ScheduledTriggerService.validate_trigger_configs`` is a
-    raise-first wrapper over that same helper, so verify, publish, and
-    Temporal sync share one semantic contract.
+    Invalid IANA timezones and invalid ISO 8601 interval strings are rejected
+    by ``workflow_validator.collect_findings`` (via
+    ``_collect_scheduled_trigger_config_findings``, which calls
+    ``ScheduledTriggerConfig.model_validate``) before any publish mutation.
+    ``ScheduledTriggerService.validate_trigger_configs`` is a raise-first
+    wrapper over that same helper, so verify, publish, and Temporal sync
+    share one semantic contract.
     """
 
     @pytest.mark.asyncio
@@ -702,6 +704,56 @@ class TestAAP87629RegressionPublishInvalidTimezone:
                         "schedule_type": "cron",
                         "cron": "0 9 * * *",
                         "timezone": "Invalid/Not_A_Real_Zone",
+                    },
+                },
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        }
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service, "_get_version_or_none", return_value=mock_version),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
+            pytest.raises(WorkflowPublishValidationError) as exc_info,
+        ):
+            await mock_service.publish_workflow_version(workflow_id, version=1)
+
+        assert any("scheduled trigger config" in f.message for f in exc_info.value.validation_result.findings)
+        assert mock_workflow.published_version_id is None
+        mock_commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_publish_rejects_invalid_interval_before_mutation(self, mock_service: WorkflowService) -> None:
+        """Publish must reject an invalid ISO 8601 interval before mutating published_version_id.
+
+        Interval was previously an unconstrained string that only failed much
+        later in ``config_to_temporal_schedule`` -> ``parse_iso8601_interval``
+        (after ``session.commit()``), recreating the published-in-DB /
+        error-to-user inconsistency this bugfix targets.
+        """
+        workflow_id = uuid4()
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.is_builtin = False
+        mock_workflow.published_version_id = None
+        mock_workflow.current_version = 1
+        mock_workflow.name = "scheduled-wf"
+        mock_workflow.project_id = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "name": "interval-test",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "interval",
+                        "interval": "not-an-interval",
                     },
                 },
             ],

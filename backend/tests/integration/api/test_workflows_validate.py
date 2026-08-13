@@ -462,6 +462,53 @@ async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
     assert scheduled[0]["field_path"] == "parameters.timezone"
 
 
+@pytest.mark.asyncio
+async def test_validate_invalid_iso8601_interval(jwt_client: AsyncClient) -> None:
+    """Invalid ISO 8601 interval on a scheduled trigger returns 422 with a scheduled-trigger finding.
+
+    Regression for AAP-87629: interval was previously an unconstrained string
+    that only failed later in publish's Temporal schedule conversion, so
+    verify (this endpoint) must reject it up front too.
+    """
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "scheduled-invalid-interval",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "interval",
+                        "interval": "not-an-interval",
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "name": "Node 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "pass"},
+                }
+            ],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == "WORKFLOW_DEFINITION_INVALID"
+    vr = data["validation_result"]
+    assert vr["is_valid"] is False
+    scheduled = [e for e in vr["findings"] if "scheduled trigger config" in e["message"]]
+    assert len(scheduled) == 1
+    assert scheduled[0]["node_id"] == "sched_1"
+    assert scheduled[0]["field_path"] == "parameters.interval"
+
+
 class TestValidateProjectScopedUser:
     """Regression test for AAP-87629.
 
