@@ -957,9 +957,10 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
                 integration_type=IntegrationType.LLM_PROVIDER,
                 configuration=LLMProviderConfiguration(
                     provider_hint=LLMProviderHint.CUSTOM,
-                    # Resolvable host (passes write-time SSRF check) with a closed port so
-                    # the endpoint is unreachable at execution time.
-                    base_url="https://example.com:9999",
+                    # Loopback host (permitted by the write-time SSRF check) with a closed
+                    # port, so the endpoint is unreachable at execution time and the
+                    # connection is refused deterministically.
+                    base_url="https://localhost:9999",
                 ),
                 management_credential_id=UUID(cred_id),
                 discovered_models=[
