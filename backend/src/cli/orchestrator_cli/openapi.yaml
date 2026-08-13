@@ -2249,20 +2249,40 @@ paths:
         - name: status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/ApprovalRequestStatus'
-              - type: 'null'
-            title: Status
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ApprovalRequestStatus'
+                    title: Equals
+                    description: Exact match of the approval status. ?status[eq]=pending
+          description: |
+            Filter by approval status.
+            - Exact match: `status=pending` or `status[eq]=pending`
         - name: execution_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
-              - type: string
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
+                type: string
                 format: uuid
-              - type: 'null'
-            title: Execution Id
+            type: string
+            format: uuid
+            description: Exact match of the parent execution ID. ?execution_id=<uuid>
+          description: |
+            Filter by parent execution ID.
+            - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
       responses:
         '200':
           description: List of approval requests
@@ -14077,22 +14097,40 @@ paths:
         - name: status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/ApprovalRequestStatus'
-              - type: 'null'
-            title: Status
-          description: Filter by approval status
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ApprovalRequestStatus'
+                    title: Equals
+                    description: Exact match of the approval status. ?status[eq]=pending
+          description: |
+            Filter by approval status.
+            - Exact match: `status=pending` or `status[eq]=pending`
         - name: execution_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
-              - type: string
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
+                type: string
                 format: uuid
-              - type: 'null'
-            title: Execution Id
-          description: Filter by parent workflow execution ID
+            type: string
+            format: uuid
+            description: Exact match of the parent execution ID. ?execution_id=<uuid>
+          description: |
+            Filter by parent execution ID.
+            - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
       responses:
         '200':
           description: Paginated list of approvals in the project

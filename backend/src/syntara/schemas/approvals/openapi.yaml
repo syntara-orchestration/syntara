@@ -51,20 +51,42 @@ paths:
         - name: status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: "#/components/schemas/ApprovalRequestStatus"
-              - type: 'null'
-            title: Status
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the approval status. ?status[eq]=pending
+                    $ref: "#/components/schemas/ApprovalRequestStatus"
+          description: |
+            Filter by approval status.
+            - Exact match: `status=pending` or `status[eq]=pending`
         - name: execution_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
                 format: uuid
-              - type: 'null'
-            title: Execution Id
+                description: Exact match of the parent execution ID. ?execution_id=<uuid>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
+                    type: string
+                    format: uuid
+          description: |
+            Filter by parent execution ID.
+            - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
       responses:
         "200":
           description: List of approval requests

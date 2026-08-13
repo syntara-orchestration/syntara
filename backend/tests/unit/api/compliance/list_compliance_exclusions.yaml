@@ -59,8 +59,6 @@ exclusions:
   # These endpoints use simple direct value filtering (e.g., ?status=pending)
   # instead of the standard operator-based pattern (e.g., ?status[eq]=pending).
   # They should be migrated to use allOf schema with operator properties.
-  - operation_id: list_approvals
-    reason: "Uses simple value filters instead of operator-based pattern - status/execution_id need allOf schema with {eq}"
 
   - operation_id: list_policies
     reason: "Uses simple value filters instead of operator-based pattern - name/scope need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_id/project_eligible need {eq}"
@@ -73,9 +71,6 @@ exclusions:
 
   - operation_id: list_projects
     reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_default/is_builtin need {eq}"
-
-  - operation_id: list_project_approvals
-    reason: "Uses simple value filters instead of operator-based pattern - status/execution_id need allOf schema with {eq}"
 
   - operation_id: list_project_roles
     reason: "Uses simple value filters instead of operator-based pattern - name/scope/policy_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin need {eq}"
