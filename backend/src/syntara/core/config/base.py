@@ -1235,6 +1235,19 @@ class TemporalSettings(BaseSettings):
         description="Maximum concurrent activity executions",
     )
 
+    max_concurrent_workflows: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Application-level cap on the number of non-terminal workflow executions allowed "
+            "simultaneously. New workflow starts are rejected with HTTP 429 when this limit is "
+            "reached, preventing unbounded Temporal server memory growth. "
+            "Set to 0 (default) to disable the limit. "
+            "Set via APP_MAX_CONCURRENT_WORKFLOWS. "
+            "Tune this value based on benchmarking against the Temporal server memory budget."
+        ),
+    )
+
     schedule_reconciliation_interval_seconds: float = Field(
         default=60.0,
         description="Seconds between schedule reconciliation cycles",

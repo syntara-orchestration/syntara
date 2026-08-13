@@ -1,7 +1,7 @@
 ---
 # Rulebook: Forward webhook events to the workflow trigger
 #
-# Listens for incoming webhook events and triggers an EDA
+# Listens for incoming events and triggers an EDA
 # webhook endpoint via a job template.
 #
 # The job template's credential (custom type) provides webhook_base_url,
@@ -19,7 +19,7 @@
         port: 5000
 
   rules:
-    - name: Forward all webhook events to the workflow trigger
+    - name: Forward all events to the workflow trigger
       condition: event.payload is defined
       action:
         run_job_template:
@@ -28,6 +28,4 @@
           job_args:
             extra_vars:
               webhook_path: "{{ webhook_path }}"
-              alert_name: "{{ event.payload.alert_name | default('unknown') }}"
-              instance: "{{ event.payload.instance | default('unknown') }}"
-              severity: "{{ event.payload.severity | default('info') }}"
+              event_payload: "{{ event.payload }}"

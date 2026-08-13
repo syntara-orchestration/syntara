@@ -344,7 +344,7 @@ describe('useAAPBrowser', () => {
 
       // Verify useQuery was called with integration_id in query params
       const calls = mockUseQuery.mock.calls
-      const orgCall = calls.find((c: unknown[]) => c[1] === '/aap/organizations')
+      const orgCall = calls.find((c: unknown[]) => c[1] === '/proxies/aap/organizations')
       expect(orgCall).toBeDefined()
       const orgCallOptions = orgCall![2] as { params: { query: { integration_id: string } } }
       expect(orgCallOptions.params.query.integration_id).toBe('int-456')

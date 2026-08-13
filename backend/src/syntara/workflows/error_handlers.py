@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         WebhookServiceAccountNotAuthorizedError,
         WebhookTriggerNotFoundError,
         WebhookTriggerPathConflictError,
+        WorkflowConcurrencyLimitError,
         WorkflowDefinitionInvalidError,
         WorkflowNameConflictError,
         WorkflowNotFoundError,
@@ -302,6 +303,24 @@ def temporal_unavailable_handler(request: Request, exc: "TemporalUnavailableErro
         title="Temporal Service Unavailable",
         detail="Temporal workflow service is currently unavailable",
         code="TEMPORAL_UNAVAILABLE",
+        retryable=True,
+        instance=str(request.url),
+    )
+
+
+def workflow_concurrency_limit_handler(request: Request, exc: "WorkflowConcurrencyLimitError") -> JSONResponse:
+    """Handle WorkflowConcurrencyLimitError with RFC 9457 format (HTTP 429)."""
+    logger.warning(
+        "Workflow concurrency limit reached",
+        limit=exc.limit,
+        active=exc.active,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        problem_type=PROBLEM_TYPES["rate_limited"],
+        title="Workflow Concurrency Limit Reached",
+        detail=str(exc),
+        code="WORKFLOW_CONCURRENCY_LIMIT",
         retryable=True,
         instance=str(request.url),
     )
