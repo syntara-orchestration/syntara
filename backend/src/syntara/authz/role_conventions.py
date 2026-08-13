@@ -114,6 +114,9 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("workflow", "create", roles=("admin",)),
     PolicyInfo("workflow", "update", roles=("admin",)),
     PolicyInfo("workflow", "delete", roles=("admin",)),
+    # script nodes
+    PolicyInfo("script", "edit", roles=("admin",)),
+    PolicyInfo("script", "execute", roles=("admin",)),
     # executions
     PolicyInfo("execution", "read", roles=("admin", "auditor")),
     PolicyInfo("execution", "run", roles=("admin",)),
@@ -183,6 +186,8 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("workflow", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
     PolicyInfo("workflow", "update", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("workflow", "delete", scope="project", roles=("project-admin", "project-user")),
+    PolicyInfo("script", "edit", scope="project", roles=("project-admin",)),
+    PolicyInfo("script", "execute", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("execution", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
     PolicyInfo("execution", "run", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("integration", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
