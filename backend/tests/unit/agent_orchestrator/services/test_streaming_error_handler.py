@@ -41,25 +41,39 @@ pytestmark = pytest.mark.unit
         (Exception("Network connection timeout"), "CONNECTION_ERROR", True),
         # Tool discovery/selection — classified by type, not message heuristics
         (
-            ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError"),
+            ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError: Tool Manager unavailable"),
             "TOOL_DISCOVERY_FAILED",
             False,
         ),
         (
-            ToolDiscoveryError("Failed to discover tools from Tool Manager: ConnectionError"),
+            ToolDiscoveryError("Failed to discover tools from Tool Manager: ConnectionError: Tool Manager unavailable"),
             "TOOL_DISCOVERY_FAILED",
             False,
         ),
         (
             ToolDiscoveryError(
                 "Enabled tools were discovered but none could be provisioned "
-                "from MCP integrations; refusing to continue without tools"
+                "from MCP integrations (enabled=['dev_tools::code_search']); "
+                "refusing to continue without tools"
             ),
             "TOOL_DISCOVERY_FAILED",
             False,
         ),
         (
-            ToolSelectionUnavailableError("None of the requested tools could be provisioned"),
+            ToolDiscoveryError(
+                "MCP returned 2 tool(s) but none matched enabled Tool Manager entries "
+                "(enabled=['dev_tools::code_search']); refusing to continue without tools "
+                "— check registry name/integration_id drift"
+            ),
+            "TOOL_DISCOVERY_FAILED",
+            False,
+        ),
+        (
+            ToolSelectionUnavailableError(
+                "None of the requested tools could be provisioned "
+                "(unavailable tool IDs: ['uuid-a', 'uuid-b']); "
+                "refusing to continue the invocation without tools"
+            ),
             "TOOL_SELECTION_UNAVAILABLE",
             False,
         ),
@@ -84,6 +98,7 @@ pytestmark = pytest.mark.unit
         "tool_discovery_connection_error",
         "tool_discovery_manager_connection_error",
         "tool_discovery_zero_provision",
+        "tool_discovery_zero_match",
         "tool_selection_unavailable",
         "unknown_value_error",
         "unknown_generic",
@@ -137,7 +152,7 @@ def test_mixed_error_signals_priority() -> None:
 
 def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
     """ToolDiscoveryError with ConnectionError in the message must not look like LLM network failure."""
-    exception = ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError")
+    exception = ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError: Tool Manager unavailable")
     error = classify_streaming_error(exception, uuid4())
 
     assert error.code == "TOOL_DISCOVERY_FAILED"
@@ -145,17 +160,37 @@ def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
     assert error.title == "Tool Discovery Failed"
     assert "LLM" not in error.title
     assert "ConnectionError" in (error.detail or "")
+    assert "Tool Manager unavailable" in (error.detail or "")
 
 
 def test_tool_selection_not_default_llm_streaming_error() -> None:
     """ToolSelectionUnavailableError must not fall through to UNKNOWN_ERROR / LLM Streaming Error."""
-    exception = ToolSelectionUnavailableError("None of the requested tools could be provisioned")
+    exception = ToolSelectionUnavailableError(
+        "None of the requested tools could be provisioned "
+        "(unavailable tool IDs: ['uuid-missing']); "
+        "refusing to continue the invocation without tools"
+    )
     error = classify_streaming_error(exception, uuid4())
 
     assert error.code == "TOOL_SELECTION_UNAVAILABLE"
     assert error.retryable is False
     assert error.title == "Selected Tools Unavailable"
     assert error.code != "UNKNOWN_ERROR"
+    assert "uuid-missing" in (error.detail or "")
+
+
+def test_tool_discovery_zero_match_detail_preserved_for_operators() -> None:
+    """Zero-match ToolDiscoveryError detail must reach stream clients unchanged."""
+    detail = (
+        "MCP returned 4 tool(s) but none matched enabled Tool Manager entries "
+        "(enabled=['a::t1', 'b::t2']); refusing to continue without tools "
+        "— check registry name/integration_id drift"
+    )
+    error = classify_streaming_error(ToolDiscoveryError(detail), uuid4())
+
+    assert error.code == "TOOL_DISCOVERY_FAILED"
+    assert error.detail == detail
+    assert error.retryable is False
 
 
 def test_multiple_invocations_independent() -> None:

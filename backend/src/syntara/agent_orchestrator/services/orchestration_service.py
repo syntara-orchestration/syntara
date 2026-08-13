@@ -439,7 +439,8 @@ class OrchestrationService:
             selected = [t for t in tools if (t.metadata or {}).get("tool_id", "") in self._tool_selections]
             if self._tool_selections and not selected:
                 msg = (
-                    "None of the requested tools could be provisioned; "
+                    "None of the requested tools could be provisioned "
+                    f"(unavailable tool IDs: {invalid_ids}); "
                     "refusing to continue the invocation without tools"
                 )
                 raise ToolSelectionUnavailableError(msg)

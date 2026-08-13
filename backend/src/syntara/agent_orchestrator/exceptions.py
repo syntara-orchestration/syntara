@@ -42,10 +42,10 @@ class OrchestrationError(AgentOrchestratorError):
 class ToolDiscoveryError(OrchestrationError):
     """Raised when tool discovery or provisioning fails while tools were required.
 
-    Covers Tool Manager / Integrations API failures during discovery, and the case
-    where enabled tools were discovered but none could be provisioned from MCP.
-    Callers that request tools (ALL or SELECTED) must not continue toolless, or
-    the LLM may fabricate tool results.
+    Covers Tool Manager / Integrations API failures during discovery, MCP returning
+    no tools when enabled tools exist, and MCP tools that fail registry matching
+    against enabled Tool Manager entries. Callers that request tools (ALL or
+    SELECTED) must not continue toolless, or the LLM may fabricate tool results.
     """
 
 
@@ -54,6 +54,7 @@ class ToolSelectionUnavailableError(OrchestrationError):
 
     Distinct from ToolDiscoveryError: discovery succeeded, but every selected
     tool ID was missing, disabled, or otherwise unavailable at runtime.
+    Exception messages should include the unavailable tool IDs.
     """
 
 

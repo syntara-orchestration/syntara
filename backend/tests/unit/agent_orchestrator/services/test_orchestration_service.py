@@ -786,13 +786,21 @@ class TestApplyToolSelection:
         assert result == [tool_a, tool_c]
 
     def test_selected_strategy_with_no_matching_tools_raises(self) -> None:
-        """SELECTED with zero provisionable tools must fail the invocation."""
+        """SELECTED with zero provisionable tools must fail and include unavailable IDs."""
         from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 
-        service = self._make_service(strategy="SELECTED", selections=["uuid-x"])
+        service = self._make_service(strategy="SELECTED", selections=["uuid-z", "uuid-x"])
         tools = [self._make_tool("uuid-a"), self._make_tool("uuid-b")]
-        with pytest.raises(ToolSelectionUnavailableError, match="None of the requested tools"):
+        with pytest.raises(ToolSelectionUnavailableError, match=r"unavailable tool IDs: \['uuid-x', 'uuid-z'\]"):
             service._apply_tool_selection(tools)
+
+    def test_selected_strategy_empty_catalog_raises_with_all_selection_ids(self) -> None:
+        """SELECTED against an empty provisioned catalog must still surface requested IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        service = self._make_service(strategy="SELECTED", selections=["uuid-b", "uuid-a"])
+        with pytest.raises(ToolSelectionUnavailableError, match=r"unavailable tool IDs: \['uuid-a', 'uuid-b'\]"):
+            service._apply_tool_selection([])
 
     def test_selected_strategy_with_empty_selections_returns_empty(self) -> None:
         service = self._make_service(strategy="SELECTED", selections=[])
@@ -808,13 +816,18 @@ class TestApplyToolSelection:
         assert service._apply_tool_selection(tools) == [tool_with_id]
 
     def test_selected_strategy_logs_invalid_ids_and_keeps_valid_tools(self, caplog: pytest.LogCaptureFixture) -> None:
-        """T088: invalid selections are reported; valid tools still returned."""
+        """T088: invalid selections are reported via structured log; valid tools still returned."""
         tool_a = self._make_tool("uuid-a")
         service = self._make_service(strategy="SELECTED", selections=["uuid-a", "uuid-missing"])
         with caplog.at_level(logging.WARNING):
             result = service._apply_tool_selection([tool_a])
         assert result == [tool_a]
         assert any("Invalid or unavailable tool selections" in msg for msg in caplog.messages)
+        # Structured context carries the unavailable IDs (no raise on partial match)
+        assert any(
+            getattr(record, "invalid_tool_ids", None) == ["uuid-missing"] or "uuid-missing" in record.getMessage()
+            for record in caplog.records
+        )
 
     def test_selected_strategy_filters_large_tool_set_quickly(self) -> None:
         """T074: SELECTED filtering stays fast for large synchronized tool sets."""

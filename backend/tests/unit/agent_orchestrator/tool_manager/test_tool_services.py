@@ -5,7 +5,7 @@ in the tool_services module.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -106,7 +106,10 @@ class TestToolServices:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
-            with pytest.raises(ToolDiscoveryError, match="Failed to discover MCP integrations"):
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"Failed to discover MCP integrations: ConnectionError: Tool Manager unavailable",
+            ):
                 await tool_services._discover_mcp_integrations()
 
     async def test_discover_tools_failure_raises_tool_discovery_error(self, tool_manager_client: Mock) -> None:
@@ -119,7 +122,10 @@ class TestToolServices:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
-            with pytest.raises(ToolDiscoveryError, match="Failed to discover tools"):
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"Failed to discover tools from Tool Manager: ConnectionError: Tool Manager unavailable",
+            ):
                 await tool_services._discover_tools()
 
     async def test_retrieve_tools_propagates_discovery_failure(self, tool_manager_client: Mock) -> None:
@@ -142,7 +148,7 @@ class TestToolServices:
         sample_mcp_integrations: list[IntegrationRead],
         sample_tools: list[ToolWithParameters],
     ) -> None:
-        """ALL/SELECTED must fail closed when enabled tools exist but MCP yields none."""
+        """ALL/SELECTED must fail closed when MCP yields zero tools (connectivity/soft-skip)."""
         from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
 
         tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
@@ -160,8 +166,81 @@ class TestToolServices:
             mock_client_class.return_value.__aexit__.return_value = None
 
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
-            with pytest.raises(ToolDiscoveryError, match="none could be provisioned"):
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"none could be provisioned from MCP integrations \(enabled=",
+            ):
                 await retriever.retrieve_tools()
+
+    async def test_retrieve_tools_fails_when_mcp_tools_do_not_match_enabled(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """Fail closed must blame registry/match drift when MCP returned tools but 0 matched."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = sample_tools
+
+        unmatched = [
+            NamespacedBaseTool(
+                integration_id=uuid4(),
+                integration_name="other_integration",
+                tool_name="unrelated_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=unmatched,
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"MCP returned 1 tool\(s\) but none matched enabled Tool Manager entries \(enabled=",
+            ):
+                await retriever.retrieve_tools()
+
+    def test_require_provisioned_tools_distinguishes_empty_mcp_vs_zero_match(self) -> None:
+        """Guard messages must distinguish MCP emptiness from post-filter zero-match."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=uuid4(),
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+
+        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from MCP"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_count=0)
+
+        with pytest.raises(ToolDiscoveryError, match=r"MCP returned 3 tool\(s\) but none matched"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_count=3)
+
+        # No enabled tools → no raise
+        tool_services._require_provisioned_tools_when_enabled([], [], namespaced_count=0)
+
+        # Provisioned tools present → no raise
+        tool_services._require_provisioned_tools_when_enabled(enabled, [MagicMock(spec=BaseTool)], namespaced_count=1)
 
     async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
         self,

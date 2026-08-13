@@ -48,6 +48,26 @@ def _get_tool_manager_client() -> ToolManagerClient:
     )
 
 
+def _sanitize_error_message(error: Exception, max_length: int = 200) -> str:
+    """Produce a safe, truncated error summary for user-facing storage.
+
+    Raw exception messages from external services may contain internal
+    hostnames, credentials, stack traces, or other sensitive data.
+    Uses the same credential patterns as the audit EventSanitizer to
+    detect and redact sensitive tokens embedded in the message.
+    """
+    msg = str(error).split("\n", maxsplit=1)[0].strip()
+    if len(msg) > max_length:
+        msg = msg[:max_length] + "…"
+
+    msg_lower = msg.lower()
+    for pattern in CREDENTIAL_PATTERNS:
+        if re.search(rf"(?:^|[_\-. ])(?:{re.escape(pattern)})(?:[_\-. ]|$)", msg_lower):
+            return f"{type(error).__name__}: {REDACTED}"
+
+    return msg
+
+
 async def _discover_mcp_integrations() -> list[IntegrationRead]:
     """Discover MCP server integrations from the Integrations API.
 
@@ -67,7 +87,7 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
             return all_integrations
     except Exception as e:
         logger.warning("Failed to discover MCP integrations", error=str(e))
-        msg = f"Failed to discover MCP integrations: {type(e).__name__}"
+        msg = f"Failed to discover MCP integrations: {type(e).__name__}: {_sanitize_error_message(e)}"
         raise ToolDiscoveryError(msg) from e
 
 
@@ -97,7 +117,7 @@ async def _discover_tools() -> ToolDiscoveryResult:
             return enabled_tools, disabled_tools
     except Exception as e:
         logger.warning("Tool Manager discovery failed", error=str(e))
-        msg = f"Failed to discover tools from Tool Manager: {type(e).__name__}"
+        msg = f"Failed to discover tools from Tool Manager: {type(e).__name__}: {_sanitize_error_message(e)}"
         raise ToolDiscoveryError(msg) from e
 
 
@@ -180,26 +200,6 @@ def _create_namespaced_tools(integration: IntegrationRead, provider_tools: list[
         )
         for tool in provider_tools
     ]
-
-
-def _sanitize_error_message(error: Exception, max_length: int = 200) -> str:
-    """Produce a safe, truncated error summary for user-facing storage.
-
-    Raw exception messages from external services may contain internal
-    hostnames, credentials, stack traces, or other sensitive data.
-    Uses the same credential patterns as the audit EventSanitizer to
-    detect and redact sensitive tokens embedded in the message.
-    """
-    msg = str(error).split("\n", maxsplit=1)[0].strip()
-    if len(msg) > max_length:
-        msg = msg[:max_length] + "…"
-
-    msg_lower = msg.lower()
-    for pattern in CREDENTIAL_PATTERNS:
-        if re.search(rf"(?:^|[_\-. ])(?:{re.escape(pattern)})(?:[_\-. ]|$)", msg_lower):
-            return f"{type(error).__name__}: {REDACTED}"
-
-    return msg
 
 
 async def _process_single_integration(
@@ -328,18 +328,35 @@ def _enhance_tools_with_metadata(
 def _require_provisioned_tools_when_enabled(
     enabled_tools: list[ToolWithParameters],
     provisioned_tools: list[BaseTool],
+    *,
+    namespaced_count: int,
 ) -> None:
-    """Fail closed when enabled tools exist but none were provisioned from MCP.
+    """Fail closed when enabled tools exist but none survived provisioning/filter.
 
     Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
     (and SELECTED) would continue toolless and the LLM may fabricate results.
+
+    Distinguishes MCP returning nothing (connectivity / soft-skip) from MCP
+    returning tools that failed ``(integration_id, name)`` matching against
+    enabled Tool Manager entries (registry drift).
     """
-    if enabled_tools and not provisioned_tools:
+    if not enabled_tools or provisioned_tools:
+        return
+
+    enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
+    if namespaced_count == 0:
         msg = (
             "Enabled tools were discovered but none could be provisioned "
-            "from MCP integrations; refusing to continue without tools"
+            f"from MCP integrations (enabled={enabled_names}); "
+            "refusing to continue without tools"
         )
-        raise ToolDiscoveryError(msg)
+    else:
+        msg = (
+            f"MCP returned {namespaced_count} tool(s) but none matched enabled "
+            f"Tool Manager entries (enabled={enabled_names}); "
+            "refusing to continue without tools — check registry name/integration_id drift"
+        )
+    raise ToolDiscoveryError(msg)
 
 
 class ToolRetriever:
@@ -384,9 +401,10 @@ class ToolRetriever:
             List of filtered BaseTools ready for execution
 
         Raises:
-            ToolDiscoveryError: If Tool Manager / Integrations discovery fails, or
-                if enabled tools were discovered but none could be provisioned from
-                MCP integrations.
+            ToolDiscoveryError: If Tool Manager / Integrations discovery fails, if
+                enabled tools exist but MCP returned none, or if MCP returned tools
+                that failed ``(integration_id, name)`` matching against enabled
+                Tool Manager entries.
             Exception: Propagates unexpected retrieval failures after emitting a
                 FAILED audit event. Callers that require tools must not swallow
                 these errors and continue toolless.
@@ -421,7 +439,11 @@ class ToolRetriever:
 
             # Step 4: Enhance BaseTools with metadata for failure handling
             enhanced_tools = _enhance_tools_with_metadata(filtered_tools, self.enabled_tools)
-            _require_provisioned_tools_when_enabled(self.enabled_tools, enhanced_tools)
+            _require_provisioned_tools_when_enabled(
+                self.enabled_tools,
+                enhanced_tools,
+                namespaced_count=len(self.namespaced_tools),
+            )
 
             logger.info("Tool retrieval completed", invocation_id=self.invocation_id)
 
