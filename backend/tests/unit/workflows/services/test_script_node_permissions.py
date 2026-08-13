@@ -119,6 +119,78 @@ class TestCheckScriptEditPermission:
                 await svc._check_script_edit_permission(_def_with_script(), uuid4())
 
 
+class TestCheckScriptEditPermissionDiffBased:
+    """Test diff-based script:edit check when previous_definition is provided."""
+
+    @pytest.mark.asyncio
+    async def test_unchanged_script_nodes_skips_check(self) -> None:
+        """When script nodes haven't changed, no OPA call is made."""
+        svc = _make_service()
+        definition = _def_with_script()
+        with patch("syntara.workflows.services.workflow_service.authorize") as mock_authorize:
+            await svc._check_script_edit_permission(definition, uuid4(), previous_definition=definition)
+        mock_authorize.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_added_script_node_requires_permission(self) -> None:
+        """Adding a script node to a previously script-free definition triggers the check."""
+        svc = _make_service()
+        denied = MagicMock()
+        denied.allowed = False
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=denied):
+            with pytest.raises(AuthorizationDeniedError):
+                await svc._check_script_edit_permission(
+                    _def_with_script(), uuid4(), previous_definition=_def_without_script()
+                )
+
+    @pytest.mark.asyncio
+    async def test_modified_script_code_requires_permission(self) -> None:
+        """Changing script code in a node triggers the check."""
+        svc = _make_service()
+        old_def = _def_with_script()
+        new_def = _def_with_script()
+        new_def["nodes"][0]["parameters"]["code"] = "echo MODIFIED"  # type: ignore[index]
+        denied = MagicMock()
+        denied.allowed = False
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=denied):
+            with pytest.raises(AuthorizationDeniedError):
+                await svc._check_script_edit_permission(new_def, uuid4(), previous_definition=old_def)
+
+    @pytest.mark.asyncio
+    async def test_no_previous_definition_is_presence_based(self) -> None:
+        """Without previous_definition (new workflow), presence-based check applies."""
+        svc = _make_service()
+        denied = MagicMock()
+        denied.allowed = False
+        with patch("syntara.workflows.services.workflow_service.authorize", return_value=denied):
+            with pytest.raises(AuthorizationDeniedError):
+                await svc._check_script_edit_permission(_def_with_script(), uuid4())
+
+
+class TestExtractScriptNodes:
+    """Test the _extract_script_nodes helper."""
+
+    def test_extracts_script_nodes(self) -> None:
+        nodes = WorkflowService._extract_script_nodes(_def_with_script())
+        assert len(nodes) == 1
+        assert nodes[0]["type"] == "script"
+
+    def test_no_script_nodes(self) -> None:
+        nodes = WorkflowService._extract_script_nodes(_def_without_script())
+        assert len(nodes) == 0
+
+    def test_mixed_nodes(self) -> None:
+        definition: dict[str, object] = {
+            "nodes": [
+                {"id": "n1", "type": "script", "parameters": {"code": "echo hi"}},
+                {"id": "n2", "type": "http_request", "parameters": {}},
+                {"id": "n3", "type": "script", "parameters": {"code": "echo bye"}},
+            ]
+        }
+        nodes = WorkflowService._extract_script_nodes(definition)
+        assert len(nodes) == 2
+
+
 class TestCheckScriptExecutePermission:
     """Test script:execute permission enforcement in execution service."""
 

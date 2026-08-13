@@ -291,12 +291,25 @@ class WorkflowService(BaseService):
         """Return True if any node in the definition has type 'script'."""
         return any(node.get("type") == "script" for node in workflow_definition.get("nodes", []))
 
+    @staticmethod
+    def _extract_script_nodes(workflow_definition: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return the list of script-type nodes from a workflow definition."""
+        return [node for node in workflow_definition.get("nodes", []) if node.get("type") == "script"]
+
     async def _check_script_edit_permission(
         self,
         workflow_definition: dict[str, Any],
         project_id: UUID,
+        *,
+        previous_definition: dict[str, Any] | None = None,
     ) -> None:
-        """Check script:edit permission if the definition contains script nodes.
+        """Check script:edit permission if script nodes were added or modified.
+
+        When *previous_definition* is provided the check is diff-based: it
+        only fires when the script nodes in the new definition differ from
+        those in the previous version.  This allows users who lack
+        ``script:edit`` to save a workflow without changing its script nodes
+        (e.g. the auto-save that the UI performs before a run).
 
         Also checks the workflow_engine.script_nodes_enabled runtime setting.
 
@@ -306,6 +319,11 @@ class WorkflowService(BaseService):
 
         """
         if not self._definition_contains_script_nodes(workflow_definition):
+            return
+
+        if previous_definition is not None and self._extract_script_nodes(
+            workflow_definition
+        ) == self._extract_script_nodes(previous_definition):
             return
 
         cache = get_runtime_settings()
@@ -1112,12 +1130,16 @@ class WorkflowService(BaseService):
 
         if workflow.project_id is not None:
             previous_cred_ids: set[str] | None = None
+            previous_def: dict[str, Any] | None = None
             if workflow.current_version is not None:
                 prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
+                    previous_def = prev_version.workflow_definition
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
-            await self._check_script_edit_permission(workflow_definition, workflow.project_id)
+            await self._check_script_edit_permission(
+                workflow_definition, workflow.project_id, previous_definition=previous_def
+            )
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1277,6 +1299,7 @@ class WorkflowService(BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
+        prev_publish_def = target_version.workflow_definition if workflow_definition is not None else None
         if workflow_definition is not None:
             target_version = await self._create_and_flush_version(
                 workflow, target_version, workflow_definition, change_description
@@ -1308,7 +1331,9 @@ class WorkflowService(BaseService):
             await self._validate_credential_project_scope(
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
-            await self._check_script_edit_permission(workflow_definition, workflow.project_id)
+            await self._check_script_edit_permission(
+                workflow_definition, workflow.project_id, previous_definition=prev_publish_def
+            )
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )
@@ -1513,9 +1538,11 @@ class WorkflowService(BaseService):
         current_version_record = await self._get_version_or_none(workflow.id, workflow.current_version)
         old_definition = current_version_record.workflow_definition if current_version_record else None
 
-        # Check script:edit permission if restoring a definition with script nodes
+        # Check script:edit permission if restoring a definition with changed script nodes
         if workflow.project_id is not None:
-            await self._check_script_edit_permission(target_version.workflow_definition, workflow.project_id)
+            await self._check_script_edit_permission(
+                target_version.workflow_definition, workflow.project_id, previous_definition=old_definition
+            )
 
         date_iso = target_version.created_at.isoformat() if target_version.created_at else None
         source_label = target_version.name or date_iso or f"version {version}"
