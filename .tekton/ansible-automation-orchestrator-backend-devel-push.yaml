@@ -28,7 +28,7 @@ spec:
     - name: output-image
       value: quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-backend-rhel9:{{revision}}
     - name: dockerfile
-      value: backend/containers/nexus/Containerfile
+      value: backend/containers/syntara/Containerfile
     - name: path-context
       value: backend
     - name: build-args
