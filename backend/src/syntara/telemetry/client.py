@@ -6,7 +6,6 @@ the WorkerRegistry pattern used in temporal_worker.py.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import uuid
 from functools import lru_cache
@@ -209,47 +208,6 @@ class TelemetryClientRegistry:
             logger.info("Flushing pending telemetry events")
             self._client.flush()
 
-    def reinitialize(self, write_key: str, host: str | None = None) -> None:
-        """Replace the Segment client with a new write key and/or host.
-
-        Flushes pending events from the current client, then creates a
-        new one.  If *write_key* is empty, the client is shut down and
-        subsequent :meth:`send_event` calls become silent no-ops.
-
-        Args:
-            write_key: Segment write API key.
-            host: Segment API endpoint URL.  Falls back to the static
-                ``APP_SEGMENT_ENDPOINT`` setting when *None*.
-
-        """
-        if self._client is not None:
-            logger.info("Flushing telemetry before reinitializing")
-            self._client.flush()
-            self._client = None
-
-        if not write_key:
-            logger.info("Telemetry disabled via runtime setting (empty write key)")
-            return
-
-        settings = get_settings()
-        resolved_host = host or str(settings.segment_endpoint)
-
-        self._client = segment_analytics.Client(
-            write_key=write_key,
-            host=resolved_host,
-            gzip=True,
-            max_queue_size=20000,
-            max_retries=settings.segment_max_retries,
-            timeout=settings.segment_timeout,
-            upload_interval=0.5,
-            upload_size=100,
-            on_error=self._error_handler,
-        )
-        logger.info(
-            "Telemetry client reinitialized",
-            host=resolved_host,
-        )
-
     def is_initialized(self) -> bool:
         """Check if the registry has been initialized.
 
@@ -375,118 +333,3 @@ def flush_telemetry() -> None:
     registry = get_telemetry_registry()
     if registry.is_initialized():
         registry.flush()
-
-
-# ---------------------------------------------------------------------------
-# Live-reload watcher: propagates runtime setting changes to the Segment
-# client across all API instances and Temporal workers via Redis Pub/Sub.
-# ---------------------------------------------------------------------------
-
-from syntara.settings.watch import watch_setting  # noqa: E402
-
-
-def _resolve_telemetry_config(
-    *,
-    override_write_key: str | None = None,
-    override_endpoint: str | None = None,
-) -> tuple[str, str | None]:
-    """Resolve the effective write key and endpoint.
-
-    Runtime overrides take precedence; empty strings fall back to static
-    config.  Returns ``(write_key, host_or_none)``.
-    """
-    settings = get_settings()
-
-    write_key = (override_write_key or "").strip()
-    if not write_key:
-        write_key = settings.segment_write_key.get_secret_value()
-
-    endpoint = (override_endpoint or "").strip()
-    host: str | None = endpoint or None
-
-    return write_key, host
-
-
-async def _async_initialize_from_runtime(write_key: str, host: str | None) -> None:
-    """Perform a full first-time telemetry initialization driven by a runtime key.
-
-    Called as an asyncio task from ``_reinitialize_from_runtime()`` when the
-    registry was never initialized at startup (no static write key) but a key
-    has since been set via the runtime settings API.  Needs a DB round-trip
-    to derive ``anonymous_id`` — hence async.
-
-    Args:
-        write_key: Resolved Segment write key from runtime settings.
-        host: Resolved Segment endpoint URL, or *None* to fall back to the
-            static ``APP_SEGMENT_ENDPOINT`` setting.
-
-    """
-    settings = get_settings()
-    try:
-        async with AsyncSessionLocal() as session:
-            installation = await get_installation(session)
-    except Exception:
-        logger.exception("Failed to fetch installation for telemetry initialization")
-        return
-
-    anonymous_id = derive_anonymous_id(installation.id, settings.db_host, settings.db_name)
-    registry = get_telemetry_registry()
-    registry.initialize(
-        write_key=write_key,
-        host=host or str(settings.segment_endpoint),
-        entitlement_id=settings.entitlement_id,
-        anonymous_id=anonymous_id,
-        installation_salt=str(installation.salt),
-        max_retries=settings.segment_max_retries,
-        timeout=settings.segment_timeout,
-    )
-    logger.info("Telemetry client initialized from runtime settings")
-
-
-def _reinitialize_from_runtime() -> None:
-    """Reinitialize the Segment client from the current runtime settings.
-
-    Reads both ``telemetry.segment_write_key`` and
-    ``telemetry.segment_endpoint`` from the in-process L1 cache (already
-    populated by the cache layer before callbacks fire).
-    """
-    from syntara.settings.cache.settings_cache import get_runtime_settings  # noqa: PLC0415
-
-    cache = get_runtime_settings()
-
-    write_key, host = _resolve_telemetry_config(
-        override_write_key=cache.get_cached("telemetry.segment_write_key"),
-        override_endpoint=cache.get_cached("telemetry.segment_endpoint"),
-    )
-
-    registry = get_telemetry_registry()
-    if not registry.is_initialized():
-        if write_key:
-            # First-time enablement via runtime settings: the registry was
-            # never initialized at startup (no static write key).  Schedule
-            # an async task to do the DB round-trip for anonymous_id, then
-            # call registry.initialize().
-            try:
-                asyncio.get_running_loop().create_task(_async_initialize_from_runtime(write_key, host))
-            except RuntimeError:
-                logger.warning("No running event loop; cannot enable telemetry from runtime settings")
-        return
-
-    if write_key:
-        logger.info("Reinitializing telemetry client from runtime settings")
-        registry.reinitialize(write_key, host=host)
-    else:
-        logger.info("Telemetry disabled — no write key in runtime or static config")
-        registry.reinitialize("")
-
-
-@watch_setting("telemetry.segment_write_key")
-def _on_segment_write_key_changed(_key: str, _new_value: object) -> None:
-    """Reinitialize the Segment client when the write key changes at runtime."""
-    _reinitialize_from_runtime()
-
-
-@watch_setting("telemetry.segment_endpoint")
-def _on_segment_endpoint_changed(_key: str, _new_value: object) -> None:
-    """Reinitialize the Segment client when the endpoint changes at runtime."""
-    _reinitialize_from_runtime()
