@@ -200,9 +200,10 @@ class ScheduledTriggerService:
     def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
         """Pre-validate all scheduled trigger configs without contacting Temporal.
 
-        Call this before committing a publish transaction so that invalid
-        trigger configs (e.g. bad timezone) prevent the commit rather than
-        failing after it.
+        Enforces semantic constraints the JSON schema does not (e.g. IANA
+        timezone names). ``WorkflowValidator.collect_findings`` applies the
+        same ``ScheduledTriggerConfig`` checks (accumulating findings); this
+        method remains the raise-first guard used by ``sync_scheduled_triggers``.
 
         Raises:
             TriggerValidationError: If any scheduled trigger config is invalid.
@@ -211,9 +212,7 @@ class ScheduledTriggerService:
         triggers = workflow_definition.get("triggers", [])
         for trigger in triggers:
             if trigger.get("type") == NodeType.SCHEDULED_TRIGGER:
-                node_id = trigger.get("id")
-                if not node_id:
-                    continue
+                node_id = trigger.get("id") or "<missing id>"
                 config = trigger.get("parameters", {})
                 try:
                     ScheduledTriggerConfig.model_validate(config)

@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 import jsonschema
+from pydantic import ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
@@ -25,6 +26,7 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
@@ -383,6 +385,48 @@ def _extract_node_id_and_field(
     return None, None
 
 
+def _collect_scheduled_trigger_config_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Validate scheduled trigger configs beyond JSON Schema (e.g. IANA timezones).
+
+    Uses the same ``ScheduledTriggerConfig`` model as Temporal sync so
+    ``/workflows/validate`` and publish share one semantic contract.
+    Accumulates one finding per invalid trigger (with ``node_id`` /
+    ``field_path`` for Builder highlighting).
+    """
+    findings: list[ValidationFinding] = []
+    for trigger in workflow_definition.get("triggers", []):
+        if not isinstance(trigger, dict):
+            continue
+        if trigger.get("type") != NodeType.SCHEDULED_TRIGGER:
+            continue
+        node_id = trigger.get("id")
+        display_id = node_id if isinstance(node_id, str) and node_id else "<missing id>"
+        config = trigger.get("parameters") or {}
+        if not isinstance(config, dict):
+            config = {}
+        try:
+            ScheduledTriggerConfig.model_validate(config)
+        except ValidationError as exc:
+            field_path: str | None = None
+            errors = exc.errors()
+            if errors:
+                loc = errors[0].get("loc", ())
+                if loc:
+                    field_path = "parameters." + ".".join(str(part) for part in loc)
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message=f"Invalid scheduled trigger config for node '{display_id}': {exc}",
+                    node_id=node_id if isinstance(node_id, str) and node_id else None,
+                    field_path=field_path,
+                )
+            )
+    return findings
+
+
 class WorkflowValidator:
     """Validator for V2 workflows and metadata.
 
@@ -409,6 +453,9 @@ class WorkflowValidator:
         node_ids = _extract_node_ids(workflow_definition)
         self._validate_graph_structure(workflow_definition, node_ids)
         self._validate_template_expressions(workflow_definition, node_ids)
+        scheduled_trigger_findings = _collect_scheduled_trigger_config_findings(workflow_definition)
+        if scheduled_trigger_findings:
+            raise SafeValueError(scheduled_trigger_findings[0].message)
 
     def validate_workflow_name(self, name: str) -> None:
         """Validate workflow name is not empty.
@@ -522,6 +569,8 @@ class WorkflowValidator:
             findings.extend(_check_converge_node_findings(workflow_definition))
             findings.extend(_check_approval_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
+
+        findings.extend(_collect_scheduled_trigger_config_findings(workflow_definition))
 
         return findings
 

@@ -1238,12 +1238,6 @@ class WorkflowService(BaseService):
 
         await self._flush_with_duplicate_check(workflow.name)
 
-        # Pre-validate scheduled trigger configs before committing so that
-        # invalid configs (e.g. bad timezone) prevent the commit rather than
-        # failing after it — avoiding a state where the DB shows "published"
-        # but the user sees an error (AAP-87629).
-        ScheduledTriggerService.validate_trigger_configs(target_version.workflow_definition)
-
         webhook_service = WebhookTriggerService(self.session, self.user)
         await self._sync_all_trigger_types(
             webhook_service,
