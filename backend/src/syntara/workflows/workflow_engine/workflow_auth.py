@@ -23,6 +23,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.converter import DataConverter
 
 HEADER_NAME = "x-workflow-auth"
+HEADER_SIGNED_ID = "x-workflow-auth-id"
 
 _signing_key: bytes | None = None
 
@@ -82,5 +83,13 @@ def verify_workflow(workflow_id: str, workflow_type: str, args: Sequence[Any], t
 
 
 def build_auth_header(workflow_id: str, workflow_type: str, args: Sequence[Any]) -> dict[str, Payload]:
-    """Build a Temporal header dict containing the signed workflow submission."""
-    return {HEADER_NAME: Payload(data=sign_workflow(workflow_id, workflow_type, args))}
+    """Build a Temporal header dict containing the signed workflow submission.
+
+    Includes ``HEADER_SIGNED_ID`` so the verifier knows which workflow ID was
+    signed.  This is necessary for Temporal Schedules, where the server appends
+    a timestamp suffix to the action's workflow ID at fire time.
+    """
+    return {
+        HEADER_NAME: Payload(data=sign_workflow(workflow_id, workflow_type, args)),
+        HEADER_SIGNED_ID: Payload(data=workflow_id.encode()),
+    }
