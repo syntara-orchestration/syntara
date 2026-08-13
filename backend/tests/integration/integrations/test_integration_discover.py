@@ -13,14 +13,14 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.integrations.adapters.protocol import DiscoveredTool, DiscoveredToolParameter, DiscoverResult
+from syntara.core.models import User
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.integrations.adapters.protocol import DiscoveredTool, DiscoveredToolParameter, DiscoverResult
 
 BASE_URL = "/api/v1/integrations"
 
-MCP_DISCOVER_PATCH = "nexus.integrations.adapters.mcp_server.MCPServerAdapter.discover"
+MCP_DISCOVER_PATCH = "syntara.integrations.adapters.mcp_server.MCPServerAdapter.discover"
 
 
 def _fake_discovered_tool(name: str, *, with_params: bool = False) -> DiscoveredTool:
@@ -263,7 +263,7 @@ class TestIntegrationDiscoverContract:
         """The discover endpoint does not create any Integration records."""
         from sqlmodel import select
 
-        from nexus.integrations.models.integration import Integration
+        from syntara.integrations.models.integration import Integration
 
         credential_id = await _create_credential(test_db_session, test_user, "discover-nopersist")
 
@@ -336,8 +336,8 @@ async def _create_credential(
     """Create a minimal credential for use in discover request bodies."""
     from sqlmodel import select as sql_select
 
-    from nexus.authz.models import Project
-    from nexus.core.services.secret_service import create_secret_service
+    from syntara.authz.models import Project
+    from syntara.core.services.secret_service import create_secret_service
 
     project = Project(name=f"{name_prefix}-proj-{uuid4().hex[:8]}")
     session.add(project)

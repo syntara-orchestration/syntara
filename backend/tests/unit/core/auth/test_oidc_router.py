@@ -9,10 +9,10 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory
-from nexus.auth.exceptions import OIDCCallbackError, OIDCErrorCode, SessionStoreUnavailableError
-from nexus.auth.router import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory
+from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode, SessionStoreUnavailableError
+from syntara.auth.router import (
     _auto_create_user,
     _build_callback_error_redirect,
     _build_link_redirect,
@@ -30,15 +30,15 @@ from nexus.auth.router import (
     oidc_authorize,
     oidc_callback,
 )
-from nexus.auth.services.oidc_service import OIDCError, OIDCService
-from nexus.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.constants import FieldLimits
-from nexus.core.models import User, UserIdentity
-from nexus.core.models.group import Group
-from nexus.core.models.user_identity import SUBJECT_MAX_LENGTH
-from nexus.identity_providers.models.identity_provider import IdentityProvider
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.auth.services.oidc_service import OIDCError, OIDCService
+from syntara.authz.audit.group_membership import GroupMembershipEvent, GroupMembershipHandler
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.constants import FieldLimits
+from syntara.core.models import User, UserIdentity
+from syntara.core.models.group import Group
+from syntara.core.models.user_identity import SUBJECT_MAX_LENGTH
+from syntara.identity_providers.models.identity_provider import IdentityProvider
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
 
 def _add_begin_nested(db: AsyncMock) -> None:
@@ -70,7 +70,7 @@ def _make_user(
     password_hash: str | None = None,
     auth_type: str = "federated",
 ) -> User:
-    from nexus.core.models.user import AuthType
+    from syntara.core.models.user import AuthType
 
     return User(
         id=UUID(user_id) if user_id else uuid4(),
@@ -210,14 +210,14 @@ def _make_oidc_service_mock(
 @pytest.fixture
 def _mock_audit_dispatcher() -> Generator[MagicMock, None, None]:
     """Prevent AuditEventDispatcher.dispatch from having side effects during tests."""
-    with patch("nexus.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch:
+    with patch("syntara.auth.router.AuditEventDispatcher.dispatch") as mock_dispatch:
         yield mock_dispatch
 
 
 @pytest.fixture
 def _mock_audit_emission() -> Generator[None, None, None]:
     """Prevent @audit emission side effects in unit tests."""
-    with patch("nexus.audit.emitter.emit_audit_event"):
+    with patch("syntara.audit.emitter.emit_audit_event"):
         yield
 
 
@@ -301,7 +301,7 @@ class TestOidcAuthorize:
 
         mock_svc = _make_oidc_service_mock()
 
-        with patch("nexus.auth.router.OIDCService", return_value=mock_svc):
+        with patch("syntara.auth.router.OIDCService", return_value=mock_svc):
             response = await oidc_authorize(provider_id, _make_request(), db)
 
         assert response.status_code == 302
@@ -331,7 +331,7 @@ class TestOidcAuthorize:
         mock_settings.jwt_issuer = "http://localhost:3000"
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = await oidc_authorize(provider_id, _make_request(), db)
 
         assert response.status_code == 302
@@ -352,7 +352,7 @@ class TestOidcAuthorize:
         mock_settings.jwt_issuer = "http://localhost:3000"
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = await oidc_authorize(provider_id, _make_request(), db)
 
         assert response.status_code == 302
@@ -371,7 +371,7 @@ class TestOidcAuthorize:
 
         mock_svc = _make_oidc_service_mock()
 
-        with patch("nexus.auth.router.OIDCService", return_value=mock_svc):
+        with patch("syntara.auth.router.OIDCService", return_value=mock_svc):
             await oidc_authorize(provider_id, _make_request(), db)
 
         mock_svc.generate_pkce.assert_called_once()
@@ -391,7 +391,7 @@ class TestOidcAuthorize:
 
         mock_svc = _make_oidc_service_mock()
 
-        with patch("nexus.auth.router.OIDCService", return_value=mock_svc):
+        with patch("syntara.auth.router.OIDCService", return_value=mock_svc):
             await oidc_authorize(provider_id, _make_request(), db)
 
         call_kwargs = mock_svc.build_authorization_url.call_args.kwargs
@@ -461,8 +461,8 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(uuid4()),
@@ -493,8 +493,8 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.OIDCService") as mock_oidc_cls,
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.OIDCService") as mock_oidc_cls,
         ):
             mock_oidc_cls.return_value.retrieve_oidc_state.return_value = {
                 "provider_id": str(uuid4()),
@@ -528,8 +528,8 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_svc),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.OIDCService", return_value=mock_svc),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
         ):
             response = await oidc_callback(
                 state="invalid-state",
@@ -576,15 +576,15 @@ class TestOidcCallback:
         mock_settings.jwt_refresh_token_lifetime_hours = 8
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie") as mock_set_cookie,
-            patch("nexus.auth.router._resolve_oidc_user", AsyncMock(return_value=(new_user, new_identity))),
-            patch("nexus.auth.router.sync_idp_groups", AsyncMock()),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="test-seed"),
-            patch("nexus.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie") as mock_set_cookie,
+            patch("syntara.auth.router._resolve_oidc_user", AsyncMock(return_value=(new_user, new_identity))),
+            patch("syntara.auth.router.sync_idp_groups", AsyncMock()),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="test-seed"),
+            patch("syntara.auth.router.set_csrf_cookie"),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -632,15 +632,15 @@ class TestOidcCallback:
         mock_settings.jwt_refresh_token_lifetime_hours = 8
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
-            patch("nexus.auth.router._resolve_oidc_user", AsyncMock(return_value=(existing_user, existing_identity))),
-            patch("nexus.auth.router.sync_idp_groups", AsyncMock()),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="test-seed"),
-            patch("nexus.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router._resolve_oidc_user", AsyncMock(return_value=(existing_user, existing_identity))),
+            patch("syntara.auth.router.sync_idp_groups", AsyncMock()),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="test-seed"),
+            patch("syntara.auth.router.set_csrf_cookie"),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -678,10 +678,11 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
             patch(
-                "nexus.auth.router._resolve_oidc_user", AsyncMock(side_effect=OIDCError("User account is deactivated"))
+                "syntara.auth.router._resolve_oidc_user",
+                AsyncMock(side_effect=OIDCError("User account is deactivated")),
             ),
         ):
             response = await oidc_callback(
@@ -721,9 +722,9 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._resolve_oidc_user", AsyncMock(side_effect=OIDCError("Username already taken"))),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._resolve_oidc_user", AsyncMock(side_effect=OIDCError("Username already taken"))),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -769,15 +770,15 @@ class TestOidcCallback:
         mock_settings.jwt_refresh_token_lifetime_hours = 24
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie") as mock_set_cookie,
-            patch("nexus.auth.router._resolve_oidc_user", AsyncMock(return_value=(test_user, test_identity))),
-            patch("nexus.auth.router.sync_idp_groups", AsyncMock()),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="test-seed"),
-            patch("nexus.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie") as mock_set_cookie,
+            patch("syntara.auth.router._resolve_oidc_user", AsyncMock(return_value=(test_user, test_identity))),
+            patch("syntara.auth.router.sync_idp_groups", AsyncMock()),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="test-seed"),
+            patch("syntara.auth.router.set_csrf_cookie"),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -827,15 +828,15 @@ class TestOidcCallback:
         mock_settings.jwt_refresh_token_lifetime_hours = 8
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.set_refresh_cookie"),
-            patch("nexus.auth.router._resolve_oidc_user", AsyncMock(return_value=(test_user, test_identity))),
-            patch("nexus.auth.router.sync_idp_groups", AsyncMock()),
-            patch("nexus.auth.router.generate_csrf_seed", return_value="test-seed"),
-            patch("nexus.auth.router.set_csrf_cookie"),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.set_refresh_cookie"),
+            patch("syntara.auth.router._resolve_oidc_user", AsyncMock(return_value=(test_user, test_identity))),
+            patch("syntara.auth.router.sync_idp_groups", AsyncMock()),
+            patch("syntara.auth.router.generate_csrf_seed", return_value="test-seed"),
+            patch("syntara.auth.router.set_csrf_cookie"),
         ):
             await oidc_callback(
                 state="valid-state",
@@ -875,7 +876,7 @@ class TestOidcCallback:
         username_result = MagicMock()
         username_result.one_or_none.return_value = None
         # create_identity checks is_builtin and auth_type on the auto-created user
-        from nexus.core.models.user import AuthType
+        from syntara.core.models.user import AuthType
 
         auto_created_user = MagicMock()
         auto_created_user.auth_type = AuthType.FEDERATED
@@ -908,11 +909,11 @@ class TestOidcCallback:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router._get_token_service", return_value=mock_token_service),
-            patch("nexus.auth.router.create_session_store", _patch_session_store(mock_store)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router.sync_idp_groups", new_callable=AsyncMock, return_value=True),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+            patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock, return_value=True),
             pytest.raises(SessionStoreUnavailableError),
         ):
             await oidc_callback(
@@ -1240,7 +1241,7 @@ class TestResolveOidcUser:
     """Tests for the _resolve_oidc_user helper function."""
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_returns_user_linked_by_identity(self, mock_svc_cls: MagicMock) -> None:
         """Should return user when identity (issuer, sub) is found."""
         existing_user = _make_user(email="existing@example.com")
@@ -1262,7 +1263,7 @@ class TestResolveOidcUser:
         assert identity == mock_identity
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_creates_new_user_when_identity_not_found(self, mock_svc_cls: MagicMock) -> None:
         """Should create a new user when no identity exists for (issuer, sub)."""
         provider = _make_provider()
@@ -1285,7 +1286,7 @@ class TestResolveOidcUser:
         assert identity is not None
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_creates_new_user_with_mixed_case_email(self, mock_svc_cls: MagicMock) -> None:
         """Should create a new user when identity not found, preserving email from claim."""
         provider = _make_provider()
@@ -1308,7 +1309,7 @@ class TestResolveOidcUser:
         mock_svc.create_identity.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_succeeds_when_no_email_claim(self, mock_svc_cls: MagicMock) -> None:
         """Should create user without email when email claim is missing."""
         provider = _make_provider()
@@ -1334,7 +1335,7 @@ class TestResolveOidcUser:
         assert user.email is None
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_blocks_login_when_email_already_exists(self, mock_svc_cls: MagicMock) -> None:
         """Should block login when email is already associated with another account."""
         existing_user = _make_user(email="taken@example.com", username="existing")
@@ -1375,7 +1376,7 @@ class TestResolveOidcUser:
             await _resolve_oidc_user(db, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_raises_when_user_is_inactive(self, mock_svc_cls: MagicMock) -> None:
         """Should raise OIDCError when linked user is inactive."""
         inactive_user = _make_user(email="inactive@example.com", is_enabled=False)
@@ -1396,7 +1397,7 @@ class TestResolveOidcUser:
             await _resolve_oidc_user(db, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_removes_stale_identity_for_deleted_user_and_creates_new(self, mock_svc_cls: MagicMock) -> None:
         """Should remove stale identity when linked user is soft-deleted and create a new user."""
         deleted_user_id = uuid4()
@@ -1440,7 +1441,7 @@ class TestResolveOidcUser:
         assert identity is not None
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_retries_user_resolution_on_toctou_race(self, mock_svc_cls: MagicMock) -> None:
         """Should retry once when concurrent user creation causes OIDCError."""
         provider = _make_provider()
@@ -1465,7 +1466,7 @@ class TestResolveOidcUser:
         assert identity is not None
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_rejects_sub_exceeding_max_length(self, mock_svc_cls: MagicMock) -> None:
         """Should raise OIDCError when sub claim exceeds SUBJECT_MAX_LENGTH."""
         provider = _make_provider()
@@ -1484,7 +1485,7 @@ class TestResolveOidcUser:
         mock_svc_cls.return_value.create_identity.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_accepts_sub_at_exact_max_length(self, mock_svc_cls: MagicMock) -> None:
         """Should accept sub claim that is exactly SUBJECT_MAX_LENGTH characters."""
         provider = _make_provider()
@@ -1519,7 +1520,7 @@ class TestAutoCreateUser:
     """Tests for the _auto_create_user helper function."""
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_emits_group_member_added_for_authenticated_group(
         self,
         mock_do_emit: AsyncMock,
@@ -1959,7 +1960,7 @@ class TestRevalidateOrigin:
         mock_settings = MagicMock()
         mock_settings.cors_allow_origins = ["https://app.example.com", "https://other.example.com"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             assert _revalidate_origin("https://app.example.com") == "https://app.example.com"
 
     def test_returns_none_when_origin_removed(self) -> None:
@@ -1967,7 +1968,7 @@ class TestRevalidateOrigin:
         mock_settings = MagicMock()
         mock_settings.cors_allow_origins = ["https://other.example.com"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             assert _revalidate_origin("https://app.example.com") is None
 
     def test_returns_none_when_cors_origins_empty(self) -> None:
@@ -1975,7 +1976,7 @@ class TestRevalidateOrigin:
         mock_settings = MagicMock()
         mock_settings.cors_allow_origins = []
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             assert _revalidate_origin("https://app.example.com") is None
 
     def test_returns_none_for_none_input(self) -> None:
@@ -2002,7 +2003,7 @@ class TestSafeRedirectUrl:
 
     def test_allows_url_in_cors_origins(self) -> None:
         """Should allow absolute URLs whose origin is in CORS_ALLOW_ORIGINS."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings()):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings()):
             assert (
                 _safe_redirect_url("https://app.example.com/page", origin="https://app.example.com")
                 == "https://app.example.com/page"
@@ -2010,7 +2011,7 @@ class TestSafeRedirectUrl:
 
     def test_rejects_url_not_in_cors_origins(self) -> None:
         """Should reject URLs whose origin is not in CORS_ALLOW_ORIGINS."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings()):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings()):
             assert (
                 _safe_redirect_url("https://evil.com/steal", origin="https://app.example.com")
                 == "https://app.example.com"
@@ -2030,12 +2031,12 @@ class TestSafeRedirectUrl:
 
     def test_falls_back_to_jwt_issuer_when_no_origin(self) -> None:
         """Should fall back to jwt_issuer when no stored origin is available."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings()):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings()):
             assert _safe_redirect_url(None) == "https://api.example.com"
 
     def test_rejects_different_scheme(self) -> None:
         """Should reject URLs with different scheme even if netloc matches."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings()):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings()):
             assert (
                 _safe_redirect_url("http://app.example.com/page", origin="https://app.example.com")
                 == "https://app.example.com"
@@ -2043,14 +2044,14 @@ class TestSafeRedirectUrl:
 
     def test_rejects_javascript_uri(self) -> None:
         """Should reject javascript: URIs."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings()):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings()):
             assert (
                 _safe_redirect_url("javascript:alert(1)", origin="https://app.example.com") == "https://app.example.com"
             )
 
     def test_rejects_when_cors_origins_contains_wildcard(self) -> None:
         """Should reject absolute URLs when CORS origins contain a wildcard."""
-        with patch("nexus.auth.router.get_settings", return_value=self._mock_settings(cors_origins=["*"])):
+        with patch("syntara.auth.router.get_settings", return_value=self._mock_settings(cors_origins=["*"])):
             assert (
                 _safe_redirect_url("https://app.example.com/page", origin="https://app.example.com")
                 == "https://app.example.com"
@@ -2066,7 +2067,7 @@ class TestHandleLinkFlow:
     """Tests for the _handle_link_flow helper function."""
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.create_session_store")
+    @patch("syntara.auth.router.create_session_store")
     async def test_rejects_when_session_expired(self, mock_store_cls: MagicMock) -> None:
         """Should raise OIDCError when the session JTI is no longer valid."""
         provider = _make_provider()
@@ -2086,8 +2087,8 @@ class TestHandleLinkFlow:
             await _handle_link_flow(db, state_data, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
-    @patch("nexus.auth.router.create_session_store")
+    @patch("syntara.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.create_session_store")
     async def test_succeeds_when_session_is_valid(self, mock_store_cls: MagicMock, mock_svc_cls: MagicMock) -> None:
         """Should create identity when session is still active."""
         user = _make_user(email="user@example.com")
@@ -2123,7 +2124,7 @@ class TestHandleLinkFlow:
         mock_svc.create_identity.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_proceeds_without_session_jti(self, mock_svc_cls: MagicMock) -> None:
         """Should skip session verification when no session_jti in state (backwards compat)."""
         user = _make_user(email="user@example.com")
@@ -2167,7 +2168,7 @@ class TestHandleLinkFlow:
             await _handle_link_flow(db, state_data, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_rejects_identity_already_linked_to_same_user(self, mock_svc_cls: MagicMock) -> None:
         """Should raise when identity is already linked to the requesting user."""
         user = _make_user(email="user@example.com")
@@ -2189,7 +2190,7 @@ class TestHandleLinkFlow:
             await _handle_link_flow(db, state_data, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_rejects_identity_linked_to_another_user(self, mock_svc_cls: MagicMock) -> None:
         """Should raise when identity is already linked to a different user."""
         user = _make_user(email="user@example.com")
@@ -2254,7 +2255,7 @@ class TestHandleLinkFlow:
             await _handle_link_flow(db, state_data, user_claims, provider)
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_raises_oidc_error_on_data_error_in_link_flow(self, mock_svc_cls: MagicMock) -> None:
         """Should catch DataError (e.g. truncation) during linking and raise OIDCError."""
         user = _make_user(email="user@example.com")
@@ -2488,9 +2489,9 @@ class TestOidcCallbackLinkFlow:
         mock_settings.cors_allow_origins = ["https://app.example.com"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
-            patch("nexus.auth.router._process_link_callback", AsyncMock(return_value=(user, None))),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._process_link_callback", AsyncMock(return_value=(user, None))),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -2520,8 +2521,8 @@ class TestOidcCallbackLinkFlow:
         mock_settings.cors_allow_origins = ["https://app.example.com"]
 
         with (
-            patch("nexus.auth.router._process_oidc_callback", AsyncMock(side_effect=error)),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._process_oidc_callback", AsyncMock(side_effect=error)),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -2545,8 +2546,8 @@ class TestOidcCallbackLinkFlow:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router._process_oidc_callback", AsyncMock(side_effect=RuntimeError("unexpected"))),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router._process_oidc_callback", AsyncMock(side_effect=RuntimeError("unexpected"))),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
         ):
             response = await oidc_callback(
                 state="valid-state",
@@ -2563,7 +2564,7 @@ class TestResolveOidcUserRetryExhausted:
     """Tests for _resolve_oidc_user when retry is exhausted."""
 
     @pytest.mark.asyncio
-    @patch("nexus.auth.router.UserIdentityService")
+    @patch("syntara.auth.router.UserIdentityService")
     async def test_raises_after_two_failures(self, mock_svc_cls: MagicMock) -> None:
         """Should raise OIDCError when both creation attempts fail."""
         provider = _make_provider()
@@ -2606,7 +2607,7 @@ class TestBuildTestSigninResponse:
         mock_settings.jwt_issuer = "http://localhost:3000"
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = _build_test_signin_response(claims, "http://localhost:3000")
 
         assert response.status_code == 302
@@ -2626,7 +2627,7 @@ class TestBuildTestSigninResponse:
         mock_settings.jwt_issuer = "http://localhost:3000"
         mock_settings.cors_allow_origins = ["http://app.example.com"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = _build_test_signin_response({"sub": "x"}, "http://app.example.com")
 
         assert response.headers["location"].startswith("http://app.example.com/auth/test-signin-callback#")
@@ -2639,7 +2640,7 @@ class TestBuildTestSigninResponse:
         mock_settings.jwt_issuer = "http://localhost:3000"
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = _build_test_signin_response(claims, "http://localhost:3000")
 
         assert response.status_code == 302
@@ -2658,7 +2659,7 @@ class TestBuildCallbackErrorRedirect:
             "Something went wrong", error_code=OIDCErrorCode.AUTH_FAILED, origin="http://localhost:3000"
         )
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = _build_callback_error_redirect(error)
 
         assert response.status_code == 302
@@ -2677,7 +2678,7 @@ class TestBuildCallbackErrorRedirect:
             redirect_to="http://localhost:3000/settings",
         )
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = _build_callback_error_redirect(error)
 
         assert response.status_code == 302
@@ -2702,7 +2703,7 @@ class TestBuildLinkRedirect:
         mock_settings = MagicMock()
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = await _build_link_redirect(user, provider, None, state_data, MagicMock(), AsyncMock(), "")
 
         assert response.status_code == 302
@@ -2717,7 +2718,7 @@ class TestBuildLinkRedirect:
         mock_settings = MagicMock()
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
-        with patch("nexus.auth.router.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.router.get_settings", return_value=mock_settings):
             response = await _build_link_redirect(None, provider, None, state_data, MagicMock(), AsyncMock(), "")
 
         assert response.status_code == 302
@@ -2753,10 +2754,10 @@ class TestOIDCCallbackTestSigninFlow:
         mock_settings.cors_allow_origins = ["http://localhost:3000"]
 
         with (
-            patch("nexus.auth.router.OIDCService", return_value=mock_oidc_service),
-            patch("nexus.auth.router.get_settings", return_value=mock_settings),
+            patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+            patch("syntara.auth.router.get_settings", return_value=mock_settings),
             patch(
-                "nexus.auth.router._exchange_and_validate_tokens",
+                "syntara.auth.router._exchange_and_validate_tokens",
                 AsyncMock(return_value=(_make_user_claims(), raw_claims, "fake-id-token")),
             ),
         ):

@@ -16,7 +16,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import (
+from syntara.authz.engine import (
     AuthzRequest,
     VisibilityResult,
     assign_authenticated_group_project_user,
@@ -25,9 +25,9 @@ from nexus.authz.engine import (
     resolve_allowed_projects,
     resolve_visibility,
 )
-from nexus.authz.models.project import Project
-from nexus.core.models import User
-from nexus.core.models.group import Group
+from syntara.authz.models.project import Project
+from syntara.core.models import User
+from syntara.core.models.group import Group
 
 
 @pytest.mark.asyncio

@@ -8,9 +8,9 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from temporalio.service import RPCError
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.workflows.error_handlers import temporal_rpc_error_handler, temporal_unavailable_handler
-from nexus.workflows.exceptions import TemporalUnavailableError
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.workflows.error_handlers import temporal_rpc_error_handler, temporal_unavailable_handler
+from syntara.workflows.exceptions import TemporalUnavailableError
 
 
 class TestTemporalUnavailableHandler:
@@ -83,7 +83,7 @@ class TestTemporalRpcErrorHandler:
         request.url = "https://api.example.com/workflows/execute"
 
         # Mock logging to avoid traceback issues
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 
@@ -104,7 +104,7 @@ class TestTemporalRpcErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/workflows/test"
 
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 
@@ -116,7 +116,7 @@ class TestTemporalRpcErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/workflows/test"
 
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 
@@ -128,7 +128,7 @@ class TestTemporalRpcErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/workflows/test"
 
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 
@@ -141,7 +141,7 @@ class TestTemporalRpcErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/workflows/complex-workflow/execute"
 
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 
@@ -161,7 +161,7 @@ class TestTemporalRpcErrorHandler:
         request = Mock(spec=Request)
         request.url = url
 
-        with patch("nexus.workflows.error_handlers.logger.error"):
+        with patch("syntara.workflows.error_handlers.logger.error"):
             exc = Mock(spec=RPCError)
             response = temporal_rpc_error_handler(request, exc)
 

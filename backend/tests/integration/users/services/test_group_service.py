@@ -12,12 +12,12 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.exceptions import GroupNameConflictError, GroupNotFoundError
-from nexus.auth.passwords import hash_password
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.models.group import GroupRead, GroupSource
-from nexus.users.services.group_service import GroupsService
+from syntara.auth.exceptions import GroupNameConflictError, GroupNotFoundError
+from syntara.auth.passwords import hash_password
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.models.group import GroupRead, GroupSource
+from syntara.users.services.group_service import GroupsService
 
 
 @pytest.mark.asyncio

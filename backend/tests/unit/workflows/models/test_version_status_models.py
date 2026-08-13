@@ -9,11 +9,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from nexus.workflows.models.execution import ExecutionCreate, ExecutionRead
-from nexus.workflows.models.query_params import WorkflowVersionListParams
-from nexus.workflows.models.workflow import WorkflowRead
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
-from nexus.workflows.models.workflow_version import (
+from syntara.workflows.models.execution import ExecutionCreate, ExecutionRead
+from syntara.workflows.models.query_params import WorkflowVersionListParams
+from syntara.workflows.models.workflow import WorkflowRead
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.models.workflow_version import (
     PublishVersionRequest,
     WorkflowVersion,
     WorkflowVersionRead,
@@ -232,7 +232,7 @@ class TestWorkflowPublishEventModel:
         assert WorkflowPublishEvent.__tablename__ == "workflow_publish_events"
 
     def test_auditable_is_none(self) -> None:
-        from nexus.core.models.base.base_resource import AuditLevel
+        from syntara.core.models.base.base_resource import AuditLevel
 
         assert WorkflowPublishEvent.__auditable__ == AuditLevel.NONE
 

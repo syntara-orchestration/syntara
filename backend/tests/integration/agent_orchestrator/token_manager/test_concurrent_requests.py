@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from nexus.agent_orchestrator.token_manager.services import TokenValidationService
+from syntara.agent_orchestrator.token_manager.exceptions import TokenLimitExceededError
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
+from syntara.agent_orchestrator.token_manager.services import TokenValidationService
 
 
 @pytest_asyncio.fixture

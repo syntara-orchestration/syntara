@@ -2,9 +2,9 @@
 
 from uuid import uuid4
 
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.telemetry.events.workflow_error import TimedOutComponent
-from nexus.workflows.audit.execution_error import (
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.telemetry.events.workflow_error import TimedOutComponent
+from syntara.workflows.audit.execution_error import (
     WorkflowExecutionErrorEvent,
     WorkflowExecutionErrorHandler,
 )
@@ -36,7 +36,7 @@ class TestWorkflowExecutionErrorHandler:
         assert audit_event.event_severity == EventSeverity.ERROR
         assert audit_event.event_status == EventStatus.ERROR
         assert audit_event.event_action == "workflow_execution_error"
-        assert audit_event.source_component == "nexus.workflows.engine"
+        assert audit_event.source_component == "syntara.workflows.engine"
         assert audit_event.execution_id == EXECUTION_ID
         assert audit_event.workflow_id == WORKFLOW_ID
         assert audit_event.activity_id is None

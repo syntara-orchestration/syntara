@@ -14,12 +14,12 @@ import httpx
 import pytest
 from httpx import HTTPStatusError, Response
 
-from nexus.integrations.adapters.llm_provider import LLMProviderAdapter
-from nexus.integrations.adapters.protocol import (
+from syntara.integrations.adapters.llm_provider import LLMProviderAdapter
+from syntara.integrations.adapters.protocol import (
     HealthCheckErrorType,
     IntegrationAdapter,
 )
-from nexus.integrations.models.integration_configuration import (
+from syntara.integrations.models.integration_configuration import (
     LLMProviderConfiguration,
 )
 
@@ -59,7 +59,7 @@ def _mock_response(json_data: dict[str, Any], status_code: int = 200) -> Respons
 @contextmanager
 def _mock_httpx(*, response: Response | None = None, side_effect: Exception | None = None) -> Generator[MagicMock]:
     """Context manager that patches httpx.AsyncClient with a mock."""
-    with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+    with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         if side_effect:
             mock_client.get = AsyncMock(side_effect=side_effect)
@@ -95,7 +95,7 @@ class TestLLMProviderValidateSuccess:
     @pytest.mark.asyncio
     async def test_openai_validate_success(self) -> None:
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -110,7 +110,7 @@ class TestLLMProviderValidateSuccess:
     @pytest.mark.asyncio
     async def test_anthropic_validate_success(self) -> None:
         adapter = LLMProviderAdapter(_make_config("anthropic", base_url=None))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -129,7 +129,7 @@ class TestLLMProviderValidateSuccess:
     @pytest.mark.asyncio
     async def test_gemini_validate_success(self) -> None:
         adapter = LLMProviderAdapter(_make_config("gemini", base_url=None))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"models": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -147,7 +147,7 @@ class TestLLMProviderValidateSuccess:
     @pytest.mark.asyncio
     async def test_red_hat_ai_validate_success(self) -> None:
         adapter = LLMProviderAdapter(_make_config("red_hat_ai", base_url="https://my-cluster.example.com"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -164,7 +164,7 @@ class TestLLMProviderValidateSuccess:
     @pytest.mark.asyncio
     async def test_validate_no_model_data_in_result(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -191,7 +191,7 @@ class TestLLMProviderValidateErrors:
     @pytest.mark.asyncio
     async def test_validate_timeout(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=TimeoutError("timed out"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -206,7 +206,7 @@ class TestLLMProviderValidateErrors:
     @pytest.mark.asyncio
     async def test_validate_http_401(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=_mock_http_error(401))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -221,7 +221,7 @@ class TestLLMProviderValidateErrors:
     @pytest.mark.asyncio
     async def test_validate_connection_error(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -236,7 +236,7 @@ class TestLLMProviderValidateErrors:
     @pytest.mark.asyncio
     async def test_validate_ssl_error(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ssl.SSLError("cert failed"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -266,7 +266,7 @@ class TestLLMProviderDiscoverSuccess:
                 {"id": "gpt-4o-mini", "object": "model"},
             ]
         }
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response(response_json))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -290,7 +290,7 @@ class TestLLMProviderDiscoverSuccess:
                 {"id": "claude-sonnet-4-20250514", "display_name": "Claude Sonnet 4", "type": "model"},
             ]
         }
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response(response_json))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -322,7 +322,7 @@ class TestLLMProviderDiscoverSuccess:
                 },
             ]
         }
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response(response_json))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -341,7 +341,7 @@ class TestLLMProviderDiscoverSuccess:
     @pytest.mark.asyncio
     async def test_empty_model_list(self) -> None:
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -362,7 +362,7 @@ class TestLLMProviderDiscoverSuccess:
             content=b"<html>not json</html>",
             request=httpx.Request("GET", "https://example.com"),
         )
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=malformed)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -420,7 +420,7 @@ class TestLLMProviderDiscoverErrors:
     @pytest.mark.asyncio
     async def test_discover_timeout(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=TimeoutError("timed out"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -436,7 +436,7 @@ class TestLLMProviderDiscoverErrors:
     @pytest.mark.asyncio
     async def test_discover_http_401(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=_mock_http_error(401))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -452,7 +452,7 @@ class TestLLMProviderDiscoverErrors:
     @pytest.mark.asyncio
     async def test_discover_http_403(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=_mock_http_error(403))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -477,7 +477,7 @@ class TestLLMProviderDiscoverErrors:
     @pytest.mark.asyncio
     async def test_discover_connection_error(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -493,7 +493,7 @@ class TestLLMProviderDiscoverErrors:
     @pytest.mark.asyncio
     async def test_discover_ssl_error(self) -> None:
         adapter = LLMProviderAdapter(_make_config())
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ssl.SSLError("cert verify"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -517,7 +517,7 @@ class TestProviderDispatch:
     @pytest.mark.asyncio
     async def test_openai_uses_bearer_auth(self) -> None:
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -532,7 +532,7 @@ class TestProviderDispatch:
     @pytest.mark.asyncio
     async def test_anthropic_uses_x_api_key(self) -> None:
         adapter = LLMProviderAdapter(_make_config("anthropic", base_url=None))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -548,7 +548,7 @@ class TestProviderDispatch:
     @pytest.mark.asyncio
     async def test_gemini_uses_query_param_key(self) -> None:
         adapter = LLMProviderAdapter(_make_config("gemini", base_url=None))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"models": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -564,7 +564,7 @@ class TestProviderDispatch:
     @pytest.mark.asyncio
     async def test_custom_uses_bearer_auth(self) -> None:
         adapter = LLMProviderAdapter(_make_config("custom", base_url="http://localhost:4000"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -612,7 +612,7 @@ class TestBaseURLValidation:
 
     def test_get_provider_unknown_hint_raises(self) -> None:
         """_get_provider raises ValueError for an unregistered provider hint."""
-        from nexus.integrations.adapters.llm_provider import _get_provider
+        from syntara.integrations.adapters.llm_provider import _get_provider
 
         # Use a valid enum value that has no provider registered — none currently,
         # so we test the error path by calling with an invalid string cast.
@@ -635,7 +635,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.INFO)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -653,7 +653,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.WARNING)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=TimeoutError("timed out"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -671,7 +671,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.WARNING)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=_mock_http_error(401))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -689,7 +689,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.WARNING)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ssl.SSLError("cert"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -707,7 +707,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.WARNING)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -726,7 +726,7 @@ class TestLLMProviderLogging:
         caplog.set_level(logging.INFO)
         adapter = LLMProviderAdapter(_make_config("openai"))
         response_json = {"data": [{"id": "gpt-4o"}, {"id": "gpt-4o-mini"}]}
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=_mock_response(response_json))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -744,7 +744,7 @@ class TestLLMProviderLogging:
 
         caplog.set_level(logging.ERROR)
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=RuntimeError("unexpected"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -806,7 +806,7 @@ class TestLLMProviderDiscoverPagination:
                 "has_more": False,
             }
         )
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=[page1, page2])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -838,7 +838,7 @@ class TestLLMProviderDiscoverPagination:
                 "models": [{"name": "models/gemini-pro", "displayName": "Pro"}],
             }
         )
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=[page1, page2])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -860,7 +860,7 @@ class TestLLMProviderDiscoverPagination:
     async def test_openai_discover_no_pagination(self) -> None:
         """OpenAI does not paginate — discover makes exactly one request."""
         adapter = LLMProviderAdapter(_make_config("openai"))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(
                 return_value=_mock_response(
@@ -881,7 +881,7 @@ class TestLLMProviderDiscoverPagination:
     @pytest.mark.asyncio
     async def test_pagination_stops_at_max_pages(self) -> None:
         """Pagination loop stops at _MAX_PAGINATION_PAGES to prevent infinite loops."""
-        from nexus.integrations.adapters.llm_provider import _MAX_PAGINATION_PAGES
+        from syntara.integrations.adapters.llm_provider import _MAX_PAGINATION_PAGES
 
         adapter = LLMProviderAdapter(_make_config("anthropic", base_url=None))
         always_more = _mock_response(
@@ -891,7 +891,7 @@ class TestLLMProviderDiscoverPagination:
                 "last_id": "model-x",
             }
         )
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(return_value=always_more)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -916,7 +916,7 @@ class TestLLMProviderDiscoverPagination:
                 "last_id": "claude-opus-4",
             }
         )
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=[page1, _mock_http_error(500)])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -932,7 +932,7 @@ class TestLLMProviderDiscoverPagination:
     async def test_validate_does_not_paginate(self) -> None:
         """validate() makes exactly one request even when response has pagination."""
         adapter = LLMProviderAdapter(_make_config("anthropic", base_url=None))
-        with patch("nexus.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(
                 return_value=_mock_response(

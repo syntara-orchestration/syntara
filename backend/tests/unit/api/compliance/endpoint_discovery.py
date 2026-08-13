@@ -15,7 +15,7 @@ import yaml
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from nexus.core.router.loader import load_openapi_schema
+from syntara.core.router.loader import load_openapi_schema
 
 _ACTION_OPERATION_PREFIXES = (
     "disable_",
@@ -28,7 +28,7 @@ _ACTION_OPERATION_PREFIXES = (
 )
 
 # OpenAPI tag for AAP Controller BFF proxy endpoints (locked to upstream response shape).
-_AAP_PROXY_TAG = "Ansible Automation Platform"
+_AAP_PROXY_TAG = "Ansible Automation Platform Proxy"
 
 EXCLUSIONS_FILE = Path(__file__).parent / "list_compliance_exclusions.yaml"
 CRUD_EXCLUSIONS_FILE = Path(__file__).parent / "crud_compliance_exclusions.yaml"
@@ -69,7 +69,7 @@ def _load_spec() -> tuple[dict[str, Any], dict[str, Any]]:
         return _spec_cache
     schema = load_openapi_schema("openapi.yaml")
     if schema is None:
-        msg = "Failed to load OpenAPI spec from nexus.schemas.openapi.yaml"
+        msg = "Failed to load OpenAPI spec from syntara.schemas.openapi.yaml"
         raise FileNotFoundError(msg)
     spec = schema.schema_data
     _spec_cache = spec.get("paths", {}), spec.get("components", {}).get("schemas", {})
@@ -288,7 +288,7 @@ def discover_testable_list_endpoints() -> list[EndpointInfo]:
     """Discover list endpoints that should be tested for compliance.
 
     Filters out:
-    - AAP proxy endpoints (tagged "Ansible Automation Platform" in OpenAPI spec, locked to upstream format)
+    - AAP proxy endpoints (tagged "Ansible Automation Platform Proxy" in OpenAPI spec, locked to upstream format)
     - Explicitly excluded endpoints from list_compliance_exclusions.yaml
 
     Includes:

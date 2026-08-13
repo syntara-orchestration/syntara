@@ -34,7 +34,7 @@ class TestScheduledTrigger:
 
     def test_scheduled_trigger_workflow_publishes_successfully(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -84,7 +84,7 @@ class TestScheduledTrigger:
 
         # Publish — this creates the Temporal Schedule.  If the trigger config
         # is invalid, publish will fail with a validation error.
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=workflow.id,
             version=1,
             body=PublishVersionRequest(),
@@ -95,7 +95,7 @@ class TestScheduledTrigger:
 
     def test_scheduled_trigger_workflow_with_interval(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ):
@@ -142,7 +142,7 @@ class TestScheduledTrigger:
         workflow = workflow_factory(workflow_data)
         assert workflow.id is not None
 
-        pub_resp = nexus_api.workflows.publish_version(
+        pub_resp = syntara_api.workflows.publish_version(
             workflow_id=workflow.id,
             version=1,
             body=PublishVersionRequest(),

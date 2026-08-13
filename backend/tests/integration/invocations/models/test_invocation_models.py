@@ -23,8 +23,8 @@ from sqlalchemy import inspect
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models import Invocation, InvocationListResponse, InvocationStatus
-from nexus.core.models import User
+from syntara.agent_orchestrator.models import Invocation, InvocationListResponse, InvocationStatus
+from syntara.core.models import User
 
 
 @pytest.mark.asyncio

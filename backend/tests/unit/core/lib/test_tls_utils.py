@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from nexus.core.lib.tls_utils import build_integration_httpx_verify
+from syntara.core.lib.tls_utils import build_integration_httpx_verify
 
 
 @pytest.fixture(scope="module")

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nexus.agent_orchestrator.utils.token_usage import aggregate_token_usage
+from syntara.agent_orchestrator.utils.token_usage import aggregate_token_usage
 
 
 class TestAggregateTokenUsage:

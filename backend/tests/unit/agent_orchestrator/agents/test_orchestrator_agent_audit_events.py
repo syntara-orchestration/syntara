@@ -10,22 +10,22 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
-from nexus.agent_orchestrator.audit.agent_execution import (
+from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
+from syntara.agent_orchestrator.audit.agent_execution import (
     AgentExecutionEvent,
     AgentExecutionHandler,
 )
-from nexus.agent_orchestrator.audit.context_integration import (
+from syntara.agent_orchestrator.audit.context_integration import (
     ContextIntegrationEvent,
     ContextIntegrationHandler,
 )
-from nexus.agent_orchestrator.context_manager.models import ContextPackage
-from nexus.agent_orchestrator.models.agent_state import AgentState
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-from nexus.audit.sanitization import REDACTED
+from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.agent_orchestrator.models.agent_state import AgentState
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+from syntara.audit.sanitization import REDACTED
 
 
 def _make_agent_state(**overrides: object) -> AgentState:
@@ -92,11 +92,11 @@ class TestOrchestratorAgentExecutionEvents:
         mock_settings.get_int = AsyncMock(return_value=30)
 
         with patch(
-            "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+            "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
         ):
             agent = OrchestratorAgent(context_manager_planner=mock_context_manager)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit:
             await agent.execute(state)
 
         # Verify events: STARTED, SUCCESS (context), COMPLETED, plus @audit decorator event
@@ -154,9 +154,9 @@ class TestOrchestratorAgentExecutionEvents:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+                "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
             ),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch.object(OrchestratorAgent, "_route_request", side_effect=RuntimeError("Routing error")),
             pytest.raises(RuntimeError),
         ):
@@ -213,9 +213,9 @@ class TestOrchestratorAgentContextIntegrationEvents:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+                "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
             ),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
         ):
             agent = OrchestratorAgent(context_manager_planner=mock_context_manager)
             result = await agent._integrate_context(state)
@@ -256,9 +256,9 @@ class TestOrchestratorAgentContextIntegrationEvents:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+                "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
             ),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
         ):
             agent = OrchestratorAgent(context_manager_planner=mock_context_manager)
             result = await agent._integrate_context(state)
@@ -296,9 +296,9 @@ class TestOrchestratorAgentContextIntegrationEvents:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+                "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
             ),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
         ):
             agent = OrchestratorAgent(context_manager_planner=mock_context_manager)
             result = await agent._integrate_context(state)
@@ -338,9 +338,9 @@ class TestOrchestratorAgentContextIntegrationEvents:
 
         with (
             patch(
-                "nexus.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
+                "syntara.agent_orchestrator.agents.orchestrator_agent.get_runtime_settings", return_value=mock_settings
             ),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
         ):
             agent = OrchestratorAgent(context_manager_planner=mock_context_manager)
             await agent._integrate_context(state)

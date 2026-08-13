@@ -15,25 +15,25 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration
-from nexus.telemetry.api_usage_accumulator import AccumulatorSnapshot
-from nexus.telemetry.client import TelemetryClientRegistry
-from nexus.telemetry.periodic_collector import _collect_and_send
-from nexus.telemetry.queries import (
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration
+from syntara.telemetry.api_usage_accumulator import AccumulatorSnapshot
+from syntara.telemetry.client import TelemetryClientRegistry
+from syntara.telemetry.periodic_collector import _collect_and_send
+from syntara.telemetry.queries import (
     query_credential_counts,
     query_execution_counts,
     query_model_usage,
     query_tool_counts,
     query_workflow_counts,
 )
-from nexus.tool_manager.models.tool import Tool
-from nexus.tool_manager.models.usage_counter import CounterType, UsageCounter, WindowDuration
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.tool_manager.models.tool import Tool
+from syntara.tool_manager.models.usage_counter import CounterType, UsageCounter, WindowDuration
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from tests.integration.helpers.credential import CredentialFactory
 from tests.integration.helpers.execution import ExecutionFactory
 from tests.integration.helpers.token_usage import TokenUsageFactory
@@ -224,7 +224,7 @@ class TestPeriodicAnalyticsFlow:
         )
 
         with patch(
-            "nexus.telemetry.periodic_collector.get_accumulator",
+            "syntara.telemetry.periodic_collector.get_accumulator",
             return_value=mock_accumulator,
         ):
             await _collect_and_send(mock_session_factory, registry)

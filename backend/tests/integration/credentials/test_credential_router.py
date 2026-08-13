@@ -10,12 +10,12 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 
 
 @pytest.fixture

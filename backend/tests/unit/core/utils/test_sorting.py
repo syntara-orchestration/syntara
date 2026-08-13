@@ -6,9 +6,9 @@ field name and direction tuples. Tests will fail until sort parsing functions ar
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.utils.cursor import CursorData, SortDirection, extract_sort_from_cursor
-from nexus.core.utils.sorting import apply_sorting, parse_sort
+from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.cursor import CursorData, SortDirection, extract_sort_from_cursor
+from syntara.core.utils.sorting import apply_sorting, parse_sort
 
 
 class TestSortParsing:

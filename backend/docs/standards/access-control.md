@@ -71,9 +71,9 @@ The compliance tests run as part of `make test-unit` and `make test-coverage`. T
 
 | File | Role |
 |------|------|
-| `src/nexus/auth/dependencies.py` | `get_current_user`, `get_token_payload` — JWT validation |
-| `src/nexus/authz/dependencies.py` | `PermissionChecker`, `VisibilityFilter`, `ProjectScopeFilter` — Rego-based RBAC |
-| `src/nexus/core/nexus_router.py` | `NO_PERMISSION` sentinel, `NexusRouter` base class |
-| `src/nexus/authz/resource_actions.py` | Route introspection helpers (`_iter_route_deps`, `_get_dep_instance`) |
+| `src/syntara/auth/dependencies.py` | `get_current_user`, `get_token_payload` — JWT validation |
+| `src/syntara/authz/dependencies.py` | `PermissionChecker`, `VisibilityFilter`, `ProjectScopeFilter` — Rego-based RBAC |
+| `src/syntara/core/nexus_router.py` | `NO_PERMISSION` sentinel, `NexusRouter` base class |
+| `src/syntara/authz/resource_actions.py` | Route introspection helpers (`_iter_route_deps`, `_get_dep_instance`) |
 | `tests/unit/api/test_auth_compliance.py` | Compliance test suite |
 | `tests/unit/api/auth_exclusions.yml` | YAML-based exclusion registry (authenticated vs public) |

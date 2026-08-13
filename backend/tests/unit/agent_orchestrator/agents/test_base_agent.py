@@ -5,15 +5,15 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.agents.base_agent import BaseAgent
-from nexus.agent_orchestrator.exceptions import (
+from syntara.agent_orchestrator.agents.base_agent import BaseAgent
+from syntara.agent_orchestrator.exceptions import (
     AgentConfigurationError,
     AgentOrchestratorError,
     AgentRateLimitError,
     AgentTimeoutError,
 )
-from nexus.agent_orchestrator.models.agent_response import GenericAgentResponse
-from nexus.agent_orchestrator.models.agent_state import AgentState
+from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
+from syntara.agent_orchestrator.models.agent_state import AgentState
 
 
 class ConcreteAgent(BaseAgent):
@@ -40,14 +40,21 @@ class TestBaseAgentErrorHandling:
     """Test BaseAgent error handling helper method."""
 
     def test_handle_execution_error_converts_timeout_error(self) -> None:
-        """Test that TimeoutError is converted to AgentTimeoutError."""
+        """Test that TimeoutError is converted to AgentTimeoutError with guidance."""
         agent = ConcreteAgent()
         invocation_id = uuid4()
         original_error = TimeoutError("Connection timed out")
+        expected_message = (
+            "The AI Agent did not respond in time. Try again, increase the node "
+            "timeout, or simplify the prompt. If the agent may still be running, "
+            "check execution details before re-running."
+        )
 
         with pytest.raises(AgentTimeoutError) as exc_info:
             agent._handle_execution_error(original_error, invocation_id)
 
+        assert str(exc_info.value) == expected_message
+        assert "Request timed out" not in str(exc_info.value)
         assert exc_info.value.invocation_id == str(invocation_id)
         assert exc_info.value.__cause__ == original_error
 

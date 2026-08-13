@@ -7,13 +7,13 @@ import json
 
 import jsonschema
 
-from nexus.telemetry.events.node_execution import NodeExecutionEvent
-from nexus.telemetry.events.workflow_execution import (
+from syntara.telemetry.events.node_execution import NodeExecutionEvent
+from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
 )
-from nexus.telemetry.events.workflow_version import WorkflowVersionCreatedEvent
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.telemetry.events.workflow_version import WorkflowVersionCreatedEvent
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 # Import shared test data from unit telemetry conftest
 from tests.unit.telemetry.conftest import (

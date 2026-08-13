@@ -12,10 +12,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.dependencies import get_metrics_recorder
-from nexus.metrics.openmetrics import openmetrics_endpoint
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.openmetrics import openmetrics_endpoint
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 
 @pytest.fixture

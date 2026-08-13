@@ -120,7 +120,7 @@ describe('integrationUtils', () => {
           base_url: null,
         },
       })
-      expect(getBaseUrl(integration)).toBe('https://api.openai.com')
+      expect(getBaseUrl(integration)).toBe('https://api.openai.com/v1')
     })
 
     it('resolves default URL for Gemini when base_url is null', () => {

@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.tool_manager.lib.providers.factory import ProviderFactory
+from syntara.core.exceptions import SafeValueError
+from syntara.tool_manager.lib.providers.factory import ProviderFactory
 from tests.unit.fixtures.mock_mcp_provider import MockMCPProvider
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
-    from nexus.tool_manager.models.tool import Tool
+    from syntara.tool_manager.models.tool import Tool
 
 
 class TestProviderIntegration:

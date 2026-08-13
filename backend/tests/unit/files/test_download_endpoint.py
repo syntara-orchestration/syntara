@@ -6,9 +6,9 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, status
 
-from nexus.files.exceptions import FileContentNotFoundError, FileIntegrityError
-from nexus.files.models import FileMetadata, FileStatus
-from nexus.files.router import download_file
+from syntara.files.exceptions import FileContentNotFoundError, FileIntegrityError
+from syntara.files.models import FileMetadata, FileStatus
+from syntara.files.router import download_file
 
 
 def _make_metadata() -> FileMetadata:

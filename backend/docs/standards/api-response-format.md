@@ -22,7 +22,7 @@ All list/collection endpoints return a `ResourcesResponse[T]`:
 | `prev` | `str \| null` | Opaque cursor for the previous page |
 | `total` | `int \| null` | Total count (only present when `include_total=true`) |
 
-The response model is defined generically in `nexus.core.models.pagination`:
+The response model is defined generically in `syntara.core.models.pagination`:
 
 ```python
 class ResourcesResponse[T](ResourcesResponseBase):
@@ -96,7 +96,7 @@ The resource `id` is always appended as a tiebreaker to the sort order. This pre
 
 ## Constants
 
-Defined in `nexus.core.constants`:
+Defined in `syntara.core.constants`:
 
 | Constant | Value | Description |
 |---|---|---|
@@ -325,7 +325,7 @@ All list/collection endpoints return a `ResourcesResponse[T]`:
 | `prev` | `str \| null` | Opaque cursor for the previous page |
 | `total` | `int \| null` | Total count (only present when `include_total=true`) |
 
-The response model is defined generically in `nexus.core.models.pagination`:
+The response model is defined generically in `syntara.core.models.pagination`:
 
 ```python
 class ResourcesResponse[T](ResourcesResponseBase):
@@ -399,7 +399,7 @@ The resource `id` is always appended as a tiebreaker to the sort order. This pre
 
 ### Constants
 
-Defined in `nexus.core.constants`:
+Defined in `syntara.core.constants`:
 
 | Constant | Value | Description |
 |---|---|---|
@@ -570,7 +570,7 @@ Not all validation errors follow the exact pattern above:
 
 #### AAP Proxy Endpoints
 
-Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. They do not use cursor-based pagination or the standard query parameter conventions:
+Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not use cursor-based pagination or the standard query parameter conventions:
 
 | Aspect | Standard Pattern | AAP Proxy |
 |---|---|---|
@@ -581,7 +581,7 @@ Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. T
 | Sorting | `-field` prefix notation with ID tiebreaker | None (upstream order) |
 | Default page size | 20 (max 100) | 50 (max 200) |
 
-**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from compliance testing by the `"aap"` tag in the OpenAPI spec, not via `list_compliance_exclusions.yaml`.
+**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `list_compliance_exclusions.yaml`.
 
 #### Custom List Implementations
 
@@ -879,7 +879,7 @@ A catch-all `IntegrityError` handler in `core/error_handlers.py` provides a safe
 
 #### AAP Proxy Endpoints
 
-Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"aap"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
+Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
 
 #### Action Endpoints
 
@@ -931,7 +931,7 @@ Endpoints are classified by operation_id prefix and HTTP method:
 - **Update**: PATCH and PUT endpoints with a path parameter
 - **Delete**: DELETE endpoints
 
-AAP proxy endpoints (tagged `"aap"` in the OpenAPI spec) are excluded from CRUD discovery, same as for list compliance. Action endpoints (disable, enable, publish, unpublish, restore, rotate, retry) are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
+AAP proxy endpoints (tagged `"Ansible Automation Platform Proxy"` in the OpenAPI spec) are excluded from CRUD discovery, same as for list compliance. Action endpoints (disable, enable, publish, unpublish, restore, rotate, retry) are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
 
 #### Exclusion mechanism
 
@@ -1041,24 +1041,24 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/models/pagination.py` | `ResourcesResponse` and pagination models |
-| `src/nexus/core/models/base/query_params.py` | `BaseListParams` |
-| `src/nexus/core/models/base/` | Base resource model hierarchy |
-| `src/nexus/core/utils/pagination.py` | Cursor pagination implementation |
-| `src/nexus/core/utils/filters.py` | Filter parsing and application |
-| `src/nexus/core/utils/sorting.py` | Sort parsing and application |
-| `src/nexus/core/utils/cursor.py` | Cursor encoding/decoding |
-| `src/nexus/core/constants.py` | Pagination constants |
-| `src/nexus/core/services/base.py` | `BaseService.list_resources()` |
-| `src/nexus/core/models/error.py` | `ErrorData` model (RFC 9457 Problem Details) |
-| `src/nexus/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
-| `src/nexus/core/exceptions.py` | `SafeValueError` definition |
-| `src/nexus/core/exception_registry.py` | `@fastapi_exception` decorator |
-| `src/nexus/aap/router.py` | AAP proxy endpoints (known exception) |
-| `src/nexus/aap/models/responses.py` | `AAPListResponse` model (known exception) |
-| `src/nexus/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
-| `src/nexus/credentials/router.py` | Reference CRUD router implementation |
-| `src/nexus/credentials/services/credential_service.py` | Reference service with `_get_or_raise`, `_find_by_name` |
+| `src/syntara/core/models/pagination.py` | `ResourcesResponse` and pagination models |
+| `src/syntara/core/models/base/query_params.py` | `BaseListParams` |
+| `src/syntara/core/models/base/` | Base resource model hierarchy |
+| `src/syntara/core/utils/pagination.py` | Cursor pagination implementation |
+| `src/syntara/core/utils/filters.py` | Filter parsing and application |
+| `src/syntara/core/utils/sorting.py` | Sort parsing and application |
+| `src/syntara/core/utils/cursor.py` | Cursor encoding/decoding |
+| `src/syntara/core/constants.py` | Pagination constants |
+| `src/syntara/core/services/base.py` | `BaseService.list_resources()` |
+| `src/syntara/core/models/error.py` | `ErrorData` model (RFC 9457 Problem Details) |
+| `src/syntara/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
+| `src/syntara/core/exceptions.py` | `SafeValueError` definition |
+| `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator |
+| `src/syntara/aap/router.py` | AAP proxy endpoints (known exception) |
+| `src/syntara/aap/models/responses.py` | `AAPListResponse` model (known exception) |
+| `src/syntara/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
+| `src/syntara/credentials/router.py` | Reference CRUD router implementation |
+| `src/syntara/credentials/services/credential_service.py` | Reference service with `_get_or_raise`, `_find_by_name` |
 | `tests/unit/api/compliance/test_list_endpoint_compliance.py` | List endpoint compliance validation tests |
 | `tests/unit/api/compliance/test_list_endpoint_discovery.py` | List endpoint discovery mechanism tests |
 | `tests/unit/api/compliance/test_crud_endpoint_compliance.py` | CRUD endpoint compliance validation tests |

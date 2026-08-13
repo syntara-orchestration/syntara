@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nexus.settings import watch as watch_module
-from nexus.settings.watch import _apply_watchers, watch_setting
+from syntara.settings import watch as watch_module
+from syntara.settings.watch import _apply_watchers, watch_setting
 
 
 @pytest.fixture(autouse=True)

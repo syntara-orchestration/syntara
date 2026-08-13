@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from nexus.core.websocket.utils import is_receive_only_channel, normalize_channel_name
+from syntara.core.websocket.utils import is_receive_only_channel, normalize_channel_name
 
 
 class TestNormalizeChannelName:

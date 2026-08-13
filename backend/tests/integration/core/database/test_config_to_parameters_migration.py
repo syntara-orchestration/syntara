@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 # The exact SQL from the alembic migration upgrade() - nodes
 _UPGRADE_NODES_SQL = """

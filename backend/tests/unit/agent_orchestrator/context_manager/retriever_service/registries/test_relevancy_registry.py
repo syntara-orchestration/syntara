@@ -6,13 +6,13 @@ ensuring proper registration, retrieval, and error handling for relevancy checke
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import RegistryError
-from nexus.agent_orchestrator.context_manager.retriever_service.interfaces.relevancy_checker import RelevancyChecker
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import RegistryError
+from syntara.agent_orchestrator.context_manager.retriever_service.interfaces.relevancy_checker import RelevancyChecker
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
 
 
 # Mock implementations for testing

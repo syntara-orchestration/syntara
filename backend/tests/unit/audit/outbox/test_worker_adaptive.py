@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.outbox.worker import AuditOutboxWorker
+from syntara.audit.outbox.worker import AuditOutboxWorker
 
 
 class TestAdaptiveCallback:
@@ -28,7 +28,7 @@ class TestAdaptiveCallback:
         # Mock _get_pending_outbox_count to return a backlog
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=500),
-            patch("nexus.audit.outbox.worker.publish_outbox_events") as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events") as mock_publish,
         ):
             # Initial state: base values
             assert worker._interval_seconds == 5.0
@@ -49,7 +49,7 @@ class TestAdaptiveCallback:
         # Second cycle: 650 pending → delta=150 → GROWING_MODERATE
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=650),
-            patch("nexus.audit.outbox.worker.publish_outbox_events") as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events") as mock_publish,
         ):
             await worker._adaptive_callback(test_session_factory)
 
@@ -82,7 +82,7 @@ class TestAdaptiveCallback:
         # Mock DB error (returns None)
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=None),
-            patch("nexus.audit.outbox.worker.publish_outbox_events") as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events") as mock_publish,
         ):
             await worker._adaptive_callback(test_session_factory)
 
@@ -115,7 +115,7 @@ class TestAdaptiveCallback:
         # Empty queue
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=0),
-            patch("nexus.audit.outbox.worker.publish_outbox_events") as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events") as mock_publish,
         ):
             await worker._adaptive_callback(test_session_factory)
 
@@ -149,7 +149,7 @@ class TestAdaptiveCallback:
         # Shrinking: 1000 → 400 (delta = -600 < 0)
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=400),
-            patch("nexus.audit.outbox.worker.publish_outbox_events") as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events") as mock_publish,
         ):
             await worker._adaptive_callback(test_session_factory)
 
@@ -177,7 +177,7 @@ class TestAdaptiveCallback:
         # Cycle 1: 100 pending (first cycle seeds)
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=100),
-            patch("nexus.audit.outbox.worker.publish_outbox_events"),
+            patch("syntara.audit.outbox.worker.publish_outbox_events"),
         ):
             await worker._adaptive_callback(test_session_factory)
             interval_1 = worker._interval_seconds
@@ -186,7 +186,7 @@ class TestAdaptiveCallback:
         # Cycle 2: Growing moderately (100 → 250, delta=150)
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=250),
-            patch("nexus.audit.outbox.worker.publish_outbox_events"),
+            patch("syntara.audit.outbox.worker.publish_outbox_events"),
         ):
             await worker._adaptive_callback(test_session_factory)
             interval_2 = worker._interval_seconds
@@ -195,7 +195,7 @@ class TestAdaptiveCallback:
         # Cycle 3: Growing fast (250 → 600, delta=350)
         with (
             patch.object(worker, "_get_pending_outbox_count", return_value=600),
-            patch("nexus.audit.outbox.worker.publish_outbox_events"),
+            patch("syntara.audit.outbox.worker.publish_outbox_events"),
         ):
             await worker._adaptive_callback(test_session_factory)
             interval_3 = worker._interval_seconds

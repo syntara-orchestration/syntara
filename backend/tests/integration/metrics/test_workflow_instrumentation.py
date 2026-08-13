@@ -14,20 +14,20 @@ import pytest
 import pytest_asyncio
 from prometheus_client import CollectorRegistry
 
-from nexus.core.models import User
-from nexus.metrics.emission import reset_emission_trackers
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
-from nexus.workflows.models.activity_execution import ActivityStatus
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.services.execution_service import ExecutionService
+from syntara.core.models import User
+from syntara.metrics.emission import reset_emission_trackers
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
+from syntara.workflows.models.activity_execution import ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.services.execution_service import ExecutionService
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from tests.integration.helpers.workflow import ActivitiesFactory, ExecutionsFactory
 
-PATCH_TARGET = "nexus.workflows.services.execution_service.get_metrics_recorder"
+PATCH_TARGET = "syntara.workflows.services.execution_service.get_metrics_recorder"
 
 
 @pytest.fixture

@@ -13,23 +13,23 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.credentials.exceptions import CredentialDisabledError
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.integrations.adapters.protocol import (
+from syntara.core.models import User
+from syntara.credentials.exceptions import CredentialDisabledError
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.integrations.adapters.protocol import (
     DiscoveredTool,
     DiscoveredToolParameter,
     DiscoverResult,
     ValidateResult,
 )
-from nexus.integrations.exceptions import (
+from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
     IntegrationCredentialRequiredError,
     IntegrationNotFoundError,
     IntegrationRefreshNotSupportedError,
 )
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     InitialToolSelection,
     Integration,
     IntegrationCreate,
@@ -37,11 +37,11 @@ from nexus.integrations.models.integration import (
     IntegrationStatus,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import AAPConfiguration, LLMProviderConfiguration
-from nexus.integrations.services.integration_service import IntegrationService
-from nexus.tool_manager.models.tool import Tool, ToolStatus
+from syntara.integrations.models.integration_configuration import AAPConfiguration, LLMProviderConfiguration
+from syntara.integrations.services.integration_service import IntegrationService
+from syntara.tool_manager.models.tool import Tool, ToolStatus
 
-SERVICE_MODULE = "nexus.integrations.services.integration_service"
+SERVICE_MODULE = "syntara.integrations.services.integration_service"
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ async def _insert_integration_direct(
 async def _create_credential(
     session: AsyncSession, user: User, *, secret_id: str | None = None, with_secret: bool = True
 ) -> tuple[Credential, CredentialType]:
-    from nexus.authz.models import Project
+    from syntara.authz.models import Project
 
     project = Project(name=f"test-project-{uuid4().hex[:8]}", created_by=user.id, updated_by=user.id)
     session.add(project)
@@ -540,8 +540,8 @@ class TestDiscover:
         mock_adapter_factory.return_value = mock_adapter
         mock_settings.return_value = _mock_runtime_settings()
 
-        from nexus.integrations.models.integration import IntegrationTestConnection
-        from nexus.integrations.models.integration_configuration import MCPServerConfigurationInput
+        from syntara.integrations.models.integration import IntegrationTestConnection
+        from syntara.integrations.models.integration_configuration import MCPServerConfigurationInput
 
         cred_id = uuid4()
         data = IntegrationTestConnection(
@@ -585,8 +585,8 @@ class TestDiscover:
         mock_adapter_factory.return_value = mock_adapter
         mock_settings.return_value = _mock_runtime_settings()
 
-        from nexus.integrations.models.integration import IntegrationTestConnection
-        from nexus.integrations.models.integration_configuration import MCPServerConfigurationInput
+        from syntara.integrations.models.integration import IntegrationTestConnection
+        from syntara.integrations.models.integration_configuration import MCPServerConfigurationInput
 
         cred_id = uuid4()
         data = IntegrationTestConnection(

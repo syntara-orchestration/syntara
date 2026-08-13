@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.agent_orchestrator.models.context_data import InvocationContextData
-from nexus.agent_orchestrator.utils.context_helpers import extract_request_id
+from syntara.agent_orchestrator.models.context_data import InvocationContextData
+from syntara.agent_orchestrator.utils.context_helpers import extract_request_id
 
 
 class TestExtractRequestId:

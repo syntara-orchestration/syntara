@@ -13,17 +13,17 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nexus.api.constants import API_V1_PATH_PREFIX
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.http_request import HTTPRequestEvent
-from nexus.audit.middleware import AuditMiddleware
-from nexus.telemetry.handlers.api_call import APICallTelemetryHandler
+from syntara.api.constants import API_V1_PATH_PREFIX
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.http_request import HTTPRequestEvent
+from syntara.audit.middleware import AuditMiddleware
+from syntara.telemetry.handlers.api_call import APICallTelemetryHandler
 
 if TYPE_CHECKING:
-    from nexus.telemetry.events.api_call import APICallEvent
+    from syntara.telemetry.events.api_call import APICallEvent
 
-_SETTINGS_PATH = "nexus.telemetry.handlers.api_call.get_settings"
-_REGISTRY_PATH = "nexus.telemetry.handlers.api_call.get_telemetry_registry"
+_SETTINGS_PATH = "syntara.telemetry.handlers.api_call.get_settings"
+_REGISTRY_PATH = "syntara.telemetry.handlers.api_call.get_telemetry_registry"
 
 
 def _make_registry_mock() -> MagicMock:

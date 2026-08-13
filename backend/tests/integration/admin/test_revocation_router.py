@@ -9,14 +9,14 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
-from nexus.identity_providers.models.identity_provider import IdentityProvider
+from syntara.auth.models.global_revocation_timestamp import GlobalRevocationTimestamp
+from syntara.identity_providers.models.identity_provider import IdentityProvider
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 pytestmark = pytest.mark.asyncio
@@ -67,7 +67,7 @@ class TestRevokeAllSessions:
     """Tests for the POST /admin/revocation endpoint."""
 
     async def test_sets_global_revocation_timestamp(self, auth_client: AsyncClient) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             response = await auth_client.post("/api/v1/admin/revocation")
 
         assert response.status_code == 200
@@ -80,7 +80,7 @@ class TestRevokeAllSessions:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             await auth_client.post("/api/v1/admin/revocation")
 
         response = await auth_client.get("/api/v1/admin/revocation")
@@ -96,7 +96,7 @@ class TestRevokeAllSessions:
         self,
         auth_client: AsyncClient,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             response = await auth_client.post("/api/v1/admin/revocation")
 
         data = response.json()
@@ -111,7 +111,7 @@ class TestRevokeAllSessions:
         self,
         auth_client: AsyncClient,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             await auth_client.post("/api/v1/admin/revocation")
 
         mock_dispatcher.dispatch.assert_called_once()
@@ -122,7 +122,7 @@ class TestRevokeAllSessions:
         self,
         auth_client: AsyncClient,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             mock_dispatcher.dispatch.side_effect = RuntimeError("audit failure")
             response = await auth_client.post("/api/v1/admin/revocation")
 
@@ -137,7 +137,7 @@ class TestRevokeUserSessions:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             response = await auth_client.post(
                 f"/api/v1/admin/revocation/users/{test_user.username}",
             )
@@ -153,8 +153,8 @@ class TestRevokeUserSessions:
         test_user: User,
     ) -> None:
         with (
-            patch("nexus.admin.services.AuditEventDispatcher"),
-            patch("nexus.admin.services.create_session_store") as mock_create,
+            patch("syntara.admin.services.AuditEventDispatcher"),
+            patch("syntara.admin.services.create_session_store") as mock_create,
         ):
             mock_store = AsyncMock()
             mock_store.revoke_all_for_user.return_value = 3
@@ -204,7 +204,7 @@ class TestRevokeUserSessions:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             await auth_client.post(
                 f"/api/v1/admin/revocation/users/{test_user.username}",
             )
@@ -219,7 +219,7 @@ class TestRevokeUserSessions:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             mock_dispatcher.dispatch.side_effect = RuntimeError("audit down")
             response = await auth_client.post(
                 f"/api/v1/admin/revocation/users/{test_user.username}",
@@ -252,7 +252,7 @@ class TestRevokeIdpSessions:
         test_db_session.add(provider)
         await test_db_session.commit()
 
-        with patch("nexus.admin.services.AuditEventDispatcher"):
+        with patch("syntara.admin.services.AuditEventDispatcher"):
             response = await auth_client.post(
                 f"/api/v1/admin/revocation/identity_providers/{provider.name}",
             )
@@ -284,8 +284,8 @@ class TestRevokeIdpSessions:
         await test_db_session.commit()
 
         with (
-            patch("nexus.admin.services.AuditEventDispatcher"),
-            patch("nexus.admin.services.create_session_store") as mock_create,
+            patch("syntara.admin.services.AuditEventDispatcher"),
+            patch("syntara.admin.services.create_session_store") as mock_create,
         ):
             mock_store = AsyncMock()
             mock_store.revoke_by_idp.return_value = 7
@@ -346,7 +346,7 @@ class TestRevokeIdpSessions:
         test_db_session.add(provider)
         await test_db_session.commit()
 
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             await auth_client.post(
                 f"/api/v1/admin/revocation/identity_providers/{provider.name}",
             )
@@ -377,7 +377,7 @@ class TestRevokeIdpSessions:
         test_db_session.add(provider)
         await test_db_session.commit()
 
-        with patch("nexus.admin.services.AuditEventDispatcher") as mock_dispatcher:
+        with patch("syntara.admin.services.AuditEventDispatcher") as mock_dispatcher:
             mock_dispatcher.dispatch.side_effect = RuntimeError("audit broken")
             response = await auth_client.post(
                 f"/api/v1/admin/revocation/identity_providers/{provider.name}",

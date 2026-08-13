@@ -34,7 +34,7 @@ TRANSIENT_STATUSES = {HTTPStatus.INTERNAL_SERVER_ERROR, HTTPStatus.BAD_GATEWAY, 
 
 
 def _validate_provider(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     provider_id: UUID,
     *,
     timeout: float = 10.0,
@@ -44,7 +44,7 @@ def _validate_provider(
     deadline = time.monotonic() + timeout
     while True:
         try:
-            resp = nexus_api.integrations.validate(integration_id=provider_id)
+            resp = syntara_api.integrations.validate(integration_id=provider_id)
         except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError):
             if time.monotonic() >= deadline:
                 raise
@@ -59,7 +59,7 @@ def _validate_provider(
 
 
 def _wait_for_provider_status(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     provider_id: UUID,
     expected: IntegrationStatus,
     *,
@@ -70,7 +70,7 @@ def _wait_for_provider_status(
     deadline = time.monotonic() + timeout
     while True:
         try:
-            resp = nexus_api.integrations.get(integration_id=provider_id)
+            resp = syntara_api.integrations.get(integration_id=provider_id)
         except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError):
             if time.monotonic() >= deadline:
                 raise
@@ -98,12 +98,12 @@ class TestMCPProviderIntegration:
     """E2E tests for MCP integration with the running MCP server."""
 
     @pytest.mark.mcp
-    def test_provider_status_and_tools(self, nexus_api: SyntaraApiRegistry, mcp_integration_id: str) -> None:
+    def test_provider_status_and_tools(self, syntara_api: SyntaraApiRegistry, mcp_integration_id: str) -> None:
         """Test that the shared MCP integration is available with discovered tools."""
         integration_id = UUID(mcp_integration_id)
 
         # Check integration status
-        integration = nexus_api.integrations.get(integration_id=integration_id).assert_and_get()
+        integration = syntara_api.integrations.get(integration_id=integration_id).assert_and_get()
         assert integration.validation_status == IntegrationStatus.AVAILABLE
         assert integration.enabled is True
         assert integration.validation_error is None
@@ -111,7 +111,9 @@ class TestMCPProviderIntegration:
         assert integration.integration_type == IntegrationType.MCP_SERVER
 
         # Verify discovered tools
-        tools_list = nexus_api.tools.list(additional_params={"integration_id[eq]": mcp_integration_id}).assert_and_get()
+        tools_list = syntara_api.tools.list(
+            additional_params={"integration_id[eq]": mcp_integration_id}
+        ).assert_and_get()
         tools = tools_list.resources
         expected_tools = {"calculate_sum", "calculate_product", "get_greeting"}
         discovered_names = {t.name for t in tools}
@@ -127,31 +129,33 @@ class TestMCPProviderIntegration:
 
         # Verify tool detail endpoint
         sum_tool = next(t for t in tools if t.name == "calculate_sum")
-        nexus_api.tools.get(tool_id=sum_tool.id).assert_and_get()
+        syntara_api.tools.get(tool_id=sum_tool.id).assert_and_get()
 
     @pytest.mark.mcp
-    def test_tool_parameters_persistence(self, nexus_api: SyntaraApiRegistry, mcp_integration_id: str) -> None:
+    def test_tool_parameters_persistence(self, syntara_api: SyntaraApiRegistry, mcp_integration_id: str) -> None:
         """Test that MCP tool parameters are properly persisted to database."""
         integration_id = UUID(mcp_integration_id)
 
-        tools_list = nexus_api.tools.list(additional_params={"integration_id[eq]": mcp_integration_id}).assert_and_get()
+        tools_list = syntara_api.tools.list(
+            additional_params={"integration_id[eq]": mcp_integration_id}
+        ).assert_and_get()
         tools = tools_list.resources
         assert len(tools) == 3
 
         sum_tool = next((t for t in tools if t.name == "calculate_sum"), None)
         assert sum_tool is not None
 
-        tool_detail = nexus_api.tools.get(tool_id=sum_tool.id).assert_and_get()
+        tool_detail = syntara_api.tools.get(tool_id=sum_tool.id).assert_and_get()
         assert tool_detail.integration_id == integration_id
         assert tool_detail.name == "calculate_sum"
         assert tool_detail.description is not None
 
     @pytest.mark.mcp
     @pytest.mark.skip(reason="Validate is a no-op pending MCP ping implementation")
-    def test_mcp_provider_connection_failure_handling(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_mcp_provider_connection_failure_handling(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration creation with unreachable server."""
         create_resp = _retry_api_call(
-            lambda: nexus_api.integrations.create(
+            lambda: syntara_api.integrations.create(
                 body=IntegrationCreate(
                     name=unique_name("test-mcp-unreachable"),
                     description="Test MCP integration with unreachable server",
@@ -166,18 +170,18 @@ class TestMCPProviderIntegration:
         integration_id = integration.id
         assert integration.validation_status == IntegrationStatus.UNKNOWN
 
-        validate_result = _validate_provider(nexus_api, integration_id).assert_and_get()
+        validate_result = _validate_provider(syntara_api, integration_id).assert_and_get()
         assert isinstance(validate_result, ValidateResult)
         assert validate_result.success is False
         assert isinstance(validate_result.error, str)
         assert "All connection attempts failed" in validate_result.error
 
-        _wait_for_provider_status(nexus_api, integration_id, IntegrationStatus.ERROR)
+        _wait_for_provider_status(syntara_api, integration_id, IntegrationStatus.ERROR)
 
-        integration_after = nexus_api.integrations.get(integration_id=integration_id).assert_and_get()
+        integration_after = syntara_api.integrations.get(integration_id=integration_id).assert_and_get()
         assert integration_after.validation_error is not None
 
-        tools_list = nexus_api.tools.list(
+        tools_list = syntara_api.tools.list(
             additional_params={"integration_id[eq]": str(integration_id)}
         ).assert_and_get()
         assert len(tools_list.resources) == 0
@@ -185,7 +189,7 @@ class TestMCPProviderIntegration:
     @pytest.mark.mcp
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="Validate is a no-op pending MCP ping implementation")
-    async def test_mcp_provider_connection_failure_unauthorized(self, nexus_api: SyntaraApiRegistry) -> None:
+    async def test_mcp_provider_connection_failure_unauthorized(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration validation fails when the server requires auth."""
         from fastmcp.server.auth import StaticTokenVerifier
         from orchestrator_test_sdk.app.mcp_servers import ExampleMCPServer
@@ -196,7 +200,7 @@ class TestMCPProviderIntegration:
             provider_url = f"http://host.containers.internal:{test_server.port}/mcp"
 
             create_resp = _retry_api_call(
-                lambda: nexus_api.integrations.create(
+                lambda: syntara_api.integrations.create(
                     body=IntegrationCreate(
                         name=unique_name("test-mcp-unauthorised"),
                         description="Test MCP integration with unauthorised user",
@@ -209,13 +213,13 @@ class TestMCPProviderIntegration:
             integration_id = integration.id
             assert integration.validation_status == IntegrationStatus.UNKNOWN
 
-            validate_result = _validate_provider(nexus_api, integration_id).assert_and_get()
+            validate_result = _validate_provider(syntara_api, integration_id).assert_and_get()
             assert isinstance(validate_result, ValidateResult)
             assert validate_result.success is False
 
-            _wait_for_provider_status(nexus_api, integration_id, IntegrationStatus.ERROR)
+            _wait_for_provider_status(syntara_api, integration_id, IntegrationStatus.ERROR)
 
-            tools_list = nexus_api.tools.list(
+            tools_list = syntara_api.tools.list(
                 additional_params={"integration_id[eq]": str(integration_id)}
             ).assert_and_get()
             assert len(tools_list.resources) == 0
@@ -223,7 +227,7 @@ class TestMCPProviderIntegration:
     @pytest.mark.mcp
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="Validate is a no-op pending MCP ping implementation")
-    async def test_mcp_provider_connection_failure_forbidden(self, nexus_api: SyntaraApiRegistry) -> None:
+    async def test_mcp_provider_connection_failure_forbidden(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration validation fails when the server returns 403."""
         from orchestrator_test_sdk.app.mcp_servers import ForbiddenMCPServer
 
@@ -233,7 +237,7 @@ class TestMCPProviderIntegration:
             provider_url = f"http://host.containers.internal:{test_server.port}/mcp"
 
             create_resp = _retry_api_call(
-                lambda: nexus_api.integrations.create(
+                lambda: syntara_api.integrations.create(
                     body=IntegrationCreate(
                         name=unique_name("test-mcp-forbidden"),
                         description="Test MCP integration with forbidden user",
@@ -246,13 +250,13 @@ class TestMCPProviderIntegration:
             integration_id = integration.id
             assert integration.validation_status == IntegrationStatus.UNKNOWN
 
-            validate_result = _validate_provider(nexus_api, integration_id).assert_and_get()
+            validate_result = _validate_provider(syntara_api, integration_id).assert_and_get()
             assert isinstance(validate_result, ValidateResult)
             assert validate_result.success is False
 
-            _wait_for_provider_status(nexus_api, integration_id, IntegrationStatus.ERROR)
+            _wait_for_provider_status(syntara_api, integration_id, IntegrationStatus.ERROR)
 
-            tools_list = nexus_api.tools.list(
+            tools_list = syntara_api.tools.list(
                 additional_params={"integration_id[eq]": str(integration_id)}
             ).assert_and_get()
             assert len(tools_list.resources) == 0

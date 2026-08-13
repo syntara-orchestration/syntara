@@ -15,15 +15,15 @@ import pytest
 import respx
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
-from nexus.agent_orchestrator.tool_manager.types import NamespacedBaseTool
-from nexus.integrations.models.integration import (
+from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+from syntara.integrations.models.integration import (
     IntegrationRead,
     IntegrationStatus,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
-from nexus.tool_manager.models.tool import ToolWithParameters
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.tool_manager.models.tool import ToolWithParameters
 
 
 class PaginationMockFactory:

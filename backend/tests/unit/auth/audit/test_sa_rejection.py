@@ -2,9 +2,9 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.sa_rejection import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.sa_rejection import (
     DisabledSACredentialRejectionEvent,
     DisabledSACredentialRejectionHandler,
     DisabledSARejectionEvent,
@@ -14,7 +14,7 @@ from nexus.auth.audit.sa_rejection import (
     StaleSATokenDetectionEvent,
     StaleSATokenDetectionHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestDisabledSARejectionHandler:
@@ -33,7 +33,7 @@ class TestDisabledSARejectionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "disabled_sa_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "disabled" in result.event_message
 
     def test_maps_deleted_sa_to_audit_event(self) -> None:
@@ -80,7 +80,7 @@ class TestDisabledSACredentialRejectionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "disabled_sa_credential_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "disabled" in result.event_message
         assert cred_id in result.event_message
 
@@ -125,7 +125,7 @@ class TestMissingSACredentialClaimHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "missing_sa_credential_claim_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "cred_id" in result.event_message
 
     def test_resource_fields(self) -> None:
@@ -161,7 +161,7 @@ class TestStaleSATokenDetectionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "stale_sa_token_detected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
 
     def test_resource_fields(self) -> None:
         sa_id = str(uuid4())

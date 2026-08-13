@@ -19,9 +19,9 @@ from temporalio.client import ScheduleAlreadyRunningError, ScheduleOverlapPolicy
 from temporalio.common import TypedSearchAttributes
 from temporalio.service import RPCError, RPCStatusCode
 
-import nexus.workflows.services.scheduled_trigger_service as _mod
-from nexus.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
-from nexus.workflows.services.scheduled_trigger_service import (
+import syntara.workflows.services.scheduled_trigger_service as _mod
+from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
+from syntara.workflows.services.scheduled_trigger_service import (
     ScheduledTriggerService,
 )
 
@@ -631,7 +631,7 @@ class TestScheduleAlreadyRunningError:
 
         definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
 
-        sleep_path = "nexus.workflows.services.scheduled_trigger_service.asyncio.sleep"
+        sleep_path = "syntara.workflows.services.scheduled_trigger_service.asyncio.sleep"
         with patch(sleep_path, new_callable=AsyncMock) as mock_sleep:
             count = await service.sync_scheduled_triggers(
                 workflow_id="wf-123",
@@ -653,7 +653,7 @@ class TestScheduleAlreadyRunningError:
 
         definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
 
-        sleep_path = "nexus.workflows.services.scheduled_trigger_service.asyncio.sleep"
+        sleep_path = "syntara.workflows.services.scheduled_trigger_service.asyncio.sleep"
         with patch(sleep_path, new_callable=AsyncMock), pytest.raises(ScheduleAlreadyRunningError):
             await service.sync_scheduled_triggers(
                 workflow_id="wf-123",
@@ -854,7 +854,7 @@ class TestListWorkflowSchedulesOptimized:
         service = ScheduledTriggerService(temporal_client=client)
 
         with (
-            patch("nexus.workflows.services.scheduled_trigger_service._invalidate_client_cache") as mock_invalidate,
+            patch("syntara.workflows.services.scheduled_trigger_service._invalidate_client_cache") as mock_invalidate,
             pytest.raises(RPCError),
         ):
             await service._list_workflow_schedules(client, "wf-123")
@@ -969,7 +969,7 @@ class TestGetSharedClient:
         """Should connect, cache, and return a new client."""
         mock_client = MagicMock()
         with patch(
-            "nexus.workflows.services.scheduled_trigger_service.Client.connect",
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
             new_callable=AsyncMock,
             return_value=mock_client,
         ):
@@ -983,7 +983,9 @@ class TestGetSharedClient:
     async def test_returns_none_on_connection_failure(self, exc: Exception) -> None:
         """Should return None when Temporal is unreachable."""
         with patch(
-            "nexus.workflows.services.scheduled_trigger_service.Client.connect", new_callable=AsyncMock, side_effect=exc
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new_callable=AsyncMock,
+            side_effect=exc,
         ):
             result = await _mod._get_shared_client()
         assert result is None

@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.models.user import User
-from nexus.users.users_directory_router import (
+from syntara.core.models.user import User
+from syntara.users.users_directory_router import (
     UserDirectoryEntry,
     UserDirectoryListResponse,
     _UserDirectoryService,

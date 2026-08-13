@@ -19,14 +19,14 @@ from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.database.session import get_db
-from nexus.core.models import User
-from nexus.core.models.principal import PrincipalType
-from nexus.workflows.models.execution import Execution
-from nexus.workflows.models.webhook_trigger import WebhookTrigger
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.services.workflow_service import WorkflowService
-from nexus.workflows.webhook_router import get_webhook_caller, get_webhook_temporal_service
+from syntara.core.database.session import get_db
+from syntara.core.models import User
+from syntara.core.models.principal import PrincipalType
+from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.webhook_trigger import WebhookTrigger
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.webhook_router import get_webhook_caller, get_webhook_temporal_service
 
 pytestmark = pytest.mark.integration
 
@@ -63,7 +63,7 @@ def _patch_webhook_caller(session_app: FastAPI, _mock_webhook_caller: tuple[User
 def _skip_sa_authorization() -> Generator[None]:
     """Skip SA authorization check — the caller is already mocked via get_webhook_caller."""
     with patch(
-        "nexus.workflows.services.webhook_trigger_service.WebhookTriggerService.verify_service_account_authorization",
+        "syntara.workflows.services.webhook_trigger_service.WebhookTriggerService.verify_service_account_authorization",
         new_callable=AsyncMock,
     ):
         yield
@@ -259,7 +259,7 @@ class TestEDAWebhookValidation:
         eda_workflow_with_schema: Workflow,
     ) -> None:
         """Returns 202 when payload conforms to the trigger's input_schema."""
-        with patch("nexus.workflows.webhook_router.ExecutionService") as mock_exec_cls:
+        with patch("syntara.workflows.webhook_router.ExecutionService") as mock_exec_cls:
             mock_exec = AsyncMock()
             mock_exec_cls.return_value = mock_exec
 
@@ -297,7 +297,7 @@ class TestEDAWebhookWorkflowMatching:
         eda_workflow: Workflow,
     ) -> None:
         """Triggers workflow that matches webhook_path in lookup table."""
-        with patch("nexus.workflows.webhook_router.ExecutionService") as mock_exec_service_class:
+        with patch("syntara.workflows.webhook_router.ExecutionService") as mock_exec_service_class:
             mock_exec_service = AsyncMock()
             mock_exec_service_class.return_value = mock_exec_service
 
@@ -471,7 +471,7 @@ class TestCrossTypePathIsolation:
         """POST /webhooks/eda/shared-path triggers EDA workflow, not generic."""
         _wf_generic, wf_eda = shared_path_workflows
 
-        with patch("nexus.workflows.webhook_router.ExecutionService") as mock_cls:
+        with patch("syntara.workflows.webhook_router.ExecutionService") as mock_cls:
             mock_svc = AsyncMock()
             mock_cls.return_value = mock_svc
             mock_execution = Mock(spec=Execution)
@@ -496,7 +496,7 @@ class TestCrossTypePathIsolation:
         """POST /webhooks/shared-path triggers generic workflow, not EDA."""
         wf_generic, _wf_eda = shared_path_workflows
 
-        with patch("nexus.workflows.webhook_router.ExecutionService") as mock_cls:
+        with patch("syntara.workflows.webhook_router.ExecutionService") as mock_cls:
             mock_svc = AsyncMock()
             mock_cls.return_value = mock_svc
             mock_execution = Mock(spec=Execution)

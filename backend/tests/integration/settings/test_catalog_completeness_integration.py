@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy
 
-from nexus.api.main import _check_settings_catalog
-from nexus.settings.seeder import seed_settings
+from syntara.api.main import _check_settings_catalog
+from syntara.settings.seeder import seed_settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -13,16 +13,16 @@ from uuid import uuid4
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.integrations.models.integration import (
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import LLMProviderConfiguration
-from nexus.integrations.models.llm_model import LLMModel
+from syntara.integrations.models.integration_configuration import LLMProviderConfiguration
+from syntara.integrations.models.llm_model import LLMModel
 from tests.integration.api.conftest import (
     make_admin,
     make_project_user,

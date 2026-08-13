@@ -12,21 +12,21 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.retriever_service.checkers.keyword_relevancy_checker import (
+from syntara.agent_orchestrator.context_manager.retriever_service.checkers.keyword_relevancy_checker import (
     KeywordRelevancyChecker,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker import (
+from syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker import (
     LLMRelevancyChecker,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
-from nexus.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
-from nexus.agent_orchestrator.context_manager.retriever_service.services.retriever_service import RetrieverService
-from nexus.agent_orchestrator.models import Invocation
-from nexus.core.constants import CONTEXT_KEY_FILE_IDS
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.relevancy_registry import RelevancyRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.registries.retriever_registry import RetrieverRegistry
+from syntara.agent_orchestrator.context_manager.retriever_service.services.retriever_service import RetrieverService
+from syntara.agent_orchestrator.models import Invocation
+from syntara.core.constants import CONTEXT_KEY_FILE_IDS
+from syntara.files.models import FileMetadata, FileStatus
 
 from .conftest import TestUploadedFileRetriever, async_session_generator
 
@@ -175,7 +175,7 @@ class TestFallbackBehavior:
 
             # Mock LLM failure
             with patch(
-                "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+                "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
             ) as mock_llm:
                 mock_llm.side_effect = Exception("LLM service unavailable")
 
@@ -239,7 +239,7 @@ class TestFallbackBehavior:
 
             # Mock LLM timeout
             with patch(
-                "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+                "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
             ) as mock_llm:
                 mock_llm_instance = AsyncMock()
                 mock_llm_instance.ainvoke.side_effect = TimeoutError("Request timeout")
@@ -306,7 +306,7 @@ class TestFallbackBehavior:
 
             # For this test, we'll simply mock LLM failure for all documents to ensure fallback behavior
             with patch(
-                "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+                "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
             ) as mock_llm:
                 # Mock LLM completely unavailable to trigger fallback for all documents
                 mock_llm.side_effect = Exception("LLM service completely unavailable")
@@ -372,7 +372,7 @@ class TestFallbackBehavior:
 
             # Force LLM failure to test keyword fallback exclusively
             with patch(
-                "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+                "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
             ) as mock_llm:
                 mock_llm.side_effect = Exception("Forced LLM failure for testing")
 
@@ -415,7 +415,7 @@ class TestFallbackBehavior:
 
         # Force LLM failure with no fallback available
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
         ) as mock_llm:
             mock_llm.side_effect = Exception("LLM failure")
 

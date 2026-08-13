@@ -8,11 +8,11 @@ Approval nodes suspend workflow execution using Temporal's async completion patt
 
 ### Execution Flow
 
-1. **Request creation**: `_execute_approval_node()` calls `_prepare_approval_args()` to build context (`backend/src/nexus/workflows/workflow_engine/approval_mixin.py`)
+1. **Request creation**: `_execute_approval_node()` calls `_prepare_approval_args()` to build context (`backend/src/syntara/workflows/workflow_engine/approval_mixin.py`)
 2. **Async completion**: `workflow.execute_activity(ActivityName.APPROVAL, ...)` starts the activity (`approval_mixin.py`)
-3. **Activity suspension**: `create_approval_request_activity()` creates the DB record and calls `activity.raise_complete_async()` (`backend/src/nexus/workflows/workflow_engine/activities/approval_activity.py`)
-4. **External decision**: User submits decision via `PATCH /api/v1/approvals/{id}` (`backend/src/nexus/approvals/router.py`)
-5. **Signal delivery**: Approval service sends decision to workflow via `POST /api/v1/executions/{execution_id}/activities/{activity_id}/signal` (`backend/src/nexus/workflows/executions_router.py`)
+3. **Activity suspension**: `create_approval_request_activity()` creates the DB record and calls `activity.raise_complete_async()` (`backend/src/syntara/workflows/workflow_engine/activities/approval_activity.py`)
+4. **External decision**: User submits decision via `PATCH /api/v1/approvals/{id}` (`backend/src/syntara/approvals/router.py`)
+5. **Signal delivery**: Approval service sends decision to workflow via `POST /api/v1/executions/{execution_id}/activities/{activity_id}/signal` (`backend/src/syntara/workflows/executions_router.py`)
 6. **Activity completion**: Temporal completes the async activity with signal payload
 7. **Result processing**: `_execute_approval_node()` extracts decision fields and sets routing port (`approval_mixin.py`)
 
@@ -32,7 +32,7 @@ Timeout values are resolved in the following order (earliest match wins):
 2. **Global catalog default**: `workflow_engine.approval_decision_window_seconds` runtime setting
 3. **Hardcoded fallback**: `86400` seconds (24 hours)
 
-Resolution is performed by `resolve_decision_window()` in `backend/src/nexus/workflows/workflow_engine/node_settings_resolver.py`. It checks the node's `decision_window` parameter first and, if not set, falls back to the `workflow_engine.approval_decision_window_seconds` runtime catalog value (default 86400).
+Resolution is performed by `resolve_decision_window()` in `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`. It checks the node's `decision_window` parameter first and, if not set, falls back to the `workflow_engine.approval_decision_window_seconds` runtime catalog value (default 86400).
 
 ### Temporal Timeout Margin
 
@@ -52,7 +52,7 @@ Where:
 - `{execution_id}` is the workflow execution UUID
 - `{activity_id}` is the approval node ID from the workflow definition
 
-Implementation: `backend/src/nexus/workflows/executions_router.py`
+Implementation: `backend/src/syntara/workflows/executions_router.py`
 
 ### Signal Payload Structure
 
@@ -75,7 +75,7 @@ The signal payload contains a `signal_data` object with fields matching the appr
 - `decided_at` (string, required): ISO 8601 timestamp when the decision was made
 - `decision_notes` (string, optional): Approver's comments (truncated to 500 characters per `FieldLimits.DESCRIPTION_MAX_LENGTH`)
 
-The approval service constructs this payload in `backend/src/nexus/approvals/clients/workflow_client.py`. Field names match the resultSchema exactly to avoid remapping in the workflow (`approval_mixin.py`).
+The approval service constructs this payload in `backend/src/syntara/approvals/clients/workflow_client.py`. Field names match the resultSchema exactly to avoid remapping in the workflow (`approval_mixin.py`).
 
 ## Retry Configuration
 
@@ -83,7 +83,7 @@ The approval service constructs this payload in `backend/src/nexus/approvals/cli
 
 The approval service retries signal delivery using exponential backoff to handle transient failures (network issues, temporary service unavailable).
 
-**Configuration** (`backend/src/nexus/core/config/base.py`):
+**Configuration** (`backend/src/syntara/core/config/base.py`):
 
 The `WorkflowClientSettings` class defines the following settings with their defaults:
 
@@ -113,7 +113,7 @@ The backoff delay is calculated as `base * (growth_factor ^ attempt)`, capped at
 
 Approval activities use the node's retry policy for Temporal activity retries (separate from signal delivery retries). By default, approval nodes use `RetryPolicy(maximum_attempts=1)` (no retries) unless overridden via `node.settings.retry_policy`.
 
-Resolution is performed by `resolve_retry_policy()` in `backend/src/nexus/workflows/workflow_engine/node_settings_resolver.py`.
+Resolution is performed by `resolve_retry_policy()` in `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`.
 
 ## Error Handling
 
@@ -156,13 +156,13 @@ This is triggered by the `asyncio.CancelledError` exception handler in the workf
 ## Implementation Reference
 
 **Core Files**:
-- Workflow approval logic: `backend/src/nexus/workflows/workflow_engine/approval_mixin.py`
-- Approval activity: `backend/src/nexus/workflows/workflow_engine/activities/approval_activity.py`
-- Signal endpoint: `backend/src/nexus/workflows/executions_router.py`
-- Signal client (approvals → workflow engine): `backend/src/nexus/approvals/clients/workflow_client.py`
-- Approvals client (workflow engine → approvals): `backend/src/nexus/workflows/clients/approvals_client.py`
-- Timeout resolution: `backend/src/nexus/workflows/workflow_engine/node_settings_resolver.py`
-- Retry configuration: `backend/src/nexus/core/config/base.py`
+- Workflow approval logic: `backend/src/syntara/workflows/workflow_engine/approval_mixin.py`
+- Approval activity: `backend/src/syntara/workflows/workflow_engine/activities/approval_activity.py`
+- Signal endpoint: `backend/src/syntara/workflows/executions_router.py`
+- Signal client (approvals → workflow engine): `backend/src/syntara/approvals/clients/workflow_client.py`
+- Approvals client (workflow engine → approvals): `backend/src/syntara/workflows/clients/approvals_client.py`
+- Timeout resolution: `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`
+- Retry configuration: `backend/src/syntara/core/config/base.py`
 
 **HTTP Bridge**: Communication between the workflow engine and the approvals service is bidirectional:
 
@@ -173,7 +173,7 @@ This is triggered by the `asyncio.CancelledError` exception handler in the workf
 
 **Related Documentation**:
 
-- [Approval API Specification](../../src/nexus/schemas/approvals/openapi.yaml)
-- [Workflow Executions API](../../src/nexus/schemas/workflows/v2/executions_openapi.yaml)
+- [Approval API Specification](../../src/syntara/schemas/approvals/openapi.yaml)
+- [Workflow Executions API](../../src/syntara/schemas/workflows/v2/executions_openapi.yaml)
 - [Approval Overview](./approval-overview.md)
 - [Approval Authorization Model](./approval-authorization-model.md)

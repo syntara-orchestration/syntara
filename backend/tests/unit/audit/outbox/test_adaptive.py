@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.audit.outbox.adaptive import AdaptiveOutboxStateMachine
+from syntara.audit.outbox.adaptive import AdaptiveOutboxStateMachine
 
 
 class TestAdaptiveOutboxStateMachine:

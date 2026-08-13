@@ -9,12 +9,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.tool_manager.exceptions import ToolNotFoundError
-from nexus.tool_manager.models.tool import Tool, ToolUpdate
-from nexus.tool_manager.services.tool_service import ToolService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.tool_manager.exceptions import ToolNotFoundError
+from syntara.tool_manager.models.tool import Tool, ToolUpdate
+from syntara.tool_manager.services.tool_service import ToolService
 
 
 class TestToolServiceAuditEvents:
@@ -27,11 +27,11 @@ class TestToolServiceAuditEvents:
 
     def setup_method(self) -> None:
         """Register tool_manager audit handlers before each test."""
-        from nexus.tool_manager.audit.tool_bulk_update import (
+        from syntara.tool_manager.audit.tool_bulk_update import (
             ToolBulkUpdateEvent,
             ToolBulkUpdateHandler,
         )
-        from nexus.tool_manager.audit.tool_update import (
+        from syntara.tool_manager.audit.tool_update import (
             ToolUpdateEvent,
             ToolUpdateHandler,
         )
@@ -44,7 +44,7 @@ class TestToolServiceAuditEvents:
         )
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_update_tool_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -64,7 +64,7 @@ class TestToolServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.tool_manager.tool"
+        assert event.source_component == "syntara.tool_manager.tool"
         assert f"Tool updated: {test_tool.name}" in event.event_message
         assert "enabled" in event.event_message
         assert isinstance(event.structured_data, AuditContextData)
@@ -72,7 +72,7 @@ class TestToolServiceAuditEvents:
         assert event.structured_data.updated_fields == ["enabled"]  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_update_tool_tracks_only_modified_fields(
         self,
         mock_do_emit: AsyncMock,
@@ -97,7 +97,7 @@ class TestToolServiceAuditEvents:
         assert "refresh_error" in updated_fields
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_update_tool_not_found_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -120,7 +120,7 @@ class TestToolServiceAuditEvents:
         assert event.structured_data.error_type == "ToolNotFoundError"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_bulk_update_tools_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -141,7 +141,7 @@ class TestToolServiceAuditEvents:
         assert event.event_category == EventCategory.SYSTEM_OPERATION
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.tool_manager.tool"
+        assert event.source_component == "syntara.tool_manager.tool"
         assert "disabled" in event.event_message
         assert isinstance(event.structured_data, AuditContextData)
         assert event.structured_data.enabled is False  # type: ignore[attr-defined]
@@ -152,7 +152,7 @@ class TestToolServiceAuditEvents:
         assert event.resource_urn is None  # Bulk operation has no single resource
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_bulk_update_tools_with_duplicates_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -175,7 +175,7 @@ class TestToolServiceAuditEvents:
         assert event.structured_data.duplicate_count == 1  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_bulk_update_tools_with_not_found_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -199,14 +199,14 @@ class TestToolServiceAuditEvents:
         assert event.structured_data.not_found_count == 1  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_bulk_update_tools_empty_list_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,
         test_tool_service: ToolService,
     ) -> None:
         """bulk_update_tools with empty list should emit error audit event."""
-        from nexus.tool_manager.exceptions import ToolBulkUpdateValidationError
+        from syntara.tool_manager.exceptions import ToolBulkUpdateValidationError
 
         with pytest.raises(ToolBulkUpdateValidationError):
             await test_tool_service.bulk_update_tools(

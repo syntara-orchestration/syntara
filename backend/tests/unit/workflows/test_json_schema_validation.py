@@ -11,7 +11,7 @@ import jsonschema
 import pytest
 from referencing.exceptions import Unresolvable
 
-from nexus.workflows.json_schema_validation import (
+from syntara.workflows.json_schema_validation import (
     _has_dangerous_pattern,
     apply_schema_defaults,
     validate_json_schema_definition,

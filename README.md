@@ -1,6 +1,6 @@
 # Syntara Monorepo
 
-Monorepo combining the Nexus backend (Python/FastAPI) and frontend (React/TypeScript) into a single development and deployment environment.
+Monorepo combining the Syntara backend (Python/FastAPI) and frontend (React/TypeScript) into a single development and deployment environment.
 
 ## Repository Structure
 
@@ -56,11 +56,11 @@ TypeScript API types are generated from the backend's OpenAPI specifications. In
 make gen-contracts
 ```
 
-This reads specs from `backend/src/nexus/schemas/` and generates types in `frontend/packages/syntara-contracts/src/`.
+This reads specs from `backend/src/syntara/schemas/` and generates types in `frontend/packages/syntara-contracts/src/`.
 
 ## Container Development
 
-The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Temporal, the Nexus API, and the UI. The UI service builds from `frontend/` instead of pulling a pre-built image.
+The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Temporal, the Syntara API, and the UI. The UI service builds from `frontend/` instead of pulling a pre-built image.
 
 ```bash
 # Start all services
@@ -74,14 +74,26 @@ podman-compose up database redis temporal nexus
 
 Code quality and coverage are tracked via SonarCloud:
 
-- **Backend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-orchestration_syntara-backend)
-- **Frontend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-orchestration_syntara-frontend)
+- **Backend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-backend)
+- **Frontend**: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=syntara-frontend)
 
-SonarCloud analysis runs automatically on all PRs. Quality gate results are **informational only** — pass/fail status is visible in the PR checks list but does not block merges. The required status checks for merge are `(Backend) Required Checks` and `(Frontend) Required Checks`, which cover linting, tests, type-checking, and builds.
+SonarCloud analysis runs automatically on all PRs. Quality gate results are **informational only**, pass/fail status is visible in the PR checks list but does not block merges. The required status checks for merge are `(Backend) Required Checks` and `(Frontend) Required Checks`, which cover linting, tests, type-checking, and builds.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Component-specific details are in [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md) and [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
+* [Project wide guidelines](CONTRIBUTING.md)
+* [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md)
+* [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
+
+## Community
+
+Have a question or idea? Start a conversation in [GitHub Discussions](https://github.com/orgs/syntara-orchestration/discussions).
+
+## AI Contributions
+
+AI-assisted contributions are welcome and held to the same review and quality standards as any other contribution. Contributors take full responsibility for AI-assisted work and MUST disclose significant use of AI tools via a commit trailer, for example: `Assisted-by: Opus 4.6`. Grammar and stylistic corrections do not need disclosure.
+
+See [AI_POLICY.md](.github/AI_POLICY.md) for the full policy.
 
 ## License
 

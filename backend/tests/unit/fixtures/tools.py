@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 
 import pytest_asyncio
 
-from nexus.tool_manager.lib.providers.factory import ProviderFactory
-from nexus.tool_manager.services.tool_service import ToolService
+from syntara.tool_manager.lib.providers.factory import ProviderFactory
+from syntara.tool_manager.services.tool_service import ToolService
 from tests.unit.fixtures.mock_mcp_provider import MockMCPProvider
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture

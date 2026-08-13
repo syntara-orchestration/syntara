@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError, assert_project_id_unchanged
+from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 
 
 class TestAssertProjectIdUnchanged:

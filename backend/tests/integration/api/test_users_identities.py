@@ -9,9 +9,9 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User, UserIdentity
-from nexus.identity_providers.models.identity_provider import IdentityProvider
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.core.models import User, UserIdentity
+from syntara.identity_providers.models.identity_provider import IdentityProvider
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
 
 USERS_URL = "/api/v1/users"
 
@@ -48,7 +48,7 @@ async def identity_provider(
 @pytest.fixture
 async def federated_user(test_db_session: AsyncSession) -> User:
     """Create a federated user for identity tests."""
-    from nexus.core.models.user import AuthType
+    from syntara.core.models.user import AuthType
 
     user = User(
         id=uuid4(),
@@ -141,7 +141,7 @@ class TestAttachUserIdentity:
         identity_provider: IdentityProvider,
     ) -> None:
         """Test moving an identity from one user to another."""
-        from nexus.core.models.user import AuthType
+        from syntara.core.models.user import AuthType
 
         # Create source and target users (both federated — identities can only be
         # attached to federated users)
@@ -244,7 +244,7 @@ class TestDetachUserIdentity:
     ) -> None:
         """Test 409 when detaching the last identity from a user with no password."""
         # Create a federated-only user (no password)
-        from nexus.core.models.user import AuthType
+        from syntara.core.models.user import AuthType
 
         fed_user = User(
             id=uuid4(),

@@ -70,7 +70,7 @@ jobs:
           fi
 
           # Detect schema changes
-          if grep -qE '^backend/src/nexus/schemas/' <<< "$FILES"; then
+          if grep -qE '^backend/src/syntara/schemas/' <<< "$FILES"; then
             echo "backend_schema=true" >> "$GITHUB_OUTPUT"
           else
             echo "backend_schema=false" >> "$GITHUB_OUTPUT"
@@ -122,15 +122,15 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --exit-code -- backend/src/nexus/schemas/openapi.yaml 2>/dev/null; then
+          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml 2>/dev/null; then
             echo "::error::Bundled OpenAPI spec has uncommitted changes. Run 'make -C backend api-spec-bundle' locally and commit the changes."
             exit 1
           fi
 
       - name: Verify CLI openapi.yaml is in sync with schemas copy
         run: |
-          diff -q backend/src/nexus/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml || {
-            echo "::error::CLI-bundled openapi.yaml is out of sync with schemas/openapi.yaml. Copy the file and commit: cp backend/src/nexus/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml"
+          diff -q backend/src/syntara/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml || {
+            echo "::error::CLI-bundled openapi.yaml is out of sync with schemas/openapi.yaml. Copy the file and commit: cp backend/src/syntara/schemas/openapi.yaml backend/src/cli/orchestrator_cli/openapi.yaml"
             exit 1
           }
 
@@ -470,6 +470,10 @@ jobs:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
       PYTEST_XDIST_AUTO_NUM_WORKERS: "8"
+      SYNTARA_TELEMETRY_OVERHEAD_THRESHOLD_PCT: "50"
+      AUDIT_DRAIN_CYCLE_BASELINE_MS: "2000"
+      TOKEN_CONCURRENT_P95_THRESHOLD_MS: "15000"
+      TOKEN_CONCURRENT_CAPACITY_P95_THRESHOLD_MS: "20000"
 
     steps:
       - name: Checkout code
@@ -551,6 +555,16 @@ jobs:
           RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
         run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
 
+      - name: Diagnose podman environment
+        run: |
+          podman --version
+          podman info --format json | python3 -c '
+          import sys, json
+          h = json.load(sys.stdin)["host"]
+          print("EventLogger=" + str(h.get("eventLogger", "?")))
+          print("CgroupVersion=" + str(h.get("cgroupVersion", h.get("cgroupsVersion", "?"))))
+          '
+
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
@@ -560,24 +574,43 @@ jobs:
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
         run: |
           ulimit -n 65535
-          # Start core services + mock-segment (exclude syntara-ui which is private)
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment
+          # --no-deps: start all containers immediately without health dependency ordering.
+          # On Podman 5.x (events_logger=file), healthcheck timers are never created,
+          # so compose would hang waiting for depends_on service_healthy conditions.
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d --no-deps \
+            database redis moto mcp-server mock-segment \
+            temporal syntara temporal-worker temporal-background-worker
 
       - name: Verify services are healthy
         timeout-minutes: 5
         run: |
-          echo "Waiting for services to become healthy..."
-          # Use exact container names (with _1 suffix) to avoid substring
-          # matches — e.g. "syntara-ci_temporal" would also match
-          # "syntara-ci_temporal-worker_1", causing podman wait to block on
-          # a container we don't intend to check here.
-          podman wait --condition=healthy \
-            syntara-ci_database_1 \
-            syntara-ci_temporal_1 \
-            syntara-ci_syntara_1 \
-            syntara-ci_temporal-background-worker_1 \
-            syntara-ci_mcp-server_1 \
-            syntara-ci_mock-segment_1
+          wait_healthy() {
+            local ctr=$1 timeout=${2:-120} elapsed=0
+            echo "Waiting for $ctr (timeout: ${timeout}s)..."
+            while [ $elapsed -lt $timeout ]; do
+              podman healthcheck run "$ctr" >/dev/null 2>&1 || true
+              status=$(podman inspect --format '{{.State.Health.Status}}' "$ctr" 2>/dev/null || echo "unknown")
+              if [ "$status" = "healthy" ]; then
+                echo "  $ctr is healthy (${elapsed}s)"
+                return 0
+              fi
+              sleep 5
+              elapsed=$((elapsed + 5))
+            done
+            echo "ERROR: $ctr not healthy after ${timeout}s (status: $status)"
+            podman inspect --format '{{json .State.Health}}' "$ctr" 2>&1 || true
+            return 1
+          }
+
+          # Wave 1: infrastructure (no upstream dependencies)
+          for svc in database redis moto mcp-server mock-segment; do
+            wait_healthy "syntara-ci_${svc}_1" 120
+          done
+
+          # Wave 2: services that depend on infrastructure
+          for svc in temporal syntara temporal-worker temporal-background-worker; do
+            wait_healthy "syntara-ci_${svc}_1" 180
+          done
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
@@ -743,8 +776,6 @@ jobs:
       && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    # SonarCloud may fail due to LOC limits. Allow failure to not block PRs.
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -778,8 +809,6 @@ jobs:
       success()
       && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # SonarCloud may fail due to LOC limits. Allow failure to not block merges.
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

@@ -11,7 +11,7 @@ from typing import Any
 import jsonschema
 import pytest
 
-SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "nexus" / "schemas" / "workflows" / "v2" / "triggers"
+SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "syntara" / "schemas" / "workflows" / "v2" / "triggers"
 
 
 @pytest.fixture

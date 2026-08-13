@@ -9,15 +9,15 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from nexus.audit.decorators import audit
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.sanitization import REDACTED
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.decorators import audit
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.sanitization import REDACTED
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 def _assert_audit_event_fields(
@@ -76,7 +76,7 @@ class TestTrackEventDecorator:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = test_function()
 
             assert result == "success"
@@ -100,7 +100,7 @@ class TestTrackEventDecorator:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             # Verify all AuditEvent fields are correctly populated
@@ -121,7 +121,7 @@ class TestTrackEventDecorator:
         def test_function(arg1: str, arg2: int, kwarg1: str = "default") -> str:
             return f"{arg1}-{arg2}-{kwarg1}"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = test_function("test", 42, kwarg1="custom")
 
             assert result == "test-42-custom"
@@ -149,7 +149,7 @@ class TestTrackEventDecorator:
         def test_function(arg1: str, arg2: int) -> str:
             return f"{arg1}-{arg2}"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function("test", 42)
 
             # Verify all AuditEvent fields are correctly populated
@@ -178,7 +178,7 @@ class TestTrackEventDecorator:
         def test_function(value: str) -> dict[str, str]:
             return {"result": value}
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = test_function("test")
 
             assert result == {"result": "test"}
@@ -209,7 +209,7 @@ class TestTrackEventDecorator:
         def test_function(user: User) -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function(test_user)
 
             # Verify all AuditEvent fields are correctly populated
@@ -233,7 +233,7 @@ class TestTrackEventDecorator:
         def test_function(admin: User, other_param: str) -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function(test_user, "other")
 
             # Verify all AuditEvent fields are correctly populated
@@ -257,7 +257,7 @@ class TestTrackEventDecorator:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             # Verify all AuditEvent fields are correctly populated
@@ -281,7 +281,7 @@ class TestTrackEventDecorator:
                 raise ValueError(error_msg)
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             # Test successful execution first
             result = test_function(should_fail=False)
             assert result == "success"
@@ -331,7 +331,7 @@ class TestTrackEventDecorator:
             msg = f"Missing API key: {api_key}"
             raise KeyError(msg)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             # Test password in exception message
             with pytest.raises(ValueError, match="Invalid password: secret123"):
                 test_function_with_password_leak("secret123")
@@ -380,7 +380,7 @@ class TestTrackEventDecorator:
             error_msg = "Function failed"
             raise RuntimeError(error_msg)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             with pytest.raises(RuntimeError):
                 test_function("test", 42)
 
@@ -414,7 +414,7 @@ class TestTrackEventDecorator:
             return f"async_{value}"
 
         async def run_test() -> None:
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
                 result = await async_function("test")
 
                 assert result == "async_test"
@@ -443,8 +443,8 @@ class TestTrackEventDecorator:
 
         # Mock inspect.signature to raise an exception
         with (
-            patch("nexus.audit.decorators.inspect.signature") as mock_signature,
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit,
+            patch("syntara.audit.decorators.inspect.signature") as mock_signature,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit,
         ):
             mock_signature.side_effect = TypeError("Signature failed")
             test_function("arg1", "arg2")
@@ -469,7 +469,7 @@ class TestTrackEventDecorator:
 
     def test_audit_context_variable_injection(self, test_user: User) -> None:
         """Test that context variables are properly injected into events."""
-        from nexus.audit.emitter import (
+        from syntara.audit.emitter import (
             activity_id_context_var,
             actor_context_var,
             execution_id_context_var,
@@ -493,7 +493,7 @@ class TestTrackEventDecorator:
         token_execution_id = execution_id_context_var.set(execution_id)
 
         try:
-            with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+            with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
                 test_function()
 
                 # Verify all AuditEvent fields with context variable injection
@@ -534,7 +534,7 @@ class TestTrackEventEdgeCases:
         def double_decorated_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = double_decorated_function()
 
             assert result == "success"
@@ -565,7 +565,7 @@ class TestTrackEventEdgeCases:
         def comprehensive_function(admin_user: str, data: dict[str, str]) -> dict[str, dict[str, str]]:
             return {"processed": data}
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = comprehensive_function("admin", {"key": "value"})
 
             assert result == {"processed": {"key": "value"}}
@@ -596,7 +596,7 @@ class TestTrackEventEdgeCases:
         def test_function(current_user: User) -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function(current_user=test_user)
 
             # Verify all AuditEvent fields are correctly populated
@@ -620,7 +620,7 @@ class TestTrackEventEdgeCases:
         def test_function(password: str, username: str) -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function(password="secret123", username="testuser")  # noqa: S106
 
             # Verify all AuditEvent fields are correctly populated
@@ -650,7 +650,7 @@ class TestTrackEventEdgeCases:
             await asyncio.sleep(0)  # Simulate async operation
             return f"processed_{value}"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = await async_function("test_data")
 
             assert result == "processed_test_data"
@@ -673,7 +673,7 @@ class TestTrackEventEdgeCases:
             error_msg = "Async function error"
             raise ValueError(error_msg)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             with pytest.raises(ValueError, match="Async function error"):
                 await async_function_with_error("test")
 
@@ -699,7 +699,7 @@ class TestTrackEventEdgeCases:
         def test_function(username: str, password: str, action: str, token: str) -> str:
             return f"{username} performed {action}"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function("john", "secret123", "login", "abc123")
 
             event_obj = mock_emit.call_args[0][0]
@@ -730,7 +730,7 @@ class TestTrackEventEdgeCases:
                 "metadata": {"internal": "data"},
             }
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             event_obj = mock_emit.call_args[0][0]
@@ -762,7 +762,7 @@ class TestTrackEventEdgeCases:
         def test_function() -> UserResult:
             return UserResult()
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             event_obj = mock_emit.call_args[0][0]
@@ -786,7 +786,7 @@ class TestTrackEventEdgeCases:
         def test_function(username: str, password: str) -> dict[str, str]:
             return {"result": "data", "sensitive": "info"}
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function("john", "secret")
 
             event_obj = mock_emit.call_args[0][0]
@@ -808,8 +808,8 @@ class TestTrackEventEdgeCases:
 
         # Mock inspect.signature to raise an error
         with (
-            patch("nexus.audit.decorators.inspect.signature", side_effect=TypeError("Mock error")),
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit,
+            patch("syntara.audit.decorators.inspect.signature", side_effect=TypeError("Mock error")),
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit,
         ):
             test_function("arg1", "arg2", kwarg1="value1")
 
@@ -828,7 +828,7 @@ class TestTrackEventEdgeCases:
         def test_function(username: str, safe_param: str) -> dict[str, str]:
             return {"result": "data", "status": "success"}
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function("john", "safe_value")
 
             event_obj = mock_emit.call_args[0][0]
@@ -864,7 +864,7 @@ class TestTrackEventEdgeCases:
 
         events_captured.clear()
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             mock_emit.side_effect = capture_event
 
             await async_function()
@@ -896,7 +896,7 @@ class TestTrackEventEdgeCases:
         """Test that async functions properly clean up context variables."""
         import asyncio
 
-        from nexus.audit.emitter import actor_context_var
+        from syntara.audit.emitter import actor_context_var
 
         @audit(EventCategory.USER_ACTION)
         async def async_function() -> str:
@@ -916,7 +916,7 @@ class TestTrackEventEdgeCases:
         except LookupError:
             pass
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             await async_function()
 
         # Verify emitted event has no actor_type
@@ -939,7 +939,7 @@ class TestTrackEventEdgeCases:
         def test_function() -> str:
             return "Hello World"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = test_function()
 
             assert result == "Hello World"
@@ -958,7 +958,7 @@ class TestTrackEventEdgeCases:
         def test_function() -> str:
             return "Hello World"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = test_function()
 
             assert result == "Hello World"
@@ -978,8 +978,8 @@ class TestTrackEventEdgeCases:
             return "Hello World"
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit,
-            patch("nexus.audit.decorators.logger") as mock_logger,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit,
+            patch("syntara.audit.decorators.logger") as mock_logger,
         ):
             result = test_function()
 
@@ -1014,7 +1014,7 @@ class TestTrackEventSanitizationAndTruncation:
         def test_function(user_password: str, username: str) -> str:
             return "ok"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function("super_secret_123", "alice")
 
             event_obj = mock_emit.call_args[0][0]
@@ -1036,7 +1036,7 @@ class TestTrackEventSanitizationAndTruncation:
             # Return a payload that exceeds DEFAULT_MAX_PAYLOAD_BYTES (10,000)
             return {"large_value": "x" * 20_000}
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             event_obj = mock_emit.call_args[0][0]
@@ -1062,7 +1062,7 @@ class TestEventSeverity:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             event_obj = mock_emit.call_args[0][0]
@@ -1092,7 +1092,7 @@ class TestEventSeverity:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             event_obj = mock_emit.call_args[0][0]
@@ -1127,7 +1127,7 @@ class TestEventSeverity:
             error_msg = "Test error"
             raise RuntimeError(error_msg)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             with pytest.raises(RuntimeError):
                 test_function()
 
@@ -1151,7 +1151,7 @@ class TestEventSeverity:
             await asyncio.sleep(0)
             return "async_result"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             result = await async_function()
 
             assert result == "async_result"
@@ -1186,7 +1186,7 @@ class TestEventSeverity:
             error_msg = "Test error"
             raise RuntimeError(error_msg)
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             with pytest.raises(RuntimeError):
                 await test_function()
 
@@ -1215,7 +1215,7 @@ class TestTrackEventAttemptingEvent:
         def test_function() -> str:
             return "success"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             test_function()
 
             assert mock_emit.call_count == 1
@@ -1232,7 +1232,7 @@ class TestTrackEventAttemptingEvent:
             raise ValueError(msg)
 
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit,
             pytest.raises(ValueError, match="test error"),
         ):
             test_function()
@@ -1253,7 +1253,7 @@ class TestTrackEventAttemptingEvent:
         def inner_function() -> str:
             return "done"
 
-        with patch("nexus.audit.emitter._do_emit_audit_event") as mock_emit:
+        with patch("syntara.audit.emitter._do_emit_audit_event") as mock_emit:
             outer_function()
 
             assert mock_emit.call_count == 2

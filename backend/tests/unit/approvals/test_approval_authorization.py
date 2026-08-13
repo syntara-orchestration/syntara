@@ -15,9 +15,9 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.approvals.audit.approval import ApprovalDecisionDeniedEvent
-from nexus.approvals.exceptions import ApprovalNotAuthorizedError
-from nexus.approvals.models import (
+from syntara.approvals.audit.approval import ApprovalDecisionDeniedEvent
+from syntara.approvals.exceptions import ApprovalNotAuthorizedError
+from syntara.approvals.models import (
     ActivitySummary,
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -29,11 +29,11 @@ from nexus.approvals.models import (
     BatchApprovalRequest,
     WorkflowContext,
 )
-from nexus.approvals.services.approval_service import ApprovalService
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.authz.engine import AuthzResult
-from nexus.core.models import Group, User
-from nexus.core.models.group import user_groups
+from syntara.approvals.services.approval_service import ApprovalService
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.authz.engine import AuthzResult
+from syntara.core.models import Group, User
+from syntara.core.models.group import user_groups
 from tests.integration.helpers.workflow import ExecutionsFactory
 
 
@@ -82,7 +82,7 @@ def _mock_evaluator_for_approver_tests(monkeypatch: pytest.MonkeyPatch, request)
         )
 
     monkeypatch.setattr(
-        "nexus.authz.engine.authorize",
+        "syntara.authz.engine.authorize",
         mock_authorize,
     )
 
@@ -564,7 +564,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
                 effective_policies=[],
             )
 
-        monkeypatch.setattr("nexus.authz.engine.authorize", mock_authorize)
+        monkeypatch.setattr("syntara.authz.engine.authorize", mock_authorize)
 
         service = ApprovalService(test_db_session, user, evaluator=mock_evaluator)
         approval_read = await service.create(request)
@@ -611,7 +611,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
                 effective_policies=[],
             )
 
-        monkeypatch.setattr("nexus.authz.engine.authorize", mock_authorize)
+        monkeypatch.setattr("syntara.authz.engine.authorize", mock_authorize)
 
         service = ApprovalService(test_db_session, user, evaluator=mock_evaluator)
         approval_read = await service.create(request)
@@ -659,7 +659,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
                 effective_policies=[],
             )
 
-        monkeypatch.setattr("nexus.authz.engine.authorize", mock_authorize)
+        monkeypatch.setattr("syntara.authz.engine.authorize", mock_authorize)
 
         service = ApprovalService(test_db_session, user, evaluator=mock_evaluator)
         approval_read = await service.create(request)
@@ -706,7 +706,7 @@ class TestApprovalServiceEvaluatorAuthorization(TestApprovalAuthorizationBase):
                 effective_policies=[],
             )
 
-        monkeypatch.setattr("nexus.authz.engine.authorize", mock_authorize)
+        monkeypatch.setattr("syntara.authz.engine.authorize", mock_authorize)
 
         service = ApprovalService(test_db_session, user, evaluator=mock_evaluator)
         approval_read = await service.create(request)
@@ -743,7 +743,7 @@ class TestApprovalAuthorizationDeniedAuditEvents(TestApprovalAuthorizationBase):
 
         decision = ApprovalDecisionRequest(status=ApprovalDecisionStatus.APPROVED)
 
-        with patch("nexus.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
+        with patch("syntara.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
             with pytest.raises(ApprovalNotAuthorizedError):
                 await service.decide(approval_read.id, decision)
 
@@ -793,7 +793,7 @@ class TestApprovalAuthorizationDeniedAuditEvents(TestApprovalAuthorizationBase):
             ]
         )
 
-        with patch("nexus.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
+        with patch("syntara.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
             response = await service.batch_decide(batch_request)
 
         assert response.total_failed == 1
@@ -827,7 +827,7 @@ class TestApprovalAuthorizationDeniedAuditEvents(TestApprovalAuthorizationBase):
         service = ApprovalService(test_db_session, user)
         approval_read = await service.create(request)
 
-        with patch("nexus.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
+        with patch("syntara.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
             with pytest.raises(ApprovalNotAuthorizedError):
                 await service.delete(approval_read.id)
 
@@ -849,7 +849,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
 
     def setup_method(self) -> None:
         """Register audit handlers so the dispatcher routes events to real handlers."""
-        from nexus.approvals.audit.approval import (
+        from syntara.approvals.audit.approval import (
             ApprovalDecidedEvent,
             ApprovalDecidedHandler,
             ApprovalDecisionDeniedHandler,
@@ -871,7 +871,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         self, test_db_session: AsyncSession, users: dict[str, User], executions_factory: ExecutionsFactory
     ) -> None:
         """Full pipeline: decide() denial produces authorization_denied SECURITY_EVENT."""
-        from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
 
         user = users["user_1"]
         other_user = users["user_2"]
@@ -891,7 +891,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
 
         captured_events: list[Any] = []
         capture = patch(
-            "nexus.audit.dispatcher.emit_audit_event",
+            "syntara.audit.dispatcher.emit_audit_event",
             side_effect=lambda e, _s=None: captured_events.append(e),
         )
         with capture:
@@ -904,7 +904,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         assert audit_event.event_action == "authorization_denied"
         assert audit_event.event_severity == EventSeverity.WARNING
         assert audit_event.event_status == EventStatus.ERROR
-        assert audit_event.source_component == "nexus.approvals"
+        assert audit_event.source_component == "syntara.approvals"
         assert audit_event.actor_id == user.id
         assert audit_event.actor_username == user.username
         assert audit_event.resource_urn == f"urn:syntara:approval:{approval_read.id}"
@@ -914,7 +914,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         self, test_db_session: AsyncSession, users: dict[str, User], executions_factory: ExecutionsFactory
     ) -> None:
         """Full pipeline: batch denial produces per-item authorization_denied SECURITY_EVENT."""
-        from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+        from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
 
         user = users["user_1"]
         other_user = users["user_2"]
@@ -951,7 +951,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
 
         captured_events: list[Any] = []
         capture = patch(
-            "nexus.audit.dispatcher.emit_audit_event",
+            "syntara.audit.dispatcher.emit_audit_event",
             side_effect=lambda e, _s=None: captured_events.append(e),
         )
         with capture:
@@ -966,7 +966,7 @@ class TestApprovalAuthorizationDeniedAuditRegression(TestApprovalAuthorizationBa
         assert audit_event.event_category == EventCategory.SECURITY_EVENT
         assert audit_event.event_severity == EventSeverity.WARNING
         assert audit_event.event_status == EventStatus.ERROR
-        assert audit_event.source_component == "nexus.approvals"
+        assert audit_event.source_component == "syntara.approvals"
         assert audit_event.actor_id == user.id
         assert audit_event.resource_urn == f"urn:syntara:approval:{approval2.id}"
 

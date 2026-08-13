@@ -10,14 +10,14 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nexus.credentials.models.credential import (
+from syntara.credentials.models.credential import (
     Credential,
     CredentialListResponse,
     CredentialRead,
     CredentialWorkflowRef,
 )
-from nexus.credentials.services.credential_service import CredentialService
-from nexus.projects.router import router
+from syntara.credentials.services.credential_service import CredentialService
+from syntara.projects.router import router
 
 PROJECT_ID = uuid4()
 OTHER_PROJECT_ID = uuid4()
@@ -63,10 +63,10 @@ def app(mock_credential_service: AsyncMock) -> FastAPI:
     """Create a test FastAPI app with project credential routes and mocked deps."""
     test_app = FastAPI()
 
-    from nexus.auth import get_current_user
-    from nexus.credentials.error_handlers import credential_not_found_handler
-    from nexus.credentials.exceptions import CredentialNotFoundError
-    from nexus.credentials.router import get_credential_service
+    from syntara.auth import get_current_user
+    from syntara.credentials.error_handlers import credential_not_found_handler
+    from syntara.credentials.exceptions import CredentialNotFoundError
+    from syntara.credentials.router import get_credential_service
 
     async def _no_auth() -> None:
         return None
@@ -74,7 +74,7 @@ def app(mock_credential_service: AsyncMock) -> FastAPI:
     test_app.dependency_overrides[get_current_user] = lambda: MagicMock()
     test_app.dependency_overrides[get_credential_service] = lambda: mock_credential_service
 
-    from nexus.projects import router as proj_mod
+    from syntara.projects import router as proj_mod
 
     for dep_name in [
         "_perm_credential_create",

@@ -84,10 +84,10 @@ If a wait node's configured duration exceeds this limit, the activity fails with
 
 | File | Purpose |
 |------|---------|
-| `src/nexus/schemas/workflows/v2/control-nodes/wait.schema.json` | JSON Schema for config and result |
-| `src/nexus/schemas/workflows/v2/catalog/node_type_catalog.json` | Node type registry entry |
-| `src/nexus/workflows/workflow_engine/activities/wait_activity.py` | Async completion activity + local completion activity |
-| `src/nexus/workflows/workflow_engine/dynamic_workflow.py` | Workflow dispatch and durable timer |
-| `src/nexus/workflows/workflow_engine/services/activity_sync_service.py` | WAITING status handling |
+| `src/syntara/schemas/workflows/v2/control-nodes/wait.schema.json` | JSON Schema for config and result |
+| `src/syntara/schemas/workflows/v2/catalog/node_type_catalog.json` | Node type registry entry |
+| `src/syntara/workflows/workflow_engine/activities/wait_activity.py` | Async completion activity + local completion activity |
+| `src/syntara/workflows/workflow_engine/dynamic_workflow.py` | Workflow dispatch and durable timer |
+| `src/syntara/workflows/workflow_engine/services/activity_sync_service.py` | WAITING status handling |
 | `tests/unit/workflows/workflow_engine/activities/test_wait_activity.py` | Unit tests |
 | `tests/integration/workflows/workflow_engine/services/test_wait_node_integration.py` | Integration tests |

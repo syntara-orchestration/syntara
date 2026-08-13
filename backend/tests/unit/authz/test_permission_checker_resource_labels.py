@@ -10,10 +10,10 @@ from uuid import uuid4
 import pytest
 from fastapi.exceptions import RequestValidationError
 
-from nexus.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
-from nexus.authz.engine import AllowedProjectsResult, AuthzResult, VisibilityResult
-from nexus.authz.exceptions import AuthorizationDeniedError
-from nexus.credentials.models.credential import Credential
+from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+from syntara.authz.engine import AllowedProjectsResult, AuthzResult, VisibilityResult
+from syntara.authz.exceptions import AuthorizationDeniedError
+from syntara.credentials.models.credential import Credential
 
 
 def _mock_db_with_results(*results: object) -> AsyncMock:
@@ -205,7 +205,7 @@ class TestResolveProjectFromPath:
         assert result == ""
 
     async def test_project_not_found_raises(self) -> None:
-        from nexus.authz.exceptions import ProjectNotFoundError
+        from syntara.authz.exceptions import ProjectNotFoundError
 
         checker = PermissionChecker("project", "update", project_param="project_id")
         request = MagicMock()
@@ -238,7 +238,7 @@ class TestResolveProjectFromBody:
         assert result == "my-project"
 
     async def test_body_with_project_not_found_raises(self) -> None:
-        from nexus.authz.exceptions import ProjectNotFoundError
+        from syntara.authz.exceptions import ProjectNotFoundError
 
         checker = PermissionChecker("credential", "create", body_project_field="project_id")
         request = MagicMock()
@@ -311,7 +311,7 @@ class TestCallPassesResourceLabels:
                 return_value=(resource_id, "my-credential", "my-project", expected_labels),
             ),
             patch(
-                "nexus.authz.dependencies.authorize",
+                "syntara.authz.dependencies.authorize",
                 new_callable=AsyncMock,
                 return_value=_allowed_result(),
             ) as mock_authorize,
@@ -335,7 +335,7 @@ class TestCallPassesResourceLabels:
                 return_value=("", "", "", {}),
             ),
             patch(
-                "nexus.authz.dependencies.authorize",
+                "syntara.authz.dependencies.authorize",
                 new_callable=AsyncMock,
                 return_value=_denied_result(),
             ),
@@ -354,7 +354,7 @@ class TestProjectScopeFilter:
 
         expected = AllowedProjectsResult(all_projects=True, project_ids=[])
         with patch(
-            "nexus.authz.dependencies.resolve_allowed_projects",
+            "syntara.authz.dependencies.resolve_allowed_projects",
             new_callable=AsyncMock,
             return_value=expected,
         ) as mock_resolve:
@@ -374,7 +374,7 @@ class TestVisibilityFilter:
 
         expected = VisibilityResult(unrestricted=True)
         with patch(
-            "nexus.authz.dependencies.resolve_visibility",
+            "syntara.authz.dependencies.resolve_visibility",
             new_callable=AsyncMock,
             return_value=expected,
         ) as mock_resolve:

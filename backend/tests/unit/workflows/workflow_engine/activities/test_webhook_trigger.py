@@ -8,7 +8,7 @@ Covers:
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
+from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
 
 
 async def test_webhook_trigger_basic() -> None:

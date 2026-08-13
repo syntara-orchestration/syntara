@@ -18,7 +18,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.constants import CONTEXT_KEY, CONTEXT_KEY_FILE_IDS
+from syntara.core.constants import CONTEXT_KEY, CONTEXT_KEY_FILE_IDS
 
 
 @pytest.mark.asyncio

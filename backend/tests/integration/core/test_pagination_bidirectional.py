@@ -12,10 +12,10 @@ import pytest
 import pytest_asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.core.utils.cursor import decode_cursor
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.services import WorkflowService
+from syntara.core.models import User
+from syntara.core.utils.cursor import decode_cursor
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.services import WorkflowService
 from tests.helpers.workflow import create_minimal_workflow_definition
 
 DATASET_SIZE = 25  # Number of workflows created by workflows_dataset fixture

@@ -14,26 +14,26 @@ from fastapi import Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.exceptions import InvalidTokenError
-from nexus.auth.services.token_service import TokenPayload
-from nexus.core.constants import WebhookLimits
-from nexus.core.models import User
-from nexus.workflows.exceptions import (
+from syntara.auth.exceptions import InvalidTokenError
+from syntara.auth.services.token_service import TokenPayload
+from syntara.core.constants import WebhookLimits
+from syntara.core.models import User
+from syntara.workflows.exceptions import (
     PayloadTooLargeError,
     TemporalUnavailableError,
     TriggerValidationError,
     WebhookAuthenticationRequiredError,
 )
-from nexus.workflows.models.webhook_trigger import WebhookTrigger
-from nexus.workflows.webhook_router import (
+from syntara.workflows.models.webhook_trigger import WebhookTrigger
+from syntara.workflows.webhook_router import (
     WebhookResponse,
     _check_payload_size,
     get_webhook_caller,
     receive_eda_webhook,
     receive_webhook,
 )
-from nexus.workflows.workflow_engine.models.workflow_definition import NodeType
-from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 # ============================================================================
 # _check_payload_size tests
@@ -155,7 +155,7 @@ class TestGetWebhookCaller:
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
 
         with (
-            patch("nexus.workflows.webhook_router._get_token_service") as mock_ts,
+            patch("syntara.workflows.webhook_router._get_token_service") as mock_ts,
             pytest.raises(WebhookAuthenticationRequiredError),
         ):
             mock_ts.return_value.decode_token.side_effect = InvalidTokenError
@@ -168,8 +168,8 @@ class TestGetWebhookCaller:
         user_payload = _make_user_payload()
 
         with (
-            patch("nexus.workflows.webhook_router._get_token_service") as mock_ts,
-            patch("nexus.workflows.webhook_router._check_global_revocation") as mock_revoke,
+            patch("syntara.workflows.webhook_router._get_token_service") as mock_ts,
+            patch("syntara.workflows.webhook_router._check_global_revocation") as mock_revoke,
             pytest.raises(WebhookAuthenticationRequiredError),
         ):
             mock_ts.return_value.decode_token.return_value = user_payload
@@ -185,9 +185,9 @@ class TestGetWebhookCaller:
         mock_user = Mock(spec=User)
 
         with (
-            patch("nexus.workflows.webhook_router._get_token_service") as mock_ts,
-            patch("nexus.workflows.webhook_router._check_global_revocation") as mock_revoke,
-            patch("nexus.workflows.webhook_router._user_from_payload", return_value=mock_user),
+            patch("syntara.workflows.webhook_router._get_token_service") as mock_ts,
+            patch("syntara.workflows.webhook_router._check_global_revocation") as mock_revoke,
+            patch("syntara.workflows.webhook_router._user_from_payload", return_value=mock_user),
         ):
             mock_ts.return_value.decode_token.return_value = sa_payload
             mock_revoke.return_value = None
@@ -199,15 +199,15 @@ class TestGetWebhookCaller:
 
     async def test_globally_revoked_token_raises(self) -> None:
         """Token that has been globally revoked raises through _check_global_revocation."""
-        from nexus.auth.exceptions import TokenGloballyRevokedError
+        from syntara.auth.exceptions import TokenGloballyRevokedError
 
         mock_db = AsyncMock(spec=AsyncSession)
         sa_payload = _make_sa_payload()
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="revoked-token")
 
         with (
-            patch("nexus.workflows.webhook_router._get_token_service") as mock_ts,
-            patch("nexus.workflows.webhook_router._check_global_revocation") as mock_revoke,
+            patch("syntara.workflows.webhook_router._get_token_service") as mock_ts,
+            patch("syntara.workflows.webhook_router._check_global_revocation") as mock_revoke,
             pytest.raises(TokenGloballyRevokedError),
         ):
             mock_ts.return_value.decode_token.return_value = sa_payload
@@ -266,9 +266,9 @@ class TestReceiveWebhookEndpoints:
         mock_execution.id = execution_id
 
         with (
-            patch("nexus.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
-            patch("nexus.workflows.webhook_router.ExecutionService") as mock_exec_svc_cls,
-            patch("nexus.workflows.webhook_router.AuditEventDispatcher"),
+            patch("syntara.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
+            patch("syntara.workflows.webhook_router.ExecutionService") as mock_exec_svc_cls,
+            patch("syntara.workflows.webhook_router.AuditEventDispatcher"),
         ):
             mock_wts = AsyncMock()
             mock_wts.get_by_webhook_path = AsyncMock(return_value=trigger)
@@ -303,8 +303,8 @@ class TestReceiveWebhookEndpoints:
         caller = _make_caller()
 
         with (
-            patch("nexus.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
-            patch("nexus.workflows.webhook_router.AuditEventDispatcher"),
+            patch("syntara.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
+            patch("syntara.workflows.webhook_router.AuditEventDispatcher"),
         ):
             mock_wts = AsyncMock()
             mock_wts.get_by_webhook_path = AsyncMock(return_value=_make_trigger(webhook_path=default_path))
@@ -326,12 +326,12 @@ class TestReceiveWebhookEndpoints:
         self, endpoint_fn: Callable[..., Any], trigger_type: str, label: str, default_path: str
     ) -> None:
         """SA not bound to trigger raises WebhookServiceAccountNotAuthorizedError."""
-        from nexus.workflows.exceptions import WebhookServiceAccountNotAuthorizedError
+        from syntara.workflows.exceptions import WebhookServiceAccountNotAuthorizedError
 
         mock_db = AsyncMock(spec=AsyncSession)
         caller = _make_caller()
 
-        with patch("nexus.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls:
+        with patch("syntara.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls:
             mock_wts = AsyncMock()
             mock_wts.get_by_webhook_path = AsyncMock(return_value=_make_trigger(webhook_path=default_path))
             mock_wts.verify_service_account_authorization = AsyncMock(
@@ -362,9 +362,9 @@ class TestReceiveWebhookEndpoints:
         mock_execution.id = uuid4()
 
         with (
-            patch("nexus.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
-            patch("nexus.workflows.webhook_router.ExecutionService") as mock_exec_svc_cls,
-            patch("nexus.workflows.webhook_router.AuditEventDispatcher"),
+            patch("syntara.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
+            patch("syntara.workflows.webhook_router.ExecutionService") as mock_exec_svc_cls,
+            patch("syntara.workflows.webhook_router.AuditEventDispatcher"),
         ):
             mock_wts = AsyncMock()
             mock_wts.get_by_webhook_path = AsyncMock(return_value=_make_trigger(webhook_path=default_path))

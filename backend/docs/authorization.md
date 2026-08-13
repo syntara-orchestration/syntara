@@ -20,11 +20,11 @@ Authorization is **deny-by-default** — requests are denied unless an explicit 
 
 ### Resource Types and Actions
 
-Every authorization decision is about whether a user can perform an **action** on a **resource type**. The canonical catalog is built dynamically at startup by `build_resource_actions()` in `src/nexus/authz/resource_actions.py`, which introspects all registered route dependencies (`PermissionChecker`, `ProjectScopeFilter`) and merges them with `BUILTIN_POLICIES`. The `GET /authz/resource_actions` endpoint exposes the live catalog to API consumers.
+Every authorization decision is about whether a user can perform an **action** on a **resource type**. The canonical catalog is built dynamically at startup by `build_resource_actions()` in `src/syntara/authz/resource_actions.py`, which introspects all registered route dependencies (`PermissionChecker`, `ProjectScopeFilter`) and merges them with `BUILTIN_POLICIES`. The `GET /authz/resource_actions` endpoint exposes the live catalog to API consumers.
 
 #### Adding a New Resource Type or Action
 
-1. Add a `PolicyInfo` to `BUILTIN_POLICIES` in `src/nexus/authz/role_conventions.py`
+1. Add a `PolicyInfo` to `BUILTIN_POLICIES` in `src/syntara/authz/role_conventions.py`
 2. Use `PermissionChecker("resource", "action")` on the new endpoint
 
 The registry is rebuilt automatically — no manual dictionary to maintain. Tests in `tests/unit/authz/test_resource_actions.py` validate that `PermissionChecker` calls, `BUILTIN_POLICIES`, and OpenAPI `x-app-permission` entries all stay in sync.
@@ -55,14 +55,14 @@ A policy contains one or more **statements** that define what actions are allowe
 
 There are two categories of policies:
 
-- **Built-in policies**: Defined in `BUILTIN_POLICIES` in `src/nexus/authz/role_conventions.py`. These exist only in code and are resolved at runtime — they are **not** stored in the database.
+- **Built-in policies**: Defined in `BUILTIN_POLICIES` in `src/syntara/authz/role_conventions.py`. These exist only in code and are resolved at runtime — they are **not** stored in the database.
 - **Custom policies**: Created via the API (system-level or project-scoped) and stored in the `policies` database table.
 
 ### Roles
 
 A role bundles a set of policies. Like policies, roles come in two categories:
 
-- **Built-in roles**: Defined in `BUILTIN_ROLES` in `src/nexus/authz/role_conventions.py`. Their policy assignments are declared via the `roles` tuple on each `PolicyInfo`. These are resolved at runtime and **not** stored in the database.
+- **Built-in roles**: Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`. Their policy assignments are declared via the `roles` tuple on each `PolicyInfo`. These are resolved at runtime and **not** stored in the database.
 - **Custom roles**: Created via the API (system-level or project-scoped) and stored in the `roles` database table, with policies linked via `policy_names` or the `role_policies` join table.
 
 ### Groups
@@ -75,7 +75,7 @@ Projects provide resource isolation. Resources belong to projects, and users can
 
 ## Built-in Roles
 
-Defined in `BUILTIN_ROLES` in `src/nexus/authz/role_conventions.py`:
+Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`:
 
 | Role | Builtin | Scope | Description | Key Permissions |
 |------|---------|-------|-------------|-----------------|
@@ -93,14 +93,14 @@ The authorization system uses these tables:
 
 | Table | Model | Location | Description |
 |-------|-------|----------|-------------|
-| `policies` | `Policy` | `src/nexus/authz/models/policy.py` | Custom IAM-style policies with JSONB statements; optional `project_id` for project scoping |
-| `roles` | `Role` | `src/nexus/authz/models/role.py` | Custom named roles; optional `project_id` for project scoping |
-| `role_policies` | `RolePolicyLink` | `src/nexus/authz/models/role.py` | Many-to-many join table linking custom roles to custom policies |
-| `principals` | `Principal` | `src/nexus/core/models/principal.py` | Supertype table for identity types that can own resources (users, future service accounts) |
-| `groups` | `Group` | `src/nexus/core/models/group.py` | User groups with labels |
-| `user_groups` | *(association table)* | `src/nexus/core/models/group.py` | User-to-group membership (SQLAlchemy Table) |
-| `role_assignments` | `RoleAssignment` | `src/nexus/authz/models/assignments.py` | Principal-to-role with `principal_type` (user/group), `principal_id`, optional `project_id`; references roles by `role_name` (string) |
-| `projects` | `Project` | `src/nexus/authz/models/project.py` | Resource isolation boundaries |
+| `policies` | `Policy` | `src/syntara/authz/models/policy.py` | Custom IAM-style policies with JSONB statements; optional `project_id` for project scoping |
+| `roles` | `Role` | `src/syntara/authz/models/role.py` | Custom named roles; optional `project_id` for project scoping |
+| `role_policies` | `RolePolicyLink` | `src/syntara/authz/models/role.py` | Many-to-many join table linking custom roles to custom policies |
+| `principals` | `Principal` | `src/syntara/core/models/principal.py` | Supertype table for identity types that can own resources (users, future service accounts) |
+| `groups` | `Group` | `src/syntara/core/models/group.py` | User groups with labels |
+| `user_groups` | *(association table)* | `src/syntara/core/models/group.py` | User-to-group membership (SQLAlchemy Table) |
+| `role_assignments` | `RoleAssignment` | `src/syntara/authz/models/assignments.py` | Principal-to-role with `principal_type` (user/group), `principal_id`, optional `project_id`; references roles by `role_name` (string) |
+| `projects` | `Project` | `src/syntara/authz/models/project.py` | Resource isolation boundaries |
 
 Built-in roles and policies are **not** stored in these tables. They live in `role_conventions.py` and are resolved at runtime by the policy resolver, then merged into API list/get responses by the service layer.
 
@@ -147,7 +147,7 @@ User
 
 ## Default Bootstrap State
 
-On first boot, the seed module (`src/nexus/authz/seed.py`) creates:
+On first boot, the seed module (`src/syntara/authz/seed.py`) creates:
 
 - `authenticated` group (builtin, implicit — all users belong to it)
 - `admins` group (builtin)
@@ -177,7 +177,7 @@ Both functions only create groups, the default project, the admin user, and role
 Use the `PermissionChecker` dependency on your router endpoints:
 
 ```python
-from nexus.authz.dependencies import PermissionChecker
+from syntara.authz.dependencies import PermissionChecker
 
 # Simple check: user must have workflow:create permission
 @router.post("", dependencies=[Depends(PermissionChecker("workflow", "create"))])
@@ -235,8 +235,8 @@ async def create_workflow_in_project(...):
 Use `VisibilityFilter` to restrict list queries based on the user's effective policies. It resolves project-scoped access, self-scope access, and unrestricted access in a single policy evaluation:
 
 ```python
-from nexus.authz.dependencies import VisibilityFilter
-from nexus.authz.engine import VisibilityResult
+from syntara.authz.dependencies import VisibilityFilter
+from syntara.authz.engine import VisibilityResult
 
 # Project-scoped resources (workflows, executions, approvals, credentials, projects)
 @router.get("")
@@ -322,7 +322,7 @@ If a condition key is absent from the policy, it is not checked (backward compat
 
 ## Policy Logic
 
-The Rego policy (`src/nexus/authz/rego/authz.rego`) implements deny-first evaluation:
+The Rego policy (`src/syntara/authz/rego/authz.rego`) implements deny-first evaluation:
 
 1. **Deny check**: If any policy with `effect: "deny"` matches the action, scope, and conditions → **denied**
 2. **Allow check**: If no deny matched AND any policy with `effect: "allow"` matches → **allowed**
@@ -442,7 +442,7 @@ The `user-directory:read` and `group-directory:read` policies are granted to the
 
 ## Policy and Role Management
 
-Built-in policies and roles are defined as static registries in `src/nexus/authz/role_conventions.py`. They are the single source of truth and are resolved at runtime — they are never stored in or read from the database.
+Built-in policies and roles are defined as static registries in `src/syntara/authz/role_conventions.py`. They are the single source of truth and are resolved at runtime — they are never stored in or read from the database.
 
 ### `PolicyInfo` — Built-in Policy Definition
 
@@ -539,7 +539,7 @@ Authorization is evaluated in-process, so local development does not require a s
 make run-all
 ```
 
-The evaluator loads Rego policies from `src/nexus/authz/rego/`.
+The evaluator loads Rego policies from `src/syntara/authz/rego/`.
 
 ### Configuration
 

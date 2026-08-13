@@ -12,17 +12,17 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.router import (
+from syntara.auth.router import (
     _auto_create_user,
     _create_identity_with_race_handling,
     _resolve_oidc_user,
 )
-from nexus.auth.services.oidc_service import OIDCError
-from nexus.core.models import User
-from nexus.core.models.user import AuthType
-from nexus.core.models.user_identity import UserIdentity
-from nexus.identity_providers.models.identity_provider import IdentityProvider
-from nexus.users.services.user_identity_service import UserIdentityService
+from syntara.auth.services.oidc_service import OIDCError
+from syntara.core.models import User
+from syntara.core.models.user import AuthType
+from syntara.core.models.user_identity import UserIdentity
+from syntara.identity_providers.models.identity_provider import IdentityProvider
+from syntara.users.services.user_identity_service import UserIdentityService
 
 pytestmark = pytest.mark.integration
 

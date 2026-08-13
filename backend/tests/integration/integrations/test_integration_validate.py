@@ -14,16 +14,16 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.credentials.models.credential import Credential
-from nexus.credentials.models.credential_type import CredentialType
-from nexus.integrations.adapters.protocol import ValidateResult
-from nexus.integrations.models.integration import IntegrationCreate, IntegrationStatus, IntegrationType
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.core.models import User
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
+from syntara.integrations.adapters.protocol import ValidateResult
+from syntara.integrations.models.integration import IntegrationCreate, IntegrationStatus, IntegrationType
+from syntara.integrations.services.integration_service import IntegrationService
 
 BASE_URL = "/api/v1/integrations"
 
-MCP_VALIDATE_PATCH = "nexus.integrations.adapters.mcp_server.MCPServerAdapter.validate"
+MCP_VALIDATE_PATCH = "syntara.integrations.adapters.mcp_server.MCPServerAdapter.validate"
 
 
 @pytest.mark.asyncio
@@ -179,7 +179,7 @@ class TestIntegrationValidateContract:
         """Validate does NOT sync Tool records — that is the refresh endpoint's job."""
         from sqlmodel import select
 
-        from nexus.tool_manager.models.tool import Tool
+        from syntara.tool_manager.models.tool import Tool
 
         integration_id = await _create_integration_with_mocked_credential(
             test_db_session, test_user, "validate-no-sync"
@@ -209,8 +209,8 @@ async def _create_integration_with_mocked_credential(
     """Create an mcp_server integration with a minimal fake credential attached."""
     from sqlmodel import select as sql_select
 
-    from nexus.authz.models import Project
-    from nexus.core.services.secret_service import create_secret_service
+    from syntara.authz.models import Project
+    from syntara.core.services.secret_service import create_secret_service
 
     project = Project(name=f"{name_prefix}-proj-{uuid4().hex[:8]}")
     session.add(project)

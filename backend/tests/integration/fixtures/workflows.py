@@ -9,14 +9,14 @@ from uuid import uuid4
 import pytest_asyncio
 from sqlmodel import select
 
-from nexus.workflows.models import ActivityExecution, ActivityStatus, Workflow, WorkflowVersion
-from nexus.workflows.models.execution import Execution, ExecutionStatus
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.models import ActivityExecution, ActivityStatus, Workflow, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
+    from syntara.core.models import User
 
 
 @pytest_asyncio.fixture
@@ -54,7 +54,7 @@ async def test_workflow(
     test_db_session: AsyncSession, test_user: User, test_workflow_definition: dict[str, Any]
 ) -> Workflow:
     """Create a test workflow with version."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name=f"test-project-{uuid4().hex[:8]}", description="Test project")
     test_db_session.add(project)

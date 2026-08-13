@@ -4,17 +4,17 @@
 
 from uuid import uuid4
 
-from nexus.agent_orchestrator.audit.invocation_lifecycle import (
+from syntara.agent_orchestrator.audit.invocation_lifecycle import (
     InvocationLifecycleEvent,
     InvocationLifecycleHandler,
 )
-from nexus.agent_orchestrator.models import InvocationStatus
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.agent_orchestrator.models import InvocationStatus
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 class TestInvocationLifecycleHandler:
@@ -49,7 +49,7 @@ class TestInvocationLifecycleHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "invocation_running"
         assert result.event_message == "Invocation running"
-        assert result.source_component == "nexus.agent_orchestrator.executor"
+        assert result.source_component == "syntara.agent_orchestrator.executor"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -85,7 +85,7 @@ class TestInvocationLifecycleHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "invocation_failed"
         assert result.event_message == "Invocation failed"
-        assert result.source_component == "nexus.agent_orchestrator.executor"
+        assert result.source_component == "syntara.agent_orchestrator.executor"
 
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.error_type == "LLMConnectionError"

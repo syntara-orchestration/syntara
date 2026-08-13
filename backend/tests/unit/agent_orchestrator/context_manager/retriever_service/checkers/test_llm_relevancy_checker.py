@@ -9,16 +9,16 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker import (
+from syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker import (
     LLMRelevancyChecker,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
+from syntara.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
     ConfigurationManager,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import RelevancyCheckError
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.models.llm_credential_config import LLMCredentialConfig
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import RelevancyCheckError
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.models.llm_credential_config import LLMCredentialConfig
+from syntara.files.models import FileMetadata
 
 _TEST_CREDENTIAL = LLMCredentialConfig(
     api_key="test-key",
@@ -69,7 +69,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ):
             checker = LLMRelevancyChecker()
@@ -120,7 +120,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ):
             checker = LLMRelevancyChecker()
@@ -170,7 +170,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ):
             checker = LLMRelevancyChecker()
@@ -225,7 +225,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.side_effect = [mock_response_conservative, mock_response_creative]
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ):
             checker = LLMRelevancyChecker()
@@ -275,7 +275,7 @@ class TestLLMRelevancyCheckerIntegration:
 
         # Mock the get_openrouter_llm to raise an exception
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             side_effect=ValueError("Invalid model configuration"),
         ):
             checker = LLMRelevancyChecker()
@@ -318,7 +318,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ) as mock_get_llm:
             checker = LLMRelevancyChecker()
@@ -378,7 +378,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ) as mock_get_llm:
             checker = LLMRelevancyChecker()
@@ -424,7 +424,7 @@ class TestLLMRelevancyCheckerIntegration:
         mock_llm.ainvoke.return_value = mock_response
 
         with patch(
-            "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
+            "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm",
             return_value=(mock_llm, None),
         ):
             checker = LLMRelevancyChecker()

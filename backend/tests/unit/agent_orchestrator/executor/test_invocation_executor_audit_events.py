@@ -13,19 +13,19 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.audit.invocation_lifecycle import (
+from syntara.agent_orchestrator.audit.invocation_lifecycle import (
     InvocationLifecycleEvent,
     InvocationLifecycleHandler,
 )
-from nexus.agent_orchestrator.exceptions import InvocationCancelledError
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
-from nexus.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
-from nexus.core.config.base import Settings
-from nexus.core.models.principal import PrincipalType, service_principal_id
-from nexus.core.models.user import User
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.function_execution import FunctionExecutionEvent, FunctionExecutionHandler
+from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventStatus
+from syntara.core.config.base import Settings
+from syntara.core.models.principal import PrincipalType, service_principal_id
+from syntara.core.models.user import User
 
 
 def _make_invocation(**overrides: object) -> Invocation:
@@ -129,7 +129,7 @@ class TestInvocationExecutorLifecycleEvents:
         executor = InvocationExecutor()
 
         patches = [
-            patch("nexus.audit.emitter._do_emit_audit_event"),
+            patch("syntara.audit.emitter._do_emit_audit_event"),
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
             patch.object(executor, "_init_orchestration", return_value=(mock_orchestration_service, None)),
             patch.object(
@@ -419,11 +419,11 @@ class TestInvocationExecutorLifecycleEvents:
 
         # Mock WorkflowSignalClient to prevent actual signal sending
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
             patch.object(executor, "_init_orchestration", return_value=(mock_orchestration_service, None)),
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
                 new_callable=AsyncMock,
             ),
         ):
@@ -499,11 +499,11 @@ class TestInvocationExecutorLifecycleEvents:
 
         # Mock WorkflowSignalClient to prevent actual signal sending
         with (
-            patch("nexus.audit.emitter._do_emit_audit_event") as mock_do_emit,
+            patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
             patch.object(executor, "_init_orchestration", return_value=(mock_orchestration_service, None)),
             patch(
-                "nexus.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
                 new_callable=AsyncMock,
             ),
         ):

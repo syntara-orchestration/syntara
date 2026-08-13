@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from nexus.tool_manager.models import Tool
+from syntara.tool_manager.models import Tool
 
 if TYPE_CHECKING:
     from tests.integration.helpers.tool_manager import ToolFactory

@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nexus.aap.models.responses import (
+from syntara.aap.models.responses import (
     AAPCredential,
     AAPExecutionEnvironment,
     AAPInstanceGroup,
@@ -19,9 +19,9 @@ from nexus.aap.models.responses import (
     AAPListResponse,
     AAPOrganization,
 )
-from nexus.aap.router import router
-from nexus.aap.services.aap_proxy_service import AAPProxyService
-from nexus.core.models import User
+from syntara.aap.router import router
+from syntara.aap.services.aap_proxy_service import AAPProxyService
+from syntara.core.models import User
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ def app(mock_service: AsyncMock, mock_user: User) -> FastAPI:
         return mock_user
 
     # Apply overrides before including router
-    from nexus.aap import router as aap_router
-    from nexus.auth import get_current_user
+    from syntara.aap import router as aap_router
+    from syntara.auth import get_current_user
 
     test_app.dependency_overrides[aap_router._get_aap_proxy_service] = mock_get_service
     test_app.dependency_overrides[get_current_user] = mock_get_user
@@ -64,7 +64,7 @@ def app(mock_service: AsyncMock, mock_user: User) -> FastAPI:
 
 
 class TestListOrganizations:
-    """Tests for GET /api/v1/aap/organizations."""
+    """Tests for GET /api/v1/proxies/aap/organizations."""
 
     @pytest.mark.asyncio
     async def test_returns_organizations(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -78,7 +78,7 @@ class TestListOrganizations:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/organizations")
+            response = await client.get("/api/v1/proxies/aap/organizations")
 
         assert response.status_code == 200
         data = response.json()
@@ -89,7 +89,7 @@ class TestListOrganizations:
 
 
 class TestListJobTemplates:
-    """Tests for GET /api/v1/aap/job_templates."""
+    """Tests for GET /api/v1/proxies/aap/job_templates."""
 
     @pytest.mark.asyncio
     async def test_returns_job_templates(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -100,7 +100,7 @@ class TestListJobTemplates:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/job_templates")
+            response = await client.get("/api/v1/proxies/aap/job_templates")
 
         assert response.status_code == 200
         data = response.json()
@@ -109,7 +109,7 @@ class TestListJobTemplates:
 
 
 class TestGetJobTemplate:
-    """Tests for GET /api/v1/aap/job_templates/{job_template_id}."""
+    """Tests for GET /api/v1/proxies/aap/job_templates/{job_template_id}."""
 
     @pytest.mark.asyncio
     async def test_returns_job_template_detail(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -125,7 +125,7 @@ class TestGetJobTemplate:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/job_templates/1")
+            response = await client.get("/api/v1/proxies/aap/job_templates/1")
 
         assert response.status_code == 200
         data = response.json()
@@ -135,7 +135,7 @@ class TestGetJobTemplate:
 
 
 class TestListInventories:
-    """Tests for GET /api/v1/aap/inventories."""
+    """Tests for GET /api/v1/proxies/aap/inventories."""
 
     @pytest.mark.asyncio
     async def test_returns_inventories(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -146,7 +146,7 @@ class TestListInventories:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/inventories")
+            response = await client.get("/api/v1/proxies/aap/inventories")
 
         assert response.status_code == 200
         data = response.json()
@@ -155,7 +155,7 @@ class TestListInventories:
 
 
 class TestListExecutionEnvironments:
-    """Tests for GET /api/v1/aap/execution_environments."""
+    """Tests for GET /api/v1/proxies/aap/execution_environments."""
 
     @pytest.mark.asyncio
     async def test_returns_execution_environments(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -166,7 +166,7 @@ class TestListExecutionEnvironments:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/execution_environments")
+            response = await client.get("/api/v1/proxies/aap/execution_environments")
 
         assert response.status_code == 200
         data = response.json()
@@ -175,7 +175,7 @@ class TestListExecutionEnvironments:
 
 
 class TestListCredentials:
-    """Tests for GET /api/v1/aap/credentials."""
+    """Tests for GET /api/v1/proxies/aap/credentials."""
 
     @pytest.mark.asyncio
     async def test_returns_credentials(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -186,7 +186,7 @@ class TestListCredentials:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/credentials")
+            response = await client.get("/api/v1/proxies/aap/credentials")
 
         assert response.status_code == 200
         data = response.json()
@@ -195,7 +195,7 @@ class TestListCredentials:
 
 
 class TestListInstanceGroups:
-    """Tests for GET /api/v1/aap/instance_groups."""
+    """Tests for GET /api/v1/proxies/aap/instance_groups."""
 
     @pytest.mark.asyncio
     async def test_returns_instance_groups(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -206,7 +206,7 @@ class TestListInstanceGroups:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/instance_groups")
+            response = await client.get("/api/v1/proxies/aap/instance_groups")
 
         assert response.status_code == 200
         data = response.json()
@@ -215,7 +215,7 @@ class TestListInstanceGroups:
 
 
 class TestListLabels:
-    """Tests for GET /api/v1/aap/labels."""
+    """Tests for GET /api/v1/proxies/aap/labels."""
 
     @pytest.mark.asyncio
     async def test_returns_labels(self, app: FastAPI, mock_service: AsyncMock) -> None:
@@ -229,7 +229,7 @@ class TestListLabels:
         )
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/aap/labels")
+            response = await client.get("/api/v1/proxies/aap/labels")
 
         assert response.status_code == 200
         data = response.json()
