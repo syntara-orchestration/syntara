@@ -22,8 +22,8 @@ metadata:
   namespace: nexus-tenant
 spec:
   timeouts:
-    pipeline: "8h"
-    tasks: "6h"
+    pipeline: "10h"
+    tasks: "8h"
     finally: "2h"
   params:
     - name: git-url
@@ -37,22 +37,16 @@ spec:
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
   pipelineRef:
-    resolver: git
     params:
-      - name: org
-        value: ansible-automation-platform
-      - name: repo
-        value: aap-konflux-pipelines
-      - name: revision
-        value: main
-      - name: pathInRepo
-        value: pipelines/test/ao-api-tests/0.1/pipeline.yaml
-      - name: token
-        value: github-aap-org-secret
-      - name: tokenKey
-        value: password
-      - name: scmType
-        value: github
+      - name: name
+        value: ao-api-tests
+      - name: bundle
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:7d6d243c00d41f28e864637927c655d5a9749ce7c03f7ad1a826e3a512e96b99
+      - name: kind
+        value: pipeline
+      - name: secret
+        value: quay-aap-ci-viewer
+    resolver: bundles
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner

@@ -6,7 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.aap_list_response_aap_job_template import AAPListResponseAAPJobTemplate
+from ...models.aap_list_response_aap_organization import AAPListResponseAAPOrganization
 from ...models.error_data import ErrorData
 from ...types import UNSET, Response, Unset
 
@@ -17,7 +17,6 @@ def _get_kwargs(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -51,18 +50,11 @@ def _get_kwargs(
         json_integration_id = integration_id
     params["integration_id"] = json_integration_id
 
-    json_organization: None | str | Unset
-    if isinstance(organization, Unset):
-        json_organization = UNSET
-    else:
-        json_organization = organization
-    params["organization"] = json_organization
-
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/aap/job_templates",
+        "url": "/proxies/aap/organizations",
         "params": params,
     }
 
@@ -71,9 +63,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> AAPListResponseAAPJobTemplate | ErrorData | None:
+) -> AAPListResponseAAPOrganization | ErrorData | None:
     if response.status_code == 200:
-        response_200 = AAPListResponseAAPJobTemplate.from_dict(response.json())
+        response_200 = AAPListResponseAAPOrganization.from_dict(response.json())
 
         return response_200
 
@@ -125,7 +117,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[AAPListResponseAAPJobTemplate | ErrorData]:
+) -> Response[AAPListResponseAAPOrganization | ErrorData]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -143,26 +135,24 @@ def sync_detailed(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[AAPListResponseAAPJobTemplate | ErrorData]:
-    """List job templates
+) -> Response[AAPListResponseAAPOrganization | ErrorData]:
+    """List organizations
 
-     List Ansible Automation Platform job templates, optionally filtered by organization.
+     List Ansible Automation Platform organizations.
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPJobTemplate | ErrorData]
+        Response[AAPListResponseAAPOrganization | ErrorData]
     """
 
     kwargs = _get_kwargs(
@@ -170,7 +160,6 @@ def sync_detailed(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
         additional_params=additional_params,
     )
 
@@ -188,25 +177,23 @@ def sync(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> AAPListResponseAAPJobTemplate | ErrorData | None:
-    """List job templates
+) -> AAPListResponseAAPOrganization | ErrorData | None:
+    """List organizations
 
-     List Ansible Automation Platform job templates, optionally filtered by organization.
+     List Ansible Automation Platform organizations.
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPJobTemplate | ErrorData
+        AAPListResponseAAPOrganization | ErrorData
     """
 
     return sync_detailed(
@@ -215,7 +202,6 @@ def sync(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
     ).parsed
 
 
@@ -226,25 +212,23 @@ async def asyncio_detailed(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> Response[AAPListResponseAAPJobTemplate | ErrorData]:
-    """List job templates
+) -> Response[AAPListResponseAAPOrganization | ErrorData]:
+    """List organizations
 
-     List Ansible Automation Platform job templates, optionally filtered by organization.
+     List Ansible Automation Platform organizations.
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPJobTemplate | ErrorData]
+        Response[AAPListResponseAAPOrganization | ErrorData]
     """
 
     kwargs = _get_kwargs(
@@ -252,7 +236,6 @@ async def asyncio_detailed(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -267,25 +250,23 @@ async def asyncio(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> AAPListResponseAAPJobTemplate | ErrorData | None:
-    """List job templates
+) -> AAPListResponseAAPOrganization | ErrorData | None:
+    """List organizations
 
-     List Ansible Automation Platform job templates, optionally filtered by organization.
+     List Ansible Automation Platform organizations.
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPJobTemplate | ErrorData
+        AAPListResponseAAPOrganization | ErrorData
     """
 
     return (
@@ -295,6 +276,5 @@ async def asyncio(
             page_size=page_size,
             credential_id=credential_id,
             integration_id=integration_id,
-            organization=organization,
         )
     ).parsed

@@ -267,22 +267,21 @@ function VersionRow({
             </Tooltip>
           </FlexItem>
           {(showSecondaryDatetime && version.created_at) || version.created_by_username ? (
-            <Stack className={styles.versionMetaStack}>
-              {showSecondaryDatetime && version.created_at ? (
-                <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
-                  {formatHistoryDateTime(version.created_at)}
-                </Content>
-              ) : null}
+            <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
+              {showSecondaryDatetime && version.created_at ? formatHistoryDateTime(version.created_at) : null}
               {version.created_by_username ? (
-                <NxLink
-                  to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
-                  className={styles.usernameLink}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {version.created_by_username}
-                </NxLink>
+                <>
+                  {showSecondaryDatetime && version.created_at ? ' by ' : null}
+                  <NxLink
+                    to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
+                    className={styles.usernameLink}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {version.created_by_username}
+                  </NxLink>
+                </>
               ) : null}
-            </Stack>
+            </Content>
           ) : null}
           {badgeStatus ? (
             <div className={styles.labelsRow}>

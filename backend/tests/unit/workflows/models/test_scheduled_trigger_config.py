@@ -287,6 +287,54 @@ class TestTimezoneValidation:
         )
         assert config.timezone is None
 
+    async def test_valid_timezones_is_nonempty(self) -> None:
+        """Regression: available timezone set must never be empty (AAP-86297)."""
+        from syntara.workflows.workflow_engine.models.workflow_definition import (
+            _get_valid_timezones,
+        )
+
+        tzs = _get_valid_timezones()
+        assert len(tzs) > 100, f"Expected >100 timezones, got {len(tzs)}"
+        assert "America/New_York" in tzs
+        assert "Europe/London" in tzs
+        assert "UTC" in tzs
+
+    async def test_raises_when_no_timezone_data(self) -> None:
+        """Runtime guard should raise if timezone data is missing (AAP-86297)."""
+        from unittest.mock import patch
+
+        import syntara.workflows.workflow_engine.models.workflow_definition as wd
+
+        original = wd._VALID_TIMEZONES
+        try:
+            wd._VALID_TIMEZONES = None  # Force re-initialisation
+            with (
+                patch.object(wd, "available_timezones", return_value=frozenset()),
+                pytest.raises(RuntimeError, match="No IANA timezone data found"),
+            ):
+                wd._get_valid_timezones()
+        finally:
+            wd._VALID_TIMEZONES = original
+
+    async def test_published_workflow_timezone_round_trip(self) -> None:
+        """Timezone selected from a standard dropdown must survive validation (AAP-86297)."""
+        browser_timezones = [
+            "America/New_York",
+            "America/Chicago",
+            "America/Los_Angeles",
+            "Europe/London",
+            "Asia/Tokyo",
+            "Australia/Sydney",
+            "Pacific/Auckland",
+        ]
+        for tz in browser_timezones:
+            config = ScheduledTriggerConfig(
+                schedule_type=ScheduleType.CRON,
+                cron="0 9 * * *",
+                timezone=tz,
+            )
+            assert config.timezone == tz, f"Timezone {tz} should be accepted"
+
 
 class TestTemplateExpressionBypass:
     """Tests for template expression bypass in validated fields."""

@@ -51,7 +51,7 @@ def group_access_env(
     create_project: ProjectFactory,
     create_project_role: ProjectRoleFactory,
     create_workflow: WorkflowFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ):
     """Create project, group, two users, and assign roles."""
     # Create project
@@ -83,8 +83,8 @@ def group_access_env(
     # Seed a workflow for read tests
     create_workflow(admin_api, project_id, "tc14")
 
-    u1_api = api_for(nexus_base_url, u1_name, u1_pass)
-    u2_api = api_for(nexus_base_url, u2_name, u2_pass)
+    u1_api = api_for(syntara_base_url, u1_name, u1_pass)
+    u2_api = api_for(syntara_base_url, u2_name, u2_pass)
     return {
         "project_id": project_id,
         "u1_api": u1_api,

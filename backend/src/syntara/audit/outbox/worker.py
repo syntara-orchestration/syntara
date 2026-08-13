@@ -123,7 +123,10 @@ def _build_otel_log_record(
         timestamp=datetime_to_unix_ns(event_date),
         severity_text="INFO",
         severity_number=SeverityNumber.INFO,
-        body="audit_event",
+        # Loki deduplicates same-stream entries with identical timestamp + body.
+        # Co-transactional outbox rows can share created_at; include event_id so
+        # each export line is unique and durable at the log store.
+        body=f"audit_event:{audit_event.event_id}",
         attributes=event_dict,
     )
     return ReadableLogRecord(
@@ -512,8 +515,8 @@ class AuditOutboxWorker(PeriodicWorker):
                 self._log_non_retryable_error(event, exc)
                 return  # Don't retry constraint violations
 
-            except DatabaseError as exc:
-                # Transient database errors - retry with exponential backoff
+            except (DatabaseError, OSError) as exc:
+                # Transient database/socket errors - retry with exponential backoff
                 if attempt < self._max_retries:
                     delay = self._base_delay * (2**attempt)  # 0.1s, 0.2s, 0.4s
                     self._log_retry(event, attempt + 1, delay, exc)
