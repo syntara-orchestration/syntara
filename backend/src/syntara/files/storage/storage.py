@@ -25,7 +25,7 @@ def sanitize_filename(filename: str, max_length: int = 200) -> str:
 
     Note:
         Files are saved with pattern: orchestrator-{36-char-uuid}-{filename}
-        Total prefix length is ~43 chars, so we limit filename to 200 chars
+        Total prefix length is ~50 chars, so we limit filename to 200 chars
         to ensure total path stays well under the 255-byte filesystem limit.
 
     """

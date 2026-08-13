@@ -1107,7 +1107,7 @@ class TestListAllSchedules:
 class TestListSchedulesByPrefix:
     """Tests for the list_schedules_by_prefix static method."""
 
-    async def test_no_prefix_matches_all_nexus_schedules(self) -> None:
+    async def test_no_prefix_matches_all_orchestrator_schedules(self) -> None:
         """Empty prefix should match all orchestrator-sched-* schedule IDs."""
         client = _make_mock_client()
         client.list_schedules = AsyncMock(
