@@ -5,7 +5,8 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 
-from syntara.core.config.base import Settings, get_settings
+from syntara.core.config.base import Settings
+from tests.fixtures.settings import enable_script_nodes
 
 
 @pytest.fixture(autouse=True)
@@ -18,10 +19,5 @@ def _mock_service_identity() -> Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def _enable_script_nodes() -> Generator[None, None, None]:
     """Enable script nodes for activity unit tests."""
-    settings = get_settings()
-    original = settings.script_nodes_enabled
-    object.__setattr__(settings, "script_nodes_enabled", True)
-    try:
+    with enable_script_nodes():
         yield
-    finally:
-        object.__setattr__(settings, "script_nodes_enabled", original)

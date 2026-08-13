@@ -1446,7 +1446,7 @@ class WorkflowEngineSettings(BaseSettings):
     # Enabling Script Node is not recommended for production deployments.
     script_nodes_enabled: bool = Field(
         default=False,
-        description="Enable Developer Preview Script node execution in workflows (Developer Preview)",
+        description="Enable Script node execution in workflows (Developer Preview)",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

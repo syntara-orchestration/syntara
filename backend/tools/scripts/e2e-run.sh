@@ -110,5 +110,6 @@ curl -sf --cacert .secrets/certs/ca.pem -X PATCH "$API/settings/metrics.perf_tes
   -d '{"value": true}'
 
 SEGMENT_SERVER_URL="http://localhost:9999" \
+APP_SCRIPT_NODES_ENABLED=true \
 APP_BASE_URL="${APP_BASE_URL:-https://localhost:8000}" \
 uv run pytest "${PYTEST_ARGS[@]}"

@@ -4,8 +4,7 @@ from collections.abc import Generator
 
 import pytest
 
-from syntara.core.config.base import get_settings
-from tests.fixtures.settings import FakeSettingsCache
+from tests.fixtures.settings import FakeSettingsCache, enable_script_nodes
 
 
 @pytest.fixture(autouse=True)
@@ -21,12 +20,8 @@ def _ensure_runtime_settings() -> Generator[None, None, None]:
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
 
-    settings = get_settings()
-    original_script_nodes = settings.script_nodes_enabled
-    object.__setattr__(settings, "script_nodes_enabled", True)
-
-    try:
-        yield
-    finally:
-        object.__setattr__(settings, "script_nodes_enabled", original_script_nodes)
-        _settings_mod._runtime_settings = original
+    with enable_script_nodes():
+        try:
+            yield
+        finally:
+            _settings_mod._runtime_settings = original

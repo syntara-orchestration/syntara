@@ -8,20 +8,15 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
+from tests.fixtures.settings import enable_script_nodes
 
 
 @pytest.fixture(autouse=True)
 def _enable_script_nodes() -> Generator[None, None, None]:
     """Enable script nodes for telemetry tests that call execute_script_activity directly."""
-    settings = get_settings()
-    original = settings.script_nodes_enabled
-    object.__setattr__(settings, "script_nodes_enabled", True)
-    try:
+    with enable_script_nodes():
         yield
-    finally:
-        object.__setattr__(settings, "script_nodes_enabled", original)
 
 
 @pytest.fixture
