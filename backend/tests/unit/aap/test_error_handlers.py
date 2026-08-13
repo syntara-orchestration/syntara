@@ -20,7 +20,7 @@ from syntara.aap.exceptions import (
 )
 
 
-def _mock_request(url: str = "https://example.com/api/v1/aap/organizations") -> MagicMock:
+def _mock_request(url: str = "https://example.com/api/v1/proxies/aap/organizations") -> MagicMock:
     request = MagicMock()
     request.url = url
     return request

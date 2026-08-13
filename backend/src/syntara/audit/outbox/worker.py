@@ -123,7 +123,10 @@ def _build_otel_log_record(
         timestamp=datetime_to_unix_ns(event_date),
         severity_text="INFO",
         severity_number=SeverityNumber.INFO,
-        body="audit_event",
+        # Loki deduplicates same-stream entries with identical timestamp + body.
+        # Co-transactional outbox rows can share created_at; include event_id so
+        # each export line is unique and durable at the log store.
+        body=f"audit_event:{audit_event.event_id}",
         attributes=event_dict,
     )
     return ReadableLogRecord(

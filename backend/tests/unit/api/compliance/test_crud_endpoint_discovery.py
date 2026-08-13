@@ -283,7 +283,7 @@ class TestEndpointValidation:
     ) -> None:
         """AAP proxy endpoints are excluded from all CRUD discovery."""
         for ep in [*read_endpoints, *create_endpoints, *update_endpoints, *delete_endpoints]:
-            assert "Ansible Automation Platform" not in ep.tags, (
+            assert "Ansible Automation Platform Proxy" not in ep.tags, (
                 f"{ep.operation_id} is an AAP proxy endpoint and should be excluded"
             )
 
