@@ -79,8 +79,6 @@ class MCPServerAdapter:
         Note: This creates a fresh MCP session for each ping. MCPProvider (used by discover())
         manages sessions via MultiServerMCPClient from langchain-mcp-adapters. These two
         session management approaches could be unified in future work.
-
-        See AAP-81945 for session reuse optimization investigation.
         """
         ssrf_error = _check_ssrf(self._config)
         if ssrf_error:

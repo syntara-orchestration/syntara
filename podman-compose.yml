@@ -251,6 +251,10 @@ services:
       - APP_AAP_TIMEOUT_SECONDS=${APP_AAP_TIMEOUT_SECONDS:-3600}
       - APP_AAP_POLL_INTERVAL_SECONDS=${APP_AAP_POLL_INTERVAL_SECONDS:-5.0}
       - APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS=${APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS:-[]}
+      # Must match the API (syntara) service: the execution-time integration SSRF check
+      # runs here in the worker (LLM invoke, MCP connect, AAP resolve). Without the same
+      # allowlist, a base_url the API accepted at write time is rejected at run time.
+      - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_AAP_VERIFY_SSL=${APP_AAP_VERIFY_SSL:-true}
       - APP_SEGMENT_WRITE_KEY=${APP_SEGMENT_WRITE_KEY}
       - APP_SEGMENT_ENDPOINT=${APP_SEGMENT_ENDPOINT:-http://mock-segment:9999}
@@ -318,6 +322,10 @@ services:
       - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000/api/v1}
       - APP_APPROVALS_API_BASE_URL=${APP_APPROVALS_API_BASE_URL:-https://syntara:8000/api/v1}
       - APP_TOOL_MANAGER_BASE_URL=${APP_TOOL_MANAGER_BASE_URL:-https://syntara:8000/api/v1}
+      # Must match the API (syntara) service: the execution-time integration SSRF check
+      # runs in the workers, so a base_url the API accepted at write time is not rejected
+      # at run time.
+      - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_SEGMENT_WRITE_KEY=${APP_SEGMENT_WRITE_KEY}
       - APP_SEGMENT_ENDPOINT=${APP_SEGMENT_ENDPOINT:-http://mock-segment:9999}
       - APP_ENTITLEMENT_ID=${APP_ENTITLEMENT_ID}
