@@ -1,4 +1,3 @@
-import { Content, ContentVariants } from '@patternfly/react-core'
 import type { CredentialsAPI } from '@syntara/contracts'
 
 import { NxLink } from '../../../components/NxLink'
@@ -30,11 +29,11 @@ function resolveUserId(user: UserReference | string | null | undefined): string 
 }
 
 /**
- * Displays a username with a formatted timestamp.
+ * Displays a formatted timestamp with an optional username.
  * When the user is a UserReference (has an id), the username renders as a link
  * to the user detail page. Plain strings render as brand-colored text.
- * In inline mode (tables): "username · date" on one line.
- * In stacked mode (detail views): username above date on separate lines.
+ * In inline mode (tables): "date by username" on one line.
+ * In stacked mode (detail views): date above "by username" on separate lines.
  */
 export function UserTimestamp({
   user,
@@ -46,45 +45,25 @@ export function UserTimestamp({
   const userId = resolveUserId(user)
   const formattedDate = formatDateTime(timestamp)
 
+  const userLink = userId ? (
+    <NxLink to={getUserDetailPath(userId)}>{displayName}</NxLink>
+  ) : (
+    <span className={styles.userName}>{displayName}</span>
+  )
+
   if (inline) {
     return (
-      <Content component={ContentVariants.p} className={styles.inlineWrapper}>
-        {displayName && (
-          <>
-            {userId ? (
-              <NxLink to={getUserDetailPath(userId)}>{displayName}</NxLink>
-            ) : (
-              <span className={styles.inlineUser}>{displayName}</span>
-            )}
-            {' · '}
-          </>
-        )}
-        <Content
-          component={ContentVariants.small}
-          className={subtleTimestamp ? styles.inlineTimestamp : styles.inlineTimestampDefault}
-        >
-          {formattedDate}
-        </Content>
-      </Content>
+      <span className={styles.inlineWrapper}>
+        <span className={subtleTimestamp ? styles.inlineTimestampSubtle : undefined}>{formattedDate}</span>
+        {displayName && <> by {userLink}</>}
+      </span>
     )
   }
 
   return (
-    <>
-      {displayName &&
-        (userId ? (
-          <NxLink to={getUserDetailPath(userId)}>{displayName}</NxLink>
-        ) : (
-          <Content component={ContentVariants.p} className={styles.user}>
-            {displayName}
-          </Content>
-        ))}
-      <Content
-        component={ContentVariants.small}
-        className={subtleTimestamp ? styles.timestamp : styles.timestampDefault}
-      >
-        {formattedDate}
-      </Content>
-    </>
+    <div className={styles.stackedWrapper}>
+      <div className={subtleTimestamp ? styles.stackedTimestampSubtle : undefined}>{formattedDate}</div>
+      {displayName && <div>by {userLink}</div>}
+    </div>
   )
 }

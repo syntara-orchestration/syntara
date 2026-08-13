@@ -6,7 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.aap_list_response_aap_execution_environment import AAPListResponseAAPExecutionEnvironment
+from ...models.aap_list_response_aap_credential import AAPListResponseAAPCredential
 from ...models.error_data import ErrorData
 from ...types import UNSET, Response, Unset
 
@@ -17,7 +17,6 @@ def _get_kwargs(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -51,18 +50,11 @@ def _get_kwargs(
         json_integration_id = integration_id
     params["integration_id"] = json_integration_id
 
-    json_organization: None | str | Unset
-    if isinstance(organization, Unset):
-        json_organization = UNSET
-    else:
-        json_organization = organization
-    params["organization"] = json_organization
-
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/aap/execution_environments",
+        "url": "/proxies/aap/credentials",
         "params": params,
     }
 
@@ -71,9 +63,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> AAPListResponseAAPExecutionEnvironment | ErrorData | None:
+) -> AAPListResponseAAPCredential | ErrorData | None:
     if response.status_code == 200:
-        response_200 = AAPListResponseAAPExecutionEnvironment.from_dict(response.json())
+        response_200 = AAPListResponseAAPCredential.from_dict(response.json())
 
         return response_200
 
@@ -125,7 +117,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[AAPListResponseAAPExecutionEnvironment | ErrorData]:
+) -> Response[AAPListResponseAAPCredential | ErrorData]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -143,26 +135,24 @@ def sync_detailed(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[AAPListResponseAAPExecutionEnvironment | ErrorData]:
-    """List execution environments
+) -> Response[AAPListResponseAAPCredential | ErrorData]:
+    """List credentials
 
-     List Ansible Automation Platform execution environments, optionally filtered by organization.
+     List Ansible Automation Platform credentials (not organization-scoped).
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPExecutionEnvironment | ErrorData]
+        Response[AAPListResponseAAPCredential | ErrorData]
     """
 
     kwargs = _get_kwargs(
@@ -170,7 +160,6 @@ def sync_detailed(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
         additional_params=additional_params,
     )
 
@@ -188,25 +177,23 @@ def sync(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> AAPListResponseAAPExecutionEnvironment | ErrorData | None:
-    """List execution environments
+) -> AAPListResponseAAPCredential | ErrorData | None:
+    """List credentials
 
-     List Ansible Automation Platform execution environments, optionally filtered by organization.
+     List Ansible Automation Platform credentials (not organization-scoped).
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPExecutionEnvironment | ErrorData
+        AAPListResponseAAPCredential | ErrorData
     """
 
     return sync_detailed(
@@ -215,7 +202,6 @@ def sync(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
     ).parsed
 
 
@@ -226,25 +212,23 @@ async def asyncio_detailed(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> Response[AAPListResponseAAPExecutionEnvironment | ErrorData]:
-    """List execution environments
+) -> Response[AAPListResponseAAPCredential | ErrorData]:
+    """List credentials
 
-     List Ansible Automation Platform execution environments, optionally filtered by organization.
+     List Ansible Automation Platform credentials (not organization-scoped).
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPExecutionEnvironment | ErrorData]
+        Response[AAPListResponseAAPCredential | ErrorData]
     """
 
     kwargs = _get_kwargs(
@@ -252,7 +236,6 @@ async def asyncio_detailed(
         page_size=page_size,
         credential_id=credential_id,
         integration_id=integration_id,
-        organization=organization,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -267,25 +250,23 @@ async def asyncio(
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-    organization: None | str | Unset = UNSET,
-) -> AAPListResponseAAPExecutionEnvironment | ErrorData | None:
-    """List execution environments
+) -> AAPListResponseAAPCredential | ErrorData | None:
+    """List credentials
 
-     List Ansible Automation Platform execution environments, optionally filtered by organization.
+     List Ansible Automation Platform credentials (not organization-scoped).
 
     Args:
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
         integration_id (None | Unset | UUID):
-        organization (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPExecutionEnvironment | ErrorData
+        AAPListResponseAAPCredential | ErrorData
     """
 
     return (
@@ -295,6 +276,5 @@ async def asyncio(
             page_size=page_size,
             credential_id=credential_id,
             integration_id=integration_id,
-            organization=organization,
         )
     ).parsed

@@ -11,7 +11,7 @@ packages:
   - name: libgomp
 context:
   containerfile:
-    file: containers/nexus/Containerfile
+    file: containers/syntara/Containerfile
 arches:
   - x86_64
   - aarch64
