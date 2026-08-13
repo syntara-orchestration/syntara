@@ -141,6 +141,58 @@ describe('useFileUploadState', () => {
     expect(showError).not.toHaveBeenCalled()
   })
 
+  it('after markPersisted, remove detaches locally without calling DELETE', async () => {
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result)
+
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
+
+    act(() => {
+      result.current.markPersisted(['session-file-1'])
+    })
+
+    act(() => {
+      result.current.handleFileRemove('session-file-1')
+    })
+
+    expect(deleteFileById).not.toHaveBeenCalled()
+    expect(removeFile).toHaveBeenCalledWith('session-file-1')
+    expect(showSuccess).not.toHaveBeenCalled()
+  })
+
+  it('session upload before persist still DELETEs on remove', async () => {
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result)
+
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
+
+    act(() => {
+      result.current.handleFileRemove('session-file-1')
+    })
+
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('session-file-1')
+    })
+  })
+
   it('keeps the session file and shows an error when server delete fails', async () => {
     vi.mocked(deleteFileById).mockRejectedValue(new Error('network'))
     const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
@@ -216,7 +268,7 @@ describe('useFileUploadState', () => {
     })
     expect(deleteFileById).toHaveBeenCalledTimes(1)
 
-    await act(async () => {
+    act(() => {
       resolveDelete()
     })
     await waitFor(() => {
@@ -224,7 +276,15 @@ describe('useFileUploadState', () => {
     })
   })
 
-  it('on same-name re-upload, deletes prior session upload but not hydrated files', async () => {
+  it('on same-name re-upload, awaits DELETE for session upload then starts replacement', async () => {
+    let resolveDelete!: () => void
+    vi.mocked(deleteFileById).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveDelete = () => resolve()
+        })
+    )
+
     const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
       initialProps: { ctx: createFileContext([]) },
     })
@@ -239,18 +299,72 @@ describe('useFileUploadState', () => {
     rerender({ ctx: createFileContext([sessionFile, hydratedFile]) })
     vi.mocked(deleteFileById).mockClear()
     vi.mocked(removeFilesByName).mockClear()
+    vi.mocked(removeFile).mockClear()
+    vi.mocked(uploadFiles).mockClear()
     uploadFiles.mockResolvedValue({ files: [{ file_id: 'session-file-2' }] })
 
     act(() => {
       result.current.handleFilesSelected([new File(['new'], 'Report.pdf', { type: 'application/pdf' })])
     })
 
-    expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
     await waitFor(() => {
       expect(deleteFileById).toHaveBeenCalledWith('session-file-1')
     })
+    // UI / upload must not proceed until DELETE succeeds
+    expect(removeFilesByName).not.toHaveBeenCalled()
+    expect(uploadFiles).not.toHaveBeenCalled()
+
+    act(() => {
+      resolveDelete()
+    })
+
+    await waitFor(() => {
+      expect(removeFile).toHaveBeenCalledWith('session-file-1')
+    })
+    await waitFor(() => {
+      expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
+    })
+    await waitFor(() => {
+      expect(uploadFiles).toHaveBeenCalled()
+    })
     expect(deleteFileById).not.toHaveBeenCalledWith('hydrated-file-1')
     expect(deleteFileById).toHaveBeenCalledTimes(1)
+  })
+
+  it('on same-name re-upload DELETE failure, keeps old chip and does not start replacement', async () => {
+    vi.mocked(deleteFileById).mockRejectedValue(new Error('network'))
+
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result, 'Report.pdf', 'session-file-1')
+    const sessionFile: UploadedFile = {
+      id: 'session-file-1',
+      file: new File(['content'], 'Report.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionFile]) })
+    vi.mocked(deleteFileById).mockClear()
+    vi.mocked(removeFilesByName).mockClear()
+    vi.mocked(removeFile).mockClear()
+    vi.mocked(uploadFiles).mockClear()
+    vi.mocked(addFiles).mockClear()
+
+    act(() => {
+      result.current.handleFilesSelected([new File(['new'], 'Report.pdf', { type: 'application/pdf' })])
+    })
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith({
+        title: 'Unable to delete Report.pdf. Please try again.',
+      })
+    })
+    expect(removeFile).not.toHaveBeenCalled()
+    expect(removeFilesByName).not.toHaveBeenCalled()
+    expect(uploadFiles).not.toHaveBeenCalled()
+    expect(addFiles).not.toHaveBeenCalled()
   })
 
   it('on same-name re-upload of a hydrated file only, detaches locally without DELETE', async () => {
@@ -261,7 +375,9 @@ describe('useFileUploadState', () => {
       result.current.handleFilesSelected([new File(['new'], 'Report.pdf', { type: 'application/pdf' })])
     })
 
-    expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
+    await waitFor(() => {
+      expect(removeFilesByName).toHaveBeenCalledWith(new Set(['Report.pdf']))
+    })
     expect(deleteFileById).not.toHaveBeenCalled()
 
     await waitFor(() => {

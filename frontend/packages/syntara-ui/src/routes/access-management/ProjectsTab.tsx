@@ -177,7 +177,10 @@ function DeleteProjectDialog({
           <List>
             <ListItem>All workflows in this project will be permanently deleted.</ListItem>
             <ListItem>All project role assignments will be removed.</ListItem>
-            <ListItem>Uploaded files are retained after project deletion for administrator cleanup.</ListItem>
+            <ListItem>
+              Uploaded files are retained after project deletion. Removing them currently requires known file IDs or an
+              out-of-band administrator process.
+            </ListItem>
           </List>
         </StackItem>
       </Stack>

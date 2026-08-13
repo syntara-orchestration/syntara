@@ -42,6 +42,7 @@ import { ToolsMultiSelect } from './ToolsMultiSelect'
 import { useAllEnabledMcpIntegrations } from './useAllEnabledMcpIntegrations'
 import { useAllTools } from './useAllTools'
 import { useFilesMetadata } from './useFilesMetadata'
+import type { MarkPersistedFn } from './useFileUploadState'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 type ToolWithParameters = ToolManagerAPI.components['schemas']['ToolWithParameters']
@@ -373,6 +374,12 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   const { data: hydratedFiles, isError: isFilesError } = useFilesMetadata(props.existingFileIds)
   const [userFiles, setUserFiles] = useState<UploadedFile[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
+  const [markPersisted, setMarkPersisted] = useState<MarkPersistedFn | null>(null)
+
+  const onMarkPersistedReady = useCallback((fn: MarkPersistedFn | null) => {
+    // Functional update so a function value is stored, not invoked as a setState updater.
+    setMarkPersisted(() => fn)
+  }, [])
 
   const completedFiles = useMemo(() => {
     const userIds = new Set(userFiles.map((f) => f.id))
@@ -423,6 +430,8 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     const fileIds: string[] = completedFiles.filter((f) => f.status === 'success').map((f) => f.id)
 
     props.onSubmit({ ...data, fileIds, parsedResponseSchema })
+    // File IDs are now in durable node state — remove becomes detach-only (no hard DELETE).
+    markPersisted?.(fileIds)
   }
 
   const methods = useForm<AIAgentFormData>({
@@ -442,8 +451,9 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
       removeFile,
       removeFilesByName,
       isFilesError: isFilesError && !!props.existingFileIds?.length,
+      onMarkPersistedReady,
     }),
-    [completedFiles, addFiles, removeFile, removeFilesByName, isFilesError, props.existingFileIds]
+    [completedFiles, addFiles, removeFile, removeFilesByName, isFilesError, props.existingFileIds, onMarkPersistedReady]
   )
 
   return (

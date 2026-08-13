@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   FILE_STORAGE_UNAVAILABLE_MESSAGE,
@@ -26,7 +26,7 @@ export function AIAgentFileUploadSection({
   hasExistingFiles,
   fileContext,
 }: AIAgentFileUploadSectionProps) {
-  const { uploadedFiles, handleFilesSelected, handleFileRemove, deletingFileIds } = useFileUploadState(
+  const { uploadedFiles, handleFilesSelected, handleFileRemove, deletingFileIds, markPersisted } = useFileUploadState(
     fileContext,
     projectId
   )
@@ -34,6 +34,14 @@ export function AIAgentFileUploadSection({
   const { showSuccess, showError } = useAlerts()
   const [downloadingFileIds, setDownloadingFileIds] = useState<Set<string>>(() => new Set())
   const downloadControllersRef = useRef(new Map<string, AbortController>())
+  const onMarkPersistedReady = fileContext.onMarkPersistedReady
+
+  useEffect(() => {
+    onMarkPersistedReady?.(markPersisted)
+    return () => {
+      onMarkPersistedReady?.(null)
+    }
+  }, [markPersisted, onMarkPersistedReady])
 
   const clearDownloadState = useCallback((fileId: string) => {
     downloadControllersRef.current.delete(fileId)
