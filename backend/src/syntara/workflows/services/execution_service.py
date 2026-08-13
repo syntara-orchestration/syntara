@@ -27,11 +27,11 @@ from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
-from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.audit.execution_lifecycle import ExecutionAction, ExecutionLifecycleEvent
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,

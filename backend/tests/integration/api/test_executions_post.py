@@ -336,8 +336,6 @@ async def test_create_execution_with_script_node_requires_permission(
 
     This is a regression test for AAP-87589 finding #3 (execute permission).
     """
-    from tests.helpers.workflow import create_minimal_workflow_definition
-
     script_definition = {
         "schema_version": "2.0.0",
         "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],

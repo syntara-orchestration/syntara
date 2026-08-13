@@ -196,9 +196,7 @@ async def test_restore_with_script_node_requires_permission(jwt_client: AsyncCli
     workflow_id = create_resp.json()["id"]
 
     # Create v2 without script nodes
-    defn_v2 = create_minimal_workflow_definition(
-        name="script-restore", description="v2 no script", activity_id="task1"
-    )
+    defn_v2 = create_minimal_workflow_definition(name="script-restore", description="v2 no script", activity_id="task1")
     await jwt_client.patch(
         f"/api/v1/workflows/{workflow_id}",
         json={"workflow_definition": defn_v2},
