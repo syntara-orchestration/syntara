@@ -58,10 +58,10 @@ class TestScriptNodeGateDisabled:
     immediately with an opaque, non-retryable error.
     """
 
-    def test_script_activity_fails_immediately(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_script_activity_fails_immediately(self, syntara_api: SyntaraApiRegistry) -> None:
         """Script activity fails immediately when the gate is disabled."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-script-gate-disabled",
             _script_workflow_definition("script-gate-disabled"),
         )
@@ -75,10 +75,10 @@ class TestScriptNodeGateDisabled:
             f"Expected 'Script node execution is not enabled' in error_details, got: {error_text}"
         )
 
-    def test_failure_visible_in_activity_history(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_failure_visible_in_activity_history(self, syntara_api: SyntaraApiRegistry) -> None:
         """The script activity failure is recorded in per-node activity history."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-script-gate-disabled-activity",
             _script_workflow_definition("script-gate-disabled-activity"),
         )
@@ -97,10 +97,10 @@ class TestScriptNodeGateDisabled:
             f"Expected error details on script activity, got: {activity_error}"
         )
 
-    def test_error_message_is_opaque(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_error_message_is_opaque(self, syntara_api: SyntaraApiRegistry) -> None:
         """The error message does not expose configuration details."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-script-gate-opaque",
             _script_workflow_definition("script-gate-opaque"),
         )
@@ -132,10 +132,10 @@ class TestScriptNodeGateEnabled:
     gate is enabled.
     """
 
-    def test_script_activity_executes_normally(self, nexus_api: SyntaraApiRegistry) -> None:
+    def test_script_activity_executes_normally(self, syntara_api: SyntaraApiRegistry) -> None:
         """Script activity completes successfully when the gate is enabled."""
         result = create_and_run_workflow(
-            nexus_api,
+            syntara_api,
             "e2e-script-gate-enabled",
             _script_workflow_definition("script-gate-enabled"),
         )
