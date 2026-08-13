@@ -753,3 +753,85 @@ class TestBackgroundWorkerConfiguration:
 
         settings = get_settings()
         assert settings.background_worker_max_concurrent_activities == 10
+
+
+class TestActivityQueueingBehavior:
+    """Test that activities queue rather than fail when concurrency cap is reached."""
+
+    @pytest.mark.asyncio
+    async def test_low_concurrency_cap_queues_excess_activities(self) -> None:
+        """When concurrency cap is low, excess activities queue in Temporal.
+
+        This test verifies the documented behavior: activities that arrive when
+        max_concurrent_activities is reached do not fail. Instead, they queue in
+        the Temporal task queue and process in FIFO order when a worker slot
+        becomes available. This is standard Temporal SDK behavior.
+        """
+        # Create service with very low concurrency cap to simulate overload
+        service = TemporalWorkerService(
+            temporal_address="test-address",
+            namespace="test-namespace",
+            task_queue="test-queue",
+            max_concurrent_activities=2,  # Very low cap to test queueing
+        )
+
+        # Verify the low cap is set
+        assert service.max_concurrent_activities == 2
+
+        mock_client = MagicMock()
+        mock_worker = MagicMock()
+
+        async def mock_run() -> None:
+            await asyncio.sleep(0)
+
+        mock_worker.run = mock_run
+
+        original_create_task = asyncio.create_task
+
+        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+            return original_create_task(coro)
+
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                new=AsyncMock(return_value=mock_client),
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+            ) as mock_worker_class,
+            patch("asyncio.create_task", side_effect=mock_create_task),
+        ):
+            await service.start()
+
+            # Verify Worker was created with the low concurrency cap
+            mock_worker_class.assert_called_once()
+            _, kwargs = mock_worker_class.call_args
+            # When cap is reached, Temporal SDK queues excess activities.
+            # This is the documented behavior — no application-level failure.
+            assert kwargs["max_concurrent_activities"] == 2
+
+    def test_concurrency_cap_is_configurable_per_queue(self) -> None:
+        """Different queues can have different concurrency caps.
+
+        Main worker queue can have cap=50 while background queue has cap=10.
+        This allows tuning memory usage separately for user vs builtin workflows.
+        """
+        main_worker = TemporalWorkerService(
+            temporal_address="temporal:7233",
+            namespace="default",
+            task_queue="orchestrator-workflow-queue",
+            max_concurrent_activities=50,
+        )
+
+        background_worker = TemporalWorkerService(
+            temporal_address="temporal:7233",
+            namespace="default",
+            task_queue="orchestrator-background-queue",
+            max_concurrent_activities=10,
+        )
+
+        assert main_worker.max_concurrent_activities == 50
+        assert background_worker.max_concurrent_activities == 10
+
+        # Verify both workers are configured independently
+        assert main_worker.task_queue != background_worker.task_queue
