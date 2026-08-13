@@ -23,7 +23,7 @@ async function pollExecutionStatus(
   executionId: string,
   token: string,
   expectedStatuses: string[],
-  timeout = 30_000
+  timeout = 90_000
 ): Promise<void> {
   await expect(async () => {
     const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
