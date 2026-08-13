@@ -558,6 +558,7 @@ jobs:
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_SEGMENT_WRITE_KEY: test-e2e-write-key
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"

@@ -44,6 +44,7 @@ ${COMPOSE_CMD} --profile telemetry-e2e up -d --force-recreate database \
     > /tmp/syntara-e2e-infra.log 2>&1
 
 echo "🚀 Starting remaining services..."
+APP_SCRIPT_NODES_ENABLED=true \
 APP_SEGMENT_WRITE_KEY=test-e2e-write-key \
 APP_SEGMENT_ENDPOINT="http://mock-segment:9999" \
 APP_SEGMENT_MAX_RETRIES=2 \
