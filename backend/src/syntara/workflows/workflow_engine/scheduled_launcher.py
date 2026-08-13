@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from temporalio import activity, workflow
+from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
@@ -148,7 +149,8 @@ class ScheduledExecutionLauncher:
             Dict with execution setup data for child workflow start.
 
         Raises:
-            WorkflowNotPublishedError: If the workflow is not published.
+            ApplicationError: Non-retryable, if the workflow is missing,
+                soft-deleted, disabled, or has no published version.
 
         """
         workflow_id = UUID(workflow_id_str)
@@ -187,7 +189,7 @@ class ScheduledExecutionLauncher:
                 logger.debug("Failed to record success metric", exc_info=True)
 
             return result
-        except Exception:
+        except Exception as exc:
             try:
                 recorder.record(
                     MetricType.SCHEDULED_TRIGGER_FIRES,
@@ -196,6 +198,15 @@ class ScheduledExecutionLauncher:
                 )
             except Exception:  # noqa: BLE001
                 logger.debug("Failed to record error metric", exc_info=True)
+            if isinstance(exc, WorkflowNotPublishedError):
+                # Permanent state: workflow is missing, soft-deleted, disabled,
+                # or has no published version.  Mark non-retryable so Temporal
+                # does not retry the activity forever (AAP-86776).
+                raise ApplicationError(
+                    str(exc),
+                    type="WorkflowNotPublishedError",
+                    non_retryable=True,
+                ) from exc
             raise
 
     async def _create_execution(

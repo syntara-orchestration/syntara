@@ -2,10 +2,11 @@
 # Defaults to scratch (empty, built-in) so builds without --build-arg succeed.
 ARG DOWNSTREAM_OVERRIDE=scratch
 ARG BRANDING=false
+ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
 
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
-FROM registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a AS builder
+FROM ${BUILDER_IMAGE} AS builder
 
 ARG BRANDING
 
@@ -24,8 +25,15 @@ ENV PYTHON=python3.12 \
 
 WORKDIR /opt/app-root/src
 
-# regopy links against libatomic at build time
-RUN dnf install --setopt=install_weak_deps=0 --nodocs -y libatomic && dnf clean all
+# Build tools required by regopy (C/C++ compiler, cmake, ninja) and its
+# setup.py (git).  uv is the project's package manager.
+# When BUILDER_IMAGE is overridden to uv-builder-rhel9, the dnf packages
+# are already present (no-ops) and the uv guard skips the pip install.
+RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
+        cmake gcc gcc-c++ git libatomic ninja-build \
+    && dnf clean all \
+    && (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
+    && [ -f /usr/local/bin/uv ] || { command -v uv && ln -s "$(command -v uv)" /usr/local/bin/uv; }
 
 # Copy dependency files first (for layer caching)
 COPY pyproject.toml uv.lock LICENSE README.md alembic.ini ./
@@ -145,6 +153,9 @@ COPY containers/nexus/scripts/start-api /usr/local/bin/start-api
 COPY containers/nexus/scripts/start-worker /usr/local/bin/start-worker
 COPY containers/nexus/scripts/start-background-worker /usr/local/bin/start-background-worker
 COPY containers/nexus/scripts/run-seed /usr/local/bin/run-seed
+
+# Verify timezone data is available in the image (AAP-86297)
+RUN python3.12 -c "from zoneinfo import available_timezones; tzs = available_timezones(); assert len(tzs) > 100, f'Expected >100 timezones, got {len(tzs)}'"
 
 # Switch back to non-root user (UBI default user)
 USER 1001

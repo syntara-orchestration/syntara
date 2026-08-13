@@ -18,7 +18,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import func
+from sqlalchemy import func, literal_column
 from sqlmodel import select
 
 if TYPE_CHECKING:
@@ -90,7 +90,7 @@ async def reconcile_scheduled_triggers(
                 Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
                 func.jsonb_path_exists(
                     WorkflowVersion.workflow_definition,
-                    '$.triggers[*] ? (@.type == "scheduled_trigger")',
+                    literal_column("'$.triggers[*] ? (@.type == \"scheduled_trigger\")'::jsonpath"),
                 ),
             )
         )
