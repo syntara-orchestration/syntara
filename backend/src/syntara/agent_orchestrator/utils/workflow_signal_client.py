@@ -4,6 +4,7 @@ This module provides a centralized client for agent orchestrator services
 to send activity completion signals (both success and failure) to workflows.
 """
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -17,6 +18,8 @@ from syntara.core.tls.http_client import build_internal_http_client
 logger = structlog.stdlib.get_logger(__name__)
 
 _SIGNAL_HTTP_TIMEOUT_SECONDS = 10.0
+_SIGNAL_MAX_ATTEMPTS = 3
+_SIGNAL_RETRY_BACKOFF_BASE = 0.5
 
 
 def validate_signal_url(callback_url: str) -> None:
@@ -94,19 +97,46 @@ def validate_signal_url(callback_url: str) -> None:
 
 
 async def _post_signal(callback_url: str, payload: dict[str, Any], invocation_id: UUID) -> None:
-    """POST a signal payload to a callback URL with mTLS auth."""
+    """POST a signal payload to a callback URL with mTLS auth.
+
+    Retries on transient failures (network errors, timeouts, 5xx) up to
+    ``_SIGNAL_MAX_ATTEMPTS`` times with exponential backoff.
+    """
     async with build_internal_http_client(timeout=_SIGNAL_HTTP_TIMEOUT_SECONDS) as client:
-        response = await client.post(
-            callback_url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        logger.info(
-            "Signal HTTP response received",
-            invocation_id=invocation_id,
-            status_code=response.status_code,
-        )
-        response.raise_for_status()
+        for attempt in range(_SIGNAL_MAX_ATTEMPTS):
+            try:
+                response = await client.post(
+                    callback_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                logger.info(
+                    "Signal HTTP response received",
+                    invocation_id=invocation_id,
+                    status_code=response.status_code,
+                    attempt=attempt + 1,
+                )
+                if response.is_server_error and attempt < _SIGNAL_MAX_ATTEMPTS - 1:
+                    logger.warning(
+                        "Signal POST server error, retrying",
+                        invocation_id=invocation_id,
+                        status_code=response.status_code,
+                        attempt=attempt + 1,
+                    )
+                    await asyncio.sleep(_SIGNAL_RETRY_BACKOFF_BASE * (2**attempt))
+                    continue
+                response.raise_for_status()
+                return
+            except (httpx.NetworkError, httpx.TimeoutException):
+                if attempt < _SIGNAL_MAX_ATTEMPTS - 1:
+                    logger.warning(
+                        "Signal POST transient failure, retrying",
+                        invocation_id=invocation_id,
+                        attempt=attempt + 1,
+                    )
+                    await asyncio.sleep(_SIGNAL_RETRY_BACKOFF_BASE * (2**attempt))
+                    continue
+                raise
 
 
 class WorkflowSignalClient:

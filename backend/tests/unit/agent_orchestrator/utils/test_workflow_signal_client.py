@@ -1,6 +1,7 @@
 """Unit tests for WorkflowSignalClient."""
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 import httpx
@@ -154,7 +155,8 @@ class TestWorkflowSignalClientSendSuccessSignal:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_send_success_signal_raises_on_http_error(self) -> None:
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_success_signal_raises_on_http_error(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
         """Test that send_success_signal raises on HTTP error."""
         invocation_id = UUID(_EXEC_UUID)
         result = {"content": "Test"}
@@ -166,7 +168,8 @@ class TestWorkflowSignalClientSendSuccessSignal:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_send_success_signal_raises_on_connection_error(self) -> None:
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_success_signal_raises_on_connection_error(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
         """Test that send_success_signal raises on connection error."""
         invocation_id = UUID(_EXEC_UUID)
         result = {"content": "Test"}
@@ -175,6 +178,22 @@ class TestWorkflowSignalClientSendSuccessSignal:
 
         with pytest.raises(httpx.ConnectError):
             await WorkflowSignalClient.send_success_signal(_SIGNAL_URL, invocation_id, result)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_success_signal_retries_then_succeeds(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
+        """Transient 503 followed by 200 delivers the signal."""
+        invocation_id = UUID(_EXEC_UUID)
+        result = {"content": "Test"}
+
+        route = respx.post(_SIGNAL_URL).mock(
+            side_effect=[httpx.Response(503), httpx.Response(200)],
+        )
+
+        await WorkflowSignalClient.send_success_signal(_SIGNAL_URL, invocation_id, result)
+
+        assert route.call_count == 2
 
     @pytest.mark.asyncio
     @respx.mock
@@ -243,7 +262,8 @@ class TestWorkflowSignalClientSendFailureSignal:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_send_failure_signal_swallows_http_error(self) -> None:
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_failure_signal_swallows_http_error(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
         """Test that send_failure_signal swallows HTTP errors (best-effort)."""
         invocation_id = UUID(_EXEC_UUID)
         error = RuntimeError("Something went wrong")
@@ -254,7 +274,8 @@ class TestWorkflowSignalClientSendFailureSignal:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_send_failure_signal_swallows_connection_error(self) -> None:
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_failure_signal_swallows_connection_error(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
         """Test that send_failure_signal swallows connection errors (best-effort)."""
         invocation_id = UUID(_EXEC_UUID)
         error = Exception("Test error")
@@ -265,7 +286,8 @@ class TestWorkflowSignalClientSendFailureSignal:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_send_failure_signal_swallows_timeout(self) -> None:
+    @patch("syntara.agent_orchestrator.utils.workflow_signal_client.asyncio.sleep", new_callable=AsyncMock)
+    async def test_send_failure_signal_swallows_timeout(self, _mock_sleep: AsyncMock) -> None:  # noqa: PT019
         """Test that send_failure_signal swallows timeout errors (best-effort)."""
         invocation_id = UUID(_EXEC_UUID)
         error = TimeoutError("Request timed out")

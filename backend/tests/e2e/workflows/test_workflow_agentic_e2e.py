@@ -1006,7 +1006,7 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
         }, f"Expected failure with unreachable endpoint, got: {result.status}"
 
         error_text = str(result.error_details or "")
-        error_keywords = ("connect", "unreachable", "timeout", "refused", "resolve", "dns")
+        error_keywords = ("connect", "unreachable", "timeout", "timed out", "refused", "resolve", "dns")
         assert any(kw in error_text.lower() for kw in error_keywords), (
             f"Expected identifiable connection error, got: {error_text}"
         )
