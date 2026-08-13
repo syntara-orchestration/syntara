@@ -301,4 +301,3 @@ class TestErrorReporting:
         assert "available" in request_data
         assert '"refresh_error":null' in request_data
         assert "enabled" not in request_data
-
