@@ -165,11 +165,15 @@ async def test_restore_preserves_workflow_definition(jwt_client: AsyncClient, te
 
 
 @pytest.mark.asyncio
-async def test_restore_with_script_node_requires_permission(jwt_client: AsyncClient, test_project_id: str) -> None:
-    """Test that restoring a version with script nodes checks script:edit.
+async def test_restore_with_script_node_denied_returns_403(jwt_client: AsyncClient, test_project_id: str) -> None:
+    """Restoring a version with script nodes returns 403 when script:edit is denied.
 
-    This is a regression test for AAP-87589 finding #2 (restore bypass).
+    Regression test for AAP-87589 finding #2 (restore bypass).
     """
+    from unittest.mock import patch
+
+    from syntara.authz.engine import AuthzResult
+
     script_definition = {
         "schema_version": "2.0.0",
         "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
@@ -183,7 +187,6 @@ async def test_restore_with_script_node_requires_permission(jwt_client: AsyncCli
         "edges": [{"from": "trigger_manual", "to": "script1"}],
     }
 
-    # Create workflow with script nodes (v1)
     create_resp = await jwt_client.post(
         "/api/v1/workflows",
         json={
@@ -195,15 +198,18 @@ async def test_restore_with_script_node_requires_permission(jwt_client: AsyncCli
     assert create_resp.status_code == 201
     workflow_id = create_resp.json()["id"]
 
-    # Create v2 without script nodes
     defn_v2 = create_minimal_workflow_definition(name="script-restore", description="v2 no script", activity_id="task1")
     await jwt_client.patch(
         f"/api/v1/workflows/{workflow_id}",
         json={"workflow_definition": defn_v2},
     )
 
-    # Restore v1 (has script nodes) - should check script:edit
-    response = await jwt_client.post(f"/api/v1/workflows/{workflow_id}/versions/1/restore")
+    async def _deny_script_edit(_db, _evaluator, request) -> AuthzResult:
+        if request.resource_type == "script" and request.action == "edit":
+            return AuthzResult(allowed=False, denied=True, matched_policy="", denial_reason="test deny")
+        return AuthzResult(allowed=True, denied=False, matched_policy="", denial_reason="")
 
-    # Expected: 403 Forbidden if user lacks script:edit, 200 if permissive authz
-    assert response.status_code in [200, 403]  # 200 if permissive, 403 if RBAC enabled
+    with patch("syntara.workflows.services.workflow_service.authorize", side_effect=_deny_script_edit):
+        response = await jwt_client.post(f"/api/v1/workflows/{workflow_id}/versions/1/restore")
+
+    assert response.status_code == 403

@@ -244,11 +244,14 @@ class ExecutionService(BaseService):
     async def _check_script_execute_permission(
         self,
         workflow_definition: dict[str, Any],
-        project_id: UUID,
+        project_id: UUID | None = None,
     ) -> None:
         """Check script:execute permission if the definition contains script nodes.
 
-        Also checks the workflow_engine.script_nodes_enabled runtime setting.
+        The runtime kill switch (``workflow_engine.script_nodes_enabled``) is
+        checked unconditionally for any definition containing script nodes,
+        regardless of *project_id*.  The OPA authorization call is only made
+        when *project_id* is provided (project-scoped workflows).
 
         Raises:
             ScriptNodesDisabledError: If script nodes are disabled org-wide.
@@ -262,6 +265,9 @@ class ExecutionService(BaseService):
         if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
             raise ScriptNodesDisabledError
 
+        if project_id is None:
+            return
+
         if self.opa_client is None:
             msg = "Authorization service unavailable; cannot verify script:execute permission"
             raise AuthorizationDeniedError(msg)
@@ -269,7 +275,10 @@ class ExecutionService(BaseService):
         proj_result = await self.session.exec(
             select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
         )
-        project_name = proj_result.first() or ""
+        project_name = proj_result.first()
+        if not project_name:
+            msg = "Cannot verify script:execute permission: project not found or deleted"
+            raise AuthorizationDeniedError(msg)
 
         authz_result = await authorize(
             self.session,
@@ -415,8 +424,7 @@ class ExecutionService(BaseService):
 
         # Step 2: Check script:execute permission if workflow contains script nodes
         workflow_def = workflow_version.workflow_definition
-        if workflow.project_id is not None:
-            await self._check_script_execute_permission(workflow_def, workflow.project_id)
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
 
         # Step 3: Resolve trigger node and apply input_schema defaults
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
@@ -780,8 +788,7 @@ class ExecutionService(BaseService):
 
         # Step 2: Check script:execute permission if workflow contains script nodes
         workflow_def = workflow_version.workflow_definition
-        if workflow.project_id is not None:
-            await self._check_script_execute_permission(workflow_def, workflow.project_id)
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
 
         # Step 3: Validate target_node_id exists in workflow definition
         all_nodes = workflow_def.get("nodes", [])
@@ -1271,6 +1278,8 @@ class ExecutionService(BaseService):
 
         # Step 5: Resolve trigger node from the original version's definition
         workflow_def = workflow_version.workflow_definition
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
+
         if original.trigger_node_id is None:
             from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
 

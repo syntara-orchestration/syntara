@@ -326,16 +326,18 @@ async def test_create_execution_without_trigger_node_id_returns_422(
 
 
 @pytest.mark.asyncio
-async def test_create_execution_with_script_node_requires_permission(
+async def test_create_execution_with_script_node_denied_returns_403(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: str,
 ) -> None:
-    """Test that creating execution with script nodes checks script:execute.
+    """Executing a workflow with script nodes returns 403 when script:execute is denied.
 
-    This is a regression test for AAP-87589 finding #3 (execute permission).
+    Regression test for AAP-87589 finding #3 (execute permission).
     """
+    from syntara.authz.engine import AuthzResult
+
     script_definition = {
         "schema_version": "2.0.0",
         "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
@@ -349,7 +351,6 @@ async def test_create_execution_with_script_node_requires_permission(
         "edges": [{"from": "trigger_manual", "to": "script1"}],
     }
 
-    # Create workflow with script node
     create_resp = await auth_client.post(
         "/api/v1/workflows",
         json={
@@ -361,18 +362,21 @@ async def test_create_execution_with_script_node_requires_permission(
     assert create_resp.status_code == 201
     workflow_id = create_resp.json()["id"]
 
-    # Publish the workflow
     await auth_client.post(f"/api/v1/workflows/{workflow_id}/versions/1/publish", json={})
 
-    # Try to execute - should check script:execute permission
-    response = await auth_client.post(
-        "/api/v1/executions",
-        json={
-            "workflow_id": workflow_id,
-            "input_data": {},
-            "trigger_node_id": "trigger_manual",
-        },
-    )
+    async def _deny_script_execute(_db, _evaluator, request) -> AuthzResult:
+        if request.resource_type == "script" and request.action == "execute":
+            return AuthzResult(allowed=False, denied=True, matched_policy="", denial_reason="test deny")
+        return AuthzResult(allowed=True, denied=False, matched_policy="", denial_reason="")
 
-    # Expected: 403 Forbidden if user lacks script:execute, 201 if permissive authz
-    assert response.status_code in [201, 403]  # 201 if permissive, 403 if RBAC enabled
+    with patch("syntara.workflows.services.execution_service.authorize", side_effect=_deny_script_execute):
+        response = await auth_client.post(
+            "/api/v1/executions",
+            json={
+                "workflow_id": workflow_id,
+                "input_data": {},
+                "trigger_node_id": "trigger_manual",
+            },
+        )
+
+    assert response.status_code == 403

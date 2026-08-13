@@ -4,7 +4,7 @@ Tests verify the test execution creation logic including validation,
 Temporal integration, and database operations.
 """
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -77,6 +77,11 @@ def _make_service(
 
 class TestCreateTestExecution:
     """Test create_test_execution method."""
+
+    @pytest.fixture(autouse=True)
+    def _bypass_script_permission(self) -> None:
+        with patch.object(ExecutionService, "_check_script_execute_permission", new_callable=AsyncMock):
+            yield
 
     @pytest.mark.asyncio
     async def test_success_returns_execution_with_test_mode(self) -> None:

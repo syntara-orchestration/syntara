@@ -11,10 +11,10 @@ from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.services.workflow_service import WorkflowService
 
 
-def _make_service(*, with_opa: bool = True) -> WorkflowService:
+def _make_service(*, with_opa: bool = True, project_name: str | None = "test-project") -> WorkflowService:
     session = AsyncMock()
     proj_result = MagicMock()
-    proj_result.first.return_value = "test-project"
+    proj_result.first.return_value = project_name
     session.exec.return_value = proj_result
 
     user = MagicMock()
@@ -117,6 +117,34 @@ class TestCheckScriptEditPermission:
             mock_settings.return_value = cache
             with pytest.raises(ScriptNodesDisabledError):
                 await svc._check_script_edit_permission(_def_with_script(), uuid4())
+
+    @pytest.mark.asyncio
+    async def test_kill_switch_fires_without_project_id(self) -> None:
+        """Kill switch is org-wide and must fire even when project_id is None."""
+        from syntara.workflows.exceptions import ScriptNodesDisabledError
+
+        svc = _make_service()
+        with patch("syntara.workflows.services.workflow_service.get_runtime_settings") as mock_settings:
+            cache = AsyncMock()
+            cache.get_bool.return_value = False
+            mock_settings.return_value = cache
+            with pytest.raises(ScriptNodesDisabledError):
+                await svc._check_script_edit_permission(_def_with_script())
+
+    @pytest.mark.asyncio
+    async def test_no_project_id_skips_opa(self) -> None:
+        """Without project_id, kill switch passes but OPA is skipped."""
+        svc = _make_service()
+        with patch("syntara.workflows.services.workflow_service.authorize") as mock_authorize:
+            await svc._check_script_edit_permission(_def_with_script())
+        mock_authorize.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_soft_deleted_project_raises(self) -> None:
+        """Soft-deleted project must fail closed, not pass empty string to OPA."""
+        svc = _make_service(project_name=None)
+        with pytest.raises(AuthorizationDeniedError, match="project not found or deleted"):
+            await svc._check_script_edit_permission(_def_with_script(), uuid4())
 
 
 class TestCheckScriptEditPermissionDiffBased:
@@ -236,12 +264,165 @@ class TestCheckScriptExecutePermission:
             with pytest.raises(ScriptNodesDisabledError):
                 await svc._check_script_execute_permission(_def_with_script(), uuid4())
 
+    @pytest.mark.asyncio
+    async def test_kill_switch_fires_without_project_id(self) -> None:
+        """Kill switch is org-wide and must fire even when project_id is None."""
+        from syntara.workflows.exceptions import ScriptNodesDisabledError
 
-def _make_execution_service(*, with_opa: bool = True) -> ExecutionService:
+        svc = _make_execution_service()
+        with patch("syntara.workflows.services.execution_service.get_runtime_settings") as mock_settings:
+            cache = AsyncMock()
+            cache.get_bool.return_value = False
+            mock_settings.return_value = cache
+            with pytest.raises(ScriptNodesDisabledError):
+                await svc._check_script_execute_permission(_def_with_script())
+
+    @pytest.mark.asyncio
+    async def test_no_project_id_skips_opa(self) -> None:
+        """Without project_id, kill switch passes but OPA is skipped."""
+        svc = _make_execution_service()
+        with patch("syntara.workflows.services.execution_service.authorize") as mock_authorize:
+            await svc._check_script_execute_permission(_def_with_script())
+        mock_authorize.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_soft_deleted_project_raises(self) -> None:
+        """Soft-deleted project must fail closed, not pass empty string to OPA."""
+        svc = _make_execution_service(project_name=None)
+        with pytest.raises(AuthorizationDeniedError, match="project not found or deleted"):
+            await svc._check_script_execute_permission(_def_with_script(), uuid4())
+
+
+class TestCreateTestExecutionScriptPermission:
+    """Test that create_test_execution enforces script:execute."""
+
+    @pytest.mark.asyncio
+    async def test_create_test_execution_checks_script_execute(self) -> None:
+        """create_test_execution must call _check_script_execute_permission before starting."""
+        svc = _make_execution_service()
+
+        workflow_id = uuid4()
+        project_id = uuid4()
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.name = "test-wf"
+        mock_workflow.project_id = project_id
+        mock_workflow.deleted_at = None
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.schema_version = "2.0.0"
+        mock_version.workflow_definition = _def_with_script()
+
+        mock_result = MagicMock()
+        mock_result.first.return_value = (mock_workflow, mock_version)
+        svc.session.exec = AsyncMock(return_value=mock_result)
+
+        sentinel = AuthorizationDeniedError("script:execute denied")
+        with patch.object(svc, "_check_script_execute_permission", side_effect=sentinel):
+            with pytest.raises(AuthorizationDeniedError, match="script:execute denied"):
+                from syntara.workflows.models.execution import PreResolvedNodeOutput
+
+                await svc.create_test_execution(
+                    workflow_id=workflow_id,
+                    target_node_id="n1",
+                    pre_resolved_nodes={},
+                    trigger_inputs={},
+                    trigger_node_id="t1",
+                )
+
+    @pytest.mark.asyncio
+    async def test_create_test_execution_passes_project_id(self) -> None:
+        """create_test_execution passes workflow's project_id to the permission check."""
+        svc = _make_execution_service()
+
+        workflow_id = uuid4()
+        project_id = uuid4()
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.name = "test-wf"
+        mock_workflow.project_id = project_id
+        mock_workflow.deleted_at = None
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.schema_version = "2.0.0"
+        mock_version.workflow_definition = _def_with_script()
+
+        mock_result = MagicMock()
+        mock_result.first.return_value = (mock_workflow, mock_version)
+        svc.session.exec = AsyncMock(return_value=mock_result)
+
+        mock_check = AsyncMock()
+        with patch.object(svc, "_check_script_execute_permission", mock_check):
+            with pytest.raises(Exception):
+                await svc.create_test_execution(
+                    workflow_id=workflow_id,
+                    target_node_id="n1",
+                    pre_resolved_nodes={},
+                    trigger_inputs={},
+                    trigger_node_id="t1",
+                )
+
+        mock_check.assert_awaited_once_with(_def_with_script(), project_id)
+
+
+class TestRetryExecutionScriptPermission:
+    """Test that retry_execution enforces script:execute."""
+
+    @pytest.mark.asyncio
+    async def test_retry_checks_script_execute(self) -> None:
+        """retry_execution must call _check_script_execute_permission before starting."""
+        svc = _make_execution_service()
+
+        execution_id = uuid4()
+        workflow_id = uuid4()
+        project_id = uuid4()
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.project_id = project_id
+        mock_workflow.deleted_at = None
+
+        mock_execution = MagicMock()
+        mock_execution.id = execution_id
+        mock_execution.status = MagicMock(value="failed")
+        mock_execution.mode = MagicMock(value="normal")
+        mock_execution.workflow = mock_workflow
+        mock_execution.workflow_version_id = uuid4()
+        mock_execution.trigger_node_id = "t1"
+        mock_execution.input_data = {}
+
+        mock_version = MagicMock()
+        mock_version.id = mock_execution.workflow_version_id
+        mock_version.workflow_definition = _def_with_script()
+
+        from syntara.workflows.models.execution import ExecutionMode, ExecutionStatus
+
+        mock_execution.status = ExecutionStatus.FAILED
+        mock_execution.mode = ExecutionMode.STANDARD
+
+        exec_result = MagicMock()
+        exec_result.one_or_none.return_value = mock_execution
+        version_result = MagicMock()
+        version_result.one_or_none.return_value = mock_version
+        svc.session.exec = AsyncMock(side_effect=[exec_result, version_result])
+
+        sentinel = AuthorizationDeniedError("script:execute denied")
+        with patch.object(svc, "_check_script_execute_permission", side_effect=sentinel):
+            with pytest.raises(AuthorizationDeniedError, match="script:execute denied"):
+                await svc.retry_execution(execution_id)
+
+
+def _make_execution_service(*, with_opa: bool = True, project_name: str | None = "test-project") -> ExecutionService:
     """Create ExecutionService mock for testing."""
     session = AsyncMock()
     proj_result = MagicMock()
-    proj_result.first.return_value = "test-project"
+    proj_result.first.return_value = project_name
     session.exec.return_value = proj_result
 
     user = MagicMock()

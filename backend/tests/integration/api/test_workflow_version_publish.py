@@ -570,11 +570,15 @@ async def test_publish_blocked_preserves_existing_published_version(
 
 
 @pytest.mark.asyncio
-async def test_publish_with_script_node_requires_permission(jwt_client: AsyncClient, test_project_id: str) -> None:
-    """Test that atomic save-and-publish with script nodes checks script:edit.
+async def test_publish_with_script_node_denied_returns_403(jwt_client: AsyncClient, test_project_id: str) -> None:
+    """Atomic save-and-publish with script nodes returns 403 when script:edit is denied.
 
-    This is a regression test for AAP-87589 finding #1 (publish bypass).
+    Regression test for AAP-87589 finding #1 (publish bypass).
     """
+    from unittest.mock import patch
+
+    from syntara.authz.engine import AuthzResult
+
     script_definition = {
         "schema_version": "2.0.0",
         "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
@@ -588,7 +592,6 @@ async def test_publish_with_script_node_requires_permission(jwt_client: AsyncCli
         "edges": [{"from": "trigger_manual", "to": "script1"}],
     }
 
-    # Create workflow without script nodes
     workflow = {
         "name": "script-publish-test",
         "project_id": test_project_id,
@@ -600,15 +603,15 @@ async def test_publish_with_script_node_requires_permission(jwt_client: AsyncCli
     assert create_resp.status_code == 201
     workflow_id = create_resp.json()["id"]
 
-    # Atomic save-and-publish with script nodes (without script:edit permission)
-    # This should fail with 403 if permission checks are working
-    response = await jwt_client.post(
-        f"/api/v1/workflows/{workflow_id}/versions/1/publish",
-        json={"workflow_definition": script_definition},
-    )
+    async def _deny_script_edit(_db, _evaluator, request) -> AuthzResult:
+        if request.resource_type == "script" and request.action == "edit":
+            return AuthzResult(allowed=False, denied=True, matched_policy="", denial_reason="test deny")
+        return AuthzResult(allowed=True, denied=False, matched_policy="", denial_reason="")
 
-    # Expected: 403 Forbidden (user lacks script:edit permission)
-    # Note: In a real test environment with proper RBAC setup, this would be 403.
-    # With a mock/permissive authz evaluator, it may succeed. The key is that
-    # _check_script_edit_permission is called in the code path.
-    assert response.status_code in [200, 403]  # 200 if permissive, 403 if RBAC enabled
+    with patch("syntara.workflows.services.workflow_service.authorize", side_effect=_deny_script_edit):
+        response = await jwt_client.post(
+            f"/api/v1/workflows/{workflow_id}/versions/1/publish",
+            json={"workflow_definition": script_definition},
+        )
+
+    assert response.status_code == 403
