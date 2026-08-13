@@ -7,8 +7,15 @@ import { axe } from 'vitest-axe'
 import { adminClient, identityProvidersClient } from '../../../client'
 import { useCanI } from '../../../hooks/useCanI'
 import { AlertProvider } from '../../../providers/alerts'
+import type { DocKey } from '../../../utils/docs/types'
 
 import Authentication from './Authentication'
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../client', () => ({
   identityProvidersClient: {
@@ -70,6 +77,7 @@ function setupEmptyProviders() {
 
 describe('Authentication', () => {
   beforeEach(() => {
+    useDocLinkMock.mockClear()
     vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
   })
 
@@ -160,12 +168,13 @@ describe('Authentication', () => {
   })
 
   describe('documentation link', () => {
-    it('passes authentication doc link to header', () => {
+    it('passes identityProviders doc link to header', () => {
       setupEmptyProviders()
       render(<Authentication />, { wrapper })
 
+      expect(useDocLinkMock).toHaveBeenCalledWith('identityProviders')
       const docLink = screen.getByRole('link', { name: /documentation/i })
-      expect(docLink).toBeInTheDocument()
+      expect(docLink).toHaveAttribute('href', 'https://docs.example/identityProviders')
     })
   })
 })

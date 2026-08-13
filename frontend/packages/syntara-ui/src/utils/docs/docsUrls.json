@@ -15,5 +15,10 @@
   "accessControl": "__PLACEHOLDER__/access-control",
   "authentication": "__PLACEHOLDER__/authentication",
   "identityProviders": "__PLACEHOLDER__/identity-providers",
-  "serviceAccounts": "__PLACEHOLDER__/service-accounts"
+  "serviceAccounts": "__PLACEHOLDER__/service-accounts",
+  "configureIntegration": "__PLACEHOLDER__/configure-integration",
+  "createUser": "__PLACEHOLDER__/create-user",
+  "transferIdentity": "__PLACEHOLDER__/transfer-identity",
+  "addIdentityProvider": "__PLACEHOLDER__/add-identity-provider",
+  "identityProviderMapping": "__PLACEHOLDER__/identity-provider-mapping"
 }

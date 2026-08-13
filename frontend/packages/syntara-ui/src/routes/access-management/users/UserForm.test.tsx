@@ -8,10 +8,17 @@ import { axe } from 'vitest-axe'
 import { authClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
+import type { DocKey } from '../../../utils/docs/types'
 import { accessClient } from '../../access/accessClient'
 import { COMPLIANT_TEST_PASSWORD } from '../passwordComplexity.testFixtures'
 
 import { UserForm } from './UserForm'
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../client', () => ({
   authClient: {
@@ -150,6 +157,17 @@ describe('UserForm', () => {
 
       expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
+    })
+
+    it('uses createUser documentation key', () => {
+      setupCreateMocks()
+      render(<UserForm mode="create" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('createUser')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+        'href',
+        'https://docs.example/createUser'
+      )
     })
 
     it('renders a Cancel button that navigates back to users list', async () => {
@@ -323,6 +341,14 @@ describe('UserForm', () => {
 
       expect(screen.getByRole('heading', { name: 'Edit User' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    })
+
+    it('uses users documentation key', () => {
+      setupEditMocks()
+      render(<UserForm mode="edit" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('users')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute('href', 'https://docs.example/users')
     })
 
     it('does not render the groups field', () => {

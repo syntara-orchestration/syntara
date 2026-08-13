@@ -12,7 +12,7 @@ import { IdentityProvidersTab } from './IdentityProvidersTab'
 
 export default function Authentication() {
   const { allowed: canRead, isChecking } = useCanI('read', 'identity-provider')
-  const authenticationDocLink = useDocLink('authentication')
+  const identityProvidersDocLink = useDocLink('identityProviders')
 
   if (isChecking) {
     return (
@@ -45,7 +45,7 @@ export default function Authentication() {
       <NxPageTitle segments={['Identity Providers']} />
       <NxPageHeader
         title="Identity Providers"
-        docLink={authenticationDocLink}
+        docLink={identityProvidersDocLink}
         breadcrumbs={breadcrumbsIdentityProvidersPage()}
       />
       <NxPageBody>

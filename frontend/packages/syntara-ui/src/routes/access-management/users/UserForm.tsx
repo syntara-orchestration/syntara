@@ -171,8 +171,8 @@ function UserFormEditBusyPage({ pageTitle, children }: Readonly<{ pageTitle: str
 
 export function UserForm({ mode }: Readonly<UserFormProps>) {
   const navigate = useNavigate()
-  const usersDocLink = useDocLink('users')
   const isEdit = mode === 'edit'
+  const usersDocLink = useDocLink(isEdit ? 'users' : 'createUser')
   const pageTitle = isEdit ? 'Edit User' : 'Create User'
   const submitLabel = isEdit ? 'Save' : 'Create user'
 
