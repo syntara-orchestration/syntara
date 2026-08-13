@@ -292,6 +292,10 @@ async def test_admin_cannot_delete_default_project(
 
     response = await auth_client.delete(f"/api/v1/projects/{default_project.id}")
     assert response.status_code == 403
+    body = response.json()
+    assert body["detail"] == "Default project cannot be deleted"
+    assert body["code"] == "DEFAULT_PROJECT_PROTECTED"
+    assert body["title"] == "Default Project Protected"
 
     await test_db_session.refresh(default_project)
     assert default_project.deleted_at is None

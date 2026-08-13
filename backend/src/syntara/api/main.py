@@ -37,6 +37,7 @@ from syntara.auth.session.cleanup import get_session_cleanup_worker
 from syntara.authz.evaluator import RegoEvaluator
 from syntara.authz.exceptions import (  # noqa: F401
     BuiltinProtectionError,
+    DefaultProjectProtectionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
     RoleNameConflictError,
