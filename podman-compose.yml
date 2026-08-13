@@ -125,7 +125,7 @@ services:
         DOWNSTREAM_OVERRIDE: ${DOWNSTREAM_OVERRIDE:-scratch}
         BRANDING: ${BRANDING:-false}
       context: ./backend
-      dockerfile: containers/nexus/Containerfile
+      dockerfile: containers/syntara/Containerfile
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
     command: [sh, -c, 'chmod -R g+rwX /data/audit-exports 2>/dev/null; uv run --no-sync alembic upgrade head && uv run --no-sync python -m syntara.seed --all && (uv run --no-sync python -c "import os,boto3; boto3.client(\"s3\", endpoint_url=os.environ[\"APP_S3_ENDPOINT_URL\"], aws_access_key_id=os.environ[\"APP_S3_ACCESS_KEY_ID\"], aws_secret_access_key=os.environ[\"APP_S3_SECRET_ACCESS_KEY\"], region_name=os.environ[\"APP_S3_REGION\"]).create_bucket(Bucket=os.environ[\"APP_S3_BUCKET_NAME\"])" || true) && uv run --no-sync python -m syntara.api.main']
