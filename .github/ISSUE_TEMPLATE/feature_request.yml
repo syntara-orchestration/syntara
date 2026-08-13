@@ -1,0 +1,44 @@
+---
+name: Feature request
+description: Suggest an idea for this project
+
+body:
+  - type: dropdown
+    attributes:
+      label: Component
+      description: Which part of the system does this relate to?
+      options:
+        - Backend (API / Python)
+        - Frontend (UI / React)
+        - Both
+        - Unknown, N/A
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Summary
+      description: A clear description of the feature you'd like.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Use case
+      description: >
+        What problem does this solve? How would you use this feature?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: >
+        Any other context, mockups, or examples that help explain the request.
+
+  - type: checkboxes
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow the [Code of Conduct](https://github.com/syntara-orchestration/syntara/blob/devel/.github/CODE_OF_CONDUCT.md)
+          required: true
