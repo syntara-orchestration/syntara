@@ -201,5 +201,83 @@ describe('ApproverMultiSelect', () => {
 
       expect(screen.getByRole('textbox')).toBeDisabled()
     })
+
+    it('deselects an already selected item on click', async () => {
+      const onChange = vi.fn()
+      const user = userEvent.setup()
+
+      render(<ApproverMultiSelect<TestItem> {...defaultProps} value={['Alice', 'Bob']} onChange={onChange} />)
+
+      await user.click(screen.getByRole('textbox'))
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Alice').length).toBeGreaterThan(1)
+      })
+
+      const allAlice = screen.getAllByText('Alice')
+      await user.click(allAlice[allAlice.length - 1])
+
+      expect(onChange).toHaveBeenCalledWith(['Bob'])
+    })
+
+    it('shows validation error message', () => {
+      render(
+        <ApproverMultiSelect<TestItem>
+          {...defaultProps}
+          validationError={{ message: 'Select at least one approver' }}
+        />
+      )
+
+      expect(screen.getByText('Select at least one approver')).toBeInTheDocument()
+    })
+
+    it('displays helper text', () => {
+      render(<ApproverMultiSelect<TestItem> {...defaultProps} />)
+
+      expect(screen.getByText('Choose one or more items')).toBeInTheDocument()
+    })
+
+    it('shows placeholder only when no items are selected', () => {
+      const { rerender } = render(<ApproverMultiSelect<TestItem> {...defaultProps} />)
+
+      expect(screen.getByPlaceholderText('Select items')).toBeInTheDocument()
+
+      rerender(<ApproverMultiSelect<TestItem> {...defaultProps} value={['Alice']} />)
+
+      expect(screen.queryByPlaceholderText('Select items')).not.toBeInTheDocument()
+    })
+
+    it('filters items by search input', async () => {
+      const user = userEvent.setup()
+
+      render(<ApproverMultiSelect<TestItem> {...defaultProps} />)
+
+      const input = screen.getByPlaceholderText('Select items')
+      await user.click(input)
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice')).toBeInTheDocument()
+        expect(screen.getByText('Bob')).toBeInTheDocument()
+        expect(screen.getByText('Charlie')).toBeInTheDocument()
+      })
+
+      await user.type(input, 'Ali')
+
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+      expect(screen.queryByText('Bob')).not.toBeInTheDocument()
+      expect(screen.queryByText('Charlie')).not.toBeInTheDocument()
+    })
+
+    it('removes individual chip via close button', async () => {
+      const onChange = vi.fn()
+      const user = userEvent.setup()
+
+      render(<ApproverMultiSelect<TestItem> {...defaultProps} value={['Alice', 'Bob']} onChange={onChange} />)
+
+      const closeButtons = screen.getAllByRole('button', { name: /close/i })
+      await user.click(closeButtons[0])
+
+      expect(onChange).toHaveBeenCalledWith(['Bob'])
+    })
   })
 })
