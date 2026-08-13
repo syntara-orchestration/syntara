@@ -704,6 +704,13 @@ class ServerSettings(BaseSettings):
         "as a JSON array.",
     )
 
+    integration_url_allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description="Hostnames that integration base_url fields are permitted to use "
+        "despite resolving to private IPs. Cloud metadata endpoints are always blocked "
+        "regardless of this allowlist. Set via APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
+    )
+
 
 # =============================================================================
 # Retriever Service Configuration
