@@ -4,7 +4,10 @@ from unittest.mock import patch
 
 import pytest
 
-from syntara.integrations.lib.url_validation import validate_integration_url_no_ssrf
+from syntara.integrations.lib.url_validation import (
+    validate_integration_configuration_no_ssrf,
+    validate_integration_url_no_ssrf,
+)
 
 
 def _mock_getaddrinfo(ip: str) -> list[tuple[None, None, None, None, tuple[str, int]]]:
@@ -101,3 +104,39 @@ class TestValidateUrlNoSsrf:
             pytest.raises(ValueError, match="SSRF blocked"),
         ):
             validate_integration_url_no_ssrf("http://169.254.169.254", allow_http=True)
+
+
+class TestValidateConfigurationNoSsrf:
+    """Tests for validate_integration_configuration_no_ssrf() — the shared choke point."""
+
+    def test_missing_base_url_attribute_is_noop(self) -> None:
+        """A configuration without a base_url attribute is a no-op (must not raise)."""
+        config = type("C", (), {})()  # no base_url attribute
+        validate_integration_configuration_no_ssrf(config)
+
+    def test_none_base_url_is_noop(self) -> None:
+        """A None base_url (e.g. an LLM provider using its default endpoint) is a no-op."""
+        config = type("C", (), {"base_url": None})()
+        validate_integration_configuration_no_ssrf(config)
+
+    def test_empty_base_url_is_noop(self) -> None:
+        """An empty base_url is a no-op."""
+        config = type("C", (), {"base_url": ""})()
+        validate_integration_configuration_no_ssrf(config)
+
+    @pytest.mark.ssrf_enforced
+    def test_present_base_url_is_validated_and_allow_http_forwarded(self) -> None:
+        """A present base_url is routed through the real check, forwarding the allow_http flag.
+
+        Confirms the choke point is not a blanket no-op: it reads base_url and the per-config
+        allow_http flag and delegates to validate_integration_url_no_ssrf. Marked
+        ``ssrf_enforced`` so the autouse bypass does not intercept the delegated call.
+        """
+        # allow_http=False: http:// to a public IP is rejected (https required by default).
+        blocked = type("C", (), {"base_url": f"http://{_PUBLIC_IP}", "allow_http": False})()
+        with pytest.raises(ValueError, match="SSRF blocked"):
+            validate_integration_configuration_no_ssrf(blocked)
+
+        # allow_http=True: the same URL is accepted, proving the flag reached the validator.
+        allowed = type("C", (), {"base_url": f"http://{_PUBLIC_IP}", "allow_http": True})()
+        validate_integration_configuration_no_ssrf(allowed)

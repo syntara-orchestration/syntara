@@ -1,10 +1,16 @@
 """Tests for URL validation utilities (SSRF prevention)."""
 
+import socket
 from unittest.mock import patch
 
 import pytest
 
-from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url, validate_url_no_ssrf
+from syntara.core.lib.url_validation import (
+    _is_resolution_failure,
+    validate_endpoint_url,
+    validate_host_url,
+    validate_url_no_ssrf,
+)
 
 
 class TestValidateHostUrl:
@@ -350,3 +356,68 @@ class TestValidateUrlNoSsrf:
             pytest.raises(ValueError, match="SSRF blocked"),
         ):
             validate_url_no_ssrf("https://evil.example.com")
+
+    def test_allowlisted_host_unresolvable_accepted(self) -> None:
+        """Accept an allowlisted host that fails DNS resolution — defer to the request-time re-check.
+
+        A trusted host that cannot be resolved cannot be reached, so a transient DNS failure is a
+        connectivity problem, not an SSRF policy violation, and must not surface as a misleading
+        "resolves to a private address" rejection.
+        """
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=socket.gaierror("Name or service not known")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["internal.example.com"]})(),
+            ),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")
+
+    def test_allowlisted_host_network_error_accepted(self) -> None:
+        """Accept an allowlisted host when resolution hits a transient network (OSError) failure."""
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=OSError("Temporary failure in name resolution")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["internal.example.com"]})(),
+            ),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")
+
+    def test_non_allowlisted_host_unresolvable_rejected(self) -> None:
+        """Still fail closed for a non-allowlisted host that fails DNS resolution."""
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=socket.gaierror("Name or service not known")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["other.example.com"]})(),
+            ),
+            pytest.raises(ValueError, match="resolve"),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")
+
+
+class TestIsResolutionFailure:
+    """Tests for _is_resolution_failure() — distinguishes connectivity failures from policy blocks."""
+
+    def test_gaierror_cause_is_resolution_failure(self) -> None:
+        """A ValueError chained from socket.gaierror is a resolution failure."""
+        err = ValueError("Failed to resolve hostname")
+        err.__cause__ = socket.gaierror("Name or service not known")
+        assert _is_resolution_failure(err) is True
+
+    def test_oserror_cause_is_resolution_failure(self) -> None:
+        """A ValueError chained from a generic OSError is a (network) resolution failure."""
+        err = ValueError("Network error while validating URL")
+        err.__cause__ = OSError("Temporary failure in name resolution")
+        assert _is_resolution_failure(err) is True
+
+    def test_policy_block_cause_is_not_resolution_failure(self) -> None:
+        """A ValueError chained from a non-OSError (e.g. an SSRF policy block) is not a resolution failure."""
+        err = ValueError("SSRF blocked")
+        err.__cause__ = RuntimeError("SSRFBlockedError stand-in (not an OSError)")
+        assert _is_resolution_failure(err) is False
+
+    def test_no_cause_is_not_resolution_failure(self) -> None:
+        """A ValueError with no chained cause is not a resolution failure."""
+        assert _is_resolution_failure(ValueError("boom")) is False

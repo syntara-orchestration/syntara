@@ -142,6 +142,19 @@ def validate_endpoint_url(url: str, *, allow_http: bool = False) -> str:
     return url
 
 
+def _is_resolution_failure(error: ValueError) -> bool:
+    """Return True if a validate_safe_url ValueError is a DNS/network failure, not a policy block.
+
+    langchain-core's ``validate_safe_url`` wraps the underlying cause: a resolved-but-blocked
+    address surfaces with an ``SSRFBlockedError`` cause, while a DNS-resolution failure
+    (``socket.gaierror``) or transient network error surfaces with an ``OSError`` cause
+    (``gaierror`` is an ``OSError`` subclass; ``SSRFBlockedError`` is not). Only the latter is a
+    connectivity problem rather than an SSRF policy violation, so it can be keyed on the cause
+    type without brittle message matching.
+    """
+    return isinstance(error.__cause__, OSError)
+
+
 def validate_url_no_ssrf(
     url: str,
     *,
@@ -155,6 +168,15 @@ def validate_url_no_ssrf(
     cloud metadata, and Kubernetes internal DNS addresses. Hosts in *allowed_hosts*
     bypass the private/loopback check (allowing RFC1918 and loopback targets) but cloud
     metadata endpoints are always blocked regardless of the allowlist.
+
+    A host in *allowed_hosts* is operator-trusted, so a DNS-resolution or transient network
+    failure for it is treated as a pass rather than a rejection: it is a connectivity problem,
+    not an SSRF policy violation, and a host that cannot be resolved cannot be reached. This
+    keeps the check from reporting a misleading "resolves to a private address" error for an
+    unresolvable trusted host and from flaking when that host is momentarily unreachable; the
+    resolved address is re-validated at request time. Non-allowlisted hosts still fail closed on
+    resolution failure, and a trusted host that *does* resolve to a blocked address (e.g. cloud
+    metadata) is still rejected.
 
     Args:
         url: The URL to validate.
@@ -176,6 +198,13 @@ def validate_url_no_ssrf(
     hostname = (parsed.hostname or "").lower()
 
     if hostname in allowed:
-        validate_safe_url(url, allow_private=True, allow_http=allow_http)
+        try:
+            validate_safe_url(url, allow_private=True, allow_http=allow_http)
+        except ValueError as e:
+            # Trusted host that could not be resolved/reached: defer to the request-time
+            # re-check rather than rejecting a transient DNS/network failure as an SSRF block.
+            if _is_resolution_failure(e):
+                return
+            raise
     else:
         validate_safe_url(url, allow_private=False, allow_http=allow_http)
