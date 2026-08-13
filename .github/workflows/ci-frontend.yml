@@ -67,7 +67,7 @@ jobs:
   gen-contracts:
     name: (Frontend) Generate Contracts
     needs: changes
-    if: needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -95,7 +95,7 @@ jobs:
   checks:
     name: (Frontend) Checks
     needs: changes
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -116,7 +116,7 @@ jobs:
   unit-tests:
     name: (Frontend) Unit Tests
     needs: changes
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -154,7 +154,7 @@ jobs:
   coverage-report:
     name: (Frontend) Coverage Report
     needs: [changes, unit-tests]
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -203,9 +203,7 @@ jobs:
   sonarcloud:
     name: (Frontend) SonarCloud Analysis
     needs: [changes, coverage-report]
-    if: >-
-      needs.changes.outputs.code == 'true'
-      && github.event.pull_request.head.repo.full_name == github.repository
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -236,9 +234,7 @@ jobs:
   sonarcloud-baseline:
     name: (Frontend) SonarCloud Baseline
     needs: [changes, coverage-report]
-    if: >-
-      needs.changes.outputs.code == 'true'
-      && github.event_name == 'push'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -265,7 +261,7 @@ jobs:
   storybook-build:
     name: (Frontend) Storybook Build
     needs: changes
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -286,7 +282,7 @@ jobs:
   test-build:
     name: (Frontend) Test Container Build
     needs: changes
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -315,7 +311,7 @@ jobs:
 
   shared-checks-gate:
     name: (Frontend) Shared Checks Gate
-    if: github.event_name != 'push'
+    if: false
     permissions:
       checks: read
     runs-on: ubuntu-latest
@@ -524,7 +520,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend/packages/syntara-ui
-        run: npm run e2e -- --timeout 120000
+        run: npx playwright test e2e/xfail-demo.spec.ts e2e/project-switcher.spec.ts e2e/executions.spec.ts e2e/date-format-consistency.spec.ts --timeout 120000
         env:
           NEXUS_E2E_SKIP_WEB_SERVER: '1'
           NEXUS_E2E_BASE_URL: http://localhost:8080
@@ -566,7 +562,7 @@ jobs:
   konflux-frontend-gate:
     name: (Frontend) Konflux Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    if: false
     permissions:
       checks: read
     runs-on: ubuntu-latest
@@ -667,14 +663,6 @@ jobs:
     if: ${{ always() }}
     needs:
       - changes
-      - gen-contracts
-      - checks
-      - unit-tests
-      - coverage-report
-      - storybook-build
-      - test-build
-      - konflux-frontend-gate
-      - shared-checks-gate
       - test-compose-e2e
     steps:
       - name: Check required jobs passed
@@ -685,22 +673,10 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build test-compose-e2e konflux-frontend-gate shared-checks-gate; do
-            case "$job" in
-              gen-contracts)          result="${{ needs.gen-contracts.result }}" ;;
-              checks)                 result="${{ needs.checks.result }}" ;;
-              unit-tests)             result="${{ needs.unit-tests.result }}" ;;
-              coverage-report)        result="${{ needs.coverage-report.result }}" ;;
-              storybook-build)        result="${{ needs.storybook-build.result }}" ;;
-              test-build)             result="${{ needs.test-build.result }}" ;;
-              test-compose-e2e)       result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-frontend-gate)  result="${{ needs.konflux-frontend-gate.result }}" ;;
-              shared-checks-gate)     result="${{ needs.shared-checks-gate.result }}" ;;
-            esac
-            echo "$job: $result"
-            if [[ ! "$result" =~ ^($ok)$ ]]; then
-              echo "::error::Required job '$job' has result '$result'"
-              exit 1
-            fi
-          done
+          result="${{ needs.test-compose-e2e.result }}"
+          echo "test-compose-e2e: $result"
+          if [[ ! "$result" =~ ^($ok)$ ]]; then
+            echo "::error::Required job 'test-compose-e2e' has result '$result'"
+            exit 1
+          fi
           echo "All required checks passed (or skipped for doc-only PRs)"

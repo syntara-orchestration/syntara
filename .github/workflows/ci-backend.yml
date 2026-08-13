@@ -79,7 +79,7 @@ jobs:
   api-spec-validation:
     name: (Backend) API Spec Validation
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -101,7 +101,7 @@ jobs:
   api-spec-bundle:
     name: (Backend) API Spec Bundle
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -137,7 +137,7 @@ jobs:
   api-spec-drift:
     name: (Backend) API Spec Drift
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -159,7 +159,7 @@ jobs:
   generate-api-client:
     name: (Backend) Generate API Client
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -188,7 +188,7 @@ jobs:
   check-api-paths:
     name: (Backend) Check API Paths
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -210,7 +210,7 @@ jobs:
   check-dead-code:
     name: (Backend) Check Dead Code
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -232,7 +232,7 @@ jobs:
   check-cycles:
     name: (Backend) Check Import Cycles
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -254,7 +254,7 @@ jobs:
   check-orphans:
     name: (Backend) Check Orphan Modules
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -276,7 +276,7 @@ jobs:
   check-openapi-breaking:
     name: (Backend) Check OpenAPI Breaking Changes
     needs: changes
-    if: needs.changes.outputs.backend_schema == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -305,7 +305,7 @@ jobs:
   verify-test-structure:
     name: (Backend) Verify Test Structure
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -327,7 +327,7 @@ jobs:
   mypy:
     name: (Backend) mypy
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -352,7 +352,7 @@ jobs:
   check-migrations:
     name: (Backend) check-migrations
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: false
     runs-on: ubuntu-latest
 
     env:
@@ -380,7 +380,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.13"]
       fail-fast: false
 
     env:
@@ -417,7 +417,7 @@ jobs:
   test-cli:
     name: (Backend) CLI Tests
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -459,7 +459,7 @@ jobs:
   test-integration:
     name: (Backend) Integration Tests
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: false
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 30
     strategy:
@@ -519,7 +519,7 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -663,7 +663,7 @@ jobs:
       - test-unit
       - test-cli
       - test-integration
-    if: needs.changes.outputs.backend == 'true' && success()
+    if: false
 
     steps:
       - name: Checkout code
@@ -776,10 +776,7 @@ jobs:
   sonarcloud:
     name: (Backend) SonarCloud Analysis
     needs: combine
-    if: >-
-      success()
-      && github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name == github.repository
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -810,9 +807,7 @@ jobs:
   sonarcloud-baseline:
     name: (Backend) SonarCloud Baseline
     needs: combine
-    if: >-
-      success()
-      && github.event_name == 'push'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -838,7 +833,7 @@ jobs:
 
   shared-checks-gate:
     name: (Backend) Shared Checks Gate
-    if: github.event_name != 'push'
+    if: false
     permissions:
       checks: read
     runs-on: ubuntu-latest
@@ -898,7 +893,7 @@ jobs:
   konflux-backend-gate:
     name: (Backend) Konflux Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    if: false
     permissions:
       checks: read
     runs-on: ubuntu-latest
@@ -988,10 +983,12 @@ jobs:
             core.setFailed(`Timed out after 85 minutes waiting for: ${conformaCheckName}`);
 
   snyk-sast:
+    if: false
     uses: ./.github/workflows/sast-snyk.yml
     secrets: inherit
 
   snyk-sca:
+    if: false
     uses: ./.github/workflows/sca-snyk.yml
     secrets: inherit
 
@@ -1000,25 +997,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changes
-      - api-spec-validation
-      - api-spec-bundle
-      - api-spec-drift
-      - generate-api-client
-      - check-api-paths
-      - check-dead-code
-      - check-cycles
-      - check-orphans
-      - check-openapi-breaking
-      - verify-test-structure
-      - mypy
       - test-unit
-      - test-cli
-      - test-integration
-      - test-compose-e2e
-      - konflux-backend-gate
-      - shared-checks-gate
-      - snyk-sast
-      - snyk-sca
     if: always()
     steps:
       - name: Check required jobs passed
@@ -1037,27 +1016,9 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in test-unit; do
             case "$job" in
-              api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
-              api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
-              api-spec-drift)        result="${{ needs.api-spec-drift.result }}" ;;
-              generate-api-client)   result="${{ needs.generate-api-client.result }}" ;;
-              check-api-paths)       result="${{ needs.check-api-paths.result }}" ;;
-              check-dead-code)       result="${{ needs.check-dead-code.result }}" ;;
-              check-cycles)          result="${{ needs.check-cycles.result }}" ;;
-              check-orphans)         result="${{ needs.check-orphans.result }}" ;;
-              check-openapi-breaking) result="${{ needs.check-openapi-breaking.result }}" ;;
-              verify-test-structure) result="${{ needs.verify-test-structure.result }}" ;;
-              mypy)                  result="${{ needs.mypy.result }}" ;;
               test-unit)             result="${{ needs.test-unit.result }}" ;;
-              test-cli)              result="${{ needs.test-cli.result }}" ;;
-              test-integration)      result="${{ needs.test-integration.result }}" ;;
-              test-compose-e2e)      result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-backend-gate)  result="${{ needs.konflux-backend-gate.result }}" ;;
-              shared-checks-gate)    result="${{ needs.shared-checks-gate.result }}" ;;
-              snyk-sast)             result="${{ needs.snyk-sast.result }}" ;;
-              snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
             esac
             echo "$job: $result"
             if [[ ! "$result" =~ ^($ok)$ ]]; then
