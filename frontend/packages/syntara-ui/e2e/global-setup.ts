@@ -6,7 +6,13 @@
  * are operational. Results are exported as environment variables so test files
  * can skip entire describe blocks at collection time (0ms cost).
  *
- * On the mock backend this is a no-op — all services are synthetic.
+ * The probe is **fail-open**: env vars default to '1' (healthy). Only a positive
+ * confirmation that a service is down (API responded but execution never left
+ * "pending") clears the flag. Timeouts, auth failures, and network errors all
+ * leave the flags set so tests run and discover issues themselves.
+ *
+ * On the mock backend the flags are set to '1' unconditionally — all services
+ * are synthetic and always available.
  */
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 
@@ -57,16 +63,19 @@ async function sleep(ms: number): Promise<void> {
 
 /**
  * Probe the execution engine and Temporal worker by creating, running, and
- * polling a minimal workflow. Returns which capabilities are available.
+ * polling a minimal workflow.
+ *
+ * Returns which services are **positively confirmed as down**. A timeout or
+ * error is treated as inconclusive (fail-open).
  */
 async function probeExecutionEngine(token: string): Promise<{
-  executionEngine: boolean
-  temporalWorker: boolean
+  executionEngineDown: boolean
+  temporalWorkerDown: boolean
 }> {
-  const result = { executionEngine: false, temporalWorker: false }
+  const result = { executionEngineDown: false, temporalWorkerDown: false }
+  let createdProjectId: string | null = null
 
   try {
-    // Find or create a project
     const projectsResp = await api(token, 'GET', '/projects')
     if (!projectsResp.ok) return result
     const projects = (await projectsResp.json()) as { resources: Array<{ id: string }> }
@@ -79,9 +88,9 @@ async function probeExecutionEngine(token: string): Promise<{
       })
       if (!createProject.ok) return result
       projectId = ((await createProject.json()) as { id: string }).id
+      createdProjectId = projectId
     }
 
-    // Create a minimal workflow
     const createResp = await api(token, 'POST', '/workflows', {
       name: `__e2e_probe_${Date.now()}`,
       project_id: projectId,
@@ -105,59 +114,74 @@ async function probeExecutionEngine(token: string): Promise<{
     const workflowId = workflow.id
 
     try {
-      // Publish
       await api(token, 'POST', `/workflows/${workflowId}/versions/${workflow.current_version}/publish`, {})
 
-      // Run
       const runResp = await api(token, 'POST', `/workflows/${workflowId}/run`, {})
-      if (!runResp.ok) return result
+      if (!runResp.ok) {
+        // API explicitly rejected the run request — engine is positively down
+        result.executionEngineDown = true
+        return result
+      }
+
       const execution = (await runResp.json()) as { id?: string; execution_id?: string }
       const executionId = execution.id ?? execution.execution_id
       if (!executionId) return result
 
-      result.executionEngine = true
-
       // Poll execution status — check if Temporal picks it up
-      for (let i = 0; i < 15; i++) {
+      // Use a longer window (60s) to tolerate Temporal warm-up in Compose
+      let finalStatus = 'pending'
+      for (let i = 0; i < 30; i++) {
         await sleep(2000)
         const statusResp = await api(token, 'GET', `/executions/${executionId}`)
-        if (!statusResp.ok) break
+        if (!statusResp.ok) return result
         const exec = (await statusResp.json()) as { status: string }
-        if (exec.status !== 'pending') {
-          result.temporalWorker = true
-          break
-        }
+        finalStatus = exec.status
+        if (finalStatus !== 'pending') break
+      }
+
+      if (finalStatus === 'pending') {
+        // Execution stayed pending for the full 60s — Temporal is positively not processing
+        result.temporalWorkerDown = true
       }
     } finally {
-      // Clean up
       await api(token, 'DELETE', `/workflows/${workflowId}`).catch(() => {})
     }
   } catch {
-    // Probe failed — leave defaults (false)
+    // Network/unexpected error — inconclusive, leave fail-open defaults
+  } finally {
+    if (createdProjectId) {
+      await api(token, 'DELETE', `/projects/${createdProjectId}`).catch(() => {})
+    }
   }
 
   return result
 }
 
-// eslint-disable-next-line no-restricted-exports -- Playwright requires globalSetup to be a default export
 export default async function globalSetup(): Promise<void> {
+  // Default to healthy — tests run unless probe positively confirms otherwise
+  process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'] = '1'
+  process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'] = '1'
+
   if (!isSkipWebServerForPlaywrightTests()) return
 
-  // eslint-disable-next-line no-console -- globalSetup runs in Node before tests; console is the only logging mechanism
   console.log('[global-setup] Probing backend service health...')
 
   const token = await authenticate()
   if (!token) {
-    // eslint-disable-next-line no-console
-    console.log('[global-setup] Could not authenticate — skipping probes')
+    console.log('[global-setup] Could not authenticate — assuming services are healthy (fail-open)')
     return
   }
 
-  const { executionEngine, temporalWorker } = await probeExecutionEngine(token)
+  const { executionEngineDown, temporalWorkerDown } = await probeExecutionEngine(token)
 
-  if (executionEngine) process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'] = '1'
-  if (temporalWorker) process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'] = '1'
+  if (executionEngineDown) {
+    delete process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE']
+    delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+  } else if (temporalWorkerDown) {
+    delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+  }
 
-  // eslint-disable-next-line no-console
-  console.log(`[global-setup] Probe results: execution_engine=${executionEngine}, temporal_worker=${temporalWorker}`)
+  console.log(
+    `[global-setup] Probe results: execution_engine=${!executionEngineDown}, temporal_worker=${!temporalWorkerDown}`
+  )
 }

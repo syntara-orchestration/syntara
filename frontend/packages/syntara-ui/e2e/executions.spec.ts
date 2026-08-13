@@ -1,7 +1,7 @@
 import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 
-test.describe(() => {
+test.describe('Execution list (requires running executions)', () => {
   test.skip(!!process.env.CI, 'CI deploys a fresh backend with no running executions to assert on')
 
   test('user views executions and opens a running execution', async ({ app }) => {

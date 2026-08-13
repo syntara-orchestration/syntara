@@ -16,7 +16,7 @@
  * - Filter persistence across navigation
  */
 
-import { test, expect, toAppUrl, type Page } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl, type Page } from './fixtures'
 import { apiRequest } from './utils/api'
 
 /** Select a workflow from the async typeahead, waiting for real options to load. */
@@ -46,12 +46,7 @@ async function switchFieldSelector(app: Page, currentFieldLabel: string, targetF
 }
 
 test.describe('Execution Filtering @pr-check', () => {
-  let executionsUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(executionsUnavailable, 'No execution data available; seed data required')
-  })
+  const guard = createUnavailableGuard('No execution data available; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/executions'))
@@ -62,7 +57,7 @@ test.describe('Execution Filtering @pr-check', () => {
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) executionsUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No execution data available; seed data required')
   })
 

@@ -12,7 +12,7 @@
  * - Kebab menu edit action
  * - Kebab menu delete action
  */
-import { test, expect } from './fixtures'
+import { createUnavailableGuard, test, expect } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import {
   createTestCredential,
@@ -143,12 +143,7 @@ test.describe('Table Display and Sorting', () => {
 // Test 4: Cursor-Based Pagination
 // ---------------------------------------------------------------------------
 test.describe('Cursor-Based Pagination', () => {
-  let credentialsUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(credentialsUnavailable, 'No credential data available; seed data required')
-  })
+  const guard = createUnavailableGuard('No credential data available; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await goToCredentialsList(app)
@@ -157,7 +152,7 @@ test.describe('Cursor-Based Pagination', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) credentialsUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No credential data available; seed data required')
   })
 

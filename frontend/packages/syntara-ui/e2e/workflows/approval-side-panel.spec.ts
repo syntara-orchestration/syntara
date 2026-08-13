@@ -14,7 +14,7 @@
  * Seed data:
  * - Approval "Production Deployment Approval" (550e8400-...-446655440050) linked to exec-approval
  */
-import { test, expect, toAppUrl } from '../fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
 import { apiRequest, pollExecutionStatus } from '../utils/api'
@@ -66,16 +66,11 @@ test.describe('Approval Side Panel — list navigation', () => {
 })
 
 test.describe('Approval Side Panel — deep-link', () => {
-  let panelUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(panelUnavailable, 'Approval side panel not available')
-  })
+  const guard = createUnavailableGuard('Approval side panel not available')
 
   test.beforeEach(async ({ app }) => {
     const hasPanel = await navigateToApprovalPanel(app)
-    if (!hasPanel) panelUnavailable = true
+    if (!hasPanel) guard.markUnavailable()
     test.skip(!hasPanel, 'Approval side panel not available')
   })
 

@@ -17,7 +17,7 @@ const WIZARD_URL = '/configuration/integrations/configure'
 const INTEGRATIONS_LIST_URL = '/configuration/integrations'
 
 test.describe('Create Integration Wizard', () => {
-  test.describe(() => {
+  test.describe('MCP Server integration', () => {
     test.skip(
       isRealBackend && !mcpServerUrl,
       'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
@@ -76,7 +76,7 @@ test.describe('Create Integration Wizard', () => {
     })
   })
 
-  test.describe(() => {
+  test.describe('LLM Provider integration', () => {
     test.skip(
       isRealBackend && !openrouterApiKey,
       'APP_OPENROUTER_API_KEY not set; cannot test LLM Provider on real backend'
@@ -136,7 +136,7 @@ test.describe('Create Integration Wizard', () => {
     })
   })
 
-  test.describe(() => {
+  test.describe('AAP Gateway integration', () => {
     test.skip(isRealBackend, 'AAP Gateway not available in upstream test environment')
 
     test('user creates an AAP Gateway integration through the wizard', async ({ app }) => {

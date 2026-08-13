@@ -8,7 +8,7 @@
  */
 import type { Page } from '@playwright/test'
 
-import { test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -134,12 +134,7 @@ function isGlobalWorkflowsListUrl(url: string): boolean {
 }
 
 test.describe('Pagination Footer — Users Tab', () => {
-  let usersUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(usersUnavailable, 'No users data available')
-  })
+  const guard = createUnavailableGuard('No users data available')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/users'))
@@ -149,7 +144,7 @@ test.describe('Pagination Footer — Users Tab', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) usersUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No users data available')
   })
 
@@ -188,12 +183,7 @@ test.describe('Pagination Footer — Groups Tab', () => {
 })
 
 test.describe('Project Selector — Workflows', () => {
-  let selectorUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(selectorUnavailable, 'No workflows or project selector not available')
-  })
+  const guard = createUnavailableGuard('No workflows or project selector not available')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/workflows'))
@@ -205,7 +195,7 @@ test.describe('Project Selector — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) {
-      selectorUnavailable = true
+      guard.markUnavailable()
       test.skip(true, 'No workflows available — create workflows first')
       return
     }
@@ -216,7 +206,7 @@ test.describe('Project Selector — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     if (!selectorVisible) {
-      selectorUnavailable = true
+      guard.markUnavailable()
       test.skip(true, 'Project selector not available in this environment')
       return
     }
@@ -228,7 +218,7 @@ test.describe('Project Selector — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     await app.keyboard.press('Escape')
-    if (!optionsInteractive) selectorUnavailable = true
+    if (!optionsInteractive) guard.markUnavailable()
     test.skip(!optionsInteractive, 'Project selector is not interactive in this environment')
   })
 
@@ -325,12 +315,7 @@ test.describe('Project Selector — Workflows', () => {
 })
 
 test.describe('Pagination Navigation — Workflows', () => {
-  let paginationUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(paginationUnavailable, 'Not enough data to paginate')
-  })
+  const guard = createUnavailableGuard('Not enough data to paginate')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/workflows'))
@@ -340,7 +325,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) {
-      paginationUnavailable = true
+      guard.markUnavailable()
       test.skip(true, 'No workflows available')
       return
     }
@@ -357,7 +342,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     const hasNextPage = buttonVisible && (await nextButton.isEnabled().catch(() => false))
-    if (!hasNextPage) paginationUnavailable = true
+    if (!hasNextPage) guard.markUnavailable()
     test.skip(!hasNextPage, 'Not enough data to paginate — need more than 10 workflows')
   })
 
@@ -391,12 +376,7 @@ test.describe('Pagination Navigation — Workflows', () => {
 })
 
 test.describe('Pagination Footer — Credentials', () => {
-  let credentialsUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(credentialsUnavailable, 'No credentials data available')
-  })
+  const guard = createUnavailableGuard('No credentials data available')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/credentials'))
@@ -405,7 +385,7 @@ test.describe('Pagination Footer — Credentials', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) credentialsUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No credentials data available')
   })
 
@@ -416,12 +396,7 @@ test.describe('Pagination Footer — Credentials', () => {
 })
 
 test.describe('Pagination Footer — Integrations', () => {
-  let integrationsUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(integrationsUnavailable, 'No integrations data available')
-  })
+  const guard = createUnavailableGuard('No integrations data available')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
@@ -431,7 +406,7 @@ test.describe('Pagination Footer — Integrations', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) integrationsUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No integrations data available')
   })
 

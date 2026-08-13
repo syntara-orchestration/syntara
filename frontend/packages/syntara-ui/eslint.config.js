@@ -323,6 +323,14 @@ export default tseslint.config(
     },
   },
   {
+    // Playwright globalSetup runs in Node before tests — requires default export and uses console for logging
+    files: ['e2e/global-setup.ts'],
+    rules: {
+      'no-console': 'off',
+      'no-restricted-exports': 'off',
+    },
+  },
+  {
     // Storybook CSF requires `export default meta`; Storybook config files require a default export —
     // exempt both from the default-export ban
     files: ['**/*.stories.{ts,tsx}', '**/.storybook/**/*.{ts,tsx}'],

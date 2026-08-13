@@ -9,7 +9,7 @@
  * - Navigate back to groups list
  * - Manage group membership from user detail page
  */
-import { test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { createUserViaApi, deleteUserViaApi, ensureGroupExists, type SeededUser } from './seeds/iam'
 import { getAuthToken } from './utils/api'
@@ -37,12 +37,7 @@ test.afterAll(async ({ browser }) => {
 })
 
 test.describe('Group Detail — Navigation & Tabs', () => {
-  let adminsUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(adminsUnavailable, 'No "admins" group found; seed data required')
-  })
+  const guard = createUnavailableGuard('No "admins" group found; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
@@ -53,7 +48,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       .waitFor({ state: 'visible', timeout: 3000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasAdmins) adminsUnavailable = true
+    if (!hasAdmins) guard.markUnavailable()
     test.skip(!hasAdmins, 'No "admins" group found; seed data required')
   })
 
@@ -108,7 +103,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
     await expect(table.getByRole('button', { name: 'admins', exact: true })).toBeVisible()
   })
 
-  test.describe(() => {
+  test.describe('Member add/remove (typeahead)', () => {
     test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
 
     test('add and remove a member from the group detail', async ({ app }) => {

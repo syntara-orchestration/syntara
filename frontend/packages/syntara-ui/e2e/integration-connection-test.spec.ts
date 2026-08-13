@@ -37,7 +37,7 @@ async function createLlmCredential(app: Page, name: string): Promise<string> {
 }
 
 test.describe('Integration Wizard @pr-check', () => {
-  test.describe(() => {
+  test.describe('Connection test — MCP Server', () => {
     test.skip(
       isRealBackend && !mcpServerUrl,
       'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
@@ -345,7 +345,7 @@ test.describe('Integration Wizard @pr-check', () => {
     }
   })
 
-  test.describe(() => {
+  test.describe('Health check transitions (real backend)', () => {
     test.skip(!isRealBackend || !mcpServerUrl, 'Requires real backend with SYNTARA_E2E_MCP_SERVER_URL set')
 
     test('health check status transitions between available and error', async ({ app }) => {

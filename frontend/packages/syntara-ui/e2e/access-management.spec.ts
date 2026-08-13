@@ -14,7 +14,7 @@
  * - Filters and sort survive a full page reload
  * - User detail sub-tabs sync to URL
  */
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect, toAppUrl, createUnavailableGuard } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -112,12 +112,7 @@ test.describe('Access Management — Tab Navigation', () => {
 })
 
 test.describe('Access Management — Roles Tab Filtering', () => {
-  let rolesFilterUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(rolesFilterUnavailable, 'No roles data available; seed data required')
-  })
+  const guard = createUnavailableGuard('No roles data available; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(`${ACCESS_URL}/roles`))
@@ -128,7 +123,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) rolesFilterUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No roles data available; seed data required')
   })
 
@@ -180,12 +175,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
 })
 
 test.describe('Access Management — Roles Tab Sorting', () => {
-  let rolesSortUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(rolesSortUnavailable, 'No roles data available; seed data required')
-  })
+  const guard = createUnavailableGuard('No roles data available; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(`${ACCESS_URL}/roles`))
@@ -196,7 +186,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) rolesSortUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No roles data available; seed data required')
   })
 
@@ -340,12 +330,7 @@ test.describe('Access Management — User Detail Tabs', () => {
 })
 
 test.describe('Access Management — Policies Tab Columns', () => {
-  let policiesUnavailable = false
-
-  // Guard hook: skips without setting up the app fixture (login) once data is known unavailable.
-  test.beforeEach(() => {
-    test.skip(policiesUnavailable, 'No policies data available; seed data required')
-  })
+  const guard = createUnavailableGuard('No policies data available; seed data required')
 
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(`${ACCESS_URL}/policies`))
@@ -356,7 +341,7 @@ test.describe('Access Management — Policies Tab Columns', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) policiesUnavailable = true
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No policies data available; seed data required')
   })
 
