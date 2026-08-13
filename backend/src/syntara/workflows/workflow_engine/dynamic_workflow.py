@@ -279,7 +279,7 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if not pending_tasks:
                 break
 
-            # Include timeout tasks so asyncio.wait wakes up when a timeout fires,
+            # Include timeout tasks so workflow.wait wakes up when a timeout fires,
             # rather than blocking until a pending node completes.
             wait_tasks = [t for _, t in sorted(pending_tasks.items())]
             wait_tasks.extend(t for _, t in sorted(self._timeout_tasks.items()) if not t.done())

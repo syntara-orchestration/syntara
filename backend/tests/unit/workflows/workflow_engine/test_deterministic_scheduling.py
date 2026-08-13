@@ -7,8 +7,7 @@ sorted node-ID order.
 """
 
 import asyncio
-from collections.abc import Coroutine, Generator
-from typing import Any
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -18,6 +17,8 @@ from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
+
+type _Task = asyncio.Task[None]
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -60,6 +61,17 @@ def _make_workflow(
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
     return wf
+
+
+def _new_task() -> _Task:
+    return asyncio.create_task(asyncio.sleep(0))
+
+
+def _mark_converge_timed_out(wf: NexusWorkflow, converge_id: str) -> None:
+    wf._timed_out_converge_nodes.add(converge_id)
+    wf._cof_failed_nodes.add(converge_id)
+    wf.failed_nodes[converge_id] = "timed out"
+    wf.resolver.set_namespace(converge_id, {"status": "failed"})
 
 
 def _build_parallel_graph(branch_ids: list[str]) -> WorkflowGraph:
@@ -119,23 +131,14 @@ def _build_two_converge_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _run_loop(coro: Coroutine[object, object, object]) -> object:
-    """Execute a coroutine in a fresh event loop and return its result."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 def _make_capturing_wait(
-    pending: dict[str, asyncio.Task[Any]],
-    captured: list[list[asyncio.Task[Any]]],
+    pending: dict[str, _Task],
+    captured: list[list[_Task]],
 ) -> object:
     """Record ``wait_tasks`` on the first call and drain ``pending`` to exit the processing loop."""
     called = False
 
-    async def _wait(wait_tasks: list[asyncio.Task[Any]], **_kwargs: object) -> tuple[list, list]:
+    async def _wait(wait_tasks: list[_Task], **_kwargs: object) -> tuple[list[_Task], list[_Task]]:
         nonlocal called
         assert not called, "workflow.wait called more than once"
         called = True
@@ -155,40 +158,15 @@ def _make_capturing_wait(
 class TestWaitTasksOrdering:
     """Pending tasks are passed to workflow.wait in sorted node-ID order."""
 
-    def test_two_pending_tasks_sorted_by_node_id(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """Two pending tasks are passed to workflow.wait in sorted node-ID order."""
-        wf = _make_workflow()
-        graph = _build_parallel_graph(["node_z", "node_a"])
-        captured: list[list[asyncio.Task[Any]]] = []
-
-        async def run() -> None:
-            async def instant() -> dict[str, Any]:
-                return {}
-
-            task_z = asyncio.create_task(instant())
-            task_a = asyncio.create_task(instant())
-            pending: dict[str, asyncio.Task[Any]] = {"node_z": task_z, "node_a": task_a}
-
-            _mock_temporal_workflow.wait = _make_capturing_wait(pending, captured)
-            await wf._process_pending_tasks(pending, graph)
-
-            assert captured[0][0] is task_a
-            assert captured[0][1] is task_z
-
-        _run_loop(run())
-
-    def test_five_pending_tasks_sorted_by_node_id(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """Five pending tasks are passed to workflow.wait in sorted node-ID order."""
+    def test_pending_tasks_sorted_by_node_id(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
+        """Pending tasks are passed to workflow.wait in sorted node-ID order."""
         branch_ids = ["b4_s1", "b2_s1", "b0_s1", "b1_s1", "b3_s1"]
         wf = _make_workflow()
         graph = _build_parallel_graph(branch_ids)
-        captured: list[list[asyncio.Task[Any]]] = []
+        captured: list[list[_Task]] = []
 
         async def run() -> None:
-            async def instant() -> dict[str, Any]:
-                return {}
-
-            tasks = {bid: asyncio.create_task(instant()) for bid in branch_ids}
+            tasks = {bid: _new_task() for bid in branch_ids}
             pending = dict(tasks)
 
             _mock_temporal_workflow.wait = _make_capturing_wait(pending, captured)
@@ -197,44 +175,20 @@ class TestWaitTasksOrdering:
             expected_order = [tasks[nid] for nid in sorted(branch_ids)]
             assert captured[0] == expected_order
 
-        _run_loop(run())
-
-    def test_single_pending_task_passed_through(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """A single pending task is passed to workflow.wait unchanged."""
-        wf = _make_workflow()
-        graph = _build_parallel_graph(["only_node"])
-        captured: list[list[asyncio.Task[Any]]] = []
-
-        async def run() -> None:
-            async def instant() -> dict[str, Any]:
-                return {}
-
-            task = asyncio.create_task(instant())
-            pending: dict[str, asyncio.Task[Any]] = {"only_node": task}
-
-            _mock_temporal_workflow.wait = _make_capturing_wait(pending, captured)
-            await wf._process_pending_tasks(pending, graph)
-
-            assert captured[0] == [task]
-
-        _run_loop(run())
+        asyncio.run(run())
 
     def test_timeout_tasks_appended_after_sorted_pending_tasks(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
         """Timeout tasks are appended after pending tasks in wait_tasks."""
         wf = _make_workflow()
         graph = _build_parallel_graph(["node_b", "node_a"])
-        captured: list[list[asyncio.Task[Any]]] = []
+        captured: list[list[_Task]] = []
 
         async def run() -> None:
-            async def instant() -> dict[str, Any]:
-                return {}
-
             async def timeout_coro() -> None:
                 await asyncio.sleep(9999)
 
-            task_b = asyncio.create_task(instant())
-            task_a = asyncio.create_task(instant())
-            pending: dict[str, asyncio.Task[Any]] = {"node_b": task_b, "node_a": task_a}
+            task_a, task_b = _new_task(), _new_task()
+            pending: dict[str, _Task] = {"node_b": task_b, "node_a": task_a}
 
             timeout_task = asyncio.create_task(timeout_coro())
             wf._timeout_tasks["some_converge"] = timeout_task
@@ -249,35 +203,7 @@ class TestWaitTasksOrdering:
             assert captured[0][1] is task_b
             assert captured[0][2] is timeout_task
 
-        _run_loop(run())
-
-    def test_wait_called_with_list_not_set(self, _mock_temporal_workflow: MagicMock) -> None:  # noqa: PT019
-        """workflow.wait receives a list, not a set."""
-        wf = _make_workflow()
-        graph = _build_parallel_graph(["node_a", "node_b"])
-
-        async def run() -> None:
-            async def instant() -> dict[str, Any]:
-                return {}
-
-            pending: dict[str, asyncio.Task[Any]] = {
-                "node_a": asyncio.create_task(instant()),
-                "node_b": asyncio.create_task(instant()),
-            }
-
-            captured_type: list[type] = []
-
-            async def type_capturing_wait(wait_tasks: object, **_kwargs: object) -> tuple[list, list]:
-                captured_type.append(type(wait_tasks))
-                pending.clear()
-                return [], []
-
-            _mock_temporal_workflow.wait = type_capturing_wait
-            await wf._process_pending_tasks(pending, graph)
-
-            assert captured_type[0] is list
-
-        _run_loop(run())
+        asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
@@ -288,29 +214,8 @@ class TestWaitTasksOrdering:
 class TestTimedOutConvergeOrdering:
     """Simultaneously timed-out converge nodes schedule successors in sorted node-ID order."""
 
-    def test_two_timed_out_converges_scheduled_in_node_id_order(self) -> None:
-        """Two timed-out converge nodes schedule successors in sorted node-ID order."""
-        wf = _make_workflow()
-        graph = _build_two_converge_graph()
-
-        for cid in ("conv_alpha", "conv_beta"):
-            wf._timed_out_converge_nodes.add(cid)
-            wf._cof_failed_nodes.add(cid)
-            wf.failed_nodes[cid] = "timed out"
-            wf.resolver.set_namespace(cid, {"status": "failed"})
-
-        schedule_order: list[str] = []
-
-        async def fake_schedule_successors(completed_node_id: str, *_args: object, **_kwargs: object) -> None:
-            schedule_order.append(completed_node_id)
-
-        with patch.object(wf, "_schedule_successors", new_callable=AsyncMock, side_effect=fake_schedule_successors):
-            _run_loop(wf._process_pending_tasks({}, graph))
-
-        assert schedule_order == ["conv_alpha", "conv_beta"]
-
-    def test_five_timed_out_converges_scheduled_in_node_id_order(self) -> None:
-        """Five timed-out converge nodes schedule successors in sorted node-ID order."""
+    def test_timed_out_converges_scheduled_in_node_id_order(self) -> None:
+        """Timed-out converge nodes schedule successors in sorted node-ID order."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         converge_ids = ["conv_e", "conv_c", "conv_a", "conv_b", "conv_d"]
@@ -324,10 +229,7 @@ class TestTimedOutConvergeOrdering:
 
         wf = _make_workflow()
         for cid in converge_ids:
-            wf._timed_out_converge_nodes.add(cid)
-            wf._cof_failed_nodes.add(cid)
-            wf.failed_nodes[cid] = "timed out"
-            wf.resolver.set_namespace(cid, {"status": "failed"})
+            _mark_converge_timed_out(wf, cid)
 
         schedule_order: list[str] = []
 
@@ -335,7 +237,7 @@ class TestTimedOutConvergeOrdering:
             schedule_order.append(completed_node_id)
 
         with patch.object(wf, "_schedule_successors", new_callable=AsyncMock, side_effect=fake_schedule_successors):
-            _run_loop(wf._process_pending_tasks({}, graph))
+            asyncio.run(wf._process_pending_tasks({}, graph))
 
         assert schedule_order == sorted(converge_ids)
 
@@ -345,13 +247,10 @@ class TestTimedOutConvergeOrdering:
         graph = _build_two_converge_graph()
 
         for cid in ("conv_alpha", "conv_beta"):
-            wf._timed_out_converge_nodes.add(cid)
-            wf._cof_failed_nodes.add(cid)
-            wf.failed_nodes[cid] = "timed out"
-            wf.resolver.set_namespace(cid, {"status": "failed"})
+            _mark_converge_timed_out(wf, cid)
 
         with patch.object(wf, "_schedule_successors", new_callable=AsyncMock):
-            _run_loop(wf._process_pending_tasks({}, graph))
+            asyncio.run(wf._process_pending_tasks({}, graph))
 
         assert len(wf._timed_out_converge_nodes) == 0
 
