@@ -337,7 +337,7 @@ class TestTimezoneValidation:
 
 
 class TestIntervalValidation:
-    """Tests for interval field validation (AAP-87629 follow-up).
+    """Tests for interval field validation at the model layer.
 
     ``interval`` previously had no semantic validation beyond "non-empty",
     so ``ScheduledTriggerConfig.model_validate`` (used by ``/workflows/validate``,
@@ -371,7 +371,7 @@ class TestIntervalValidation:
         assert config.interval == "R/2024-01-15T09:00:00Z/P1M"
 
     async def test_rejects_not_an_interval(self) -> None:
-        """Non-interval text (AAP-87629 regression) should be rejected."""
+        """Non-interval text should be rejected."""
         with pytest.raises((ValidationError, ValueError), match="Invalid ISO 8601 repeating interval"):
             ScheduledTriggerConfig(
                 schedule_type=ScheduleType.INTERVAL,

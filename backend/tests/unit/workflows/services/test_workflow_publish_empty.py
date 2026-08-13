@@ -666,12 +666,12 @@ class TestScheduledTriggerSyncGracefulDegradation:
             await mock_service.delete_workflow(workflow_id)
 
 
-class TestAAP87629RegressionPublishInvalidTimezone:
-    """Regression tests for AAP-87629: publish with invalid scheduled trigger config.
+class TestPublishRejectsInvalidScheduledTriggerConfig:
+    """Publish must reject invalid scheduled trigger configs before mutation.
 
     Invalid IANA timezones and invalid ISO 8601 interval strings are rejected
     by ``workflow_validator.collect_findings`` (via
-    ``_collect_scheduled_trigger_config_findings``, which calls
+    ``collect_scheduled_trigger_config_findings``, which calls
     ``ScheduledTriggerConfig.model_validate``) before any publish mutation.
     ``ScheduledTriggerService.validate_trigger_configs`` is a raise-first
     wrapper over that same helper, so verify, publish, and Temporal sync
@@ -821,10 +821,10 @@ class TestAAP87629RegressionPublishInvalidTimezone:
         assert workflow.published_version_id == mock_version.id
 
 
-class TestAAP87629RegressionValidateTriggerConfigs:
-    """Unit tests for ScheduledTriggerService.validate_trigger_configs static method.
+class TestValidateTriggerConfigsSharedContract:
+    """Unit tests for ScheduledTriggerService.validate_trigger_configs.
 
-    This method is a raise-first wrapper over ``_collect_scheduled_trigger_config_findings``.
+    Raise-first wrapper over ``collect_scheduled_trigger_config_findings``.
     """
 
     def test_valid_timezone_passes(self) -> None:
@@ -893,8 +893,7 @@ class TestAAP87629RegressionValidateTriggerConfigs:
 
     def test_raise_message_matches_collect_findings(self) -> None:
         """Raise-first wrapper must surface the same message as the shared helper."""
-        from syntara.workflows.validators import workflow_validator
-        from syntara.workflows.validators.workflow_definition import _collect_scheduled_trigger_config_findings
+        from syntara.workflows.validators import collect_scheduled_trigger_config_findings, workflow_validator
 
         definition = {
             "schema_version": "2.0.0",
@@ -913,7 +912,7 @@ class TestAAP87629RegressionValidateTriggerConfigs:
             "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
-        findings = _collect_scheduled_trigger_config_findings(definition)
+        findings = collect_scheduled_trigger_config_findings(definition)
         assert findings
         with pytest.raises(TriggerValidationError) as exc_info:
             ScheduledTriggerService.validate_trigger_configs(definition)

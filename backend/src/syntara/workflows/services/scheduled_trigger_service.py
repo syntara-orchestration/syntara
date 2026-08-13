@@ -38,7 +38,7 @@ from syntara.workflows.utils.schedule_parser import (
     build_schedule_id,
     config_to_temporal_schedule,
 )
-from syntara.workflows.validators.workflow_definition import _collect_scheduled_trigger_config_findings
+from syntara.workflows.validators import collect_scheduled_trigger_config_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -202,7 +202,7 @@ class ScheduledTriggerService:
         """Pre-validate all scheduled trigger configs without contacting Temporal.
 
         Raise-first wrapper around
-        ``_collect_scheduled_trigger_config_findings`` so Temporal sync and
+        ``collect_scheduled_trigger_config_findings`` so Temporal sync and
         ``WorkflowValidator.collect_findings`` share one walk / one id and
         config-handling policy. Used by ``sync_scheduled_triggers`` as a
         defense-in-depth guard after publish's pre-mutation
@@ -212,7 +212,7 @@ class ScheduledTriggerService:
             TriggerValidationError: If any scheduled trigger config is invalid.
 
         """
-        findings = _collect_scheduled_trigger_config_findings(workflow_definition)
+        findings = collect_scheduled_trigger_config_findings(workflow_definition)
         if findings:
             raise TriggerValidationError(findings[0].message)
 

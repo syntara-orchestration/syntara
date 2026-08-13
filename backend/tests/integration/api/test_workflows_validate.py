@@ -416,9 +416,9 @@ async def test_validate_converge_valid(jwt_client: AsyncClient) -> None:
 async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
     """Invalid IANA timezone on a scheduled trigger returns 422 with a scheduled-trigger finding.
 
-    Regression for AAP-87629: Builder's handleVerify calls POST /workflows/validate;
-    invalid timezones must fail here (not only on publish) so verify and publish
-    share one semantic contract.
+    Builder's handleVerify calls POST /workflows/validate; invalid timezones
+    must fail here (not only on publish) so verify and publish share one
+    semantic contract.
     """
     payload = {
         "workflow_definition": {
@@ -466,9 +466,9 @@ async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
 async def test_validate_invalid_iso8601_interval(jwt_client: AsyncClient) -> None:
     """Invalid ISO 8601 interval on a scheduled trigger returns 422 with a scheduled-trigger finding.
 
-    Regression for AAP-87629: interval was previously an unconstrained string
-    that only failed later in publish's Temporal schedule conversion, so
-    verify (this endpoint) must reject it up front too.
+    Interval was previously an unconstrained string that only failed later in
+    publish's Temporal schedule conversion, so verify (this endpoint) must reject
+    it up front too.
     """
     payload = {
         "workflow_definition": {
@@ -510,7 +510,7 @@ async def test_validate_invalid_iso8601_interval(jwt_client: AsyncClient) -> Non
 
 
 class TestValidateProjectScopedUser:
-    """Regression test for AAP-87629.
+    """Project-scoped users can call POST /workflows/validate without workflow:create.
 
     Before the fix, ``/workflows/validate`` was gated by a PermissionChecker
     that could never resolve a project scope from the request body (it has

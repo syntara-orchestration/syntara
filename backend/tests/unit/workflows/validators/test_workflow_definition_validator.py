@@ -930,7 +930,7 @@ class TestScheduledTriggerConfigFindings:
         }
 
     def test_invalid_interval_is_error(self, validator: WorkflowValidator) -> None:
-        """AAP-87629 follow-up: an unparseable interval must fail collect_findings, not just publish."""
+        """An unparseable interval must fail collect_findings, not only publish."""
         result = validator.collect_findings(self._interval_definition(interval="not-an-interval"))
         assert result.is_valid is False
         scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]

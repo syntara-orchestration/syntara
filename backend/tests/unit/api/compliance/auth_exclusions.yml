@@ -146,7 +146,7 @@ authenticated:
   # -- workflows: stateless validation --
   - method: POST
     path: /api/v1/workflows/validate
-    justification: Stateless, side-effect-free validation of caller-supplied definition; no project_id/workflow_id to authorize against (AAP-87629)
+    justification: Stateless, side-effect-free validation of caller-supplied definition; no project_id/workflow_id to authorize against
 
 public:
   # -- auth: pre-authentication flow --

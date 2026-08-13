@@ -385,7 +385,7 @@ def _extract_node_id_and_field(
     return None, None
 
 
-def _collect_scheduled_trigger_config_findings(
+def collect_scheduled_trigger_config_findings(
     workflow_definition: dict[str, Any],
 ) -> list[ValidationFinding]:
     """Validate scheduled trigger configs beyond JSON Schema (e.g. IANA timezones).
@@ -395,6 +395,11 @@ def _collect_scheduled_trigger_config_findings(
     with ``node_id`` / ``field_path`` for Builder) and by
     ``ScheduledTriggerService.validate_trigger_configs`` (raise on the first
     finding) so verify, publish, and Temporal sync cannot drift.
+
+    Public (not underscore-prefixed) and re-exported from
+    ``syntara.workflows.validators`` because it is a load-bearing shared
+    contract with ``ScheduledTriggerService``, not a private implementation
+    detail of this module.
     """
     findings: list[ValidationFinding] = []
     for trigger in workflow_definition.get("triggers", []):
@@ -455,7 +460,7 @@ class WorkflowValidator:
         node_ids = _extract_node_ids(workflow_definition)
         self._validate_graph_structure(workflow_definition, node_ids)
         self._validate_template_expressions(workflow_definition, node_ids)
-        scheduled_trigger_findings = _collect_scheduled_trigger_config_findings(workflow_definition)
+        scheduled_trigger_findings = collect_scheduled_trigger_config_findings(workflow_definition)
         if scheduled_trigger_findings:
             raise SafeValueError(scheduled_trigger_findings[0].message)
 
@@ -572,7 +577,7 @@ class WorkflowValidator:
             findings.extend(_check_approval_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
-        findings.extend(_collect_scheduled_trigger_config_findings(workflow_definition))
+        findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
 
         return findings
 
