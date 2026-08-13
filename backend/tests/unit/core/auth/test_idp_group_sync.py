@@ -239,8 +239,8 @@ class TestSyncIdpGroups:
         with patch("syntara.auth.services.idp_group_sync.jmespath.search", side_effect=TypeError("unexpected type")):
             result = await sync_idp_groups(db, user, identity, {"groups": ["admin"]}, config)
         assert result is False
-        # Should only have the mapping entries query, no sync queries
-        assert db.exec.call_count == 1
+        # Mapping entries query + _apply_group_membership_diff (clears stale IdP groups)
+        assert db.exec.call_count >= 2
 
     @pytest.mark.asyncio
     async def test_processes_matching_groups(self):
