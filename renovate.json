@@ -62,8 +62,15 @@
       "automerge": true
     },
     {
-      "description": "Disable all renovate updates on the early-access branch",
+      "description": "Keep ao-ui-tests and ao-api-tests bundle SHAs up to date in Tekton files",
+      "matchManagers": ["tekton"],
+      "matchFileNames": [".tekton/**"],
+      "automerge": true
+    },
+    {
+      "description": "Disable all renovate updates on the early-access branch except Tekton bundle digest updates",
       "matchBaseBranches": ["early-access"],
+      "matchManagers": ["!tekton"],
       "enabled": false
     }
   ]
