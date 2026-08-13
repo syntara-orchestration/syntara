@@ -4762,7 +4762,7 @@ export const handlers = [
   }),
 
   // ── AAP proxy endpoints ──────────────────────────────────────────────
-  http.get('*/aap/organizations', ({ request }) => {
+  http.get('*/proxies/aap/organizations', ({ request }) => {
     const url = new URL(request.url)
     const validationError = validateCredentialId(url)
     if (validationError) return validationError
@@ -4773,7 +4773,7 @@ export const handlers = [
     return HttpResponse.json({ count: filtered.length, results: filtered })
   }),
 
-  http.get('*/aap/job_templates/:id', ({ params, request }) => {
+  http.get('*/proxies/aap/job_templates/:id', ({ params, request }) => {
     const url = new URL(request.url)
     const validationError = validateCredentialId(url)
     if (validationError) return validationError
@@ -4809,7 +4809,7 @@ export const handlers = [
     })
   }),
 
-  http.get('*/aap/job_templates', ({ request }) => {
+  http.get('*/proxies/aap/job_templates', ({ request }) => {
     const url = new URL(request.url)
     const org = url.searchParams.get('organization')
     const search = url.searchParams.get('search')?.toLowerCase()
@@ -4824,7 +4824,7 @@ export const handlers = [
     return HttpResponse.json({ count: filtered.length, results: filtered })
   }),
 
-  http.get('*/aap/workflow_job_templates/:id', ({ params, request }) => {
+  http.get('*/proxies/aap/workflow_job_templates/:id', ({ params, request }) => {
     const url = new URL(request.url)
     const validationError = validateCredentialId(url)
     if (validationError) return validationError
@@ -4853,7 +4853,7 @@ export const handlers = [
     })
   }),
 
-  http.get('*/aap/workflow_job_templates', ({ request }) => {
+  http.get('*/proxies/aap/workflow_job_templates', ({ request }) => {
     const url = new URL(request.url)
     const org = url.searchParams.get('organization')
     const search = url.searchParams.get('search')?.toLowerCase()
@@ -4868,7 +4868,7 @@ export const handlers = [
     return HttpResponse.json({ count: filtered.length, results: filtered })
   }),
 
-  http.get('*/aap/inventories', ({ request }) => {
+  http.get('*/proxies/aap/inventories', ({ request }) => {
     const url = new URL(request.url)
     const org = url.searchParams.get('organization')
     const search = url.searchParams.get('search')?.toLowerCase()
@@ -4883,7 +4883,7 @@ export const handlers = [
     return HttpResponse.json({ count: filtered.length, results: filtered })
   }),
 
-  http.get('*/aap/execution_environments', ({ request }) => {
+  http.get('*/proxies/aap/execution_environments', ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get('search')?.toLowerCase()
 
@@ -4896,7 +4896,7 @@ export const handlers = [
     return HttpResponse.json({ count: filtered.length, results: filtered })
   }),
 
-  http.get('*/aap/credentials', ({ request }) => {
+  http.get('*/proxies/aap/credentials', ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get('search')?.toLowerCase()
 
@@ -4930,7 +4930,7 @@ export const handlers = [
     })
   }),
 
-  http.get('*/aap/instance_groups', ({ request }) => {
+  http.get('*/proxies/aap/instance_groups', ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get('search')?.toLowerCase()
 

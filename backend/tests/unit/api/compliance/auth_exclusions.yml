@@ -95,43 +95,43 @@ authenticated:
 
   # -- aap: proxy to Controller which enforces its own RBAC --
   - method: GET
-    path: /api/v1/aap/credentials
+    path: /api/v1/proxies/aap/credentials
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/execution_environments
+    path: /api/v1/proxies/aap/execution_environments
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/instance_groups
+    path: /api/v1/proxies/aap/instance_groups
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/inventories
+    path: /api/v1/proxies/aap/inventories
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/job_templates
+    path: /api/v1/proxies/aap/job_templates
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/job_templates/{job_template_id}
+    path: /api/v1/proxies/aap/job_templates/{job_template_id}
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/labels
+    path: /api/v1/proxies/aap/labels
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/organizations
+    path: /api/v1/proxies/aap/organizations
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/workflow_job_templates
+    path: /api/v1/proxies/aap/workflow_job_templates
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/workflow_job_templates/{workflow_job_template_id}
+    path: /api/v1/proxies/aap/workflow_job_templates/{workflow_job_template_id}
     justification: Proxy to Controller; Controller enforces RBAC
 
   # -- tool_manager/metrics: internal observability --

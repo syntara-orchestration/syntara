@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from temporalio.exceptions import ApplicationError
 
 from syntara.core.models.principal import service_principal_id
 from syntara.metrics.types import MetricType
@@ -438,3 +439,75 @@ class TestLoadPublishedWorkflow:
 
         with pytest.raises(WorkflowNotPublishedError):
             await ScheduledExecutionLauncher._load_published_workflow(session, uuid4())
+
+
+class TestNonRetryablePermanentFailures:
+    """Tests that permanent failures are raised as non-retryable ApplicationErrors (AAP-86776).
+
+    A schedule firing against a workflow that is missing, soft-deleted,
+    disabled, or unpublished must fail once — not retry forever under
+    Temporal's default unlimited retry policy.
+    """
+
+    async def test_workflow_not_published_raises_non_retryable_application_error(self) -> None:
+        """WorkflowNotPublishedError must surface as ApplicationError(non_retryable=True)."""
+        launcher = _make_launcher()
+        workflow_id = uuid4()
+        workflow_id_str = str(workflow_id)
+        scheduled_at = datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC)
+        triggered_at = scheduled_at + timedelta(seconds=3)
+
+        mock_info = _make_mock_activity_info(scheduled_at, triggered_at)
+        mock_recorder = MagicMock()
+
+        with (
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch(
+                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+            ),
+            patch.object(
+                launcher,
+                "_create_execution",
+                new_callable=AsyncMock,
+                side_effect=WorkflowNotPublishedError(workflow_id),
+            ),
+        ):
+            mock_activity.info.return_value = mock_info
+
+            with pytest.raises(ApplicationError, match="has no published version") as exc_info:
+                await launcher.run(workflow_id_str, "trigger_1")
+
+            assert exc_info.value.non_retryable is True
+            assert exc_info.value.type == "WorkflowNotPublishedError"
+
+        # Error metric should still be recorded
+        calls = mock_recorder.record.call_args_list
+        assert len(calls) == 1
+        assert calls[0][1]["labels"]["status"] == "error"
+
+    async def test_transient_error_remains_retryable(self) -> None:
+        """A transient error (e.g. DB connection lost) must NOT be wrapped as non-retryable."""
+        launcher = _make_launcher()
+        workflow_id_str = str(uuid4())
+        scheduled_at = datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC)
+        triggered_at = scheduled_at + timedelta(seconds=2)
+
+        mock_info = _make_mock_activity_info(scheduled_at, triggered_at)
+        mock_recorder = MagicMock()
+
+        with (
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch(
+                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+            ),
+            patch.object(
+                launcher,
+                "_create_execution",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("DB connection lost"),
+            ),
+        ):
+            mock_activity.info.return_value = mock_info
+
+            with pytest.raises(RuntimeError, match="DB connection lost"):
+                await launcher.run(workflow_id_str, "trigger_1")
