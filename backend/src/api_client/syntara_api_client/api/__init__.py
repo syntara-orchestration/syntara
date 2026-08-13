@@ -9,7 +9,7 @@ from ..client import AuthenticatedClient
 
 if TYPE_CHECKING:
     from .admin import AdminApi
-    from .ansible_automation_platform import AnsibleAutomationPlatformApi
+    from .ansible_automation_platform_proxy import AnsibleAutomationPlatformProxyApi
     from .approvals import ApprovalsApi
     from .authentication import AuthenticationApi
     from .authorization import AuthorizationApi
@@ -44,10 +44,10 @@ class SyntaraApiRegistry:
         self._client = client
 
     @cached_property
-    def ansible_automation_platform(self) -> AnsibleAutomationPlatformApi:
-        from .ansible_automation_platform import AnsibleAutomationPlatformApi
+    def ansible_automation_platform_proxy(self) -> AnsibleAutomationPlatformProxyApi:
+        from .ansible_automation_platform_proxy import AnsibleAutomationPlatformProxyApi
 
-        return AnsibleAutomationPlatformApi(client=self._client)
+        return AnsibleAutomationPlatformProxyApi(client=self._client)
 
     @cached_property
     def admin(self) -> AdminApi:

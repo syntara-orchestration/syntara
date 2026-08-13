@@ -6,12 +6,13 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.aap_list_response_aap_label import AAPListResponseAAPLabel
+from ...models.aap_workflow_job_template_detail import AAPWorkflowJobTemplateDetail
 from ...models.error_data import ErrorData
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
+    workflow_job_template_id: int,
     *,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
@@ -54,7 +55,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/aap/labels",
+        "url": f"/proxies/aap/workflow_job_templates/{workflow_job_template_id}",
         "params": params,
     }
 
@@ -63,9 +64,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> AAPListResponseAAPLabel | ErrorData | None:
+) -> AAPWorkflowJobTemplateDetail | ErrorData | None:
     if response.status_code == 200:
-        response_200 = AAPListResponseAAPLabel.from_dict(response.json())
+        response_200 = AAPWorkflowJobTemplateDetail.from_dict(response.json())
 
         return response_200
 
@@ -117,7 +118,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[AAPListResponseAAPLabel | ErrorData]:
+) -> Response[AAPWorkflowJobTemplateDetail | ErrorData]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -129,6 +130,7 @@ def _build_response(
 
 
 def sync_detailed(
+    workflow_job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
@@ -136,12 +138,14 @@ def sync_detailed(
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[AAPListResponseAAPLabel | ErrorData]:
-    """List labels
+) -> Response[AAPWorkflowJobTemplateDetail | ErrorData]:
+    """Get workflow job template
 
-     List Ansible Automation Platform labels.
+     Get Ansible Automation Platform workflow job template details including prompt-on-launch
+    capabilities.
 
     Args:
+        workflow_job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -152,10 +156,11 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPLabel | ErrorData]
+        Response[AAPWorkflowJobTemplateDetail | ErrorData]
     """
 
     kwargs = _get_kwargs(
+        workflow_job_template_id=workflow_job_template_id,
         search=search,
         page_size=page_size,
         credential_id=credential_id,
@@ -171,18 +176,21 @@ def sync_detailed(
 
 
 def sync(
+    workflow_job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> AAPListResponseAAPLabel | ErrorData | None:
-    """List labels
+) -> AAPWorkflowJobTemplateDetail | ErrorData | None:
+    """Get workflow job template
 
-     List Ansible Automation Platform labels.
+     Get Ansible Automation Platform workflow job template details including prompt-on-launch
+    capabilities.
 
     Args:
+        workflow_job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -193,10 +201,11 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPLabel | ErrorData
+        AAPWorkflowJobTemplateDetail | ErrorData
     """
 
     return sync_detailed(
+        workflow_job_template_id=workflow_job_template_id,
         client=client,
         search=search,
         page_size=page_size,
@@ -206,18 +215,21 @@ def sync(
 
 
 async def asyncio_detailed(
+    workflow_job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> Response[AAPListResponseAAPLabel | ErrorData]:
-    """List labels
+) -> Response[AAPWorkflowJobTemplateDetail | ErrorData]:
+    """Get workflow job template
 
-     List Ansible Automation Platform labels.
+     Get Ansible Automation Platform workflow job template details including prompt-on-launch
+    capabilities.
 
     Args:
+        workflow_job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -228,10 +240,11 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AAPListResponseAAPLabel | ErrorData]
+        Response[AAPWorkflowJobTemplateDetail | ErrorData]
     """
 
     kwargs = _get_kwargs(
+        workflow_job_template_id=workflow_job_template_id,
         search=search,
         page_size=page_size,
         credential_id=credential_id,
@@ -244,18 +257,21 @@ async def asyncio_detailed(
 
 
 async def asyncio(
+    workflow_job_template_id: int,
     *,
     client: AuthenticatedClient,
     search: None | str | Unset = UNSET,
     page_size: int | Unset = 50,
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
-) -> AAPListResponseAAPLabel | ErrorData | None:
-    """List labels
+) -> AAPWorkflowJobTemplateDetail | ErrorData | None:
+    """Get workflow job template
 
-     List Ansible Automation Platform labels.
+     Get Ansible Automation Platform workflow job template details including prompt-on-launch
+    capabilities.
 
     Args:
+        workflow_job_template_id (int):
         search (None | str | Unset):
         page_size (int | Unset):  Default: 50.
         credential_id (None | Unset | UUID):
@@ -266,11 +282,12 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AAPListResponseAAPLabel | ErrorData
+        AAPWorkflowJobTemplateDetail | ErrorData
     """
 
     return (
         await asyncio_detailed(
+            workflow_job_template_id=workflow_job_template_id,
             client=client,
             search=search,
             page_size=page_size,

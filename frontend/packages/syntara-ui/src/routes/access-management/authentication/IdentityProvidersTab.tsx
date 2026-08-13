@@ -200,7 +200,7 @@ function ProviderRow({
             id={`provider-toggle-${provider.id}`}
             label="Enabled"
             isChecked={provider.enabled}
-            isDisabled={!permissions.canUpdate}
+            aria-disabled={!permissions.canUpdate || undefined}
             onChange={permissions.canUpdate ? () => onToggleEnabled(provider) : undefined}
             aria-label={`Toggle ${provider.name}`}
           />
