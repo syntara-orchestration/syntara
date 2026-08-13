@@ -136,7 +136,7 @@ class TestAsyncToolInvocationEventDispatch:
             msg = "Access denied"
             raise PermissionError(msg)
 
-        # Mock the tool disable functionality to avoid side effects
+        # Mock failure reporting to avoid side effects
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
@@ -287,7 +287,7 @@ class TestSyncToolInvocationEventDispatch:
             msg = "Invalid operation"
             raise ValueError(msg)
 
-        # Mock the tool disable functionality to avoid side effects
+        # Mock failure reporting to avoid side effects
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(

@@ -194,8 +194,8 @@ class TestSyncToolWrapper:
     @pytest.mark.usefixtures("fast_retry_settings")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    def test_sync_wrapper_tool_disable_scheduling(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
-        """Test sync tool wrapper disables tool for valid tool_id (no event loop provided)."""
+    def test_sync_wrapper_tool_failure_reporting(self, mock_logger: Mock, mock_report_tool_failure: AsyncMock) -> None:
+        """Test sync tool wrapper reports failure for valid tool_id (no event loop provided)."""
         # Create BaseTool with valid tool_id
         valid_tool_id = uuid4()
         tool = Mock(spec=BaseTool)
@@ -216,13 +216,13 @@ class TestSyncToolWrapper:
         )
 
         # Verify _report_tool_failure was actually called (fallback path using asyncio.run)
-        mock_disable_tool.assert_called_once()
-        args = mock_disable_tool.call_args[0]
+        mock_report_tool_failure.assert_called_once()
+        args = mock_report_tool_failure.call_args[0]
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, RuntimeError)
-        assert str(disabled_error) == "Sync failure"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, RuntimeError)
+        assert str(reported_error) == "Sync failure"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -234,8 +234,10 @@ class TestSyncToolWrapper:
     @pytest.mark.usefixtures("fast_retry_settings")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    def test_sync_wrapper_tool_disable_with_event_loop(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
-        """Test sync tool wrapper disables tool for valid tool_id (with event loop provided)."""
+    def test_sync_wrapper_tool_failure_reporting_with_event_loop(
+        self, mock_logger: Mock, mock_report_tool_failure: AsyncMock
+    ) -> None:
+        """Test sync tool wrapper reports failure for valid tool_id (with event loop provided)."""
         # Create a mock event loop
         import asyncio
 
@@ -262,13 +264,13 @@ class TestSyncToolWrapper:
         )
 
         # Verify _report_tool_failure was actually called (via run_coroutine_threadsafe path)
-        mock_disable_tool.assert_called_once()
-        args = mock_disable_tool.call_args[0]
+        mock_report_tool_failure.assert_called_once()
+        args = mock_report_tool_failure.call_args[0]
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, ConnectionError)
-        assert str(disabled_error) == "Network failure"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, ConnectionError)
+        assert str(reported_error) == "Network failure"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -473,10 +475,10 @@ class TestToolWrapperFailureScenarios:
 
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    async def test_tool_wrapper_successful_tool_id_extraction_and_disable_scheduling(
-        self, mock_logger: Mock, mock_disable_tool: AsyncMock
+    async def test_tool_wrapper_successful_tool_id_extraction_and_failure_reporting(
+        self, mock_logger: Mock, mock_report_tool_failure: AsyncMock
     ) -> None:
-        """Test tool wrapper with valid tool_id that gets disabled directly."""
+        """Test tool wrapper with valid tool_id reports failure directly."""
         # Create BaseTool with valid tool_id
         valid_tool_id = uuid4()
         tool = Mock(spec=BaseTool)
@@ -497,14 +499,14 @@ class TestToolWrapperFailureScenarios:
         )
         mock_logger.debug.assert_any_call("Extracted tool_id from metadata", tool_id=valid_tool_id)
 
-        # Verify tool disable was called directly
-        mock_disable_tool.assert_called_once()
-        args, _kwargs = mock_disable_tool.call_args
+        # Verify failure reporting was called directly
+        mock_report_tool_failure.assert_called_once()
+        args, _kwargs = mock_report_tool_failure.call_args
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, OSError)
-        assert str(disabled_error) == "Disk full"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, OSError)
+        assert str(reported_error) == "Disk full"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -666,7 +668,7 @@ class TestMetricsEmissionAndDbPersistence:
         _, _, emit_status = mock_emit.call_args[0]
         assert emit_status == ToolExecutionStatus.TIMEOUT
 
-        # _run_coroutine_from_sync is called twice: once for tool disable, once for DB persistence
+        # _run_coroutine_from_sync is called twice: once for failure reporting, once for DB persistence
         assert mock_run_coro.call_count == 2
         persist_call = mock_run_coro.call_args_list[-1]
         assert persist_call[0][2] == "tool execution DB persistence"
