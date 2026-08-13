@@ -314,7 +314,7 @@ When reviewing your own implementation before committing, verify these gates pas
 
 ### Independent Review (High-Risk Changes)
 
-For high-risk UI changes (new pages, auth flows, complex state management), run `/review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
+For high-risk UI changes (new pages, auth flows, complex state management), run `/frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
 
 ---
 

@@ -89,7 +89,7 @@ Step 3 — REVIEW LOCALLY
 Run npm start, open http://localhost:5173, test every state in the browser.
 
 Step 4 — CODE REVIEW
-Type /review-pr. Fix all Blocking issues.
+Type /frontend-review-pr. Fix all Blocking issues.
 
 Step 5 — UX CHECK
 Use the patternfly-ux-design-system skill + paste a screenshot.
@@ -183,12 +183,12 @@ npm run test:ui # unit tests with coverage
 
 Run two checks after implementation:
 
-**1. Code quality** — type `/review-pr` in the agent chat. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
+**1. Code quality** — type `/frontend-review-pr` in the agent chat. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
 
 **2. Visual / UX** — paste a screenshot and ask the agent to verify against the `patternfly-ux-design-system` skill.
 
 ```text
-Implement → /review-pr (fix blockers) → UX skill + screenshot (fix visual gaps)
+Implement → /frontend-review-pr (fix blockers) → UX skill + screenshot (fix visual gaps)
   → lint/tsc/coverage → Open PR with screenshots
 ```
 
@@ -222,7 +222,7 @@ Always check in a browser before opening a PR. Run `npm start` (UI at http://loc
 Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](../AGENTS.md), flags missing tests, and produces a draft PR description.
 
 ```text
-/review-pr
+/frontend-review-pr
 ```
 
 Or with focus areas:
@@ -293,7 +293,7 @@ npm run e2e     # Playwright integration tests
 
 ## 9. Fixing Guideline Violations
 
-When `/review-pr` or a reviewer flags violations, here are the most common ones. You can also paste any violation into the agent and say "explain and fix this."
+When `/frontend-review-pr` or a reviewer flags violations, here are the most common ones. You can also paste any violation into the agent and say "explain and fix this."
 
 | Violation                           | How to fix                                                                                 |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -327,7 +327,7 @@ Shortest path from "I need to build this page" to an open PR:
 8. **Review locally** — `npm start`, open http://localhost:5173, walk through every state ([§4](#4-review-your-changes-locally))
 9. **Side-by-side screenshot** — paste your page + mockup back to fix visual gaps
 10. **Run quality checks** -- `npm run check && npm run test:ui`
-11. **`/review-pr`** — fix every Blocking issue ([§9](#9-fixing-guideline-violations) if unclear)
+11. **`/frontend-review-pr`** — fix every Blocking issue ([§9](#9-fixing-guideline-violations) if unclear)
 12. **UX skill + screenshot** — fix visual divergences
 13. **Open the PR** with screenshots of every state (loaded, empty, error, success toast) following the PR template provided
 
@@ -353,7 +353,7 @@ Skills are detailed reference guides the agent consults while working. You can a
 | ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Coding Standards**            | `coding_standards.md` (993 lines)            | 21+ patterns with code examples: typed API clients, `useQueryState`, Zod forms, error handling, design tokens, accessibility, no nested ternaries                         | Every implementation task. The agent reads this automatically, but you can say "check against the coding standards skill" to force a review. |
 | **Testing Guidelines**          | `testing_guidelines.md` (358 lines)          | Coverage requirements (80%), query priority (`getByRole` > `getByLabelText` > `getByText`), `userEvent` over `fireEvent`, `vitest-axe` accessibility tests, mock patterns | Writing or reviewing tests. Say "use the testing guidelines skill" to verify test quality.                                                   |
-| **PR Review**                   | `pr_review.md` (234 lines)                   | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                             | Before opening a PR. Type `/review-pr` and the agent runs the full checklist.                                                                |
+| **PR Review**                   | `pr_review.md` (234 lines)                   | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                             | Before opening a PR. Type `/frontend-review-pr` and the agent runs the full checklist.                                                                |
 | **Playwright E2E**              | `playwright_e2e.md` (772 lines)              | E2E test writing: page objects, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                  | Writing browser-level tests for user flows. Say "use the playwright_e2e skill" to write E2E tests.                                           |
 | **PatternFly UX Design System** | `patternfly-ux-design-system.md` (898 lines) | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                                   | Verifying that your UI matches the design system. Paste a screenshot and say "use the patternfly-ux-design-system skill to check this."      |
 | **Frontend Specialist**         | `frontend_specialist.md`                     | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                             | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
@@ -365,7 +365,7 @@ Commands are shortcuts you type in the agent chat. They trigger specific workflo
 
 | Command             | What it does                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------- |
-| `/review-pr`        | Runs the full PR review skill against your current branch                                         |
+| `/frontend-review-pr`        | Runs the full PR review skill against your current branch                                         |
 | `/specify`          | Creates a feature spec from a natural language description                                        |
 | `/clarify`          | Asks up to 5 clarification questions about an underspecified feature spec                         |
 | `/plan`             | Generates an implementation plan from a feature spec                                              |
@@ -393,11 +393,11 @@ Commands are shortcuts you type in the agent chat. They trigger specific workflo
 /implement
     → executes each task, writes code + tests
 
-/review-pr
+/frontend-review-pr
     → reviews the result against the quality checklist
 ```
 
-You can skip steps. For a quick bug fix, just describe the problem and let the agent fix it, then run `/review-pr` before opening the PR.
+You can skip steps. For a quick bug fix, just describe the problem and let the agent fix it, then run `/frontend-review-pr` before opening the PR.
 
 ---
 
@@ -457,7 +457,7 @@ The command asks you 5 questions, then handles the rest:
 4. What should this page or component do?
 5. Should I write E2E tests?
 
-After collecting your answers, it runs the full workflow: finds a similar existing page as a reference, reads the coding standards and PatternFly UX skills, creates a plan for your approval, implements the component with unit tests and accessibility checks, verifies against the design system, optionally writes Playwright E2E tests, and finishes with `/review-pr`.
+After collecting your answers, it runs the full workflow: finds a similar existing page as a reference, reads the coding standards and PatternFly UX skills, creates a plan for your approval, implements the component with unit tests and accessibility checks, verifies against the design system, optionally writes Playwright E2E tests, and finishes with `/frontend-review-pr`.
 
 ### Why a command and not a skill
 
