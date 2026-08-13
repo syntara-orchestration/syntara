@@ -76,6 +76,7 @@ class TestExecutionMetadata:
             ),
         ):
             mock_get_settings.return_value.service_identity = service_identity
+            mock_get_settings.return_value.max_concurrent_workflows = 0
 
             mock_session = AsyncMock()
             launcher._session_factory = MagicMock()
@@ -263,6 +264,7 @@ class TestSetupActivityNoTemporalStart:
             ),
         ):
             mock_get_settings.return_value.service_identity = "backend.ao.svc"
+            mock_get_settings.return_value.max_concurrent_workflows = 0
 
             mock_session = AsyncMock()
             launcher._session_factory = MagicMock()
@@ -313,6 +315,7 @@ class TestSetupActivityNoTemporalStart:
             ),
         ):
             mock_get_settings.return_value.service_identity = "backend.ao.svc"
+            mock_get_settings.return_value.max_concurrent_workflows = 0
 
             mock_session = AsyncMock()
             launcher._session_factory = MagicMock()
@@ -324,6 +327,111 @@ class TestSetupActivityNoTemporalStart:
         execution_id = result["execution_id"]
         expected_temporal_id = f"my-workflow-{execution_id}"
         assert result["temporal_workflow_id"] == expected_temporal_id
+
+
+class TestScheduledLauncherConcurrencyLimit:
+    """Tests for the application-level concurrency gate in ScheduledExecutionLauncher."""
+
+    async def test_raises_when_active_meets_limit(self) -> None:
+        """_create_execution raises non-retryable ApplicationError when active >= limit."""
+        from temporalio.exceptions import ApplicationError
+
+        launcher = _make_launcher()
+        workflow_id = uuid4()
+        scheduled_at = datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC)
+        triggered_at = datetime(2024, 1, 1, 9, 0, 3, tzinfo=UTC)
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.name = "test-workflow"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "triggers": [],
+            "nodes": [],
+            "edges": [],
+        }
+
+        with (
+            patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch(
+                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                return_value="Author Name",
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.count_active_executions",
+                new_callable=AsyncMock,
+                return_value=5,
+            ) as mock_count,
+        ):
+            mock_get_settings.return_value.service_identity = "backend.ao.svc"
+            mock_get_settings.return_value.max_concurrent_workflows = 5
+
+            mock_session = AsyncMock()
+            launcher._session_factory = MagicMock()
+            launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            with pytest.raises(ApplicationError, match="concurrency limit reached") as exc_info:
+                await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+
+        assert exc_info.value.non_retryable is True
+        mock_count.assert_awaited_once_with(mock_session)
+        mock_session.add.assert_not_called()
+
+    async def test_proceeds_when_under_limit(self) -> None:
+        """_create_execution continues when active count is below the configured limit."""
+        launcher = _make_launcher()
+        workflow_id = uuid4()
+        scheduled_at = datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC)
+        triggered_at = datetime(2024, 1, 1, 9, 0, 3, tzinfo=UTC)
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.name = "test-workflow"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "triggers": [],
+            "nodes": [],
+            "edges": [],
+        }
+
+        with (
+            patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch(
+                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                return_value="Author Name",
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.count_active_executions",
+                new_callable=AsyncMock,
+                return_value=2,
+            ) as mock_count,
+        ):
+            mock_get_settings.return_value.service_identity = "backend.ao.svc"
+            mock_get_settings.return_value.max_concurrent_workflows = 5
+
+            mock_session = AsyncMock()
+            launcher._session_factory = MagicMock()
+            launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+
+        mock_count.assert_awaited_once_with(mock_session)
+        mock_session.add.assert_called_once()
+        assert "execution_id" in result
 
 
 class TestLauncherWorkflow:
