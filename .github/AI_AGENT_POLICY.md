@@ -2,7 +2,9 @@
 
 This document records the upstream policy for AI coding-agent configuration in
 this repository (Claude Code, Cursor, and similar tools that read project
-instruction files).
+instruction files). For the policy on AI-assisted **contributions** (disclosure,
+accountability, quality standards), see
+[`AI_POLICY.md`](AI_POLICY.md).
 
 ## Decision: no agent hooks in upstream
 

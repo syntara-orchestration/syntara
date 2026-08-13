@@ -9,6 +9,10 @@ This policy applies to the following projects and resources:
 
 > **Note:** The above projects and resources **MAY have their own AI policies** which MAY expand or be more restrictive than this policy.
 
+For the policy on AI **agent runtime configuration** in this repository (hooks,
+skills, `.claude/` settings), see
+[`AI_AGENT_POLICY.md`](AI_AGENT_POLICY.md).
+
 ## Principles
 
 1. Contributors MAY use the assistance of AI tools for contributing [^1] to the above projects and resources, provided that they take full responsibility for their contributions and follow the principles described in this policy.
