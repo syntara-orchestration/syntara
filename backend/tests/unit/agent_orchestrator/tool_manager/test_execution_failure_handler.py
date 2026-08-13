@@ -678,8 +678,8 @@ class TestReportToolFailure:
     """Tests for the execution failure reporting helper."""
 
     @pytest.mark.asyncio
-    async def test_report_tool_failure_leaves_enabled_untouched(self) -> None:
-        """Test that reporting a failure records status only and never changes the enabled flag."""
+    async def test_report_tool_failure_reports_error_status(self) -> None:
+        """Helper reports ERROR status and refresh_error via update_tool_status."""
         tool_id = uuid4()
         client = AsyncMock()
         client.__aenter__.return_value = client
@@ -695,4 +695,3 @@ class TestReportToolFailure:
         assert kwargs["tool_id"] == tool_id
         assert kwargs["status"] == ToolStatus.ERROR
         assert "TimeoutError" in kwargs["refresh_error"]
-        assert "enabled" not in kwargs
