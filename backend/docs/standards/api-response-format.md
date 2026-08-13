@@ -570,7 +570,7 @@ Not all validation errors follow the exact pattern above:
 
 #### AAP Proxy Endpoints
 
-Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. They do not use cursor-based pagination or the standard query parameter conventions:
+Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not use cursor-based pagination or the standard query parameter conventions:
 
 | Aspect | Standard Pattern | AAP Proxy |
 |---|---|---|
@@ -581,7 +581,7 @@ Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. T
 | Sorting | `-field` prefix notation with ID tiebreaker | None (upstream order) |
 | Default page size | 20 (max 100) | 50 (max 200) |
 
-**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from compliance testing by the `"aap"` tag in the OpenAPI spec, not via `list_compliance_exclusions.yaml`.
+**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `list_compliance_exclusions.yaml`.
 
 #### Custom List Implementations
 
@@ -879,7 +879,7 @@ A catch-all `IntegrityError` handler in `core/error_handlers.py` provides a safe
 
 #### AAP Proxy Endpoints
 
-Endpoints under `/api/v1/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"aap"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
+Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
 
 #### Action Endpoints
 
@@ -931,7 +931,7 @@ Endpoints are classified by operation_id prefix and HTTP method:
 - **Update**: PATCH and PUT endpoints with a path parameter
 - **Delete**: DELETE endpoints
 
-AAP proxy endpoints (tagged `"aap"` in the OpenAPI spec) are excluded from CRUD discovery, same as for list compliance. Action endpoints (disable, enable, publish, unpublish, restore, rotate, retry) are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
+AAP proxy endpoints (tagged `"Ansible Automation Platform Proxy"` in the OpenAPI spec) are excluded from CRUD discovery, same as for list compliance. Action endpoints (disable, enable, publish, unpublish, restore, rotate, retry) are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
 
 #### Exclusion mechanism
 

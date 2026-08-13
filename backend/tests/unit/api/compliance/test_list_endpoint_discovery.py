@@ -176,7 +176,7 @@ class TestFiltering:
         testable_ids = {ep.operation_id for ep in testable_endpoints}
 
         # AAP endpoints should be in all but not testable (tagged in OpenAPI spec)
-        aap_endpoints = [ep for ep in all_endpoints if "Ansible Automation Platform" in ep.tags]
+        aap_endpoints = [ep for ep in all_endpoints if "Ansible Automation Platform Proxy" in ep.tags]
         assert len(aap_endpoints) > 0, "Should have some AAP endpoints"
 
         for ep in aap_endpoints:
