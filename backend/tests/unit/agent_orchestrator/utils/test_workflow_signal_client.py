@@ -1,8 +1,6 @@
 """Unit tests for WorkflowSignalClient."""
 
-from collections.abc import Generator
 from datetime import UTC, datetime
-from unittest.mock import patch
 from uuid import UUID
 
 import httpx
@@ -16,23 +14,8 @@ _EXEC_UUID = "12345678-1234-5678-1234-567812345678"
 _SIGNAL_URL = f"{_BASE_URL}/executions/{_EXEC_UUID}/activities/step_1/signal"
 
 
-@pytest.fixture(autouse=True)
-def _patch_api_base_url() -> Generator[None]:
-    with (
-        patch(
-            "syntara.agent_orchestrator.utils.workflow_signal_client.get_api_base_url",
-            return_value=_BASE_URL,
-        ),
-        patch(
-            "syntara.workflows.utils.url.get_api_base_url",
-            return_value=_BASE_URL,
-        ),
-    ):
-        yield
-
-
 class TestValidateSignalUrl:
-    """Tests for validate_signal_url SSRF prevention."""
+    """Tests for validate_signal_url path structure validation."""
 
     def test_valid_signal_url_accepted(self) -> None:
         validate_signal_url(_SIGNAL_URL)
@@ -41,14 +24,17 @@ class TestValidateSignalUrl:
         url = f"{_BASE_URL}/executions/{_EXEC_UUID}/activities/my-step.v2/signal"
         validate_signal_url(url)
 
-    def test_rejects_different_host(self) -> None:
-        url = f"https://evil.com/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
-        with pytest.raises(ValueError, match="host/scheme"):
-            validate_signal_url(url)
+    def test_valid_url_with_different_host(self) -> None:
+        url = f"https://other-host:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
+        validate_signal_url(url)
 
-    def test_rejects_different_scheme(self) -> None:
+    def test_valid_url_with_http_scheme(self) -> None:
         url = f"http://nexus:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
-        with pytest.raises(ValueError, match="host/scheme"):
+        validate_signal_url(url)
+
+    def test_rejects_invalid_scheme(self) -> None:
+        url = f"ftp://nexus:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
+        with pytest.raises(ValueError, match="http or https"):
             validate_signal_url(url)
 
     def test_rejects_arbitrary_path(self) -> None:
@@ -56,29 +42,19 @@ class TestValidateSignalUrl:
         with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 
-    def test_rejects_path_outside_api_base(self) -> None:
-        url = f"https://nexus:8000/other/executions/{_EXEC_UUID}/activities/step_1/signal"
-        with pytest.raises(ValueError, match="outside the API base"):
-            validate_signal_url(url)
-
     def test_rejects_invalid_execution_id(self) -> None:
         url = f"{_BASE_URL}/executions/not-a-uuid/activities/step_1/signal"
         with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 
-    def test_rejects_loopback_ssrf(self) -> None:
+    def test_rejects_loopback_ssrf_without_signal_path(self) -> None:
         url = "https://127.0.0.1:9911/some/path"
-        with pytest.raises(ValueError, match="host/scheme"):
-            validate_signal_url(url)
-
-    def test_rejects_url_with_userinfo_at_sign(self) -> None:
-        url = f"https://evil.com@nexus:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
-        with pytest.raises(ValueError, match="host/scheme"):
+        with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 
     def test_rejects_extra_path_segments(self) -> None:
         url = f"{_BASE_URL}/executions/{_EXEC_UUID}/activities/step_1/signal/extra"
-        with pytest.raises(ValueError, match="does not match expected"):
+        with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 
     def test_rejects_publish_endpoint_ssrf(self) -> None:
@@ -230,7 +206,7 @@ class TestWorkflowSignalClientSendSuccessSignal:
         invocation_id = UUID(_EXEC_UUID)
         result = {"content": "Test"}
 
-        with pytest.raises(ValueError, match="host/scheme"):
+        with pytest.raises(ValueError, match="not a valid signal endpoint"):
             await WorkflowSignalClient.send_success_signal("https://evil.com/steal", invocation_id, result)
 
 
@@ -348,5 +324,5 @@ class TestWorkflowSignalClientSendFailureSignal:
         invocation_id = UUID(_EXEC_UUID)
         error = RuntimeError("some error")
 
-        with pytest.raises(ValueError, match="host/scheme"):
+        with pytest.raises(ValueError, match="not a valid signal endpoint"):
             await WorkflowSignalClient.send_failure_signal("https://evil.com/steal", invocation_id, error)

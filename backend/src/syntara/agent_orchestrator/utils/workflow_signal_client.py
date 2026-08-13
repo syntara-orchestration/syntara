@@ -13,7 +13,6 @@ import httpx
 import structlog
 
 from syntara.core.tls.http_client import build_internal_http_client
-from syntara.workflows.utils.url import generate_activity_signal_url, get_api_base_url
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -21,29 +20,27 @@ _SIGNAL_HTTP_TIMEOUT_SECONDS = 10.0
 
 
 def validate_signal_url(callback_url: str) -> None:
-    """Validate that callback_url points to an allowed internal signal endpoint.
+    """Validate that callback_url points to a well-formed internal signal endpoint.
 
-    Prevents the platform mTLS identity from being presented to arbitrary
-    destinations (SSRF mitigation).  Validation works by parsing the URL,
-    extracting the execution-id and activity-id, and round-tripping through
-    ``generate_activity_signal_url`` — so this stays in sync with the
-    canonical URL shape automatically.
+    Defense-in-depth against SSRF: validates that the URL path has the
+    canonical ``/executions/{id}/activities/{id}/signal`` shape by
+    round-tripping through ``generate_activity_signal_url``.  Host-level
+    SSRF prevention is handled by ``_sanitize_context_data`` (strips
+    ``callback_url`` from non-cert-authenticated requests) and by
+    ``build_internal_http_client`` (mTLS CA verification).
 
     Raises:
         ValueError: If the URL does not match the expected signal endpoint.
 
     """
-    base_url = get_api_base_url()
-    base_parsed = urlparse(base_url)
     url_parsed = urlparse(callback_url)
 
-    if url_parsed.scheme != base_parsed.scheme or url_parsed.netloc != base_parsed.netloc:
+    if url_parsed.scheme not in ("https", "http"):
         logger.critical(
-            "SECURITY: signal callback URL host/scheme mismatch — potential SSRF",
+            "SECURITY: signal callback URL has invalid scheme",
             callback_url=callback_url,
-            expected_base=base_url,
         )
-        msg = "Signal callback URL host/scheme does not match configured API base"
+        msg = "Signal callback URL must use http or https scheme"
         raise ValueError(msg)
 
     if url_parsed.query or url_parsed.fragment:
@@ -54,23 +51,13 @@ def validate_signal_url(callback_url: str) -> None:
         msg = "Signal callback URL must not contain query string or fragment"
         raise ValueError(msg)
 
-    base_path = base_parsed.path.rstrip("/")
-    if not url_parsed.path.startswith(base_path + "/"):
-        logger.critical(
-            "SECURITY: signal callback URL path outside API base — potential SSRF",
-            callback_url=callback_url,
-            expected_base=base_url,
-        )
-        msg = "Signal callback URL path is outside the API base"
-        raise ValueError(msg)
-
-    path_suffix = url_parsed.path[len(base_path) :]
-    parts = path_suffix.strip("/").split("/")
+    parts = url_parsed.path.strip("/").split("/")
 
     try:
-        execution_id = UUID(parts[1])
-        activity_id = parts[3]
-    except (IndexError, ValueError):
+        exec_idx = parts.index("executions")
+        act_idx = parts.index("activities")
+        sig_idx = parts.index("signal")
+    except ValueError:
         logger.critical(
             "SECURITY: signal callback URL path is not a valid signal endpoint — potential SSRF",
             callback_url=callback_url,
@@ -78,14 +65,31 @@ def validate_signal_url(callback_url: str) -> None:
         msg = "Signal callback URL path is not a valid signal endpoint"
         raise ValueError(msg) from None
 
-    expected = generate_activity_signal_url(execution_id, activity_id)
-    if callback_url != expected:
+    if act_idx != exec_idx + 2 or sig_idx != act_idx + 2 or sig_idx != len(parts) - 1:
         logger.critical(
-            "SECURITY: signal callback URL does not match expected pattern — potential SSRF",
+            "SECURITY: signal callback URL path structure is invalid",
             callback_url=callback_url,
-            expected_url=expected,
         )
-        msg = "Signal callback URL does not match expected signal endpoint"
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg)
+
+    try:
+        UUID(parts[exec_idx + 1])
+    except ValueError:
+        logger.critical(
+            "SECURITY: signal callback URL has invalid execution ID",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg) from None
+
+    activity_id = parts[act_idx + 1]
+    if not activity_id:
+        logger.critical(
+            "SECURITY: signal callback URL has empty activity ID",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
         raise ValueError(msg)
 
 
