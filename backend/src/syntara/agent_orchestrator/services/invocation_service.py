@@ -450,7 +450,12 @@ class InvocationService(BaseService):
                     await retriever.delete_file(file_path)
                     logger.info("Cleaned up file", file_path=file_path, context=context)
                 except Exception:
-                    logger.exception("Failed to cleanup file", file_path=file_path)
+                    logger.exception(
+                        "Failed to cleanup file",
+                        file_path=file_path,
+                        invocation_id=invocation_id,
+                        context=context,
+                    )
         except Exception:
             logger.exception(
                 "File cleanup failed for invocation",
