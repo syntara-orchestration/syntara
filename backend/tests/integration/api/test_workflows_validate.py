@@ -412,6 +412,56 @@ async def test_validate_converge_valid(jwt_client: AsyncClient) -> None:
     assert data["findings"] == []
 
 
+@pytest.mark.asyncio
+async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
+    """Invalid IANA timezone on a scheduled trigger returns 422 with a scheduled-trigger finding.
+
+    Regression for AAP-87629: Builder's handleVerify calls POST /workflows/validate;
+    invalid timezones must fail here (not only on publish) so verify and publish
+    share one semantic contract.
+    """
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "scheduled-invalid-tz",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 9 * * *",
+                        "timezone": "Invalid/Not_A_Real_Zone",
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "name": "Node 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "pass"},
+                }
+            ],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["type"] == "https://api.example.com/errors/validation-error"
+    assert data["code"] == "WORKFLOW_DEFINITION_INVALID"
+    assert data["retryable"] is False
+    vr = data["validation_result"]
+    assert vr["is_valid"] is False
+    scheduled = [e for e in vr["findings"] if "scheduled trigger config" in e["message"]]
+    assert len(scheduled) == 1
+    assert scheduled[0]["node_id"] == "sched_1"
+    assert scheduled[0]["field_path"] == "parameters.timezone"
+
+
 class TestValidateProjectScopedUser:
     """Regression test for AAP-87629.
 
