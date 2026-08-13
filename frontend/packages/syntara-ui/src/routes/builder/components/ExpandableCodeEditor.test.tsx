@@ -201,7 +201,7 @@ describe('ExpandableCodeEditor', () => {
     const dropTarget = screen.getByTestId('inline-code-editor')
     const dataTransfer = {
       getData: (format: string) => {
-        if (format === 'application/json') return '{"type":"nexus/input-field"}'
+        if (format === 'application/json') return '{"type":"syntara/input-field"}'
         if (format === 'text/plain') return '${node.field}'
         return ''
       },

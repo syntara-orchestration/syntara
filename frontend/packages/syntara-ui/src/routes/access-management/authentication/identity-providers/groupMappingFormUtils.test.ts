@@ -55,7 +55,7 @@ describe('groupMappingFormUtils', () => {
 
     it('returns server entries when present', () => {
       const entries = initialGroupMappingFormEntries({
-        group_mapping_entries: [{ idp_group_value: 'admins', nexus_group_id: 'g1' }],
+        group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: 'g1' }],
       })
       expect(entries).toHaveLength(1)
       expect(entries[0]?.idpGroupValue).toBe('admins')
@@ -68,20 +68,20 @@ describe('groupMappingFormUtils', () => {
         buildGroupMappingFormDefaultValues(
           {
             group_jmespath_expression: 'groups[?@]',
-            group_mapping_entries: [{ idp_group_value: 'admins', nexus_group_id: 'g1' }],
+            group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: 'g1' }],
           },
           'groups[*]'
         )
       ).toEqual({
         expression: 'groups[?@]',
-        entries: [{ idpGroupValue: 'admins', nexusGroupId: 'g1' }],
+        entries: [{ idpGroupValue: 'admins', mappedGroupId: 'g1' }],
       })
     })
 
     it('falls back to default expression when server has none', () => {
       expect(buildGroupMappingFormDefaultValues(null, 'groups[*]')).toEqual({
         expression: 'groups[*]',
-        entries: [{ idpGroupValue: '', nexusGroupId: '' }],
+        entries: [{ idpGroupValue: '', mappedGroupId: '' }],
       })
     })
   })

@@ -1774,7 +1774,7 @@ The run history panel displays execution history for a workflow using a scrollab
 - **Dropzone layout:** Use vertical layout for `MultipleFileUpload` (not `isHorizontal`)
 - **Collapsible file list:** Use `ExpandableSection` (not `MultipleFileUploadStatus`) for the attached file list. The section auto-expands when new files are dropped and can start collapsed via `defaultStatusExpanded={false}`.
 - **Status text:** Use "N files attached" (or "1 file attached") when all files are successfully uploaded — not "N/N files uploaded". Show "N/M files uploaded" only during active upload or when errors occur.
-- **Disabled opacity:** Use `var(--nexus-disabled-opacity)` CSS variable for disabled dropzone opacity, not hardcoded `0.5`.
+- **Disabled opacity:** Use `var(--syntara-disabled-opacity)` CSS variable for disabled dropzone opacity, not hardcoded `0.5`.
 - **Post-upload download:** Once a file has successfully uploaded, show a download icon button on its list item that fetches the file and triggers a browser download preserving the server-provided filename. While the download is in progress, show a loading spinner plus a "Cancel" link in place of the download button, and hide the remove action for that item until the download finishes or is cancelled.
 
 ### Schedule Trigger Form

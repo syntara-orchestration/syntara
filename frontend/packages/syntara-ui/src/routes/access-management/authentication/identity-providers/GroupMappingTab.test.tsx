@@ -38,7 +38,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
-const mockNexusGroups = [
+const mockMappedGroups = [
   { id: 'g1', name: 'admin', description: 'Admins', created_at: '2026-01-01T00:00:00Z' },
   { id: 'g2', name: 'users', description: 'Users', created_at: '2026-01-02T00:00:00Z' },
 ]
@@ -52,7 +52,7 @@ describe('GroupMappingTab', () => {
   beforeEach(() => {
     routerTestState.navigate.mockClear()
     vi.mocked(useAllGroups).mockReturnValue({
-      groups: mockNexusGroups.map((g) => ({
+      groups: mockMappedGroups.map((g) => ({
         ...g,
         is_builtin: false,
         updated_at: g.created_at,
@@ -63,7 +63,7 @@ describe('GroupMappingTab', () => {
     })
 
     vi.mocked(usersClient.useQuery).mockReturnValue({
-      data: { resources: mockNexusGroups },
+      data: { resources: mockMappedGroups },
       isPending: false,
       isError: false,
       error: null,
@@ -108,8 +108,8 @@ describe('GroupMappingTab', () => {
     const existingMapping = {
       group_jmespath_expression: 'groups[*]',
       group_mapping_entries: [
-        { idp_group_value: 'idp-admin', nexus_group_id: 'g1' },
-        { idp_group_value: 'idp-users', nexus_group_id: 'g2' },
+        { idp_group_value: 'idp-admin', mapped_group_id: 'g1' },
+        { idp_group_value: 'idp-users', mapped_group_id: 'g2' },
       ],
     }
 
@@ -144,7 +144,7 @@ describe('GroupMappingTab', () => {
 
     it('hides Edit group mapping when readOnly and mappings exist', () => {
       const existingMapping = {
-        group_mapping_entries: [{ idp_group_value: 'idp-admin', nexus_group_id: 'g1' }],
+        group_mapping_entries: [{ idp_group_value: 'idp-admin', mapped_group_id: 'g1' }],
       }
       render(<GroupMappingTab {...defaultProps} groupMapping={existingMapping} readOnly />, { wrapper })
 
@@ -163,7 +163,7 @@ describe('GroupMappingTab', () => {
 
     it('has no accessibility violations in read-only view', async () => {
       const existingMapping = {
-        group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: 'g1' }],
+        group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: 'g1' }],
       }
       const { container } = render(<GroupMappingTab {...defaultProps} groupMapping={existingMapping} />, { wrapper })
       const results = await axe(container)
