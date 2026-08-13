@@ -73,7 +73,7 @@ async def test_validate_and_save_files_success() -> None:
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
     fm._retriever = mock_retriever
 
     result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
@@ -116,7 +116,7 @@ async def test_upload_sets_content_hash() -> None:
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-hash_test.txt")
+    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-hash_test.txt")
     fm._retriever = mock_retriever
 
     result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
@@ -145,7 +145,7 @@ async def test_multiple_files_saved_successfully() -> None:
     async def unique_save(content: bytes, path: str) -> str:
         nonlocal call_count
         call_count += 1
-        return f"nexus-{call_count}-file.pdf"
+        return f"orchestrator-{call_count}-file.pdf"
 
     mock_retriever = AsyncMock()
     mock_retriever.save_file = AsyncMock(side_effect=unique_save)
@@ -179,7 +179,7 @@ async def test_storage_failure_cleans_up_saved_files() -> None:
         if call_count == 2:
             msg = "Disk full"
             raise OSError(msg)
-        return "nexus-1-file0.pdf"
+        return "orchestrator-1-file0.pdf"
 
     mock_retriever = AsyncMock()
     mock_retriever.save_file = AsyncMock(side_effect=fail_on_second)
@@ -190,7 +190,7 @@ async def test_storage_failure_cleans_up_saved_files() -> None:
     with pytest.raises(OSError, match="Disk full"):
         await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
 
-    mock_retriever.delete_file.assert_called_once_with("nexus-1-file0.pdf")
+    mock_retriever.delete_file.assert_called_once_with("orchestrator-1-file0.pdf")
 
 
 @pytest.mark.asyncio
@@ -206,7 +206,7 @@ async def test_file_upload_events_logged() -> None:
     with patch("syntara.files.file_manager.logger") as mock_logger:
         fm = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-logged.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-logged.pdf")
         fm._retriever = mock_retriever
 
         await fm.validate_and_save_files([mock_file], project_id=uuid4())
@@ -226,7 +226,7 @@ async def test_async_io_used_for_file_operations() -> None:
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-async_test.pdf")
+    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-async_test.pdf")
     fm._retriever = mock_retriever
 
     result = await asyncio.wait_for(fm.validate_and_save_files([mock_file], project_id=uuid4()), timeout=5.0)
@@ -250,7 +250,7 @@ async def test_load_file_with_integrity_check_success() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-integrity-check.txt"
+    mock_metadata.file_path = "orchestrator-uuid-integrity-check.txt"
     mock_metadata.content_hash = content_hash
     mock_metadata.id = "test-id"
     mock_metadata.filename = "integrity-check.txt"
@@ -270,7 +270,7 @@ async def test_load_file_with_integrity_check_no_hash() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-legacy.txt"
+    mock_metadata.file_path = "orchestrator-uuid-legacy.txt"
     mock_metadata.content_hash = None
 
     result = await fm.load_file_with_integrity_check(mock_metadata)
@@ -290,7 +290,7 @@ async def test_load_file_with_integrity_check_hash_mismatch() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-tampered.txt"
+    mock_metadata.file_path = "orchestrator-uuid-tampered.txt"
     mock_metadata.content_hash = "0" * 64
     mock_metadata.id = "test-id"
     mock_metadata.filename = "tampered.txt"
@@ -522,7 +522,7 @@ async def test_audit_event_storage_backend_is_s3() -> None:
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-audit.txt")
+    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-audit.txt")
     fm._retriever = mock_retriever
 
     with patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch:

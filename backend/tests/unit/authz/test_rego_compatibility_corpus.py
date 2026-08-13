@@ -80,7 +80,7 @@ def _evaluate_with_opa_cli(authz_input: dict[str, Any], *, policy_path: Path | N
                 str(policy_file),
                 "--input",
                 input_file.name,
-                "data.syntara.authz",
+                "data.orchestrator.authz",
             ],
             check=True,
             capture_output=True,

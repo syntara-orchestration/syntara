@@ -17,7 +17,7 @@ import regopy  # type: ignore[import-untyped]
 _INTERPRETER: regopy.Interpreter | None = None
 _POLICY_NAME: str = ""
 _POLICY_TEXT: str = ""
-_DECISION_QUERY = "data.syntara.authz"
+_DECISION_QUERY = "data.orchestrator.authz"
 
 _EVAL_COUNT: int = 0
 _RECYCLE_EVERY: int = 32

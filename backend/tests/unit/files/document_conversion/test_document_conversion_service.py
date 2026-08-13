@@ -450,7 +450,7 @@ class TestDocumentConversionServiceStorageIntegration:
     async def test_store_converted_file_uses_correct_retriever(self, conversion_helper: ConversionTestHelper) -> None:
         """Test that _store_converted_file uses FileManager.get_retriever."""
         file_metadata = create_file_metadata(filename="store_test.pdf", status=FileStatus.CONVERTING)
-        expected_key = f"nexus-{file_metadata.id}-content.md"
+        expected_key = f"orchestrator-{file_metadata.id}-content.md"
         conversion_result = create_success_result("# Converted Content\n\nThis is the markdown version.", 1000)
 
         mock_retriever = AsyncMock()
