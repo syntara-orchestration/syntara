@@ -240,7 +240,7 @@ _validate_router = NexusRouter(route_class=_ValidationRoute)
     "/validate",
     summary="Validate workflow definition",
     response_model=ValidationResult,
-    dependencies=[Depends(_wf_perm_create)],
+    dependencies=[Depends(_wf_perm_update)],
     operation_id="validate_workflow_definition",
     response_description="Validation result",
     responses={422: {"model": DetailedValidationProblemDetail, "description": "Unprocessable Content"}},
