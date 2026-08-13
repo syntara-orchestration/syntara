@@ -105,6 +105,35 @@ class TestWorkflowAuth:
             decoded_args = converter.from_payloads(converter.to_payloads(raw_args))
             assert verify_workflow("wf-1", "orchestrator_workflow", decoded_args, token)
 
+    def test_schedule_launcher_timestamp_suffix_accepted(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+
+            wf_id = "4297d494-0336-474e-9165-49411e2facc6"
+            trigger_id = "sched_trigger"
+            base_id = f"sched-exec-{wf_id}-{trigger_id}"
+            runtime_id = f"{base_id}-2026-08-13T16:47:31Z"
+            args = [wf_id, trigger_id]
+            token = sign_workflow(base_id, "scheduled_workflow_launcher", args)
+            assert verify_workflow(runtime_id, "scheduled_workflow_launcher", args, token)
+
+    def test_schedule_launcher_invalid_suffix_rejected(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+
+            wf_id = "4297d494-0336-474e-9165-49411e2facc6"
+            trigger_id = "sched_trigger"
+            base_id = f"sched-exec-{wf_id}-{trigger_id}"
+            args = [wf_id, trigger_id]
+            token = sign_workflow(base_id, "scheduled_workflow_launcher", args)
+            assert not verify_workflow(f"{base_id}-evil", "scheduled_workflow_launcher", args, token)
+
     def test_invalid_token_rejected(self) -> None:
         with patch(
             "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",

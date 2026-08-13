@@ -14,6 +14,7 @@ pre-existing schedules must be republished to acquire headers.
 
 import hashlib
 import hmac as hmac_mod
+import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -24,6 +25,11 @@ from temporalio.converter import DataConverter
 
 HEADER_NAME = "x-workflow-auth"
 HEADER_SIGNED_ID = "x-workflow-auth-id"
+
+_SCHEDULE_LAUNCHER_TYPE = "scheduled_workflow_launcher"
+_SCHEDULE_LAUNCHER_ARG_COUNT = 2
+# Temporal appends the schedule action timestamp in RFC3339 UTC (second resolution).
+_SCHEDULE_TIME_SUFFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 _signing_key: bytes | None = None
 
@@ -70,6 +76,27 @@ def _fingerprint_args(args: Sequence[Any]) -> str:
     return digest.hexdigest()
 
 
+def _auth_workflow_id(workflow_id: str, workflow_type: str, args: Sequence[Any]) -> str:
+    """Map a runtime workflow ID to the ID that was used when signing the MAC.
+
+    Temporal Schedules append ``-{RFC3339 UTC schedule time}`` to the action's
+    workflow ID on each fire.  Schedule actions are signed with the base ID
+    (without the suffix) at publish time.
+    """
+    if workflow_type != _SCHEDULE_LAUNCHER_TYPE or len(args) < _SCHEDULE_LAUNCHER_ARG_COUNT:
+        return workflow_id
+
+    base_id = f"sched-exec-{args[0]}-{args[1]}"
+    prefix = f"{base_id}-"
+    if not workflow_id.startswith(prefix):
+        return workflow_id
+
+    suffix = workflow_id[len(prefix) :]
+    if _SCHEDULE_TIME_SUFFIX_RE.fullmatch(suffix):
+        return base_id
+    return workflow_id
+
+
 def sign_workflow(workflow_id: str, workflow_type: str, args: Sequence[Any]) -> bytes:
     """Compute HMAC-SHA256 over workflow ID, type, and args fingerprint."""
     message = f"{workflow_id}\n{workflow_type}\n{_fingerprint_args(args)}".encode()
@@ -78,7 +105,8 @@ def sign_workflow(workflow_id: str, workflow_type: str, args: Sequence[Any]) -> 
 
 def verify_workflow(workflow_id: str, workflow_type: str, args: Sequence[Any], token: bytes) -> bool:
     """Verify an HMAC-SHA256 token using constant-time comparison."""
-    expected = sign_workflow(workflow_id, workflow_type, args)
+    canonical_id = _auth_workflow_id(workflow_id, workflow_type, args)
+    expected = sign_workflow(canonical_id, workflow_type, args)
     return hmac_mod.compare_digest(expected, token)
 
 
