@@ -266,12 +266,12 @@ class ToolManagerClient:
 
     @retry_with_backoff
     async def update_tool_status(self, tool_id: UUID, status: ToolStatus, refresh_error: str | None = None) -> None:
-        """Update tool status in Tool Manager.
+        """Report a tool status and optional refresh_error to Tool Manager.
 
-        Reports tool execution status back to Tool Manager for operational visibility.
-        Used to update tool status to ERROR when execution fails, or back to
-        AVAILABLE when tools recover. The ``enabled`` flag is administrator-owned
-        and is never modified here.
+        Production callers use this to record ``ERROR`` (and ``refresh_error``) after
+        execution failures. The ``enabled`` flag is administrator-owned and is never
+        modified here. Tool recovery to ``AVAILABLE`` is handled elsewhere (e.g.
+        integration refresh), not by this method.
 
         Args:
             tool_id: UUID of the tool to update
