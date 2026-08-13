@@ -14,13 +14,13 @@ pre-existing schedules must be republished to acquire headers.
 
 import hashlib
 import hmac as hmac_mod
-import json
 from collections.abc import Sequence
 from typing import Any
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from temporalio.api.common.v1 import Payload
+from temporalio.converter import DataConverter
 
 HEADER_NAME = "x-workflow-auth"
 
@@ -56,9 +56,17 @@ def _get_signing_key() -> bytes:
 
 
 def _fingerprint_args(args: Sequence[Any]) -> str:
-    """Deterministic SHA-256 hex digest of workflow start arguments."""
-    canonical = json.dumps(list(args), sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    """Deterministic SHA-256 hex digest of Temporal-encoded workflow start arguments.
+
+    Hashes the raw payload bytes from ``DataConverter.default.payload_converter``
+    so client-side signing and worker-side verification agree after Temporal's
+    encode/decode round-trip (unlike ad-hoc JSON serialization).
+    """
+    payloads = DataConverter.default.payload_converter.to_payloads(args)
+    digest = hashlib.sha256()
+    for payload in payloads:
+        digest.update(payload.data)
+    return digest.hexdigest()
 
 
 def sign_workflow(workflow_id: str, workflow_type: str, args: Sequence[Any]) -> bytes:

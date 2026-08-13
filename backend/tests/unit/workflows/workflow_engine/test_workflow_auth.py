@@ -2,15 +2,16 @@
 
 import hashlib
 import hmac as hmac_mod
-import json
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from temporalio.api.common.v1 import Payload
+from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import WorkflowInboundInterceptor
 
@@ -22,7 +23,9 @@ _DEFAULT_ARGS: list[Any] = [{"schema_version": "2.0.0"}, "exec-1", "trigger_manu
 
 
 def _fingerprint(args: Sequence[Any]) -> str:
-    return hashlib.sha256(json.dumps(list(args), sort_keys=True, default=str).encode()).hexdigest()
+    from syntara.workflows.workflow_engine.workflow_auth import _fingerprint_args
+
+    return _fingerprint_args(args)
 
 
 def _sign(
@@ -84,6 +87,23 @@ class TestWorkflowAuth:
 
             token = sign_workflow("wf-1", "orchestrator_workflow", ["legit-wf", "trigger"])
             assert not verify_workflow("wf-1", "orchestrator_workflow", ["evil-wf", "trigger"], token)
+
+    def test_sign_verify_after_temporal_round_trip(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+
+            raw_args: list[Any] = [
+                datetime(2024, 1, 1, tzinfo=UTC),
+                {"nested": "value"},
+                "trigger_manual",
+            ]
+            token = sign_workflow("wf-1", "orchestrator_workflow", raw_args)
+            converter = DataConverter.default.payload_converter
+            decoded_args = converter.from_payloads(converter.to_payloads(raw_args))
+            assert verify_workflow("wf-1", "orchestrator_workflow", decoded_args, token)
 
     def test_invalid_token_rejected(self) -> None:
         with patch(
