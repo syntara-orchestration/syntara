@@ -227,7 +227,10 @@ async def execute_agentic_activity(  # noqa: PLR0915
         raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
     except AgentOrchestratorClientConnectionError:
         logger.exception("Failed to connect to Agent Orchestrator")
-        msg = "Failed to connect to Agent Orchestrator"
+        msg = (
+            "The AI Agent service is temporarily unavailable. This is a system issue. "
+            "Please try again in a few minutes. If this persists, contact your administrator."
+        )
         raise ApplicationError(msg, type="ConnectionError", non_retryable=True) from None
     except Exception as e:
         logger.exception("Unexpected error during agentic activity")
