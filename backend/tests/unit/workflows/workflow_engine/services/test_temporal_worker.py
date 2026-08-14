@@ -755,9 +755,7 @@ class TestBackgroundWorkerConfiguration:
         assert settings.background_worker_max_concurrent_activities == 10
 
     @pytest.mark.asyncio
-    async def test_background_entrypoint_passes_settings_to_start_worker(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_background_entrypoint_passes_settings_to_start_worker(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Regression: background_worker.main() must pass settings value, not a hardcoded constant.
 
         Exercises the actual entrypoint path so that removing the
