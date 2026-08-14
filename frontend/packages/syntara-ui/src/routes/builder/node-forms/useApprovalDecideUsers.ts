@@ -14,18 +14,17 @@ class PermissionDeniedError extends Error {
 }
 
 /**
- * Hook to fetch all users who have approval:decide permission.
+ * Hook to fetch all users who have approval:decide permission in a project.
  *
  * Uses /authz/who_can endpoint with cursor pagination to fetch all authorized users.
- * When a project is specified, returns users who can approve on that specific project
- * (includes both system-level and project-scoped permissions).
+ * The query is disabled until a projectId is provided — the approval form shows a
+ * "select a project" prompt in the meantime rather than firing an unscoped request.
  *
  * If the endpoint returns 403, the hook surfaces `isPermissionDenied: true` so the
  * UI can offer a manual-input fallback instead of an empty dropdown.
  *
- * @param projectId - Optional project ID to scope the permission check to a specific project.
- *                    If provided, returns users with approval:decide permission on that project.
- *                    If omitted, returns only users with system-level approval:decide permission.
+ * @param projectId - Project ID to scope the permission check. The query does not
+ *                    run until this is a non-empty string.
  * @returns Object containing users array, loading state, permission-denied flag, and error
  */
 export function useApprovalDecideUsers(projectId?: string | null) {
@@ -38,7 +37,7 @@ export function useApprovalDecideUsers(projectId?: string | null) {
           sort: 'username',
           limit: MAX_PAGE_SIZE,
           cursor,
-          ...(projectId && { resource_project: projectId }),
+          resource_project: projectId!,
         },
       })
 
@@ -61,11 +60,13 @@ export function useApprovalDecideUsers(projectId?: string | null) {
   const {
     data: users = [],
     isPending,
+    isFetching,
     error,
     refetch,
   } = useQuery({
     queryKey: ['approval-decide-users', projectId],
     queryFn: fetchAllApprovalDecideUsers,
+    enabled: !!projectId,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     retry: (failureCount, err) => {
@@ -78,7 +79,7 @@ export function useApprovalDecideUsers(projectId?: string | null) {
 
   return {
     users,
-    isLoading: isPending,
+    isLoading: isPending && isFetching,
     isPermissionDenied,
     error: isPermissionDenied ? null : error,
     refetch,

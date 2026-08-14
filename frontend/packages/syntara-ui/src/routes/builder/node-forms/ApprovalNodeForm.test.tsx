@@ -110,7 +110,7 @@ describe('ApprovalNodeForm', () => {
     })
 
     it('renders permission-filtered user and group selects', () => {
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Verify both select fields are present
       expect(screen.getByText('Approver users')).toBeInTheDocument()
@@ -143,6 +143,7 @@ describe('ApprovalNodeForm', () => {
       renderWithHeader(
         <ApprovalNodeForm
           onSubmit={mockOnSubmit}
+          projectId="test-project"
           initialData={{
             name: 'Test Approval',
             prompt: 'Test approval message',
@@ -178,7 +179,7 @@ describe('ApprovalNodeForm', () => {
   describe('User Interactions', () => {
     it('allows selecting users', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Initially shows "Select users"
       expect(screen.getByPlaceholderText('Select users')).toBeInTheDocument()
@@ -209,6 +210,7 @@ describe('ApprovalNodeForm', () => {
       renderWithHeader(
         <ApprovalNodeForm
           onSubmit={mockOnSubmit}
+          projectId="test-project"
           initialData={{
             name: 'Test',
             prompt: 'Test',
@@ -257,7 +259,7 @@ describe('ApprovalNodeForm', () => {
 
     it('allows selecting multiple users', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -499,23 +501,16 @@ describe('ApprovalNodeForm', () => {
       ).toBeInTheDocument()
     })
 
-    it('shows project-context message when permission-denied without project', () => {
-      mockUseApprovalDecideUsers.mockReturnValue({
-        users: [],
-        isLoading: false,
-        isPermissionDenied: true,
-        error: null,
-        refetch: vi.fn(),
-      })
-
+    it('shows project-required info alert when no project is selected', () => {
       renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
 
+      expect(screen.getByText('Project required')).toBeInTheDocument()
       expect(
         screen.getByText('Select a project to load approval users, or enter usernames manually.')
       ).toBeInTheDocument()
     })
 
-    it('shows permission message when permission-denied with project', () => {
+    it('shows permission-denied warning when project is set but user lacks permission', () => {
       mockUseApprovalDecideUsers.mockReturnValue({
         users: [],
         isLoading: false,
@@ -526,22 +521,15 @@ describe('ApprovalNodeForm', () => {
 
       renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="some-project" />)
 
+      expect(screen.getByText('Dropdown unavailable')).toBeInTheDocument()
       expect(
         screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
       ).toBeInTheDocument()
     })
 
-    it('has no accessibility violations in permission-denied state', async () => {
-      mockUseApprovalDecideUsers.mockReturnValue({
-        users: [],
-        isLoading: false,
-        isPermissionDenied: true,
-        error: null,
-        refetch: vi.fn(),
-      })
-
+    it('has no accessibility violations in no-project state', async () => {
       const { container } = renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
-      expect(await screen.findByText('Dropdown unavailable')).toBeInTheDocument()
+      expect(await screen.findByText('Project required')).toBeInTheDocument()
       const results = await axe(container, {
         rules: {
           // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
@@ -574,7 +562,7 @@ describe('ApprovalNodeForm', () => {
   describe('Typeahead Filtering', () => {
     it('filters users based on search input', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -624,7 +612,7 @@ describe('ApprovalNodeForm', () => {
 
     it('shows empty text when search returns no results', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -646,7 +634,7 @@ describe('ApprovalNodeForm', () => {
 
     it('clears search filter when dropdown is closed', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       const usersToggle = screen.getByPlaceholderText('Select users')
@@ -676,7 +664,7 @@ describe('ApprovalNodeForm', () => {
 
     it('search is case-insensitive', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))

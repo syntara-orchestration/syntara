@@ -110,10 +110,7 @@ function ApproverUsersSelect({
   isPermissionDenied?: boolean
   hasProjectContext?: boolean
 }>) {
-  const alertMessage =
-    isPermissionDenied && !hasProjectContext
-      ? 'Select a project to load approval users, or enter usernames manually.'
-      : "You don't have permission to list approval users. You can still enter usernames manually."
+  const showFallback = !hasProjectContext || isPermissionDenied
 
   return (
     <Stack hasGutter>
@@ -127,17 +124,24 @@ function ApproverUsersSelect({
           getItemId={(item) => item.id}
           getItemValue={(item) => item.username}
           getItemLabel={(item) => item.username}
-          placeholderText={isPermissionDenied ? 'Type a username and press Enter' : APPROVER_USERS_PLACEHOLDER}
-          emptyText={isPermissionDenied ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
+          placeholderText={showFallback ? 'Type a username and press Enter' : APPROVER_USERS_PLACEHOLDER}
+          emptyText={showFallback ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
           loadingText={APPROVER_USERS_LOADING}
           helperText={APPROVER_USERS_HELPER_TEXT}
-          allowCustomValue={isPermissionDenied}
+          allowCustomValue={showFallback}
         />
       </StackItem>
-      {isPermissionDenied && (
+      {!hasProjectContext && (
+        <StackItem>
+          <Alert variant="info" title="Project required" isInline isPlain>
+            Select a project to load approval users, or enter usernames manually.
+          </Alert>
+        </StackItem>
+      )}
+      {hasProjectContext && isPermissionDenied && (
         <StackItem>
           <Alert variant="warning" title="Dropdown unavailable" isInline isPlain>
-            {alertMessage}
+            You don&apos;t have permission to list approval users. You can still enter usernames manually.
           </Alert>
         </StackItem>
       )}
