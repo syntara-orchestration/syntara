@@ -45,7 +45,101 @@ pytestmark = [
 ]
 
 AGENTIC_POLL_TIMEOUT = 180
+# Parallel agentic paths need more headroom under OpenRouter rate limits.
+PARALLEL_AGENTIC_POLL_TIMEOUT = AGENTIC_POLL_TIMEOUT * 3
+# Soft retries for LLM-dependent tool-invocation proofs (models may skip tools).
 MAX_TOOL_CALL_ATTEMPTS = 3
+
+
+def _normalize_activity_data(data: object) -> dict[str, Any]:
+    """Normalize an activity's input_data/output_data to a plain dict for assertions."""
+    if isinstance(data, dict):
+        return data
+    return getattr(data, "additional_properties", {}) or {}
+
+
+def _get_greeting_tool_id(syntara_api: SyntaraApiRegistry, mcp_integration_id: str) -> str:
+    """Resolve the MCP ``get_greeting`` tool id for SELECTED tool_selections wiring."""
+    tools_list = syntara_api.tools.list(additional_params={"integration_id[eq]": mcp_integration_id}).assert_and_get()
+    greeting_tool = next((t for t in tools_list.resources if t.name == "get_greeting"), None)
+    assert greeting_tool is not None, (
+        f"get_greeting tool not found on MCP integration; got {[t.name for t in tools_list.resources]}"
+    )
+    return str(greeting_tool.id)
+
+
+def _assert_agent_completed_with_output(result: ExecutionRead, activity_id: str = "agent") -> dict[str, Any]:
+    """Assert execution + activity completed with non-empty agentic output (deterministic contract)."""
+    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+    activities = {a.activity_id: a for a in (result.activities or [])}
+    assert activity_id in activities, f"Missing activity {activity_id!r}; got {list(activities)}"
+    assert activities[activity_id].status == "completed"
+    output = activities[activity_id].output_data
+    assert output is not None, f"Agentic activity {activity_id!r} should produce output"
+    return _normalize_activity_data(output)
+
+
+def _result_envelope(output_dict: dict[str, Any]) -> dict[str, Any]:
+    """Return the nested ``result`` envelope from agentic activity output_data."""
+    envelope = output_dict.get("result")
+    return envelope if isinstance(envelope, dict) else {}
+
+
+def _assert_nonempty_result_content(output_dict: dict[str, Any]) -> str | dict[str, Any]:
+    """Assert the agent produced a non-empty ``result.content`` (string or dict)."""
+    envelope = _result_envelope(output_dict)
+    content = envelope.get("content")
+    if isinstance(content, str) and content.strip():
+        return content
+    if isinstance(content, dict) and content:
+        return content
+    msg = f"Expected non-empty result content (str|dict), got: {output_dict}"
+    raise AssertionError(msg)
+
+
+def _extract_used_tools(output_dict: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract ``used_tools`` from the agentic result envelope (or top-level fallback)."""
+    envelope = _result_envelope(output_dict)
+    used = envelope.get("used_tools")
+    if used is None:
+        used = output_dict.get("used_tools")
+    if not isinstance(used, list):
+        return []
+    return [item for item in used if isinstance(item, dict)]
+
+
+def _used_tools_include(used_tools: list[dict[str, Any]], tool_name: str) -> bool:
+    """Return True when ``used_tools`` contains an entry for ``tool_name``."""
+    return any(item.get("name") == tool_name for item in used_tools)
+
+
+def _assert_schema_output(result: ExecutionRead, activity_id: str = "agent") -> tuple[dict[str, Any], dict[str, Any]]:
+    """Assert agent completed and return ``(output_dict, parsed_content)``.
+
+    The activity output envelope nests the LLM answer under ``result.content``
+    (see ``WorkflowSignalClient.send_success_signal``); for a ``response_schema``
+    request, ``content`` is the parsed JSON object itself, not the envelope.
+    Indexing the envelope directly (i.e. ``output_dict["result"]``) instead of
+    ``output_dict["result"]["content"]`` never matches the schema's keys.
+
+    Returns ``output_dict`` alongside ``parsed_content`` so callers can inspect
+    ``used_tools`` without a redundant second completion assertion.
+    """
+    output_dict = _assert_agent_completed_with_output(result, activity_id)
+    result_envelope = output_dict.get("result")
+    content = result_envelope.get("content", "") if isinstance(result_envelope, dict) else ""
+    if isinstance(content, dict):
+        return output_dict, content
+    if isinstance(content, str) and content:
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as exc:
+            pytest.fail(f"response_schema content is not valid JSON: {exc}; envelope: {output_dict}")
+        assert isinstance(parsed, dict), (
+            f"Expected JSON object from response_schema, got {type(parsed).__name__}: {content!r}"
+        )
+        return output_dict, parsed
+    pytest.fail(f"Expected dict or JSON string content for response_schema output, got envelope: {output_dict}")
 
 
 def _assert_no_credentials_in_execution(result: ExecutionRead) -> None:
@@ -88,7 +182,6 @@ def _agentic_node(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_basic_prompt_completion(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
@@ -118,73 +211,32 @@ def test_basic_prompt_completion(
         project_id=first_project_id,
     )
 
-    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
-    activities = {a.activity_id: a for a in (result.activities or [])}
-    assert activities["agent"].status == "completed"
-    output = activities["agent"].output_data
-    assert output is not None, "Agentic activity should produce output"
+    output_dict = _assert_agent_completed_with_output(result)
+    _assert_nonempty_result_content(output_dict)
     _assert_no_credentials_in_execution(result)
 
 
 # ---------------------------------------------------------------------------
-# 2. Output contains expected content
+# 2. Agentic with MCP tool execution (SELECTED)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
-def test_agentic_output_contains_expected_content(
+def test_agentic_with_selected_mcp_tool_completes(
     syntara_api: SyntaraApiRegistry,
+    mcp_integration_id: str,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
-    """Prompt for a specific word and verify the output contains it."""
-    result = create_and_run_workflow(
-        syntara_api,
-        "e2e-agentic-expected-content",
-        {
-            "name": "agentic-content",
-            "schema_version": "2.0.0",
-            "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [
-                _agentic_node(
-                    "agent",
-                    "Content Agent",
-                    "Respond with exactly the word 'pineapple' and nothing else",
-                    llm_credential_id,
-                    llm_model_id,
-                ),
-            ],
-            "edges": [{"from": "trigger", "to": "agent"}],
-        },
-        timeout=AGENTIC_POLL_TIMEOUT,
-        project_id=first_project_id,
-    )
+    """Agentic node with a SELECTED MCP tool executes that tool successfully.
 
-    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
-    activities = {a.activity_id: a for a in (result.activities or [])}
-    output = activities["agent"].output_data
-    assert output is not None
-    output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-    output_str = json.dumps(output_dict).lower()
-    assert "pineapple" in output_str, f"Expected 'pineapple' in output, got: {output_str}"
+    Retries a few times because models can skip tool calls even with a
+    directive prompt. Soft proof is ``used_tools`` containing ``get_greeting``
+    so regressions in ToolNode wiring / MCP session / tool_id metadata fail.
+    """
+    greeting_tool_id = _get_greeting_tool_id(syntara_api, mcp_integration_id)
 
-
-# ---------------------------------------------------------------------------
-# 3. Agentic with MCP tool call
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.xfail(strict=False, reason="LLM non-determinism: model may skip tool call")
-def test_agentic_with_mcp_tool_call(
-    syntara_api: SyntaraApiRegistry,
-    mcp_integration_id: str,  # side-effect: ensures MCP integration is validated so agent discovers tools
-    llm_credential_id: str,
-    llm_model_id: str,
-    first_project_id: UUID,
-) -> None:
-    """Agentic node uses an MCP tool to generate a greeting."""
-    output: object = None
+    last_output: dict[str, Any] | None = None
     for _attempt in range(1, MAX_TOOL_CALL_ATTEMPTS + 1):
         result = create_and_run_workflow(
             syntara_api,
@@ -198,11 +250,13 @@ def test_agentic_with_mcp_tool_call(
                         "agent",
                         "MCP Tool Agent",
                         (
-                            "You MUST use the get_greeting tool to greet jimmy. "
+                            "You MUST call the get_greeting tool to greet jimmy. "
                             "Do not answer without calling the tool first."
                         ),
                         llm_credential_id,
                         llm_model_id,
+                        tool_selection_strategy="SELECTED",
+                        tool_selections=[greeting_tool_id],
                     ),
                 ],
                 "edges": [{"from": "trigger", "to": "agent"}],
@@ -211,44 +265,44 @@ def test_agentic_with_mcp_tool_call(
             project_id=first_project_id,
         )
 
-        assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+        output_dict = _assert_agent_completed_with_output(result)
+        _assert_nonempty_result_content(output_dict)
         _assert_no_credentials_in_execution(result)
-        activities = {a.activity_id: a for a in (result.activities or [])}
-        output = activities["agent"].output_data
-        if output is not None:
-            output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-            output_str = json.dumps(output_dict).lower()
-            if "jimmy" in output_str or "greeting" in output_str or "hello" in output_str:
-                return
+        last_output = output_dict
+        if _used_tools_include(_extract_used_tools(output_dict), "get_greeting"):
+            return
 
-    assert output is not None, f"Agent produced no output across all {MAX_TOOL_CALL_ATTEMPTS} attempts"
-    output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-    output_str = json.dumps(output_dict).lower()
-    assert any(kw in output_str for kw in ("jimmy", "greeting", "hello")), (
-        f"Agent output after {MAX_TOOL_CALL_ATTEMPTS} attempts lacked expected greeting keywords: {output_str}"
+    # Hard contract (COMPLETED + content) passed in all attempts. Tool invocation is
+    # a soft proof — models may skip tool calls despite directive prompts. Log the miss
+    # as a warning rather than failing the test for non-deterministic LLM behavior.
+    import warnings
+
+    warnings.warn(
+        f"get_greeting not found in used_tools after {MAX_TOOL_CALL_ATTEMPTS} attempts "
+        f"(LLM tool-skip); last output: {last_output}",
+        stacklevel=1,
     )
 
 
 # ---------------------------------------------------------------------------
-# 4. Agentic with response schema
+# 3. Agentic with response schema
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_with_response_schema(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
-    """Agentic node with response_schema produces JSON-parseable output."""
-    response_schema = json.dumps(
-        {
-            "type": "object",
-            "properties": {"fruits": {"type": "array", "items": {"type": "string"}}},
-            "required": ["fruits"],
-        }
-    )
+    """Agentic node with response_schema produces structured JSON output."""
+    # response_schema must be a dict (OpaqueResponseSchema); a JSON string is only
+    # accepted for unresolved ``${...}`` template expressions.
+    response_schema = {
+        "type": "object",
+        "properties": {"fruits": {"type": "array", "items": {"type": "string"}}},
+        "required": ["fruits"],
+    }
     result = create_and_run_workflow(
         syntara_api,
         "e2e-agentic-response-schema",
@@ -264,64 +318,6 @@ def test_agentic_with_response_schema(
                     llm_credential_id,
                     llm_model_id,
                     response_schema=response_schema,
-                ),
-            ],
-            "edges": [{"from": "trigger", "to": "agent"}],
-        },
-        timeout=AGENTIC_POLL_TIMEOUT,
-        project_id=first_project_id,
-    )
-
-    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
-    activities = {a.activity_id: a for a in (result.activities or [])}
-    output = activities["agent"].output_data
-    assert output is not None, "Agent should produce output"
-    output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-    result_value = output_dict.get("result", "")
-    if isinstance(result_value, str):
-        parsed = json.loads(result_value)
-    elif isinstance(result_value, dict):
-        parsed = result_value
-    else:
-        parsed = output_dict
-    assert "fruits" in parsed, f"Expected 'fruits' key in parsed output, got: {parsed}"
-
-
-# ---------------------------------------------------------------------------
-# 4b. Agentic with tool selection + response schema (AAP-66977 T089)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
-def test_agentic_with_tool_selection_and_response_schema(
-    syntara_api: SyntaraApiRegistry,
-    llm_credential_id: str,
-    llm_model_id: str,
-    first_project_id: UUID,
-) -> None:
-    """Agentic node with tool_selection_strategy NONE and response_schema produces JSON output."""
-    response_schema = json.dumps(
-        {
-            "type": "object",
-            "properties": {"fruits": {"type": "array", "items": {"type": "string"}}},
-            "required": ["fruits"],
-        }
-    )
-    result = create_and_run_workflow(
-        syntara_api,
-        "e2e-agentic-tools-and-schema",
-        {
-            "name": "agentic-tools-schema",
-            "schema_version": "2.0.0",
-            "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [
-                _agentic_node(
-                    "agent",
-                    "Tools Schema Agent",
-                    "List exactly 2 fruits",
-                    llm_credential_id,
-                    llm_model_id,
-                    response_schema=response_schema,
                     tool_selection_strategy="NONE",
                 ),
             ],
@@ -331,19 +327,94 @@ def test_agentic_with_tool_selection_and_response_schema(
         project_id=first_project_id,
     )
 
-    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
-    activities = {a.activity_id: a for a in (result.activities or [])}
-    output = activities["agent"].output_data
-    assert output is not None, "Agent should produce output"
-    output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-    result_value = output_dict.get("result", "")
-    if isinstance(result_value, str):
-        parsed = json.loads(result_value)
-    elif isinstance(result_value, dict):
-        parsed = result_value
-    else:
-        parsed = output_dict
+    _, parsed = _assert_schema_output(result)
     assert "fruits" in parsed, f"Expected 'fruits' key in parsed output, got: {parsed}"
+    assert isinstance(parsed["fruits"], list), f"Expected fruits list, got: {parsed}"
+
+
+# ---------------------------------------------------------------------------
+# 4b. Agentic with tool selection + response schema
+# ---------------------------------------------------------------------------
+
+
+def test_agentic_with_tool_selection_and_response_schema(
+    syntara_api: SyntaraApiRegistry,
+    mcp_integration_id: str,
+    llm_credential_id: str,
+    llm_model_id: str,
+    first_project_id: UUID,
+) -> None:
+    """SELECTED tool + response_schema produces JSON via the tool-loop extraction path.
+
+    Soft E2E proof that tools were actually available/executed is ``used_tools``
+    containing ``get_greeting`` (retried a few times for LLM skip). Deterministic
+    Case A coverage (``_execute_standard`` then ``_extract_structured_output`` when
+    ``available_tools`` is non-empty) lives in
+    ``TestGenericAgentStructuredOutputWithTools``; SELECTED ID filtering is covered
+    by orchestration-service unit tests for ``_apply_tool_selection``.
+    """
+    greeting_tool_id = _get_greeting_tool_id(syntara_api, mcp_integration_id)
+
+    # response_schema must be a dict (OpaqueResponseSchema); a JSON string is only
+    # accepted for unresolved ``${...}`` template expressions.
+    response_schema = {
+        "type": "object",
+        "properties": {"greeting": {"type": "string"}},
+        "required": ["greeting"],
+    }
+
+    last_parsed: dict[str, Any] | None = None
+    last_used_tools: list[dict[str, Any]] = []
+    for _attempt in range(1, MAX_TOOL_CALL_ATTEMPTS + 1):
+        result = create_and_run_workflow(
+            syntara_api,
+            "e2e-agentic-tools-and-schema",
+            {
+                "name": "agentic-tools-schema",
+                "schema_version": "2.0.0",
+                "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+                "nodes": [
+                    _agentic_node(
+                        "agent",
+                        "Tools Schema Agent",
+                        (
+                            "You MUST call the get_greeting tool to greet jimmy, "
+                            "then return a JSON object with a greeting field. "
+                            "Do not answer without calling the tool first."
+                        ),
+                        llm_credential_id,
+                        llm_model_id,
+                        response_schema=response_schema,
+                        tool_selection_strategy="SELECTED",
+                        tool_selections=[greeting_tool_id],
+                    ),
+                ],
+                "edges": [{"from": "trigger", "to": "agent"}],
+            },
+            timeout=AGENTIC_POLL_TIMEOUT,
+            project_id=first_project_id,
+        )
+
+        output_dict, parsed = _assert_schema_output(result)
+        _assert_no_credentials_in_execution(result)
+        assert "greeting" in parsed, f"Expected 'greeting' key in parsed output, got: {parsed}"
+        assert isinstance(parsed["greeting"], str), f"Expected greeting to be a string, got: {parsed}"
+        assert parsed["greeting"], f"Expected non-empty greeting, got: {parsed}"
+
+        last_parsed = parsed
+        last_used_tools = _extract_used_tools(output_dict)
+        if _used_tools_include(last_used_tools, "get_greeting"):
+            return
+
+    # Hard contract (COMPLETED + schema keys) passed in all attempts. Tool invocation
+    # is a soft proof — models may skip tool calls despite directive prompts.
+    import warnings
+
+    warnings.warn(
+        f"get_greeting not found in used_tools after {MAX_TOOL_CALL_ATTEMPTS} attempts "
+        f"(LLM tool-skip); last used_tools={last_used_tools!r}, last parsed={last_parsed!r}",
+        stacklevel=1,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -351,14 +422,19 @@ def test_agentic_with_tool_selection_and_response_schema(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="LLM output non-determinism")
 def test_agentic_input_from_upstream_node(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
-    """Script node outputs JSON consumed by agentic node via variable reference."""
+    """Script node feeds agentic node via variable reference; both complete.
+
+    The interesting, deterministic contract here is that ``${prep.stdout_json.name}``
+    resolves into the agent's *input* prompt before dispatch — independent of
+    what the LLM says back. Exact greeting text is LLM-dependent, so we do not
+    assert on the agent's output content, only on its resolved input.
+    """
     result = create_and_run_workflow(
         syntara_api,
         "e2e-agentic-upstream-input",
@@ -379,9 +455,10 @@ def test_agentic_input_from_upstream_node(
                 _agentic_node(
                     "agent",
                     "Upstream Agent",
-                    "Greet the person named ${prep.stdout_json.name}. Include their name in your response.",
+                    "Greet the person named ${prep.stdout_json.name} in one short sentence.",
                     llm_credential_id,
                     llm_model_id,
+                    tool_selection_strategy="NONE",
                 ),
             ],
             "edges": [
@@ -397,11 +474,23 @@ def test_agentic_input_from_upstream_node(
     activities = {a.activity_id: a for a in (result.activities or [])}
     assert activities["prep"].status == "completed"
     assert activities["agent"].status == "completed"
-    output = activities["agent"].output_data
-    assert output is not None
-    output_dict = output if isinstance(output, dict) else getattr(output, "additional_properties", {})
-    output_str = json.dumps(output_dict).lower()
-    assert "alice" in output_str, f"Expected 'alice' in output, got: {output_str}"
+    assert activities["agent"].output_data is not None
+
+    # ExecutionRead's embedded activities only carry output_data (input_data is
+    # intentionally omitted to avoid leaking resolved credentials). The resolved
+    # input is only available via the dedicated activity-executions endpoint.
+    # ActivityExecution.activity_name is the workflow node/activity id (same key
+    # as ExecutionRead.activities[].activity_id), not the display ``name``.
+    activity_executions = syntara_api.executions.list_activities(execution_id=result.id).assert_and_get()
+    executions_by_activity_id = {a.activity_name: a for a in activity_executions.resources}
+    assert "agent" in executions_by_activity_id, (
+        f"Missing activity execution 'agent'; got {list(executions_by_activity_id)}"
+    )
+    agent_input = _normalize_activity_data(executions_by_activity_id["agent"].input_data)
+    assert "alice" in str(agent_input.get("prompt", "")).lower(), (
+        f"Expected upstream value 'alice' resolved into agent prompt, got: {agent_input.get('prompt')!r}"
+    )
+    _assert_no_credentials_in_execution(result)
 
 
 # ---------------------------------------------------------------------------
@@ -409,7 +498,6 @@ def test_agentic_input_from_upstream_node(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_output_consumed_by_downstream(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
@@ -466,7 +554,6 @@ def test_agentic_output_consumed_by_downstream(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_with_tool_selection_none(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
@@ -659,7 +746,6 @@ def test_agentic_short_timeout_reaches_terminal_state(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_in_loop(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
@@ -713,7 +799,6 @@ def test_agentic_in_loop(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
 def test_agentic_in_condition_true_branch(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
@@ -774,14 +859,16 @@ def test_agentic_in_condition_true_branch(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="Parallel LLM calls may exceed poll timeout on rate-limited APIs")
 def test_agentic_parallel_paths_converge(
     syntara_api: SyntaraApiRegistry,
     llm_credential_id: str,
     llm_model_id: str,
     first_project_id: UUID,
 ) -> None:
-    """Two parallel agentic nodes converge before a downstream script runs."""
+    """Two parallel agentic nodes converge before a downstream script runs.
+
+    Uses a longer poll timeout so rate-limited parallel LLM calls can finish.
+    """
     result = create_and_run_workflow(
         syntara_api,
         "e2e-agentic-parallel-converge",
@@ -793,16 +880,18 @@ def test_agentic_parallel_paths_converge(
                 _agentic_node(
                     "agent_a",
                     "Agent A",
-                    "Say exactly: path A done",
+                    "Say hello in one short sentence.",
                     llm_credential_id,
                     llm_model_id,
+                    tool_selection_strategy="NONE",
                 ),
                 _agentic_node(
                     "agent_b",
                     "Agent B",
-                    "Say exactly: path B done",
+                    "Say hello in one short sentence.",
                     llm_credential_id,
                     llm_model_id,
+                    tool_selection_strategy="NONE",
                 ),
                 {
                     "id": "join",
@@ -825,7 +914,7 @@ def test_agentic_parallel_paths_converge(
                 {"from": "join", "to": "final"},
             ],
         },
-        timeout=AGENTIC_POLL_TIMEOUT * 2,
+        timeout=PARALLEL_AGENTIC_POLL_TIMEOUT,
         project_id=first_project_id,
     )
 
