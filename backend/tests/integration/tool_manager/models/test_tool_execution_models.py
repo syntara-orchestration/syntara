@@ -1,10 +1,8 @@
-"""Unit tests for Tool Metrics models.
+"""Unit tests for Tool Execution models.
 
 Tests cover:
 - ToolExecution creation with required fields
 - ToolExecutionStatus enum
-- ToolMetricsSummary dataclass functionality
-- Dictionary conversion methods
 - Field validation and constraints
 """
 
@@ -21,7 +19,6 @@ from syntara.tool_manager.models import Tool
 from syntara.tool_manager.models.tool_execution import (
     ToolExecution,
     ToolExecutionStatus,
-    ToolMetricsSummary,
 )
 
 
@@ -169,29 +166,6 @@ def test_tool_execution_constraints() -> None:
             input_parameters={"test": "value"},
             created_by=created_by,
         )
-
-
-def test_tool_metrics_summary_creation() -> None:
-    """Test ToolMetricsSummary dataclass creation."""
-    now = datetime.now(UTC)
-
-    summary = ToolMetricsSummary(
-        total_executions=100,
-        success_count=85,
-        failure_count=15,
-        avg_duration_ms=1200,
-        p95_duration_ms=3000,
-        time_window="day",
-        generated_at=now,
-    )
-
-    assert summary.total_executions == 100
-    assert summary.success_count == 85
-    assert summary.failure_count == 15
-    assert summary.avg_duration_ms == 1200
-    assert summary.p95_duration_ms == 3000
-    assert summary.time_window == "day"
-    assert summary.generated_at == now
 
 
 @pytest.mark.asyncio

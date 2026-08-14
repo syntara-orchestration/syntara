@@ -1,15 +1,14 @@
-"""Tool metrics models for database storage and summary responses."""
+"""Tool execution model for database storage."""
 
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict
 from sqlalchemy import Column, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlmodel import DateTime, Field, SQLModel
+from sqlmodel import DateTime, Field
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base.user_owned import UserOwnedResource
@@ -28,7 +27,6 @@ class ToolExecution(UserOwnedResource, table=True):
     """Tool execution records stored in database.
 
     Records individual Tool executions for performance monitoring and analysis.
-    This model matches the ToolExecution schema from the metrics contract.
 
     Inherits from UserOwnedResource:
         id: UUID primary key
@@ -111,30 +109,3 @@ class ToolExecution(UserOwnedResource, table=True):
         sa_type=String(FieldLimits.ERROR_CODE_MAX_LENGTH),  # type: ignore[call-overload]
         description="Structured error code",
     )
-
-
-class ToolMetricsSummary(SQLModel):
-    """Summary of tool usage metrics.
-
-    Attributes:
-        total_executions: Total number of tool executions
-        success_count: Number of successful executions
-        failure_count: Number of failed executions
-        avg_duration_ms: Average execution duration in milliseconds
-        p95_duration_ms: 95th percentile execution duration in milliseconds
-        time_window: Time window for the metrics (hour/day/week/month)
-        generated_at: Timestamp when metrics were generated
-
-    """
-
-    total_executions: int
-    success_count: int
-    failure_count: int
-    avg_duration_ms: int
-    p95_duration_ms: int
-    time_window: str
-    generated_at: datetime
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        extra="forbid",  # Reject unknown fields
-    )  # type: ignore[assignment]

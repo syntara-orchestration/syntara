@@ -269,7 +269,7 @@ except FilterError as e:
 Any endpoint that accepts an `additional_params` parameter supports these filter utilities, including:
 
 - **List endpoints**: `workflows.list()`, `executions.list()`, `credentials.list()`, etc.
-- **Get endpoints with filters**: `executions.get()`, `tool_metrics.get()`, etc.
+- **Get endpoints with filters**: `executions.get()`, `invocations.list()`, etc.
 
 Check the endpoint's method signature - if it has `additional_params`, you can use `build_filters()`.
 
