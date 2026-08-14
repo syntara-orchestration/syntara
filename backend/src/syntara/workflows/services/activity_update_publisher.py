@@ -113,25 +113,26 @@ class ActivityUpdatePublisher:
         self,
         execution: Execution,
         snapshot_type: Literal["initial_snapshot", "final_snapshot"],
-    ) -> str:
+    ) -> str | None:
         """Publish execution snapshot to Redis Stream.
 
         Sends a full snapshot of the execution state including all activities.
         Used for both initial snapshot (first activity sync) and final snapshot
         (execution reaches terminal state).
 
+        Gracefully degrades if Redis pool is exhausted; logs a warning but does
+        not block execution (activity snapshots are for WebSocket streaming only).
+
         Args:
             execution: The Execution model instance with loaded activities relationship
             snapshot_type: The snapshot type - either "initial_snapshot" or "final_snapshot"
 
         Returns:
-            The Redis-generated event ID (e.g., "1642680000000-0")
-
-        Raises:
-            RedisConnectionError: If connection to Redis fails
-            ValueError: If required parameters are missing or invalid
+            The Redis-generated event ID (e.g., "1642680000000-0"), or None if publish failed
 
         """
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
         stream_id = self._get_stream_id(execution.id)
 
         # Serialize execution data with activities, scrub credentials
@@ -146,27 +147,39 @@ class ActivityUpdatePublisher:
             timestamp=datetime.now(UTC),
         )
 
-        # Publish to Redis Streams
-        async with StreamClient() as client:
-            event_id = await client.publish(stream_id, message.model_dump(mode="json", exclude={"event_id"}))
-            logger.debug(
-                "Published execution snapshot to stream",
+        # Publish to Redis Streams with graceful degradation
+        try:
+            async with StreamClient() as client:
+                event_id = await client.publish(stream_id, message.model_dump(mode="json", exclude={"event_id"}))
+                logger.debug(
+                    "Published execution snapshot to stream",
+                    snapshot_type=snapshot_type,
+                    execution_id=execution.id,
+                    stream_id=stream_id,
+                    event_id=event_id,
+                )
+                return event_id
+        except RedisConnectionError:
+            logger.warning(
+                "Failed to publish execution snapshot (Redis unavailable)",
                 snapshot_type=snapshot_type,
                 execution_id=execution.id,
                 stream_id=stream_id,
-                event_id=event_id,
             )
-            return event_id
+            return None
 
     async def publish_activity_patch(
         self,
         execution_id: UUID | str,
         activity_updates: list[JsonPatch],
-    ) -> str:
+    ) -> str | None:
         """Publish incremental activity updates as JSON Patch operations.
 
         Sends a patch message containing JSON Patch operations to apply to the
         activities array. This enables efficient incremental updates.
+
+        Gracefully degrades if Redis pool is exhausted; logs a warning but does
+        not block execution (activity updates are for WebSocket streaming only).
 
         Args:
             execution_id: The execution UUID
@@ -174,13 +187,11 @@ class ActivityUpdatePublisher:
                             the operations to apply
 
         Returns:
-            The Redis-generated event ID (e.g., "1642680123456-1")
-
-        Raises:
-            RedisConnectionError: If connection to Redis fails
-            ValueError: If required parameters are missing or invalid
+            The Redis-generated event ID (e.g., "1642680123456-1"), or None if publish failed
 
         """
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
         stream_id = self._get_stream_id(execution_id)
 
         # Convert list of JsonPatch to list of JsonPatchOperation
@@ -209,38 +220,52 @@ class ActivityUpdatePublisher:
             timestamp=datetime.now(UTC),
         )
 
-        # Publish to Redis Streams
-        async with StreamClient() as client:
-            event_id = await client.publish(
-                stream_id, message.model_dump(mode="json", by_alias=True, exclude={"event_id"})
-            )
-            logger.debug(
-                "Published activity patch to stream",
+        # Publish to Redis Streams with graceful degradation
+        try:
+            async with StreamClient() as client:
+                event_id = await client.publish(
+                    stream_id, message.model_dump(mode="json", by_alias=True, exclude={"event_id"})
+                )
+                logger.debug(
+                    "Published activity patch to stream",
+                    execution_id=execution_id,
+                    stream_id=stream_id,
+                    event_id=event_id,
+                    operation_count=len(ops),
+                )
+                return event_id
+        except RedisConnectionError:
+            logger.warning(
+                "Failed to publish activity patch (Redis unavailable)",
                 execution_id=execution_id,
                 stream_id=stream_id,
-                event_id=event_id,
                 operation_count=len(ops),
             )
-            return event_id
+            return None
 
     async def publish_execution_patch(
         self,
         execution_id: UUID | str,
         ops: list[JsonPatchOperation],
-    ) -> str:
+    ) -> str | None:
         """Publish execution-level field updates as JSON Patch operations.
 
         Sends a lightweight patch for execution status changes (e.g. RUNNING→PAUSED)
         instead of resending the full snapshot.
+
+        Gracefully degrades if Redis pool is exhausted; logs a warning but does
+        not block execution (patches are for WebSocket streaming only).
 
         Args:
             execution_id: The execution UUID
             ops: JSON Patch operations to apply to execution fields
 
         Returns:
-            The Redis-generated event ID
+            The Redis-generated event ID, or None if publish failed
 
         """
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
         stream_id = self._get_stream_id(execution_id)
 
         message = ExecutionPatchMessage(
@@ -251,15 +276,24 @@ class ActivityUpdatePublisher:
             timestamp=datetime.now(UTC),
         )
 
-        async with StreamClient() as client:
-            event_id = await client.publish(
-                stream_id, message.model_dump(mode="json", by_alias=True, exclude={"event_id"})
-            )
-            logger.debug(
-                "Published execution patch to stream",
+        try:
+            async with StreamClient() as client:
+                event_id = await client.publish(
+                    stream_id, message.model_dump(mode="json", by_alias=True, exclude={"event_id"})
+                )
+                logger.debug(
+                    "Published execution patch to stream",
+                    execution_id=execution_id,
+                    stream_id=stream_id,
+                    event_id=event_id,
+                    operation_count=len(ops),
+                )
+                return event_id
+        except RedisConnectionError:
+            logger.warning(
+                "Failed to publish execution patch (Redis unavailable)",
                 execution_id=execution_id,
                 stream_id=stream_id,
-                event_id=event_id,
                 operation_count=len(ops),
             )
-            return event_id
+            return None
