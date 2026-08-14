@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Claude, you have access to the following skills. **Do not load them all at once** -- read each skill file on-demand when its trigger condition is met. If a loaded skill (e.g., `frontend_specialist.md`) tells you to read another skill you have already loaded in this conversation, skip the re-read.
 
-<!-- NOTE: Hook enforcement (skill-gate.sh, skill-triggers.json) was removed during
-     monorepo migration. Skills are advisory — Claude should still read them on-demand
-     per the triggers below. Hook-based enforcement may be re-added at the root level
-     once the monorepo hook strategy is finalized. -->
+<!-- NOTE: Executable agent hooks (skill-gate.sh, skill-triggers.json, settings.json)
+     were removed for supply-chain safety and are not allowed upstream. Skills are
+     advisory — read them on-demand per the triggers below. See
+     ../.github/AI_AGENT_POLICY.md. -->
 
 | Trigger                                                                             | Skill file to read                                                                        |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -404,7 +404,6 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
 - **Authentication**: Basic (demo/coffee)
 - **Separate containers**: UI and Mock API
-- **Build script**: `./build-multiarch.sh` for multi-arch Podman builds
 
 ### Container Commands
 
@@ -418,8 +417,4 @@ npm run podman:build:mock-api     # Build mock API container only
 npm run podman:run                # Run all containers
 npm run podman:run:ui             # Run UI on port 4000
 npm run podman:run:mock-api       # Run API on port 3000
-
-# Multi-arch builds
-./build-multiarch.sh              # Build for AMD64 + ARM64
-./build-multiarch.sh push         # Build and push to registry
 ```

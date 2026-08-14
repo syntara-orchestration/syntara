@@ -16,7 +16,7 @@ from syntara.service_accounts.models.service_account_credential import (
 )
 
 
-class SACredentialCreate(SQLModel):
+class ServiceAccountCredentialCreate(SQLModel):
     """Schema for creating a new service account credential."""
 
     credential_type: ServiceAccountCredentialType = Field(
@@ -37,7 +37,7 @@ class SACredentialCreate(SQLModel):
     )
 
 
-class SACredentialRead(SQLModel):
+class ServiceAccountCredentialRead(SQLModel):
     """Schema for credential responses (excludes secrets)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
@@ -57,7 +57,7 @@ class SACredentialRead(SQLModel):
     updated_at: datetime
 
 
-class SACredentialCreateResponse(SACredentialRead):
+class ServiceAccountCredentialCreateResponse(ServiceAccountCredentialRead):
     """Schema for the create response — includes one-time plaintext secret(s)."""
 
     client_secret: str | None = Field(
@@ -66,7 +66,7 @@ class SACredentialCreateResponse(SACredentialRead):
     )
 
 
-class SACredentialRotateRequest(SQLModel):
+class ServiceAccountCredentialRotateRequest(SQLModel):
     """Schema for rotating a credential's secret."""
 
     grace_period_seconds: int | None = Field(
@@ -77,18 +77,18 @@ class SACredentialRotateRequest(SQLModel):
     )
 
 
-class SACredentialRotateResponse(SACredentialCreateResponse):
+class ServiceAccountCredentialRotateResponse(ServiceAccountCredentialCreateResponse):
     """Schema for the rotate response — same shape as create response."""
 
 
-class SACredentialListParams(BaseListParams):
+class ServiceAccountCredentialListParams(BaseListParams):
     """Query parameters for listing service account credentials."""
 
     credential_type: ServiceAccountCredentialType | None = Field(default=None, description="Filter by credential type")
     status: ServiceAccountCredentialStatus | None = Field(default=None, description="Filter by status")
 
 
-class SACredentialListResponse(ResourcesResponse[SACredentialRead]):
+class ServiceAccountCredentialListResponse(ResourcesResponse[ServiceAccountCredentialRead]):
     """Paginated list response for service account credentials."""
 
     max_credentials: int = Field(

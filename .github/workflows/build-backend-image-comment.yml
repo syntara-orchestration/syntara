@@ -55,7 +55,9 @@ jobs:
   build:
     needs: prepare
     uses: ./.github/workflows/_build-backend-image.yml
-    secrets: inherit
+    secrets:
+      RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
+      RH_REGISTRY_TOKEN: ${{ secrets.RH_REGISTRY_TOKEN }}
     with:
       ref: ${{ needs.prepare.outputs.ref }}
       pr_number: ${{ needs.prepare.outputs.pr_number }}
@@ -79,7 +81,7 @@ jobs:
             const success = process.env.BUILD_RESULT === 'success';
             const prNumber = process.env.PR_NUMBER;
             const runUrl = process.env.RUN_URL;
-            const tag = `quay.io/ansible/nexus:pr-${prNumber}`;
+            const tag = `quay.io/ansible/syntara:pr-${prNumber}`;
             const body = success
               ? `Image built and queued for push.\n\nTag: \`${tag}\`\n\n[View run](${runUrl})`
               : `Image build failed. [View run](${runUrl})`;

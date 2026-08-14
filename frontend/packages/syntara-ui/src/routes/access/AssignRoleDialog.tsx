@@ -366,7 +366,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
 
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const debouncedUserSearch = useDebouncedValue(userSearchTerm)
-  const usersQuery = accessClient.useQuery('get', '/users_directory', {
+  const usersQuery = accessClient.useQuery('get', '/users/directory', {
     params: {
       query: {
         sort: 'username',
@@ -382,7 +382,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
 
   const [groupSearchTerm, setGroupSearchTerm] = useState('')
   const debouncedGroupSearch = useDebouncedValue(groupSearchTerm)
-  const groupsQuery = accessClient.useQuery('get', '/groups_directory', {
+  const groupsQuery = accessClient.useQuery('get', '/groups/directory', {
     params: {
       query: {
         sort: 'name',

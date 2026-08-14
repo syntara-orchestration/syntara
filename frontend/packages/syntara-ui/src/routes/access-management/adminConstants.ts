@@ -15,6 +15,15 @@ export const BUILTIN_ADMINS_GROUP_NAME = 'admins'
 /** Name of the built-in authenticated group as defined by the backend. */
 export const BUILTIN_AUTHENTICATED_GROUP_NAME = 'authenticated'
 
+/**
+ * Excludes the built-in "authenticated" group from a list of groups. Every user is
+ * implicitly a member of this group regardless of selection, so it should never appear
+ * as a selectable option in group-assignment dropdowns (e.g. create user, group mapping).
+ */
+export function excludeAuthenticatedGroup<T extends { name: string }>(groups: readonly T[]): T[] {
+  return groups.filter((g) => g.name !== BUILTIN_AUTHENTICATED_GROUP_NAME)
+}
+
 /** Explanation shown when the admin toggle is disabled for the built-in admin. */
 export const BUILTIN_ADMIN_TOGGLE_DISABLED_REASON =
   'Only the built-in administrator can disable their own account, and only when at least one other enabled user exists in the admins group.'

@@ -162,7 +162,7 @@ function setupDefaultMocks() {
         data: { resources: mockProjectRoles, next: null },
       } as never
     }
-    if (path === '/users_directory') {
+    if (path === '/users/directory') {
       return {
         ...defaultQueryReturn,
         data: {
@@ -174,7 +174,7 @@ function setupDefaultMocks() {
         },
       } as never
     }
-    if (path === '/groups_directory') {
+    if (path === '/groups/directory') {
       return {
         ...defaultQueryReturn,
         data: {
@@ -312,7 +312,7 @@ describe('AssignRoleDialog', () => {
       await user.type(userInput, 'ali')
 
       await waitFor(() => {
-        expect(accessClient.useQuery).toHaveBeenCalledWith('get', '/users_directory', {
+        expect(accessClient.useQuery).toHaveBeenCalledWith('get', '/users/directory', {
           params: { query: { sort: 'username', limit: 20, 'username[contains]': 'ali' } },
         })
       })
@@ -331,7 +331,7 @@ describe('AssignRoleDialog', () => {
       await user.type(groupInput, 'test')
 
       await waitFor(() => {
-        expect(accessClient.useQuery).toHaveBeenCalledWith('get', '/groups_directory', {
+        expect(accessClient.useQuery).toHaveBeenCalledWith('get', '/groups/directory', {
           params: { query: { sort: 'name', limit: 20, 'name[contains]': 'test' } },
         })
       })

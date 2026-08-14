@@ -156,7 +156,10 @@ def safe_eval_with_namespace(expression: str, namespace: dict[str, Any]) -> bool
 def _eval_variable(node: ast.Name, namespace: dict[str, Any]) -> Any:  # noqa: ANN401
     """Evaluate variable reference (e.g., status, user, fetch_order)."""
     if node.id not in namespace:
-        msg = f"Variable '{node.id}' not found in namespace"
+        msg = (
+            f'The condition references "{node.id}" but no step with that name has produced '
+            "output. Check that the step name is correct and runs before this condition."
+        )
         raise KeyError(msg)
     return namespace[node.id]
 

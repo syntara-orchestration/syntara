@@ -18,12 +18,18 @@ import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject, 
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
-async function pollExecutionUntilDone(page: Page, executionId: string, token: string): Promise<void> {
+async function pollExecutionStatus(
+  page: Page,
+  executionId: string,
+  token: string,
+  expectedStatuses: string[],
+  timeout = 90_000
+): Promise<void> {
   await expect(async () => {
     const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
     const exec = (await resp.json()) as { status: string }
-    expect(TERMINAL_STATUSES).toContain(exec.status)
-  }).toPass({ timeout: 30_000, intervals: [1_000] })
+    expect(expectedStatuses).toContain(exec.status)
+  }).toPass({ timeout, intervals: [1_000] })
 }
 
 let sleepWorkflowId: string | null = null
@@ -62,6 +68,7 @@ test.beforeAll(async ({ browser }) => {
     if (runResp.ok()) {
       const body = (await runResp.json()) as { id: string }
       runningExecutionId = body.id
+      await pollExecutionStatus(page, runningExecutionId, token, ['running'], 60_000)
     }
 
     const echoName = buildUniqueName('e2e-cancel-echo')
@@ -87,7 +94,7 @@ test.beforeAll(async ({ browser }) => {
     if (echoRunResp.ok()) {
       const body = (await echoRunResp.json()) as { id: string }
       completedExecutionId = body.id
-      await pollExecutionUntilDone(page, completedExecutionId, token)
+      await pollExecutionStatus(page, completedExecutionId, token, TERMINAL_STATUSES)
     }
   } finally {
     await page.close()
@@ -116,7 +123,7 @@ test.afterAll(async ({ browser }) => {
   }
 })
 
-test.describe.skip('Cancel Execution', () => {
+test.describe('Cancel Execution', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('cancel button is visible for a running execution', async ({ app }) => {
