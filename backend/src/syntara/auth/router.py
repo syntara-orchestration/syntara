@@ -2115,14 +2115,11 @@ async def _resolve_and_login_user(
             # or extraction failed) — check if the user has any group
             # memberships from other sources (manually assigned),
             # excluding the authenticated group which all users have.
-            # Subquery: group IDs tracked as IdP-managed — excludes them
-            # from the "manually assigned" check so leftover tracking rows
-            # (if any) cannot satisfy the fallback admission path.
+            # Subquery: group IDs tracked as IdP-managed.  IdP-tracked
+            # rows must never satisfy the manual-group fallback —
+            # including rows written earlier in this same login attempt.
             idp_managed_subq = (
-                select(user_idp_groups.c.group_id)
-                .where(user_idp_groups.c.user_id == user.id)
-                .correlate(user_groups)
-                .scalar_subquery()
+                select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == user.id).scalar_subquery()
             )
             other_groups = await db.exec(
                 select(user_groups.c.group_id)

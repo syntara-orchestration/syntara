@@ -806,6 +806,107 @@ class TestAapRoleMapping:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_issuer_mismatch_clears_memberships_with_empty_set(self):
+        """AAP issuer mismatch must clear IdP memberships with set(), not desired_group_ids."""
+        from unittest.mock import AsyncMock, patch
+
+        user = _make_user()
+        provider_id = uuid4()
+        identity = _make_identity(user, provider_id)
+        config = _make_config(aap_role_mapping_enabled=True, idp_type="aap")
+        db = _make_mock_db_for_aap(builtin_group=_make_builtin_group("admins"))
+
+        mock_diff = AsyncMock()
+        with patch("syntara.auth.services.idp_group_sync._apply_group_membership_diff", mock_diff):
+            result = await sync_idp_groups(
+                db,
+                user,
+                identity,
+                {"iss": "https://evil-provider.example.com", "aap_system_role": "system_administrator"},
+                config,
+            )
+        assert result is False
+        mock_diff.assert_awaited_once_with(db, user.id, provider_id, set(), username=user.username)
+
+    @pytest.mark.asyncio
+    async def test_missing_builtin_group_clears_memberships_with_empty_set(self):
+        """AAP deny when built-in group missing must clear IdP memberships with set()."""
+        from unittest.mock import AsyncMock, patch
+
+        user = _make_user()
+        provider_id = uuid4()
+        identity = _make_identity(user, provider_id)
+        config = _make_config(aap_role_mapping_enabled=True, idp_type="aap")
+        db = _make_mock_db_for_aap(builtin_group=None)
+
+        mock_diff = AsyncMock()
+        with patch("syntara.auth.services.idp_group_sync._apply_group_membership_diff", mock_diff):
+            result = await sync_idp_groups(
+                db,
+                user,
+                identity,
+                {"iss": "https://idp.example.com", "aap_system_role": "system_administrator"},
+                config,
+            )
+        assert result is False
+        mock_diff.assert_awaited_once_with(db, user.id, provider_id, set(), username=user.username)
+
+    @pytest.mark.asyncio
+    async def test_aap_deny_clears_with_set_even_when_claim_groups_matched(self):
+        """When claim groups matched but AAP validation fails, clear with set() — not desired_group_ids.
+
+        Regression: old code passed desired_group_ids (containing matched claim
+        groups) to _apply_group_membership_diff on AAP deny, writing elevated
+        memberships for a user whose login was being rejected.
+        """
+        from unittest.mock import AsyncMock, patch
+
+        user = _make_user()
+        provider_id = uuid4()
+        identity = _make_identity(user, provider_id)
+        nexus_group_id = uuid4()
+        config = _make_config(
+            group_jmespath_expression="groups[*]",
+            aap_role_mapping_enabled=True,
+            idp_type="aap",
+        )
+        entry = _make_db_entry(provider_id, "admin", nexus_group_id)
+        db = _make_mock_db_for_aap(mapping_entries=[entry])
+
+        mock_diff = AsyncMock()
+        with patch("syntara.auth.services.idp_group_sync._apply_group_membership_diff", mock_diff):
+            result = await sync_idp_groups(
+                db,
+                user,
+                identity,
+                {
+                    "iss": "https://evil-provider.example.com",
+                    "groups": ["admin"],
+                    "aap_system_role": "system_administrator",
+                },
+                config,
+            )
+        assert result is False
+        mock_diff.assert_awaited_once_with(db, user.id, provider_id, set(), username=user.username)
+
+    @pytest.mark.asyncio
+    async def test_missing_issuer_clears_memberships_with_empty_set(self):
+        """AAP deny when issuer claim absent must clear IdP memberships with set()."""
+        from unittest.mock import AsyncMock, patch
+
+        user = _make_user()
+        provider_id = uuid4()
+        identity = _make_identity(user, provider_id)
+        config = _make_config(aap_role_mapping_enabled=True, idp_type="aap")
+        db = _make_mock_db_for_aap(builtin_group=_make_builtin_group("admins"))
+
+        mock_diff = AsyncMock()
+        with patch("syntara.auth.services.idp_group_sync._apply_group_membership_diff", mock_diff):
+            result = await sync_idp_groups(db, user, identity, {"aap_system_role": "system_administrator"}, config)
+        assert result is False
+        mock_diff.assert_awaited_once_with(db, user.id, provider_id, set(), username=user.username)
+
+    @pytest.mark.asyncio
     async def test_missing_issuer_rejects_aap_claims(self):
         """AAP role mapping must reject tokens with no iss claim."""
         user = _make_user()

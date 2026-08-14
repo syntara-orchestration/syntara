@@ -280,7 +280,7 @@ async def sync_idp_groups(
                 user_id=str(user.id),
                 provider_id=str(provider_id),
             )
-            await _apply_group_membership_diff(db, user.id, provider_id, desired_group_ids, username=user.username)
+            await _apply_group_membership_diff(db, user.id, provider_id, set(), username=user.username)
             return False
         desired_group_ids = desired_group_ids | aap_group_ids
         aap_validated = True
