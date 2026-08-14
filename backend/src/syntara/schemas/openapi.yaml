@@ -8753,6 +8753,18 @@ paths:
                 code: NOT_FOUND
                 retryable: false
                 instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
         '422':
           description: Validation Error
           content:
@@ -30080,7 +30092,6 @@ components:
           anyOf:
             - type: boolean
             - type: 'null'
-          default: null
           description: True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
           title: Is Project Deleted
     FileDetailResponse:

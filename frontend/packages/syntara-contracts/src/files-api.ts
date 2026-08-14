@@ -204,7 +204,6 @@ export interface components {
       /**
        * Is Project Deleted
        * @description True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
-       * @default null
        */
       is_project_deleted?: boolean | null
     }
@@ -642,6 +641,7 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']

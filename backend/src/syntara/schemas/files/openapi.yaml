@@ -256,6 +256,8 @@ paths:
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
         '404':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
         '422':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
         '429':
@@ -433,7 +435,6 @@ components:
           anyOf:
             - type: boolean
             - type: 'null'
-          default: null
           description: >-
             True when the owning project has been soft-deleted; the file is
             retained as an orphan. Null when not computed (e.g. upload response).
