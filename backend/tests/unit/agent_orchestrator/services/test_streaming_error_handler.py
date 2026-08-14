@@ -195,8 +195,7 @@ def test_tool_discovery_zero_match_uses_client_safe_detail() -> None:
     assert error.code == "TOOL_DISCOVERY_FAILED"
     # Client-safe detail, not the raw exception text with internal names.
     expected_detail = (
-        "Required tools could not be discovered or provisioned."
-        " Check integration connectivity and tool configuration."
+        "Required tools could not be discovered or provisioned. Check integration connectivity and tool configuration."
     )
     assert error.detail == expected_detail
     assert error.retryable is False

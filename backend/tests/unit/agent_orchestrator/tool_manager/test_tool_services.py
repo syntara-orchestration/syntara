@@ -269,7 +269,9 @@ class TestToolServices:
         tool_services._require_provisioned_tools_when_enabled([], [], namespaced_tools=[])
 
         # Provisioned tools present → no raise
-        tool_services._require_provisioned_tools_when_enabled(enabled, [MagicMock(spec=BaseTool)], namespaced_tools=owning_tools)
+        tool_services._require_provisioned_tools_when_enabled(
+            enabled, [MagicMock(spec=BaseTool)], namespaced_tools=owning_tools
+        )
 
     async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
         self,

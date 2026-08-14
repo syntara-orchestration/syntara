@@ -347,9 +347,7 @@ def _require_provisioned_tools_when_enabled(
 
     # Count only MCP tools from integrations that own at least one enabled tool.
     owning_integration_ids = {tool.integration_id for tool in enabled_tools}
-    owning_namespaced_count = sum(
-        1 for t in namespaced_tools if t.integration_id in owning_integration_ids
-    )
+    owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
 
     if owning_namespaced_count == 0:
         msg = (
