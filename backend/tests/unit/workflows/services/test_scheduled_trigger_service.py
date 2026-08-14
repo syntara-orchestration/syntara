@@ -1113,7 +1113,6 @@ class TestListSchedulesByPrefix:
             return_value=_async_iter_from(
                 [
                     _make_schedule_list_entry("orchestrator-sched-wf-1-t1"),
-                    _make_schedule_list_entry("nexus-sched-wf-2-t2"),
                     _make_schedule_list_entry("other-system-schedule"),
                 ]
             )
@@ -1130,7 +1129,7 @@ class TestListSchedulesByPrefix:
             return_value=_async_iter_from(
                 [
                     _make_schedule_list_entry("orchestrator-sched-wf-123-t1"),
-                    _make_schedule_list_entry("nexus-sched-wf-123-t2"),
+                    _make_schedule_list_entry("other-sched-wf-123-t2"),
                     _make_schedule_list_entry("orchestrator-sched-wf-456-t1"),
                 ]
             )
