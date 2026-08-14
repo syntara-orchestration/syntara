@@ -345,9 +345,7 @@ class TestOwnerFieldResolution:
         """Owner metadata is not populated when resource_id is empty."""
         from syntara.credentials.models.credential import Credential
 
-        checker = PermissionChecker(
-            "credential", "update", resource_model=Credential, owner_field="created_by"
-        )
+        checker = PermissionChecker("credential", "update", resource_model=Credential, owner_field="created_by")
 
         request = MagicMock()
         request.state.is_cert_authenticated = False
