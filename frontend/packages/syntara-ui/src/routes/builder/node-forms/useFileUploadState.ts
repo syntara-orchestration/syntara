@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useCallback, useRef, useState } from 'react'
 
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
@@ -25,6 +26,86 @@ export type FileContextType = {
    * The form uses this to exclude mid-DELETE files from submit payloads.
    */
   onDeletingFileIdsChange?: (ids: Set<string>) => void
+}
+
+type BatchDeleteResult = {
+  success: boolean
+  deleted: UploadedFile[]
+}
+
+async function deleteSessionReplacements(
+  replacements: UploadedFile[],
+  beginDeleting: (id: string) => boolean,
+  clearDeletingState: (id: string) => void,
+  showError: (opts: { title: string }) => void,
+): Promise<BatchDeleteResult> {
+  for (const file of replacements) {
+    beginDeleting(file.id)
+  }
+  const deleted: UploadedFile[] = []
+  for (let i = 0; i < replacements.length; i++) {
+    const file = replacements[i]
+    try {
+      await deleteFileById(file.id)
+      deleted.push(file)
+    } catch {
+      showError({ title: `Unable to delete ${file.file.name}. Please try again.` })
+      clearDeletingState(file.id)
+      for (let j = i + 1; j < replacements.length; j++) {
+        clearDeletingState(replacements[j].id)
+      }
+      if (deleted.length > 0) {
+        const names = deleted.map((f) => f.file.name).join(', ')
+        showError({
+          title: `Replace aborted. ${names} ${deleted.length === 1 ? 'was' : 'were'} already removed.`,
+        })
+      }
+      return { success: false, deleted }
+    }
+  }
+  return { success: true, deleted }
+}
+
+type UploadDeps = {
+  uploadFiles: (files: File[], projectId: string) => Promise<{ files?: Array<{ file_id: string }> }>
+  addFiles: (files: UploadedFile[]) => void
+  setUploadingFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>
+  setSessionUploadedIds: React.Dispatch<React.SetStateAction<Set<string>>>
+}
+
+async function uploadAndTrackFiles(files: File[], projectId: string, deps: UploadDeps): Promise<void> {
+  const { uploadFiles, addFiles, setUploadingFiles, setSessionUploadedIds } = deps
+  const newFiles: UploadedFile[] = files.map((file) => ({
+    id: generateUUID(),
+    file,
+    progress: 0,
+    status: 'uploading' as const,
+  }))
+  setUploadingFiles(newFiles)
+  try {
+    const response = await uploadFiles(files, projectId)
+    const successFiles = newFiles.map((f, i) => ({
+      ...f,
+      id: response.files?.[i]?.file_id ?? f.id,
+      progress: 100,
+      status: 'success' as const,
+    }))
+    addFiles(successFiles)
+    setSessionUploadedIds((prev) => {
+      const next = new Set(prev)
+      for (const f of successFiles) next.add(f.id)
+      return next
+    })
+    setUploadingFiles([])
+  } catch {
+    const errorFiles = newFiles.map((f) => ({
+      ...f,
+      status: 'error' as const,
+      errorMessage: 'Upload failed. Please try again.',
+    }))
+    addFiles(errorFiles)
+    setUploadingFiles([])
+  }
 }
 
 export function useFileUploadState(fileContext: FileContextType, projectId: string) {
@@ -160,45 +241,17 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
               return
             }
 
-            // Mark ALL session replacements as deleting up front so every chip in
-            // the batch shows the spinner immediately, not just the one currently
-            // being deleted.
-            for (const file of sessionReplacements) {
-              beginDeleting(file.id)
-            }
-
-            // Sequential DELETEs; defer all UI clears until the batch succeeds.
-            // On first failure: stop further DELETEs, unlock remaining + successes, inform user, abort upload.
-            const deletedSuccessfully: UploadedFile[] = []
-            for (let i = 0; i < sessionReplacements.length; i++) {
-              const file = sessionReplacements[i]
-              try {
-                await deleteFileById(file.id)
-                deletedSuccessfully.push(file)
-              } catch {
-                showError({ title: `Unable to delete ${file.file.name}. Please try again.` })
-                clearDeletingState(file.id)
-                for (let j = i + 1; j < sessionReplacements.length; j++) {
-                  clearDeletingState(sessionReplacements[j].id)
-                }
-                for (const removed of deletedSuccessfully) {
-                  removeLocalFile(removed.id)
-                  clearDeletingState(removed.id)
-                }
-                if (deletedSuccessfully.length > 0) {
-                  const names = deletedSuccessfully.map((f) => f.file.name).join(', ')
-                  showError({
-                    title: `Replace aborted. ${names} ${deletedSuccessfully.length === 1 ? 'was' : 'were'} already removed.`,
-                  })
-                }
-                return
-              }
-            }
-
-            for (const file of deletedSuccessfully) {
+            const batch = await deleteSessionReplacements(
+              sessionReplacements,
+              beginDeleting,
+              clearDeletingState,
+              showError,
+            )
+            for (const file of batch.deleted) {
               removeLocalFile(file.id)
               clearDeletingState(file.id)
             }
+            if (!batch.success) return
 
             removeFilesByName(reUploadNames)
             for (const file of completedFiles) {
@@ -207,38 +260,12 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
               }
             }
 
-            const newFiles: UploadedFile[] = files.map((file) => ({
-              id: generateUUID(),
-              file,
-              progress: 0,
-              status: 'uploading' as const,
-            }))
-            setUploadingFiles(newFiles)
-
-            try {
-              const response = await uploadFiles(files, projectId)
-              const successFiles = newFiles.map((f, i) => ({
-                ...f,
-                id: response.files?.[i]?.file_id ?? f.id,
-                progress: 100,
-                status: 'success' as const,
-              }))
-              addFiles(successFiles)
-              setSessionUploadedIds((prev) => {
-                const next = new Set(prev)
-                for (const f of successFiles) next.add(f.id)
-                return next
-              })
-              setUploadingFiles([])
-            } catch {
-              const errorFiles = newFiles.map((f) => ({
-                ...f,
-                status: 'error' as const,
-                errorMessage: 'Upload failed. Please try again.',
-              }))
-              addFiles(errorFiles)
-              setUploadingFiles([])
-            }
+            await uploadAndTrackFiles(files, projectId, {
+              uploadFiles,
+              addFiles,
+              setUploadingFiles,
+              setSessionUploadedIds,
+            })
           } finally {
             selectionInFlightRef.current = false
           }
