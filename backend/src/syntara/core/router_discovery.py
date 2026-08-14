@@ -300,6 +300,13 @@ def register_routers(
     """
     logger.info("Registering router(s) with prefix", count=len(routers), prefix=prefix or "(none)")
 
+    # Static-prefix routers must be registered before parameterized ones so
+    # that e.g. /groups/directory is matched before /groups/{group_id}.
+    def _has_path_param(r: RouterInfo) -> bool:
+        return any("{" in route.path for route in r.router.routes if hasattr(route, "path"))
+
+    routers = sorted(routers, key=_has_path_param)
+
     for router_info in routers:
         try:
             app.include_router(router_info.router, prefix=prefix)
