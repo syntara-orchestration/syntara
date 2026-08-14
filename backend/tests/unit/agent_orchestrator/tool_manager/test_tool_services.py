@@ -169,7 +169,7 @@ class TestToolServices:
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
             with pytest.raises(
                 ToolDiscoveryError,
-                match=r"none could be provisioned from their owning MCP integrations \(enabled=",
+                match=r"owning MCP integrations returned no tools",
             ):
                 await retriever.retrieve_tools()
 
@@ -212,7 +212,7 @@ class TestToolServices:
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
             with pytest.raises(
                 ToolDiscoveryError,
-                match=r"Owning integrations returned 1 tool\(s\) but none matched",
+                match=r"owning integrations returned 1 tool\(s\) but none matched",
             ):
                 await retriever.retrieve_tools()
 
@@ -238,7 +238,7 @@ class TestToolServices:
         ]
 
         # No MCP tools at all → connectivity/provisioning blame
-        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from their owning MCP"):
+        with pytest.raises(ToolDiscoveryError, match=r"owning MCP integrations returned no tools"):
             tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=[])
 
         # Owning integration returned tools but none matched → registry drift blame
@@ -251,7 +251,7 @@ class TestToolServices:
             )
             for _ in range(3)
         ]
-        with pytest.raises(ToolDiscoveryError, match=r"Owning integrations returned 3 tool\(s\) but none matched"):
+        with pytest.raises(ToolDiscoveryError, match=r"owning integrations returned 3 tool\(s\) but none matched"):
             tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=owning_tools)
 
         # Only unrelated integration returned tools → still connectivity blame (owning count = 0)
@@ -263,7 +263,7 @@ class TestToolServices:
                 base_tool=MagicMock(spec=BaseTool),
             )
         ]
-        with pytest.raises(ToolDiscoveryError, match=r"none could be provisioned from their owning MCP"):
+        with pytest.raises(ToolDiscoveryError, match=r"owning MCP integrations returned no tools"):
             tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=unrelated_tools)
 
         # No enabled tools → no raise
@@ -323,7 +323,7 @@ class TestToolServices:
     def test_require_provisioned_tools_selected_total_soft_skip_raises_selection_unavailable(
         self,
     ) -> None:
-        """SELECTED zero-provision via soft-skip must raise ToolSelectionUnavailableError with IDs."""
+        """SELECTED zero-provision via soft-skip must raise ToolSelectionUnavailableError with IDs and cause."""
         from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 
         owning_integration_id = uuid4()
@@ -341,10 +341,11 @@ class TestToolServices:
                 created_by=uuid4(),
             )
         ]
+        # Total soft-skip (no MCP tools) → connectivity cause
         with pytest.raises(
             ToolSelectionUnavailableError,
             match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
-        ):
+        ) as exc_info:
             tool_services._require_provisioned_tools_when_enabled(
                 enabled,
                 [],
@@ -352,6 +353,52 @@ class TestToolServices:
                 tool_selection_strategy="SELECTED",
                 tool_selections=set(selected_ids),
             )
+        assert "check integration connectivity" in str(exc_info.value)
+
+    def test_require_provisioned_tools_selected_with_drift_includes_drift_cause(
+        self,
+    ) -> None:
+        """SELECTED zero-provision via registry drift must include drift diagnostic."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        owning_integration_id = uuid4()
+        selected_ids = sorted([str(uuid4()), str(uuid4())])
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=owning_integration_id,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        # Owning integration returned tools but none matched enabled entries
+        owning_unmatched = [
+            NamespacedBaseTool(
+                integration_id=owning_integration_id,
+                integration_name="dev_tools",
+                tool_name="unmatched_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+            for _ in range(2)
+        ]
+        with pytest.raises(
+            ToolSelectionUnavailableError,
+            match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+        ) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=owning_unmatched,
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+        assert "check registry name/integration_id drift" in str(exc_info.value)
 
     async def test_retrieve_tools_selected_soft_skip_raises_selection_unavailable(
         self,

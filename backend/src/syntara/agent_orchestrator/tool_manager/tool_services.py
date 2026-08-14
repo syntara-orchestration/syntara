@@ -353,16 +353,6 @@ def _require_provisioned_tools_when_enabled(
     if not enabled_tools or provisioned_tools:
         return
 
-    selections = tool_selections or set()
-    if tool_selection_strategy == "SELECTED" and selections:
-        unavailable = sorted(selections)
-        msg = (
-            "None of the requested tools could be provisioned "
-            f"(unavailable tool IDs: {unavailable}); "
-            "refusing to continue the invocation without tools"
-        )
-        raise ToolSelectionUnavailableError(msg)
-
     enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
 
     # Count only MCP tools from integrations that own at least one enabled tool.
@@ -371,27 +361,33 @@ def _require_provisioned_tools_when_enabled(
     owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
     soft_skipped_owners = owning_integration_ids - owning_with_mcp_tools
 
+    # Build root-cause diagnostic shared by both SELECTED and ALL paths.
     if owning_namespaced_count == 0:
-        msg = (
-            "Enabled tools were discovered but none could be provisioned "
-            f"from their owning MCP integrations (enabled={enabled_names}); "
-            "refusing to continue without tools"
-        )
+        cause = "owning MCP integrations returned no tools — check integration connectivity"
     elif soft_skipped_owners:
-        # Mixed: at least one owning integration soft-skipped while another
-        # returned tools that failed (integration_id, name) matching.
-        msg = (
-            "Enabled tools could not be provisioned: one or more owning MCP "
-            "integrations returned no tools while others returned "
-            f"{owning_namespaced_count} unmatched tool(s) "
-            f"(enabled={enabled_names}); refusing to continue without tools"
+        cause = (
+            "one or more owning MCP integrations returned no tools while others returned "
+            f"{owning_namespaced_count} unmatched tool(s) — check integration connectivity and registry alignment"
         )
     else:
-        msg = (
-            f"Owning integrations returned {owning_namespaced_count} tool(s) but none matched "
-            f"enabled Tool Manager entries (enabled={enabled_names}); "
-            "refusing to continue without tools — check registry name/integration_id drift"
+        cause = (
+            f"owning integrations returned {owning_namespaced_count} tool(s) but none matched "
+            "enabled Tool Manager entries — check registry name/integration_id drift"
         )
+
+    selections = tool_selections or set()
+    if tool_selection_strategy == "SELECTED" and selections:
+        unavailable = sorted(selections)
+        msg = (
+            "None of the requested tools could be provisioned "
+            f"(unavailable tool IDs: {unavailable}); {cause}"
+        )
+        raise ToolSelectionUnavailableError(msg)
+
+    msg = (
+        f"Enabled tools could not be provisioned (enabled={enabled_names}); "
+        f"{cause}; refusing to continue without tools"
+    )
     raise ToolDiscoveryError(msg)
 
 
