@@ -232,11 +232,8 @@ class TestResolveConfigTemplates:
             "method": "GET",
             "url": "https://api.example.com/users/${input.user_id}",
             "timeout": "${input.api_timeout}",
-            "headers": {"Authorization": "Bearer ${secrets.api_token}"},
+            "headers": {"Authorization": "Bearer my-static-token"},
         }
-
-        # Note: secrets need to be in inputs for this test
-        workflow_state["inputs"]["secrets"] = {"api_token": "abc123"}
 
         result = resolve_parameter_templates(config, workflow_state)
         assert result["method"] == "GET"

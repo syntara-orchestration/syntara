@@ -625,6 +625,27 @@ async def test_delete_builtin_project_raises(seeded_db: AsyncSession, test_user:
 
 
 @pytest.mark.asyncio
+async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting the default project raises DefaultProjectProtectionError (AAP-87623)."""
+    from syntara.authz.exceptions import DefaultProjectProtectionError
+    from syntara.authz.models.project import Project
+
+    result = await seeded_db.exec(select(Project).where(Project.is_default == True))  # noqa: E712
+    default_project = result.first()
+    assert default_project is not None, "seed_authz_data should create a default project"
+    assert default_project.is_builtin is False
+
+    svc = ProjectService(seeded_db, test_user)
+    with pytest.raises(DefaultProjectProtectionError, match="Default project cannot be deleted"):
+        await svc.delete_project(default_project.id)
+
+    # Still present and still the default after rejected delete
+    await seeded_db.refresh(default_project)
+    assert default_project.deleted_at is None
+    assert default_project.is_default is True
+
+
+@pytest.mark.asyncio
 async def test_update_non_builtin_project_succeeds(seeded_db: AsyncSession, test_user: User) -> None:
     """Updating a non-builtin project succeeds normally."""
     svc = ProjectService(seeded_db, test_user)

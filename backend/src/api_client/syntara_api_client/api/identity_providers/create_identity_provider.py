@@ -7,7 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.identity_provider_create import IdentityProviderCreate
-from ...models.identity_provider_response import IdentityProviderResponse
+from ...models.identity_provider_read import IdentityProviderRead
 from ...types import Response
 
 
@@ -32,9 +32,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     if response.status_code == 201:
-        response_201 = IdentityProviderResponse.from_dict(response.json())
+        response_201 = IdentityProviderRead.from_dict(response.json())
 
         return response_201
 
@@ -86,7 +86,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -101,7 +101,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: IdentityProviderCreate,
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     """Create identity provider
 
      Create a new identity provider.
@@ -114,7 +114,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -132,7 +132,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: IdentityProviderCreate,
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     """Create identity provider
 
      Create a new identity provider.
@@ -145,7 +145,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return sync_detailed(
@@ -158,7 +158,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: IdentityProviderCreate,
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     """Create identity provider
 
      Create a new identity provider.
@@ -171,7 +171,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -187,7 +187,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: IdentityProviderCreate,
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     """Create identity provider
 
      Create a new identity provider.
@@ -200,7 +200,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return (

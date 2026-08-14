@@ -42,7 +42,6 @@ from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.services import BaseService
-from syntara.files import utils as file_utils
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.models import FileMetadata
 from syntara.invocations.audit.invocation_cancelled import InvocationCancellationResult, InvocationCancelledEvent
@@ -283,7 +282,7 @@ class InvocationService(BaseService):
                     file_count=len(new_file_metadata_list),
                 )
                 saved_file_paths = [fm.file_path for fm in new_file_metadata_list]
-                await file_utils.cleanup_files(saved_file_paths, context="after DB failure")
+                await self._cleanup_files_from_paths(saved_file_paths, invocation_id, context="after DB failure")
 
             # Dispatch failure audit event
             AuditEventDispatcher.dispatch(
@@ -431,22 +430,35 @@ class InvocationService(BaseService):
             )
             raise
 
-    async def _cleanup_files_from_paths(self, files_to_cleanup: list[str], invocation_id: UUID) -> None:
-        """Clean up files from given paths (best-effort)."""
+    async def _cleanup_files_from_paths(
+        self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""
+    ) -> None:
+        """Clean up files from storage via the retriever (best-effort)."""
         if not files_to_cleanup:
-            logger.debug("No file paths found to clean up for invocation", invocation_id=invocation_id)
             return
 
         logger.info(
-            "Cleaning up files for cancelled invocation",
+            "Cleaning up files for invocation",
             file_count=len(files_to_cleanup),
             invocation_id=invocation_id,
+            context=context,
         )
         try:
-            await file_utils.cleanup_files(files_to_cleanup, context="after invocation cancellation")
+            retriever = self.file_manager.get_retriever()
+            for file_path in files_to_cleanup:
+                try:
+                    await retriever.delete_file(file_path)
+                    logger.info("Cleaned up file", file_path=file_path, context=context)
+                except Exception:
+                    logger.exception(
+                        "Failed to cleanup file",
+                        file_path=file_path,
+                        invocation_id=invocation_id,
+                        context=context,
+                    )
         except Exception:
             logger.exception(
-                "File cleanup failed for cancelled invocation, but cancellation will proceed",
+                "File cleanup failed for invocation",
                 invocation_id=invocation_id,
             )
 
@@ -486,7 +498,7 @@ class InvocationService(BaseService):
             if metadata.converted_content_path:
                 files_to_cleanup.append(metadata.converted_content_path)
 
-        await self._cleanup_files_from_paths(files_to_cleanup, invocation.id)
+        await self._cleanup_files_from_paths(files_to_cleanup, invocation.id, context="after invocation cancellation")
 
         return file_ids
 

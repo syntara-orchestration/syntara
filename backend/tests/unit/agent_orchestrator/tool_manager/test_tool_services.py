@@ -5,7 +5,7 @@ in the tool_services module.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -304,6 +304,37 @@ class TestToolServices:
 
         assert captured_params["api_key"] is None
         assert len(result) == 1
+
+    @pytest.mark.ssrf_enforced
+    @pytest.mark.asyncio
+    async def test_process_single_integration_blocks_rebound_base_url_before_dispatch(self) -> None:
+        """Request-time SSRF re-check blocks a rebound/metadata base_url before adapter dispatch.
+
+        The stored base_url may be re-pointed to a private/metadata address after write time
+        (DNS rebinding). _process_single_integration re-runs the SSRF policy BEFORE creating the
+        provider adapter; a block raises ValueError that is caught and the integration is skipped.
+        If the re-check is removed, create_provider_instance would run against 169.254.169.254 --
+        so the assert_not_called() below is what actually guards this call site.
+        """
+        integration = _make_integration("rebound-mcp")
+        integration = IntegrationRead(
+            **{
+                **integration.model_dump(),
+                "configuration": MCPServerConfiguration(
+                    integration_type="mcp_server",
+                    base_url="https://169.254.169.254",
+                ),
+            }
+        )
+
+        # MagicMock so create_provider_instance is a tracked mock and is_registered("mcp") is truthy.
+        provider_factory = MagicMock()
+
+        result = await tool_services._process_single_integration(integration, provider_factory)
+
+        # Integration is skipped (empty result) and, critically, the adapter is never created.
+        assert result == []
+        provider_factory.create_provider_instance.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_prepare_config_params_includes_api_key_when_provided(self) -> None:

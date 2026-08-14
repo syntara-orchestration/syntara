@@ -152,7 +152,7 @@ export interface paths {
       cookie?: never
     }
     /**
-     * List credentials
+     * List AAP credentials
      * @description List Ansible Automation Platform credentials (not organization-scoped).
      */
     get: operations['list_aap_credentials']

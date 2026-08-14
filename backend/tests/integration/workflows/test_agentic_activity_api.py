@@ -146,7 +146,11 @@ class TestAgenticActivityErrorHandling:
 
         with pytest.raises(ApplicationError) as exc_info:
             await execute_agentic_activity(input_config, None, project_id=str(uuid4()))
-        assert "agent orchestrator" in str(exc_info.value).lower()
+        error_message = str(exc_info.value)
+        assert "temporarily unavailable" in error_message.lower()
+        assert "try again" in error_message.lower()
+        assert "agent orchestrator" not in error_message.lower()
+        assert "Failed to connect to Agent Orchestrator" not in error_message
 
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_timeout(self, mock_agent_client) -> None:

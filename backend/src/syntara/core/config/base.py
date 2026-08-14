@@ -220,17 +220,18 @@ class OpenAPIValidationSettings(BaseSettings):
 class APIDocsSettings(BaseSettings):
     """API documentation endpoint configuration.
 
-    Controls whether Swagger UI (/docs), ReDoc (/redoc), and the raw
-    OpenAPI JSON (/openapi.json) endpoints are served. Disabled by
-    default so production deployments do not expose the API schema.
+    Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
+    endpoints are served at /api_docs/v1/. A convenience redirect
+    from /docs is also registered. Disabled by default so production
+    deployments do not expose the API schema.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
         default=False,
-        description="Serve OpenAPI documentation endpoints (/docs, /redoc, /openapi.json). "
-        "Enable for development environments.",
+        description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
+        "(docs, redoc, openapi.json). Enable for development environments.",
     )
 
     enable_try_it_out: bool = Field(
@@ -702,6 +703,14 @@ class ServerSettings(BaseSettings):
         description="Hostnames that workflow HTTP request nodes are permitted to target "
         "despite resolving to private IPs. Set via APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS "
         "as a JSON array.",
+    )
+
+    integration_url_allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description="Hostnames that integration base_url fields are permitted to use "
+        "despite resolving to private or loopback IPs (e.g. add 'localhost' to allow a "
+        "local MCP server). Cloud metadata endpoints are always blocked regardless of "
+        "this allowlist. Set via APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
     )
 
 
@@ -1233,6 +1242,19 @@ class TemporalSettings(BaseSettings):
         default=50,
         ge=1,
         description="Maximum concurrent activity executions",
+    )
+
+    max_concurrent_workflows: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Application-level cap on the number of non-terminal workflow executions allowed "
+            "simultaneously. New workflow starts are rejected with HTTP 429 when this limit is "
+            "reached, preventing unbounded Temporal server memory growth. "
+            "Set to 0 (default) to disable the limit. "
+            "Set via APP_MAX_CONCURRENT_WORKFLOWS. "
+            "Tune this value based on benchmarking against the Temporal server memory budget."
+        ),
     )
 
     schedule_reconciliation_interval_seconds: float = Field(

@@ -11,7 +11,7 @@ const processEnv: Record<string, string | undefined> = (
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 const openrouterApiKey = processEnv['APP_OPENROUTER_API_KEY']
 const openrouterBaseUrl = processEnv['APP_OPENROUTER_BASE_URL'] ?? 'https://openrouter.ai/api/v1'
-const mcpServerUrl = processEnv['NEXUS_E2E_MCP_SERVER_URL']
+const mcpServerUrl = processEnv['SYNTARA_E2E_MCP_SERVER_URL']
 
 const WIZARD_URL = '/configuration/integrations/configure'
 const INTEGRATIONS_LIST_URL = '/configuration/integrations'
@@ -20,7 +20,7 @@ test.describe('Create Integration Wizard', () => {
   test('user creates an MCP Server integration through the wizard', async ({ app }) => {
     test.skip(
       isRealBackend && !mcpServerUrl,
-      'NEXUS_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
+      'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
     )
 
     const integrationName = buildUniqueName('e2e-wizard-mcp')
@@ -282,6 +282,12 @@ test.describe('HTTP URL Rejection and Allow HTTP Override', () => {
 })
 
 test('discovery failure shows error state, retry after correction succeeds', async ({ app }) => {
+  // Mock-only: after the injected discover failure is cleared, the "retry" step expects a real
+  // discover to succeed, which requires a reachable, live LLM endpoint. The real-backend E2E
+  // environment has none (and an unresolvable placeholder host is rejected by SSRF validation),
+  // so this UX flow cannot be exercised there.
+  test.skip(isRealBackend, 'Retry requires a live LLM endpoint not available on the real backend')
+
   const integrationName = buildUniqueName('e2e-wizard-retry')
   const credName = buildUniqueName('e2e-wizard-retry-cred')
   let credential: SeededCredential | null = null

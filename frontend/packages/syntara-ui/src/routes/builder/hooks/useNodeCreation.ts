@@ -23,7 +23,6 @@ export type ActionFormData = {
   code?: string
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url?: string
-  authentication?: string
   headers?: Array<{ id: string; key: string; value: string }>
   body?: string
   parameters?: string

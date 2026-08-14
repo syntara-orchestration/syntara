@@ -96,7 +96,10 @@ data/uploads/
 .cursorignore
 .cursorindexingignore
 
-# AI agent local files — ignore .claude/ contents by default, then selectively un-ignore
+# AI agent local files — ignore .claude/ contents by default, then selectively un-ignore.
+# Policy: executable agent hooks and local settings must not ship publicly
+# (see .github/AI_AGENT_POLICY.md). The blanket ignore covers settings.json,
+# settings.local.json, hooks/, and other runtime agent config.
 .claude/*
 !.claude/skills/
 !.claude/skills/**

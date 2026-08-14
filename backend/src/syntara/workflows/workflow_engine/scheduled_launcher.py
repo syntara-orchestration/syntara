@@ -21,6 +21,7 @@ with workflow.unsafe.imports_passed_through():
     import structlog
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
+    from temporalio.exceptions import ApplicationError
 
     from syntara.core.config.base import get_settings
     from syntara.core.models.principal import service_principal_id
@@ -237,6 +238,21 @@ class ScheduledExecutionLauncher:
             workflow_def = wf_version.workflow_definition
 
             author_name = await resolve_user_display_name(session, wf_workflow.created_by)
+
+            limit = settings.max_concurrent_workflows
+            if limit > 0:
+                from syntara.workflows.services.execution_service import count_active_executions  # noqa: PLC0415
+
+                active = await count_active_executions(session)
+                if active >= limit:
+                    logger.warning(
+                        "Scheduled workflow skipped: concurrency limit reached",
+                        workflow_id=str(workflow_id),
+                        active=active,
+                        limit=limit,
+                    )
+                    msg = f"Workflow concurrency limit reached: {active}/{limit} active workflows."
+                    raise ApplicationError(msg, non_retryable=True)
 
         # Phase 2: Prepare execution identity and metadata
         pre_generated_execution_id = str(uuid4())

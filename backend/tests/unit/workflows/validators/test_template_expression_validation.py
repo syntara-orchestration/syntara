@@ -195,7 +195,6 @@ class TestAllValidExpressions:
             "${input.name}",
             "${inputs.name}",
             "${variables.count}",
-            "${secrets.api_key}",
             "${trigger.data}",
             "${workflow_context.execution.id}",
             "${workflow_context.now}",

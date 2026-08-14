@@ -118,6 +118,9 @@ async def test_validate_and_record_exceeds_limit(
     assert error.current_usage == 9500
     assert error.token_limit == 10000
     assert error.request_tokens == 1000
+    assert str(user_config.user_id) not in str(error)
+    assert "Token limit exceeded for user" not in str(error)
+    assert "model token limit" in str(error)
 
     # Verify usage was NOT recorded
     mock_repository.record_usage.assert_not_called()

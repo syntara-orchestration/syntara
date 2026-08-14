@@ -4,8 +4,8 @@ from syntara.identity_providers.models.identity_provider import (
     IdentityProvider,
     IdentityProviderCreate,
     IdentityProviderListResponse,
-    IdentityProviderPatch,
-    IdentityProviderResponse,
+    IdentityProviderRead,
+    IdentityProviderUpdate,
 )
 from syntara.identity_providers.models.identity_provider_configuration import (
     IdentityProviderConfiguration,
@@ -30,8 +30,8 @@ __all__ = [
     "IdentityProviderCreate",
     "IdentityProviderListParams",
     "IdentityProviderListResponse",
-    "IdentityProviderPatch",
-    "IdentityProviderResponse",
+    "IdentityProviderRead",
+    "IdentityProviderUpdate",
     "IdpGroupMappingEntry",
     "IdpGroupMappingEntryCreate",
     "IdpGroupMappingEntryRead",

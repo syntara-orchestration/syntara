@@ -4,7 +4,7 @@ import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
-const KNOWN_NAMESPACES = new Set(['input', 'trigger', 'secrets', 'workflow', 'workflow_context'])
+const KNOWN_NAMESPACES = new Set(['input', 'trigger', 'workflow', 'workflow_context'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
