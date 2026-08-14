@@ -19,7 +19,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.engine import AllowedProjectsResult, AuthzRequest, authorize
+from syntara.authz.evaluator import AuthzEvaluator
+from syntara.authz.exceptions import AuthorizationDeniedError
+from syntara.authz.models import Project
 from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
@@ -28,11 +31,13 @@ from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.audit.execution_lifecycle import ExecutionAction, ExecutionLifecycleEvent
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
+    ScriptNodesDisabledError,
     TemporalUnavailableError,
     TriggerValidationError,
     WorkflowConcurrencyLimitError,
@@ -190,6 +195,7 @@ class ExecutionService(BaseService):
         session: AsyncSession,
         user: User,
         temporal_service: TemporalExecutionService | None = None,
+        opa_client: AuthzEvaluator | None = None,
     ) -> None:
         """Initialize service with database session.
 
@@ -197,6 +203,7 @@ class ExecutionService(BaseService):
             session: Database session for queries
             user: Current authenticated user
             temporal_service: Optional Temporal execution service for workflow operations
+            opa_client: Optional authorization evaluator for permission checks
 
         """
         super().__init__(
@@ -206,6 +213,7 @@ class ExecutionService(BaseService):
             convert_resource_mixin=ExecutionsConvertResourceMixin(),
         )
         self.temporal_service = temporal_service
+        self.opa_client = opa_client
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -227,6 +235,66 @@ class ExecutionService(BaseService):
                 error_type=error_type,
             )
         )
+
+    @staticmethod
+    def _definition_contains_script_nodes(workflow_definition: dict[str, Any]) -> bool:
+        """Return True if any node in the definition has type 'script'."""
+        return any(node.get("type") == "script" for node in workflow_definition.get("nodes", []))
+
+    async def _check_script_execute_permission(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID | None = None,
+    ) -> None:
+        """Check script:execute permission if the definition contains script nodes.
+
+        The runtime kill switch (``workflow_engine.script_nodes_enabled``) is
+        checked unconditionally for any definition containing script nodes,
+        regardless of *project_id*.  The OPA authorization call is only made
+        when *project_id* and an ``opa_client`` are both available.
+
+        Raises:
+            ScriptNodesDisabledError: If script nodes are disabled org-wide.
+            AuthorizationDeniedError: If the user lacks script:execute.
+
+        """
+        if not self._definition_contains_script_nodes(workflow_definition):
+            return
+
+        cache = get_runtime_settings()
+        if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
+            raise ScriptNodesDisabledError
+
+        if project_id is None:
+            return
+
+        if self.opa_client is None:
+            return
+
+        proj_result = await self.session.exec(
+            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
+        )
+        project_name = proj_result.first()
+        if not project_name:
+            msg = "Cannot verify script:execute permission: project not found or deleted"
+            raise AuthorizationDeniedError(msg)
+
+        authz_result = await authorize(
+            self.session,
+            self.opa_client,
+            AuthzRequest(
+                user_id=self.user.id,
+                action="execute",
+                resource_type="script",
+                resource_id="",
+                resource_project=project_name,
+                user_labels=self.user.labels,
+                user_metadata=self.user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = "Not authorized to execute workflows containing script nodes"
+            raise AuthorizationDeniedError(msg)
 
     @staticmethod
     def _apply_trigger_schema_defaults(
@@ -353,8 +421,11 @@ class ExecutionService(BaseService):
             schema_version=workflow_version.schema_version,
         )
 
-        # Step 2: Resolve trigger node and apply input_schema defaults
+        # Step 2: Check script:execute permission if workflow contains script nodes
         workflow_def = workflow_version.workflow_definition
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
+
+        # Step 3: Resolve trigger node and apply input_schema defaults
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
         self._apply_trigger_schema_defaults(trigger_node, input_data)
 
@@ -714,8 +785,11 @@ class ExecutionService(BaseService):
             schema_version=workflow_version.schema_version,
         )
 
-        # Step 2: Validate target_node_id exists in workflow definition
+        # Step 2: Check script:execute permission if workflow contains script nodes
         workflow_def = workflow_version.workflow_definition
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
+
+        # Step 3: Validate target_node_id exists in workflow definition
         all_nodes = workflow_def.get("nodes", [])
         node_ids = {node["id"] for node in all_nodes if "id" in node}
 
@@ -1203,6 +1277,8 @@ class ExecutionService(BaseService):
 
         # Step 5: Resolve trigger node from the original version's definition
         workflow_def = workflow_version.workflow_definition
+        await self._check_script_execute_permission(workflow_def, workflow.project_id)
+
         if original.trigger_node_id is None:
             from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
 

@@ -27,6 +27,7 @@ from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.credentials.models.credential import Credential
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
 from syntara.workflows.audit.workflow_version import (
     WorkflowVersionCreatedEvent,
@@ -39,6 +40,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    ScriptNodesDisabledError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -284,6 +286,84 @@ class WorkflowService(BaseService):
                     cred_ids.add(cred_id)
         return cred_ids
 
+    @staticmethod
+    def _definition_contains_script_nodes(workflow_definition: dict[str, Any]) -> bool:
+        """Return True if any node in the definition has type 'script'."""
+        return any(node.get("type") == "script" for node in workflow_definition.get("nodes", []))
+
+    @staticmethod
+    def _extract_script_nodes(workflow_definition: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return the list of script-type nodes from a workflow definition."""
+        return [node for node in workflow_definition.get("nodes", []) if node.get("type") == "script"]
+
+    async def _check_script_edit_permission(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID | None = None,
+        *,
+        previous_definition: dict[str, Any] | None = None,
+    ) -> None:
+        """Check script:edit permission if script nodes were added or modified.
+
+        When *previous_definition* is provided the check is diff-based: it
+        only fires when the script nodes in the new definition differ from
+        those in the previous version.  This allows users who lack
+        ``script:edit`` to save a workflow without changing its script nodes
+        (e.g. the auto-save that the UI performs before a run).
+
+        The runtime kill switch (``workflow_engine.script_nodes_enabled``) is
+        checked unconditionally for any definition containing script nodes,
+        regardless of *project_id*.  The OPA authorization call is only made
+        when *project_id* and an ``opa_client`` are both available.
+
+        Raises:
+            ScriptNodesDisabledError: If script nodes are disabled org-wide.
+            AuthorizationDeniedError: If the user lacks script:edit.
+
+        """
+        if not self._definition_contains_script_nodes(workflow_definition):
+            return
+
+        if previous_definition is not None and self._extract_script_nodes(
+            workflow_definition
+        ) == self._extract_script_nodes(previous_definition):
+            return
+
+        cache = get_runtime_settings()
+        if not await cache.get_bool("workflow_engine.script_nodes_enabled", default=True):
+            raise ScriptNodesDisabledError
+
+        if project_id is None:
+            return
+
+        if self.opa_client is None:
+            return
+
+        proj_result = await self.session.exec(
+            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
+        )
+        project_name = proj_result.first()
+        if not project_name:
+            msg = "Cannot verify script:edit permission: project not found or deleted"
+            raise AuthorizationDeniedError(msg)
+
+        authz_result = await authorize(
+            self.session,
+            self.opa_client,
+            AuthzRequest(
+                user_id=self.user.id,
+                action="edit",
+                resource_type="script",
+                resource_id="",
+                resource_project=project_name,
+                user_labels=self.user.labels,
+                user_metadata=self.user.authz_metadata,
+            ),
+        )
+        if not authz_result.allowed:
+            msg = "Not authorized to create or modify workflows containing script nodes"
+            raise AuthorizationDeniedError(msg)
+
     async def _validate_credential_project_scope(
         self,
         workflow_definition: dict[str, Any],
@@ -471,6 +551,7 @@ class WorkflowService(BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
+        await self._check_script_edit_permission(workflow_definition, project_id)
         ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1008,12 +1089,17 @@ class WorkflowService(BaseService):
                 findings=[f.message for f in result.findings[:10]],
             )
 
+        previous_cred_ids: set[str] | None = None
+        previous_def: dict[str, Any] | None = None
+        if workflow.current_version is not None:
+            prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
+            if prev_version and prev_version.workflow_definition:
+                previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
+                previous_def = prev_version.workflow_definition
+        await self._check_script_edit_permission(
+            workflow_definition, workflow.project_id, previous_definition=previous_def
+        )
         if workflow.project_id is not None:
-            previous_cred_ids: set[str] | None = None
-            if workflow.current_version is not None:
-                prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
-                if prev_version and prev_version.workflow_definition:
-                    previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
@@ -1142,7 +1228,7 @@ class WorkflowService(BaseService):
 
         return workflow, current_version, validation_result
 
-    async def publish_workflow_version(  # noqa: C901, PLR0915
+    async def publish_workflow_version(  # noqa: C901, PLR0912, PLR0915
         self,
         workflow_id: UUID,
         version: int,
@@ -1174,6 +1260,7 @@ class WorkflowService(BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
+        prev_publish_def = target_version.workflow_definition if workflow_definition is not None else None
         if workflow_definition is not None:
             target_version = await self._create_and_flush_version(
                 workflow, target_version, workflow_definition, change_description
@@ -1196,18 +1283,22 @@ class WorkflowService(BaseService):
             raise WorkflowPublishValidationError(result)
 
         stale_tool_findings: list[ValidationFinding] = []
-        if workflow_definition is not None and workflow.project_id is not None:
-            # Inline definition provided (atomic save-and-publish). At this point
-            # target_version already points to the newly created version, so its
-            # workflow_definition equals workflow_definition — diff-based previous_cred_ids
-            # would be empty and skip the check. Pass None to treat all credentials in the
-            # new definition as candidates for the credential:use check (safe and correct).
-            await self._validate_credential_project_scope(
-                workflow_definition, workflow.project_id, previous_credential_ids=None
+        if workflow_definition is not None:
+            await self._check_script_edit_permission(
+                workflow_definition, workflow.project_id, previous_definition=prev_publish_def
             )
-            stale_tool_findings = await validate_workflow_references(
-                self.session, workflow_definition, workflow.project_id
-            )
+            if workflow.project_id is not None:
+                # Inline definition provided (atomic save-and-publish). At this point
+                # target_version already points to the newly created version, so its
+                # workflow_definition equals workflow_definition — diff-based previous_cred_ids
+                # would be empty and skip the check. Pass None to treat all credentials in the
+                # new definition as candidates for the credential:use check (safe and correct).
+                await self._validate_credential_project_scope(
+                    workflow_definition, workflow.project_id, previous_credential_ids=None
+                )
+                stale_tool_findings = await validate_workflow_references(
+                    self.session, workflow_definition, workflow.project_id
+                )
 
         if workflow.published_version_id is not None and workflow.published_version_id != target_version.id:
             unpublish_event = WorkflowPublishEvent(
@@ -1408,6 +1499,11 @@ class WorkflowService(BaseService):
         # Capture current definition for audit change summary
         current_version_record = await self._get_version_or_none(workflow.id, workflow.current_version)
         old_definition = current_version_record.workflow_definition if current_version_record else None
+
+        # Check script:edit permission if restoring a definition with changed script nodes
+        await self._check_script_edit_permission(
+            target_version.workflow_definition, workflow.project_id, previous_definition=old_definition
+        )
 
         date_iso = target_version.created_at.isoformat() if target_version.created_at else None
         source_label = target_version.name or date_iso or f"version {version}"

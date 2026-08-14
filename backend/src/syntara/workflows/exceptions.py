@@ -206,6 +206,15 @@ class BuiltinWorkflowMissingError(WorkflowError):
         super().__init__(f"Required built-in workflow '{workflow_name}' is missing")
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.script_nodes_disabled_handler")
+class ScriptNodesDisabledError(WorkflowError):
+    """Raised when script nodes are disabled via runtime setting."""
+
+    def __init__(self) -> None:
+        """Initialize exception."""
+        super().__init__("Script nodes are disabled by the administrator")
+
+
 @fastapi_exception(handler="syntara.workflows.error_handlers.workflow_version_conflict_handler")
 class WorkflowVersionConflictError(WorkflowError):
     """Raised when a save or publish conflicts with a newer version."""

@@ -567,3 +567,65 @@ async def test_publish_blocked_preserves_existing_published_version(
     v1_resp = await jwt_client.get(f"/api/v1/workflows/{workflow_id}/versions/1")
     assert v1_resp.status_code == 200
     assert v1_resp.json()["status"] == "published"
+
+
+@pytest.mark.asyncio
+async def test_publish_with_script_node_denied_returns_403(jwt_client: AsyncClient, test_project_id: str) -> None:
+    """Atomic save-and-publish with script nodes returns 403 when script:edit is denied.
+
+    Regression test for AAP-87589 finding #1 (publish bypass).
+    """
+    from unittest.mock import patch
+
+    from syntara.authz.engine import AuthzResult
+
+    script_definition = {
+        "schema_version": "2.0.0",
+        "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "script1",
+                "type": "script",
+                "parameters": {"language": "python", "code": "print('hello')"},
+            }
+        ],
+        "edges": [{"from": "trigger_manual", "to": "script1"}],
+    }
+
+    workflow = {
+        "name": "script-publish-test",
+        "project_id": test_project_id,
+        "workflow_definition": create_minimal_workflow_definition(
+            name="script-publish", description="Test", activity_id="task1"
+        ),
+    }
+    create_resp = await jwt_client.post("/api/v1/workflows", json=workflow)
+    assert create_resp.status_code == 201
+    workflow_id = create_resp.json()["id"]
+
+    async def _deny_script_edit(_db, _evaluator, request) -> AuthzResult:
+        if request.resource_type == "script" and request.action == "edit":
+            return AuthzResult(
+                allowed=False,
+                denied=True,
+                matched_policy="",
+                denial_reason="test deny",
+                denied_by="",
+                effective_policies=[],
+            )
+        return AuthzResult(
+            allowed=True,
+            denied=False,
+            matched_policy="",
+            denial_reason="",
+            denied_by="",
+            effective_policies=[],
+        )
+
+    with patch("syntara.workflows.services.workflow_service.authorize", side_effect=_deny_script_edit):
+        response = await jwt_client.post(
+            f"/api/v1/workflows/{workflow_id}/versions/1/publish",
+            json={"workflow_definition": script_definition},
+        )
+
+    assert response.status_code == 403

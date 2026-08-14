@@ -24,6 +24,7 @@ def mock_service() -> WorkflowService:
     service = WorkflowService.__new__(WorkflowService)
     service.session = session
     service.user = user
+    service.opa_client = None
     return service
 
 
