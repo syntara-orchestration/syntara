@@ -1103,7 +1103,6 @@ class TestListAllSchedules:
         assert result == {"orchestrator-sched-wf-1-t1"}
 
 
-
 class TestListSchedulesByPrefix:
     """Tests for the list_schedules_by_prefix static method."""
 
