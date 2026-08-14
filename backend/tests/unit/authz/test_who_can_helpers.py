@@ -483,7 +483,7 @@ class TestUserHasAuthzQueryPermission:
 
 
 # ---------------------------------------------------------------------------
-# who_can three-tier permission gate
+# who_can two-tier permission gate
 # ---------------------------------------------------------------------------
 
 
@@ -634,7 +634,8 @@ class TestWhoCanPermissionGate:
             )
 
     @pytest.mark.asyncio
-    async def test_tier1_with_resource_id_checks_workflow_edit(self) -> None:
+    async def test_tier1_resource_project_drives_check_not_resource_id(self) -> None:
+        """resource_project is what drives Tier 1; resource_id is informational only."""
         db = AsyncMock()
         evaluator = AsyncMock()
         user = self._make_user()
@@ -658,6 +659,27 @@ class TestWhoCanPermissionGate:
             authz_req = mock_auth.call_args[0][2]
             assert authz_req.resource_type == "workflow"
             assert authz_req.action in ("update", "create")
+
+    @pytest.mark.asyncio
+    async def test_resource_id_alone_without_project_is_denied(self) -> None:
+        """resource_id without resource_project falls to Tier 2, not Tier 1."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_id="res-123",
+        )
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router._dispatch_who_can_denied"),
+            pytest.raises(AuthorizationDeniedError, match="System-wide who_can queries require authz:query permission"),
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="", request=self._make_request()
+            )
 
     @pytest.mark.asyncio
     async def test_tier1_does_not_use_client_labels(self) -> None:

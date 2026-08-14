@@ -739,12 +739,11 @@ async def _enforce_who_can_permission(
 
     Tier 0 (always): authz:query holders (admins, CLI) pass unconditionally,
             preserving backwards compatibility with the old PermissionChecker gate.
-    Tier 1: resource_project or resource_id provided — the query's
-            (resource_type, action) pair must match a gate rule in
-            _WHO_CAN_GATE_RULES, and the user must pass that rule's
-            permission check. Each rule binds the allowed query pair
-            to its required permission, so adding a new pair forces
-            the developer to specify how it is authorized.
+    Tier 1: resource_project provided — the query's (resource_type, action)
+            pair must match a gate rule in _WHO_CAN_GATE_RULES, and the user
+            must pass that rule's permission check. Each rule binds the
+            allowed query pair to its required permission, so adding a new
+            pair forces the developer to specify how it is authorized.
     Tier 2: No project context and no authz:query — denied.
 
     Certificate-authenticated requests (service-to-service) bypass the gate,
@@ -759,7 +758,7 @@ async def _enforce_who_can_permission(
     if await _user_has_authz_query_permission(current_user, evaluator, db):
         return
 
-    if resource_project or body.resource_id:
+    if resource_project:
         query_pair = (body.resource_type, body.action)
         rule = _WHO_CAN_GATE_LOOKUP.get(query_pair)
         if rule is None:
@@ -861,10 +860,10 @@ async def who_can(
     """List users who can perform a specific action.
 
     Two-tier authorization model:
-    1. resource_project or resource_id provided — the (resource_type, action) pair
-       must match a gate rule, and the user must pass that rule's permission check
+    1. resource_project provided — the (resource_type, action) pair must match
+       a gate rule, and the user must pass that rule's permission check
        (e.g. workflow:update for approval:decide queries).
-    2. Neither provided — system-wide query, requires authz:query (admin).
+    2. No resource_project — system-wide query, requires authz:query (admin).
 
     Args:
         request: The HTTP request (used for cert-auth bypass check).

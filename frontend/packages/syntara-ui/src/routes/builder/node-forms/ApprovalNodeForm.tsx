@@ -100,6 +100,7 @@ function ApproverUsersSelect({
   isLoading,
   validationError,
   isPermissionDenied,
+  hasProjectContext,
 }: Readonly<{
   value: readonly string[]
   onChange: (value: string[]) => void
@@ -107,7 +108,13 @@ function ApproverUsersSelect({
   isLoading: boolean
   validationError?: Readonly<{ message?: string }>
   isPermissionDenied?: boolean
+  hasProjectContext?: boolean
 }>) {
+  const alertMessage =
+    isPermissionDenied && !hasProjectContext
+      ? 'Select a project to load approval users, or enter usernames manually.'
+      : "You don't have permission to list approval users. You can still enter usernames manually."
+
   return (
     <Stack hasGutter>
       <StackItem>
@@ -130,7 +137,7 @@ function ApproverUsersSelect({
       {isPermissionDenied && (
         <StackItem>
           <Alert variant="warning" title="Dropdown unavailable" isInline isPlain>
-            You don't have permission to list approval users. You can still enter usernames manually.
+            {alertMessage}
           </Alert>
         </StackItem>
       )}
@@ -257,6 +264,7 @@ function ApprovalFormFields({
                   isLoading={isLoadingUsers}
                   validationError={validationErrors?.approver_users}
                   isPermissionDenied={usersPermissionDenied}
+                  hasProjectContext={!!effectiveProjectId}
                 />
               )}
             />

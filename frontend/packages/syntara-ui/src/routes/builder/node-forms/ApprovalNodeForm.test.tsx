@@ -6,33 +6,34 @@ import { axe } from 'vitest-axe'
 import { ApprovalNodeForm } from './ApprovalNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
-// Mock the permission-filtered hooks
-const mockUseApprovalDecideUsers = vi.fn(() => ({
-  users: [
-    { id: 'user-1', username: 'approver1' },
-    { id: 'user-2', username: 'approver2' },
-  ],
-  isLoading: false,
-  isPermissionDenied: false,
-  error: null,
-  refetch: vi.fn(),
-}))
-
-const mockUseApprovalDecideGroups = vi.fn(() => ({
-  groups: [
-    { id: 'group-1', name: 'approvers' },
-    { id: 'group-2', name: 'admins' },
-  ],
-  isLoading: false,
-  error: null,
+// Mock the permission-filtered hooks — vi.hoisted ensures these are available when vi.mock factories run
+const { mockUseApprovalDecideUsers, mockUseApprovalDecideGroups } = vi.hoisted(() => ({
+  mockUseApprovalDecideUsers: vi.fn(() => ({
+    users: [
+      { id: 'user-1', username: 'approver1' },
+      { id: 'user-2', username: 'approver2' },
+    ],
+    isLoading: false,
+    isPermissionDenied: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  mockUseApprovalDecideGroups: vi.fn(() => ({
+    groups: [
+      { id: 'group-1', name: 'approvers' },
+      { id: 'group-2', name: 'admins' },
+    ],
+    isLoading: false,
+    error: null,
+  })),
 }))
 
 vi.mock('./useApprovalDecideUsers', () => ({
-  useApprovalDecideUsers: () => mockUseApprovalDecideUsers(),
+  useApprovalDecideUsers: mockUseApprovalDecideUsers,
 }))
 
 vi.mock('./useApprovalDecideGroups', () => ({
-  useApprovalDecideGroups: () => mockUseApprovalDecideGroups(),
+  useApprovalDecideGroups: mockUseApprovalDecideGroups,
 }))
 
 vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
@@ -490,9 +491,41 @@ describe('ApprovalNodeForm', () => {
         refetch: vi.fn(),
       })
 
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="some-project" />)
 
       expect(screen.getByText('Dropdown unavailable')).toBeInTheDocument()
+      expect(
+        screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
+      ).toBeInTheDocument()
+    })
+
+    it('shows project-context message when permission-denied without project', () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+
+      expect(
+        screen.getByText('Select a project to load approval users, or enter usernames manually.')
+      ).toBeInTheDocument()
+    })
+
+    it('shows permission message when permission-denied with project', () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="some-project" />)
+
       expect(
         screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
       ).toBeInTheDocument()
@@ -516,6 +549,12 @@ describe('ApprovalNodeForm', () => {
         },
       })
       expect(results).toHaveNoViolations()
+    })
+
+    it('forwards projectId prop to useApprovalDecideUsers', () => {
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project-123" />)
+
+      expect(mockUseApprovalDecideUsers).toHaveBeenCalledWith('test-project-123')
     })
 
     it('renders with groups loading state', () => {

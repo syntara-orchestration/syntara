@@ -119,11 +119,11 @@ export function ApproverMultiSelect<T extends SelectableItem>({
       selectedValues.map((val) => {
         const item = items.find((i) => getItemValue(i) === val)
         if (item) {
-          return { key: getItemId(item), label: getItemLabel(item), value: getItemValue(item) }
+          return { key: val, label: getItemLabel(item), value: getItemValue(item) }
         }
         return { key: val, label: val, value: val }
       }),
-    [selectedValues, items, getItemId, getItemValue, getItemLabel]
+    [selectedValues, items, getItemValue, getItemLabel]
   )
 
   const handleRemoveSelection = useCallback(
