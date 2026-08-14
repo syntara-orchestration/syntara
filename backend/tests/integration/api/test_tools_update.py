@@ -304,3 +304,45 @@ class TestToolsUpdateContract:
         data = response.json()
         assert data["refresh_error"] == error_message  # Preserved from initial set
         assert not data["enabled"]  # Updated field
+
+    @pytest.mark.asyncio
+    async def test_update_tool_status_preserves_disabled_contract(
+        self, jwt_client: AsyncClient, test_tool: Tool
+    ) -> None:
+        """Test that a status-only update does not re-enable an administrator-disabled tool."""
+        response = await jwt_client.patch(f"/api/v1/tools/{test_tool.id}", json={"enabled": False})
+        assert response.status_code == 200
+        assert not response.json()["enabled"]
+
+        response = await jwt_client.patch(f"/api/v1/tools/{test_tool.id}", json={"status": "available"})
+
+        # Contract: Must return 200 OK
+        assert response.status_code == 200
+
+        # Contract: Must apply the status without re-enabling the tool
+        data = response.json()
+        assert data["status"] == "available"
+        assert not data["enabled"]
+
+    @pytest.mark.asyncio
+    async def test_update_tool_status_preserves_enabled_contract(
+        self, jwt_client: AsyncClient, test_tool: Tool
+    ) -> None:
+        """Test that a status-only update does not disable an administrator-enabled tool."""
+        response = await jwt_client.patch(f"/api/v1/tools/{test_tool.id}", json={"enabled": True})
+        assert response.status_code == 200
+        assert response.json()["enabled"]
+
+        response = await jwt_client.patch(
+            f"/api/v1/tools/{test_tool.id}",
+            json={"status": "error", "refresh_error": "Tool execution failed"},
+        )
+
+        # Contract: Must return 200 OK
+        assert response.status_code == 200
+
+        # Contract: Must apply the status without disabling the tool
+        data = response.json()
+        assert data["status"] == "error"
+        assert data["refresh_error"] == "Tool execution failed"
+        assert data["enabled"]
