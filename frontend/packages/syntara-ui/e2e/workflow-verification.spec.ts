@@ -11,8 +11,8 @@
  */
 
 import AxeBuilder from '@axe-core/playwright'
-import { type Page } from '@playwright/test'
 
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
@@ -55,7 +55,6 @@ async function mockValidateEndpoint(app: Page, options: MockValidateOptions = {}
   // Wait for any in-flight requests to settle before setting up the route mock.
   // Without this, a pending validation request from save/load can race with the
   // mock, causing the real response to overwrite the mocked error state.
-  await app.waitForLoadState('networkidle')
   await app.route(VALIDATE_ROUTE, (route) =>
     route.fulfill({
       status: 200,

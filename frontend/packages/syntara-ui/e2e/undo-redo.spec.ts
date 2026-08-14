@@ -14,8 +14,7 @@
  * - Edge synchronization details
  */
 
-import type { Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { addScriptNode } from './helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
@@ -139,9 +138,9 @@ test.describe('Execution History Navigation', () => {
       // Click the execution to navigate to the execution page
       const runHistoryPanel = app.getByRole('heading', { name: 'Run history' }).locator('..')
       const executionItems = runHistoryPanel.locator('button[class*="simpleList"]')
-      const itemCount = await executionItems.count()
-      if (itemCount > 0) {
-        await executionItems.nth(0).click()
+      const allExecutionItems = await executionItems.all()
+      if (allExecutionItems.length > 0) {
+        await allExecutionItems[0].click()
         await expect(app).toHaveURL(/\/executions\//)
         await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
       }

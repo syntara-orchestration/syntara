@@ -12,7 +12,8 @@ export function useFilesMetadata(fileIds: string[] | undefined): {
     queryKey: ['files', 'metadata', fileIds],
     queryFn: () =>
       filesFetchClient.GET('/files/metadata', {
-        params: { query: { file_ids: fileIds! } },
+        // enabled above guarantees fileIds is a non-empty array
+        params: { query: { file_ids: fileIds as string[] } },
       }),
     enabled: !!fileIds && fileIds.length > 0,
     select: (res) =>

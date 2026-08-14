@@ -226,8 +226,7 @@ test.describe('Alert Notifications', () => {
 
     // The error may appear as a PF alert (role="alert") or as form-level error text
     const errorAlert = app.getByRole('alert').filter({ hasText: /error|fail/i })
-    const dangerAlert = app.locator('[class*="pf-m-danger"]').filter({ hasText: /error|fail/i })
-    await expect(errorAlert.or(dangerAlert)).toBeVisible({ timeout: 10_000 })
+    await expect(errorAlert).toBeVisible({ timeout: 10_000 })
 
     await app.unroute('**/api/v1/credentials')
   })
@@ -255,7 +254,7 @@ test.describe('Dynamic Field Renderer — Help Text', () => {
 
     await tokenHelpButton.click()
     // Help popover should appear — PF6 renders it as a popover with a body
-    await expect(app.locator('.pf-v6-c-popover__body')).toBeVisible({ timeout: 5_000 })
+    await expect(app.getByRole('tooltip').or(app.getByRole('dialog'))).toBeVisible({ timeout: 5_000 })
 
     await selectCredentialType(modal, 'HTTP Basic Auth')
 

@@ -1,9 +1,7 @@
 /**
  * Helpers for the builder's "Verify workflow" action.
  */
-import { type Page } from '@playwright/test'
-
-import { expect } from '../fixtures'
+import { expect, type Page } from '../fixtures'
 
 /** Glob for the workflow validation endpoint that "Verify workflow" posts to. */
 export const VALIDATE_ROUTE = '**/api/v1/workflows/validate'

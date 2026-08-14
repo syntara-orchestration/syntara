@@ -70,8 +70,8 @@ function reachableNodes(entryId: string, adjacency: Map<string, string[]>, stopA
   const visited = new Set<string>()
   const stack = [entryId]
   while (stack.length > 0) {
-    const nodeId = stack.pop()!
-    if (visited.has(nodeId) || nodeId.startsWith('converge-') || nodeId === stopAt) continue
+    const nodeId = stack.pop()
+    if (nodeId === undefined || visited.has(nodeId) || nodeId.startsWith('converge-') || nodeId === stopAt) continue
     visited.add(nodeId)
     for (const child of adjacency.get(nodeId) ?? []) {
       if (!visited.has(child)) stack.push(child)
@@ -341,11 +341,14 @@ export class ExecutionStateEnricher {
     triggerDisplayToRealId: Map<string, string> | undefined,
     edges: EdgeConnection[]
   ): 'passed' | 'pending' {
-    const targetStarted = this.targetHasStarted(edge.target, activityStates, edges)
+    const resolvedEdges = edges
+    const targetStarted = this.targetHasStarted(edge.target, activityStates, resolvedEdges)
 
     if (edge.source.startsWith('trigger-')) {
       const triggerRealId = triggerDisplayToRealId?.get(edge.source)
-      const sourceCompleted = triggerRealId ? this.sourceIsTerminal(triggerRealId, activityStates, edges) : false
+      const sourceCompleted = triggerRealId
+        ? this.sourceIsTerminal(triggerRealId, activityStates, resolvedEdges)
+        : false
       return sourceCompleted && targetStarted ? 'passed' : 'pending'
     }
 
@@ -353,7 +356,7 @@ export class ExecutionStateEnricher {
       return targetStarted ? 'passed' : 'pending'
     }
 
-    if (this.sourceIsTerminal(edge.source, activityStates, edges)) {
+    if (this.sourceIsTerminal(edge.source, activityStates, resolvedEdges)) {
       return targetStarted ? 'passed' : 'pending'
     }
 

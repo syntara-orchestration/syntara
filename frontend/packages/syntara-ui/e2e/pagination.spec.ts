@@ -6,9 +6,7 @@
  * - Project selector filters workflows by project_id
  * - Changing per-page resets to first page
  */
-import type { Page } from '@playwright/test'
-
-import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, type Page, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -149,12 +147,12 @@ test.describe('Pagination Footer — Users Tab', () => {
   })
 
   test('pagination footer is visible with per-page toggle', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -177,7 +175,7 @@ test.describe('Pagination Footer — Groups Tab', () => {
       .catch(() => false)
     test.skip(!hasTable, 'No groups data available')
 
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -250,13 +248,12 @@ test.describe('Project Selector — Workflows', () => {
     await app.getByRole('option', { name: 'All projects' }).waitFor({ state: 'visible', timeout: 10_000 })
 
     // Find and click first real project (not "All projects" or "Create project")
-    const options = app.getByRole('option')
-    const count = await options.count()
+    const options = await app.getByRole('option').all()
     let clicked = false
-    for (let i = 0; i < count; i++) {
-      const text = await options.nth(i).textContent()
+    for (const option of options) {
+      const text = await option.textContent()
       if (text && !text.includes('All projects') && !text.includes('Create project')) {
-        await options.nth(i).click()
+        await option.click()
         clicked = true
         break
       }
@@ -279,13 +276,12 @@ test.describe('Project Selector — Workflows', () => {
     await app.getByPlaceholder('All projects').click()
     await app.getByRole('option', { name: 'All projects' }).waitFor({ state: 'visible', timeout: 10_000 })
 
-    const options = app.getByRole('option')
-    const count = await options.count()
+    const options = await app.getByRole('option').all()
     let clicked = false
-    for (let i = 0; i < count; i++) {
-      const text = await options.nth(i).textContent()
+    for (const option of options) {
+      const text = await option.textContent()
       if (text && !text.includes('All projects') && !text.includes('Create project')) {
-        await options.nth(i).click()
+        await option.click()
         clicked = true
         break
       }
@@ -309,7 +305,7 @@ test.describe('Project Selector — Workflows', () => {
   })
 
   test('pagination footer has per-page toggle', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -330,7 +326,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       return
     }
 
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.waitFor({ state: 'visible', timeout: 10_000 })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /10 per page/i }).click()
@@ -367,7 +363,7 @@ test.describe('Pagination Navigation — Workflows', () => {
     await expect(prevButton).toBeEnabled()
 
     // Change per-page
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /50 per page/i }).click()
 
@@ -411,12 +407,12 @@ test.describe('Pagination Footer — Integrations', () => {
   })
 
   test('pagination footer is visible', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -436,7 +432,7 @@ test.describe('Pagination Footer — Identity Providers', () => {
       .catch(() => false)
     test.skip(!hasTable, 'No identity provider data available')
 
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = app.getByRole('navigation', { name: /pagination/i }).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible({ timeout: 5000 })
   })
 })

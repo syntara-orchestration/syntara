@@ -67,6 +67,7 @@ function groupExecutionsByDate(executions: Execution[]): ExecutionGroup[] {
   for (const exec of executions) {
     const label = exec.created_at ? getDateGroupLabel(exec.created_at) : 'Unknown'
     if (!map.has(label)) map.set(label, [])
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via map.set(label, []) above
     map.get(label)!.push(exec)
   }
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }))
@@ -304,7 +305,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
                     <RhUiHistoryIcon />
                   </Icon>
                   <Title headingLevel="h2" size={TitleSizes.md}>
-                    Run history
+                    Run History
                   </Title>
                 </Flex>
                 <Content component={ContentVariants.small}>View past runs of this workflow.</Content>

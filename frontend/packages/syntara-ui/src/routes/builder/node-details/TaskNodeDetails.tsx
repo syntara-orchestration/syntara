@@ -159,7 +159,7 @@ function buildHTTPConfig(
     credential_id?: string
   } = {
     method: data.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    url: data.url!,
+    url: data.url ?? '',
   }
 
   if (headers) {
@@ -194,7 +194,7 @@ function buildScriptConfig(data: RegistryActionFormData): {
 } {
   const config: { language: string; code: string; credential_id?: string; environment?: Record<string, string> } = {
     language: data.language ?? 'python',
-    code: data.code!,
+    code: data.code ?? '',
   }
 
   if (data.credential_id) {

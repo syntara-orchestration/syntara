@@ -980,3 +980,20 @@ describe('Button', () => {
 - Catches most bugs without diminishing returns
 - Balances thoroughness with development velocity
 - Forces testing of critical paths without testing getters/setters
+
+---
+
+## Keep Mock Handlers in Sync with Contract Types
+
+When a contract field is renamed, added, or removed, **update `packages/syntara-mock-api/src/handlers.ts` in the same PR.** Stale handler keys are silently ignored by browsers — the mock never exercises the new code path, so developers cannot trigger or test the behavior locally.
+
+```typescript
+// ❌ BAD: contract switched from warnings: string[] → warning?: string | null
+// but the mock still returns the old shape — the warning toast is untestable
+return HttpResponse.json({ ...workflow, warnings: [] })
+
+// ✅ GOOD: keep the mock in sync with the new contract field
+return HttpResponse.json({ ...workflow, warning: null })
+```
+
+**PR checklist item:** Any PR that renames or removes a response field must include a corresponding mock handler update. TypeScript won't catch this automatically because `HttpResponse.json()` is untyped — it's a manual discipline.
