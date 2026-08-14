@@ -55,7 +55,6 @@ from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeo
 PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 
 
-
 logger = structlog.stdlib.get_logger(__name__)
 
 # Retry parameters for querying activity output after Temporal marks an activity as
