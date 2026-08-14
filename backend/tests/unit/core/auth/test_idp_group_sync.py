@@ -864,13 +864,13 @@ class TestAapRoleMapping:
         user = _make_user()
         provider_id = uuid4()
         identity = _make_identity(user, provider_id)
-        nexus_group_id = uuid4()
+        mapped_group_id = uuid4()
         config = _make_config(
             group_jmespath_expression="groups[*]",
             aap_role_mapping_enabled=True,
             idp_type="aap",
         )
-        entry = _make_db_entry(provider_id, "admin", nexus_group_id)
+        entry = _make_db_entry(provider_id, "admin", mapped_group_id)
         db = _make_mock_db_for_aap(mapping_entries=[entry])
 
         mock_diff = AsyncMock()

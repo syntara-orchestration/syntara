@@ -111,7 +111,7 @@ async def group_mapping(test_db_session: AsyncSession, provider_id: UUID, test_g
     entry = IdpGroupMappingEntry(
         identity_provider_id=provider_id,
         idp_group_value="admin",
-        nexus_group_id=test_group.id,
+        mapped_group_id=test_group.id,
     )
     test_db_session.add(entry)
     await test_db_session.flush()
@@ -315,3 +315,92 @@ class TestMalformedClaimClearsGroups:
             select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
         )
         assert set(idp_tracking.all()) == set(), "IdP tracking must be cleared on extraction failure"
+
+    @pytest.mark.asyncio
+    async def test_aap_deny_clears_groups_on_issuer_mismatch(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """AAP issuer mismatch must clear stale IdP groups and deny login."""
+        admins_group = Group(
+            name="admins",
+            description="Built-in admins group",
+            is_builtin=True,
+            created_by=test_user.id,
+        )
+        test_db_session.add(admins_group)
+        await test_db_session.flush()
+
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+            aap_role_mapping_enabled=True,
+            idp_type="aap",
+        )
+
+        # First login: healthy claims — matching issuer, valid role, matching group
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {
+                "iss": "https://idp.example.com",
+                "groups": ["admin"],
+                "aap_system_role": "system_administrator",
+            },
+            config,
+        )
+        await test_db_session.flush()
+        assert result is True
+
+        # Verify groups granted
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        group_ids = set(memberships.all())
+        assert test_group.id in group_ids
+        assert admins_group.id in group_ids
+
+        idp_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+        )
+        assert test_group.id in set(idp_tracking.all())
+
+        # Second login: mismatched issuer — AAP role validation fails
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {
+                "iss": "https://evil-provider.example.com",
+                "groups": ["admin"],
+                "aap_system_role": "system_administrator",
+            },
+            config,
+        )
+        await test_db_session.flush()
+        assert result is False, "Login must be denied on AAP issuer mismatch"
+
+        # Stale IdP-managed groups must be cleared
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        group_ids = set(memberships.all())
+        assert test_group.id not in group_ids, "Stale claim-mapped group must be cleared on AAP deny"
+        assert admins_group.id not in group_ids, "Stale AAP-resolved group must be cleared on AAP deny"
+
+        # IdP tracking table must be empty
+        idp_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+        )
+        assert set(idp_tracking.all()) == set(), "IdP tracking must be cleared on AAP deny"
