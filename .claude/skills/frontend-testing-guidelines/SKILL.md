@@ -17,26 +17,23 @@ Write tests that verify **what** your code does, not **how** it does it. Tests s
 
 ## Coverage Requirements
 
-**All new and modified files must meet 80% coverage threshold** across:
+**CI (blocks merge):** merged Vitest coverage must meet **85% statements**. That is
+`nyc check-coverage --statements 85` in `packages/syntara-ui/scripts/merge-coverage.js`,
+run by the `(Frontend) Coverage Report` required check. It is a **global** gate on
+merged shards, not a per-file gate.
 
-- **Statements**: 80%
-- **Branches**: 80%
-- **Functions**: 80%
-- **Lines**: 80%
+There is **no** `scripts/check-pr-coverage.js`. Vitest has **no** coverage
+thresholds in config. SonarCloud coverage is informational (not a required check).
 
-This is enforced incrementally - existing files can improve gradually, but new code should meet the standard.
+**Authoring target:** aim for ~80% statements/branches/functions/lines on **new**
+files so the global 85% does not regress. Utilities 90%+. Existing files can
+improve gradually.
 
-**Coverage enforcement:**
-
-Coverage is enforced on changed files in PRs via `scripts/check-pr-coverage.js`. Run locally from `frontend/packages/syntara-ui`:
+Run locally from `frontend/packages/syntara-ui`:
 
 ```bash
-cd packages/syntara-ui
 npm run test:coverage        # Generate coverage report
-npm run test:coverage        # Check coverage (see CI for per-file threshold enforcement)
 ```
-
-CI automatically runs this check and **blocks PRs** where any changed source file falls below 80% on any of the four metrics (lines, statements, functions, branches). All new and modified source files must meet the threshold to merge.
 
 **Critical: files never imported are silently excluded from coverage reports**
 
@@ -426,7 +423,7 @@ it('returns debounced value after delay', async () => {
 })
 ```
 
-This ensures the 80% coverage threshold is met on the hook file independently, and prevents regressions when the consuming component changes.
+This ensures the hook file itself is measured (not only indirect coverage from a component test) and prevents regressions when the consuming component changes.
 
 ### 4. Unnecessary `useEffect` in Hooks
 
@@ -950,7 +947,7 @@ const axe = configureAxe({
 
 ## Industry Best Practices for Test Coverage
 
-### Bare Minimum (80%)
+### Bare minimum (authoring target, ~80% on new files)
 
 - **Happy path**: Test the most common user flow
 - **Error cases**: Test at least one error scenario
@@ -974,7 +971,7 @@ describe('Button', () => {
 })
 ```
 
-### Why 80%?
+### Why aim for ~80% on new files?
 
 - Industry standard (Google, Airbnb, Netflix use 80-90%)
 - Catches most bugs without diminishing returns

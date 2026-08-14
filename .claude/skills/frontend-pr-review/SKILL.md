@@ -105,18 +105,16 @@ Check whether the changes follow:
 | New `use*.ts` hook without `use*.test.ts(x)`                   | #14 -- every new hook needs a dedicated test file                                                         |
 | `useEffect` + `setState` for derived/computed values           | #15 -- compute during render or use `useMemo`                                                             |
 | `useEffect` + `setValue` watching form fields                  | #16 -- move cascading resets to field's `onChange` handler                                                |
-| `formState.isSubmitting` for loading state                     | #18 -- use `isPending` from mutation hooks                                                                |
 | `PlusCircleIcon` or non-`RhUi*` icons                          | #19 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
 | Inline style objects (`style={{ ... }}`)                       | #20 -- refactor to CSS module classes                                                                     |
 | `let` counter inside `.map()`                                  | #21 -- pre-compute indices immutably                                                                      |
-| `aria-label` on `<span>` / `<div>`                             | #22 -- only use on interactive elements, widgets, landmarks, images                                       |
+| `aria-label` on `<div>` (non-interactive)                      | #22 -- span is ESLint; still flag `aria-label` on generic `<div>`                                         |
 | Any `eslint-disable` or `eslint-disable-next-line`             | #23 -- never suppress rules; fix the code so it passes                                                    |
 | Hook called unconditionally but used conditionally             | #24 -- extract to a conditionally-rendered wrapper component                                              |
 | `useEffect` + `useState` for API calls                         | #25 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)                                         |
 | Manual `Promise.all` + cancellation for parallel fetches       | #25 -- use `useQueries` from TanStack Query                                                               |
 | `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #26 -- track deferred work in an issue, not code comments                                                 |
-| Hardcoded documentation URLs                                   | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`           |
-| `SynPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
+| `SynPageHeader` without `docLink` prop                          | #30 -- hardcoded URLs are ESLint; still pass `docLink={useDocLink('key')}`                                |
 | Hardcoded colors in CSS modules                                | ESLint can't catch these; review CSS module files manually                                                |
 | `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
 | `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |
