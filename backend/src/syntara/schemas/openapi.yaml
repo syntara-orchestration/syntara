@@ -26587,15 +26587,20 @@ paths:
   /workflows/validate:
     post:
       summary: Validate workflow definition
-      description: Validate a workflow definition without saving it.
+      description: |
+        Validate a workflow definition without saving it.
+
+        Requires authentication but no specific workflow/project permission:
+        validation is a stateless, side-effect-free check of caller-supplied
+        data with no workflow_id or project_id in scope to authorize against.
       operationId: validate_workflow_definition
       tags:
         - Workflows
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: workflow
-        action: create
+        resource: null
+        action: null
       requestBody:
         required: true
         content:
