@@ -32,7 +32,6 @@ class TestWorkflowConcurrencyLimitHandler:
         assert data["code"] == "WORKFLOW_CONCURRENCY_LIMIT"
         assert data["retryable"] is True
         assert data["instance"] == "https://api.example.com/executions"
-        assert response.headers["retry-after"] == "5"
 
     def test_detail_includes_active_and_limit_counts(self) -> None:
         """Detail message contains the active/limit counts."""

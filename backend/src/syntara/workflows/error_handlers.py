@@ -315,7 +315,7 @@ def workflow_concurrency_limit_handler(request: Request, exc: "WorkflowConcurren
         limit=exc.limit,
         active=exc.active,
     )
-    response = create_problem_details_response(
+    return create_problem_details_response(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         problem_type=PROBLEM_TYPES["rate_limited"],
         title="Workflow Concurrency Limit Reached",
@@ -324,8 +324,6 @@ def workflow_concurrency_limit_handler(request: Request, exc: "WorkflowConcurren
         retryable=True,
         instance=str(request.url),
     )
-    response.headers["Retry-After"] = "5"
-    return response
 
 
 # ============================================================================
