@@ -102,7 +102,7 @@ class StreamClient(BaseRedisClient):
 
         Raises:
             RedisConnectionError: If XADD fails after retries exhausted
-            json.JSONDecodeError: If data cannot be serialized to JSON
+            TypeError: If data contains values not serializable to JSON
             ResponseError: If XADD operation fails
             ValueError: If stream_id is empty
 
@@ -125,7 +125,7 @@ class StreamClient(BaseRedisClient):
         try:
             # Serialize the entire data dict to JSON for storage
             json_data = json.dumps(data)
-        except json.JSONDecodeError:
+        except TypeError:
             logger.exception("Failed to serialize data for stream", stream_id=stream_id)
             raise
 
