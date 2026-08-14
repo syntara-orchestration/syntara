@@ -13,7 +13,7 @@ import structlog
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.audit.tool_management import ToolDiscoveryEvent, ToolDiscoveryStatus
-from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.tool_manager.tool_filtering import (
     enhance_namespaced_tools_with_metadata,
     filter_base_tools_by_enabled,
@@ -330,6 +330,8 @@ def _require_provisioned_tools_when_enabled(
     provisioned_tools: list[BaseTool],
     *,
     namespaced_tools: list[NamespacedBaseTool],
+    tool_selection_strategy: str | None = None,
+    tool_selections: set[str] | frozenset[str] | None = None,
 ) -> None:
     """Fail closed when enabled tools exist but none survived provisioning/filter.
 
@@ -339,21 +341,50 @@ def _require_provisioned_tools_when_enabled(
     Scopes the MCP-returned count to integrations that own enabled tools so
     that tools from unrelated integrations do not mask a connectivity failure
     on the owning integration.
+
+    When any owning integration contributes zero MCP tools (soft-skip), prefer
+    a connectivity or mixed-failure message over pure registry-drift blame —
+    sibling integrations returning unmatched tools must not hide soft-skips.
+
+    For ``SELECTED`` with non-empty selections, raise
+    ``ToolSelectionUnavailableError`` (including selection IDs) so stream
+    classification matches the selection-unavailable path.
     """
     if not enabled_tools or provisioned_tools:
         return
+
+    selections = tool_selections or set()
+    if tool_selection_strategy == "SELECTED" and selections:
+        unavailable = sorted(selections)
+        msg = (
+            "None of the requested tools could be provisioned "
+            f"(unavailable tool IDs: {unavailable}); "
+            "refusing to continue the invocation without tools"
+        )
+        raise ToolSelectionUnavailableError(msg)
 
     enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
 
     # Count only MCP tools from integrations that own at least one enabled tool.
     owning_integration_ids = {tool.integration_id for tool in enabled_tools}
+    owning_with_mcp_tools = {t.integration_id for t in namespaced_tools if t.integration_id in owning_integration_ids}
     owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
+    soft_skipped_owners = owning_integration_ids - owning_with_mcp_tools
 
     if owning_namespaced_count == 0:
         msg = (
             "Enabled tools were discovered but none could be provisioned "
             f"from their owning MCP integrations (enabled={enabled_names}); "
             "refusing to continue without tools"
+        )
+    elif soft_skipped_owners:
+        # Mixed: at least one owning integration soft-skipped while another
+        # returned tools that failed (integration_id, name) matching.
+        msg = (
+            "Enabled tools could not be provisioned: one or more owning MCP "
+            "integrations returned no tools while others returned "
+            f"{owning_namespaced_count} unmatched tool(s) "
+            f"(enabled={enabled_names}); refusing to continue without tools"
         )
     else:
         msg = (
@@ -399,8 +430,19 @@ class ToolRetriever:
         self.disabled_tools: list[ToolWithParameters] = []
         self.namespaced_tools: list[NamespacedBaseTool] = []
 
-    async def retrieve_tools(self) -> list[BaseTool]:
+    async def retrieve_tools(
+        self,
+        *,
+        tool_selection_strategy: str | None = None,
+        tool_selections: set[str] | frozenset[str] | None = None,
+    ) -> list[BaseTool]:
         """Retrieve tools from MCP servers, filtered by what is enabled in the DB.
+
+        Args:
+            tool_selection_strategy: Optional strategy from the invocation
+                (``ALL`` / ``SELECTED`` / ``NONE``). When ``SELECTED``, zero
+                provision maps to ``ToolSelectionUnavailableError``.
+            tool_selections: Selected tool IDs when strategy is ``SELECTED``.
 
         Returns:
             List of filtered BaseTools ready for execution
@@ -410,6 +452,8 @@ class ToolRetriever:
                 enabled tools exist but MCP returned none, or if MCP returned tools
                 that failed ``(integration_id, name)`` matching against enabled
                 Tool Manager entries.
+            ToolSelectionUnavailableError: If strategy is ``SELECTED`` and none of
+                the selected tools could be provisioned.
             Exception: Propagates unexpected retrieval failures after emitting a
                 FAILED audit event. Callers that require tools must not swallow
                 these errors and continue toolless.
@@ -448,6 +492,8 @@ class ToolRetriever:
                 self.enabled_tools,
                 enhanced_tools,
                 namespaced_tools=self.namespaced_tools,
+                tool_selection_strategy=tool_selection_strategy,
+                tool_selections=tool_selections,
             )
 
             logger.info("Tool retrieval completed", invocation_id=self.invocation_id)

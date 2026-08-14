@@ -4,6 +4,7 @@ Tests the tool discovery, retrieval, and error reporting functions
 in the tool_services module.
 """
 
+import re
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
@@ -181,12 +182,12 @@ class TestToolServices:
         """Fail closed must blame registry/match drift when MCP returned tools but 0 matched."""
         from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
         from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
-
-        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
-        tool_manager_client.get_all_tools.return_value = sample_tools
-
-        # Use an owning integration ID so the scoped count is >0 (drift scenario).
         from tests.unit.agent_orchestrator.tool_manager.conftest import INTEGRATION_1_ID
+
+        # Single owning integration so soft-skip of a sibling owner cannot flip the message.
+        single_owner_tools = [t for t in sample_tools if t.integration_id == INTEGRATION_1_ID]
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = single_owner_tools
 
         unmatched = [
             NamespacedBaseTool(
@@ -272,6 +273,119 @@ class TestToolServices:
         tool_services._require_provisioned_tools_when_enabled(
             enabled, [MagicMock(spec=BaseTool)], namespaced_tools=owning_tools
         )
+
+    def test_require_provisioned_tools_mixed_soft_skip_and_unmatched_sibling(self) -> None:
+        """Multi-owner: soft-skipped A + unmatched tools from B must not pure-blame drift."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_a = uuid4()
+        integration_b = uuid4()
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="tool_a",
+                namespaced_name="mcp_a::tool_a",
+                description="A",
+                integration_id=integration_a,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+            ToolWithParameters(
+                id=uuid4(),
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+        ]
+        # A soft-skipped (no tools); B returned unmatched tools only
+        sibling_unmatched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="unrelated_on_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+        with pytest.raises(
+            ToolDiscoveryError,
+            match=r"one or more owning MCP integrations returned no tools while others returned 1 unmatched",
+        ):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=sibling_unmatched)
+
+    def test_require_provisioned_tools_selected_total_soft_skip_raises_selection_unavailable(
+        self,
+    ) -> None:
+        """SELECTED zero-provision via soft-skip must raise ToolSelectionUnavailableError with IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        owning_integration_id = uuid4()
+        selected_ids = sorted([str(uuid4()), str(uuid4())])
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=owning_integration_id,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        with pytest.raises(
+            ToolSelectionUnavailableError,
+            match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+        ):
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+
+    async def test_retrieve_tools_selected_soft_skip_raises_selection_unavailable(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """SELECTED + total soft-skip must raise ToolSelectionUnavailableError (not ToolDiscoveryError)."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = sample_tools
+        selected_ids = sorted([str(uuid4()), str(uuid4())])
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(
+                ToolSelectionUnavailableError,
+                match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+            ):
+                await retriever.retrieve_tools(
+                    tool_selection_strategy="SELECTED",
+                    tool_selections=set(selected_ids),
+                )
 
     async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
         self,

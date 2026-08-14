@@ -391,7 +391,7 @@ class OrchestrationService:
 
         Raises:
             ToolDiscoveryError: If discovery fails, or enabled tools cannot be
-                provisioned from MCP (ALL/SELECTED).
+                provisioned from MCP (ALL).
             ToolSelectionUnavailableError: If SELECTED tools cannot be provisioned.
 
         """
@@ -408,7 +408,10 @@ class OrchestrationService:
             activity_id=activity_id,
             activity_name=activity_name,
         )
-        tools = await retriever.retrieve_tools()
+        tools = await retriever.retrieve_tools(
+            tool_selection_strategy=strategy,
+            tool_selections=self._tool_selections,
+        )
         return self._apply_tool_selection(tools)
 
     def _apply_tool_selection(self, tools: list[BaseTool]) -> list[BaseTool]:

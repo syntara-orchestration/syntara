@@ -878,3 +878,41 @@ class TestGetToolsStrategy:
         ):
             with pytest.raises(ToolDiscoveryError, match="discovery failed"):
                 await service._get_tools("session", uuid4())
+        mock_retriever.retrieve_tools.assert_awaited_once_with(
+            tool_selection_strategy="ALL",
+            tool_selections=set(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_selected_strategy_total_soft_skip_raises_selection_unavailable(self) -> None:
+        """SELECTED total soft-skip must raise ToolSelectionUnavailableError with IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        selections = ["uuid-b", "uuid-a"]
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="SELECTED",
+            tool_selections=selections,
+        )
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve_tools = AsyncMock(
+            side_effect=ToolSelectionUnavailableError(
+                "None of the requested tools could be provisioned "
+                "(unavailable tool IDs: ['uuid-a', 'uuid-b']); "
+                "refusing to continue the invocation without tools"
+            )
+        )
+        with patch(
+            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever",
+            return_value=mock_retriever,
+        ):
+            with pytest.raises(
+                ToolSelectionUnavailableError,
+                match=r"unavailable tool IDs: \['uuid-a', 'uuid-b'\]",
+            ):
+                await service._get_tools("session", uuid4())
+        mock_retriever.retrieve_tools.assert_awaited_once_with(
+            tool_selection_strategy="SELECTED",
+            tool_selections={"uuid-a", "uuid-b"},
+        )
