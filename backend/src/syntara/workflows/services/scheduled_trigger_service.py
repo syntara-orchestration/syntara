@@ -35,11 +35,13 @@ from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
     SCHEDULE_ID_PREFIX,
+    build_schedule_execution_workflow_id,
     build_schedule_id,
     config_to_temporal_schedule,
 )
 from syntara.workflows.validators import collect_scheduled_trigger_config_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflows.workflow_engine.workflow_auth import build_auth_header
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -407,11 +409,15 @@ class ScheduledTriggerService:
         """
         spec, policy = config_to_temporal_schedule(config)
 
+        schedule_workflow_id = build_schedule_execution_workflow_id(workflow_id, trigger_node_id)
         action = ScheduleActionStartWorkflow(
             "scheduled_workflow_launcher",
             args=[workflow_id, trigger_node_id],
-            id=f"sched-exec-{workflow_id}-{trigger_node_id}",
+            id=schedule_workflow_id,
             task_queue=task_queue,
+        )
+        action.headers = build_auth_header(
+            schedule_workflow_id, "scheduled_workflow_launcher", [workflow_id, trigger_node_id]
         )
 
         schedule = Schedule(

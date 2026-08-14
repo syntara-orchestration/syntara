@@ -4,7 +4,7 @@ import { test, expect, toAppUrl } from '../fixtures'
 import { waitForApprovalPanel } from '../helpers/approvals'
 import { addManualTrigger } from '../helpers/v2-nodes'
 import { addNodePanel, waitForUIReady, buildUniqueName, closeNodeEditorPanel } from '../helpers/workflows'
-import { apiRequest } from '../utils/api'
+import { apiRequest, pollExecutionStatus } from '../utils/api'
 
 /** Select a direct (non-category) button in the add-node panel. */
 async function selectDirectNodeType(page: Page, label: string | RegExp) {
@@ -27,6 +27,7 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
  * run them, and clean up afterward.
  */
 test.describe('Multi-Approval Navigation', () => {
+  // API polling fix applied but Run button stays aria-disabled after saving parallel-branch workflows — separate root cause to investigate
   test.skip('navigate between multiple pending approvals using Previous/Next buttons', async ({ app }) => {
     const workflowName = buildUniqueName('Multi-Approval Workflow')
     let workflowId: string | undefined
@@ -132,13 +133,14 @@ test.describe('Multi-Approval Navigation', () => {
         .catch(() => false)
       test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-      // Step 3: Wait for execution to reach "paused" status (all 3 parallel approvals pending)
-      const reachedPaused = await app
-        .getByText('Paused')
-        .waitFor({ state: 'visible', timeout: 30_000 })
+      // Step 3: Poll API for "paused" status (all 3 parallel approvals pending)
+      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+      test.skip(!executionId, 'Could not extract execution ID from URL')
+
+      const reachedPaused = await pollExecutionStatus(app, executionId!, ['paused'])
         .then(() => true)
         .catch(() => false)
-      test.skip(!reachedPaused, 'Execution stayed Pending — Temporal worker may not be running')
+      test.skip(!reachedPaused, 'Execution did not reach paused state — Temporal worker may not be running')
 
       // Navigate to approvals page to see all pending approvals
       await app.goto(toAppUrl('/approvals'))
@@ -209,6 +211,7 @@ test.describe('Multi-Approval Navigation', () => {
     }
   })
 
+  // API polling fix applied but Run button stays aria-disabled after saving parallel-branch workflows — separate root cause to investigate
   test.skip('verify approval counter shows correct position when multiple approvals exist', async ({ app }) => {
     const workflowName = buildUniqueName('Counter Test Workflow')
     let workflowId: string | undefined
@@ -282,12 +285,13 @@ test.describe('Multi-Approval Navigation', () => {
         .catch(() => false)
       test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-      const reachedPaused = await app
-        .getByText('Paused')
-        .waitFor({ state: 'visible', timeout: 30_000 })
+      const execId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+      test.skip(!execId, 'Could not extract execution ID from URL')
+
+      const reachedPaused = await pollExecutionStatus(app, execId!, ['paused'])
         .then(() => true)
         .catch(() => false)
-      test.skip(!reachedPaused, 'Execution stayed Pending — Temporal worker may not be running')
+      test.skip(!reachedPaused, 'Execution did not reach paused state — Temporal worker may not be running')
 
       // Navigate to approvals page
       await app.goto(toAppUrl('/approvals'))

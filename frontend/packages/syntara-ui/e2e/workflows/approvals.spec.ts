@@ -12,7 +12,7 @@ import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest } from '../utils/api'
+import { apiRequest, pollExecutionStatus } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -48,13 +48,14 @@ async function createPendingApproval(
     .catch(() => false)
   test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-  // Wait for execution to pause at the approval node (requires Temporal)
-  const reachedApproval = await app
-    .getByText('Paused')
-    .waitFor({ state: 'visible', timeout: 30_000 })
+  // Extract execution ID from URL and poll API for "paused" status
+  const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+  test.skip(!executionId, 'Could not extract execution ID from URL')
+
+  const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
     .then(() => true)
     .catch(() => false)
-  test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+  test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
   return { workflowId, approvalName }
 }
@@ -490,13 +491,14 @@ test('UI-29: self-contained approve flow via approvals queue', async ({ app }) =
       .catch(() => false)
     test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-    // Wait for execution to pause at the approval node (requires Temporal)
-    const reachedApproval = await app
-      .getByText('Paused')
-      .waitFor({ state: 'visible', timeout: 30_000 })
+    // Extract execution ID and poll API for "paused" status
+    const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+    test.skip(!executionId, 'Could not extract execution ID from URL')
+
+    const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
       .then(() => true)
       .catch(() => false)
-    test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+    test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
     // Navigate to the approvals queue and find our approval
     await app.goto(toAppUrl('/approvals'))

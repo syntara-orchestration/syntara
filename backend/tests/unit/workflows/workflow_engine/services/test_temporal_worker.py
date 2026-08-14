@@ -13,6 +13,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import syntara.workflows.workflow_engine.services.temporal_worker
+from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
+from syntara.workflows.workflow_engine.interceptors.auth_interceptor import WorkflowAuthInterceptor
+from syntara.workflows.workflow_engine.interceptors.credential_output_interceptor import CredentialOutputInterceptor
+from syntara.workflows.workflow_engine.interceptors.monitoring_interceptor import MonitoringWorkflowInterceptor
 from syntara.workflows.workflow_engine.services.temporal_worker import (
     TemporalWorkerService,
     get_worker,
@@ -154,6 +158,60 @@ class TestTemporalWorkerServiceStart:
             mock_worker_class.assert_called_once()
             _, kwargs = mock_worker_class.call_args
             assert kwargs["task_queue"] == "staging-queue"
+
+    @pytest.mark.asyncio
+    async def test_start_wires_auth_interceptors_and_signing_key(self) -> None:
+        """Auth interceptors and signing key init must be wired at worker startup."""
+        service = TemporalWorkerService(
+            temporal_address="test-address",
+            namespace="test-namespace",
+            task_queue="test-queue",
+        )
+
+        mock_client = MagicMock()
+        mock_worker = MagicMock()
+
+        async def mock_run() -> None:
+            await asyncio.sleep(0)
+
+        mock_worker.run = mock_run
+
+        original_create_task = asyncio.create_task
+
+        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+            return original_create_task(coro)
+
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.init_signing_key",
+            ) as mock_init_signing_key,
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                new=AsyncMock(return_value=mock_client),
+            ) as mock_connect,
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.Worker",
+                return_value=mock_worker,
+            ) as mock_worker_class,
+            patch("asyncio.create_task", side_effect=mock_create_task),
+        ):
+            await service.start()
+
+            mock_init_signing_key.assert_called_once()
+
+            mock_connect.assert_called_once()
+            connect_kwargs = mock_connect.call_args[1]
+            client_interceptors = connect_kwargs["interceptors"]
+            assert len(client_interceptors) == 1
+            assert isinstance(client_interceptors[0], WorkflowAuthClientInterceptor)
+
+            mock_worker_class.assert_called_once()
+            worker_kwargs = mock_worker_class.call_args[1]
+            worker_interceptors = worker_kwargs["interceptors"]
+            assert len(worker_interceptors) == 3
+            assert isinstance(worker_interceptors[0], WorkflowAuthInterceptor)
+            assert isinstance(worker_interceptors[1], MonitoringWorkflowInterceptor)
+            assert isinstance(worker_interceptors[2], CredentialOutputInterceptor)
 
     @pytest.mark.asyncio
     async def test_start_passes_concurrency_controls_to_worker(self) -> None:

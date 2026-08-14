@@ -320,7 +320,7 @@ describe('AssignmentsTab', () => {
       expect(within(rows[3]).getByText('System')).toBeInTheDocument()
     })
 
-    it('renders policies as labels when present', () => {
+    it('renders policies as labels when row is expanded', async () => {
       const withPolicies = [
         {
           ...sampleAssignments[0],
@@ -328,18 +328,70 @@ describe('AssignmentsTab', () => {
         },
       ] as unknown as RoleAssignmentRead[]
       setupAssignmentsQuery(withPolicies)
+      const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
-      expect(screen.getByText('read-only')).toBeInTheDocument()
-      expect(screen.getByText('write-access')).toBeInTheDocument()
+      expect(screen.queryByText('read-only')).not.toBeVisible()
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+
+      expect(screen.getByText('read-only')).toBeVisible()
+      expect(screen.getByText('write-access')).toBeVisible()
     })
 
-    it('renders dash when no policies', () => {
+    it('does not show a Policies column header', () => {
       setupAssignmentsQuery(sampleAssignments)
       render(<AssignmentsTab />, { wrapper })
 
-      const dashes = screen.getAllByText('-')
-      expect(dashes.length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByRole('columnheader', { name: 'Policies' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Expandable rows', () => {
+    beforeEach(() => {
+      setupAssignmentsQuery(sampleAssignments)
+    })
+
+    it('policies are hidden by default and shown when row is expanded', async () => {
+      const user = userEvent.setup()
+      render(<AssignmentsTab />, { wrapper })
+
+      expect(screen.queryByText('project.edit')).not.toBeVisible()
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+
+      expect(screen.getByText('project.edit')).toBeVisible()
+    })
+
+    it('expand-all button expands all rows, clicking again collapses them', async () => {
+      const user = userEvent.setup()
+      render(<AssignmentsTab />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+
+      expect(screen.getByText('project.edit')).toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+
+      expect(screen.queryByText('project.edit')).not.toBeVisible()
+    })
+
+    it('toggling a single row does not affect other rows', async () => {
+      const twoPolicyRows = [
+        { ...sampleAssignments[0], role_policies: ['alpha-policy'] },
+        { ...sampleAssignments[3], role_policies: ['beta-policy'] },
+      ] as unknown as RoleAssignmentRead[]
+      setupAssignmentsQuery(twoPolicyRows)
+      const user = userEvent.setup()
+      render(<AssignmentsTab />, { wrapper })
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+
+      expect(screen.getByText('alpha-policy')).toBeVisible()
+      expect(screen.queryByText('beta-policy')).not.toBeVisible()
     })
 
     it('renders User label when group_id is null', () => {
@@ -1148,7 +1200,7 @@ describe('AssignmentsTab', () => {
   })
 
   describe('Mixed row data', () => {
-    it('renders rows with all optional fields populated', () => {
+    it('renders rows with all optional fields populated', async () => {
       const fullRow: RoleAssignmentRead[] = [
         {
           id: 'full1',
@@ -1176,14 +1228,18 @@ describe('AssignmentsTab', () => {
         },
       ] as unknown as RoleAssignmentRead[]
       setupAssignmentsQuery(fullRow)
+      const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
       expect(screen.getByText('full-user')).toBeInTheDocument()
       expect(screen.getByText('ops-team')).toBeInTheDocument()
       expect(screen.getByText('SuperAdmin')).toBeInTheDocument()
       expect(screen.getByText('Operator')).toBeInTheDocument()
-      expect(screen.getByText('policy-a')).toBeInTheDocument()
-      expect(screen.getByText('ops-policy')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+
+      expect(screen.getByText('policy-a')).toBeVisible()
+      expect(screen.getByText('ops-policy')).toBeVisible()
     })
 
     it('renders single row with no project and empty policies', () => {
@@ -1206,8 +1262,7 @@ describe('AssignmentsTab', () => {
 
       expect(screen.getByText('solo-user')).toBeInTheDocument()
       expect(screen.getByText('System')).toBeInTheDocument()
-      const dashes = screen.getAllByText('-')
-      expect(dashes.length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByRole('columnheader', { name: 'Policies' })).not.toBeInTheDocument()
     })
   })
 
@@ -1264,14 +1319,11 @@ describe('AssignmentsTab', () => {
       expect(screen.getByText('No assignments found')).toBeInTheDocument()
     })
 
-    it('renders dash for rows with undefined role_policies', () => {
+    it('does not show policy labels until a row is expanded', () => {
       setupAssignmentsQuery(sampleAssignments)
       render(<AssignmentsTab />, { wrapper })
 
-      const table = screen.getByRole('grid', { name: 'Role assignments' })
-      const rows = within(table).getAllByRole('row')
-      const policiesCell = within(rows[3]).getAllByText('-')
-      expect(policiesCell.length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText('project.edit')).not.toBeVisible()
     })
   })
 
@@ -1368,7 +1420,7 @@ describe('AssignmentsTab', () => {
       expect(screen.getByText('User')).toBeInTheDocument()
     })
 
-    it('renders group assignment with policies', () => {
+    it('renders group assignment with policies when expanded', async () => {
       const groupRow: RoleAssignmentRead[] = [
         {
           id: 'grp1',
@@ -1384,13 +1436,17 @@ describe('AssignmentsTab', () => {
         },
       ] as unknown as RoleAssignmentRead[]
       setupAssignmentsQuery(groupRow)
+      const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
       expect(screen.getByText('QA Team')).toBeInTheDocument()
       expect(screen.getByText('Group')).toBeInTheDocument()
       expect(screen.getByText('Tester')).toBeInTheDocument()
-      expect(screen.getByText('test-read')).toBeInTheDocument()
-      expect(screen.getByText('test-write')).toBeInTheDocument()
+
+      await user.click(screen.getAllByRole('button', { name: /details/i })[0])
+
+      expect(screen.getByText('test-read')).toBeVisible()
+      expect(screen.getByText('test-write')).toBeVisible()
     })
   })
 
@@ -1406,6 +1462,25 @@ describe('AssignmentsTab', () => {
 
     it('has no accessibility violations in empty state', async () => {
       const { container } = render(<AssignmentsTab />, { wrapper })
+
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
+    })
+
+    it('has no accessibility violations with expanded rows', async () => {
+      const withPolicies = [
+        { ...sampleAssignments[0], role_policies: ['read-only', 'write-access'] },
+        { ...sampleAssignments[3], role_policies: ['project.edit'] },
+      ] as unknown as RoleAssignmentRead[]
+      setupAssignmentsQuery(withPolicies)
+      const user = userEvent.setup()
+
+      const { container } = render(<AssignmentsTab />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+      await waitFor(() => {
+        expect(screen.getByText('read-only')).toBeVisible()
+      })
 
       const results = await axe(container)
       expect(results).toHaveNoViolations()
