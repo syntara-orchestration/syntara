@@ -10,6 +10,7 @@ from uuid import UUID
 
 import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from syntara.core.cache.stream import StreamClient
 from syntara.workflows.models.activity_execution import ActivityExecution
@@ -131,8 +132,6 @@ class ActivityUpdatePublisher:
             The Redis-generated event ID (e.g., "1642680000000-0"), or None if publish failed
 
         """
-        from redis.exceptions import ConnectionError as RedisConnectionError
-
         stream_id = self._get_stream_id(execution.id)
 
         # Serialize execution data with activities, scrub credentials
@@ -190,8 +189,6 @@ class ActivityUpdatePublisher:
             The Redis-generated event ID (e.g., "1642680123456-1"), or None if publish failed
 
         """
-        from redis.exceptions import ConnectionError as RedisConnectionError
-
         stream_id = self._get_stream_id(execution_id)
 
         # Convert list of JsonPatch to list of JsonPatchOperation
@@ -264,8 +261,6 @@ class ActivityUpdatePublisher:
             The Redis-generated event ID, or None if publish failed
 
         """
-        from redis.exceptions import ConnectionError as RedisConnectionError
-
         stream_id = self._get_stream_id(execution_id)
 
         message = ExecutionPatchMessage(

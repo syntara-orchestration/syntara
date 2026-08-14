@@ -43,7 +43,7 @@ import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
-from syntara.core.cache.base import BaseRedisClient
+from syntara.core.cache.base import BaseRedisClient, redis_operation_with_backoff
 from syntara.core.exceptions import SafeValueError
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -72,6 +72,12 @@ class StreamClient(BaseRedisClient):
         to the specified stream using XADD. The entire dict is stored in a
         single 'data' field for simplicity.
 
+        Retries with exponential backoff on transient connection/pool
+        exhaustion errors (up to 3 retries, 10ms-500ms backoff). Pool
+        exhaustion (``MaxConnectionsError``) happens while acquiring a
+        connection, before any command reaches the server, so retrying is
+        safe and does not risk duplicate stream entries.
+
         Args:
             stream_id: Stream identifier
             data: Arbitrary dictionary data to publish
@@ -80,7 +86,7 @@ class StreamClient(BaseRedisClient):
             The stream-generated event ID (e.g., "1234567890123-0")
 
         Raises:
-            RedisConnectionError: If connection to cache fails
+            RedisConnectionError: If connection to cache fails after retries exhausted
             json.JSONDecodeError: If data cannot be serialized to JSON
             ResponseError: If XADD operation fails
             ValueError: If stream_id is empty
@@ -104,36 +110,40 @@ class StreamClient(BaseRedisClient):
         try:
             # Serialize the entire data dict to JSON for storage
             json_data = json.dumps(data)
-
-            # XADD to stream - store in 'data' field
-            # Using '*' for auto-generated ID
-            event_id = await client.xadd(stream_id, {"data": json_data})
-
-            # Set TTL on stream key for automatic cleanup
-            # Each publish resets the TTL, so streams expire after inactivity period
-            await client.expire(stream_id, self._settings.cache_stream_ttl_seconds)
-
-            logger.debug(
-                "Published event to stream",
-                stream_id=stream_id,
-                event_id=event_id,
-                ttl_seconds=self._settings.cache_stream_ttl_seconds,
-            )
-            return str(event_id)  # Explicitly cast to str for type safety
-
         except json.JSONDecodeError:
             logger.exception("Failed to serialize data for stream", stream_id=stream_id)
             raise
-        except ResponseError:
-            logger.exception("Cache error publishing to stream ", stream_id=stream_id)
-            raise
-        except RedisConnectionError:
-            logger.exception("Connection error publishing to stream", stream_id=stream_id)
-            raise
-        except OSError as e:
-            logger.exception("Network error publishing to stream", stream_id=stream_id)
-            msg = f"Network error: {e}"
-            raise RedisConnectionError(msg) from e
+
+        async def _publish() -> str:
+            try:
+                # XADD to stream - store in 'data' field
+                # Using '*' for auto-generated ID
+                event_id = await client.xadd(stream_id, {"data": json_data})
+
+                # Set TTL on stream key for automatic cleanup
+                # Each publish resets the TTL, so streams expire after inactivity period
+                await client.expire(stream_id, self._settings.cache_stream_ttl_seconds)
+
+                logger.debug(
+                    "Published event to stream",
+                    stream_id=stream_id,
+                    event_id=event_id,
+                    ttl_seconds=self._settings.cache_stream_ttl_seconds,
+                )
+                return str(event_id)  # Explicitly cast to str for type safety
+
+            except ResponseError:
+                logger.exception("Cache error publishing to stream ", stream_id=stream_id)
+                raise
+            except RedisConnectionError:
+                logger.exception("Connection error publishing to stream", stream_id=stream_id)
+                raise
+            except OSError as e:
+                logger.exception("Network error publishing to stream", stream_id=stream_id)
+                msg = f"Network error: {e}"
+                raise RedisConnectionError(msg) from e
+
+        return await redis_operation_with_backoff(_publish, "stream_publish", stream_id=stream_id)
 
     def _validate_events_params(self, stream_id: str, start_id: str | None, replay: int | None) -> None:
         """Validate parameters for the events method.

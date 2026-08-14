@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -342,3 +343,87 @@ class TestPublishExecutionPatch:
             call_args = mock_stream_client.publish.call_args
             message_data = call_args[0][1]
             assert len(message_data["ops"]) == 2
+
+
+class TestGracefulDegradationOnRedisFailure:
+    """Publisher methods must degrade gracefully (return None) instead of raising.
+
+    Activity updates are for WebSocket streaming only — a Redis outage or
+    pool exhaustion must not halt workflow execution.
+    """
+
+    @staticmethod
+    def _unavailable_stream_client() -> AsyncMock:
+        """A StreamClient mock whose publish() always raises RedisConnectionError."""
+        mock_client = AsyncMock()
+        mock_client.publish = AsyncMock(side_effect=RedisConnectionError("pool exhausted"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        return mock_client
+
+    @pytest.mark.asyncio
+    async def test_publish_snapshot_returns_none_on_redis_failure(
+        self, execution_with_activities: Execution
+    ) -> None:
+        publisher = ActivityUpdatePublisher()
+        unavailable_client = self._unavailable_stream_client()
+
+        with mock_patch(
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+        ):
+            event_id = await publisher.publish_snapshot(execution_with_activities, snapshot_type="initial_snapshot")
+
+        assert event_id is None
+
+    @pytest.mark.asyncio
+    async def test_publish_activity_patch_returns_none_on_redis_failure(self) -> None:
+        publisher = ActivityUpdatePublisher()
+        execution_id = uuid4()
+        patch = JsonPatch.from_diff(
+            [{"activity_id": "step1", "status": "running"}],
+            [{"activity_id": "step1", "status": "completed"}],
+        )
+        unavailable_client = self._unavailable_stream_client()
+
+        with mock_patch(
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+        ):
+            event_id = await publisher.publish_activity_patch(execution_id, [patch])
+
+        assert event_id is None
+
+    @pytest.mark.asyncio
+    async def test_publish_execution_patch_returns_none_on_redis_failure(self) -> None:
+        from syntara.workflows.models.visualization import JsonPatchOperation
+
+        publisher = ActivityUpdatePublisher()
+        execution_id = uuid4()
+        ops = [JsonPatchOperation(op="replace", path="/status", value="running")]
+        unavailable_client = self._unavailable_stream_client()
+
+        with mock_patch(
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+        ):
+            event_id = await publisher.publish_execution_patch(execution_id, ops)
+
+        assert event_id is None
+
+    @pytest.mark.asyncio
+    async def test_publish_snapshot_logs_warning_not_exception(
+        self, execution_with_activities: Execution
+    ) -> None:
+        """Degradation should be a warning, not swallowed silently or logged as an exception."""
+        publisher = ActivityUpdatePublisher()
+        unavailable_client = self._unavailable_stream_client()
+
+        with (
+            mock_patch(
+                "syntara.workflows.services.activity_update_publisher.StreamClient",
+                return_value=unavailable_client,
+            ),
+            mock_patch("syntara.workflows.services.activity_update_publisher.logger") as mock_logger,
+        ):
+            await publisher.publish_snapshot(execution_with_activities, snapshot_type="initial_snapshot")
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.exception.assert_not_called()

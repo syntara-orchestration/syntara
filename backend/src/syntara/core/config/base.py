@@ -304,8 +304,19 @@ class CacheSettings(BaseSettings):
 
     cache_connection_pool_size: int = Field(
         default=50,
-        description="Maximum number of cache connections in pool. Workflow workers with high concurrency may need larger pools.",
+        description=(
+            "Maximum number of cache connections in pool. "
+            "Workflow workers with high concurrency may need larger pools."
+        ),
     )
+
+    @field_validator("cache_connection_pool_size")
+    @classmethod
+    def _validate_cache_connection_pool_size(cls, v: int) -> int:
+        if v < 1:
+            msg = "cache_connection_pool_size must be at least 1"
+            raise ValueError(msg)
+        return v
 
 
 # =============================================================================
