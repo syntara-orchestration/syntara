@@ -31,6 +31,71 @@ paths:
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: boolean
+                description: Exact match of the enabled state. ?enabled=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the enabled state. ?enabled[eq]=true
+                    type: boolean
+          description: |
+            Filter identity providers by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: provider_type
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                description: Exact match of the provider type. ?provider_type=oidc
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the provider type. ?provider_type[eq]=oidc
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?provider_type[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?provider_type[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?provider_type[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?provider_type[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?provider_type[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?provider_type[lte]=<value>
+                    type: string
+          description: |
+            Filter identity providers by provider type.
+            - Exact match: `provider_type=oidc` or `provider_type[eq]=oidc`
       responses:
         '200':
           description: List of identity providers

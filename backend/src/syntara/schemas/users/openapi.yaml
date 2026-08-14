@@ -692,6 +692,34 @@ paths:
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: source
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                enum:
+                  - local
+                  - idp
+                description: Exact match of the group source. ?source=local
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the group source. ?source[eq]=local
+                    type: string
+                    enum:
+                      - local
+                      - idp
+          description: |
+            Filter groups by source.
+            - Exact match: `source=local` or `source[eq]=local`
       responses:
         '200':
           description: List of groups

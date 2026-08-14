@@ -623,6 +623,90 @@ paths:
             title: Sort
           description: "Sort parameter (e.g., 'name', '-created_at')"
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: boolean
+                description: Exact match of the enabled state. ?enabled=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the enabled state. ?enabled[eq]=true
+                    type: boolean
+          description: |
+            Filter models by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: is_default
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: boolean
+                description: Exact match of the default flag. ?is_default=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the default flag. ?is_default[eq]=true
+                    type: boolean
+          description: |
+            Filter models by default flag.
+            - Exact match: `is_default=true` or `is_default[eq]=true`
+        - name: model_id
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                description: Exact match of the model ID. ?model_id=gpt-4
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the model ID. ?model_id[eq]=gpt-4
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?model_id[contains]=gpt
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?model_id[starts_with]=gpt
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?model_id[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?model_id[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?model_id[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?model_id[lte]=<value>
+                    type: string
+          description: |
+            Filter models by model ID.
+            - Exact match: `model_id=gpt-4` or `model_id[eq]=gpt-4`
+            - Contains: `model_id[contains]=gpt`
       responses:
         '200':
           description: Successful Response
@@ -827,6 +911,99 @@ paths:
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: boolean
+                description: Exact match of the enabled state. ?enabled=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the enabled state. ?enabled[eq]=true
+                    type: boolean
+          description: |
+            Filter tools by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: status
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                enum:
+                  - available
+                  - missing
+                  - error
+                description: Exact match of the tool status. ?status=available
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the tool status. ?status[eq]=available
+                    type: string
+                    enum:
+                      - available
+                      - missing
+                      - error
+          description: |
+            Filter tools by status.
+            - Exact match: `status=available` or `status[eq]=available`
+        - name: namespaced_name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                description: Exact match of the namespaced name. ?namespaced_name=<name>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the namespaced name. ?namespaced_name[eq]=<name>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?namespaced_name[gte]=<name>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?namespaced_name[lte]=<name>
+                    type: string
+          description: |
+            Filter tools by namespaced name.
+            - Exact match: `namespaced_name=value`
+            - Contains: `namespaced_name[contains]=value`
       responses:
         '200':
           description: Successful Response

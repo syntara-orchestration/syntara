@@ -8880,6 +8880,179 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          description: |
+            Filter resources by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+          example: auth
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the enabled state. ?enabled[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the enabled state. ?enabled=true
+          description: |
+            Filter identity providers by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: provider_type
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the provider type. ?provider_type[eq]=oidc
+                type: string
+              contains:
+                title: Contains
+                description: Substring match (case-insensitive). ?provider_type[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix match (case-insensitive). ?provider_type[starts_with]=<prefix>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?provider_type[gt]=<value>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?provider_type[gte]=<value>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?provider_type[lt]=<value>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?provider_type[lte]=<value>
+                type: string
+            type: string
+            description: Exact match of the provider type. ?provider_type=oidc
+          description: |
+            Filter identity providers by provider type.
+            - Exact match: `provider_type=oidc` or `provider_type[eq]=oidc`
       responses:
         '200':
           description: List of identity providers
@@ -11316,6 +11489,154 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the enabled state. ?enabled[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the enabled state. ?enabled=true
+          description: |
+            Filter models by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: is_default
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the default flag. ?is_default[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the default flag. ?is_default=true
+          description: |
+            Filter models by default flag.
+            - Exact match: `is_default=true` or `is_default[eq]=true`
+        - name: model_id
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the model ID. ?model_id[eq]=gpt-4
+                type: string
+              contains:
+                title: Contains
+                description: Substring match (case-insensitive). ?model_id[contains]=gpt
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix match (case-insensitive). ?model_id[starts_with]=gpt
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?model_id[gt]=<value>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?model_id[gte]=<value>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?model_id[lt]=<value>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?model_id[lte]=<value>
+                type: string
+            type: string
+            description: Exact match of the model ID. ?model_id=gpt-4
+          description: |
+            Filter models by model ID.
+            - Exact match: `model_id=gpt-4` or `model_id[eq]=gpt-4`
+            - Contains: `model_id[contains]=gpt`
       responses:
         '200':
           description: Successful Response
@@ -11882,6 +12203,205 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          description: |
+            Filter resources by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+          example: auth
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the enabled state. ?enabled[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the enabled state. ?enabled=true
+          description: |
+            Filter tools by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
+        - name: status
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the tool status. ?status[eq]=available
+                type: string
+                enum:
+                  - available
+                  - missing
+                  - error
+            type: string
+            enum:
+              - available
+              - missing
+              - error
+            description: Exact match of the tool status. ?status=available
+          description: |
+            Filter tools by status.
+            - Exact match: `status=available` or `status[eq]=available`
+        - name: namespaced_name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the namespaced name. ?namespaced_name[eq]=<name>
+                type: string
+              contains:
+                title: Contains
+                description: Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?namespaced_name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?namespaced_name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the namespaced name. ?namespaced_name=<name>
+          description: |
+            Filter tools by namespaced name.
+            - Exact match: `namespaced_name=value`
+            - Contains: `namespaced_name[contains]=value`
       responses:
         '200':
           description: Successful Response
@@ -13923,6 +14443,172 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          description: |
+            Filter resources by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+          example: auth
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: is_builtin
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the builtin flag. ?is_builtin[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the builtin flag. ?is_builtin=true
+          description: |
+            Filter workflows by builtin flag.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
+        - name: is_enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the enabled state. ?is_enabled[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the enabled state. ?is_enabled=true
+          description: |
+            Filter workflows by enabled state.
+            - Exact match: `is_enabled=true` or `is_enabled[eq]=true`
+        - name: has_validation_issues
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match. ?has_validation_issues[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match. ?has_validation_issues=true
+          description: |
+            Filter workflows by validation issues.
+            - Exact match: `has_validation_issues=true` or `has_validation_issues[eq]=true`
       responses:
         '200':
           description: Paginated list of workflows in the project
@@ -22444,6 +23130,144 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          description: |
+            Filter resources by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+          example: auth
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: source
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the group source. ?source[eq]=local
+                type: string
+                enum:
+                  - local
+                  - idp
+            type: string
+            enum:
+              - local
+              - idp
+            description: Exact match of the group source. ?source=local
+          description: |
+            Filter groups by source.
+            - Exact match: `source=local` or `source[eq]=local`
       responses:
         '200':
           description: List of groups
@@ -24414,6 +25238,150 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: workflow_id
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the workflow ID. ?workflow_id[eq]=<uuid>
+                type: string
+                format: uuid
+            type: string
+            format: uuid
+            description: Exact match of the workflow ID. ?workflow_id=<uuid>
+          description: |
+            Filter executions by workflow ID.
+            - Exact match: `workflow_id=<uuid>` or `workflow_id[eq]=<uuid>`
+        - name: status
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ExecutionStatus'
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ExecutionStatus'
+                    title: Equals
+                    description: Exact match of the execution status. ?status[eq]=running
+          description: |
+            Filter executions by status.
+            - Exact match: `status=running` or `status[eq]=running`
+        - name: mode
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ExecutionMode'
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ExecutionMode'
+                    title: Equals
+                    description: Exact match of the execution mode. ?mode[eq]=standard
+          description: |
+            Filter executions by mode.
+            - Exact match: `mode=standard` or `mode[eq]=standard`
+        - name: approval_pending
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match. ?approval_pending[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of approval pending state. ?approval_pending=true
+          description: |
+            Filter executions by approval pending state.
+            - Exact match: `approval_pending=true` or `approval_pending[eq]=true`
       responses:
         '200':
           description: Successful Response
@@ -25082,6 +26050,156 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: activity_name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the activity name. ?activity_name[eq]=<name>
+                type: string
+              contains:
+                title: Contains
+                description: Substring match (case-insensitive). ?activity_name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix match (case-insensitive). ?activity_name[starts_with]=<prefix>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?activity_name[gt]=<value>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?activity_name[gte]=<value>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?activity_name[lt]=<value>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?activity_name[lte]=<value>
+                type: string
+            type: string
+            description: Exact match of the activity name. ?activity_name=<name>
+          description: |
+            Filter activities by name.
+            - Exact match: `activity_name=<name>` or `activity_name[eq]=<name>`
+            - Contains: `activity_name[contains]=<substring>`
+        - name: node_type
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/NodeType'
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/NodeType'
+                    title: Equals
+                    description: Exact match of the node type. ?node_type[eq]=condition
+          description: |
+            Filter activities by node type.
+            - Exact match: `node_type=condition` or `node_type[eq]=condition`
+        - name: status
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ActivityStatus'
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ActivityStatus'
+                    title: Equals
+                    description: Exact match of the activity status. ?status[eq]=completed
+          description: |
+            Filter activities by status.
+            - Exact match: `status=completed` or `status[eq]=completed`
       responses:
         '200':
           description: Successful Response
@@ -25386,6 +26504,191 @@ paths:
             description: Include total count in response (expensive)
             title: Include Total
           description: Include total count in response (expensive)
+        - name: name
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              contains:
+                title: Contains
+                description: Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+                type: string
+              starts_with:
+                title: Starts With
+                description: Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+                type: string
+              eq:
+                title: Equals
+                description: Exact match of the name (case-insensitive). ?name[eq]=<name>
+                type: string
+              gt:
+                title: Greater Than
+                description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                type: string
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+                type: string
+              lt:
+                title: Less Than
+                description: Less than comparison (lexicographical). ?name[lt]=<name>
+                type: string
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
+                type: string
+            type: string
+            description: Exact match of the name (case-insensitive). ?name=<name>
+          description: |
+            Filter resources by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+          example: auth
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: is_builtin
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the builtin flag. ?is_builtin[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the builtin flag. ?is_builtin=true
+          description: |
+            Filter workflows by builtin flag.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
+        - name: is_enabled
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the enabled state. ?is_enabled[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match of the enabled state. ?is_enabled=true
+          description: |
+            Filter workflows by enabled state.
+            - Exact match: `is_enabled=true` or `is_enabled[eq]=true`
+        - name: has_validation_issues
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match. ?has_validation_issues[eq]=true
+                type: boolean
+            type: boolean
+            description: Exact match. ?has_validation_issues=true
+          description: |
+            Filter workflows by validation issues.
+            - Exact match: `has_validation_issues=true` or `has_validation_issues[eq]=true`
+        - name: project_id
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the project ID. ?project_id[eq]=<uuid>
+                type: string
+                format: uuid
+            type: string
+            format: uuid
+            description: Exact match of the project ID. ?project_id=<uuid>
+          description: |
+            Filter workflows by project ID.
+            - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
       responses:
         '200':
           description: List of workflows
@@ -26299,6 +27602,112 @@ paths:
             type: boolean
             default: false
             title: Include Total
+        - name: created_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?created_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?created_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?created_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of creation timestamp. ?created_at=<timestamp>
+        - name: updated_at
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+                type: string
+                format: date-time
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?updated_at[gt]=<timestamp>
+                type: string
+                format: date-time
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+                type: string
+                format: date-time
+              lt:
+                title: Less Than
+                description: Less than comparison. ?updated_at[lt]=<timestamp>
+                type: string
+                format: date-time
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
+                type: string
+                format: date-time
+            type: string
+            format: date-time
+            description: Exact match of last update timestamp. ?updated_at=<timestamp>
+        - name: version
+          in: query
+          required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
+          schema:
+            properties:
+              eq:
+                title: Equals
+                description: Exact match of the version number. ?version[eq]=1
+                type: integer
+              gt:
+                title: Greater Than
+                description: Greater than comparison. ?version[gt]=1
+                type: integer
+              gte:
+                title: Greater Than Or Equal
+                description: Greater than or equal comparison. ?version[gte]=1
+                type: integer
+              lt:
+                title: Less Than
+                description: Less than comparison. ?version[lt]=5
+                type: integer
+              lte:
+                title: Less Than Or Equal
+                description: Less than or equal comparison. ?version[lte]=5
+                type: integer
+            type: integer
+            description: Exact match of the version number. ?version=1
+          description: |
+            Filter versions by version number.
+            - Exact match: `version=1` or `version[eq]=1`
+            - Range: `version[gt]=1&version[lt]=5`
       responses:
         '200':
           description: Workflow version history
