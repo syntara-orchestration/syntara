@@ -323,8 +323,12 @@ class TestValidateIntegration:
         resp = syntara_api.integrations.validate(integration_id=uuid4())
         assert resp.status_code == HTTPStatus.NOT_FOUND
 
+    @pytest.mark.mcp
     def test_validate_unreachable_server_returns_200_with_connection_error(
-        self, syntara_api: SyntaraApiRegistry, integration_factory: Callable[..., dict[str, Any]]
+        self,
+        syntara_api: SyntaraApiRegistry,
+        integration_factory: Callable[..., dict[str, Any]],
+        require_mcp_server: None,
     ) -> None:
         """Validate returns 200 OK with success=False and connection_error/timeout when MCP server is unreachable.
 
@@ -334,6 +338,10 @@ class TestValidateIntegration:
         closed port makes the server unreachable at validation time (fast, deterministic
         connection error). This is not a client error (4xx) — the request is valid. It's an
         external service failure, communicated via the success/error/error_type fields in the response.
+
+        Gated on ``require_mcp_server``: mcp-server is only allowlisted in environments that
+        provision the MCP test server, so this skips where that host is not allowlisted (the
+        write-time SSRF check would otherwise return 422).
         """
         created = integration_factory(_mcp_create(base_url="https://mcp-server:9999"))
         integration_id = UUID(created["id"])
