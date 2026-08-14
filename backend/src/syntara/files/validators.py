@@ -196,6 +196,47 @@ def validate_mime_type_from_bytes(
     return mime_type
 
 
+_MIME_HEADER_SIZE = 8192  # 8 KB — enough for reliable MIME detection
+
+
+async def validate_single_file(
+    file: UploadFile,
+    settings: Settings,
+) -> tuple[bytes, str]:
+    """Validate a single file and return header bytes with detected MIME type.
+
+    Validates size without buffering, then reads only the first 8 KB for
+    MIME type detection.  The caller is responsible for streaming the
+    remainder of the file content.
+
+    Args:
+        file: Uploaded file to validate
+        settings: Application settings with validation limits
+
+    Returns:
+        Tuple of (header_bytes, mime_type).  header_bytes contains at most
+        8 KB — enough for MIME detection.  The UploadFile position is left
+        at the end of the header; callers should continue reading from
+        that position for the remaining content.
+
+    Raises:
+        FileValidationError: If size or MIME type validation fails
+
+    """
+    await validate_file_size(file, settings.file_upload_max_size_mb)
+
+    header = await file.read(_MIME_HEADER_SIZE)
+    filename = file.filename or "unknown"
+
+    mime_type = validate_mime_type_from_bytes(
+        header,
+        filename,
+        settings.file_upload_allowed_mime_types,
+    )
+
+    return header, mime_type
+
+
 async def validate_files(
     files: list[UploadFile],
     settings: Settings,

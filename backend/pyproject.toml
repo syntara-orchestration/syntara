@@ -373,4 +373,5 @@ dev = [
     "respx>=0.22.0",
     "pypandoc-binary>=1.16.2",
     "pytest-order>=1.5.0",
+    "pytest-timeout>=2.4.0",
 ]

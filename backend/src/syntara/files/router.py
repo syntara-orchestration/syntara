@@ -7,7 +7,7 @@ Document conversion is triggered automatically for each uploaded file
 via a builtin Temporal workflow.
 """
 
-from io import BytesIO
+from collections.abc import AsyncGenerator
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -380,30 +380,44 @@ async def download_file(
             detail="The requested file could not be found",
         )
 
-    download_error: str | None = None
-    try:
-        content = await file_manager.load_file_with_integrity_check(metadata)
-    except Exception as e:
-        download_error = type(e).__name__
-        raise
-    finally:
-        AuditEventDispatcher.dispatch(
-            FileDownloadedEvent(
-                file_id=metadata.id,
-                filename=metadata.filename,
-                mime_type=metadata.mime_type,
-                size_bytes=metadata.size_bytes,
-                storage_backend="s3",
-                error_type=download_error,
-            ),
-        )
+    async def _stream_and_audit() -> AsyncGenerator[bytes]:
+        """Wrap the streaming download with audit event dispatch.
+
+        Emits a FileDownloadedEvent after streaming completes (or fails).
+        Tracks bytes yielded to detect client disconnects — GeneratorExit
+        inherits from BaseException and bypasses ``except Exception``, so
+        a bytes-vs-expected comparison in ``finally`` is used instead.
+        """
+        download_error: str | None = None
+        bytes_yielded = 0
+        try:
+            async for chunk in file_manager.stream_file_with_integrity_check(metadata):
+                yield chunk
+                bytes_yielded += len(chunk)
+        except Exception as e:
+            download_error = type(e).__name__
+            raise
+        finally:
+            if download_error is None and bytes_yielded < metadata.size_bytes:
+                download_error = "ClientDisconnect"
+            AuditEventDispatcher.dispatch(
+                FileDownloadedEvent(
+                    file_id=metadata.id,
+                    filename=metadata.filename,
+                    mime_type=metadata.mime_type,
+                    size_bytes=metadata.size_bytes,
+                    storage_backend="s3",
+                    error_type=download_error,
+                ),
+            )
 
     safe_name = sanitize_filename(metadata.filename)
     return StreamingResponse(
-        BytesIO(content),
+        _stream_and_audit(),
         media_type=metadata.mime_type,
         headers={
             "content-disposition": f'attachment; filename="{safe_name}"',
+            "content-length": str(metadata.size_bytes),
             "x-content-type-options": "nosniff",
         },
     )

@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 from syntara.files.file_manager import FileManager
 
+from .conftest import make_upload_mock
+
 
 @pytest.mark.asyncio
 async def test_validates_mime_type_using_python_magic(
@@ -33,12 +35,7 @@ async def test_validates_mime_type_using_python_magic(
     - Content-based detection (not just file extension)
     """
     # Arrange
-    mock_file = Mock()
-    mock_file.filename = "document.pdf"
-    mock_file.size = 1024
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"PDF content")
-    mock_file.seek = AsyncMock()
+    mock_file = make_upload_mock("document.pdf", b"PDF content")
 
     with patch("magic.from_buffer") as mock_magic:
         mock_magic.return_value = "application/pdf"
@@ -143,12 +140,7 @@ async def test_accepts_pdf_mime_type(
     - PDF files pass validation
     """
     # Arrange
-    mock_file = Mock()
-    mock_file.filename = "document.pdf"
-    mock_file.size = 1024
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"PDF content")
-    mock_file.seek = AsyncMock()
+    mock_file = make_upload_mock("document.pdf", b"PDF content")
 
     with patch("magic.from_buffer") as mock_magic:
         mock_magic.return_value = "application/pdf"
@@ -174,12 +166,7 @@ async def test_accepts_docx_mime_type(
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document accepted
     """
     # Arrange
-    mock_file = Mock()
-    mock_file.filename = "document.docx"
-    mock_file.size = 2048
-    mock_file.content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    mock_file.read = AsyncMock(return_value=b"DOCX content")
-    mock_file.seek = AsyncMock()
+    mock_file = make_upload_mock("document.docx", b"DOCX content")
 
     with patch("magic.from_buffer") as mock_magic:
         mock_magic.return_value = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -211,12 +198,7 @@ async def test_accepts_text_plain_mime_type(
     - TXT and MD files supported
     """
     # Arrange
-    mock_file = Mock()
-    mock_file.filename = "readme.txt"
-    mock_file.size = 512
-    mock_file.content_type = "text/plain"
-    mock_file.read = AsyncMock(return_value=b"Plain text content")
-    mock_file.seek = AsyncMock()
+    mock_file = make_upload_mock("readme.txt", b"Plain text content", content_type="text/plain")
 
     with override_settings(file_upload_allowed_mime_types=["text/plain"]):
         file_manager = FileManager()
@@ -240,27 +222,12 @@ async def test_validates_mime_type_for_each_file(
     - One unsupported file fails entire batch
     """
     # Arrange - 2 supported files + 1 unsupported
-    mock_files = []
-
-    # Supported PDF
-    mock_file1 = Mock()
-    mock_file1.filename = "doc.pdf"
-    mock_file1.size = 1024
-    mock_file1.content_type = "application/pdf"
-    mock_file1.read = AsyncMock(return_value=b"PDF")
-    mock_file1.seek = AsyncMock()
-    mock_files.append(mock_file1)
-
-    # Supported TXT
-    mock_file2 = Mock()
-    mock_file2.filename = "notes.txt"
-    mock_file2.size = 512
-    mock_file2.content_type = "text/plain"
-    mock_file2.read = AsyncMock(return_value=b"text")
-    mock_file2.seek = AsyncMock()
-    mock_files.append(mock_file2)
-
-    # Unsupported PNG
+    # Files 1-2 pass validation and reach streaming — need finite reads
+    # File 3 fails MIME validation before streaming — plain Mock is fine
+    mock_files: list[Mock] = [
+        make_upload_mock("doc.pdf", b"PDF"),
+        make_upload_mock("notes.txt", b"text", content_type="text/plain"),
+    ]
     mock_file3 = Mock()
     mock_file3.filename = "image.png"
     mock_file3.size = 2048
