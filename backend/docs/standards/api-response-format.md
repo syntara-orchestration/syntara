@@ -124,6 +124,7 @@ Two formats are supported:
 | `gte` | Greater than or equal | `?created_at[gte]=2025-01-01` |
 | `lt` | Less than | `?size[lt]=1000` |
 | `lte` | Less than or equal | `?size[lte]=1000` |
+| `isnull` | Null check | `?description[isnull]=true` |
 
 ### Label Filters
 
@@ -457,12 +458,14 @@ Two formats are supported:
 | Operator | Description | Example |
 |---|---|---|
 | `eq` | Exact equality (default) | `?status=ACTIVE` or `?status[eq]=ACTIVE` |
+| `in` | Match any value in comma-separated list | `?status[in]=ACTIVE,PENDING` |
 | `contains` | Substring match (case-insensitive) | `?name[contains]=test` |
 | `starts_with` | Prefix match (case-insensitive) | `?name[starts_with]=prod` |
 | `gt` | Greater than | `?created_at[gt]=2025-01-01` |
 | `gte` | Greater than or equal | `?created_at[gte]=2025-01-01` |
 | `lt` | Less than | `?size[lt]=1000` |
 | `lte` | Less than or equal | `?size[lte]=1000` |
+| `isnull` | Null check | `?description[isnull]=true` |
 
 #### Label Filters
 
@@ -522,15 +525,21 @@ class MyModel(BaseResource, table=True):
 
 ### Domain-Specific Query Parameters
 
-Extend `BaseListParams` to add domain-specific filters:
+Most filter parameters are handled generically by `parse_filters()` via the
+raw query string — they do not need fields on the params model. Extend
+`BaseListParams` only for non-filter query parameters that the router or
+service accesses directly (e.g., scoping parameters, action flags):
 
 ```python
-class ApprovalListParams(BaseListParams):
-    status: ApprovalRequestStatus | None = None
-    execution_id: UUID | None = None
+class CredentialListParams(BaseListParams):
+    """Query parameters for listing credentials."""
+
+    for_action: Literal["use"] | None = Field(default=None, description="When 'use', returns only usable credentials.")
 ```
 
-These fields are injected via `Depends()` in the router:
+The params model is injected via `Depends()` in the router. Filter parameters
+arrive through `request.query_params.items()` and are parsed by the service
+layer via `parse_filters()`:
 
 ```python
 @router.get("")
@@ -579,6 +588,7 @@ All list parameter validation errors are raised as `SafeValueError` (messages ar
 | Invalid datetime value | `"Invalid datetime format: not-a-date..."` |
 | Invalid boolean value | `"Invalid boolean value: maybe..."` |
 | Invalid enum value | `"Invalid value 'bogus' for field 'status'. Valid values are: ..."` |
+| Invalid UUID value | `"Invalid UUID value 'not-a-uuid' for field 'execution_id'. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"` |
 
 #### Example Error Response
 
@@ -614,7 +624,7 @@ Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller A
 | Pagination | Cursor-based keyset (N+1) | Offset-based (`page_size`) |
 | Response type | `ResourcesResponse[T]` (`resources`, `next`, `prev`, `total`) | `AAPListResponse[T]` (`count`, `results`) |
 | Query params | `BaseListParams` (`limit`, `cursor`, `sort`, `include_total`) | `AAPBaseQuery` (`search`, `page_size`, `credential_id`) |
-| Filtering | Bracket notation with 7 operators + label filters | `search` string only |
+| Filtering | Bracket notation with 9 operators + label filters | `search` string only |
 | Sorting | `-field` prefix notation with ID tiebreaker | None (upstream order) |
 | Default page size | 20 (max 100) | 50 (max 200) |
 
@@ -681,12 +691,16 @@ Each exclusion requires:
        ]
    ```
 
-2. **Create a ListParams class** if your endpoint has domain-specific filters (otherwise use `BaseListParams` directly):
+2. **Create a ListParams class** if your endpoint has query parameters that the router or service accesses directly as `params.field_name` (otherwise use `BaseListParams` directly):
 
    ```python
    class MyResourceListParams(BaseListParams):
-       status: MyStatus | None = None
+       for_action: Literal["use"] | None = Field(default=None, description="When 'use', returns only usable resources.")
    ```
+
+   A parameter belongs on the model (not in `parse_filters()`) when the router or service references it by name to control behavior — e.g., `params.for_action` to decide which query to run, or `params.project_id` for visibility scoping. These are passed as named kwargs to the service, not through `query_params_items`.
+
+   Filter parameters (status, name, enabled, etc.) that map directly to database column `WHERE` clauses do not need fields on the model — they are parsed generically by `parse_filters()` from the raw query string and applied by `apply_filters()`.
 
 3. **Define the read model and response type** (see [Model Naming Conventions](#model-naming-conventions)):
 
@@ -703,7 +717,7 @@ Each exclusion requires:
        """Paginated list response for my resources."""
    ```
 
-4. **Wire the router** — inject `Request` to pass raw query params for filter parsing:
+4. **Wire the router** — inject `Request` to pass raw query params for filter parsing. Non-filter params are passed as named kwargs; filter params flow through `query_params_items`:
 
    ```python
    @router.get("", operation_id="get_my_resources")
@@ -719,10 +733,54 @@ Each exclusion requires:
            sort=params.sort,
            query_params_items=request.query_params.items(),
            include_total=params.include_total,
+           for_action=params.for_action,  # domain-specific query param (not a filter)
        )
    ```
 
-5. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic:
+5. **Add filter params to the OpenAPI sub-spec** — since filter params are parsed by `parse_filters()` (not from model fields), they won't appear in the auto-generated spec. Add them manually to the endpoint's sub-spec YAML with the operator-based `allOf` pattern and `x-spec-only: true`:
+
+   ```yaml
+   - name: status
+     in: query
+     required: false
+     x-spec-only: true
+     style: deepObject
+     explode: true
+     schema:
+       allOf:
+         - $ref: "#/components/schemas/MyStatus"
+         - type: object
+           properties:
+             eq:
+               title: Equals
+               description: Exact match. ?status[eq]=ACTIVE
+               $ref: "#/components/schemas/MyStatus"
+     description: |
+       Filter by status.
+       - Exact match: `status=ACTIVE` or `status[eq]=ACTIVE`
+   ```
+
+   Use the appropriate operator set for the field type:
+   - **String fields**: `eq`, `contains`, `starts_with`, `gt`, `gte`, `lt`, `lte`
+   - **Boolean/enum/UUID fields**: `eq` only
+   - **Datetime fields**: `eq`, `gt`, `gte`, `lt`, `lte`
+
+   Shared filter params (`name`, `created_at`, `updated_at`) can reference the reusable definitions in `shared-resources.openapi.yaml`:
+
+   ```yaml
+   - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+   - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
+   - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+   ```
+
+   After updating the sub-spec, regenerate the bundled spec and TypeScript contracts:
+
+   ```bash
+   make -C backend gen-openapi
+   make gen-contracts
+   ```
+
+6. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic:
 
    ```python
    async def list_my_resources(
@@ -745,7 +803,7 @@ Each exclusion requires:
        )
    ```
 
-6. **Run `make test-api-compliance`** — if you used `ResourcesResponse[T]` and `BaseListParams`, the compliance tests pass automatically. If the standard pattern doesn't apply, add the endpoint to `list_compliance_exclusions.yaml` with a justification.
+7. **Run `make test-api-compliance`** — if you used `ResourcesResponse[T]` and `BaseListParams`, the compliance tests pass automatically. If the standard pattern doesn't apply, add the endpoint to `list_compliance_exclusions.yaml` with a justification.
 
 ---
 
