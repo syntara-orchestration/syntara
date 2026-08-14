@@ -18,8 +18,8 @@ server {
     add_header Content-Security-Policy "frame-ancestors 'self'" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # Proxy backend paths (API, metrics, docs)
-    location ~ ^/(api|metrics|docs|openapi) {
+    # Proxy backend paths (API, metrics, versioned API docs, /docs redirect)
+    location ~ ^/(api_docs|api|metrics|docs) {
         proxy_pass ${APP_API_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;

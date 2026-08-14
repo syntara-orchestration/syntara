@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from syntara.api.constants import API_V1_PATH_PREFIX
+from syntara.api.constants import API_DOCS_V1_PATH_PREFIX
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.events.http_request import HTTPRequestEvent
 from syntara.audit.middleware import AuditMiddleware
@@ -63,8 +63,8 @@ def _create_test_app() -> FastAPI:
     async def api_discovery() -> dict[str, str]:
         return {"current_version": "/api/v1"}
 
-    @app.get(f"{API_V1_PATH_PREFIX}/docs", include_in_schema=False)
-    async def api_v1_docs() -> dict[str, str]:
+    @app.get(f"{API_DOCS_V1_PATH_PREFIX}/docs", include_in_schema=False)
+    async def api_docs() -> dict[str, str]:
         return {"docs": "placeholder"}
 
     app.add_middleware(AuditMiddleware, fastapi_app=app)
@@ -194,7 +194,7 @@ class TestExcludedPathsIntegration:
             patch(_REGISTRY_PATH, return_value=mock_registry),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                await client.get(f"{API_V1_PATH_PREFIX}/docs")
+                await client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
 
         mock_registry.send_event.assert_not_called()
 
