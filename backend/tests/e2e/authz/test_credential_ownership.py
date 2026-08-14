@@ -139,3 +139,125 @@ class TestOwnScopeCredentialUpdate:
             body=CredentialUpdate(description="admin override"),
         )
         assert resp.is_success
+
+
+class TestOwnScopeEdgeCases:
+    """Verify edge cases and boundary conditions for own-scope."""
+
+    def test_cross_project_isolation(
+        self,
+        admin_api: SyntaraApiRegistry,
+        create_user: UserFactory,
+        create_project: ProjectFactory,
+        create_project_role: ProjectRoleFactory,
+        assign_project_role_to_user: AssignProjectRoleFactory,
+        syntara_base_url: str,
+    ) -> None:
+        """User cannot update credential from different project, even if they created it.
+
+        This test verifies project boundary enforcement: credential:update:own
+        requires BOTH ownership match AND project match. A user with the policy
+        only in project B cannot update a project-A credential, even if they own it.
+        """
+        # Create two projects
+        proj_a_id, _ = create_project(admin_api, "cross-proj-a")
+        proj_b_id, _ = create_project(admin_api, "cross-proj-b")
+
+        # Create user with credential:update:own ONLY in project B
+        user_id, username, password = create_user(admin_api, "cross-user")
+        role_b = create_project_role(admin_api, proj_b_id, "own-b", _OWN_UPDATE_POLICIES)
+        assign_project_role_to_user(admin_api, proj_b_id, user_id, role_b)
+
+        # Also give user project-user role in project A (so they can create credential)
+        # but WITHOUT credential:update:own
+        from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
+
+        admin_api.projects.create_role_assignment(
+            project_id=proj_a_id,
+            body=RoleAssignmentCreate(principal_id=user_id, role_name="project-user"),
+        ).assert_and_get()
+
+        user_api = api_for(syntara_base_url, username, password)
+        type_id = get_bearer_token_type_id(user_api)
+
+        # User creates credential in project A (they have project-user role)
+        cred_a = user_api.credentials.create(
+            body=CredentialCreate(
+                name=unique_name("cross-proj-cred-a"),
+                credential_type_id=type_id,
+                project_id=proj_a_id,
+                inputs=CredentialCreateInputs.from_dict({"token": "secret-a"}),
+            )
+        ).assert_and_get()
+
+        # Now revoke project-user from project A and verify they can't update
+        # even though they have credential:update:own in project B
+        assignments = admin_api.projects.list_role_assignments(project_id=proj_a_id).assert_and_get()
+        user_assignment = next(
+            (a for a in assignments.resources if str(a.principal_id) == str(user_id)), None
+        )
+        if user_assignment:
+            admin_api.projects.delete_role_assignment(
+                project_id=proj_a_id, assignment_id=user_assignment.id
+            )
+
+        # User attempts to update the project-A credential
+        # They own it, but their credential:update:own policy is in project B,
+        # and the Rego check requires policy.project == resource.project
+        resp = user_api.credentials.update(
+            credential_id=cred_a.id,
+            body=CredentialUpdate(description="trying with wrong-project policy"),
+        )
+
+        assert resp.status_code == HTTPStatus.FORBIDDEN, (
+            "User should be denied: they own the credential but their "
+            "credential:update:own policy is in project B, not project A"
+        )
+
+    def test_orphaned_credential_admin_can_update(
+        self,
+        admin_api: SyntaraApiRegistry,
+        create_user: UserFactory,
+        create_project: ProjectFactory,
+        syntara_base_url: str,
+    ) -> None:
+        """Project-admin can update credential even when original owner is deleted.
+
+        This test verifies graceful degradation: when a user is deleted, their
+        credentials become "orphaned" (created_by points to deleted user). The
+        project-admin should still be able to manage these credentials via
+        credential:update:project scope (which doesn't check ownership).
+        """
+        project_id, _ = create_project(admin_api, "orphan-proj")
+        user_id, username, password = create_user(admin_api, "temp-owner")
+
+        # Assign temporary user to project so they can create credential
+        from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
+
+        admin_api.projects.create_role_assignment(
+            project_id=project_id,
+            body=RoleAssignmentCreate(principal_id=user_id, role_name="project-user"),
+        ).assert_and_get()
+
+        user_api = api_for(syntara_base_url, username, password)
+        type_id = get_bearer_token_type_id(user_api)
+
+        # User creates credential
+        cred = user_api.credentials.create(
+            body=CredentialCreate(
+                name=unique_name("orphan-cred"),
+                credential_type_id=type_id,
+                project_id=project_id,
+                inputs=CredentialCreateInputs.from_dict({"token": "orphan-secret"}),
+            )
+        ).assert_and_get()
+
+        # Delete the user (simulating employee departure)
+        admin_api.users.delete(user_id=user_id)
+
+        # Admin should still be able to update the orphaned credential
+        resp = admin_api.credentials.update(
+            credential_id=cred.id,
+            body=CredentialUpdate(description="admin managing orphaned credential"),
+        )
+        assert resp.is_success, "Project-admin should manage orphaned credentials"

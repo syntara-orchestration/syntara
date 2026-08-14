@@ -318,3 +318,71 @@ class TestBuildResourceActions:
         finally:
             mod._registry = old_registry
             mod._all_pairs = old_pairs
+
+
+# ============================================================================
+# validate_own_scope_actions
+# ============================================================================
+
+
+class TestValidateOwnScopeActions:
+    """Verify validation that rejects nonsensical own-scope + create combinations."""
+
+    def test_own_scope_with_update_allowed(self) -> None:
+        """'own' scope with 'update' action is valid (existing resource operation)."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [{"scope": "own", "actions": ["credential:update"]}]
+        assert validate_own_scope_actions(stmts) is None
+
+    def test_own_scope_with_create_rejected(self) -> None:
+        """'own' scope with 'create' action is rejected (resource doesn't exist yet)."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [{"scope": "own", "actions": ["credential:create"]}]
+        error = validate_own_scope_actions(stmts)
+        assert error is not None
+        assert "create" in error
+        assert "scope='own'" in error
+        assert "doesn't exist yet" in error
+
+    def test_own_scope_with_wildcard_rejected(self) -> None:
+        """'own' scope with wildcard action is rejected."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [{"scope": "own", "actions": ["credential:*"]}]
+        error = validate_own_scope_actions(stmts)
+        assert error is not None
+        assert "Wildcard" in error
+        assert "scope='own'" in error
+
+    def test_own_scope_with_valid_actions(self) -> None:
+        """'own' scope with all valid actions (read, update, delete, use, decide, revoke)."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [
+            {"scope": "own", "actions": ["credential:update", "credential:delete", "credential:read"]},
+            {"scope": "own", "actions": ["approval:decide"]},
+            {"scope": "own", "actions": ["role-assignment:revoke"]},
+        ]
+        assert validate_own_scope_actions(stmts) is None
+
+    def test_project_scope_with_create_allowed(self) -> None:
+        """'project' scope with 'create' is allowed (validation only checks 'own')."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [{"scope": "project", "actions": ["credential:create"]}]
+        assert validate_own_scope_actions(stmts) is None
+
+    def test_empty_statements(self) -> None:
+        """Empty statements list is valid."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        assert validate_own_scope_actions([]) is None
+
+    def test_statements_without_scope(self) -> None:
+        """Statements without scope field (defaults to 'any') are ignored."""
+        from syntara.authz.resource_actions import validate_own_scope_actions
+
+        stmts = [{"actions": ["credential:create"]}]
+        assert validate_own_scope_actions(stmts) is None
