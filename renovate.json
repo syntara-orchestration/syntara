@@ -12,6 +12,17 @@
     "rangeStrategy": "bump",
     "schedule": ["at any time"]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^\\.tekton/.*\\.yaml$"],
+      "matchStrings": [
+        "value: (?<depName>quay\\.io/aap-ci/tekton-catalog/pipeline/[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "description": "Use in-range-only strategy for all Python dependencies",
