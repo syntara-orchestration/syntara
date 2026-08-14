@@ -325,6 +325,39 @@ def _enhance_tools_with_metadata(
     return enhanced_tools
 
 
+def _selected_tools_provisioned(
+    provisioned_tools: list[BaseTool],
+    tool_selections: set[str] | frozenset[str],
+) -> bool:
+    """Check whether any selected tool IDs appear among provisioned tools."""
+    provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
+    provisioned_ids.discard("")
+    return bool(provisioned_ids & tool_selections)
+
+
+def _build_provisioning_failure_cause(
+    enabled_tools: list[ToolWithParameters],
+    namespaced_tools: list[NamespacedBaseTool],
+) -> str:
+    """Diagnose why enabled tools failed provisioning (connectivity vs drift)."""
+    owning_integration_ids = {tool.integration_id for tool in enabled_tools}
+    owning_with_mcp_tools = {t.integration_id for t in namespaced_tools if t.integration_id in owning_integration_ids}
+    owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
+    soft_skipped_owners = owning_integration_ids - owning_with_mcp_tools
+
+    if owning_namespaced_count == 0:
+        return "owning MCP integrations returned no tools — check integration connectivity"
+    if soft_skipped_owners:
+        return (
+            "one or more owning MCP integrations returned no tools while others returned "
+            f"{owning_namespaced_count} unmatched tool(s) — check integration connectivity and registry alignment"
+        )
+    return (
+        f"owning integrations returned {owning_namespaced_count} tool(s) but none matched "
+        "enabled Tool Manager entries — check registry name/integration_id drift"
+    )
+
+
 def _require_provisioned_tools_when_enabled(
     enabled_tools: list[ToolWithParameters],
     provisioned_tools: list[BaseTool],
@@ -337,64 +370,24 @@ def _require_provisioned_tools_when_enabled(
 
     Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
     (and SELECTED) would continue toolless and the LLM may fabricate results.
-
-    Scopes the MCP-returned count to integrations that own enabled tools so
-    that tools from unrelated integrations do not mask a connectivity failure
-    on the owning integration.
-
-    When any owning integration contributes zero MCP tools (soft-skip), prefer
-    a connectivity or mixed-failure message over pure registry-drift blame —
-    sibling integrations returning unmatched tools must not hide soft-skips.
-
-    For ``SELECTED`` with non-empty selections, raise
-    ``ToolSelectionUnavailableError`` (including selection IDs) so stream
-    classification matches the selection-unavailable path.
     """
     if not enabled_tools:
         return
 
-    # For SELECTED, "some tools provisioned" is only meaningful if the
-    # *selected* tools are among them. When a sibling tool provisions but
-    # the selected tool's integration soft-skipped, we must still fail with
-    # a diagnostic — not silently defer to _apply_tool_selection.
-    if provisioned_tools:
-        if tool_selection_strategy == "SELECTED" and tool_selections:
-            provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
-            provisioned_ids.discard("")
-            if provisioned_ids & (tool_selections or set()):
-                return
-            # Fall through: selected tools missing despite other tools provisioning
-        else:
-            return
-
-    enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
-
-    # Count only MCP tools from integrations that own at least one enabled tool.
-    owning_integration_ids = {tool.integration_id for tool in enabled_tools}
-    owning_with_mcp_tools = {t.integration_id for t in namespaced_tools if t.integration_id in owning_integration_ids}
-    owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
-    soft_skipped_owners = owning_integration_ids - owning_with_mcp_tools
-
-    # Build root-cause diagnostic shared by both SELECTED and ALL paths.
-    if owning_namespaced_count == 0:
-        cause = "owning MCP integrations returned no tools — check integration connectivity"
-    elif soft_skipped_owners:
-        cause = (
-            "one or more owning MCP integrations returned no tools while others returned "
-            f"{owning_namespaced_count} unmatched tool(s) — check integration connectivity and registry alignment"
-        )
-    else:
-        cause = (
-            f"owning integrations returned {owning_namespaced_count} tool(s) but none matched "
-            "enabled Tool Manager entries — check registry name/integration_id drift"
-        )
-
     selections = tool_selections or set()
-    if tool_selection_strategy == "SELECTED" and selections:
+    is_selected = tool_selection_strategy == "SELECTED" and bool(selections)
+
+    if provisioned_tools and (not is_selected or _selected_tools_provisioned(provisioned_tools, selections)):
+        return
+
+    cause = _build_provisioning_failure_cause(enabled_tools, namespaced_tools)
+
+    if is_selected:
         unavailable = sorted(selections)
         msg = f"None of the requested tools could be provisioned (unavailable tool IDs: {unavailable}); {cause}"
         raise ToolSelectionUnavailableError(msg)
 
+    enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
     msg = (
         f"Enabled tools could not be provisioned (enabled={enabled_names}); {cause}; refusing to continue without tools"
     )
