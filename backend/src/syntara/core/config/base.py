@@ -305,8 +305,7 @@ class CacheSettings(BaseSettings):
     cache_connection_pool_size: int = Field(
         default=50,
         description=(
-            "Maximum number of cache connections in pool. "
-            "Workflow workers with high concurrency may need larger pools."
+            "Maximum number of cache connections in pool. Workflow workers with high concurrency may need larger pools."
         ),
     )
 

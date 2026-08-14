@@ -362,9 +362,7 @@ class TestGracefulDegradationOnRedisFailure:
         return mock_client
 
     @pytest.mark.asyncio
-    async def test_publish_snapshot_returns_none_on_redis_failure(
-        self, execution_with_activities: Execution
-    ) -> None:
+    async def test_publish_snapshot_returns_none_on_redis_failure(self, execution_with_activities: Execution) -> None:
         publisher = ActivityUpdatePublisher()
         unavailable_client = self._unavailable_stream_client()
 
@@ -409,9 +407,7 @@ class TestGracefulDegradationOnRedisFailure:
         assert event_id is None
 
     @pytest.mark.asyncio
-    async def test_publish_snapshot_logs_warning_not_exception(
-        self, execution_with_activities: Execution
-    ) -> None:
+    async def test_publish_snapshot_logs_warning_not_exception(self, execution_with_activities: Execution) -> None:
         """Degradation should be a warning, not swallowed silently or logged as an exception."""
         publisher = ActivityUpdatePublisher()
         unavailable_client = self._unavailable_stream_client()
