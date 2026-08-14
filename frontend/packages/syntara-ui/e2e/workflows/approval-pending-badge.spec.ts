@@ -123,6 +123,7 @@ test.describe('Approval Pending Badge', () => {
         // VERIFICATION: Filter by "Pending approval" via Status filter
         // ===================================================================
         await applyPendingApprovalStatusFilter(app)
+        await expect(app).toHaveURL(/approval_pending=true/)
         await expect(badgeInList).toBeVisible()
       } finally {
         // Cleanup: Delete the workflow

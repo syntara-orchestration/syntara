@@ -25,8 +25,7 @@ export function useAllProjectRoles(projectId: string | undefined) {
     refetch,
   } = useQuery({
     queryKey: ['all-project-roles', projectId],
-    // `enabled` guarantees projectId is defined when this runs.
-    queryFn: () => fetchAllProjectRoles(projectId as string),
+    queryFn: () => fetchAllProjectRoles(projectId ?? ''),
     enabled: !!projectId,
   })
   return { roles, isLoading: isPending, error, refetch }
