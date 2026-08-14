@@ -82,11 +82,14 @@ jobs:
           retention-days: 30
 
       # With --update-snapshots=all, Playwright rewrites every PNG it captures.
-      # Diffing against the checked-in files (rather than trusting Playwright's
-      # pass/fail) is what keeps this PR limited to
-      # only the images that are genuinely different — see
-      # update-visual-baselines.yml, which uses the same approach for the
-      # on-demand /update-screenshots flow.
+      # Filter drops AA/byte-noise under the hybrid keep rule so git only sees
+      # meaningful diffs (validated on PR #213). Same filter is used by
+      # update-visual-baselines.yml for /update-screenshots.
+      - name: Filter noisy baseline diffs
+        if: steps.screenshots.outcome == 'success'
+        working-directory: frontend/packages/syntara-ui
+        run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
+
       - name: Detect changed baselines
         id: detect
         working-directory: frontend/packages/syntara-ui
