@@ -525,6 +525,10 @@ If the compromise is detected but not actively exploited (e.g., a key was accide
 
 On first application startup, an `admin` user is seeded with the password from `APP_ADMIN_PASSWORD_PATH`. This happens in the application lifespan handler via `authz/seed.py`, which reads the password file, hashes it with Argon2id, and creates the user if it doesn't already exist. The admin user is created with `is_builtin=True`, which identifies it as a built-in user with special protection rules.
 
+The bootstrap admin is also given a **placeholder email** of `admin@example.com` so JWT access tokens (and audit / approval attribution that keys on email) are never `null`. **Change this email after install** — the built-in admin may update its own email via `PATCH /users/{id}` (self). Username and display name remain protected.
+
+If an existing deployment still has `email=NULL` on the builtin admin, the next seed run (and `set_admin_password`) backfills `admin@example.com` without overwriting a non-null email. If that placeholder is already taken by another user, the conflict is logged and the admin email is left unchanged so seeding / password reset can still complete.
+
 If the password file is not configured or missing, the application still starts but logs a warning — the admin user will be created without a password (unable to log in locally).
 
 > **Recommended**: Run `make secrets-generate` before first startup to create the password file.
@@ -535,7 +539,8 @@ The built-in admin user (identified by `is_builtin=True`) has special protection
 
 | Action | Who Can Do It | Guard |
 |--------|--------------|-------|
-| **Modify properties** (username, first_name, last_name, email) | Nobody | `AdminModifyError` (403) |
+| **Modify username / first_name / last_name** | Nobody | `AdminModifyError` (403) |
+| **Modify email** | Only the admin itself | `AdminModifyError` (403) for non-self |
 | **Change password** | Only the admin itself | `AdminModifyError` (403) for non-self |
 | **Disable** (`is_enabled=false`) | Only the admin itself, and only when at least one other enabled user exists in the admins group | `AdminModifyError` (403) for non-self; `AdminDisableNoOtherAdminsError` (403) if no other enabled admins |
 | **Re-enable** (`is_enabled=true`) | Any admin user | Always allowed |

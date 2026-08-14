@@ -7,7 +7,7 @@
  * Critical paths covered:
  * - Wizard navigation: button on identities tab, page title, step nav
  * - Step 1: Next disabled until user selected, filtering, user selection
- * - Step 2: empty state, Transfer identity disabled until identity selected
+ * - Step 2: empty state (no selection heading/filters when source has no identities)
  * - Back from Step 2 clears selections and returns to Step 1
  * - Cancel navigates back to identities tab
  * - Full attach flow tested in user-identity-admin-actions.spec.ts (route-intercepted)
@@ -207,7 +207,9 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
     await app.getByText(`${prefix}-source@test.com`).click()
     await app.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(app.getByRole('heading', { level: 2, name: 'Select an identity' })).toBeVisible({ timeout: 10_000 })
+    // Seeded source users have no federated identities, so Step 2 is the empty state
+    // (selection heading/filters are hidden until there is something to select).
+    await expect(app.getByText('No identities')).toBeVisible({ timeout: 10_000 })
 
     await app.getByRole('button', { name: 'Back' }).click()
 
@@ -225,7 +227,7 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
     await app.getByText(`${prefix}-source@test.com`).click()
     await app.getByRole('button', { name: 'Next', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 2, name: 'Select an identity' })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByText('No identities')).toBeVisible({ timeout: 10_000 })
 
     await app.getByRole('button', { name: 'Back' }).click()
     await expect(app.getByRole('heading', { level: 2, name: 'Select a user' })).toBeVisible({ timeout: 10_000 })
@@ -235,11 +237,11 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
     await app.getByText(`${prefix}-source2@test.com`).click()
     await app.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(app.getByRole('heading', { level: 2, name: 'Select an identity' })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByText('No identities')).toBeVisible({ timeout: 10_000 })
     await expect(app.getByRole('button', { name: 'Transfer identity' })).toBeDisabled()
   })
 
-  test('Step 2 shows step heading and description with selected user name', async ({ app }) => {
+  test('step 2 empty state hides selection heading and description', async ({ app }) => {
     expect(targetUserId && sourceUserId, 'Backend seeding failed').toBeTruthy()
 
     await app.goto(toAppUrl(`${ACCESS_URL}/${targetUserId}/transfer-identity`))
@@ -250,7 +252,8 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
     await app.getByText(`${prefix}-source@test.com`).click()
     await app.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(app.getByRole('heading', { level: 2, name: 'Select an identity' })).toBeVisible({ timeout: 10_000 })
-    await expect(app.getByText(/federated identities to attach to the current user/i)).toBeVisible()
+    await expect(app.getByText('No identities')).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { level: 2, name: 'Select an identity' })).not.toBeVisible()
+    await expect(app.getByText(/federated identities to attach to the current user/i)).not.toBeVisible()
   })
 })
