@@ -107,7 +107,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -268,7 +268,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -445,7 +445,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -606,7 +606,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -783,7 +783,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -944,7 +944,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1114,7 +1114,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1284,7 +1284,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1445,7 +1445,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1605,7 +1605,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -12661,11 +12661,11 @@ paths:
         - Internal Metrics
       summary: Metrics store KPIs
       description: |-
-        Return a computed KPI dashboard covering all Nexus components.
+        Return a computed KPI dashboard covering all Syntara components.
 
-        Maps metrics to the KPIs defined in the Nexus KPI documents:
-        - Nexus Key Performance Indicators (KPIs)
-        - Nexus LLM/Agent Performance KPIs
+        Maps metrics to the KPIs defined in the Syntara KPI documents:
+        - Syntara Key Performance Indicators (KPIs)
+        - Syntara LLM/Agent Performance KPIs
       operationId: get_internal_metrics_kpis
       responses:
         '200':
@@ -30905,7 +30905,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Nexus user fields to IdP-specific OIDC claim names.
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -30932,7 +30932,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Nexus group mapping entry.
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -31069,7 +31069,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31197,7 +31197,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31337,7 +31337,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries (omit to keep existing)
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -33044,7 +33044,7 @@ components:
       required:
         - component
       title: ComponentKPISummary
-      description: KPI summary for a single Nexus component.
+      description: KPI summary for a single Syntara component.
     KPIDashboard:
       properties:
         generated_at:
@@ -33062,7 +33062,7 @@ components:
       required:
         - generated_at
       title: KPIDashboard
-      description: Full KPI dashboard covering all Nexus components.
+      description: Full KPI dashboard covering all Syntara components.
     MetricRecord:
       description: |-
         Lightweight in-memory metric data point.
@@ -36855,7 +36855,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Nexus Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -37451,7 +37451,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -37606,7 +37606,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -37727,7 +37727,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for authentication or Secret URL.
+          description: Syntara credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -37755,7 +37755,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for LLM provider authentication
+          description: Syntara credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -37809,7 +37809,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Nexus credential UUID for execution calls (distinct from management credential)
+          description: Syntara credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -37844,7 +37844,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for credential scrubbing
+          description: Syntara credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -37858,7 +37858,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID
+          description: Syntara credential UUID
         approver_users:
           anyOf:
             - items:

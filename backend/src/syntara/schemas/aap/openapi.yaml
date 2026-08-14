@@ -14,7 +14,7 @@ info:
     Authentication to the Ansible Automation Platform Controller is resolved server-side from
     environment variables (`APP_AAP_BASE_URL`, `APP_AAP_TOKEN`).
 
-    Note: This API intentionally diverges from standard Nexus response conventions.
+    Note: This API intentionally diverges from standard Syntara response conventions.
     As a BFF proxy, it mirrors the upstream Ansible Automation Platform API shape (count/results, page_size)
     rather than the standard ResourcesResponseBase format.
 
@@ -1259,7 +1259,7 @@ components:
           - type: "null"
         title: Credential Id
       description: |
-        Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+        Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
         If provided, the credential is decrypted and used instead of environment variables.
         Credential must be of type "Ansible Automation Platform".
     integrationId:
