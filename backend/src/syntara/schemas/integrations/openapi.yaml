@@ -43,60 +43,118 @@ paths:
         - name: integration_type
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/IntegrationType'
-              - type: "null"
-            title: Integration Type
-          description: Filter by integration type
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the integration type. ?integration_type[eq]=aap_controller
+                    $ref: '#/components/schemas/IntegrationType'
+          description: |
+            Filter by integration type.
+            - Exact match: `integration_type=aap_controller` or `integration_type[eq]=aap_controller`
         - name: validation_status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/IntegrationStatus'
-              - type: "null"
-            title: Validation Status
-          description: Filter by validation status
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the validation status. ?validation_status[eq]=valid
+                    $ref: '#/components/schemas/IntegrationStatus'
+          description: |
+            Filter by validation status.
+            - Exact match: `validation_status=valid` or `validation_status[eq]=valid`
         - name: enabled
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: "null"
-            description: Filter by enabled status
-            title: Enabled
-          description: Filter by enabled status
+                description: Exact match of the enabled status. ?enabled=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the enabled status. ?enabled[eq]=true
+                    type: boolean
+          description: |
+            Filter by enabled status.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
         - name: scope
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/IntegrationScope'
-              - type: "null"
-            title: Scope
-          description: Filter by visibility scope
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the visibility scope. ?scope[eq]=global
+                    $ref: '#/components/schemas/IntegrationScope'
+          description: |
+            Filter by visibility scope.
+            - Exact match: `scope=global` or `scope[eq]=global`
         - name: management_credential_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
                 format: uuid
-              - type: "null"
-            title: Management Credential Id
-          description: Filter by management credential ID (credential used for admin operations like validation and tool/model discovery)
+                description: Exact match of the management credential ID. ?management_credential_id=<uuid>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the management credential ID. ?management_credential_id[eq]=<uuid>
+                    type: string
+                    format: uuid
+          description: |
+            Filter by management credential ID (credential used for admin operations like validation and tool/model discovery).
+            - Exact match: `management_credential_id=<uuid>` or `management_credential_id[eq]=<uuid>`
         - name: project_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
                 format: uuid
-              - type: "null"
-            title: Project Id
-          description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+                description: Exact match of the project ID. ?project_id=<uuid>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the project ID. ?project_id[eq]=<uuid>
+                    type: string
+                    format: uuid
+          description: |
+            Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+            - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
       responses:
         "200":
           description: Successful Response

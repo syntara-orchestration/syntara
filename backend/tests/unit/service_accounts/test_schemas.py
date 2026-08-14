@@ -118,12 +118,6 @@ class TestServiceAccountListParams:
         assert params.cursor is None
         assert params.sort is None
         assert params.include_total is False
-        assert params.status is None
-        assert params.name is None
-
-    def test_status_filter(self) -> None:
-        params = ServiceAccountListParams(status=ServiceAccountStatus.DISABLED)
-        assert params.status == ServiceAccountStatus.DISABLED
 
 
 class TestServiceAccountListResponse:

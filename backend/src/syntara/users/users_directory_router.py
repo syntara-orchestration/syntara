@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query, Request
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
@@ -33,8 +33,6 @@ UserDirectoryListResponse = ResourcesResponse[UserDirectoryEntry]
 
 class UserDirectoryListParams(BaseListParams):
     """Query parameters for the user directory listing."""
-
-    username: str | None = Field(default=None, description="Filter by username")
 
 
 class _UserDirectoryService(BaseService):

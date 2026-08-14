@@ -41,19 +41,107 @@ paths:
         - name: category
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: "null"
-            title: Category
+                description: Exact match of the category. ?category=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the category. ?category[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?category[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?category[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?category[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?category[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?category[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?category[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?category[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?category[isnull]=true
+                    type: boolean
+          description: |
+            Filter settings by category.
+            - Exact match: `category=value`
+            - Contains: `category[contains]=substring`
         - name: group
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: "null"
-            title: Group
+                description: Exact match of the group. ?group=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the group. ?group[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?group[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?group[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?group[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?group[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?group[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?group[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?group[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?group[isnull]=true
+                    type: boolean
+          description: |
+            Filter settings by group.
+            - Exact match: `group=value`
+            - Contains: `group[contains]=substring`
       responses:
         "200":
           description: Paginated list of runtime settings

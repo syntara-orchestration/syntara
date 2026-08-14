@@ -467,14 +467,126 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by policy name */
-        name?: string | null
-        /** @description Filter by builtin status */
-        is_builtin?: boolean | null
-        /** @description Filter by project scope */
-        project_id?: string | null
-        project_eligible?: boolean | null
-        scope?: string | null
+        /**
+         * @description Filter policies by name.
+         *     - Exact match: `name=value` or `name[eq]=value`
+         *     - Contains: `name[contains]=value`
+         *     - Prefix: `name[starts_with]=value`
+         */
+        name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the policy name. ?name[eq]=<name>
+           */
+          eq?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?name[contains]=<substring>
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?name[starts_with]=<prefix>
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?name[gt]=<name>
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?name[gte]=<name>
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?name[lt]=<name>
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?name[lte]=<name>
+           */
+          lte?: string
+        }
+        /**
+         * @description Filter policies by builtin status.
+         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
+         */
+        is_builtin?: boolean & {
+          /**
+           * Equals
+           * @description Exact match of the builtin status. ?is_builtin[eq]=true
+           */
+          eq?: boolean
+        }
+        /**
+         * @description Filter policies by project scope.
+         *     - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
+         */
+        project_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           * @description Exact match of the project ID. ?project_id[eq]=<uuid>
+           */
+          eq?: string
+        }
+        /**
+         * @description Filter policies by project eligibility.
+         *     - Exact match: `project_eligible=true` or `project_eligible[eq]=true`
+         */
+        project_eligible?: boolean & {
+          /**
+           * Equals
+           * @description Exact match of the project eligible flag. ?project_eligible[eq]=true
+           */
+          eq?: boolean
+        }
+        /**
+         * @description Filter policies by scope.
+         *     - Exact match: `scope=value` or `scope[eq]=value`
+         *     - Contains: `scope[contains]=value`
+         *     - Prefix: `scope[starts_with]=value`
+         */
+        scope?: string & {
+          /**
+           * Equals
+           * @description Exact match of the scope. ?scope[eq]=<value>
+           */
+          eq?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?scope[contains]=<substring>
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?scope[gt]=<value>
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?scope[gte]=<value>
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?scope[lt]=<value>
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?scope[lte]=<value>
+           */
+          lte?: string
+        }
       }
       header?: never
       path?: never

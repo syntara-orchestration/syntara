@@ -1960,6 +1960,70 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than Or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /**
+       * Less Than Or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than Or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /**
+       * Less Than Or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
   }
   requestBodies: never
   headers: never
@@ -1978,6 +2042,53 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        /**
+         * @description Filter executions by workflow ID.
+         *     - Exact match: `workflow_id=<uuid>` or `workflow_id[eq]=<uuid>`
+         */
+        workflow_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           * @description Exact match of the workflow ID. ?workflow_id[eq]=<uuid>
+           */
+          eq?: string
+        }
+        /**
+         * @description Filter executions by status.
+         *     - Exact match: `status=running` or `status[eq]=running`
+         */
+        status?: components['schemas']['ExecutionStatus'] & {
+          /**
+           * Equals
+           * @description Exact match of the execution status. ?status[eq]=running
+           */
+          eq?: components['schemas']['ExecutionStatus']
+        }
+        /**
+         * @description Filter executions by mode.
+         *     - Exact match: `mode=standard` or `mode[eq]=standard`
+         */
+        mode?: components['schemas']['ExecutionMode'] & {
+          /**
+           * Equals
+           * @description Exact match of the execution mode. ?mode[eq]=standard
+           */
+          eq?: components['schemas']['ExecutionMode']
+        }
+        /**
+         * @description Filter executions by approval pending state.
+         *     - Exact match: `approval_pending=true` or `approval_pending[eq]=true`
+         */
+        approval_pending?: boolean & {
+          /**
+           * Equals
+           * @description Exact match. ?approval_pending[eq]=true
+           */
+          eq?: boolean
+        }
       }
       header?: never
       path?: never
@@ -2137,6 +2248,72 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        /**
+         * @description Filter activities by name.
+         *     - Exact match: `activity_name=<name>` or `activity_name[eq]=<name>`
+         *     - Contains: `activity_name[contains]=<substring>`
+         */
+        activity_name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the activity name. ?activity_name[eq]=<name>
+           */
+          eq?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?activity_name[contains]=<substring>
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?activity_name[starts_with]=<prefix>
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?activity_name[gt]=<value>
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?activity_name[gte]=<value>
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?activity_name[lt]=<value>
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?activity_name[lte]=<value>
+           */
+          lte?: string
+        }
+        /**
+         * @description Filter activities by node type.
+         *     - Exact match: `node_type=condition` or `node_type[eq]=condition`
+         */
+        node_type?: components['schemas']['NodeType'] & {
+          /**
+           * Equals
+           * @description Exact match of the node type. ?node_type[eq]=condition
+           */
+          eq?: components['schemas']['NodeType']
+        }
+        /**
+         * @description Filter activities by status.
+         *     - Exact match: `status=completed` or `status[eq]=completed`
+         */
+        status?: components['schemas']['ActivityStatus'] & {
+          /**
+           * Equals
+           * @description Exact match of the activity status. ?status[eq]=completed
+           */
+          eq?: components['schemas']['ActivityStatus']
+        }
       }
       header?: never
       path: {

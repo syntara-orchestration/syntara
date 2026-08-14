@@ -1302,6 +1302,113 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    /**
+     * @description Filter resources by name.
+     *     - Exact match: `name=value`
+     *     - Contains: `name[contains]=value`
+     * @example auth
+     */
+    nameFilterParam: string & {
+      /**
+       * Contains
+       * @description Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+       */
+      contains?: string
+      /**
+       * Starts With
+       * @description Prefix to match at the start of the name (case-insensitive). ?name[starts_with]=<prefix>
+       */
+      starts_with?: string
+      /**
+       * Equals
+       * @description Exact match of the name (case-insensitive). ?name[eq]=<name>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * @description Greater than comparison (lexicographical). ?name[gt]=<name>
+       */
+      gt?: string
+      /**
+       * Greater Than Or Equal
+       * @description Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * @description Less than comparison (lexicographical). ?name[lt]=<name>
+       */
+      lt?: string
+      /**
+       * Less Than Or Equal
+       * @description Less than or equal comparison (lexicographical). ?name[lte]=<name>
+       */
+      lte?: string
+    }
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than Or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /**
+       * Less Than Or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than Or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /**
+       * Less Than Or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
   }
   requestBodies: never
   headers: never
@@ -1320,12 +1427,225 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by username (username=exact, username[contains]=substring, username[starts_with]=prefix) */
-        username?: string | null
-        first_name?: string | null
-        last_name?: string | null
-        auth_type?: components['schemas']['AuthType'] | null
-        auth_source?: string | null
+        /**
+         * @description Filter users by username.
+         *     - Exact match: `username=value`
+         *     - Contains: `username[contains]=substring`
+         */
+        username?: string & {
+          /**
+           * Equals
+           * @description Exact match of the username. ?username[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?username[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?username[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?username[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?username[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?username[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?username[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?username[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?username[isnull]=true
+           */
+          isnull?: boolean
+        }
+        /**
+         * @description Filter users by first name.
+         *     - Exact match: `first_name=value`
+         *     - Contains: `first_name[contains]=substring`
+         */
+        first_name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the first name. ?first_name[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?first_name[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?first_name[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?first_name[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?first_name[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?first_name[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?first_name[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?first_name[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?first_name[isnull]=true
+           */
+          isnull?: boolean
+        }
+        /**
+         * @description Filter users by last name.
+         *     - Exact match: `last_name=value`
+         *     - Contains: `last_name[contains]=substring`
+         */
+        last_name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the last name. ?last_name[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?last_name[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?last_name[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?last_name[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?last_name[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?last_name[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?last_name[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?last_name[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?last_name[isnull]=true
+           */
+          isnull?: boolean
+        }
+        /**
+         * @description Filter users by authentication type.
+         *     - Exact match: `auth_type=local` or `auth_type[eq]=local`
+         */
+        auth_type?: components['schemas']['AuthType'] & {
+          /**
+           * Equals
+           * @description Exact match of the authentication type. ?auth_type[eq]=local
+           */
+          eq?: components['schemas']['AuthType']
+        }
+        /**
+         * @description Filter users by authentication source.
+         *     - Exact match: `auth_source=value`
+         *     - Contains: `auth_source[contains]=substring`
+         */
+        auth_source?: string & {
+          /**
+           * Equals
+           * @description Exact match of the authentication source. ?auth_source[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?auth_source[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?auth_source[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?auth_source[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?auth_source[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?auth_source[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?auth_source[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?auth_source[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?auth_source[isnull]=true
+           */
+          isnull?: boolean
+        }
       }
       header?: never
       path?: never
@@ -1681,8 +2001,58 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by username (username=exact, username[contains]=substring, username[starts_with]=prefix) */
-        username?: string | null
+        /**
+         * @description Filter by username.
+         *     - Exact match: `username=value`
+         *     - Contains: `username[contains]=substring`
+         */
+        username?: string & {
+          /**
+           * Equals
+           * @description Exact match of the username. ?username[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?username[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?username[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?username[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?username[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?username[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?username[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?username[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?username[isnull]=true
+           */
+          isnull?: boolean
+        }
       }
       header?: never
       path?: never
@@ -1720,8 +2090,58 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by group name (name=exact, name[contains]=substring, name[starts_with]=prefix) */
-        name?: string | null
+        /**
+         * @description Filter by group name.
+         *     - Exact match: `name=value`
+         *     - Contains: `name[contains]=substring`
+         */
+        name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the group name. ?name[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?name[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?name[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?name[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?name[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?name[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?name[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?name[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
+           */
+          isnull?: boolean
+        }
       }
       header?: never
       path?: never
@@ -1759,6 +2179,27 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        /**
+         * @description Filter resources by name.
+         *     - Exact match: `name=value`
+         *     - Contains: `name[contains]=value`
+         * @example auth
+         */
+        name?: components['parameters']['nameFilterParam']
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        /**
+         * @description Filter groups by source.
+         *     - Exact match: `source=local` or `source[eq]=local`
+         */
+        source?: ('local' | 'idp') & {
+          /**
+           * Equals
+           * @description Exact match of the group source. ?source[eq]=local
+           * @enum {string}
+           */
+          eq?: 'local' | 'idp'
+        }
       }
       header?: never
       path?: never

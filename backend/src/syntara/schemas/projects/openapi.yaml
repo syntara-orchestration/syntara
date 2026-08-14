@@ -92,30 +92,86 @@ paths:
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Name
-          description: Filter by project name
+                description: Exact match of the project name. ?name=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the project name. ?name[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=<value>
+                    type: string
+          description: |
+            Filter by project name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+            - Starts with: `name[starts_with]=value`
         - name: is_default
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Is Default
-          description: Filter by default project status
+                description: Exact match of the default project status. ?is_default=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the default project status. ?is_default[eq]=true
+                    type: boolean
+          description: |
+            Filter by default project status.
+            - Exact match: `is_default=true` or `is_default[eq]=true`
         - name: is_builtin
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Is Builtin
-          description: Filter by built-in project status
+                description: Exact match of the built-in project status. ?is_builtin=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the built-in project status. ?is_builtin[eq]=true
+                    type: boolean
+          description: |
+            Filter by built-in project status.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
       responses:
         "200":
           description: Paginated list of accessible projects
@@ -729,16 +785,7 @@ paths:
       tags:
         - Projects
       parameters:
-        - name: project_id
-          in: path
-          required: true
-          schema:
-            anyOf:
-              - format: uuid
-                type: string
-              - type: 'null'
-            title: Project Id
-          description: Project UUID
+        - $ref: "#/components/parameters/projectIdParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
@@ -746,39 +793,157 @@ paths:
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Name
-          description: Filter by role name
+                description: Exact match of the role name. ?name=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the role name. ?name[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=<value>
+                    type: string
+          description: |
+            Filter by role name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+            - Starts with: `name[starts_with]=value`
         - name: is_builtin
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Is Builtin
-          description: Filter by builtin status
+                description: Exact match of the builtin status. ?is_builtin=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the builtin status. ?is_builtin[eq]=true
+                    type: boolean
+          description: |
+            Filter by builtin status.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
         - name: scope
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Scope
-          description: Filter by scope
+                description: Exact match of the scope. ?scope=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the scope. ?scope[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?scope[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?scope[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?scope[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?scope[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?scope[lte]=<value>
+                    type: string
+          description: |
+            Filter by scope.
+            - Exact match: `scope=value`
+            - Contains: `scope[contains]=value`
+            - Starts with: `scope[starts_with]=value`
         - name: policy_name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Policy Name
-          description: Filter by policy name
+                description: Exact match of the policy name. ?policy_name=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the policy name. ?policy_name[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?policy_name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?policy_name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?policy_name[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?policy_name[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?policy_name[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?policy_name[lte]=<value>
+                    type: string
+          description: |
+            Filter by policy name.
+            - Exact match: `policy_name=value`
+            - Contains: `policy_name[contains]=value`
+            - Starts with: `policy_name[starts_with]=value`
       responses:
         "200":
           description: Successful Response
@@ -1029,16 +1194,7 @@ paths:
       tags:
         - Projects
       parameters:
-        - name: project_id
-          in: path
-          required: true
-          schema:
-            anyOf:
-              - format: uuid
-                type: string
-              - type: 'null'
-            title: Project Id
-          description: Project UUID
+        - $ref: "#/components/parameters/projectIdParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
@@ -1046,39 +1202,131 @@ paths:
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Name
-          description: Filter by policy name
+                description: Exact match of the policy name. ?name=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the policy name. ?name[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=<value>
+                    type: string
+          description: |
+            Filter by policy name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=value`
+            - Starts with: `name[starts_with]=value`
         - name: is_builtin
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Is Builtin
-          description: Filter by builtin status
+                description: Exact match of the builtin status. ?is_builtin=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the builtin status. ?is_builtin[eq]=true
+                    type: boolean
+          description: |
+            Filter by builtin status.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
         - name: project_eligible
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Project Eligible
-          description: Filter by project eligibility
+                description: Exact match of the project eligibility. ?project_eligible=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the project eligibility. ?project_eligible[eq]=true
+                    type: boolean
+          description: |
+            Filter by project eligibility.
+            - Exact match: `project_eligible=true` or `project_eligible[eq]=true`
         - name: scope
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Scope
-          description: Filter by scope
+                description: Exact match of the scope. ?scope=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the scope. ?scope[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?scope[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?scope[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?scope[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?scope[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?scope[lte]=<value>
+                    type: string
+          description: |
+            Filter by scope.
+            - Exact match: `scope=value`
+            - Contains: `scope[contains]=value`
+            - Starts with: `scope[starts_with]=value`
       responses:
         "200":
           description: Successful Response
@@ -1341,20 +1589,43 @@ paths:
         - name: credential_type_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
                 format: uuid
-              - type: 'null'
-            title: Credential Type Id
+                description: Exact match of the credential type ID. ?credential_type_id=<uuid>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the credential type ID. ?credential_type_id[eq]=<uuid>
+                    type: string
+                    format: uuid
+          description: |
+            Filter by credential type ID.
+            - Exact match: `credential_type_id=<uuid>` or `credential_type_id[eq]=<uuid>`
         - name: enabled
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: 'null'
-            title: Enabled
+                description: Exact match of the enabled state. ?enabled=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the enabled state. ?enabled[eq]=true
+                    type: boolean
+          description: |
+            Filter by enabled state.
+            - Exact match: `enabled=true` or `enabled[eq]=true`
         - name: for_action
           in: query
           required: false

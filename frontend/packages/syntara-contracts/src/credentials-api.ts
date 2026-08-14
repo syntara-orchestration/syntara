@@ -677,10 +677,29 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /** @description Filter by credential type ID */
-        credential_type_id?: string | null
-        /** @description Filter by enabled status */
-        enabled?: boolean | null
+        /**
+         * @description Filter by credential type ID.
+         *     - Exact match: `credential_type_id=<uuid>` or `credential_type_id[eq]=<uuid>`
+         */
+        credential_type_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           * @description Exact match of the credential type ID. ?credential_type_id[eq]=<uuid>
+           */
+          eq?: string
+        }
+        /**
+         * @description Filter by enabled status.
+         *     - Exact match: `enabled=true` or `enabled[eq]=true`
+         */
+        enabled?: boolean & {
+          /**
+           * Equals
+           * @description Exact match of the enabled state. ?enabled[eq]=true
+           */
+          eq?: boolean
+        }
         /** @description Filter by permission action. When 'use', returns only credentials with credential:use permission. */
         for_action?: 'use' | null
       }

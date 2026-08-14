@@ -511,8 +511,110 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        category?: string | null
-        group?: string | null
+        /**
+         * @description Filter settings by category.
+         *     - Exact match: `category=value`
+         *     - Contains: `category[contains]=substring`
+         */
+        category?: string & {
+          /**
+           * Equals
+           * @description Exact match of the category. ?category[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?category[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?category[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?category[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?category[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?category[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?category[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?category[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?category[isnull]=true
+           */
+          isnull?: boolean
+        }
+        /**
+         * @description Filter settings by group.
+         *     - Exact match: `group=value`
+         *     - Contains: `group[contains]=substring`
+         */
+        group?: string & {
+          /**
+           * Equals
+           * @description Exact match of the group. ?group[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?group[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?group[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?group[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?group[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?group[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?group[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?group[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?group[isnull]=true
+           */
+          isnull?: boolean
+        }
       }
       header?: never
       path?: never

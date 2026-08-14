@@ -48,44 +48,230 @@ paths:
         - name: username
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Username
-          description: "Filter by username (username=exact, username[contains]=substring, username[starts_with]=prefix)"
+                description: Exact match of the username. ?username=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the username. ?username[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?username[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?username[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?username[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?username[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?username[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?username[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?username[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?username[isnull]=true
+                    type: boolean
+          description: |
+            Filter users by username.
+            - Exact match: `username=value`
+            - Contains: `username[contains]=substring`
         - name: first_name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: First Name
+                description: Exact match of the first name. ?first_name=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the first name. ?first_name[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?first_name[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?first_name[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?first_name[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?first_name[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?first_name[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?first_name[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?first_name[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?first_name[isnull]=true
+                    type: boolean
+          description: |
+            Filter users by first name.
+            - Exact match: `first_name=value`
+            - Contains: `first_name[contains]=substring`
         - name: last_name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Last Name
+                description: Exact match of the last name. ?last_name=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the last name. ?last_name[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?last_name[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?last_name[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?last_name[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?last_name[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?last_name[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?last_name[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?last_name[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?last_name[isnull]=true
+                    type: boolean
+          description: |
+            Filter users by last name.
+            - Exact match: `last_name=value`
+            - Contains: `last_name[contains]=substring`
         - name: auth_type
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/AuthType'
-              - type: 'null'
-            title: Auth Type
+                description: Exact match of the authentication type. ?auth_type=local
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the authentication type. ?auth_type[eq]=local
+                    $ref: '#/components/schemas/AuthType'
+          description: |
+            Filter users by authentication type.
+            - Exact match: `auth_type=local` or `auth_type[eq]=local`
         - name: auth_source
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Auth Source
+                description: Exact match of the authentication source. ?auth_source=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the authentication source. ?auth_source[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?auth_source[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?auth_source[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?auth_source[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?auth_source[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?auth_source[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?auth_source[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?auth_source[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?auth_source[isnull]=true
+                    type: boolean
+          description: |
+            Filter users by authentication source.
+            - Exact match: `auth_source=value`
+            - Contains: `auth_source[contains]=substring`
       responses:
         '200':
           description: List of users
@@ -585,13 +771,55 @@ paths:
         - name: username
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            description: Filter by username (username=exact, username[contains]=substring, username[starts_with]=prefix)
-            title: Username
-          description: "Filter by username (username=exact, username[contains]=substring, username[starts_with]=prefix)"
+                description: Exact match of the username. ?username=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the username. ?username[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?username[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?username[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?username[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?username[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?username[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?username[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?username[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?username[isnull]=true
+                    type: boolean
+          description: |
+            Filter by username.
+            - Exact match: `username=value`
+            - Contains: `username[contains]=substring`
       responses:
         '200':
           description: Lightweight list of users
@@ -638,13 +866,55 @@ paths:
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            description: Filter by group name (name=exact, name[contains]=substring, name[starts_with]=prefix)
-            title: Name
-          description: "Filter by group name (name=exact, name[contains]=substring, name[starts_with]=prefix)"
+                description: Exact match of the group name. ?name=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the group name. ?name[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?name[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
+                    type: boolean
+          description: |
+            Filter by group name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=substring`
       responses:
         '200':
           description: Lightweight list of groups

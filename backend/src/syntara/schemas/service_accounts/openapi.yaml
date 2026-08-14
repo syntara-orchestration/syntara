@@ -107,23 +107,74 @@ paths:
         - name: status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/ServiceAccountStatus'
-              - type: 'null'
-            description: Filter by status
-            title: Status
-          description: Filter by status
+                description: Exact match of the status. ?status=active
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the status. ?status[eq]=active
+                    $ref: '#/components/schemas/ServiceAccountStatus'
+          description: |
+            Filter service accounts by status.
+            - Exact match: `status=active` or `status[eq]=active`
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            description: Filter by name
-            title: Name
-          description: Filter by name
+                description: Exact match of the name. ?name=value
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the name. ?name[eq]=value
+                    type: string
+                  in:
+                    title: In
+                    description: Match any of a comma-separated list. ?name[in]=a,b,c
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=substring
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=prefix
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=value
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=value
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=value
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=value
+                    type: string
+                  isnull:
+                    title: Is Null
+                    description: Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
+                    type: boolean
+          description: |
+            Filter service accounts by name.
+            - Exact match: `name=value`
+            - Contains: `name[contains]=substring`
       responses:
         '200':
           description: List of service accounts
@@ -474,23 +525,41 @@ paths:
         - name: credential_type
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/ServiceAccountCredentialType'
-              - type: 'null'
-            description: Filter by credential type
-            title: Credential Type
-          description: Filter by credential type
+                description: Exact match of the credential type. ?credential_type=client_credentials
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the credential type. ?credential_type[eq]=client_credentials
+                    $ref: '#/components/schemas/ServiceAccountCredentialType'
+          description: |
+            Filter credentials by credential type.
+            - Exact match: `credential_type=client_credentials` or `credential_type[eq]=client_credentials`
         - name: status
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - $ref: '#/components/schemas/ServiceAccountCredentialStatus'
-              - type: 'null'
-            description: Filter by status
-            title: Status
-          description: Filter by status
+                description: Exact match of the status. ?status=active
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the status. ?status[eq]=active
+                    $ref: '#/components/schemas/ServiceAccountCredentialStatus'
+          description: |
+            Filter credentials by status.
+            - Exact match: `status=active` or `status[eq]=active`
       responses:
         '200':
           description: List of credentials

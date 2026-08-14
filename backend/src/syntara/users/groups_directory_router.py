@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query, Request
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
@@ -34,8 +34,6 @@ GroupDirectoryListResponse = ResourcesResponse[GroupDirectoryEntry]
 
 class GroupDirectoryListParams(BaseListParams):
     """Query parameters for the group directory listing."""
-
-    name: str | None = Field(default=None, description="Filter by group name")
 
 
 class _GroupDirectoryService(BaseService):

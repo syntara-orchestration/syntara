@@ -78,48 +78,178 @@ paths:
         - name: name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: "null"
-            title: Name
-          description: Filter by role name
+                description: Exact match of the role name. ?name=<name>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the role name. ?name[eq]=<name>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?name[gt]=<name>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?name[gte]=<name>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?name[lt]=<name>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?name[lte]=<name>
+                    type: string
+          description: |
+            Filter roles by name.
+            - Exact match: `name=value` or `name[eq]=value`
+            - Contains: `name[contains]=value`
+            - Prefix: `name[starts_with]=value`
         - name: is_builtin
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: boolean
-              - type: "null"
-            title: Is Builtin
-          description: Filter by builtin status
+                description: Exact match of the builtin status. ?is_builtin=true
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the builtin status. ?is_builtin[eq]=true
+                    type: boolean
+          description: |
+            Filter roles by builtin status.
+            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
         - name: project_id
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
                 format: uuid
-              - type: "null"
-            title: Project Id
-          description: Filter by project scope
-        - in: query
-          name: scope
+                description: Exact match of the project ID. ?project_id=<uuid>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the project ID. ?project_id[eq]=<uuid>
+                    type: string
+                    format: uuid
+          description: |
+            Filter roles by project scope.
+            - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
+        - name: scope
+          in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Scope
+                description: Exact match of the scope. ?scope=<value>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the scope. ?scope[eq]=<value>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?scope[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?scope[gt]=<value>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?scope[gte]=<value>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?scope[lt]=<value>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?scope[lte]=<value>
+                    type: string
+          description: |
+            Filter roles by scope.
+            - Exact match: `scope=value` or `scope[eq]=value`
+            - Contains: `scope[contains]=value`
+            - Prefix: `scope[starts_with]=value`
         - name: policy_name
           in: query
           required: false
+          x-spec-only: true
+          style: deepObject
+          explode: true
           schema:
-            anyOf:
+            allOf:
               - type: string
-              - type: 'null'
-            title: Policy Name
-          description: Filter by policy name
+                description: Exact match of the policy name. ?policy_name=<name>
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    description: Exact match of the policy name. ?policy_name[eq]=<name>
+                    type: string
+                  contains:
+                    title: Contains
+                    description: Substring match (case-insensitive). ?policy_name[contains]=<substring>
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    description: Prefix match (case-insensitive). ?policy_name[starts_with]=<prefix>
+                    type: string
+                  gt:
+                    title: Greater Than
+                    description: Greater than comparison (lexicographical). ?policy_name[gt]=<name>
+                    type: string
+                  gte:
+                    title: Greater Than Or Equal
+                    description: Greater than or equal comparison. ?policy_name[gte]=<name>
+                    type: string
+                  lt:
+                    title: Less Than
+                    description: Less than comparison (lexicographical). ?policy_name[lt]=<name>
+                    type: string
+                  lte:
+                    title: Less Than Or Equal
+                    description: Less than or equal comparison. ?policy_name[lte]=<name>
+                    type: string
+          description: |
+            Filter roles by policy name.
+            - Exact match: `policy_name=value` or `policy_name[eq]=value`
+            - Contains: `policy_name[contains]=value`
+            - Prefix: `policy_name[starts_with]=value`
       responses:
         "200":
           description: Successful Response

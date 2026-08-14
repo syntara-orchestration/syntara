@@ -122,9 +122,3 @@ class GroupMemberListResponse(ResourcesResponse[GroupMemberRead]):
 
 class UserListParams(BaseListParams):
     """Query parameters for listing users."""
-
-    username: str | None = Field(default=None, description="Filter by username")
-    first_name: str | None = Field(default=None, description="Filter by first name")
-    last_name: str | None = Field(default=None, description="Filter by last name")
-    auth_type: AuthType | None = Field(default=None, description="Filter by authentication type (local or federated)")
-    auth_source: str | None = Field(default=None, description="Filter by authentication source")

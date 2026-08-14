@@ -820,10 +820,69 @@ export interface operations {
         sort?: string | null
         /** @description Include total count in response (expensive) */
         include_total?: boolean
-        /** @description Filter by status */
-        status?: components['schemas']['ServiceAccountStatus'] | null
-        /** @description Filter by name */
-        name?: string | null
+        /**
+         * @description Filter service accounts by status.
+         *     - Exact match: `status=active` or `status[eq]=active`
+         */
+        status?: components['schemas']['ServiceAccountStatus'] & {
+          /**
+           * Equals
+           * @description Exact match of the status. ?status[eq]=active
+           */
+          eq?: components['schemas']['ServiceAccountStatus']
+        }
+        /**
+         * @description Filter service accounts by name.
+         *     - Exact match: `name=value`
+         *     - Contains: `name[contains]=substring`
+         */
+        name?: string & {
+          /**
+           * Equals
+           * @description Exact match of the name. ?name[eq]=value
+           */
+          eq?: string
+          /**
+           * In
+           * @description Match any of a comma-separated list. ?name[in]=a,b,c
+           */
+          in?: string
+          /**
+           * Contains
+           * @description Substring match (case-insensitive). ?name[contains]=substring
+           */
+          contains?: string
+          /**
+           * Starts With
+           * @description Prefix match (case-insensitive). ?name[starts_with]=prefix
+           */
+          starts_with?: string
+          /**
+           * Greater Than
+           * @description Greater than comparison (lexicographical). ?name[gt]=value
+           */
+          gt?: string
+          /**
+           * Greater Than Or Equal
+           * @description Greater than or equal comparison. ?name[gte]=value
+           */
+          gte?: string
+          /**
+           * Less Than
+           * @description Less than comparison (lexicographical). ?name[lt]=value
+           */
+          lt?: string
+          /**
+           * Less Than Or Equal
+           * @description Less than or equal comparison. ?name[lte]=value
+           */
+          lte?: string
+          /**
+           * Is Null
+           * @description Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
+           */
+          isnull?: boolean
+        }
       }
       header?: never
       path?: never
@@ -1045,10 +1104,28 @@ export interface operations {
         sort?: string | null
         /** @description Include total count in response (expensive) */
         include_total?: boolean
-        /** @description Filter by credential type */
-        credential_type?: components['schemas']['ServiceAccountCredentialType'] | null
-        /** @description Filter by status */
-        status?: components['schemas']['ServiceAccountCredentialStatus'] | null
+        /**
+         * @description Filter credentials by credential type.
+         *     - Exact match: `credential_type=client_credentials` or `credential_type[eq]=client_credentials`
+         */
+        credential_type?: components['schemas']['ServiceAccountCredentialType'] & {
+          /**
+           * Equals
+           * @description Exact match of the credential type. ?credential_type[eq]=client_credentials
+           */
+          eq?: components['schemas']['ServiceAccountCredentialType']
+        }
+        /**
+         * @description Filter credentials by status.
+         *     - Exact match: `status=active` or `status[eq]=active`
+         */
+        status?: components['schemas']['ServiceAccountCredentialStatus'] & {
+          /**
+           * Equals
+           * @description Exact match of the status. ?status[eq]=active
+           */
+          eq?: components['schemas']['ServiceAccountCredentialStatus']
+        }
       }
       header?: never
       path: {

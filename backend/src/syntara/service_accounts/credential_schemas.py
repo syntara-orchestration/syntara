@@ -84,9 +84,6 @@ class ServiceAccountCredentialRotateResponse(ServiceAccountCredentialCreateRespo
 class ServiceAccountCredentialListParams(BaseListParams):
     """Query parameters for listing service account credentials."""
 
-    credential_type: ServiceAccountCredentialType | None = Field(default=None, description="Filter by credential type")
-    status: ServiceAccountCredentialStatus | None = Field(default=None, description="Filter by status")
-
 
 class ServiceAccountCredentialListResponse(ResourcesResponse[ServiceAccountCredentialRead]):
     """Paginated list response for service account credentials."""

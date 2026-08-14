@@ -106,15 +106,6 @@ class PolicyListResponse(ResourcesResponse[PolicyRead]):
 class PolicyListParams(BaseListParams):
     """Query parameters for listing policies."""
 
-    name: str | None = Field(default=None, description="Filter by name")
-    is_builtin: bool | None = Field(default=None, description="Filter by builtin status")
-    project_id: UUID | None = Field(default=None, description="Filter by project scope")
-    project_eligible: bool | None = Field(
-        default=None,
-        description="When true, return only system-scoped policies eligible for project roles",
-    )
-    scope: str | None = Field(default=None, description="Filter by policy scope (any, self, or project)")
-
 
 # ---------------------------------------------------------------------------
 # Role schemas
@@ -167,9 +158,3 @@ class RoleListResponse(ResourcesResponse[RoleRead]):
 
 class RoleListParams(BaseListParams):
     """Query parameters for listing roles."""
-
-    name: str | None = Field(default=None, description="Filter by name")
-    is_builtin: bool | None = Field(default=None, description="Filter by builtin status")
-    project_id: UUID | None = Field(default=None, description="Filter by project scope")
-    scope: str | None = Field(default=None, description="Filter by role scope (system or project)")
-    policy_name: str | None = Field(default=None, description="Filter by policy name")

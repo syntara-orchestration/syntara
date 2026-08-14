@@ -192,6 +192,13 @@ class TestListEndpointCompliance:
         return None
 
     @staticmethod
+    def _is_const_param(schema: dict[str, Any]) -> bool:
+        """Return True if the schema represents a fixed-value param (not a filter)."""
+        if "const" in schema:
+            return True
+        return any(isinstance(v, dict) and "const" in v for v in schema.get("anyOf", []))
+
+    @staticmethod
     def _infer_required_operators(schema: dict[str, Any]) -> set[str]:
         """Infer minimum required filter operators from a parameter's schema type.
 
@@ -283,7 +290,9 @@ class TestListEndpointCompliance:
         filter_fields = {
             name: schema
             for name, schema in all_fields.items()
-            if name not in pagination_fields and not schema.get("x-query-param")
+            if name not in pagination_fields
+            and not schema.get("x-query-param")
+            and not self._is_const_param(schema)
         }
 
         if not filter_fields:

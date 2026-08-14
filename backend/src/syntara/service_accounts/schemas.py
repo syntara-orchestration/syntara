@@ -73,9 +73,6 @@ class ServiceAccountRead(SQLModel):
 class ServiceAccountListParams(BaseListParams):
     """Query parameters for listing service accounts."""
 
-    status: ServiceAccountStatus | None = Field(default=None, description="Filter by status")
-    name: str | None = Field(default=None, description="Filter by name")
-
 
 class ServiceAccountListResponse(ResourcesResponse[ServiceAccountRead]):
     """Paginated list response for service accounts."""
