@@ -108,7 +108,7 @@ async def test_toctou_ownership_change_during_request(
         checker._resolve_resource_owner = resolve_then_transfer  # type: ignore[method-assign]
 
         # Mock the database query that returns the credential
-        async def mock_exec(query):  # noqa: ANN001, ANN202
+        async def mock_exec(query):  # noqa: ANN202
             result = MagicMock()
             result.first = MagicMock(return_value=str(user_a_id))  # Stale owner at check time
             return result
