@@ -359,9 +359,7 @@ def _require_provisioned_tools_when_enabled(
     # a diagnostic — not silently defer to _apply_tool_selection.
     if provisioned_tools:
         if tool_selection_strategy == "SELECTED" and tool_selections:
-            provisioned_ids = {
-                (t.metadata or {}).get("tool_id", "") for t in provisioned_tools
-            }
+            provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
             provisioned_ids.discard("")
             if provisioned_ids & (tool_selections or set()):
                 return
@@ -394,15 +392,11 @@ def _require_provisioned_tools_when_enabled(
     selections = tool_selections or set()
     if tool_selection_strategy == "SELECTED" and selections:
         unavailable = sorted(selections)
-        msg = (
-            "None of the requested tools could be provisioned "
-            f"(unavailable tool IDs: {unavailable}); {cause}"
-        )
+        msg = f"None of the requested tools could be provisioned (unavailable tool IDs: {unavailable}); {cause}"
         raise ToolSelectionUnavailableError(msg)
 
     msg = (
-        f"Enabled tools could not be provisioned (enabled={enabled_names}); "
-        f"{cause}; refusing to continue without tools"
+        f"Enabled tools could not be provisioned (enabled={enabled_names}); {cause}; refusing to continue without tools"
     )
     raise ToolDiscoveryError(msg)
 
