@@ -94,30 +94,29 @@ class TestErrorReporting:
         assert "refresh_error" not in request_data or "null" in request_data
 
     @respx.mock
-    async def test_update_tool_status_missing_auto_disable(self, client: ToolManagerClient) -> None:
-        """Test that MISSING status automatically disables the tool."""
+    async def test_update_tool_status_missing_leaves_enabled_untouched(self, client: ToolManagerClient) -> None:
+        """Test that MISSING status does not change the administrator-controlled enabled flag."""
         tool_id = uuid4()
 
-        mock_response = _create_mock_tool_response(tool_id=tool_id, status="missing", enabled=False)
+        mock_response = _create_mock_tool_response(tool_id=tool_id, status="missing", enabled=True)
         respx.patch(f"http://test-api/api/v1/tools/{tool_id}").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
         await client.update_tool_status(tool_id=tool_id, status=ToolStatus.MISSING, refresh_error=None)
 
-        # Verify the request includes auto-disable for MISSING status
         request = respx.calls.last.request
         request_data = request.content.decode()
         assert "missing" in request_data
-        assert '"enabled":false' in request_data  # Tool should be auto-disabled for MISSING status
+        assert "enabled" not in request_data
 
     @respx.mock
-    async def test_update_tool_status_error_auto_disable(self, client: ToolManagerClient) -> None:
-        """Test that ERROR status automatically disables the tool."""
+    async def test_update_tool_status_error_leaves_enabled_untouched(self, client: ToolManagerClient) -> None:
+        """Test that ERROR status does not change the administrator-controlled enabled flag."""
         tool_id = uuid4()
 
         mock_response = _create_mock_tool_response(
-            tool_id=tool_id, status="error", refresh_error="Tool execution failed", enabled=False
+            tool_id=tool_id, status="error", refresh_error="Tool execution failed", enabled=True
         )
         respx.patch(f"http://test-api/api/v1/tools/{tool_id}").mock(
             return_value=httpx.Response(200, json=mock_response)
@@ -125,12 +124,11 @@ class TestErrorReporting:
 
         await client.update_tool_status(tool_id=tool_id, status=ToolStatus.ERROR, refresh_error="Tool execution failed")
 
-        # Verify the request includes auto-disable for ERROR status
         request = respx.calls.last.request
         request_data = request.content.decode()
         assert "error" in request_data
         assert "Tool execution failed" in request_data
-        assert '"enabled":false' in request_data  # Tool should be auto-disabled for ERROR status
+        assert "enabled" not in request_data
 
     @respx.mock
     async def test_update_tool_status_tool_not_found(self, client: ToolManagerClient) -> None:
@@ -285,12 +283,12 @@ class TestErrorReporting:
         assert '"refresh_error":null' in request_data  # Should explicitly include null
 
     @respx.mock
-    async def test_update_tool_status_available_auto_enable(self, client: ToolManagerClient) -> None:
-        """Test that AVAILABLE status automatically re-enables the tool."""
+    async def test_update_tool_status_available_leaves_enabled_untouched(self, client: ToolManagerClient) -> None:
+        """Test that AVAILABLE status does not re-enable a tool an administrator disabled."""
         tool_id = uuid4()
 
         mock_response = _create_mock_tool_response(
-            tool_id=tool_id, status="available", refresh_error=None, enabled=True
+            tool_id=tool_id, status="available", refresh_error=None, enabled=False
         )
         respx.patch(f"http://test-api/api/v1/tools/{tool_id}").mock(
             return_value=httpx.Response(200, json=mock_response)
@@ -298,9 +296,8 @@ class TestErrorReporting:
 
         await client.update_tool_status(tool_id=tool_id, status=ToolStatus.AVAILABLE, refresh_error=None)
 
-        # Verify the request includes auto-enable for AVAILABLE status
         request = respx.calls.last.request
         request_data = request.content.decode()
         assert "available" in request_data
         assert '"refresh_error":null' in request_data
-        assert '"enabled":true' in request_data  # Tool should be auto-enabled for AVAILABLE status
+        assert "enabled" not in request_data

@@ -157,7 +157,10 @@ async def execute_agentic_activity(
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)  # noqa: TRY301
 
         if not project_id:
-            msg = "Agentic activity requires non-empty 'project_id'"
+            msg = (
+                "The AI Agent node could not determine the project context. "
+                "This is usually a system error. Try re-saving the workflow or contact your administrator."
+            )
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)  # noqa: TRY301
 
         file_ids = config.file_ids or []
