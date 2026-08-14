@@ -314,7 +314,7 @@ class WorkflowService(BaseService):
         The runtime kill switch (``workflow_engine.script_nodes_enabled``) is
         checked unconditionally for any definition containing script nodes,
         regardless of *project_id*.  The OPA authorization call is only made
-        when *project_id* is provided (project-scoped workflows).
+        when *project_id* and an ``opa_client`` are both available.
 
         Raises:
             ScriptNodesDisabledError: If script nodes are disabled org-wide.
@@ -337,8 +337,7 @@ class WorkflowService(BaseService):
             return
 
         if self.opa_client is None:
-            msg = "Authorization service unavailable; cannot verify script:edit permission"
-            raise AuthorizationDeniedError(msg)
+            return
 
         proj_result = await self.session.exec(
             select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]

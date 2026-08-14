@@ -366,8 +366,22 @@ async def test_create_execution_with_script_node_denied_returns_403(
 
     async def _deny_script_execute(_db, _evaluator, request) -> AuthzResult:
         if request.resource_type == "script" and request.action == "execute":
-            return AuthzResult(allowed=False, denied=True, matched_policy="", denial_reason="test deny")
-        return AuthzResult(allowed=True, denied=False, matched_policy="", denial_reason="")
+            return AuthzResult(
+                allowed=False,
+                denied=True,
+                matched_policy="",
+                denial_reason="test deny",
+                denied_by="",
+                effective_policies=[],
+            )
+        return AuthzResult(
+            allowed=True,
+            denied=False,
+            matched_policy="",
+            denial_reason="",
+            denied_by="",
+            effective_policies=[],
+        )
 
     with patch("syntara.workflows.services.execution_service.authorize", side_effect=_deny_script_execute):
         response = await auth_client.post(

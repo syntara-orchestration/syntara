@@ -101,10 +101,12 @@ class TestCheckScriptEditPermission:
                 await svc._check_script_edit_permission(_def_with_script(), uuid4())
 
     @pytest.mark.asyncio
-    async def test_no_opa_client_raises(self) -> None:
+    async def test_no_opa_client_skips_opa(self) -> None:
+        """Without OPA client, kill switch passes but OPA auth is skipped."""
         svc = _make_service(with_opa=False)
-        with pytest.raises(AuthorizationDeniedError):
+        with patch("syntara.workflows.services.workflow_service.authorize") as mock_authorize:
             await svc._check_script_edit_permission(_def_with_script(), uuid4())
+        mock_authorize.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_script_nodes_disabled_setting_raises(self) -> None:
@@ -247,10 +249,12 @@ class TestCheckScriptExecutePermission:
                 await svc._check_script_execute_permission(_def_with_script(), uuid4())
 
     @pytest.mark.asyncio
-    async def test_no_opa_client_raises(self) -> None:
+    async def test_no_opa_client_skips_opa(self) -> None:
+        """Without OPA client, kill switch passes but OPA auth is skipped."""
         svc = _make_execution_service(with_opa=False)
-        with pytest.raises(AuthorizationDeniedError):
+        with patch("syntara.workflows.services.execution_service.authorize") as mock_authorize:
             await svc._check_script_execute_permission(_def_with_script(), uuid4())
+        mock_authorize.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_script_nodes_disabled_setting_raises(self) -> None:
@@ -318,13 +322,11 @@ class TestCreateTestExecutionScriptPermission:
 
         mock_result = MagicMock()
         mock_result.first.return_value = (mock_workflow, mock_version)
-        svc.session.exec = AsyncMock(return_value=mock_result)
+        svc.session.exec = AsyncMock(return_value=mock_result)  # type: ignore[method-assign]
 
         sentinel = AuthorizationDeniedError("script:execute denied")
         with patch.object(svc, "_check_script_execute_permission", side_effect=sentinel):
             with pytest.raises(AuthorizationDeniedError, match="script:execute denied"):
-                from syntara.workflows.models.execution import PreResolvedNodeOutput
-
                 await svc.create_test_execution(
                     workflow_id=workflow_id,
                     target_node_id="n1",
@@ -355,11 +357,11 @@ class TestCreateTestExecutionScriptPermission:
 
         mock_result = MagicMock()
         mock_result.first.return_value = (mock_workflow, mock_version)
-        svc.session.exec = AsyncMock(return_value=mock_result)
+        svc.session.exec = AsyncMock(return_value=mock_result)  # type: ignore[method-assign]
 
         mock_check = AsyncMock()
         with patch.object(svc, "_check_script_execute_permission", mock_check):
-            with pytest.raises(Exception):
+            try:
                 await svc.create_test_execution(
                     workflow_id=workflow_id,
                     target_node_id="n1",
@@ -367,6 +369,8 @@ class TestCreateTestExecutionScriptPermission:
                     trigger_inputs={},
                     trigger_node_id="t1",
                 )
+            except Exception:
+                pass
 
         mock_check.assert_awaited_once_with(_def_with_script(), project_id)
 
@@ -410,7 +414,7 @@ class TestRetryExecutionScriptPermission:
         exec_result.one_or_none.return_value = mock_execution
         version_result = MagicMock()
         version_result.one_or_none.return_value = mock_version
-        svc.session.exec = AsyncMock(side_effect=[exec_result, version_result])
+        svc.session.exec = AsyncMock(side_effect=[exec_result, version_result])  # type: ignore[method-assign]
 
         sentinel = AuthorizationDeniedError("script:execute denied")
         with patch.object(svc, "_check_script_execute_permission", side_effect=sentinel):

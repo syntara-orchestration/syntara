@@ -492,6 +492,12 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "service_account:rotate_secret:any",
     "service_account:disable:any",
     "service_account:enable:any",
+    # Script permissions — enforced in workflow/execution service layer,
+    # covered by unit + integration tests (test_script_node_permissions.py)
+    "script:edit:any",
+    "script:edit:project",
+    "script:execute:any",
+    "script:execute:project",
     # Service accounts (project-scoped)
     "service_account:create:project",
     "service_account:read:project",

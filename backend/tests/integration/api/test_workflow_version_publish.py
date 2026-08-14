@@ -605,8 +605,22 @@ async def test_publish_with_script_node_denied_returns_403(jwt_client: AsyncClie
 
     async def _deny_script_edit(_db, _evaluator, request) -> AuthzResult:
         if request.resource_type == "script" and request.action == "edit":
-            return AuthzResult(allowed=False, denied=True, matched_policy="", denial_reason="test deny")
-        return AuthzResult(allowed=True, denied=False, matched_policy="", denial_reason="")
+            return AuthzResult(
+                allowed=False,
+                denied=True,
+                matched_policy="",
+                denial_reason="test deny",
+                denied_by="",
+                effective_policies=[],
+            )
+        return AuthzResult(
+            allowed=True,
+            denied=False,
+            matched_policy="",
+            denial_reason="",
+            denied_by="",
+            effective_policies=[],
+        )
 
     with patch("syntara.workflows.services.workflow_service.authorize", side_effect=_deny_script_edit):
         response = await jwt_client.post(
