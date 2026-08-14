@@ -27,7 +27,7 @@ from syntara.workflows.workflow_engine.activities.manual_trigger import manual_t
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.interceptors.auth_interceptor import WorkflowAuthInterceptor
 from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -111,7 +111,7 @@ class TestWorkflowAuthIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=TASK_QUEUE,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=_TEST_ACTIVITIES,
             interceptors=[WorkflowAuthInterceptor()],
         ):
@@ -162,7 +162,7 @@ class TestWorkflowAuthIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=TASK_QUEUE,
-            workflows=[ScheduledWorkflowLauncher, NexusWorkflow],
+            workflows=[ScheduledWorkflowLauncher, OrchestratorWorkflow],
             activities=_SCHEDULE_TEST_ACTIVITIES,
             interceptors=[WorkflowAuthInterceptor()],
         ):
@@ -202,7 +202,7 @@ class TestWorkflowAuthIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=TASK_QUEUE,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=_TEST_ACTIVITIES,
             interceptors=[WorkflowAuthInterceptor()],
         ):
@@ -229,7 +229,7 @@ class TestWorkflowAuthIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=TASK_QUEUE,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=_TEST_ACTIVITIES,
             interceptors=[WorkflowAuthInterceptor()],
         ):
