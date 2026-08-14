@@ -15,6 +15,7 @@ import {
   filterNoisyBaselineDiffs,
   formatRatio,
   isUnchangedDialogBackdropDiff,
+  largestBrightUnchangedCard,
   shouldKeepDiff,
   summarizeResults,
   type ClassifyResult,
@@ -132,6 +133,15 @@ describe('shouldKeepDiff', () => {
 })
 
 describe('isUnchangedDialogBackdropDiff', () => {
+  it('returns no card when image sizes differ', () => {
+    expect(
+      largestBrightUnchangedCard(
+        { width: 1, height: 1, data: solidRgba(1, 1, 250, 250, 250) },
+        { width: 2, height: 1, data: solidRgba(2, 1, 250, 250, 250) }
+      )
+    ).toBeNull()
+  })
+
   it('detects an unchanged centered card with backdrop-only edits', () => {
     const w = 40
     const h = 30

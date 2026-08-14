@@ -160,8 +160,6 @@ export type OverlayCard = {
   y0: number
   x1: number
   y1: number
-  /** 1 if the pixel is in the largest bright-unchanged component */
-  membership: Uint8Array
 }
 
 /**
@@ -192,7 +190,6 @@ export function largestBrightUnchangedCard(oldPng: DecodedPng, newPng: DecodedPn
   for (let start = 0; start < n; start++) {
     if (visited[start] || !isSeed(start)) continue
 
-    const membership = new Uint8Array(n)
     const stack = [start]
     visited[start] = 1
     let count = 0
@@ -203,7 +200,6 @@ export function largestBrightUnchangedCard(oldPng: DecodedPng, newPng: DecodedPn
 
     while (stack.length > 0) {
       const i = stack.pop()!
-      membership[i] = 1
       count++
       const x = i % width
       const y = (i / width) | 0
@@ -226,7 +222,7 @@ export function largestBrightUnchangedCard(oldPng: DecodedPng, newPng: DecodedPn
     }
 
     if (!best || count > best.pixelCount) {
-      best = { pixelCount: count, x0, y0, x1, y1, membership }
+      best = { pixelCount: count, x0, y0, x1, y1 }
     }
   }
 
@@ -506,7 +502,7 @@ export function printSummary(summary: FilterSummary, dryRun: boolean): void {
   }
 
   printGroup('KEPT (meaningful)', summary.kept)
-  printGroup('RESTORED (noise)', summary.restored)
+  printGroup('RESTORED', summary.restored)
   printGroup('NEW', summary.newFiles)
   console.log('')
 }
