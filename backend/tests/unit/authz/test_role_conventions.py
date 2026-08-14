@@ -247,8 +247,7 @@ class TestRegistryIntegrity:  # noqa: D101
         )
 
         e2e_covered = {
-            c.policy
-            for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
+            c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
         }
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
         all_builtin = {p.name for p in BUILTIN_POLICIES}

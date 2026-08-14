@@ -193,13 +193,9 @@ class TestOwnScopeEdgeCases:
         # Now revoke project-user from project A and verify they can't update
         # even though they have credential:update:own in project B
         assignments = admin_api.projects.list_role_assignments(project_id=proj_a_id).assert_and_get()
-        user_assignment = next(
-            (a for a in assignments.resources if str(a.principal_id) == str(user_id)), None
-        )
+        user_assignment = next((a for a in assignments.resources if str(a.principal_id) == str(user_id)), None)
         if user_assignment:
-            admin_api.projects.delete_role_assignment(
-                project_id=proj_a_id, assignment_id=user_assignment.id
-            )
+            admin_api.projects.delete_role_assignment(project_id=proj_a_id, assignment_id=user_assignment.id)
 
         # User attempts to update the project-A credential
         # They own it, but their credential:update:own policy is in project B,

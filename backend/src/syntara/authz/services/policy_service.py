@@ -530,9 +530,7 @@ class PolicyService(BaseService):
         reads = []
         for p in BUILTIN_POLICIES:
             scope_matches = (
-                not effective_scope
-                or p.scope == effective_scope
-                or (effective_scope == "project" and p.scope == "own")
+                not effective_scope or p.scope == effective_scope or (effective_scope == "project" and p.scope == "own")
             )
             if not scope_matches:
                 continue
