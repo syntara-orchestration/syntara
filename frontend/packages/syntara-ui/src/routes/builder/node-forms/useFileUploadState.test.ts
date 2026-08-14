@@ -636,4 +636,66 @@ describe('useFileUploadState', () => {
       expect(removeFile).toHaveBeenCalledWith('session-file-1')
     })
   })
+
+  it('multi-file replace marks all batch chips as deleting up front', async () => {
+    const deleteResolvers: Array<() => void> = []
+    vi.mocked(deleteFileById).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deleteResolvers.push(() => resolve())
+        })
+    )
+
+    const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
+      initialProps: { ctx: createFileContext([]) },
+    })
+
+    await uploadSessionFile(result, 'A.pdf', 'session-a')
+    await uploadSessionFile(result, 'B.pdf', 'session-b')
+
+    const sessionA: UploadedFile = {
+      id: 'session-a',
+      file: new File(['a'], 'A.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    const sessionB: UploadedFile = {
+      id: 'session-b',
+      file: new File(['b'], 'B.pdf', { type: 'application/pdf' }),
+      progress: 100,
+      status: 'success',
+    }
+    rerender({ ctx: createFileContext([sessionA, sessionB]) })
+
+    act(() => {
+      result.current.handleFilesSelected([
+        new File(['a2'], 'A.pdf', { type: 'application/pdf' }),
+        new File(['b2'], 'B.pdf', { type: 'application/pdf' }),
+      ])
+    })
+
+    await waitFor(() => {
+      expect(result.current.deletingFileIds.has('session-a')).toBe(true)
+      expect(result.current.deletingFileIds.has('session-b')).toBe(true)
+    })
+
+    act(() => {
+      deleteResolvers[0]?.()
+    })
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('session-b')
+    })
+    expect(result.current.deletingFileIds.has('session-b')).toBe(true)
+
+    uploadFiles.mockResolvedValue({
+      files: [{ file_id: 'session-a-2' }, { file_id: 'session-b-2' }],
+    })
+    act(() => {
+      deleteResolvers[1]?.()
+    })
+    await waitFor(() => {
+      expect(removeFile).toHaveBeenCalledWith('session-a')
+      expect(removeFile).toHaveBeenCalledWith('session-b')
+    })
+  })
 })

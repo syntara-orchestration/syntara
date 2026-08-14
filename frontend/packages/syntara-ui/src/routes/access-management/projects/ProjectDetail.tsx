@@ -284,8 +284,8 @@ export function ProjectDetail() {
               <ListItem>All workflows in this project will be permanently deleted.</ListItem>
               <ListItem>All project role assignments will be removed.</ListItem>
               <ListItem>
-                Uploaded files are retained after project deletion. Removing them currently requires known file IDs or
-                an out-of-band administrator process.
+                Uploaded files are kept after the project is deleted. There is no in-product list or delete flow for
+                them yet.
               </ListItem>
             </List>
           </StackItem>

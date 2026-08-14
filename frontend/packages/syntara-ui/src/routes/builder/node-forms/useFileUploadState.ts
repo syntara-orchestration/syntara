@@ -158,12 +158,27 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
               return
             }
 
-            // Sequential DELETEs; defer all UI clears until the batch succeeds.
-            // On first failure: stop further DELETEs, clear + unlock successes, inform user, abort upload.
-            const deletedSuccessfully: UploadedFile[] = []
+            // Mark ALL session replacements as deleting up front so every chip in
+            // the batch shows the spinner immediately, not just the one currently
+            // being deleted.
             for (const file of sessionReplacements) {
-              const deleted = await deleteSessionBlob(file.id, file.file.name)
-              if (!deleted) {
+              beginDeleting(file.id)
+            }
+
+            // Sequential DELETEs; defer all UI clears until the batch succeeds.
+            // On first failure: stop further DELETEs, unlock remaining + successes, inform user, abort upload.
+            const deletedSuccessfully: UploadedFile[] = []
+            for (let i = 0; i < sessionReplacements.length; i++) {
+              const file = sessionReplacements[i]
+              try {
+                await deleteFileById(file.id)
+                deletedSuccessfully.push(file)
+              } catch {
+                showError({ title: `Unable to delete ${file.file.name}. Please try again.` })
+                clearDeletingState(file.id)
+                for (let j = i + 1; j < sessionReplacements.length; j++) {
+                  clearDeletingState(sessionReplacements[j].id)
+                }
                 for (const removed of deletedSuccessfully) {
                   removeLocalFile(removed.id)
                   clearDeletingState(removed.id)
@@ -176,7 +191,6 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
                 }
                 return
               }
-              deletedSuccessfully.push(file)
             }
 
             for (const file of deletedSuccessfully) {
@@ -236,7 +250,8 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
       removeFilesByName,
       completedFiles,
       sessionUploadedIds,
-      deleteSessionBlob,
+      beginDeleting,
+      clearDeletingState,
       clearSessionUploadId,
       removeLocalFile,
       showError,
@@ -281,6 +296,7 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
       removeLocalFile,
       deleteSessionBlob,
       clearDeletingState,
+      showError,
       showSuccess,
     ]
   )
