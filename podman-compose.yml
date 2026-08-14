@@ -167,6 +167,9 @@ services:
       - APP_AAP_TOKEN=${APP_AAP_TOKEN}
       - APP_AAP_VERIFY_SSL=${APP_AAP_VERIFY_SSL:-true}
       - APP_AAP_PROXY_TIMEOUT_SECONDS=${APP_AAP_PROXY_TIMEOUT_SECONDS:-30}
+      # Default allows the bundled test MCP server (reachable as mcp-server:8765 on the
+      # compose network) so `make dev`/full-stack works out of the box, matching CI/E2E.
+      - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_JWT_PRIVATE_KEY_PATH=/run/secrets/jwt-primary.pem
       - APP_JWT_BACKUP_KEYS=[{"key_id":"orchestrator-backup","key_path":"/run/secrets/jwt-backup.pem"}]
       - APP_CORS_ALLOW_ORIGINS=${APP_CORS_ALLOW_ORIGINS:-["http://localhost:8080","https://localhost:8080","http://localhost:5173","https://localhost:5173"]}
@@ -179,6 +182,8 @@ services:
       - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
       - APP_S2S_TLS_CN_ALLOWLIST=["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc"]
       - APP_BACKGROUND_TASK_QUEUE=orchestrator-background-queue
+      # Docs off by default; enable for DAST / local container debugging.
+      - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-false}
     volumes:
       - ./backend/src:/opt/app-root/src/src:z
       - syntara_audit_exports:/data/audit-exports:z
@@ -233,6 +238,7 @@ services:
       - APP_TEMPORAL_ADDRESS=temporal:7233
       - APP_TEMPORAL_NAMESPACE=default
       - APP_TASK_QUEUE=orchestrator-workflow-queue
+      - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis
@@ -248,6 +254,10 @@ services:
       - APP_AAP_TIMEOUT_SECONDS=${APP_AAP_TIMEOUT_SECONDS:-3600}
       - APP_AAP_POLL_INTERVAL_SECONDS=${APP_AAP_POLL_INTERVAL_SECONDS:-5.0}
       - APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS=${APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS:-[]}
+      # Must match the API (syntara) service: the execution-time integration SSRF check
+      # runs here in the worker (LLM invoke, MCP connect, AAP resolve). Without the same
+      # allowlist, a base_url the API accepted at write time is rejected at run time.
+      - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_AAP_VERIFY_SSL=${APP_AAP_VERIFY_SSL:-true}
       - APP_SEGMENT_WRITE_KEY=${APP_SEGMENT_WRITE_KEY}
       - APP_SEGMENT_ENDPOINT=${APP_SEGMENT_ENDPOINT:-http://mock-segment:9999}
@@ -315,6 +325,10 @@ services:
       - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000/api/v1}
       - APP_APPROVALS_API_BASE_URL=${APP_APPROVALS_API_BASE_URL:-https://syntara:8000/api/v1}
       - APP_TOOL_MANAGER_BASE_URL=${APP_TOOL_MANAGER_BASE_URL:-https://syntara:8000/api/v1}
+      # Must match the API (syntara) service: the execution-time integration SSRF check
+      # runs in the workers, so a base_url the API accepted at write time is not rejected
+      # at run time.
+      - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_SEGMENT_WRITE_KEY=${APP_SEGMENT_WRITE_KEY}
       - APP_SEGMENT_ENDPOINT=${APP_SEGMENT_ENDPOINT:-http://mock-segment:9999}
       - APP_ENTITLEMENT_ID=${APP_ENTITLEMENT_ID}

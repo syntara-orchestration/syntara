@@ -318,12 +318,17 @@ def syntara_api_admin_group_id(syntara_api: SyntaraApiRegistry) -> UUID:
 
 
 @pytest.fixture(scope="session")
-def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
-    """Return the ID of the shared MCP server Integration used by E2E tests.
+def require_mcp_server() -> None:
+    """Skip the test unless the bundled MCP test server is deployed in this environment.
 
-    Checks that the MCP server is reachable, then either finds an existing
-    Integration named MCP_PROVIDER_NAME or creates one.  Both validate and
-    refresh_resources are synchronous — status is final when they return.
+    Health-checks ``MCP_HEALTH_URL`` and skips on failure. Reachability here is the
+    signal for "the MCP test infra is present", which in every environment that
+    provisions it (podman-compose, CI) coincides with ``mcp-server`` being in
+    ``APP_INTEGRATION_URL_ALLOWED_HOSTS``. Deployments without the test server (e.g. the
+    AAP/AO environment) leave that allowlist at its empty default, so tests that need an
+    allowlisted-but-unreachable host would otherwise fail the write-time SSRF check with
+    422. Depend on this fixture (and mark the test ``@pytest.mark.mcp``) to skip cleanly
+    there, matching how the rest of the MCP-dependent suite behaves.
     """
     try:
         resp = httpx.get(MCP_HEALTH_URL, timeout=5, verify=e2e_ssl_context())
@@ -331,6 +336,15 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
     except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         pytest.skip(f"MCP server not reachable at {MCP_HEALTH_URL}: {exc}")
 
+
+@pytest.fixture(scope="session")
+def mcp_integration_id(syntara_api: SyntaraApiRegistry, require_mcp_server: None) -> str:
+    """Return the ID of the shared MCP server Integration used by E2E tests.
+
+    Skips (via ``require_mcp_server``) when the MCP server is unreachable, then either
+    finds an existing Integration named MCP_PROVIDER_NAME or creates one.  Both validate
+    and refresh_resources are synchronous — status is final when they return.
+    """
     integrations_resp = syntara_api.integrations.list(integration_type=IntegrationType.MCP_SERVER)
     integrations_list = integrations_resp.assert_and_get()
 

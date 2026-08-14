@@ -1,4 +1,4 @@
-package syntara.authz
+package orchestrator.authz
 import rego.v1
 
 default allow := false

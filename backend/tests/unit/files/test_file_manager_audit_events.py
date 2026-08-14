@@ -59,7 +59,7 @@ class TestFileManagerAuditEvents:
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
         file_manager._retriever = mock_retriever
 
         # Act
@@ -109,7 +109,7 @@ class TestFileManagerAuditEvents:
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
         file_manager._retriever = mock_retriever
 
         # Act

@@ -110,7 +110,7 @@ class TestExecutionTimeScopeViolation:
                 name=unique_name("e2e-scope-violation"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-scope-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )
@@ -196,7 +196,7 @@ class TestNarrowGlobalToProjectScoped:
                 name=unique_name("e2e-narrow-scope"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-narrow-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.GLOBAL,
             )
@@ -316,7 +316,7 @@ class TestExecutionTimeIntegrationStateErrors:
                 name=unique_name("e2e-disabled-integ"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-disabled-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )
@@ -394,7 +394,7 @@ class TestExecutionTimeIntegrationStateErrors:
                 name=unique_name("e2e-deleted-integ"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-deleted-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )

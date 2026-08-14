@@ -21,7 +21,7 @@ def _make_metadata(
         filename="test.pdf",
         mime_type="application/pdf",
         size_bytes=100,
-        file_path="nexus-abc-test.pdf",
+        file_path="orchestrator-abc-test.pdf",
         status=file_status,
         conversion_error=conversion_error,
     )
@@ -39,7 +39,7 @@ class TestFileDetailEndpoint:
             filename="report.pdf",
             mime_type="application/pdf",
             size_bytes=524288,
-            file_path="/storage/nexus-abc-report.pdf",
+            file_path="/storage/orchestrator-abc-report.pdf",
             status=FileStatus.CONVERTED,
         )
 
@@ -85,7 +85,7 @@ class TestFileDetailEndpoint:
             filename="bad.docx",
             mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             size_bytes=1024,
-            file_path="/storage/nexus-abc-bad.docx",
+            file_path="/storage/orchestrator-abc-bad.docx",
             status=FileStatus.CONVERSION_FAILED,
             conversion_error="The file appears to be corrupted",
         )
@@ -112,7 +112,7 @@ class TestFileDetailEndpoint:
             filename="uploading.pdf",
             mime_type="application/pdf",
             size_bytes=2048,
-            file_path="/storage/nexus-abc-uploading.pdf",
+            file_path="/storage/orchestrator-abc-uploading.pdf",
             status=FileStatus.PENDING_CONVERSION,
         )
 

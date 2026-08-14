@@ -41,6 +41,8 @@ class MetricType(StrEnum):
     CACHE_MISS = "cache_miss"
     CACHE_LOOKUP_DURATION = "cache_lookup_ms"
     CACHE_UTILIZATION = "cache_utilization_ratio"
+    CACHE_POOL_RETRY = "cache_pool_retry_total"
+    CACHE_POOL_RETRY_BACKOFF_DURATION = "cache_pool_retry_backoff_duration_ms"
 
     # Workflow Metrics (FR-014 to FR-017)
     WORKFLOW_DURATION = "workflow_duration_ms"
@@ -137,6 +139,8 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.CACHE_MISS,
         MetricType.CACHE_LOOKUP_DURATION,
         MetricType.CACHE_UTILIZATION,
+        MetricType.CACHE_POOL_RETRY,
+        MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION,
     ],
     MetricsCategoryType.WORKFLOW: [
         MetricType.WORKFLOW_DURATION,

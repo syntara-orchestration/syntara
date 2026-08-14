@@ -160,6 +160,26 @@ class TestResolveLlmModelAndIntegration:
             await executor._resolve_llm_model_and_integration(model_id)
 
     @pytest.mark.asyncio
+    @pytest.mark.ssrf_enforced
+    async def test_rejects_metadata_base_url_before_dispatch(self) -> None:
+        """Request-time SSRF re-check blocks a rebound/metadata base_url before any LLM call.
+
+        A stored base_url pointing at the cloud-metadata IP (169.254.169.254) passes
+        the format-only model validators but must be rejected by the request-time
+        SSRF re-check. Marked ``ssrf_enforced`` so the real check runs (the autouse
+        bypass fixture is disabled). If the ``validate_integration_configuration_no_ssrf``
+        call is removed from the resolver, this test fails because the metadata base_url
+        would be returned for a live LLM request instead of raising.
+        """
+        executor, session = _make_executor()
+        mock_model, mock_integration = _mock_model_and_integration(base_url="https://169.254.169.254")
+        session.get = _session_get_dispatch(mock_model, mock_integration)
+
+        model_id = str(uuid4())
+        with pytest.raises(LLMConfigurationError, match="not permitted by SSRF policy"):
+            await executor._resolve_llm_model_and_integration(model_id)
+
+    @pytest.mark.asyncio
     async def test_not_llm_provider(self) -> None:
         executor, session = _make_executor()
         mock_model, mock_integration = _mock_model_and_integration(

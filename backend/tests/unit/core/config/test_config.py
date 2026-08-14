@@ -256,6 +256,40 @@ class TestDatabaseSSLSettings:
 
 
 # =============================================================================
+# CacheSettings Tests
+# =============================================================================
+
+
+class TestCacheSettings:
+    """Tests for CacheSettings (Redis) configuration."""
+
+    def test_cache_defaults(self) -> None:
+        """Default pool size is 50 — large enough for concurrent workflow workers."""
+        settings = Settings()
+        assert settings.cache_host == "localhost"
+        assert settings.cache_port == 6379
+        assert settings.cache_connection_pool_size == 50
+
+    def test_cache_connection_pool_size_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", "100")
+        settings = Settings()
+        assert settings.cache_connection_pool_size == 100
+
+    @pytest.mark.parametrize("pool_size", ["0", "-1", "-50"])
+    def test_cache_connection_pool_size_rejects_non_positive(
+        self, monkeypatch: pytest.MonkeyPatch, pool_size: str
+    ) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", pool_size)
+        with pytest.raises(ValidationError, match="must be at least 1"):
+            Settings()
+
+    def test_cache_connection_pool_size_accepts_one(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", "1")
+        settings = Settings()
+        assert settings.cache_connection_pool_size == 1
+
+
+# =============================================================================
 # AuditDatabaseSettings SSL Tests
 # =============================================================================
 

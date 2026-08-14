@@ -156,7 +156,7 @@ PENDING_CONVERSION → CONVERTING → CONVERTED
 1. Upload sets `status = PENDING_CONVERSION`; router dispatches the Temporal workflow
 2. Activity starts: `DocumentConversionService` loads the file from S3 via `FileManager.get_retriever()` and sets `status = CONVERTING`
 3. Content is converted to markdown by the appropriate converter (selected by MIME type via `ConverterRegistry`)
-4. Converted markdown is saved back to S3 as a separate object (`nexus-{file_id}-content.md`)
+4. Converted markdown is saved back to S3 as a separate object (`orchestrator-{file_id}-content.md`)
 5. `FileMetadata.converted_content_path` is updated and `status = CONVERTED`
 6. `FileConvertedEvent` is dispatched; on failure, `status = CONVERSION_FAILED`
 

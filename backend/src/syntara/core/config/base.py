@@ -220,17 +220,18 @@ class OpenAPIValidationSettings(BaseSettings):
 class APIDocsSettings(BaseSettings):
     """API documentation endpoint configuration.
 
-    Controls whether Swagger UI (/docs), ReDoc (/redoc), and the raw
-    OpenAPI JSON (/openapi.json) endpoints are served. Disabled by
-    default so production deployments do not expose the API schema.
+    Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
+    endpoints are served at /api_docs/v1/. A convenience redirect
+    from /docs is also registered. Disabled by default so production
+    deployments do not expose the API schema.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
         default=False,
-        description="Serve OpenAPI documentation endpoints (/docs, /redoc, /openapi.json). "
-        "Enable for development environments.",
+        description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
+        "(docs, redoc, openapi.json). Enable for development environments.",
     )
 
     enable_try_it_out: bool = Field(
@@ -303,9 +304,19 @@ class CacheSettings(BaseSettings):
     )
 
     cache_connection_pool_size: int = Field(
-        default=10,
-        description="Maximum number of cache connections in pool",
+        default=50,
+        description=(
+            "Maximum number of cache connections in pool. Workflow workers with high concurrency may need larger pools."
+        ),
     )
+
+    @field_validator("cache_connection_pool_size")
+    @classmethod
+    def _validate_cache_connection_pool_size(cls, v: int) -> int:
+        if v < 1:
+            msg = "cache_connection_pool_size must be at least 1"
+            raise ValueError(msg)
+        return v
 
 
 # =============================================================================
@@ -702,6 +713,14 @@ class ServerSettings(BaseSettings):
         description="Hostnames that workflow HTTP request nodes are permitted to target "
         "despite resolving to private IPs. Set via APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS "
         "as a JSON array.",
+    )
+
+    integration_url_allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description="Hostnames that integration base_url fields are permitted to use "
+        "despite resolving to private or loopback IPs (e.g. add 'localhost' to allow a "
+        "local MCP server). Cloud metadata endpoints are always blocked regardless of "
+        "this allowlist. Set via APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
     )
 
 
@@ -1449,6 +1468,17 @@ class WorkflowEngineSettings(BaseSettings):
         default=32768,
         description="Maximum length per environment variable in bytes (32KB)",
         ge=1024,
+    )
+
+    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
+    # directly in the Temporal worker process without additional sandboxing. Enabling this
+    # grants any user with workflow:create + execution:run permissions the ability
+    # to run arbitrary commands on the worker infrastructure, with access to all
+    # environment variables.
+    # Enabling Script Node is not recommended for production deployments.
+    script_nodes_enabled: bool = Field(
+        default=False,
+        description="Enable Script node execution in workflows (Developer Preview)",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

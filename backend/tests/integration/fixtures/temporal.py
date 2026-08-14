@@ -40,10 +40,15 @@ async def _create_temporal_worker(
 ) -> AsyncGenerator[Worker, None]:
     """Start a Temporal worker with all registered activities."""
     import syntara.settings.cache.settings_cache as _settings_mod
+    from syntara.core.config.base import get_settings
     from tests.fixtures.settings import FakeSettingsCache
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
+
+    settings = get_settings()
+    original_script_nodes = settings.script_nodes_enabled
+    object.__setattr__(settings, "script_nodes_enabled", True)
 
     try:
         async with Worker(
@@ -54,6 +59,7 @@ async def _create_temporal_worker(
         ) as worker:
             yield worker
     finally:
+        object.__setattr__(settings, "script_nodes_enabled", original_script_nodes)
         _settings_mod._runtime_settings = original
 
 
