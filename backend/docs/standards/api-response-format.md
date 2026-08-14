@@ -539,7 +539,37 @@ class CredentialListParams(BaseListParams):
 
 The params model is injected via `Depends()` in the router. Filter parameters
 arrive through `request.query_params.items()` and are parsed by the service
-layer via `parse_filters()`:
+layer via `parse_filters()`.
+
+**Important:** `request.query_params` contains the entire raw query string —
+including domain-specific query params that the router already handles via
+`params.field_name`. These must be stripped before passing to the service,
+otherwise `parse_filters()` will reject them with a 422 "Invalid field" error
+(since they won't be in `__filterable_fields__`). Standard `BaseListParams`
+fields (`limit`, `cursor`, `sort`, `include_total`) are stripped automatically
+by `BaseService.list_resources()`.
+
+```python
+@router.get("")
+async def list_credentials(
+    request: Request,
+    service: Annotated[CredentialService, Depends(get_credential_service)],
+    params: Annotated[CredentialListParams, Depends()],
+) -> CredentialListResponse:
+    # Strip domain-specific query params before passing to parse_filters()
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k != "for_action"]
+    return await service.list_credentials(
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        query_params_items=filtered_query_params,
+        include_total=params.include_total,
+        for_action=params.for_action,
+    )
+```
+
+When a params model has no domain-specific fields (only inherits `BaseListParams`),
+no stripping is needed — pass `request.query_params.items()` directly:
 
 ```python
 @router.get("")
@@ -717,7 +747,7 @@ Each exclusion requires:
        """Paginated list response for my resources."""
    ```
 
-4. **Wire the router** — inject `Request` to pass raw query params for filter parsing. Non-filter params are passed as named kwargs; filter params flow through `query_params_items`:
+4. **Wire the router** — inject `Request` to pass raw query params for filter parsing. If the params model has domain-specific fields, strip them from `query_params_items` (see [Domain-Specific Query Parameters](#domain-specific-query-parameters)). Router functions use `get_` (matching the HTTP verb); service methods use `list_` (describing the domain action):
 
    ```python
    @router.get("", operation_id="get_my_resources")
@@ -733,7 +763,6 @@ Each exclusion requires:
            sort=params.sort,
            query_params_items=request.query_params.items(),
            include_total=params.include_total,
-           for_action=params.for_action,  # domain-specific query param (not a filter)
        )
    ```
 
@@ -780,7 +809,7 @@ Each exclusion requires:
    make gen-contracts
    ```
 
-6. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic:
+6. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic. Service methods use `list_` (domain action) rather than `get_` (HTTP verb):
 
    ```python
    async def list_my_resources(
@@ -792,6 +821,7 @@ Each exclusion requires:
        *,
        include_total: bool = False,
    ) -> MyResourceListResponse:
+       """Paginate, filter, and sort my resources."""
        return await self.list_resources(
            model=MyResource,
            response_type=MyResourceListResponse,
