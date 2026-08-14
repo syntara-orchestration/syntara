@@ -184,7 +184,7 @@ class TestProjectRoleAssignment:
 class TestExpiredCredentialMiddlewareRejection:
     """Middleware rejects pre-issued JWTs after the underlying credential expires."""
 
-    CREDENTIAL_LIFETIME_SECONDS = 15
+    CREDENTIAL_LIFETIME_SECONDS = 60
 
     def test_pre_issued_jwt_rejected_after_credential_expires(
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
