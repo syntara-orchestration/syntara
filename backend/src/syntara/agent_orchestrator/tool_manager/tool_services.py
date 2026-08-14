@@ -350,8 +350,24 @@ def _require_provisioned_tools_when_enabled(
     ``ToolSelectionUnavailableError`` (including selection IDs) so stream
     classification matches the selection-unavailable path.
     """
-    if not enabled_tools or provisioned_tools:
+    if not enabled_tools:
         return
+
+    # For SELECTED, "some tools provisioned" is only meaningful if the
+    # *selected* tools are among them. When a sibling tool provisions but
+    # the selected tool's integration soft-skipped, we must still fail with
+    # a diagnostic — not silently defer to _apply_tool_selection.
+    if provisioned_tools:
+        if tool_selection_strategy == "SELECTED" and tool_selections:
+            provisioned_ids = {
+                (t.metadata or {}).get("tool_id", "") for t in provisioned_tools
+            }
+            provisioned_ids.discard("")
+            if provisioned_ids & (tool_selections or set()):
+                return
+            # Fall through: selected tools missing despite other tools provisioning
+        else:
+            return
 
     enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
 

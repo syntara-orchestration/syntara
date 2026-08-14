@@ -30,6 +30,8 @@ from syntara.agent_orchestrator.exceptions import (
     CredentialResolutionError,
     InvocationCancelledError,
     LLMConfigurationError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
 )
 from syntara.agent_orchestrator.models import (
     Invocation,
@@ -502,7 +504,11 @@ class InvocationExecutor:
             if await self._fail_invocation_if_not_cancelled(
                 invocation.id,
                 completed_at=datetime.now(UTC),
-                error_message=f"{type(e).__name__}: {classify_streaming_error(e).detail}",
+                error_message=(
+                    f"{type(e).__name__}: {classify_streaming_error(e).detail}"
+                    if isinstance(e, (ToolDiscoveryError, ToolSelectionUnavailableError))
+                    else f"{type(e).__name__}: {e}"
+                ),
             ):
                 # Dispatch FAILED event
                 AuditEventDispatcher.dispatch(

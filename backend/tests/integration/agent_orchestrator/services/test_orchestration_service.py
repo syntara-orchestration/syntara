@@ -156,7 +156,7 @@ class TestOrchestrationServiceGetTools:
             mock_mcp_client_class.return_value = mock_mcp_instance
             mock_mcp_instance.get_tools = AsyncMock(return_value=[])  # No tools from MCP server
 
-            with pytest.raises(ToolDiscoveryError, match="none could be provisioned"):
+            with pytest.raises(ToolDiscoveryError, match="could not be provisioned"):
                 await orchestration_service._get_tools(session_id, invocation_id, execution_id)
 
             assert mock_mcp_client_class.called, "MultiServerMCPClient class should have been instantiated"
@@ -279,7 +279,7 @@ class TestOrchestrationServiceGetTools:
             mock_mcp_client_class.return_value = mock_mcp_instance
             mock_mcp_instance.get_tools = AsyncMock(side_effect=ConnectionError("Connection refused"))
 
-            with pytest.raises(ToolDiscoveryError, match="none could be provisioned"):
+            with pytest.raises(ToolDiscoveryError, match="could not be provisioned"):
                 await orchestration_service._get_tools(session_id, invocation_id, execution_id)
 
             # Verify the integration was NOT mutated
