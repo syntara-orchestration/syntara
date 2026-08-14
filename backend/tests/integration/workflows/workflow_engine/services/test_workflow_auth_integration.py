@@ -135,9 +135,8 @@ class TestWorkflowAuthIntegration:
                 task_queue=TASK_QUEUE,
             )
 
-            with pytest.raises(Exception, match="Workflow execution failed") as exc_info:
+            with pytest.raises(Exception, match="Unauthorized workflow execution"):
                 await asyncio.wait_for(handle.result(), timeout=10)
-            assert "Unauthorized" in str(exc_info.value.__cause__)
 
     async def test_create_schedule_fire_accepted_with_timestamp_suffix(
         self,
