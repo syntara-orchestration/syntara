@@ -20,11 +20,13 @@ Agentic activities allow workflows to leverage AI agents for complex reasoning, 
 **Use Case**: Quick research and summarization
 
 **Key Features**:
+
 - Single agentic task
 - Template variable substitution (`{{input.topic}}`)
 - Output mapping for structured results
 
 **Manual Testing**:
+
 ```bash
 # Execute with custom input
 curl -X POST http://localhost:8000/api/v1/workflows/executions \
@@ -46,11 +48,13 @@ curl -X POST http://localhost:8000/api/v1/workflows/executions \
 **Use Case**: Data preparation, AI analysis, and report generation
 
 **Key Features**:
+
 - Mixed executor types (script + agentic)
 - Data flow between activities
 - Output chaining (`{{activities.prepare_data.output.status}}`)
 
 **Manual Testing**:
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/workflows/executions \
   -H "Content-Type: application/json" \
@@ -69,12 +73,14 @@ curl -X POST http://localhost:8000/api/v1/workflows/executions \
 **Use Case**: Comprehensive analysis requiring multiple specialized AI agents
 
 **Key Features**:
+
 - Multiple agentic tasks in sequence
 - Different specialized agents for each phase
 - Progressive data enrichment
 - Cross-activity output references
 
 **Manual Testing**:
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/workflows/executions \
   -H "Content-Type: application/json" \
@@ -95,12 +101,14 @@ curl -X POST http://localhost:8000/api/v1/workflows/executions \
 **Use Case**: Concurrent research across technical, market, and regulatory domains
 
 **Key Features**:
+
 - Parallel execution of agentic tasks
 - Different specialized agents per branch
 - Final synthesis step combining all results
 - Demonstrates workflow concurrency
 
 **Manual Testing**:
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/workflows/executions \
   -H "Content-Type: application/json" \
@@ -121,12 +129,14 @@ curl -X POST http://localhost:8000/api/v1/workflows/executions \
 **Use Case**: Intelligent request routing to domain experts
 
 **Key Features**:
+
 - AI-powered classification
 - Conditional execution based on agent output
 - Dynamic agent selection
 - Demonstrates decision-making workflows
 
 **Manual Testing**:
+
 ```bash
 # Technical request
 curl -X POST http://localhost:8000/api/v1/workflows/executions \
@@ -159,13 +169,13 @@ All agentic tasks use the following configuration structure:
 task:
   executor: agentic
   parameters:
-    agent: production://agent-name        # Agent routing identifier
-    model: claude-3-5-sonnet-20241022     # AI model to use
-    prompt: |                              # Natural language prompt
+    agent: production://agent-name # Agent routing identifier
+    model: claude-3-5-sonnet-20241022 # AI model to use
+    prompt: | # Natural language prompt
       Task description with {{variables}}
-  inputs:                                  # Runtime input mapping
-    key: "{{expression}}"
-  outputs:                                 # Output extraction
+  inputs: # Runtime input mapping
+    key: '{{expression}}'
+  outputs: # Output extraction
     key: $.result.field
 ```
 
@@ -203,7 +213,7 @@ task:
   executor: agentic
   parameters:
     # ... parameters
-  timeout: PT5M                  # 5 minute timeout
+  timeout: PT5M # 5 minute timeout
   retryPolicy:
     maxAttempts: 3
     initialInterval: PT1S

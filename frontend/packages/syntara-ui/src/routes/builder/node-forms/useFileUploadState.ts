@@ -41,6 +41,9 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
   const deletingFileIdsRef = useRef<Set<string>>(new Set())
   /** Prevent overlapping select/replace pipelines from interleaving DELETEs and UI clears. */
   const selectionInFlightRef = useRef(false)
+  /** Stable ref for the external callback so beginDeleting/clearDeletingState can notify synchronously. */
+  const onDeletingFileIdsChangeRef = useRef(fileContext.onDeletingFileIdsChange)
+  onDeletingFileIdsChangeRef.current = fileContext.onDeletingFileIdsChange
   const { uploadFiles, progress, error } = useFileUploadWithProgress()
   const { showSuccess, showError } = useAlerts()
 
@@ -60,18 +63,17 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
   const beginDeleting = useCallback((fileId: string): boolean => {
     if (deletingFileIdsRef.current.has(fileId)) return false
     deletingFileIdsRef.current.add(fileId)
-    setDeletingFileIds((prev) => new Set(prev).add(fileId))
+    const next = new Set(deletingFileIdsRef.current)
+    setDeletingFileIds(next)
+    onDeletingFileIdsChangeRef.current?.(next)
     return true
   }, [])
 
   const clearDeletingState = useCallback((fileId: string) => {
     deletingFileIdsRef.current.delete(fileId)
-    setDeletingFileIds((prev) => {
-      if (!prev.has(fileId)) return prev
-      const next = new Set(prev)
-      next.delete(fileId)
-      return next
-    })
+    const next = new Set(deletingFileIdsRef.current)
+    setDeletingFileIds(next)
+    onDeletingFileIdsChangeRef.current?.(next)
   }, [])
 
   const clearSessionUploadId = useCallback((fileId: string) => {

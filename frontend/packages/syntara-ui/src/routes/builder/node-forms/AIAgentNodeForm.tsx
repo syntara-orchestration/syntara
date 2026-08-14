@@ -11,7 +11,7 @@ import {
 import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI, ToolManagerAPI } from '@syntara/contracts'
 import type { ReactNode } from 'react'
-import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control, UseFormSetValue } from 'react-hook-form'
 import { Controller, FormProvider, useForm, useFormContext, useFormState, useWatch } from 'react-hook-form'
 
@@ -375,7 +375,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   const [userFiles, setUserFiles] = useState<UploadedFile[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [markPersisted, setMarkPersisted] = useState<MarkPersistedFn | null>(null)
-  const [deletingFileIds, setDeletingFileIds] = useState<Set<string>>(() => new Set())
+  const deletingFileIdsRef = useRef<Set<string>>(new Set())
 
   const onMarkPersistedReady = useCallback((fn: MarkPersistedFn | null) => {
     // Functional update so a function value is stored, not invoked as a setState updater.
@@ -383,7 +383,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   }, [])
 
   const onDeletingFileIdsChange = useCallback((ids: Set<string>) => {
-    setDeletingFileIds(ids)
+    deletingFileIdsRef.current = ids
   }, [])
 
   const completedFiles = useMemo(() => {
@@ -428,18 +428,15 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   }
 
   const handleSubmit = (data: AIAgentFormData) => {
-    // Parse response schema (already validated by Zod superRefine)
     const trimmed = data.responseSchema?.trim()
     const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
-    // Exclude files with an in-flight DELETE — they may already be removed from S3
-    // even though the chip is still visible pending batch UI clear.
+    const currentDeletingIds = deletingFileIdsRef.current
     const fileIds: string[] = completedFiles
-      .filter((f) => f.status === 'success' && !deletingFileIds.has(f.id))
+      .filter((f) => f.status === 'success' && !currentDeletingIds.has(f.id))
       .map((f) => f.id)
 
     props.onSubmit({ ...data, fileIds, parsedResponseSchema })
-    // File IDs are now in durable node state — remove becomes detach-only (no hard DELETE).
     markPersisted?.(fileIds)
   }
 
@@ -478,7 +475,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   return (
     <AIAgentFileContext.Provider value={fileContextValue}>
       <FormProvider {...methods}>
-        <NodeFormContainer formId="ai-agent-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+        <NodeFormContainer formId="ai-agent-node-form" onSubmit={(e) => methods.handleSubmit(handleSubmit)(e)}>
           <AIAgentFormFields
             onHeaderContentChange={props.onHeaderContentChange}
             projectId={props.projectId}

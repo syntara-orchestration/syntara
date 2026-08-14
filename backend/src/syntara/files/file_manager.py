@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -514,6 +514,30 @@ class FileManager:
         result = await session.exec(select(Project).where(Project.id == project_id))
         project = result.one_or_none()
         return project is None or project.deleted_at is not None
+
+    async def batch_is_project_deleted(
+        self,
+        project_ids: set[UUID],
+        session: AsyncSession,
+    ) -> dict[UUID, bool]:
+        """Batch-check whether projects are soft-deleted or missing.
+
+        Returns a mapping of ``project_id → is_deleted``. Missing projects
+        (hard-deleted or never existed) are treated as deleted, matching the
+        single-lookup behaviour of ``is_project_deleted``.
+        """
+        if not project_ids:
+            return {}
+
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+
+        result = await session.exec(select(Project).where(col(Project.id).in_(project_ids)))
+        projects = {p.id: p for p in result.all()}
+
+        return {
+            pid: (pid not in projects or projects[pid].deleted_at is not None)
+            for pid in project_ids
+        }
 
     async def update_file_status(
         self,

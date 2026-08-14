@@ -341,18 +341,19 @@ async def get_files_metadata(
         db,
         allowed_projects=visibility.to_allowed_projects(),
     )
-    files_info: list[FileUploadInfo] = []
-    for m in metadata_list:
-        files_info.append(  # noqa: PERF401 (await inside loop — not a list comprehension candidate)
-            FileUploadInfo(
-                file_id=m.id,
-                filename=m.filename,
-                size_bytes=m.size_bytes,
-                mime_type=m.mime_type,
-                status=m.status,
-                is_project_deleted=await file_manager.is_project_deleted(m.project_id, db),
-            )
+    project_ids = {m.project_id for m in metadata_list}
+    project_deleted_map = await file_manager.batch_is_project_deleted(project_ids, db)
+    files_info = [
+        FileUploadInfo(
+            file_id=m.id,
+            filename=m.filename,
+            size_bytes=m.size_bytes,
+            mime_type=m.mime_type,
+            status=m.status,
+            is_project_deleted=project_deleted_map.get(m.project_id, True),
         )
+        for m in metadata_list
+    ]
     return FilesMetadataResponse(files=files_info)
 
 
