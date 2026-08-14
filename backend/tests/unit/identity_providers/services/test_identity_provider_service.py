@@ -480,11 +480,30 @@ def test_extract_group_mapping_entries_empty() -> None:
 def test_extract_group_mapping_entries_populated() -> None:
     """Extracting entries from config with entries returns them."""
     group_id = uuid4()
-    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", nexus_group_id=group_id)]
+    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", mapped_group_id=group_id)]
     config = _make_oidc_config(group_mapping_entries=entries_in)
     entries_out = IdentityProviderService._extract_group_mapping_entries(config)
     assert len(entries_out) == 1
     assert entries_out[0].idp_group_value == "role-a"
+
+
+@pytest.mark.asyncio
+async def test_save_group_mapping_entries_stores_entry_rows() -> None:
+    """_save_group_mapping_entries validates group existence and inserts mapping rows."""
+    mock_session = _make_mock_session()
+    provider_id = uuid4()
+    group_id = uuid4()
+
+    mock_result = MagicMock()
+    mock_result.all.return_value = [group_id]
+    mock_session.exec = AsyncMock(return_value=mock_result)
+
+    service = _make_service(mock_session)
+    entries = [OIDCGroupMappingEntry(idp_group_value="admins", mapped_group_id=group_id)]
+
+    await service._save_group_mapping_entries(provider_id, entries)
+
+    mock_session.add.assert_called_once()
 
 
 def test_extract_group_mapping_entries_empty_list() -> None:

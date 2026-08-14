@@ -33,6 +33,7 @@ import { NxPanel } from '../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -330,7 +331,8 @@ export function EditIntegrationForm() {
     setError,
     setValue,
     getValues,
-    formState: { errors },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<EditIntegrationFormValues>({
     resolver: zodResolver(schema, undefined, { mode: 'sync' }) as Resolver<EditIntegrationFormValues>,
     defaultValues: {
@@ -351,6 +353,13 @@ export function EditIntegrationForm() {
 
   const scope = useWatch({ control, name: 'scope' })
   const credentialId = useWatch({ control, name: 'management_credential_id' })
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
+  })
 
   const handleError = useFormMutationErrorHandler<EditIntegrationFormValues>(setError)
 
@@ -404,6 +413,7 @@ export function EditIntegrationForm() {
             variant,
             autoDismiss: true,
           })
+          dismiss()
           detachPromise(navigate({ to: detailPath }))
         } catch (error: unknown) {
           handleError({ title: 'Failed to update integration', context: `Integration "${values.name}"` })(error)

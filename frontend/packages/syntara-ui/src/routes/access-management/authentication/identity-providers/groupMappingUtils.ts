@@ -51,12 +51,12 @@ export function validateGroupJmespathExpression(expression: string): string | nu
 
 export type GroupMappingConfig = {
   group_jmespath_expression?: string | null
-  group_mapping_entries?: { idp_group_value: string; nexus_group_id: string }[]
+  group_mapping_entries?: { idp_group_value: string; mapped_group_id: string }[]
 }
 
 type GroupMappingConfigSource = {
   group_jmespath_expression?: string | null
-  group_mapping_entries?: { idp_group_value: string; nexus_group_id: string }[]
+  group_mapping_entries?: { idp_group_value: string; mapped_group_id: string }[]
 }
 
 export function buildGroupMappingConfig(config: GroupMappingConfigSource | undefined): GroupMappingConfig | null {
@@ -76,7 +76,7 @@ export function toFormEntries(config: GroupMappingConfig | null | undefined): Gr
   return config.group_mapping_entries.map((e) => ({
     key: nextKey(),
     idpGroupValue: e.idp_group_value,
-    nexusGroupId: e.nexus_group_id,
+    nexusGroupId: e.mapped_group_id,
   }))
 }
 
@@ -95,7 +95,7 @@ export function buildSavePayload(
       group_jmespath_expression: expression,
       group_mapping_entries: entries
         .filter((e) => e.idpGroupValue && e.nexusGroupId)
-        .map((e) => ({ idp_group_value: e.idpGroupValue, nexus_group_id: e.nexusGroupId })),
+        .map((e) => ({ idp_group_value: e.idpGroupValue, mapped_group_id: e.nexusGroupId })),
     },
   }
 }

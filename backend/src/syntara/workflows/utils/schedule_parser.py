@@ -5,7 +5,6 @@ expressions) into Temporal SDK ``ScheduleSpec`` and ``SchedulePolicy``
 objects used to create and manage Temporal Schedules.
 """
 
-import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -19,134 +18,18 @@ from temporalio.client import (
 )
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.utils.iso8601_interval import (
+    parse_iso8601_duration as parse_iso8601_duration,  # noqa: PLC0414 - re-exported for callers/tests
+)
+from syntara.workflows.utils.iso8601_interval import (
+    parse_iso8601_repeating_interval,
+    validate_calendar_step,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import MissedSchedulePolicy, ScheduleType
-
-# ISO 8601 repeating interval pattern: R[n]/<start>/<duration>[/<end>]
-# Examples: R/2024-01-01T10:00:00Z/P1D, R/2024-01-01T00:00:00Z/P7D/2024-12-31T23:59:59Z
-_REPEATING_INTERVAL_PATTERN = re.compile(
-    r"^R(\d+)?/"  # R[repetitions]/
-    r"([^/]+)/"  # ISO datetime start
-    r"(P[^/]+)"  # ISO 8601 duration
-    r"(?:/([^/]+))?$"  # optional /end
-)
-
-# ISO 8601 duration pattern: P[nY][nM][nW][nD][T[nH][nM][nS]]
-_DURATION_PATTERN = re.compile(
-    r"^P"
-    r"(?:(\d+)Y)?"
-    r"(?:(\d+)M)?"
-    r"(?:(\d+)W)?"
-    r"(?:(\d+)D)?"
-    r"(?:T"
-    r"(?:(\d+)H)?"
-    r"(?:(\d+)M)?"
-    r"(?:(\d+(?:\.\d+)?)S)?"
-    r")?$"
-)
 
 # Catchup window for missed schedule policies
 _CATCHUP_WINDOW_SKIP = timedelta(seconds=1)
 _CATCHUP_WINDOW_RECOVER = timedelta(hours=48)
-
-
-def parse_iso8601_duration(duration_str: str) -> timedelta:
-    """Parse an ISO 8601 duration string into a timedelta.
-
-    Supports fixed-length durations: P1D, P7D, P1W, PT1H, PT30M, PT1H30M,
-    and compound forms like P1DT12H30M.
-
-    Durations containing months or years (e.g. P1M, P1Y) are rejected because
-    they cannot be represented as a fixed timedelta.  Use calendar-based specs
-    or cron expressions for those intervals.
-
-    Args:
-        duration_str: ISO 8601 duration (e.g., "P1D", "PT1H30M").
-
-    Returns:
-        Equivalent timedelta.
-
-    Raises:
-        SafeValueError: If the duration string is invalid, empty, or contains
-            months/years.
-
-    """
-    match = _DURATION_PATTERN.match(duration_str)
-    if not match:
-        msg = f"Invalid ISO 8601 duration: '{duration_str}'"
-        raise SafeValueError(msg)
-
-    years = int(match.group(1) or 0)
-    months = int(match.group(2) or 0)
-    if years or months:
-        msg = (
-            f"Duration with months or years cannot be converted to a fixed timedelta: "
-            f"'{duration_str}'. Use a cron expression for calendar-based schedules."
-        )
-        raise SafeValueError(msg)
-
-    weeks = int(match.group(3) or 0)
-    days = int(match.group(4) or 0)
-    hours = int(match.group(5) or 0)
-    minutes = int(match.group(6) or 0)
-    seconds = float(match.group(7) or 0)
-
-    total = timedelta(
-        days=weeks * 7 + days,
-        hours=hours,
-        minutes=minutes,
-        seconds=seconds,
-    )
-
-    if total == timedelta():
-        msg = f"ISO 8601 duration must be non-zero: '{duration_str}'"
-        raise SafeValueError(msg)
-
-    return total
-
-
-def _parse_iso_datetime(dt_str: str) -> datetime:
-    """Parse an ISO 8601 datetime string to a timezone-aware datetime.
-
-    Raises:
-        SafeValueError: If the string is not valid ISO 8601 or lacks timezone info.
-
-    """
-    try:
-        dt = datetime.fromisoformat(dt_str)
-    except ValueError as e:
-        msg = f"Invalid ISO 8601 datetime: '{dt_str}'"
-        raise SafeValueError(msg) from e
-    if dt.tzinfo is None:
-        msg = f"Datetime must include timezone info: '{dt_str}'"
-        raise SafeValueError(msg)
-    return dt
-
-
-def _has_calendar_components(duration_str: str) -> tuple[int, int, bool]:
-    """Return (years, months, has_fixed) parsed from an ISO 8601 duration string.
-
-    ``has_fixed`` is True when the duration also contains weeks, days, hours,
-    minutes, or seconds alongside calendar components.
-
-    Returns (0, 0, False) when the duration contains no calendar components.
-    """
-    match = _DURATION_PATTERN.match(duration_str)
-    if not match:
-        return (0, 0, False)
-    years = int(match.group(1) or 0)
-    months = int(match.group(2) or 0)
-    # Groups 3-7: weeks, days, hours, minutes, seconds
-    has_fixed = bool(
-        int(match.group(3) or 0)
-        or int(match.group(4) or 0)
-        or int(match.group(5) or 0)
-        or int(match.group(6) or 0)
-        or float(match.group(7) or 0)
-    )
-    return (years, months, has_fixed)
-
-
-_REPRESENTABLE_MONTH_STEPS = frozenset({1, 2, 3, 4, 6})
 
 
 def _interval_to_calendar_spec(start: datetime, total_months: int) -> ScheduleCalendarSpec:
@@ -158,28 +41,17 @@ def _interval_to_calendar_spec(start: datetime, total_months: int) -> ScheduleCa
 
     Raises:
         SafeValueError: If *total_months* cannot be represented as a calendar
-            spec (e.g. 5, 7, or multi-year intervals).
+            spec (e.g. 5, 7, or multi-year intervals). See
+            ``iso8601_interval.validate_calendar_step`` for the shared check.
 
     """
-    if total_months < 12 and start.day > 28:  # noqa: PLR2004
-        msg = (
-            f"Day-of-month {start.day} is not valid for monthly schedules because "
-            "not all months have that many days. Use a start date with day <= 28, "
-            "or use a cron expression for more control."
-        )
-        raise SafeValueError(msg)
+    validate_calendar_step(start.day, total_months)
 
     if total_months == 12:  # noqa: PLR2004
         month_ranges: list[ScheduleRange] = [ScheduleRange(start.month)]
-    elif total_months in _REPRESENTABLE_MONTH_STEPS:
+    else:
         offset = ((start.month - 1) % total_months) + 1
         month_ranges = [ScheduleRange(offset, 12, step=total_months)]
-    else:
-        msg = (
-            f"Calendar interval of {total_months} months cannot be represented "
-            "as a schedule. Use 1, 2, 3, 4, 6, or 12 months, or a cron expression."
-        )
-        raise SafeValueError(msg)
 
     return ScheduleCalendarSpec(
         minute=[ScheduleRange(start.minute)],
@@ -192,12 +64,10 @@ def _interval_to_calendar_spec(start: datetime, total_months: int) -> ScheduleCa
 def parse_iso8601_interval(interval: str, tz: str | None = None) -> ScheduleSpec:
     """Parse an ISO 8601 repeating interval into a Temporal ScheduleSpec.
 
-    Supports formats:
-    - ``R/<start>/<duration>`` — repeat indefinitely from start
-    - ``R/<start>/<duration>/<end>`` — repeat from start until end
-
-    Finite repetition counts (e.g. ``R1``, ``R5``) are not supported.
-    Use an end date to limit the number of executions.
+    Delegates all parsing and semantic validation to
+    ``iso8601_interval.parse_iso8601_repeating_interval`` (the single source
+    of truth shared with ``ScheduledTriggerConfig.validate_interval_expression``)
+    and only builds Temporal SDK objects here.
 
     Durations containing months or years (e.g. P1M, P1Y) are automatically
     converted to calendar specs so Temporal can evaluate them with full
@@ -214,50 +84,25 @@ def parse_iso8601_interval(interval: str, tz: str | None = None) -> ScheduleSpec
         SafeValueError: If the interval string is invalid.
 
     """
-    match = _REPEATING_INTERVAL_PATTERN.match(interval)
-    if not match:
-        msg = f"Invalid ISO 8601 repeating interval: '{interval}'"
-        raise SafeValueError(msg)
+    parsed = parse_iso8601_repeating_interval(interval)
 
-    repetitions_str = match.group(1)
-    start_str = match.group(2)
-    duration_str = match.group(3)
-    end_str = match.group(4)
-
-    if repetitions_str:
-        msg = (
-            f"Finite repetition count R{repetitions_str} is not supported. "
-            "Set an end date to limit the number of executions."
-        )
-        raise SafeValueError(msg)
-
-    start_at = _parse_iso_datetime(start_str)
-    end_at = _parse_iso_datetime(end_str) if end_str else None
-
-    years, months, has_fixed = _has_calendar_components(duration_str)
-    if years or months:
-        if has_fixed:
-            msg = (
-                f"Mixed calendar and fixed durations are not supported: "
-                f"'{duration_str}'. Separate months/years from days/hours/minutes, "
-                "or use a cron expression."
-            )
-            raise SafeValueError(msg)
-        total_months = years * 12 + months
-        cal_spec = _interval_to_calendar_spec(start_at, total_months)
+    if parsed.calendar_months is not None:
+        cal_spec = _interval_to_calendar_spec(parsed.start_at, parsed.calendar_months)
         return ScheduleSpec(
             calendars=[cal_spec],
-            start_at=start_at,
-            end_at=end_at,
+            start_at=parsed.start_at,
+            end_at=parsed.end_at,
             time_zone_name=tz or "UTC",
         )
 
-    duration = parse_iso8601_duration(duration_str)
+    if parsed.duration is None:
+        msg = f"Invalid ISO 8601 repeating interval: '{interval}'"
+        raise SafeValueError(msg)
 
     return ScheduleSpec(
-        intervals=[ScheduleIntervalSpec(every=duration)],
-        start_at=start_at,
-        end_at=end_at,
+        intervals=[ScheduleIntervalSpec(every=parsed.duration)],
+        start_at=parsed.start_at,
+        end_at=parsed.end_at,
         time_zone_name=tz or "UTC",
     )
 
