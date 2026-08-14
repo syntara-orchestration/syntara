@@ -511,7 +511,7 @@ jobs:
         run: |
           password=$(cat backend/.secrets/admin-password)
           echo "::add-mask::$password"
-          echo "NEXUS_E2E_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "SYNTARA_E2E_PASSWORD=$password" >> "$GITHUB_ENV"
 
       - name: Install npm dependencies and Playwright browsers
         run: |
@@ -526,9 +526,9 @@ jobs:
         working-directory: frontend/packages/syntara-ui
         run: npm run e2e -- --timeout 120000
         env:
-          NEXUS_E2E_SKIP_WEB_SERVER: '1'
-          NEXUS_E2E_BASE_URL: http://localhost:8080
-          NEXUS_E2E_PASSWORD: ${{ env.NEXUS_E2E_PASSWORD }}
+          SYNTARA_E2E_SKIP_WEB_SERVER: '1'
+          SYNTARA_E2E_BASE_URL: http://localhost:8080
+          SYNTARA_E2E_PASSWORD: ${{ env.SYNTARA_E2E_PASSWORD }}
           SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}

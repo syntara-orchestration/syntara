@@ -53,12 +53,12 @@ npm run e2e
 Override ports if needed:
 
 ```bash
-NEXUS_E2E_PORT=5174 NEXUS_E2E_API_PORT=3301 npm run e2e
+SYNTARA_E2E_PORT=5174 SYNTARA_E2E_API_PORT=3301 npm run e2e
 ```
 
-**How the runner works:** `npm run e2e` executes `e2e/run-e2e.ts` via `tsx`, which probes for free ports (preferring 4173 / 3300, falling back to OS-assigned ports) and passes them to Playwright as `NEXUS_E2E_PORT`, `NEXUS_E2E_API_PORT`, and `NEXUS_E2E_BASE_URL`. This means stale processes on the default ports are never silently reused — Playwright always starts fresh servers on confirmed-free ports.
+**How the runner works:** `npm run e2e` executes `e2e/run-e2e.ts` via `tsx`, which probes for free ports (preferring 4173 / 3300, falling back to OS-assigned ports) and passes them to Playwright as `SYNTARA_E2E_PORT`, `SYNTARA_E2E_API_PORT`, and `SYNTARA_E2E_BASE_URL`. This means stale processes on the default ports are never silently reused — Playwright always starts fresh servers on confirmed-free ports.
 
-If you bypass the runner (e.g. `NEXUS_E2E_SKIP_WEB_SERVER=1`) and manage servers manually, make sure they are configured with `VITE_API_URL=http://localhost:<apiPort>` or API calls will return 404.
+If you bypass the runner (e.g. `SYNTARA_E2E_SKIP_WEB_SERVER=1`) and manage servers manually, make sure they are configured with `VITE_API_URL=http://localhost:<apiPort>` or API calls will return 404.
 
 ### Real Backend Mode
 
@@ -80,8 +80,8 @@ To test against the real Nexus backend instead of the mock API:
 3. **Run E2E tests** with web server auto-start disabled:
 
    ```bash
-   NEXUS_E2E_SKIP_WEB_SERVER=1 \
-     NEXUS_E2E_BASE_URL=http://localhost:5173 \
+   SYNTARA_E2E_SKIP_WEB_SERVER=1 \
+     SYNTARA_E2E_BASE_URL=http://localhost:5173 \
      npm run e2e
    ```
 
@@ -899,7 +899,7 @@ npx playwright test --grep "user creates"
 npx playwright test --headed
 
 # Real backend mode (see Prerequisites)
-NEXUS_E2E_SKIP_WEB_SERVER=1 NEXUS_E2E_BASE_URL=http://localhost:5173 npx playwright test
+SYNTARA_E2E_SKIP_WEB_SERVER=1 SYNTARA_E2E_BASE_URL=http://localhost:5173 npx playwright test
 ```
 
 ### Debugging Failures

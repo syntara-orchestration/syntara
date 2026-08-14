@@ -21,7 +21,7 @@ settings = get_settings()
 _UVICORN_LOGGER_NAMES = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 
-class NexusLogRecordRenderer(JSONRenderer):
+class SyntaraLogRecordRenderer(JSONRenderer):
     """Renderer that outputs JSON."""
 
     def __init__(self, **kwargs: Any) -> None:  # noqa: ANN401
@@ -57,7 +57,7 @@ class NexusLogRecordRenderer(JSONRenderer):
         return str(self._dumps(serializable_dict, **self._dumps_kw))
 
 
-def build_nexus_shared_formatters() -> list[Any]:
+def build_syntara_shared_formatters() -> list[Any]:
     """Build shared formatters for stdlib logging for structured logs."""
     return [
         structlog.contextvars.merge_contextvars,
@@ -68,32 +68,32 @@ def build_nexus_shared_formatters() -> list[Any]:
     ]
 
 
-def build_nexus_formatter() -> Formatter:
-    """Configure Nexus log formatter."""
+def build_syntara_formatter() -> Formatter:
+    """Configure Syntara log formatter."""
     if settings.log_output_format == "text":
-        return build_nexus_text_formatter()
-    return build_nexus_json_formatter()
+        return build_syntara_text_formatter()
+    return build_syntara_json_formatter()
 
 
-def build_nexus_text_formatter() -> Formatter:
+def build_syntara_text_formatter() -> Formatter:
     """Build a simple text formatter for plain text logging."""
     return structlog.stdlib.ProcessorFormatter(
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             structlog.dev.ConsoleRenderer(colors=False),
         ],
-        foreign_pre_chain=build_nexus_shared_formatters(),
+        foreign_pre_chain=build_syntara_shared_formatters(),
     )
 
 
-def build_nexus_json_formatter() -> Formatter:
-    """Build a JSON formatter using NexusLogRecordRenderer."""
+def build_syntara_json_formatter() -> Formatter:
+    """Build a JSON formatter using SyntaraLogRecordRenderer."""
     return structlog.stdlib.ProcessorFormatter(
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-            NexusLogRecordRenderer(),
+            SyntaraLogRecordRenderer(),
         ],
-        foreign_pre_chain=build_nexus_shared_formatters(),
+        foreign_pre_chain=build_syntara_shared_formatters(),
     )
 
 
@@ -108,22 +108,22 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "nexus": {
-                "()": "syntara.core.logging.logging.build_nexus_formatter",
+            "syntara": {
+                "()": "syntara.core.logging.logging.build_syntara_formatter",
             },
         },
         "handlers": {
-            "nexus": {
-                "formatter": "nexus",
+            "syntara": {
+                "formatter": "syntara",
                 "class": "logging.StreamHandler",
                 "stream": "ext://sys.stdout",
             },
         },
         "loggers": {
-            name: {"handlers": ["nexus"], "level": log_level, "propagate": False} for name in _UVICORN_LOGGER_NAMES
+            name: {"handlers": ["syntara"], "level": log_level, "propagate": False} for name in _UVICORN_LOGGER_NAMES
         },
         "root": {
-            "handlers": ["nexus"],
+            "handlers": ["syntara"],
             "level": log_level,
         },
     }
@@ -200,7 +200,7 @@ def configure_app_logging() -> None:
     """Configure structlog and stdlib logging for structured logs."""
     # Always attach stdout handler
     handler = logging.StreamHandler()
-    handler.setFormatter(build_nexus_formatter())
+    handler.setFormatter(build_syntara_formatter())
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
@@ -222,7 +222,7 @@ def configure_app_logging() -> None:
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
-            *build_nexus_shared_formatters(),
+            *build_syntara_shared_formatters(),
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
