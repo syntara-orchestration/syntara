@@ -62,6 +62,13 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
     MetricType.DATABASE_QUERY_RESPONSE_TIME: ("database_query_response_time_seconds", "histogram", ("table_name",)),
     MetricType.DATABASE_CONNECTION_POOL_UTILIZATION: ("database_connection_pool_utilization", "gauge", ()),
     MetricType.DATABASE_TRANSACTION_RATE: ("database_transaction_rate_tps", "gauge", ()),
+    # Cache (Redis) pool retry/backoff
+    MetricType.CACHE_POOL_RETRY: ("cache_pool_retry_total", "counter", ("operation", "outcome")),
+    MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION: (
+        "cache_pool_retry_backoff_duration_seconds",
+        "histogram",
+        ("operation",),
+    ),
     # System-Wide
     MetricType.SYSTEM_UPTIME: ("system_uptime", "gauge", ()),
     MetricType.SYSTEM_E2E_LATENCY: ("system_e2e_latency_seconds", "histogram", ()),

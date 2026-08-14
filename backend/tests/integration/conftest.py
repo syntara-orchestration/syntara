@@ -51,7 +51,7 @@ pytest_plugins = [
     "tests.integration.fixtures.users",
 ]
 
-_MOTO_BUCKET = "nexus-integration-test"
+_MOTO_BUCKET = "orchestrator-integration-test"
 _MOTO_REGION = "us-east-1"
 
 

@@ -55,7 +55,7 @@ class TestFileManagerAuditEvents:
             total = 0
             async for chunk in stream:
                 total += len(chunk)
-            return "nexus-uuid-test.pdf", total
+            return "orchestrator-uuid-test.pdf", total
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
@@ -107,7 +107,7 @@ class TestFileManagerAuditEvents:
             total = 0
             async for chunk in stream:
                 total += len(chunk)
-            return "nexus-uuid-test.pdf", total
+            return "orchestrator-uuid-test.pdf", total
 
         mock_files = []
         for i in range(3):

@@ -65,7 +65,7 @@ async def _consuming_save(stream: AsyncGenerator[bytes], path: str) -> tuple[str
     total = 0
     async for chunk in stream:
         total += len(chunk)
-    return f"nexus-uuid-{path}", total
+    return f"orchestrator-uuid-{path}", total
 
 
 def _make_mock_file(filename: str, content: bytes) -> Mock:
@@ -176,7 +176,7 @@ async def test_multiple_files_saved_successfully() -> None:
         total = 0
         async for _chunk in stream:
             total += len(_chunk)
-        return f"nexus-{call_count}-file.pdf", total
+        return f"orchestrator-{call_count}-file.pdf", total
 
     mock_retriever = AsyncMock()
     mock_retriever.save_file_stream = AsyncMock(side_effect=unique_save)
@@ -209,7 +209,7 @@ async def test_storage_failure_cleans_up_saved_files() -> None:
         if call_count == 2:
             msg = "Disk full"
             raise OSError(msg)
-        return "nexus-1-file0.pdf", 8
+        return "orchestrator-1-file0.pdf", 8
 
     mock_retriever = AsyncMock()
     mock_retriever.save_file_stream = AsyncMock(side_effect=fail_on_second)
@@ -227,7 +227,7 @@ async def test_storage_failure_cleans_up_saved_files() -> None:
     ):
         await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
 
-    mock_retriever.delete_file.assert_called_once_with("nexus-1-file0.pdf")
+    mock_retriever.delete_file.assert_called_once_with("orchestrator-1-file0.pdf")
 
 
 @pytest.mark.asyncio
@@ -289,7 +289,7 @@ async def test_cancelled_error_cleans_up_saved_files() -> None:
             pass
         if call_count == 2:
             raise asyncio.CancelledError
-        return "nexus-1-file0.pdf", 8
+        return "orchestrator-1-file0.pdf", 8
 
     mock_retriever = AsyncMock()
     mock_retriever.save_file_stream = AsyncMock(side_effect=cancel_on_second)
@@ -307,7 +307,7 @@ async def test_cancelled_error_cleans_up_saved_files() -> None:
     ):
         await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
 
-    mock_retriever.delete_file.assert_called_once_with("nexus-1-file0.pdf")
+    mock_retriever.delete_file.assert_called_once_with("orchestrator-1-file0.pdf")
 
 
 @pytest.mark.asyncio
@@ -367,7 +367,7 @@ async def test_load_file_with_integrity_check_success() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-integrity-check.txt"
+    mock_metadata.file_path = "orchestrator-uuid-integrity-check.txt"
     mock_metadata.content_hash = content_hash
     mock_metadata.id = "test-id"
     mock_metadata.filename = "integrity-check.txt"
@@ -387,7 +387,7 @@ async def test_load_file_with_integrity_check_no_hash() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-legacy.txt"
+    mock_metadata.file_path = "orchestrator-uuid-legacy.txt"
     mock_metadata.content_hash = None
 
     result = await fm.load_file_with_integrity_check(mock_metadata)
@@ -407,7 +407,7 @@ async def test_load_file_with_integrity_check_hash_mismatch() -> None:
     fm._retriever = mock_retriever
 
     mock_metadata = Mock()
-    mock_metadata.file_path = "nexus-uuid-tampered.txt"
+    mock_metadata.file_path = "orchestrator-uuid-tampered.txt"
     mock_metadata.content_hash = "0" * 64
     mock_metadata.id = "test-id"
     mock_metadata.filename = "tampered.txt"

@@ -102,7 +102,7 @@ class TestExecutionMetadata:
         metadata = execution.execution_metadata
         assert metadata is not None
         assert metadata["trigger_type"] == ActivityName.SCHEDULED_TRIGGER
-        assert metadata["schedule_id"] == f"nexus-sched-{workflow_id}-trigger_1"
+        assert metadata["schedule_id"] == f"orchestrator-sched-{workflow_id}-trigger_1"
         assert metadata["scheduled_at"] == scheduled_at.isoformat()
         assert metadata["triggered_at"] == triggered_at.isoformat()
 

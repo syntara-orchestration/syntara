@@ -72,9 +72,8 @@ _INFRA_PATH_PREFIXES = (
     "/health",
     "/metrics",
     "/_internal/",
+    "/api_docs/",
     "/docs",
-    "/redoc",
-    "/openapi.json",
 )
 
 

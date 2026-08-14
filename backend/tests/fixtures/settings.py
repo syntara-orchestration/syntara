@@ -128,6 +128,23 @@ class FakeSettingsCache:
         """No-op in tests."""
 
 
+@contextmanager
+def enable_script_nodes() -> Generator[None, None, None]:
+    """Enable script nodes by toggling the frozen Pydantic Settings field.
+
+    Use as a context manager in fixtures that need script node execution enabled.
+    """
+    from syntara.core.config.base import get_settings
+
+    settings = get_settings()
+    original = settings.script_nodes_enabled
+    object.__setattr__(settings, "script_nodes_enabled", True)
+    try:
+        yield
+    finally:
+        object.__setattr__(settings, "script_nodes_enabled", original)
+
+
 @pytest.fixture
 def override_settings() -> Callable[..., AbstractContextManager[object]]:
     """Fixture for temporarily overriding settings in tests.

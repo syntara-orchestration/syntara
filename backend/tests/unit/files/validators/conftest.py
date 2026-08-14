@@ -55,7 +55,7 @@ async def _consume_and_save(stream: AsyncGenerator[bytes], path: str) -> tuple[s
     total = 0
     async for chunk in stream:
         total += len(chunk)
-    return "nexus-uuid-file.pdf", total
+    return "orchestrator-uuid-file.pdf", total
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +74,7 @@ def _mock_s3_retriever(monkeypatch: pytest.MonkeyPatch) -> None:
     def patched_init(self: FileManager) -> None:
         original_init(self)
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-file.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-file.pdf")
         mock_retriever.save_file_stream = AsyncMock(side_effect=_consume_and_save)
         self._retriever = mock_retriever
 

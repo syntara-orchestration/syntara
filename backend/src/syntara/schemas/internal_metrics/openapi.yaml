@@ -333,6 +333,8 @@ components:
         - cache_miss
         - cache_lookup_ms
         - cache_utilization_ratio
+        - cache_pool_retry_total
+        - cache_pool_retry_backoff_duration_ms
         - workflow_duration_ms
         - workflow_status
         - activity_duration_ms

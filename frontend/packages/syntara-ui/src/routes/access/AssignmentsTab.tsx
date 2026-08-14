@@ -1,6 +1,6 @@
 import { Button, Content, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -12,6 +12,7 @@ import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../com
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
+import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
 import { useAlerts } from '../../providers/alerts'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -76,12 +77,14 @@ const BASE_FILTER_FIELD_DEFS = [
 ]
 
 const SORT_FIELDS: Record<number, string> = {
-  0: 'principal_name',
-  1: 'principal_type',
-  2: 'role_name',
-  3: 'scope',
-  4: 'project_name',
+  1: 'principal_name',
+  2: 'principal_type',
+  3: 'role_name',
+  4: 'scope',
+  5: 'project_name',
 }
+
+const EXPANDABLE_COLUMN_COUNT = 7
 
 function getAssignmentRowActions(
   row: PermissionRow,
@@ -109,6 +112,10 @@ function getAssignmentRowActions(
 function AssignmentsTableBody({
   rows,
   projectNameMap,
+  expandedRows,
+  allRowsExpanded,
+  onToggleRow,
+  onCollapseAll,
   getSortParams,
   onEdit,
   onDelete,
@@ -116,6 +123,10 @@ function AssignmentsTableBody({
 }: Readonly<{
   rows: PermissionRow[]
   projectNameMap: Map<string, string>
+  expandedRows: Set<string>
+  allRowsExpanded: boolean
+  onToggleRow: (rowKey: string) => void
+  onCollapseAll: () => void
   getSortParams: (columnIndex: number) => ThProps['sort']
   onEdit: (row: PermissionRow) => void
   onDelete: (row: PermissionRow) => void
@@ -125,62 +136,88 @@ function AssignmentsTableBody({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Principal name</Th>
-          <Th sort={getSortParams(1)} modifier="nowrap">
+          <Th
+            expand={{
+              areAllExpanded: !allRowsExpanded,
+              collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',
+              onToggle: onCollapseAll,
+            }}
+            aria-label="Row expansion"
+          />
+          <Th sort={getSortParams(1)}>Principal name</Th>
+          <Th sort={getSortParams(2)} modifier="nowrap">
             Principal type
           </Th>
-          <Th sort={getSortParams(2)}>Role name</Th>
-          <Th sort={getSortParams(3)} modifier="nowrap">
+          <Th sort={getSortParams(3)}>Role name</Th>
+          <Th sort={getSortParams(4)} modifier="nowrap">
             Scope
           </Th>
-          <Th sort={getSortParams(4)} modifier="nowrap">
+          <Th sort={getSortParams(5)} modifier="nowrap">
             Project
           </Th>
-          <Th>Policies</Th>
           <Th screenReaderText="Actions" />
         </Tr>
       </Thead>
-      <Tbody>
-        {rows.map((row) => (
-          <Tr key={`${row.sourceEndpoint}-${row.id}`}>
-            <Td dataLabel="Principal name">
-              <PrincipalNameCell
-                principalType={row.principalType}
-                principalId={row.principalId}
-                name={row.principalName}
-              />
-            </Td>
-            <Td dataLabel="Principal type">
-              <NxLabel color={principalTypeDisplay[row.principalType].color}>
-                {principalTypeDisplay[row.principalType].text}
-              </NxLabel>
-            </Td>
-            <Td dataLabel="Role name">
-              <Truncate content={row.assignmentName} />
-            </Td>
-            <Td dataLabel="Scope">
-              <ScopeLabel scope={row.scopeType} />
-            </Td>
-            <Td dataLabel="Project">
-              <ProjectLabel projectId={row.projectId} projectNameMap={projectNameMap} />
-            </Td>
-            <Td dataLabel="Policies">
+      {rows.map((row, rowIndex) => {
+        const rowKey = `${row.sourceEndpoint}-${row.id}`
+        const isExpanded = expandedRows.has(rowKey)
+        return (
+          <Tbody key={rowKey} isExpanded={isExpanded}>
+            <Tr isContentExpanded={isExpanded}>
               {row.rolePolicies.length > 0 ? (
-                <LabelGroup numLabels={3}>
-                  {row.rolePolicies.map((name) => (
-                    <NxLabel key={name}>{name}</NxLabel>
-                  ))}
-                </LabelGroup>
+                <Td
+                  expand={{
+                    rowIndex,
+                    isExpanded,
+                    onToggle: () => onToggleRow(rowKey),
+                  }}
+                />
               ) : (
-                '-'
+                <Td />
               )}
-            </Td>
-            <Td isActionCell>
-              <ActionsColumn items={getAssignmentRowActions(row, permissions, onEdit, onDelete)} />
-            </Td>
-          </Tr>
-        ))}
-      </Tbody>
+              <Td dataLabel="Principal name">
+                <PrincipalNameCell
+                  principalType={row.principalType}
+                  principalId={row.principalId}
+                  name={row.principalName}
+                />
+              </Td>
+              <Td dataLabel="Principal type">
+                <NxLabel color={principalTypeDisplay[row.principalType].color}>
+                  {principalTypeDisplay[row.principalType].text}
+                </NxLabel>
+              </Td>
+              <Td dataLabel="Role name">
+                <Truncate content={row.assignmentName} />
+              </Td>
+              <Td dataLabel="Scope">
+                <ScopeLabel scope={row.scopeType} />
+              </Td>
+              <Td dataLabel="Project">
+                <ProjectLabel projectId={row.projectId} projectNameMap={projectNameMap} />
+              </Td>
+              <Td isActionCell>
+                <ActionsColumn items={getAssignmentRowActions(row, permissions, onEdit, onDelete)} />
+              </Td>
+            </Tr>
+            {row.rolePolicies.length > 0 && (
+              <Tr isExpanded={isExpanded}>
+                <Td colSpan={EXPANDABLE_COLUMN_COUNT}>
+                  <ExpandableRowContent>
+                    <LabelGroup isCompact numLabels={Infinity}>
+                      {row.rolePolicies.map((name) => (
+                        <NxLabel key={name} color="grey">
+                          {name}
+                        </NxLabel>
+                      ))}
+                    </LabelGroup>
+                  </ExpandableRowContent>
+                </Td>
+              </Tr>
+            )}
+          </Tbody>
+        )
+      })}
     </>
   )
 }
@@ -208,6 +245,7 @@ export function AssignmentsTab() {
     baseFilterDefs: BASE_FILTER_FIELD_DEFS,
     sortFields: SORT_FIELDS,
     defaultSortField: 'principal_name',
+    initialSortIndex: 1,
     transformFilters: transformAssignmentFilters,
   })
 
@@ -217,6 +255,8 @@ export function AssignmentsTab() {
 
   const { data, isPending, isFetching, error: queryError } = assignmentsQuery
   const rows = useMemo(() => (data?.resources ?? []).map(buildPermissionRow), [data?.resources])
+  const rowIds = useMemo(() => rows.map((row) => `${row.sourceEndpoint}-${row.id}`), [rows])
+  const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(rowIds)
   const refetch = useCallback(() => detachPromise(assignmentsQuery.refetch()), [assignmentsQuery])
 
   useCursorReset(rows.length, hasActiveFilters, cursor, isFetching, resetPagination)
@@ -298,10 +338,14 @@ export function AssignmentsTab() {
               scoped to a specific project or apply system-wide. Use this page to review, create, or revoke access in
               one place.
             </Content>
-            <NxListPanelTable caption="Role assignments" footer={getFooterProps(data)}>
+            <NxListPanelTable caption="Role assignments" isExpandable footer={getFooterProps(data)}>
               <AssignmentsTableBody
                 rows={rows}
                 projectNameMap={projectNameMap}
+                expandedRows={expandedRows}
+                allRowsExpanded={allRowsExpanded}
+                onToggleRow={handleToggleRow}
+                onCollapseAll={handleCollapseAll}
                 getSortParams={getSortParams}
                 onEdit={editDialog.open}
                 onDelete={deleteDialog.open}

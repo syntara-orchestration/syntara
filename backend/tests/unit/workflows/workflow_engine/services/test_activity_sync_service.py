@@ -154,6 +154,68 @@ class TestActivitySyncService:
         assert service._sync_tasks == {}
 
 
+class TestPublishHelpersTreatRedisFailureAsNonFatal:
+    """_publish_snapshot/_publish_execution_patch must swallow publisher failures.
+
+    ActivityUpdatePublisher raises on Redis failure (it does not degrade
+    internally) specifically so this outer layer is the single place that
+    decides publishing is best-effort. These tests pin that contract: a
+    RedisConnectionError from the publisher must not propagate, and the
+    success-path "Published ..." log must not fire when nothing was
+    actually published.
+    """
+
+    def _make_service(self, mock_session_factory) -> tuple[ActivitySyncService, AsyncMock]:
+        mock_publisher = AsyncMock()
+        service = ActivitySyncService(Mock(), mock_session_factory, mock_publisher)
+        return service, mock_publisher
+
+    @pytest.mark.asyncio
+    async def test_publish_snapshot_swallows_redis_failure(self, mock_session_factory) -> None:
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        service, mock_publisher = self._make_service(mock_session_factory)
+        mock_publisher.publish_snapshot.side_effect = RedisConnectionError("pool exhausted")
+        execution = Execution(
+            id=uuid4(),
+            workflow_id=uuid4(),
+            workflow_version_id=uuid4(),
+            temporal_workflow_id="temporal-exec",
+            status=ExecutionStatus.RUNNING,
+            created_by=uuid4(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            updated_by=uuid4(),
+            input_data={},
+            labels={},
+            project_id=uuid4(),
+        )
+        execution.activities = []
+
+        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+            await service._publish_snapshot(execution, "initial_snapshot")  # does not raise
+
+        mock_logger.exception.assert_called_once()
+        assert mock_logger.exception.call_args.args[0] == "Failed to publish snapshot (non-fatal)"
+        assert not any(
+            call.args and call.args[0] == "Published snapshot for execution"
+            for call in mock_logger.debug.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_publish_execution_patch_swallows_redis_failure(self, mock_session_factory) -> None:
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        service, mock_publisher = self._make_service(mock_session_factory)
+        mock_publisher.publish_execution_patch.side_effect = RedisConnectionError("pool exhausted")
+
+        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+            await service._publish_execution_patch(uuid4(), [])  # does not raise
+
+        mock_logger.exception.assert_called_once()
+        assert mock_logger.exception.call_args.args[0] == "Failed to publish execution patch (non-fatal)"
+
+
 class TestRegisterActivityMonitoring:
     """Test register_activity_monitoring activity function."""
 
