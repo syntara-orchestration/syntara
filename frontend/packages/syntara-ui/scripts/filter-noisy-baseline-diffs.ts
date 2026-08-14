@@ -41,8 +41,7 @@ export const DEFAULT_MAX_DIFF_PIXEL_RATIO = 0.005
 export const SOFT_KEEP_MIN_RATIO = 0.001
 export const SOFT_KEEP_MIN_CHANNEL_DELTA = 30
 
-export const SNAPSHOT_DIR_REL =
-  'e2e/visual-regression/page-screenshots.spec.ts-snapshots'
+export const SNAPSHOT_DIR_REL = 'e2e/visual-regression/page-screenshots.spec.ts-snapshots'
 
 export type ClassifyAction = 'keep' | 'restore' | 'new'
 
@@ -237,15 +236,16 @@ function gitShowBlob(cwd: string, ref: string, repoRelativePath: string): Uint8A
 }
 
 function listDiffPngsBetweenRefs(cwd: string, oldRef: string, newRef: string, snapshotRepoRel: string): string[] {
-  const out = git(
-    ['diff', '--name-only', '--diff-filter=AM', `${oldRef}...${newRef}`, '--', snapshotRepoRel],
-    cwd
-  )
+  const out = git(['diff', '--name-only', '--diff-filter=AM', `${oldRef}...${newRef}`, '--', snapshotRepoRel], cwd)
   if (!out) return []
   return out.split('\n').filter((p) => p.endsWith('.png'))
 }
 
-function listWorkingTreeDiffPngs(cwd: string, baseRef: string, snapshotRepoRel: string): {
+function listWorkingTreeDiffPngs(
+  cwd: string,
+  baseRef: string,
+  snapshotRepoRel: string
+): {
   modified: string[]
   untracked: string[]
 } {
@@ -285,15 +285,7 @@ export type FilterOptions = {
 }
 
 export function filterNoisyBaselineDiffs(options: FilterOptions): FilterSummary {
-  const {
-    repoRoot,
-    snapshotDirAbs,
-    snapshotRepoRel,
-    baseRef,
-    compareToRef,
-    maxDiffPixelRatio,
-    dryRun,
-  } = options
+  const { repoRoot, snapshotDirAbs, snapshotRepoRel, baseRef, compareToRef, maxDiffPixelRatio, dryRun } = options
 
   const results: ClassifyResult[] = []
 

@@ -26,7 +26,7 @@ function crc32(buf: Uint8Array): number {
   for (let i = 0; i < buf.length; i++) {
     c ^= buf[i]!
     for (let k = 0; k < 8; k++) {
-      c = c & 1 ? (0xedb88320 ^ (c >>> 1)) : c >>> 1
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
     }
   }
   return (c ^ 0xffffffff) >>> 0
@@ -120,10 +120,7 @@ describe('decodePng / countDifferingPixels', () => {
     bData[0] = 1
     bData[4] = 40
     bData[8] = 255
-    const diff = countDifferingPixels(
-      { width: 10, height: 10, data: aData },
-      { width: 10, height: 10, data: bData }
-    )
+    const diff = countDifferingPixels({ width: 10, height: 10, data: aData }, { width: 10, height: 10, data: bData })
     expect(diff).toEqual({ changedPixels: 3, totalPixels: 100, ratio: 0.03, maxChannelDelta: 255 })
   })
 
@@ -131,10 +128,7 @@ describe('decodePng / countDifferingPixels', () => {
     const aData = solidRgba(10, 10, 0, 0, 0, 0)
     const bData = aData.slice()
     bData[0] = 255
-    const diff = countDifferingPixels(
-      { width: 10, height: 10, data: aData },
-      { width: 10, height: 10, data: bData }
-    )
+    const diff = countDifferingPixels({ width: 10, height: 10, data: aData }, { width: 10, height: 10, data: bData })
     expect(diff).toEqual({ changedPixels: 1, totalPixels: 100, ratio: 0.01, maxChannelDelta: 255 })
   })
 
