@@ -459,20 +459,20 @@ class ScheduledTriggerService:
 
         Queries both legacy (NexusWorkflowId) and current (OrchestratorWorkflowId)
         search attributes to find schedules created before and after the rename.
-        Falls back to dual-prefix scan if search attributes are unavailable.
+        Falls back to a dual-prefix scan unless *both* queries succeed — trusting
+        a partial result (e.g. the legacy attribute failing while the new one
+        succeeds) would silently hide pre-rename schedules from the caller.
         """
         can_use_search_attr = await _ensure_search_attribute(client) and workflow_id.replace("-", "").isalnum()
         if can_use_search_attr:
-            result: set[str] = set()
-            any_succeeded = False
-            for sa_key in (SA_ORCHESTRATOR_WORKFLOW_ID, SA_LEGACY_WORKFLOW_ID):
-                query = f'{sa_key.name} = "{workflow_id}"'
-                sa_result = await self._list_schedules_by_query(client, query)
-                if sa_result is not None:
-                    any_succeeded = True
-                    result |= sa_result
-            if any_succeeded:
-                return result
+            new_result = await self._list_schedules_by_query(
+                client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} = "{workflow_id}"'
+            )
+            legacy_result = await self._list_schedules_by_query(
+                client, f'{SA_LEGACY_WORKFLOW_ID.name} = "{workflow_id}"'
+            )
+            if new_result is not None and legacy_result is not None:
+                return new_result | legacy_result
 
         return await self.list_schedules_by_prefix(client, workflow_id)
 
@@ -481,19 +481,15 @@ class ScheduledTriggerService:
 
         Queries both legacy (NexusWorkflowId) and current (OrchestratorWorkflowId)
         search attributes to capture schedules from before and after the rename.
-        Falls back to dual-prefix scan if search attributes are unavailable.
+        Falls back to a dual-prefix scan unless *both* queries succeed — trusting
+        a partial result (e.g. the legacy attribute failing while the new one
+        succeeds) would silently hide pre-rename schedules from the caller.
         """
         if await _ensure_search_attribute(client):
-            result: set[str] = set()
-            any_succeeded = False
-            for sa_key in (SA_ORCHESTRATOR_WORKFLOW_ID, SA_LEGACY_WORKFLOW_ID):
-                query = f'{sa_key.name} != ""'
-                sa_result = await self._list_schedules_by_query(client, query)
-                if sa_result is not None:
-                    any_succeeded = True
-                    result |= sa_result
-            if any_succeeded:
-                return result
+            new_result = await self._list_schedules_by_query(client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} != ""')
+            legacy_result = await self._list_schedules_by_query(client, f'{SA_LEGACY_WORKFLOW_ID.name} != ""')
+            if new_result is not None and legacy_result is not None:
+                return new_result | legacy_result
 
         return await self.list_schedules_by_prefix(client)
 

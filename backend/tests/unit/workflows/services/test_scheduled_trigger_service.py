@@ -346,6 +346,41 @@ class TestSyncScheduledTriggers:
         client.get_schedule_handle.assert_any_call("orchestrator-sched-wf-123-trigger_old")
         handle.delete.assert_called_once()
 
+    async def test_sync_retires_legacy_schedule_on_republish(self) -> None:
+        """Publish should create the orchestrator-sched-* schedule and retire its legacy nexus-sched-* twin.
+
+        This is the sync-side counterpart to reconciliation's migration
+        path: a workflow whose trigger already has a live pre-rename
+        schedule must end up with only the new-prefix schedule after
+        republish, not both. Without stale-deleting the legacy ID here,
+        every republish would leave a silently duplicated schedule.
+        """
+        client = _make_mock_client()
+        legacy_id = "nexus-sched-wf-123-trigger_1"
+        # Existing schedules for this workflow: only the legacy one (found via
+        # the dual-prefix/dual-SA _list_workflow_schedules lookup).
+        client.list_schedules = AsyncMock(return_value=_async_iter_from([_make_schedule_list_entry(legacy_id)]))
+        handle = client.get_schedule_handle.return_value
+        handle.delete = AsyncMock()
+
+        service = ScheduledTriggerService(temporal_client=client)
+
+        # trigger_1 still exists in the definition — it should get a fresh
+        # orchestrator-sched-* schedule, and the legacy twin should be
+        # stale-deleted since it isn't in the expected (new-prefix) set.
+        definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
+
+        await service.sync_scheduled_triggers(
+            workflow_id="wf-123",
+            workflow_definition=definition,
+        )
+
+        client.create_schedule.assert_called_once()
+        assert client.create_schedule.call_args[0][0] == "orchestrator-sched-wf-123-trigger_1"
+
+        client.get_schedule_handle.assert_any_call(legacy_id)
+        handle.delete.assert_called_once()
+
     async def test_sync_skips_trigger_with_missing_id(self) -> None:
         """Trigger node without id should be skipped without error."""
         client = _make_mock_client()
@@ -849,6 +884,40 @@ class TestListWorkflowSchedulesOptimized:
         assert result == {"orchestrator-sched-wf-123-trigger_1"}
         client.list_schedules.assert_called_once_with()
 
+    async def test_partial_sa_failure_falls_back_to_prefix_scan_not_partial_result(self) -> None:
+        """A single failing SA query must not be treated as a full success.
+
+        If only the OrchestratorWorkflowId query succeeds (e.g. NexusWorkflowId
+        is not a registered attribute and errors), the whole SA path must be
+        discarded in favor of a dual-prefix scan — trusting the partial
+        Orchestrator-only result would silently hide legacy schedules that
+        the failed query would have found.
+        """
+        client = _make_mock_client(search_attr_available=True)
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "OrchestratorWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")])
+            if query and "NexusWorkflowId" in query:
+                msg = "unknown search attribute"
+                raise RPCError(msg, RPCStatusCode.INVALID_ARGUMENT, b"")
+            # Prefix scan fallback (no query kwarg): includes the legacy
+            # schedule that the failed NexusWorkflowId query would have found.
+            return _async_iter_from(
+                [
+                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1"),
+                    _make_schedule_list_entry("nexus-sched-wf-123-trigger_1"),
+                ]
+            )
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
+
+        service = ScheduledTriggerService(temporal_client=client)
+        result = await service._list_workflow_schedules(client, "wf-123")
+
+        assert result == {"orchestrator-sched-wf-123-trigger_1", "nexus-sched-wf-123-trigger_1"}
+        assert client.list_schedules.call_count == 3
+
     async def test_query_error_falls_back_to_prefix(self) -> None:
         """Should fall back to prefix scan if all SA queries fail."""
         client = _make_mock_client(search_attr_available=True)
@@ -1137,6 +1206,31 @@ class TestListAllSchedules:
         result = await service.list_all_schedules(client)
 
         assert result == {"orchestrator-sched-wf-1-t1"}
+
+    async def test_partial_sa_failure_falls_back_to_prefix_scan_not_partial_result(self) -> None:
+        """A single failing SA query must not be treated as a full success (see _list_workflow_schedules equivalent)."""
+        client = _make_mock_client(search_attr_available=True)
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "OrchestratorWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("orchestrator-sched-wf-1-t1")])
+            if query and "NexusWorkflowId" in query:
+                msg = "unknown search attribute"
+                raise RPCError(msg, RPCStatusCode.INVALID_ARGUMENT, b"")
+            return _async_iter_from(
+                [
+                    _make_schedule_list_entry("orchestrator-sched-wf-1-t1"),
+                    _make_schedule_list_entry("nexus-sched-wf-2-t1"),
+                ]
+            )
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
+
+        service = ScheduledTriggerService(temporal_client=client)
+        result = await service.list_all_schedules(client)
+
+        assert result == {"orchestrator-sched-wf-1-t1", "nexus-sched-wf-2-t1"}
+        assert client.list_schedules.call_count == 3
 
 
 class TestListSchedulesByPrefix:
