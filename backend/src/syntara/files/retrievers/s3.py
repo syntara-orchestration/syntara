@@ -426,8 +426,12 @@ class S3FileRetriever(BaseRetriever):
             cancelled.set()
             producer.close_body()
             if task is not None:
-                with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+                try:
                     await asyncio.wait_for(task, timeout=2)
+                except TimeoutError:
+                    logger.warning("stream_file producer did not exit within 2s timeout", key=file_path)
+                except asyncio.CancelledError:
+                    pass
 
     async def file_exists(self, file_path: str) -> bool:
         """Check if file exists in S3-compatible storage."""

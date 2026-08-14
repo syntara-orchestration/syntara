@@ -11,11 +11,7 @@ database queries (encapsulation principle).
 
 import hashlib
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
-
-if TYPE_CHECKING:
-    from hashlib import _Hash
 
 import structlog
 from fastapi import UploadFile
@@ -245,11 +241,9 @@ class FileManager:
         file_id = uuid4()
         hasher = hashlib.sha256()
 
-        async def _hashing_stream(
-            _header: bytes = header, _file: UploadFile = file, _hasher: "_Hash" = hasher
-        ) -> AsyncGenerator[bytes]:
-            async for chunk in self._stream_upload_file(_header, _file):
-                _hasher.update(chunk)
+        async def _hashing_stream() -> AsyncGenerator[bytes]:
+            async for chunk in self._stream_upload_file(header, file):
+                hasher.update(chunk)
                 yield chunk
 
         file_path, file_size_bytes = await storage.save_file_stream(
