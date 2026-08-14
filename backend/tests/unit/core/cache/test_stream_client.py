@@ -12,8 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import MaxConnectionsError
-from redis.exceptions import ResponseError
+from redis.exceptions import MaxConnectionsError, ResponseError
 
 from syntara.core.cache.stream import StreamClient
 from syntara.core.exceptions import SafeValueError

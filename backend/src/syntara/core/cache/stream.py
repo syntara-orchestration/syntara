@@ -41,8 +41,7 @@ from typing import Any
 
 import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import MaxConnectionsError
-from redis.exceptions import ResponseError
+from redis.exceptions import MaxConnectionsError, ResponseError
 
 from syntara.core.cache.base import BaseRedisClient, redis_operation_with_backoff
 from syntara.core.exceptions import SafeValueError

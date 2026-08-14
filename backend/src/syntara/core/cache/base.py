@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any, Self
 import redis.asyncio as redis
 import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import MaxConnectionsError
 from redis.exceptions import ResponseError
 
 from syntara.core.config.base import get_settings
@@ -98,6 +97,8 @@ async def redis_operation_with_backoff[T](
         operation_name: Log/metric label for the operation (e.g., "cache_setex")
         max_retries: Maximum number of retries (default: 3)
         initial_backoff_ms: Initial backoff in milliseconds (default: 10)
+        retry_on: Exception types that trigger a retry (default: ``(RedisConnectionError,)``).
+            Use ``(MaxConnectionsError,)`` for non-idempotent operations.
         **log_context: Extra log context to pass through
 
     Returns:
