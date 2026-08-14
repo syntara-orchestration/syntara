@@ -218,8 +218,6 @@ async def _clear_and_deny(
     db: AsyncSession,
     user: User,
     provider_id: UUID,
-    *,
-    reason: str,
 ) -> bool:
     """Clear this provider's stale IdP-managed groups and deny login.
 
@@ -227,12 +225,6 @@ async def _clear_and_deny(
     other providers' memberships intact.  Returns ``False`` so callers can
     ``return await _clear_and_deny(...)``.
     """
-    logger.warning(
-        "Login denied — clearing this provider's stale IdP-managed groups",
-        reason=reason,
-        user_id=str(user.id),
-        provider_id=str(provider_id),
-    )
     await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
     return False
 
@@ -283,8 +275,8 @@ async def sync_idp_groups(
     if has_claim_based:
         result = _resolve_claim_based_groups(user, raw_merged_claims, config, provider_id, mapping_entries)
         if result is None and not aap_role_mapping and not config.allow_all_authenticated:
-            return await _clear_and_deny(db, user, provider_id, reason="jmespath_extraction_failed")
-        if result is None:
+            return await _clear_and_deny(db, user, provider_id)
+        if result is None and (aap_role_mapping or config.allow_all_authenticated):
             logger.warning(
                 "JMESPath extraction failed — skipping claim-based groups",
                 reason="aap_role_mapping" if aap_role_mapping else "allow_all_authenticated",
@@ -298,7 +290,7 @@ async def sync_idp_groups(
     if aap_role_mapping:
         aap_group_ids = await _resolve_aap_role_groups(db, raw_merged_claims, user.id, config)
         if aap_group_ids is None:
-            return await _clear_and_deny(db, user, provider_id, reason="aap_validation_failed")
+            return await _clear_and_deny(db, user, provider_id)
         desired_group_ids = desired_group_ids | aap_group_ids
         aap_validated = True
 
