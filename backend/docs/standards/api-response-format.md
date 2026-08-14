@@ -190,9 +190,43 @@ Router URL prefixes use **snake_case** (underscores), matching the Python module
 /api/v1/tool-manager     # Wrong — kebab-case not used
 ```
 
-This applies to all URL path segments. Query parameter names also use snake_case per the constitution.
+This applies to all URL path segments, including sub-paths within router decorators (e.g., `@router.post("/ws_ticket", ...)`). Query parameter names also use snake_case per the constitution.
+
+### Sub-Resource Path Structure
+
+Sub-resources that need a separate RBAC boundary use a nested path under the parent resource rather than a top-level compound name:
+
+```
+/api/v1/users/directory     # Correct — sub-resource under parent
+/api/v1/users_directory     # Wrong — top-level compound path
+```
+
+This preserves the `/{resource}/...` nesting pattern while allowing distinct permission types (e.g., `user-directory:read` vs `user:read`).
+
+### Endpoint Summary Uniqueness
+
+Endpoint summaries must be unique across the entire API surface. When a sub-resource shares the same CRUD verb as its parent, prefix the summary with the full resource path:
+
+```python
+summary="Create service account credential"   # Correct — unique across domains
+summary="Create credential"                   # Wrong — conflicts with project credentials
+```
 
 ## Model Naming Conventions
+
+### Resource Model vs Action Response Naming
+
+Resource models (CRUD responses for database-backed entities) use the `*Read` suffix. Non-resource action results (one-off RPC responses, tokens, validation results) use the `*Response` suffix:
+
+```python
+WorkflowRead          # Resource model — GET /workflows/{id}
+CredentialRead        # Resource model — GET /credentials/{id}
+CsrfTokenResponse     # Action result — not a database resource
+CanIResponse          # Action result — permission check
+WebSocketTicketResponse  # Action result — ephemeral ticket
+```
+
+### Schema Naming Table
 
 | Purpose | Pattern | Example |
 |---|---|---|
@@ -202,6 +236,9 @@ This applies to all URL path segments. Query parameter names also use snake_case
 | API read response | `{Resource}Read` | `WorkflowRead`, `ApprovalRequestRead` |
 | List response alias | `{Resource}ListResponse` | `WorkflowListResponse = ResourcesResponse[WorkflowRead]` |
 | Query parameters | `{Resource}ListParams` | `WorkflowListParams(BaseListParams)` |
+| Action/RPC response | `{Action}Response` | `CsrfTokenResponse`, `CanIResponse` |
+
+Schema names must use readable, unabbreviated resource names matching the parent resource (e.g., `ServiceAccountCredentialCreate`, not `SACredentialCreate`).
 
 ## Base Resource Model Hierarchy
 

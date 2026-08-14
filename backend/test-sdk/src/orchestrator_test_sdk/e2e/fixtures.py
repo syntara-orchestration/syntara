@@ -21,9 +21,9 @@ from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
 from syntara_api_client.models.initial_model_selection import InitialModelSelection
 from syntara_api_client.models.integration_create import IntegrationCreate
-from syntara_api_client.models.integration_patch import IntegrationPatch
 from syntara_api_client.models.integration_refresh_status import IntegrationRefreshStatus
 from syntara_api_client.models.integration_type import IntegrationType
+from syntara_api_client.models.integration_update import IntegrationUpdate
 from syntara_api_client.models.llm_provider_configuration import LLMProviderConfiguration
 from syntara_api_client.models.llm_provider_hint import LLMProviderHint
 from syntara_api_client.models.mcp_server_configuration_input import MCPServerConfigurationInput
@@ -343,7 +343,7 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry) -> str:
         integration_id = str(existing.id)
         syntara_api.integrations.update(
             integration_id=UUID(integration_id),
-            body=IntegrationPatch(
+            body=IntegrationUpdate(
                 configuration=MCPServerConfigurationInput(base_url=MCP_PROVIDER_URL, allow_http=True),
             ),
         )

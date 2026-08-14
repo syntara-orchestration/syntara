@@ -161,12 +161,6 @@ class MetricsGroup(StrEnum):
     OBSERVABILITY = "Observability"
 
 
-class TelemetryGroup(StrEnum):
-    """Group names for telemetry settings."""
-
-    SEGMENT = "Segment"
-
-
 SETTINGS_CATALOG: list[SettingDefinition] = [
     # System settings
     SettingDefinition(
@@ -205,60 +199,6 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         ),
         helper_text="Enable only in non-production environments",
         group=MetricsGroup.OBSERVABILITY,
-    ),
-    # System — Telemetry (Segment)
-    SettingDefinition(
-        key="telemetry.segment_write_key",
-        name="Segment write key",
-        category=SettingCategory.SYSTEM,
-        value_type=SettingValueType.STRING,
-        default_value="",
-        description=(
-            "Segment write API key for telemetry transmission. When set, "
-            "overrides the static APP_SEGMENT_WRITE_KEY environment variable "
-            "and takes effect immediately across all API instances and "
-            "Temporal workers without a restart. Set to an empty string to "
-            "fall back to the environment variable."
-        ),
-        helper_text="Segment write key (leave empty to use the environment variable)",
-        group=TelemetryGroup.SEGMENT,
-        requires_restart=False,
-        cache_ttl_seconds=300,
-    ),
-    SettingDefinition(
-        key="telemetry.segment_endpoint",
-        name="Segment endpoint URL",
-        category=SettingCategory.SYSTEM,
-        value_type=SettingValueType.STRING,
-        default_value="",
-        description=(
-            "Segment API endpoint URL. When set, overrides the static "
-            "APP_SEGMENT_ENDPOINT environment variable. Changing this "
-            "reinitializes the telemetry client across all instances. "
-            "Set to an empty string to fall back to the environment variable."
-        ),
-        helper_text="Full URL (e.g. https://api.segment.io). Leave empty to use the environment variable.",
-        group=TelemetryGroup.SEGMENT,
-        requires_restart=False,
-        cache_ttl_seconds=300,
-    ),
-    SettingDefinition(
-        key="telemetry.collection_interval_seconds",
-        name="Analytics collection interval",
-        category=SettingCategory.SYSTEM,
-        value_type=SettingValueType.INTEGER,
-        default_value=None,
-        description=(
-            "Interval in seconds between periodic analytics collection "
-            "cycles. When set, overrides the static "
-            "APP_COLLECTION_INTERVAL_SECONDS environment variable and "
-            "restarts the collector immediately. Clear the value "
-            "to fall back to the environment variable."
-        ),
-        helper_text="Seconds between collection cycles (leave empty to use the environment variable)",
-        group=TelemetryGroup.SEGMENT,
-        requires_restart=False,
-        cache_ttl_seconds=300,
     ),
     # Context Manager — Grounding scores
     SettingDefinition(

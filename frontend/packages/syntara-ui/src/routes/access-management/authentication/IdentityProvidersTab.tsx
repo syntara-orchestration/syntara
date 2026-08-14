@@ -42,7 +42,7 @@ import { useIdentityProviderToggle } from './useIdentityProviderToggle'
 
 const SORT_FIELDS = ['name', 'issuer_url', 'client_id', 'enabled'] as const
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 function tooltipWhenDenied(allowed: boolean, text: string) {
   return allowed ? undefined : { content: text }

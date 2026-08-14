@@ -2,7 +2,7 @@
 services:
   syntara-mock-api:
     container_name: syntara-mock-api
-    image: ghcr.io/syntara-orchestration/syntara-mock-api:latest
+    image: localhost/syntara-mock-api:latest
     build:
       context: .
       dockerfile: packages/syntara-mock-api/Containerfile
@@ -16,7 +16,7 @@ services:
 
   syntara-ui:
     container_name: syntara-ui
-    image: ghcr.io/syntara-orchestration/syntara-ui:latest
+    image: localhost/syntara-ui:latest
     build:
       context: .
       dockerfile: packages/syntara-ui/Containerfile

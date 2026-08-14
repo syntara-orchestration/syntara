@@ -14,6 +14,7 @@ import { NxPageHeader } from '../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { userFormSchema, userCreateSchema, type UserFormData } from '../userFormSchema'
@@ -187,13 +188,26 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   } = useUserFormData(isEdit)
 
   const schema = isEdit ? userFormSchema : userCreateSchema
-  const { control, handleSubmit, setError } = useForm<UserFormData>({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    formState: { isDirty },
+    reset,
+  } = useForm<UserFormData>({
     resolver: zodResolver(schema, undefined, { mode: 'sync' }),
     defaultValues: formValues ?? DEFAULT_VALUES,
     values: isEdit && formValues ? formValues : undefined,
   })
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Users }))
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this user. Your changes will be lost if you leave.',
+  })
 
   const { onSubmit, isSaving } = useUserFormSubmit({
     isEdit,
@@ -203,7 +217,10 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
     isFederatedUser,
     isSelf,
     setError,
-    navigateBack,
+    navigateBack: () => {
+      dismiss()
+      navigateBack()
+    },
   })
 
   const passwordValue = useWatch({ control, name: 'password' })

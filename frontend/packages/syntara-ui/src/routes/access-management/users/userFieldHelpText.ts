@@ -11,5 +11,7 @@ export const EMAIL_FEDERATED_EDIT_HELP =
 export const GROUPS_HELP =
   'Groups organize users for role assignments. Permissions flow from group memberships through assigned roles. New local users are added to the users group by default unless you choose otherwise.'
 
+export const GROUPS_AUTHENTICATED_HINT = 'All users are automatically members of the authenticated group.'
+
 export const STATUS_HELP =
   'When disabled, the user cannot sign in. Disabling revokes all refresh sessions and increments token_version so existing access tokens are rejected.'

@@ -342,7 +342,9 @@ class TestSettingsValidation:
 
     def test_oversized_value(self, syntara_api: SyntaraApiRegistry) -> None:
         """Value exceeding 64KB returns 422."""
-        resp = syntara_api.settings.update(key="telemetry.segment_endpoint", body=SettingUpdate(value="x" * 70_000))
+        resp = syntara_api.settings.update(
+            key="context_manager.compression_mode", body=SettingUpdate(value="x" * 70_000)
+        )
         assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
 
 
