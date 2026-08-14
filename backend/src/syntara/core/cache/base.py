@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Self
 import redis.asyncio as redis
 import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import MaxConnectionsError
 from redis.exceptions import ResponseError
 
 from syntara.core.config.base import get_settings
@@ -74,16 +75,19 @@ async def redis_operation_with_backoff[T](
     operation_name: str,
     max_retries: int = 3,
     initial_backoff_ms: int = 10,
+    retry_on: tuple[type[Exception], ...] = (RedisConnectionError,),
     **log_context: Any,  # noqa: ANN401
 ) -> T:
     """Execute a Redis operation with exponential backoff for transient failures.
 
-    Handles pool exhaustion and other transient errors (``RedisConnectionError``,
-    which includes ``MaxConnectionsError``) with exponential backoff, giving
-    in-flight operations a chance to return connections to the pool before
-    retrying. Only use for operations safe to repeat (idempotent writes) —
-    ``cache_get`` intentionally does not use this, since a miss is a valid
-    response rather than a transient failure.
+    Retries on ``retry_on`` exceptions (default: any ``RedisConnectionError``)
+    with exponential backoff, giving in-flight operations a chance to return
+    connections before retrying. Use ``retry_on=(MaxConnectionsError,)`` for
+    non-idempotent operations (e.g. XADD): ``MaxConnectionsError`` is raised
+    while acquiring a connection, before any command reaches Redis, so retrying
+    is safe. Other ``RedisConnectionError`` subtypes may have reached Redis
+    already and must not retry non-idempotent commands. Idempotent writes
+    (SETEX, DELETE) may keep the default broad catch.
 
     Emits ``MetricType.CACHE_POOL_RETRY`` (counter) and
     ``MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION`` (histogram) so pool
@@ -105,12 +109,12 @@ async def redis_operation_with_backoff[T](
     """
     recorder = get_metrics_recorder()
     backoff_ms = initial_backoff_ms
-    last_error: RedisConnectionError | None = None
+    last_error: Exception | None = None
 
     for attempt in range(max_retries + 1):
         try:
             return await operation_fn()
-        except RedisConnectionError as e:
+        except retry_on as e:
             last_error = e
             if attempt < max_retries:
                 logger.warning(

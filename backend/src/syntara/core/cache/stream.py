@@ -41,6 +41,7 @@ from typing import Any
 
 import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import MaxConnectionsError
 from redis.exceptions import ResponseError
 
 from syntara.core.cache.base import BaseRedisClient, redis_operation_with_backoff
@@ -72,17 +73,14 @@ class StreamClient(BaseRedisClient):
         to the specified stream using XADD. The entire dict is stored in a
         single 'data' field for simplicity.
 
-        Retries the XADD write with exponential backoff on transient
-        connection/pool exhaustion errors (up to 3 retries, 10ms-500ms
-        backoff). Pool exhaustion (``MaxConnectionsError``) happens while
-        acquiring a connection, before any command reaches the server, so
-        retrying XADD is safe and cannot produce a duplicate stream entry.
+        Retries XADD on ``MaxConnectionsError`` only (pool full before the
+        command reaches Redis — safe to retry, no duplicate risk). Other
+        ``RedisConnectionError`` subtypes indicate a mid-flight drop where
+        Redis may have accepted the write; they are never retried.
 
-        The subsequent TTL refresh (EXPIRE) is retried independently and,
-        if it still fails, treated as best-effort: the event has already
-        been durably written, so a failed TTL refresh only delays cleanup
-        rather than losing data. It is never used to justify re-running
-        XADD.
+        EXPIRE is best-effort: single attempt, warning on failure. The event
+        is durably written by the time EXPIRE runs; a missed TTL only delays
+        cleanup and never justifies a second XADD.
 
         Args:
             stream_id: Stream identifier
@@ -132,20 +130,14 @@ class StreamClient(BaseRedisClient):
                 msg = f"Network error: {e}"
                 raise RedisConnectionError(msg) from e
 
-        event_id = await redis_operation_with_backoff(_xadd, "stream_publish", stream_id=stream_id)
-
-        async def _expire() -> None:
-            try:
-                await client.expire(stream_id, self._settings.cache_stream_ttl_seconds)
-            except OSError as e:
-                msg = f"Network error: {e}"
-                raise RedisConnectionError(msg) from e
+        event_id = await redis_operation_with_backoff(
+            _xadd, "stream_publish", retry_on=(MaxConnectionsError,), stream_id=stream_id
+        )
 
         try:
-            await redis_operation_with_backoff(_expire, "stream_publish_expire", stream_id=stream_id)
-        except (RedisConnectionError, ResponseError) as e:
-            # The event is already durably written; a failed TTL refresh only
-            # delays cleanup, so it must not fail the publish or re-run XADD.
+            await client.expire(stream_id, self._settings.cache_stream_ttl_seconds)
+        except (RedisConnectionError, ResponseError, OSError) as e:
+            # Event is durably written; failed TTL only delays cleanup, never justifies re-running XADD.
             logger.warning("stream_expire_failed", stream_id=stream_id, event_id=event_id, error=str(e))
 
         logger.debug(
