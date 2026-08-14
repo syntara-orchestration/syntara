@@ -754,6 +754,50 @@ class TestBackgroundWorkerConfiguration:
         settings = get_settings()
         assert settings.background_worker_max_concurrent_activities == 10
 
+    @pytest.mark.asyncio
+    async def test_background_entrypoint_passes_settings_to_start_worker(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: background_worker.main() must pass settings value, not a hardcoded constant.
+
+        Exercises the actual entrypoint path so that removing the
+        settings.background_worker_max_concurrent_activities pass-through in
+        background_worker.py will fail this test, not just the simulation above.
+        """
+        from syntara.core.config.base import get_settings
+
+        monkeypatch.setenv("APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES", "3")
+        get_settings.cache_clear()
+
+        captured: dict[str, object] = {}
+
+        async def mock_start_worker(**kwargs: object) -> TemporalWorkerService:
+            captured.update(kwargs)
+            return MagicMock(spec=TemporalWorkerService)
+
+        async def mock_run_worker(start_fn: object, **_: object) -> None:
+            # Actually invoke the _start callback so start_worker gets called
+            if callable(start_fn):
+                await start_fn()  # type: ignore[operator]
+
+        with (
+            patch("syntara.workflows.background_worker.start_worker", side_effect=mock_start_worker),
+            patch("syntara.workflows.background_worker.run_worker", side_effect=mock_run_worker),
+            patch("syntara.workflows.background_worker.validate_encryption_key_at_startup"),
+            patch(
+                "syntara.workflows.workflow_engine.models.workflow_definition._get_valid_timezones",
+                return_value=["UTC"],
+            ),
+        ):
+            from syntara.workflows import background_worker
+
+            await background_worker.main()
+
+        assert captured.get("max_concurrent_activities") == 3, (
+            "background_worker.main() must pass settings.background_worker_max_concurrent_activities "
+            f"to start_worker, got {captured.get('max_concurrent_activities')!r} instead"
+        )
+
 
 class TestActivityQueueingBehavior:
     """Test that activities queue rather than fail when concurrency cap is reached."""
