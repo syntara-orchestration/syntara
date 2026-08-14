@@ -682,6 +682,30 @@ describe('builderReducer', () => {
       const result = builderReducer(initialState, action)
 
       expect(result.validationErrors).toEqual(errors)
+      expect(result.validationSource).toBe('verify')
+    })
+
+    it('SET_VALIDATION_ERRORS records save source', () => {
+      const errors = [{ message: 'Missing interval', nodeId: 't1' }]
+      const result = builderReducer(initialState, {
+        type: 'SET_VALIDATION_ERRORS',
+        payload: errors,
+        source: 'save',
+      })
+
+      expect(result.validationSource).toBe('save')
+    })
+
+    it('SET_VALIDATION_ERRORS with empty payload clears source', () => {
+      const stateWithErrors: BuilderState = {
+        ...initialState,
+        validationErrors: [{ message: 'Missing interval', nodeId: 't1' }],
+        validationSource: 'save',
+      }
+      const result = builderReducer(stateWithErrors, { type: 'SET_VALIDATION_ERRORS', payload: [] })
+
+      expect(result.validationErrors).toEqual([])
+      expect(result.validationSource).toBeNull()
     })
 
     it('SET_VALIDATION_ERRORS preserves nodeName field', () => {
@@ -699,17 +723,20 @@ describe('builderReducer', () => {
       const stateWithErrors: BuilderState = {
         ...initialState,
         validationErrors: [{ message: 'Some error', nodeId: 'node-1' }],
+        validationSource: 'save',
       }
       const action: BuilderAction = { type: 'CLEAR_VALIDATION_ERRORS' }
       const result = builderReducer(stateWithErrors, action)
 
       expect(result.validationErrors).toEqual([])
+      expect(result.validationSource).toBeNull()
     })
 
     it('INIT_WORKFLOW clears validation errors', () => {
       const stateWithErrors: BuilderState = {
         ...initialState,
         validationErrors: [{ message: 'Stale error', nodeId: null }],
+        validationSource: 'save',
       }
       const action: BuilderAction = {
         type: 'INIT_WORKFLOW',
@@ -718,10 +745,12 @@ describe('builderReducer', () => {
       const result = builderReducer(stateWithErrors, action)
 
       expect(result.validationErrors).toEqual([])
+      expect(result.validationSource).toBeNull()
     })
 
     it('getInitialBuilderState has empty validationErrors', () => {
       expect(initialState.validationErrors).toEqual([])
+      expect(initialState.validationSource).toBeNull()
     })
   })
 })

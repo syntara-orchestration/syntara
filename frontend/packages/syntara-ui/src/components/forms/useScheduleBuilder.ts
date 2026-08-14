@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useRef } from 'react'
 
 import {
+  buildRepeatingInterval,
   durationToFrequencyAndInterval,
-  frequencyAndIntervalToDuration,
   parseRepeatingInterval,
   type ScheduleFrequency,
 } from '../../utils/triggerFormatting'
@@ -59,28 +59,6 @@ function extractTimeHHMM(isoString: string): string {
   return match ? `${match[1]}:${match[2]}` : ''
 }
 
-function buildISOString(dateStr: string, timeStr: string, tzOffset: string): string {
-  if (!dateStr) return ''
-  return `${dateStr}T${timeStr}${tzOffset}`
-}
-
-function getTimezoneOffset(timezone: string, referenceDate?: string): string {
-  try {
-    const refDate = referenceDate ? new Date(`${referenceDate}T12:00:00`) : new Date()
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'longOffset',
-    })
-    const parts = formatter.formatToParts(refDate)
-    const tzPart = parts.find((p) => p.type === 'timeZoneName')
-    if (!tzPart) return 'Z'
-    const offset = tzPart.value.replace('GMT', '')
-    return offset || '+00:00'
-  } catch {
-    return 'Z'
-  }
-}
-
 function parseInitialState(value: string): BuilderState {
   const parsed = parseRepeatingInterval(value)
   const { frequency, count } = durationToFrequencyAndInterval(parsed.cadence)
@@ -109,35 +87,17 @@ export function useScheduleBuilder(value: string, timezone: string, onChange?: (
   const { startDate, startTime, endDate, frequency, intervalCount } = state
 
   useEffect(() => {
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const effectiveDate = startDate || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-    const effectiveTime = startDate ? startTime || '00:00' : `${pad(now.getHours())}:${pad(now.getMinutes())}`
-
-    const tzOffset = getTimezoneOffset(timezone, effectiveDate)
-    const start = buildISOString(effectiveDate, `${effectiveTime}:00`, tzOffset)
-    if (!start) return
-
-    const duration = frequencyAndIntervalToDuration(frequency, intervalCount)
-    if (!duration) {
-      const runOnce = `R1/${start}/PT0S`
-      if (runOnce !== value) {
-        lastEmittedRef.current = runOnce
-        onChange?.(runOnce)
-      }
-      return
-    }
-
-    let interval = `R/${start}/${duration}`
-    if (endDate) {
-      const endTzOffset = getTimezoneOffset(timezone, endDate)
-      interval += `/${buildISOString(endDate, '23:59:59', endTzOffset)}`
-    }
-
-    if (interval !== value) {
-      lastEmittedRef.current = interval
-      onChange?.(interval)
-    }
+    const interval = buildRepeatingInterval({
+      startDate,
+      startTime,
+      endDate,
+      frequency,
+      intervalCount,
+      timezone,
+    })
+    if (!interval || interval === value) return
+    lastEmittedRef.current = interval
+    onChange?.(interval)
   }, [startDate, startTime, endDate, frequency, intervalCount, timezone, onChange, value])
 
   return { state, dispatch }
