@@ -38,6 +38,7 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
     LLMCredentialConfig,
 )
+from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
 from syntara.agent_orchestrator.utils.context_helpers import (
@@ -501,7 +502,7 @@ class InvocationExecutor:
             if await self._fail_invocation_if_not_cancelled(
                 invocation.id,
                 completed_at=datetime.now(UTC),
-                error_message=f"{type(e).__name__}: {e}",
+                error_message=f"{type(e).__name__}: {classify_streaming_error(e).detail}",
             ):
                 # Dispatch FAILED event
                 AuditEventDispatcher.dispatch(
