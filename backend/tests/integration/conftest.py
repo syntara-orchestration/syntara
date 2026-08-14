@@ -899,3 +899,24 @@ def _moto_s3() -> Generator[None, None, None]:
         fm._retriever = retriever
         yield
         fm._retriever = original_retriever
+
+
+@pytest.fixture(autouse=True)
+def _skip_ssrf_validation(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Bypass integration SSRF base_url validation for tests using placeholder hostnames.
+
+    Integration configs in tests use non-resolvable hosts (e.g. gateway.example.com), so the
+    DNS-resolving SSRF check would reject them. The shared bypass covers every boundary that
+    routes through the ``validate_integration_url_no_ssrf`` choke point — write time
+    (create/patch) and the runtime resolve/connect paths. Tests that exercise the SSRF check
+    itself opt out with ``@pytest.mark.ssrf_enforced``. The probe/patch logic is shared with the
+    unit conftest via :mod:`tests.helpers.ssrf_bypass` so the safety-net rules cannot drift.
+    """
+    from tests.helpers.ssrf_bypass import bypass_integration_ssrf_validation
+
+    if request.node.get_closest_marker("ssrf_enforced"):
+        yield
+        return
+
+    with bypass_integration_ssrf_validation():
+        yield

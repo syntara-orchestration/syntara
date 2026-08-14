@@ -69,6 +69,28 @@ def _reset_opa_cache() -> Generator[None, None, None]:
     init_authz_cache(enabled=False)
 
 
+@pytest.fixture(autouse=True)
+def _skip_ssrf_validation(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Bypass integration SSRF base_url validation for tests using placeholder hostnames.
+
+    Integration configs in tests use non-resolvable hosts (e.g. gateway.example.com), so the
+    DNS-resolving SSRF check would reject them. The shared bypass covers every boundary that
+    routes through the ``validate_integration_url_no_ssrf`` choke point — write time
+    (create/patch) and the runtime resolve/connect paths (AAP proxy, workflow AAP resolution,
+    LLM invocation, MCP tool connect). Tests that exercise the SSRF check itself opt out with
+    ``@pytest.mark.ssrf_enforced``. The probe/patch logic is shared with the integration
+    conftest via :mod:`tests.helpers.ssrf_bypass` so the safety-net rules cannot drift.
+    """
+    from tests.helpers.ssrf_bypass import bypass_integration_ssrf_validation
+
+    if request.node.get_closest_marker("ssrf_enforced"):
+        yield
+        return
+
+    with bypass_integration_ssrf_validation():
+        yield
+
+
 @pytest_asyncio.fixture
 async def test_project_id(test_db_session: AsyncSession) -> UUID:
     """Create a test project and return its ID."""

@@ -282,6 +282,12 @@ test.describe('HTTP URL Rejection and Allow HTTP Override', () => {
 })
 
 test('discovery failure shows error state, retry after correction succeeds', async ({ app }) => {
+  // Mock-only: after the injected discover failure is cleared, the "retry" step expects a real
+  // discover to succeed, which requires a reachable, live LLM endpoint. The real-backend E2E
+  // environment has none (and an unresolvable placeholder host is rejected by SSRF validation),
+  // so this UX flow cannot be exercised there.
+  test.skip(isRealBackend, 'Retry requires a live LLM endpoint not available on the real backend')
+
   const integrationName = buildUniqueName('e2e-wizard-retry')
   const credName = buildUniqueName('e2e-wizard-retry-cred')
   let credential: SeededCredential | null = null
