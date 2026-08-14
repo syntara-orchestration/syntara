@@ -600,7 +600,7 @@ class IntegrationService(BaseService):
             return project_ids
         return list(set(rbac_ids) & set(project_ids))
 
-    async def _validate_patch(self, integration: Integration, data: IntegrationPatch) -> None:
+    async def _validate_patch(self, integration: Integration, data: IntegrationUpdate) -> None:
         """Validate a patch payload against the existing integration before applying updates."""
         if data.configuration is not None:
             if data.configuration.integration_type != integration.integration_type.value:
@@ -620,7 +620,7 @@ class IntegrationService(BaseService):
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
 
-    async def update_integration(self, integration_id: UUID, data: IntegrationPatch) -> IntegrationRead:
+    async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
             integration = await self._get_or_raise(integration_id)

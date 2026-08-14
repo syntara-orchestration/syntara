@@ -785,7 +785,7 @@ class TestIntegrationSsrfValidation:
                     },
                 )
             )
-        patch_data = IntegrationPatch(
+        patch_data = IntegrationUpdate(
             configuration={
                 "integration_type": "mcp_server",
                 "base_url": "http://169.254.169.254",
