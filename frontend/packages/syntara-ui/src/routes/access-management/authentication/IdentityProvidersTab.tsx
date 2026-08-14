@@ -9,12 +9,12 @@ import {
   Switch,
   Truncate,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiBanIcon, RhUiEditIcon, RhUiSecurityIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiBanIcon, RhUiEditIcon, RhUiSecurityIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction } from '@patternfly/react-table'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { adminClient, identityProvidersClient } from '../../../client'
@@ -37,6 +37,7 @@ import { DisableIdentityProviderDialog } from './DisableIdentityProviderDialog'
 import { AAPSetupModal } from './identity-providers/AAPSetupModal'
 import { IdentityProviderDeleteDialog } from './identity-providers/IdentityProviderDeleteDialog'
 import { getProviderNameFilterDefinition, getProviderStatusFilterDefinition } from './identityProviderFilters'
+import { AddProviderButton } from './IdentityProvidersPageToolbar'
 import { useIdentityProviderPermissions } from './useIdentityProviderPermissions'
 import { useIdentityProviderToggle } from './useIdentityProviderToggle'
 
@@ -93,28 +94,6 @@ function getRowActions(
       onClick: canDel ? () => onDelete(provider) : undefined,
     },
   ]
-}
-
-function AddProviderButton({
-  permissions,
-}: Readonly<{ permissions: ReturnType<typeof useIdentityProviderPermissions> }>) {
-  const navigate = useNavigate()
-  return (
-    <DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
-      <Button
-        variant="primary"
-        icon={<RhUiAddIcon />}
-        isAriaDisabled={!permissions.canCreate}
-        onClick={
-          permissions.canCreate
-            ? () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.AddIdentityProvider }))
-            : undefined
-        }
-      >
-        Add OIDC provider
-      </Button>
-    </DisabledWithTooltip>
-  )
 }
 
 function providerDetailPath(providerId: string): string {
@@ -217,7 +196,19 @@ function ProviderRow({
   )
 }
 
-export function IdentityProvidersTab() {
+export type IdentityProvidersHeaderToolbarState = {
+  showToolbar: boolean
+  showAapButton: boolean
+  openAapSetup: () => void
+  permissions: ReturnType<typeof useIdentityProviderPermissions>
+}
+
+type IdentityProvidersTabProps = {
+  /** Lift create actions into Authentication's NxPageHeader (Credentials list pattern). */
+  onHeaderToolbarStateChange?: (state: IdentityProvidersHeaderToolbarState | null) => void
+}
+
+export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<IdentityProvidersTabProps>) {
   const [aapSetupOpen, setAapSetupOpen] = useState(false)
   const openAapSetup = useCallback(() => {
     ;(document.activeElement as HTMLElement | null)?.blur?.()
@@ -299,6 +290,22 @@ export function IdentityProvidersTab() {
     )
   }
 
+  const showHeaderToolbar = providers.length > 0 || !!cursor || hasActiveFilters
+
+  useLayoutEffect(() => {
+    if (!onHeaderToolbarStateChange) return
+    onHeaderToolbarStateChange({
+      showToolbar: showHeaderToolbar,
+      showAapButton: !hasAapProvider,
+      openAapSetup,
+      permissions,
+    })
+  }, [onHeaderToolbarStateChange, showHeaderToolbar, hasAapProvider, openAapSetup, permissions])
+
+  useLayoutEffect(() => {
+    return () => onHeaderToolbarStateChange?.(null)
+  }, [onHeaderToolbarStateChange])
+
   return (
     <>
       <NxListPanelView
@@ -314,27 +321,11 @@ export function IdentityProvidersTab() {
           <NoProvidersEmptyState showAapButton={!hasAapProvider} onAapSetup={openAapSetup} permissions={permissions} />
         }
         toolbar={
-          providers.length > 0 || cursor || hasActiveFilters ? (
+          showHeaderToolbar ? (
             <NxListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
-              actions={
-                <>
-                  {!hasAapProvider && (
-                    <DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
-                      <Button
-                        variant="secondary"
-                        isAriaDisabled={!permissions.canCreate}
-                        onClick={permissions.canCreate ? openAapSetup : undefined}
-                      >
-                        Add Ansible Automation Platform
-                      </Button>
-                    </DisabledWithTooltip>
-                  )}
-                  <AddProviderButton permissions={permissions} />
-                </>
-              }
             />
           ) : undefined
         }

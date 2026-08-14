@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -48,6 +49,27 @@ vi.mock('../../../hooks/routing/navigate', () => ({
   navigate: vi.fn(),
 }))
 
+vi.mock('./identity-providers/AAPSetupModal', () => ({
+  AAPSetupModal: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
+    isOpen ? (
+      <dialog open>
+        <button onClick={onClose}>Close</button>
+      </dialog>
+    ) : null,
+}))
+
+vi.mock('./useIdentityProviderPermissions', () => ({
+  useIdentityProviderPermissions: () => ({
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    canTest: true,
+    canRevoke: true,
+    isLoading: false,
+    tooltips: { create: '', update: '', enable: '', delete: '', test: '', editMapping: '', revoke: '' },
+  }),
+}))
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
@@ -58,12 +80,24 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
-function setupEmptyProviders() {
+const mockProvider = {
+  id: 'provider-1',
+  name: 'Azure AD',
+  enabled: true,
+  provider_type: 'oidc',
+  configuration: {
+    issuer_url: 'https://login.microsoftonline.com/tenant',
+    client_id: 'client-123',
+  },
+}
+
+function setupProviders(providers: (typeof mockProvider)[] = [mockProvider]) {
   vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
-    data: { resources: [], total: 0 },
+    data: { resources: providers, total: providers.length },
     isLoading: false,
     isError: false,
     error: null,
+    isPending: false,
     refetch: vi.fn(),
   } as never)
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
@@ -73,6 +107,10 @@ function setupEmptyProviders() {
     mutate: vi.fn(),
     isPending: false,
   } as never)
+}
+
+function setupEmptyProviders() {
+  setupProviders([])
 }
 
 describe('Authentication', () => {
@@ -93,6 +131,51 @@ describe('Authentication', () => {
     render(<Authentication />, { wrapper })
 
     expect(screen.getByText('No identity providers configured')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+  })
+
+  it('keeps create actions in the empty-state footer, not the page header', () => {
+    setupEmptyProviders()
+    render(<Authentication />, { wrapper })
+
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
+  })
+
+  it('shows create actions in the page header when providers exist', () => {
+    setupProviders()
+    render(<Authentication />, { wrapper })
+
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
+
+    const filterBar = screen.getByRole('search', { name: /Filters/i })
+    expect(within(filterBar).queryByRole('button', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
+    expect(within(filterBar).queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
+  })
+
+  it('opens AAP setup modal from the page header toolbar', async () => {
+    setupProviders()
+    const user = userEvent.setup()
+    render(<Authentication />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: /Add Ansible Automation Platform/ }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('hides Add Ansible Automation Platform in the header when an AAP provider exists', () => {
+    const aapProvider = {
+      ...mockProvider,
+      id: 'aap-1',
+      name: 'AAP',
+      configuration: { ...mockProvider.configuration, idp_type: 'aap' },
+    }
+    setupProviders([aapProvider] as (typeof mockProvider)[])
+    render(<Authentication />, { wrapper })
+
+    expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 

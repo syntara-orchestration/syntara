@@ -1,3 +1,5 @@
+import { useCallback, useState } from 'react'
+
 import { breadcrumbsIdentityProvidersPage } from '../../../app/breadcrumbBuilders'
 import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
 import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
@@ -8,11 +10,30 @@ import { NxListPanel } from '../../../components/panels/list/NxListPanel'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
-import { IdentityProvidersTab } from './IdentityProvidersTab'
+import { IdentityProvidersPageToolbar } from './IdentityProvidersPageToolbar'
+import { IdentityProvidersTab, type IdentityProvidersHeaderToolbarState } from './IdentityProvidersTab'
 
 export default function Authentication() {
   const { allowed: canRead, isChecking } = useCanI('read', 'identity-provider')
   const identityProvidersDocLink = useDocLink('identityProviders')
+  const [headerToolbarState, setHeaderToolbarState] = useState<IdentityProvidersHeaderToolbarState | null>(null)
+
+  const handleHeaderToolbarStateChange = useCallback((state: IdentityProvidersHeaderToolbarState | null) => {
+    setHeaderToolbarState((prev) => {
+      if (state === null) return null
+      if (prev == null) return state
+      if (
+        prev.showToolbar === state.showToolbar &&
+        prev.showAapButton === state.showAapButton &&
+        prev.openAapSetup === state.openAapSetup &&
+        prev.permissions.canCreate === state.permissions.canCreate &&
+        prev.permissions.tooltips.create === state.permissions.tooltips.create
+      ) {
+        return prev
+      }
+      return state
+    })
+  }, [])
 
   if (isChecking) {
     return (
@@ -47,10 +68,19 @@ export default function Authentication() {
         title="Identity Providers"
         docLink={identityProvidersDocLink}
         breadcrumbs={breadcrumbsIdentityProvidersPage()}
+        toolbar={
+          headerToolbarState?.showToolbar ? (
+            <IdentityProvidersPageToolbar
+              permissions={headerToolbarState.permissions}
+              showAapButton={headerToolbarState.showAapButton}
+              onAapSetup={headerToolbarState.openAapSetup}
+            />
+          ) : undefined
+        }
       />
       <NxPageBody>
         <NxListPanel>
-          <IdentityProvidersTab />
+          <IdentityProvidersTab onHeaderToolbarStateChange={handleHeaderToolbarStateChange} />
         </NxListPanel>
       </NxPageBody>
     </NxPage>
