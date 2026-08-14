@@ -46,6 +46,13 @@ if TYPE_CHECKING:
     from tests.unit.api.compliance.endpoint_discovery import EndpointInfo
 
 
+_OPTIONAL_OPS = {FilterOperator.IN.value, FilterOperator.ISNULL.value}
+_STRING_OPS = {op.value for op in FilterOperator} - _OPTIONAL_OPS
+_COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS.value, FilterOperator.STARTS_WITH.value}
+_EQ_ONLY = {FilterOperator.EQ.value}
+_TYPE_MAP: dict[str, set[str]] = {"datetime": _COMPARISON_OPS, "eq_only": _EQ_ONLY, "string": _STRING_OPS}
+
+
 @pytest.mark.unit
 @pytest.mark.compliance
 @pytest.mark.parametrize("endpoint", discover_testable_list_endpoints(), ids=lambda e: e.operation_id)
@@ -205,33 +212,17 @@ class TestListEndpointCompliance:
         Optional operators (in, isnull) are not included in the minimum set —
         endpoints may declare them but are not required to.
         """
-        string_ops = {
-            FilterOperator.EQ.value,
-            FilterOperator.CONTAINS.value,
-            FilterOperator.STARTS_WITH.value,
-            FilterOperator.GT.value,
-            FilterOperator.GTE.value,
-            FilterOperator.LT.value,
-            FilterOperator.LTE.value,
-        }
-        comparison_ops = string_ops - {
-            FilterOperator.CONTAINS.value,
-            FilterOperator.STARTS_WITH.value,
-        }
-        eq_only = {FilterOperator.EQ.value}
-        type_map = {"datetime": comparison_ops, "eq_only": eq_only, "string": string_ops}
-
         classification = TestListEndpointCompliance._classify_schema(schema)
         if classification is not None:
-            return type_map[classification]
+            return _TYPE_MAP[classification]
 
         for variant in schema.get("anyOf", []):
             if isinstance(variant, dict):
                 classification = TestListEndpointCompliance._classify_schema(variant)
                 if classification is not None:
-                    return type_map[classification]
+                    return _TYPE_MAP[classification]
 
-        return eq_only
+        return _EQ_ONLY
 
     def _check_filter_operators(
         self,
