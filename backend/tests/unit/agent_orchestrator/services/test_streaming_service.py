@@ -5,17 +5,20 @@ Tests WebSocketStreamingHandler and StreamingService classes.
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.agent_orchestrator.models.invocation import InvocationStatus
+from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
 from syntara.agent_orchestrator.services.streaming_service import (
     InvocationNotFoundError,
     StreamingService,
     WebSocketStreamingHandler,
     get_invocation_stream_id,
 )
+from syntara.core.models import User
 from syntara.core.websocket.close_codes import POLICY_VIOLATION
 from syntara.core.websocket.exceptions import EventsExpiredError, StreamingValidationError
 
@@ -247,6 +250,32 @@ class TestWebSocketStreamingHandlerCheckInvocationExists:
 
         assert exc_info.value.error_data.code == "INVOCATION_NOT_FOUND"
         assert str(invocation_id) in exc_info.value.error_data.detail
+
+    async def test_check_invocation_exists_reads_status_from_db_aap_86853(
+        self,
+        test_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+        test_project_id: UUID,
+    ) -> None:
+        """Regression AAP-86853: DB lookup must return Invocation so .status works."""
+        invocation_id = uuid4()
+        async with test_session_factory() as session:
+            session.add(
+                Invocation(
+                    id=invocation_id,
+                    prompt="Regression test prompt",
+                    created_by=test_user.id,
+                    project_id=test_project_id,
+                    session_id="aap-86853-session",
+                    status=InvocationStatus.RUNNING,
+                )
+            )
+            await session.commit()
+
+        handler = WebSocketStreamingHandler(session_factory=test_session_factory)
+        status = await handler._check_invocation_exists(invocation_id)
+
+        assert status == InvocationStatus.RUNNING
 
 
 class TestStreamingService:
