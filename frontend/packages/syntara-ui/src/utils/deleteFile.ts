@@ -6,7 +6,7 @@ function fileDeleteMessage(status: number): string {
   return 'Failed to delete file. Please try again.'
 }
 
-export class FileDeleteError extends Error {
+class FileDeleteError extends Error {
   readonly status: number
 
   constructor(status: number) {
