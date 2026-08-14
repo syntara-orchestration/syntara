@@ -35,7 +35,6 @@ const scriptActionSchema = z.object({
   language: z.string().optional(),
   method: httpMethodSchema.optional(),
   url: z.string().optional(),
-  authentication: z.string().optional(), // backward compat — old workflows may have this
   headers: z.array(keyValueEntrySchema).optional(),
   body: z.string().optional(),
   parameters: optionalJsonObjectSchema,
@@ -50,7 +49,6 @@ const apiActionSchema = z.object({
   language: z.string().optional(),
   method: httpMethodSchema.optional(),
   url: z.string().optional(),
-  authentication: z.string().optional(), // backward compat — old workflows may have this
   headers: z.array(keyValueEntrySchema).optional(),
   body: z.string().optional(),
   parameters: z.string().optional(),

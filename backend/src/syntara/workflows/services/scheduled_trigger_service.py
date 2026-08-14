@@ -38,6 +38,7 @@ from syntara.workflows.utils.schedule_parser import (
     build_schedule_id,
     config_to_temporal_schedule,
 )
+from syntara.workflows.validators import collect_scheduled_trigger_config_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -196,6 +197,25 @@ class ScheduledTriggerService:
             return self._temporal_client
         return await _get_shared_client()
 
+    @staticmethod
+    def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
+        """Pre-validate all scheduled trigger configs without contacting Temporal.
+
+        Raise-first wrapper around
+        ``collect_scheduled_trigger_config_findings`` so Temporal sync and
+        ``WorkflowValidator.collect_findings`` share one walk / one id and
+        config-handling policy. Used by ``sync_scheduled_triggers`` as a
+        defense-in-depth guard after publish's pre-mutation
+        ``collect_findings`` check.
+
+        Raises:
+            TriggerValidationError: If any scheduled trigger config is invalid.
+
+        """
+        findings = collect_scheduled_trigger_config_findings(workflow_definition)
+        if findings:
+            raise TriggerValidationError(findings[0].message)
+
     async def sync_scheduled_triggers(
         self,
         workflow_id: str,
@@ -226,6 +246,8 @@ class ScheduledTriggerService:
             TriggerValidationError: If a scheduled trigger config is invalid.
 
         """
+        self.validate_trigger_configs(workflow_definition)
+
         # Extract scheduled trigger nodes from definition
         triggers = workflow_definition.get("triggers", [])
         scheduled_nodes: dict[str, dict[str, Any]] = {}
@@ -251,15 +273,9 @@ class ScheduledTriggerService:
         processed = 0
 
         try:
-            # Create or update schedules for current trigger nodes
+            # Create or update schedules for current trigger nodes.
+            # Configs are already validated by validate_trigger_configs() above.
             for node_id, config in scheduled_nodes.items():
-                # Validate config
-                try:
-                    ScheduledTriggerConfig.model_validate(config)
-                except ValidationError as e:
-                    msg = f"Invalid scheduled trigger config for node '{node_id}': {e}"
-                    raise TriggerValidationError(msg) from e
-
                 schedule_id = build_schedule_id(workflow_id, node_id)
                 await self._create_or_update_schedule(client, schedule_id, workflow_id, node_id, config, task_queue)
                 processed += 1

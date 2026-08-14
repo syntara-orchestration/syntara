@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
     from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
     from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
-    from ..models.authentication import Authentication
 
 
 T = TypeVar("T", bound="APIExecutorParameters")
@@ -29,9 +28,7 @@ class APIExecutorParameters:
         headers (APIExecutorParametersHeaders | Unset):
         body (APIExecutorParametersBodyType0 | None | str | Unset):
         query_params (APIExecutorParametersQueryParams | Unset):
-        authentication (Authentication | None | Unset):
-        credential_id (None | str | Unset): Nexus credential UUID for authentication or Secret URL. Takes priority over
-            authentication field.
+        credential_id (None | str | Unset): Nexus credential UUID for authentication or Secret URL.
     """
 
     method: HTTPMethod
@@ -39,13 +36,11 @@ class APIExecutorParameters:
     headers: APIExecutorParametersHeaders | Unset = UNSET
     body: APIExecutorParametersBodyType0 | None | str | Unset = UNSET
     query_params: APIExecutorParametersQueryParams | Unset = UNSET
-    authentication: Authentication | None | Unset = UNSET
     credential_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
-        from ..models.authentication import Authentication
 
         method = self.method.value
 
@@ -71,14 +66,6 @@ class APIExecutorParameters:
         if not isinstance(self.query_params, Unset):
             query_params = self.query_params.to_dict()
 
-        authentication: dict[str, Any] | None | Unset
-        if isinstance(self.authentication, Unset):
-            authentication = UNSET
-        elif isinstance(self.authentication, Authentication):
-            authentication = self.authentication.to_dict()
-        else:
-            authentication = self.authentication
-
         credential_id: None | str | Unset
         if isinstance(self.credential_id, Unset):
             credential_id = UNSET
@@ -100,8 +87,6 @@ class APIExecutorParameters:
             field_dict["body"] = body
         if query_params is not UNSET:
             field_dict["query_params"] = query_params
-        if authentication is not UNSET:
-            field_dict["authentication"] = authentication
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
 
@@ -112,7 +97,6 @@ class APIExecutorParameters:
         from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
         from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
         from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
-        from ..models.authentication import Authentication
 
         d = dict(src_dict)
         method = HTTPMethod(d.pop("method"))
@@ -157,23 +141,6 @@ class APIExecutorParameters:
         else:
             query_params = APIExecutorParametersQueryParams.from_dict(_query_params)
 
-        def _parse_authentication(data: object) -> Authentication | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                authentication_type_0 = Authentication.from_dict(data)
-
-                return authentication_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(Authentication | None | Unset, data)
-
-        authentication = _parse_authentication(d.pop("authentication", UNSET))
-
         def _parse_credential_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -189,7 +156,6 @@ class APIExecutorParameters:
             headers=headers,
             body=body,
             query_params=query_params,
-            authentication=authentication,
             credential_id=credential_id,
         )
 

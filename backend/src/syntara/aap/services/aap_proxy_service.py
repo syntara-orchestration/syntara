@@ -31,6 +31,7 @@ from syntara.aap.models.responses import (
     AAPWorkflowJobTemplateDetail,
 )
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
@@ -439,6 +440,14 @@ class AAPProxyService:
             raise AAPNotConfiguredError(msg)
 
         await self._enforce_integration_visibility(integration)
+
+        # Re-run the integration SSRF policy at request time: the stored base_url may have
+        # been re-pointed to a private/metadata address (DNS rebinding) since write time.
+        try:
+            validate_integration_configuration_no_ssrf(config)
+        except ValueError as e:
+            msg = "AAP base_url is not permitted by SSRF policy"
+            raise AAPNotConfiguredError(msg) from e
 
         base_url = config.base_url.rstrip("/")
         verify_ssl = not config.insecure_skip_tls_verify

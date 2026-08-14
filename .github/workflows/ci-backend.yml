@@ -577,6 +577,9 @@ jobs:
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
+          # The E2E MCP test server resolves to a private container IP; allowlist it so the
+          # write-time integration SSRF check accepts base_url=http://mcp-server:.../mcp.
+          APP_INTEGRATION_URL_ALLOWED_HOSTS: '["mcp-server"]'
         run: |
           ulimit -n 65535
           # --no-deps: start all containers immediately without health dependency ordering.

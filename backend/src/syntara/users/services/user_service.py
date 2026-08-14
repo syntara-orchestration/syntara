@@ -451,8 +451,9 @@ class UsersService(BaseService):
         """Enforce modification rules for the built-in admin user."""
         last_name_changed = last_name is not UNSET
         if is_self:
-            # Self can do anything except change protected fields
-            if any(field is not None for field in (username, first_name, email)) or last_name_changed:
+            # Self may change password / enabled and email (replace bootstrap placeholder).
+            # Username and display names remain protected.
+            if any(field is not None for field in (username, first_name)) or last_name_changed:
                 raise AdminModifyError
             return
         # Non-self: only re-enabling is allowed (is_enabled=True, nothing else)

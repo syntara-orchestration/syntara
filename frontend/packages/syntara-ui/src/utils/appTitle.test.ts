@@ -56,3 +56,28 @@ describe('APP_TITLE module', () => {
     expect(mod.APP_TITLE).toBe('Syntara')
   })
 })
+
+describe('CI upstream mode (VITE_APP_TITLE unset)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('resolves community title when neither VITE_EXTENDED nor VITE_APP_TITLE is set', async () => {
+    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
+    vi.stubEnv('VITE_APP_TITLE', undefined as unknown as string)
+    vi.resetModules()
+    const mod = (await import('./appTitle')) as { APP_TITLE: string }
+    expect(mod.APP_TITLE).toBe('Syntara')
+  })
+
+  it('resolveAppTitle returns Syntara with all defaults', async () => {
+    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
+    vi.stubEnv('VITE_APP_TITLE', undefined as unknown as string)
+    vi.resetModules()
+    const { resolveAppTitle } = (await import('./appTitle')) as {
+      resolveAppTitle: (extended?: boolean, title?: string) => string
+    }
+    expect(resolveAppTitle()).toBe('Syntara')
+  })
+})

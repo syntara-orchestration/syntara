@@ -7,7 +7,7 @@ For configurable values, use get_settings() from syntara.core.config.base.
 # API configuration
 
 API_V1_PATH_PREFIX = "/api/v1"
-API_V1_VERSION = "0.1.0"
+API_V1_VERSION = "1.0.0"
 
 # Full path to the OIDC callback endpoint, used by the auth router and
 # referenced by the AAP setup service when registering redirect URIs.

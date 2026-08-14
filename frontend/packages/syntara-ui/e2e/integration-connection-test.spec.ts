@@ -21,7 +21,7 @@ const processEnv: Record<string, string | undefined> = (
 ).env
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
-const mcpServerUrl = processEnv['NEXUS_E2E_MCP_SERVER_URL']
+const mcpServerUrl = processEnv['SYNTARA_E2E_MCP_SERVER_URL']
 
 async function createLlmCredential(app: Page, name: string): Promise<string> {
   const project = await ensureProject(app)
@@ -40,7 +40,7 @@ test.describe('Integration Wizard @pr-check', () => {
   test('connection test succeeds and discovers resources within 10s', async ({ app }) => {
     test.skip(
       isRealBackend && !mcpServerUrl,
-      'NEXUS_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
+      'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
     )
     const mcpUrl = isRealBackend ? mcpServerUrl! : 'https://mcp-test.example.com/mcp'
     const name = buildUniqueName('e2e-wizard-t7')
@@ -174,8 +174,11 @@ test.describe('Integration Wizard @pr-check', () => {
 
     try {
       credentialId = await createLlmCredential(app, credName)
-      // Step 1 — LLM Provider with Red Hat AI hint, base_url pointing to a port with nothing
-      // listening. TCP RST is immediate so the backend classifies this as connection_error, not timeout.
+      // Step 1 — LLM Provider with base_url pointing to a closed port on the allowlisted,
+      // in-network mcp-server host (mirrors the backend e2e). The host is allowlisted so it passes
+      // write-time SSRF validation, while nothing listens on :9999 — TCP RST is immediate so the
+      // backend classifies this as connection_error, not timeout. A loopback address (127.0.0.1)
+      // cannot be used: it is not allowlisted and would be rejected as an SSRF risk before connect.
       await app.goto(toAppUrl('/configuration/integrations/configure'))
       await expect(app.getByRole('heading', { name: 'Integration details', level: 2 })).toBeVisible()
 
@@ -183,7 +186,7 @@ test.describe('Integration Wizard @pr-check', () => {
       await app.getByRole('option', { name: 'LLM Provider' }).click()
 
       await app.getByRole('textbox', { name: 'Name' }).fill(name)
-      await app.getByRole('textbox', { name: 'API URL' }).fill('http://127.0.0.1:9999')
+      await app.getByRole('textbox', { name: 'API URL' }).fill('https://mcp-server:9999')
 
       await app.getByRole('button', { name: 'Next' }).click()
 
@@ -341,7 +344,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
   test('health check status transitions between available and error', async ({ app }) => {
     test.skip(!isRealBackend, 'Requires real backend — mock API validate always returns success')
-    test.skip(!mcpServerUrl, 'NEXUS_E2E_MCP_SERVER_URL not set; requires running MCP server')
+    test.skip(!mcpServerUrl, 'SYNTARA_E2E_MCP_SERVER_URL not set; requires running MCP server')
     test.slow() // validate against unreachable port takes up to ~10s
 
     const name = buildUniqueName('e2e-wizard-t11')
@@ -450,7 +453,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
   test('health check error classifications appear correctly on integration detail page', async ({ app }) => {
     test.skip(!isRealBackend, 'Requires real backend — mock API validate always returns success')
-    test.skip(!mcpServerUrl, 'NEXUS_E2E_MCP_SERVER_URL not set; requires running MCP server')
+    test.skip(!mcpServerUrl, 'SYNTARA_E2E_MCP_SERVER_URL not set; requires running MCP server')
     test.slow() // validate against unreachable port takes up to ~10s
 
     const name = buildUniqueName('e2e-wizard-t13')

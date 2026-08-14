@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
@@ -25,7 +26,7 @@ from syntara_api_client.models.role_assignment_create import RoleAssignmentCreat
 from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
-from tests.e2e.service_accounts import create_sa, create_sa_with_credential, token_request
+from tests.e2e.service_accounts import create_sa, create_sa_with_credential, poll_until_status, token_request
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -178,6 +179,50 @@ class TestProjectRoleAssignment:
             assert str(sa.id) in listed_ids
         finally:
             admin_api.service_accounts.delete(service_account_id=sa.id)
+
+
+class TestExpiredCredentialMiddlewareRejection:
+    """Middleware rejects pre-issued JWTs after the underlying credential expires."""
+
+    CREDENTIAL_LIFETIME_SECONDS = 60
+
+    def test_pre_issued_jwt_rejected_after_credential_expires(
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
+    ) -> None:
+        """A JWT issued before credential expiry is rejected by middleware after expiry."""
+        sa = create_sa(syntara_api, first_project_id)
+        expires_at = datetime.now(UTC) + timedelta(seconds=self.CREDENTIAL_LIFETIME_SECONDS)
+
+        cred = syntara_api.service_account_credentials.create(
+            service_account_id=sa.id,
+            body=ServiceAccountCredentialCreate(
+                credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+                expires_at=expires_at,
+            ),
+        ).assert_and_get()
+
+        try:
+            resp = token_request(syntara_base_url, cred.identifier, cred.client_secret)
+            assert resp.status_code == HTTPStatus.OK
+            access_token = resp.parsed.access_token
+
+            me_resp = httpx.get(
+                f"{syntara_base_url}/api/v1/auth/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                verify=e2e_ssl_context(),
+            )
+            assert me_resp.status_code == HTTPStatus.OK, "Token should work before credential expiry"
+
+            result = poll_until_status(
+                syntara_base_url,
+                access_token,
+                HTTPStatus.UNAUTHORIZED,
+                timeout=self.CREDENTIAL_LIFETIME_SECONDS + 10,
+            )
+            assert result.status_code == HTTPStatus.UNAUTHORIZED
+            assert result.json()["code"] == "SA_CREDENTIAL_EXPIRED"
+        finally:
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
 
 
 class TestConcurrentServiceAccounts:
