@@ -13,10 +13,7 @@ import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 
-async function createAAPIntegration(
-  app: Page,
-  name: string
-): Promise<{ integrationId: string; credentialId: string }> {
+async function createAAPIntegration(app: Page, name: string): Promise<{ integrationId: string; credentialId: string }> {
   const project = await ensureProject(app)
   if (!project) throw new Error('Could not ensure project')
 

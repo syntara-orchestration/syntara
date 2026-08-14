@@ -203,7 +203,6 @@ test.describe('Login page screenshots', { tag: '@local-only' }, () => {
         await entry.setup(page)
       }
 
-
       await page.evaluate(() => {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       })

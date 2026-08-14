@@ -4,14 +4,7 @@
  * Re-exported from auto-generated OpenAPI contracts so that consumer
  * imports stay unchanged while types stay in sync with the backend.
  */
-import type {
-  User,
-  AuthzAPI,
-  PoliciesAPI,
-  ProjectsAPI,
-  RoleAssignmentsAPI,
-  RolesAPI,
-} from '@syntara/contracts'
+import type { User, AuthzAPI, PoliciesAPI, ProjectsAPI, RoleAssignmentsAPI, RolesAPI } from '@syntara/contracts'
 
 import type { RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
