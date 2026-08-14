@@ -38,13 +38,13 @@ Before asking the user anything, find the repo root and verify defaults silently
 REPO_ROOT=$(git rev-parse --show-toplevel)
 ```
 
-| Setting | Default | How to verify |
-|---|---|---|
-| UI project path | `$REPO_ROOT/frontend/packages/syntara-ui` | `ls $REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts` |
-| Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f $REPO_ROOT/backend/.secrets/admin-password` |
-| CA cert path | `$REPO_ROOT/backend/.secrets/certs/ca.pem` | `test -f $REPO_ROOT/backend/.secrets/certs/ca.pem` |
-| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health` |
-| Frontend URL | `http://localhost:5173` | `curl -sf http://localhost:5173 -o /dev/null` |
+| Setting             | Default                                      | How to verify                                                                              |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| UI project path     | `$REPO_ROOT/frontend/packages/syntara-ui`    | `ls $REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts`                          |
+| Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f $REPO_ROOT/backend/.secrets/admin-password`                                       |
+| CA cert path        | `$REPO_ROOT/backend/.secrets/certs/ca.pem`   | `test -f $REPO_ROOT/backend/.secrets/certs/ca.pem`                                         |
+| Backend URL         | `https://localhost:8000`                     | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health` |
+| Frontend URL        | `http://localhost:5173`                      | `curl -sf http://localhost:5173 -o /dev/null`                                              |
 
 Use the results to inform the wizard — if a check fails, mention it in the question so the user knows something needs attention.
 
@@ -53,7 +53,7 @@ Use the results to inform the wizard — if a check fails, mention it in the que
 Present a single `AskUserQuestion` with these questions:
 
 1. **Mode** — "Run against real backend or mock API?"
-   - **Real backend (Recommended)** — Tests against live Nexus API, database, and auth. Requires backend + frontend to be running.
+   - **Real backend (Recommended)** — Tests against live Syntara API, database, and auth. Requires backend + frontend to be running.
    - **Mock API** — Self-contained, Playwright auto-starts mock API + UI. No services needed.
 
 2. **What to run** — "Which tests?"
@@ -145,6 +145,7 @@ npx playwright test $TEST_ARGS)
 ```
 
 If the user provided a custom admin password path, backend URL, or frontend URL, substitute those values. `$TEST_ARGS` is:
+
 - All tests: _(empty)_
 - Specific file: `e2e/workflows.spec.ts` (or whatever the user specified)
 - By pattern: `--grep "pattern"`
@@ -185,14 +186,14 @@ Keep the report concise — the user should be able to see the result at a glanc
 
 ### Environment variables
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:3300` | Backend URL for direct API calls in test fixtures |
-| `SYNTARA_E2E_SKIP_WEB_SERVER` | _(unset)_ | Set to `1` to skip auto-starting servers |
-| `SYNTARA_E2E_BASE_URL` | `http://localhost:4173` | UI URL for browser navigation |
-| `SYNTARA_E2E_PORT` | `4173` | UI server port (mock mode only) |
-| `SYNTARA_E2E_API_PORT` | `3300` | Mock API port (mock mode only) |
-| `SYNTARA_E2E_PASSWORD` | _(unset)_ | Admin password for real backend login |
+| Variable                      | Default                 | Purpose                                           |
+| ----------------------------- | ----------------------- | ------------------------------------------------- |
+| `VITE_API_URL`                | `http://localhost:3300` | Backend URL for direct API calls in test fixtures |
+| `SYNTARA_E2E_SKIP_WEB_SERVER` | _(unset)_               | Set to `1` to skip auto-starting servers          |
+| `SYNTARA_E2E_BASE_URL`        | `http://localhost:4173` | UI URL for browser navigation                     |
+| `SYNTARA_E2E_PORT`            | `4173`                  | UI server port (mock mode only)                   |
+| `SYNTARA_E2E_API_PORT`        | `3300`                  | Mock API port (mock mode only)                    |
+| `SYNTARA_E2E_PASSWORD`        | _(unset)_               | Admin password for real backend login             |
 
 ### Admin password
 
@@ -245,24 +246,24 @@ npx playwright show-trace test-results/*/trace.zip
 
 ### Troubleshooting
 
-| Problem | Cause | Fix |
-|---|---|---|
-| Connection refused | Servers not running | Start with `make dev` or check URLs |
-| SYNTARA_E2E_PASSWORD required | Missing password env var | Set it: `SYNTARA_E2E_PASSWORD=$(cat <path>)` |
-| "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
-| Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make -C backend secrets` then `make admin-password` |
-| API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
-| Port conflicts | Stale processes | `kill-port 3300 4173` |
-| Visual regression tests skipped | Expected in real backend mode | These only run in mock mode with deterministic data |
+| Problem                         | Cause                                      | Fix                                                                                        |
+| ------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Connection refused              | Servers not running                        | Start with `make dev` or check URLs                                                        |
+| SYNTARA_E2E_PASSWORD required   | Missing password env var                   | Set it: `SYNTARA_E2E_PASSWORD=$(cat <path>)`                                               |
+| "Incorrect login credentials"   | Password file and database are out of sync | Run `make admin-password` from repo root to sync                                           |
+| Login errors (other)            | Wrong password file or unseeded DB         | Regenerate: `make -C backend secrets` then `make admin-password`                           |
+| API 404s in mock mode           | UI started without correct VITE_API_URL    | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
+| Port conflicts                  | Stale processes                            | `kill-port 3300 4173`                                                                      |
+| Visual regression tests skipped | Expected in real backend mode              | These only run in mock mode with deterministic data                                        |
 
 ### What works where
 
-| Tests | Mock API | Real Backend |
-|---|---|---|
-| CRUD workflows, credentials, integrations | Yes | Yes |
-| Builder interactions | Yes | Yes |
-| Filtering, search, pagination | Yes (seed data) | Yes (if data exists) |
-| Permission gating (viewer/auditor/user) | Yes (mock tokens) | Yes (real roles created) |
-| Visual regression | Yes | No (skipped) |
-| Journey tests (auth flows) | No (skipped) | Yes |
-| Role provisioning tests | No (skipped) | Yes |
+| Tests                                     | Mock API          | Real Backend             |
+| ----------------------------------------- | ----------------- | ------------------------ |
+| CRUD workflows, credentials, integrations | Yes               | Yes                      |
+| Builder interactions                      | Yes               | Yes                      |
+| Filtering, search, pagination             | Yes (seed data)   | Yes (if data exists)     |
+| Permission gating (viewer/auditor/user)   | Yes (mock tokens) | Yes (real roles created) |
+| Visual regression                         | Yes               | No (skipped)             |
+| Journey tests (auth flows)                | No (skipped)      | Yes                      |
+| Role provisioning tests                   | No (skipped)      | Yes                      |

@@ -30,13 +30,13 @@ export type ClaimMappingFieldsProps = {
 }
 
 function buildOptions(
-  nexusField: string,
+  syntaraField: string,
   claimsSupported: string[] | null | undefined,
   claimAliases: Record<string, string[]> | null | undefined
 ): string[] | null {
   if (!claimsSupported) return null
 
-  const aliases = claimAliases?.[nexusField] ?? []
+  const aliases = claimAliases?.[syntaraField] ?? []
   const aliasSet = new Set(aliases)
   const matched = claimsSupported.filter((c) => aliasSet.has(c))
   const rest = claimsSupported.filter((c) => !aliasSet.has(c))

@@ -12,7 +12,7 @@
  * 4. Otherwise → deny
  *
  * SECURITY NOTE: This is a UX-only check. The backend ALWAYS validates and returns 403.
- * See nexus/approvals/services/approval_service.py:_is_user_authorized_approver()
+ * See syntara/approvals/services/approval_service.py:_is_user_authorized_approver()
  */
 
 import type { ApprovalWithDetails } from './Approvals'

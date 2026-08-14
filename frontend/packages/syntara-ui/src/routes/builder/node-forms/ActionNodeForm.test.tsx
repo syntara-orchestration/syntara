@@ -289,7 +289,7 @@ describe('ActionNodeForm', () => {
     fireEvent.drop(parametersField, {
       dataTransfer: {
         getData: (type: string) => {
-          if (type === 'application/json') return '{"type":"nexus/input-field"}'
+          if (type === 'application/json') return '{"type":"syntara/input-field"}'
           if (type === 'text/plain') return '${trigger.tier}'
           return ''
         },

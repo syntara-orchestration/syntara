@@ -1415,14 +1415,14 @@ export default function Workflows() {
 
 - Accepts an array of `string | null | undefined` segments (narrow → broad order)
 - Filters out falsy/blank values; trims remaining segments
-- Joins with `|` and appends the app title (from `VITE_APP_TITLE`, falls back to `'Nexus'`)
+- Joins with `|` and appends the app title (from `VITE_APP_TITLE`, falls back to `'Syntara'`)
 - Returns bare app title when all segments are empty
 
 Examples:
 
-- `toPageTitle(['Workflows'])` → `'Workflows | Nexus'`
-- `toPageTitle(['admin', 'Users'])` → `'admin | Users | Nexus'`
-- `toPageTitle([undefined])` → `'Nexus'`
+- `toPageTitle(['Workflows'])` → `'Workflows | Syntara'`
+- `toPageTitle(['admin', 'Users'])` → `'admin | Users | Syntara'`
+- `toPageTitle([undefined])` → `'Syntara'`
 
 ### Dynamic pages
 

@@ -89,7 +89,7 @@ test.describe('Page screenshots', { tag: '@local-only' }, () => {
 
       // Clear persisted project-selector state so every screenshot starts from
       // the same "All projects" baseline regardless of test ordering.
-      await page.evaluate(() => localStorage.removeItem('nexus-selected-project'))
+      await page.evaluate(() => localStorage.removeItem('syntara-selected-project'))
 
       // Navigate to the target page
       await page.goto(toAppUrl(entry.path))

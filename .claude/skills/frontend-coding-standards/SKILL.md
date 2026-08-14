@@ -48,13 +48,17 @@ Every API endpoint has a type-safe client generated from OpenAPI contracts. Raw 
 // ❌ BAD
 const response = await fetch(`/api/v1/credentials/${id}/workflows`, {
   headers: { Authorization: `Bearer ${token}` },
-})
-const data = (await response.json()) as { id: string; name: string }[]
+});
+const data = (await response.json()) as { id: string; name: string }[];
 
 // ✅ GOOD
-const { data } = credentialsClient.useQuery('get', '/credentials/{credential_id}/workflows', {
-  params: { path: { credential_id: id } },
-})
+const { data } = credentialsClient.useQuery(
+  "get",
+  "/credentials/{credential_id}/workflows",
+  {
+    params: { path: { credential_id: id } },
+  },
+);
 ```
 
 **Exception**: Pre-auth calls (e.g., fetching OIDC providers before login) where no token exists may use `fetch()` with a comment explaining why.
@@ -67,13 +71,13 @@ Prefer the object form with explicit `onRetry` for consistency and clear retry i
 
 ```typescript
 // ❌ BAD
-const queryState = useQueryState(query, 'Error loading credentials')
+const queryState = useQueryState(query, "Error loading credentials");
 
 // ✅ GOOD
 const queryState = useQueryState(query, {
-  title: 'Error loading credentials',
+  title: "Error loading credentials",
   onRetry: () => detachPromise(query.refetch()),
-})
+});
 ```
 
 ---
@@ -84,15 +88,18 @@ The typed API client already returns properly typed data. If the response type d
 
 ```typescript
 // ❌ BAD
-const credentials = data?.resources as Credential[]
+const credentials = data?.resources as Credential[];
 
 // ✅ GOOD — use the typed response directly
-const { data } = credentialsClient.useQuery('get', '/credentials')
-const credentials = data?.resources // Already typed as Credential[]
+const { data } = credentialsClient.useQuery("get", "/credentials");
+const credentials = data?.resources; // Already typed as Credential[]
 
 // ✅ GOOD — if narrowing is needed, use a type guard
 function isCredentialArray(value: unknown): value is Credential[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'object' && v !== null && 'id' in v)
+  return (
+    Array.isArray(value) &&
+    value.every((v) => typeof v === "object" && v !== null && "id" in v)
+  );
 }
 ```
 
@@ -122,17 +129,17 @@ Never use manual `useState` per field with hand-written validation. The project 
 
 ```typescript
 // ❌ BAD
-const [name, setName] = useState('')
-const [errors, setErrors] = useState({})
+const [name, setName] = useState("");
+const [errors, setErrors] = useState({});
 function validate() {
-  if (!name) setErrors({ name: 'Required' })
+  if (!name) setErrors({ name: "Required" });
 }
 
 // ✅ GOOD
-const schema = z.object({ name: z.string().min(1, 'Required') })
+const schema = z.object({ name: z.string().min(1, "Required") });
 const { register, handleSubmit } = useForm<FormData>({
-  resolver: zodResolver(schema, undefined, { mode: 'sync' }),
-})
+  resolver: zodResolver(schema, undefined, { mode: "sync" }),
+});
 ```
 
 ### Loading state: Use `isPending` from mutations, not `formState.isSubmitting`
@@ -166,16 +173,16 @@ When a form modal is always rendered (not unmounted), `defaultValues` only appli
 
 ```typescript
 // ❌ BAD — stale data on re-open
-const { register } = useForm({ defaultValues: { name: item?.name ?? '' } })
+const { register } = useForm({ defaultValues: { name: item?.name ?? "" } });
 
 // ✅ GOOD — reset when modal opens
-const { register, reset } = useForm({ defaultValues: { name: '' } })
+const { register, reset } = useForm({ defaultValues: { name: "" } });
 
 useEffect(() => {
   if (isOpen) {
-    reset({ name: item?.name ?? '', description: item?.description ?? '' })
+    reset({ name: item?.name ?? "", description: item?.description ?? "" });
   }
-}, [isOpen, item, reset])
+}, [isOpen, item, reset]);
 ```
 
 ---
@@ -204,11 +211,11 @@ const { handleToggle, handleDelete } = useCredentialActions(credential)
 
 ```typescript
 // ❌ BAD — same expression duplicated in BuilderWorkflowPageHeader.tsx and ExecutionDetail.tsx
-const isCancellable = status === 'pending' || status === 'running'
+const isCancellable = status === "pending" || status === "running";
 
 // ✅ GOOD — shared utility, single source of truth
-import { isExecutionCancellable } from '../utils/executionHelpers'
-const isCancellable = isExecutionCancellable(status)
+import { isExecutionCancellable } from "../utils/executionHelpers";
+const isCancellable = isExecutionCancellable(status);
 ```
 
 ### Code Review: Spotting Abstraction Opportunities
@@ -250,12 +257,12 @@ const isCancellable = isExecutionCancellable(status)
 
 ```tsx
 // ❌ BAD: Repeated logic in multiple components
-const [search, setSearch] = useState('')
-const fuse = new Fuse(items, { keys: ['name'] })
-const filtered = search ? fuse.search(search).map((r) => r.item) : items
+const [search, setSearch] = useState("");
+const fuse = new Fuse(items, { keys: ["name"] });
+const filtered = search ? fuse.search(search).map((r) => r.item) : items;
 
 // ✅ GOOD: Extract to hook
-const { search, setSearch, items: filtered } = useFuse(items, ['name'])
+const { search, setSearch, items: filtered } = useFuse(items, ["name"]);
 ```
 
 #### Review Questions to Ask
@@ -467,39 +474,42 @@ if (status === 'active') { ... }      // API contract value
 ```typescript
 if (parsed.cadence) {
   // parsed.cadence is the ISO duration like 'P1D', not 'Daily'
-  parts.push(`Repeats ${cadence.toLowerCase()}`)
+  parts.push(`Repeats ${cadence.toLowerCase()}`);
 }
 ```
 
 **2. Use TypeScript union types:**
 
 ```typescript
-type CadenceValue = 'none' | 'daily' | 'weekly' | 'monthly' | 'annually'
+type CadenceValue = "none" | "daily" | "weekly" | "monthly" | "annually";
 
 // Compare internal values
-if (cadence === 'daily') {
-  return 'P1D'
+if (cadence === "daily") {
+  return "P1D";
 }
 
 // Map to display strings separately
 const cadenceLabels: Record<CadenceValue, string> = {
-  none: 'Does not repeat',
-  daily: 'Daily',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  annually: 'Annually',
-}
+  none: "Does not repeat",
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  annually: "Annually",
+};
 ```
 
 **3. Use value-to-label mapping:**
 
 ```typescript
-const statusMap: Record<StatusValue, { label: string; variant: 'success' | 'danger' }> = {
-  approved: { label: 'Approved', variant: 'success' },
-  rejected: { label: 'Rejected', variant: 'danger' },
-  pending: { label: 'Pending', variant: 'warning' },
-}
-const config = statusMap[apiStatus] // Use value for logic, label for display
+const statusMap: Record<
+  StatusValue,
+  { label: string; variant: "success" | "danger" }
+> = {
+  approved: { label: "Approved", variant: "success" },
+  rejected: { label: "Rejected", variant: "danger" },
+  pending: { label: "Pending", variant: "warning" },
+};
+const config = statusMap[apiStatus]; // Use value for logic, label for display
 ```
 
 ### Allowed String Comparisons
@@ -534,15 +544,15 @@ String literals in comparisons and assignments are error-prone. A single typo in
 
 ```typescript
 // ❌ BAD: Typo-prone, no compile-time safety
-if (activity.type === 'condition') {
+if (activity.type === "condition") {
   // works
 }
-if (activity.type === 'condtion') {
+if (activity.type === "condtion") {
   // typo! No TypeScript error — this condition will never match (silent bug)
 }
 
 // ❌ BAD: Inconsistent casing
-if (edge.sourceHandle === 'Loop') {
+if (edge.sourceHandle === "Loop") {
   // Should be 'loop' — never matches (silent bug)
 }
 ```
@@ -564,42 +574,47 @@ if (activity.type === ActivityTypeEnum.CONDTION) {
 The codebase provides centralized enum constants in `@syntara/contracts`:
 
 ```typescript
-import { ActivityTypeEnum, TriggerTypeEnum, ExecutorTypeEnum, EdgeHandleEnum } from '@syntara/contracts'
+import {
+  ActivityTypeEnum,
+  TriggerTypeEnum,
+  ExecutorTypeEnum,
+  EdgeHandleEnum,
+} from "@syntara/contracts";
 
 // Activity types (v2 — executor types are first-class node types, no 'task' wrapper)
-ActivityTypeEnum.SCRIPT // 'script'
-ActivityTypeEnum.HTTP_REQUEST // 'http_request'
-ActivityTypeEnum.AGENTIC // 'agentic'
-ActivityTypeEnum.AAP_JOB_TEMPLATE // 'aap_job_template'
-ActivityTypeEnum.APPROVAL // 'approval'
-ActivityTypeEnum.CONDITION // 'condition'
-ActivityTypeEnum.LOOP // 'loop'
-ActivityTypeEnum.CONVERGE // 'converge'
+ActivityTypeEnum.SCRIPT; // 'script'
+ActivityTypeEnum.HTTP_REQUEST; // 'http_request'
+ActivityTypeEnum.AGENTIC; // 'agentic'
+ActivityTypeEnum.AAP_JOB_TEMPLATE; // 'aap_job_template'
+ActivityTypeEnum.APPROVAL; // 'approval'
+ActivityTypeEnum.CONDITION; // 'condition'
+ActivityTypeEnum.LOOP; // 'loop'
+ActivityTypeEnum.CONVERGE; // 'converge'
 
 // Trigger types
-TriggerTypeEnum.MANUAL_TRIGGER // 'manual_trigger'
-TriggerTypeEnum.SCHEDULED // 'scheduled'
-TriggerTypeEnum.EVENT // 'event'
-TriggerTypeEnum.WEBHOOK_TRIGGER // 'webhook_trigger'
-TriggerTypeEnum.EDA_TRIGGER // 'eda_trigger'
+TriggerTypeEnum.MANUAL_TRIGGER; // 'manual_trigger'
+TriggerTypeEnum.SCHEDULED; // 'scheduled'
+TriggerTypeEnum.EVENT; // 'event'
+TriggerTypeEnum.WEBHOOK_TRIGGER; // 'webhook_trigger'
+TriggerTypeEnum.EDA_TRIGGER; // 'eda_trigger'
 
 // Executor types (v2 — executor types are the node type directly, no task.executor wrapper)
-ExecutorTypeEnum.SCRIPT // 'script'
-ExecutorTypeEnum.HTTP_REQUEST // 'http_request'
-ExecutorTypeEnum.AGENTIC // 'agentic'
-ExecutorTypeEnum.AAP_JOB_TEMPLATE // 'aap_job_template'
-ExecutorTypeEnum.APPROVAL // 'approval'
+ExecutorTypeEnum.SCRIPT; // 'script'
+ExecutorTypeEnum.HTTP_REQUEST; // 'http_request'
+ExecutorTypeEnum.AGENTIC; // 'agentic'
+ExecutorTypeEnum.AAP_JOB_TEMPLATE; // 'aap_job_template'
+ExecutorTypeEnum.APPROVAL; // 'approval'
 
 // Edge handles
-EdgeHandleEnum.SOURCE // 'source'
-EdgeHandleEnum.TARGET // 'target'
-EdgeHandleEnum.LOOP // 'loop'
-EdgeHandleEnum.DONE // 'done'
-EdgeHandleEnum.END // 'end'
-EdgeHandleEnum.TRUE // 'true'
-EdgeHandleEnum.FALSE // 'false'
-EdgeHandleEnum.APPROVED // 'approved'
-EdgeHandleEnum.REJECTED // 'rejected'
+EdgeHandleEnum.SOURCE; // 'source'
+EdgeHandleEnum.TARGET; // 'target'
+EdgeHandleEnum.LOOP; // 'loop'
+EdgeHandleEnum.DONE; // 'done'
+EdgeHandleEnum.END; // 'end'
+EdgeHandleEnum.TRUE; // 'true'
+EdgeHandleEnum.FALSE; // 'false'
+EdgeHandleEnum.APPROVED; // 'approved'
+EdgeHandleEnum.REJECTED; // 'rejected'
 ```
 
 ### When to Use Enum Constants
@@ -694,14 +709,14 @@ import {
   isServiceUnavailableError,
   isValidationError,
   isConflictError,
-} from '../utils/apiErrors'
+} from "../utils/apiErrors";
 
 // ✅ GOOD
-const message = getErrorMessage(error)
-const title = getErrorTitle(error)
+const message = getErrorMessage(error);
+const title = getErrorTitle(error);
 
 // ❌ BAD
-const message = error.detail || error.message // Don't access directly
+const message = error.detail || error.message; // Don't access directly
 ```
 
 ### Error Codes
@@ -732,14 +747,20 @@ After a state transition (cancel, delete, update), invalidate **all** related qu
 
 ```typescript
 // ❌ BAD — activity list still shows "running" after cancellation
-queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}'] })
+queryClient.invalidateQueries({
+  queryKey: ["get", "/executions/{execution_id}"],
+});
 
 // ✅ GOOD — invalidate the execution AND its activities
 Promise.all([
-  queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}'] }),
-  queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}/activities'] }),
-  queryClient.invalidateQueries({ queryKey: ['get', '/executions'] }),
-])
+  queryClient.invalidateQueries({
+    queryKey: ["get", "/executions/{execution_id}"],
+  }),
+  queryClient.invalidateQueries({
+    queryKey: ["get", "/executions/{execution_id}/activities"],
+  }),
+  queryClient.invalidateQueries({ queryKey: ["get", "/executions"] }),
+]);
 ```
 
 ### Retry Support
@@ -748,22 +769,22 @@ For retryable errors, pass an `onRetry` callback:
 
 ```typescript
 // Query retry support
-const query = workflowClient.useQuery('get', '/workflows')
+const query = workflowClient.useQuery("get", "/workflows");
 const queryState = useQueryState(query, {
-  title: 'Error loading workflows',
+  title: "Error loading workflows",
   onRetry: () => detachPromise(query.refetch()),
-})
+});
 
 // Mutation retry support
-const handleError = useMutationErrorHandler()
-const { mutate } = workflowClient.useMutation('post', '/workflows')
+const handleError = useMutationErrorHandler();
+const { mutate } = workflowClient.useMutation("post", "/workflows");
 
 mutate(data, {
   onError: handleError({
-    title: 'Failed to create workflow',
+    title: "Failed to create workflow",
     onRetryable: () => setShowRetry(true),
   }),
-})
+});
 ```
 
 ### Retry Button in Error States
@@ -855,11 +876,11 @@ Uses `titleIconVariant="warning"` but **no** `destructiveAcknowledgement` checkb
 
 ```typescript
 // ❌ BAD
-const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-const [itemToDelete, setItemToDelete] = useState<User | null>(null)
+const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+const [itemToDelete, setItemToDelete] = useState<User | null>(null);
 
 // ✅ GOOD
-const deleteDialog = useDialogState<User>()
+const deleteDialog = useDialogState<User>();
 // Open: deleteDialog.open(user)
 // Close: deleteDialog.close()
 // Use: deleteDialog.isOpen, deleteDialog.item
@@ -871,10 +892,14 @@ const deleteDialog = useDialogState<User>()
 
 ```typescript
 // ❌ BAD — 50+ lines repeated per list view (also: do not wire useSortState / useColumnSortState separately)
-const [cursor, setCursor] = useState<string | null>(null)
-const { filters, clearAllFilters, setAllFilters } = useFilterState()
-const filterParams = buildFilterParams(filters)
-const queryParams = { limit: 20, ...filterParams, ...(cursor ? { cursor } : {}) }
+const [cursor, setCursor] = useState<string | null>(null);
+const { filters, clearAllFilters, setAllFilters } = useFilterState();
+const filterParams = buildFilterParams(filters);
+const queryParams = {
+  limit: 20,
+  ...filterParams,
+  ...(cursor ? { cursor } : {}),
+};
 
 // ✅ GOOD — filters + sort + cursor in one hook
 const {
@@ -894,7 +919,7 @@ const {
   transformFilters,
   defaultSort, // optional — URL-synced sort merged into queryParams
   columns, // optional — PatternFly getSortParams / handleSort
-})
+});
 ```
 
 ---
@@ -915,14 +940,14 @@ There is **no ESLint rule** in this repo that matches that Sonar check narrowly;
 // ❌ BAD — recreated each render; avoid when the helper is pure
 function MyForm() {
   function formatLabel(id: string) {
-    return id.toUpperCase()
+    return id.toUpperCase();
   }
   // ...
 }
 
 // ✅ GOOD — module scope (or a colocated `*.utils.ts` if large)
 function formatLabel(id: string) {
-  return id.toUpperCase()
+  return id.toUpperCase();
 }
 
 function MyForm() {
@@ -990,12 +1015,12 @@ Sonar rule **typescript:S7776** (_Arrays used only for existence checks should b
 
 ```typescript
 // ❌ Non-compliant (Sonar S7776) — array used only as a membership bag
-const allowedValues = [1, 2, 3, 4, 5]
-const isAllowed = (value: number) => allowedValues.includes(value)
+const allowedValues = [1, 2, 3, 4, 5];
+const isAllowed = (value: number) => allowedValues.includes(value);
 
 // ✅ Compliant — Set for existence
-const allowedValues = new Set([1, 2, 3, 4, 5])
-const isAllowed = (value: number) => allowedValues.has(value)
+const allowedValues = new Set([1, 2, 3, 4, 5]);
+const isAllowed = (value: number) => allowedValues.has(value);
 ```
 
 ---
@@ -1053,28 +1078,28 @@ When a custom hook computes derived data (maps, sorted arrays, filtered lists) f
 ```typescript
 // ❌ BAD — new Map and sorted array on every render
 export function useResourceActions() {
-  const { data } = accessClient.useQuery('get', '/authz/resource-actions')
-  const ra = data?.resource_actions ?? {}
-  const resourceTypes = Object.keys(ra).sort()
-  const actionsByResource = new Map(Object.entries(ra))
-  return { resourceTypes, actionsByResource }
+  const { data } = accessClient.useQuery("get", "/authz/resource-actions");
+  const ra = data?.resource_actions ?? {};
+  const resourceTypes = Object.keys(ra).sort();
+  const actionsByResource = new Map(Object.entries(ra));
+  return { resourceTypes, actionsByResource };
 }
 
 // ✅ GOOD — stable references when data hasn't changed
 export function useResourceActions() {
-  const { data } = accessClient.useQuery('get', '/authz/resource-actions')
+  const { data } = accessClient.useQuery("get", "/authz/resource-actions");
   const { resourceTypes, actionsByResource } = useMemo(() => {
-    const ra: Record<string, string[]> = data?.resource_actions ?? {}
+    const ra: Record<string, string[]> = data?.resource_actions ?? {};
     return {
       resourceTypes: Object.keys(ra).sort(),
       actionsByResource: new Map(
         Object.entries(ra)
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, v]) => [k, [...v].sort((a, b) => a.localeCompare(b))])
+          .map(([k, v]) => [k, [...v].sort((a, b) => a.localeCompare(b))]),
       ),
-    }
-  }, [data])
-  return { resourceTypes, actionsByResource }
+    };
+  }, [data]);
+  return { resourceTypes, actionsByResource };
 }
 ```
 
@@ -1103,10 +1128,12 @@ export function useResourceActions() {
 
 ```typescript
 // ❌ BAD — at most 100 projects, no second page
-accessClient.useQuery('get', '/projects', { params: { query: { limit: 100 } } })
+accessClient.useQuery("get", "/projects", {
+  params: { query: { limit: 100 } },
+});
 
 // ✅ GOOD — shared hook, all pages merged, React Query dedupes across consumers
-const { projects } = useAllProjects()
+const { projects } = useAllProjects();
 ```
 
 ---
@@ -1133,16 +1160,16 @@ const { projects } = useAllProjects()
 
 ```typescript
 // ❌ BAD — extra render cycle
-const [fullName, setFullName] = useState('')
+const [fullName, setFullName] = useState("");
 useEffect(() => {
-  setFullName(`${firstName} ${lastName}`)
-}, [firstName, lastName])
+  setFullName(`${firstName} ${lastName}`);
+}, [firstName, lastName]);
 
 // ✅ GOOD — calculate during render
-const fullName = `${firstName} ${lastName}`
+const fullName = `${firstName} ${lastName}`;
 
 // ✅ GOOD — expensive computation
-const filtered = useMemo(() => items.filter(expensivePredicate), [items])
+const filtered = useMemo(() => items.filter(expensivePredicate), [items]);
 ```
 
 #### B. Cascading form field resets — use `onChange` handlers
@@ -1168,14 +1195,14 @@ useEffect(() => {
 ```typescript
 // ❌ BAD — parent updates after child renders
 useEffect(() => {
-  onChange(isOn)
-}, [isOn, onChange])
+  onChange(isOn);
+}, [isOn, onChange]);
 
 // ✅ GOOD — update both in the same handler
 function handleToggle() {
-  const next = !isOn
-  setIsOn(next)
-  onChange(next)
+  const next = !isOn;
+  setIsOn(next);
+  onChange(next);
 }
 ```
 
@@ -1443,32 +1470,36 @@ Before writing a new hook or utility:
 ```typescript
 // ❌ BAD - manual useEffect + useState for an API call (loses caching, dedup, retry)
 function useCanI(action: string, resourceType: string) {
-  const [allowed, setAllowed] = useState(false)
-  const [isChecking, setIsChecking] = useState(true)
+  const [allowed, setAllowed] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     accessFetchClient
-      .POST('/authz/can_i', { body: { action, resource_type: resourceType } })
+      .POST("/authz/can_i", { body: { action, resource_type: resourceType } })
       .then(({ data }) => {
-        if (!cancelled) setAllowed(data?.allowed === true)
+        if (!cancelled) setAllowed(data?.allowed === true);
       })
       .finally(() => {
-        if (!cancelled) setIsChecking(false)
-      })
+        if (!cancelled) setIsChecking(false);
+      });
     return () => {
-      cancelled = true
-    }
-  }, [action, resourceType])
-  return { allowed, isChecking }
+      cancelled = true;
+    };
+  }, [action, resourceType]);
+  return { allowed, isChecking };
 }
 
 // ✅ GOOD - TanStack Query handles caching, dedup, retry, and DevTools
 // (this is the actual implementation in hooks/useCanI.ts)
-function useCanI(action: string, resourceType: string, options?: UseCanIOptions) {
+function useCanI(
+  action: string,
+  resourceType: string,
+  options?: UseCanIOptions,
+) {
   const { data, isLoading, isError } = useQuery({
     queryKey: [
-      'authz',
-      'can_i',
+      "authz",
+      "can_i",
       {
         action,
         resource_type: resourceType,
@@ -1476,14 +1507,14 @@ function useCanI(action: string, resourceType: string, options?: UseCanIOptions)
       },
     ],
     queryFn: () =>
-      accessFetchClient.POST('/authz/can_i', {
+      accessFetchClient.POST("/authz/can_i", {
         body: { action, resource_type: resourceType },
       }),
     select: (res) => res.data?.allowed === true,
     staleTime: Infinity,
     retry: false,
-  })
-  return { allowed: data ?? false, isChecking: isLoading, isError }
+  });
+  return { allowed: data ?? false, isChecking: isLoading, isError };
 }
 ```
 
@@ -1510,8 +1541,14 @@ All CRUD and destructive actions must be gated by permissions. See [`frontend/do
 
 ```tsx
 // Use DisabledWithTooltip + isAriaDisabled for action buttons
-<DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
-  <Button isAriaDisabled={!permissions.canCreate} onClick={permissions.canCreate ? handleCreate : undefined}>
+<DisabledWithTooltip
+  isDisabled={!permissions.canCreate}
+  content={permissions.tooltips.create}
+>
+  <Button
+    isAriaDisabled={!permissions.canCreate}
+    onClick={permissions.canCreate ? handleCreate : undefined}
+  >
     Create
   </Button>
 </DisabledWithTooltip>
@@ -1533,7 +1570,7 @@ For kebab menu items, use `isAriaDisabled` and `tooltipProps`:
 Always use `permissionTooltip()` from `hooks/permissionUtils.ts` for consistent copy:
 
 ```tsx
-permissionTooltip('create a workflow', 'workflow:create')
+permissionTooltip("create a workflow", "workflow:create");
 // → "To create a workflow, you need a role with the workflow:create policy. Contact your Admin to request access."
 ```
 
@@ -1557,8 +1594,12 @@ In `navigationItems.tsx`, use `requiredPermissions` (array, OR logic) for visibi
 Detail pages conditionally show/hide tabs based on permissions. Use a `use*DetailPermissions` hook:
 
 ```tsx
-const { canReadGroups, canReadAssignments } = useUserDetailPermissions(userId)
-const visibleTabs = computeVisibleTabs(canReadGroups, canReadAssignments, isLoading)
+const { canReadGroups, canReadAssignments } = useUserDetailPermissions(userId);
+const visibleTabs = computeVisibleTabs(
+  canReadGroups,
+  canReadAssignments,
+  isLoading,
+);
 ```
 
 When a user views their own profile, apply a self-permission exception (`isSelf`) so tabs like Groups and Identities remain visible even without system-wide read permission.
@@ -1568,7 +1609,7 @@ When a user views their own profile, apply a self-permission exception (`isSelf`
 For editor-style pages where many controls depend on a single permission, use a `canEdit` flag from the domain hook instead of wrapping every control individually:
 
 ```tsx
-const { canEdit, tooltips } = useBuilderPermissions(isNew)
+const { canEdit, tooltips } = useBuilderPermissions(isNew);
 // canEdit = isNew ? canCreate : canUpdate
 // Builder enters full read-only mode when canEdit is false
 ```
@@ -1578,7 +1619,7 @@ const { canEdit, tooltips } = useBuilderPermissions(isNew)
 After role or assignment mutations, invalidate all permission caches:
 
 ```tsx
-queryClient.invalidateQueries({ queryKey: ['authz', 'can_i'] })
+queryClient.invalidateQueries({ queryKey: ["authz", "can_i"] });
 ```
 
 ### Mock API
@@ -1627,11 +1668,11 @@ Do not ship `// TODO`, `// FIXME`, `// HACK`, or `// XXX` comments in PRs. These
 ```typescript
 // ❌ BAD — deferred work hidden in code
 // TODO: Replace with generated type once switch schema is added to the OpenAPI spec bundle
-export type SwitchConfig = { cases: Array<{ label: string }> }
+export type SwitchConfig = { cases: Array<{ label: string }> };
 
 // ✅ GOOD — use the best type available now, track the follow-up in an issue
 /** Switch step configuration. Uses inline type until the OpenAPI spec includes the switch schema (#XXXXX). */
-export type SwitchConfig = { cases: Array<{ label: string }> }
+export type SwitchConfig = { cases: Array<{ label: string }> };
 ```
 
 **Why:**
@@ -1693,7 +1734,7 @@ The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode th
 2. Use it in your component -- the `DocKey` type updates automatically from the JSON:
 
 ```typescript
-const docLink = useDocLink('myNewPage')
+const docLink = useDocLink("myNewPage");
 ```
 
 3. Pass it to `NxPageHeader`:
@@ -1706,10 +1747,10 @@ const docLink = useDocLink('myNewPage')
 
 Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). Do not use `VITE_DOC_MODE` or `VITE_APP_MODE` — they are ignored.
 
-| Build | Help link |
-|-------|-----------|
-| Community | Always community README for every key |
-| Extended | Per-key product URL when configured, otherwise community README |
+| Build     | Help link                                                       |
+| --------- | --------------------------------------------------------------- |
+| Community | Always community README for every key                           |
+| Extended  | Per-key product URL when configured, otherwise community README |
 
 ### Rules
 
@@ -1875,7 +1916,7 @@ export default function Workflows() {
 - **Static pages**: pass a string literal — `toPageTitle(['Credentials'])`
 - **Dynamic pages**: pass the entity name — `toPageTitle([integration.name])` (falls back gracefully if undefined/null)
 - **Loading/error states**: use a static fallback — `toPageTitle(['Integration'])`
-- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Nexus`
+- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Syntara`
 
 ## 38. React 19 Ref Patterns — No `forwardRef`; Prefer Ref Cleanup Functions
 
@@ -1885,13 +1926,18 @@ React 19 passes `ref` as a regular prop. Prefer the patterns below for all new a
 
 ```tsx
 // ❌ BAD — React 19 makes forwardRef unnecessary
-export const NxPanel = forwardRef<HTMLDivElement, NxPanelProps>(function NxPanel(props, ref) {
-  return <Panel ref={ref} {...props} />
-})
+export const NxPanel = forwardRef<HTMLDivElement, NxPanelProps>(
+  function NxPanel(props, ref) {
+    return <Panel ref={ref} {...props} />;
+  },
+);
 
 // ✅ GOOD — accept ref as a regular prop
-export function NxPanel({ ref, ...props }: NxPanelProps & { ref?: Ref<HTMLDivElement> }) {
-  return <Panel ref={ref} {...props} />
+export function NxPanel({
+  ref,
+  ...props
+}: NxPanelProps & { ref?: Ref<HTMLDivElement> }) {
+  return <Panel ref={ref} {...props} />;
 }
 ```
 
@@ -1903,22 +1949,22 @@ When attaching DOM listeners or observers to a mounted element, return a cleanup
 
 ```tsx
 // ❌ BAD — paired useRef + useEffect for element lifecycle
-const scrollRef = useRef<HTMLDivElement>(null)
+const scrollRef = useRef<HTMLDivElement>(null);
 useEffect(() => {
-  const el = scrollRef.current
-  if (!el) return
-  el.addEventListener('scroll', onScroll, { passive: true })
-  return () => el.removeEventListener('scroll', onScroll)
-}, [])
+  const el = scrollRef.current;
+  if (!el) return;
+  el.addEventListener("scroll", onScroll, { passive: true });
+  return () => el.removeEventListener("scroll", onScroll);
+}, []);
 
 // ✅ GOOD — React 19 calls the returned cleanup when the node unmounts
 const scrollRef = useCallback((node: HTMLElement | null) => {
-  if (!node) return
-  node.addEventListener('scroll', onScroll, { passive: true })
+  if (!node) return;
+  node.addEventListener("scroll", onScroll, { passive: true });
   return () => {
-    node.removeEventListener('scroll', onScroll)
-  }
-}, [])
+    node.removeEventListener("scroll", onScroll);
+  };
+}, []);
 ```
 
 Wrap callback refs that return cleanups in `useCallback`. A new function identity each render makes React run the previous cleanup and re-attach listeners even when the DOM node is unchanged.
@@ -1931,12 +1977,12 @@ React 19's [`use`](https://react.dev/reference/react/use) reads context (and oth
 
 ```tsx
 // ❌ BAD — legacy useContext
-import { useContext } from 'react'
-const value = useContext(AlertContext)
+import { useContext } from "react";
+const value = useContext(AlertContext);
 
 // ✅ GOOD — React 19 use()
-import { use } from 'react'
-const value = use(AlertContext)
+import { use } from "react";
+const value = use(AlertContext);
 ```
 
 `use(Context)` is the standard for reading React context in this codebase. Keep using domain hooks that wrap it (`useAlerts`, `useBrand`, `useDocLink`, etc.) — migrate the implementation inside those hooks, not every call site that already goes through a hook.
@@ -1946,22 +1992,26 @@ const value = use(AlertContext)
 When a mutation has a clear before/after UI (toggles, counters, list membership), prefer React 19 [`useOptimistic`](https://react.dev/reference/react/useOptimistic) so the UI updates immediately and rolls back if the Action fails.
 
 ```tsx
-import { startTransition, useOptimistic } from 'react'
+import { startTransition, useOptimistic } from "react";
 
-const [optimisticItems, setOptimisticItems] = useOptimistic(items, (current, update: EnabledUpdate) =>
-  current.map((item) => (item.id === update.id ? { ...item, enabled: update.enabled } : item))
-)
+const [optimisticItems, setOptimisticItems] = useOptimistic(
+  items,
+  (current, update: EnabledUpdate) =>
+    current.map((item) =>
+      item.id === update.id ? { ...item, enabled: update.enabled } : item,
+    ),
+);
 
 function setEnabled(item: Item, enabled: boolean) {
   startTransition(async () => {
-    setOptimisticItems({ id: item.id, enabled })
+    setOptimisticItems({ id: item.id, enabled });
     try {
-      await mutateAsync({ body: { enabled } })
-      await refetch()
+      await mutateAsync({ body: { enabled } });
+      await refetch();
     } catch (error) {
-      showError(error) // base `items` unchanged → UI rolls back when the Action ends
+      showError(error); // base `items` unchanged → UI rolls back when the Action ends
     }
-  })
+  });
 }
 ```
 

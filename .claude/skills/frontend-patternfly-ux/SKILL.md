@@ -114,7 +114,7 @@ While PatternFly provides flexible building blocks, this project follows an **op
 | Source                                       | Description                                                                           |
 | -------------------------------------------- | ------------------------------------------------------------------------------------- |
 | **Compass Layout**                           | Layout architecture providing systematic page structure and spacing                   |
-| **UI Repository**                         | The opinionated PatternFly implementation — the reference for tables, filters, modals |
+| **UI Repository**                            | The opinionated PatternFly implementation — the reference for tables, filters, modals |
 | **PatternFly (https://www.patternfly.org/)** | The upstream design system; always check here first for component docs                |
 
 ### Key Experience Principles
@@ -137,15 +137,15 @@ Use a docked icon navigation (left sidebar) with PatternFly's [flyout panels com
 
 ### Behavior Rules
 
-| Interaction                      | Behavior                                      |
-| -------------------------------- | --------------------------------------------- |
-| Hover on nav item (no children)  | Show tooltip with label                       |
-| Hover on nav item (has children) | Show flyout panel with sub-items              |
-| Click on nav item (no children)  | Navigate to route                             |
-| Click on nav item (has children) | Navigate to first enabled child route         |
+| Interaction                      | Behavior                                             |
+| -------------------------------- | ---------------------------------------------------- |
+| Hover on nav item (no children)  | Show tooltip with label                              |
+| Hover on nav item (has children) | Show flyout panel with sub-items                     |
+| Click on nav item (no children)  | Navigate to route                                    |
+| Click on nav item (has children) | Navigate to first enabled child route                |
 | Click on flyout sub-item         | Navigate to that route, **close flyout immediately** |
-| Mouse leaves flyout              | Close flyout after 150ms delay (grace period) |
-| Mouse moves from icon to flyout  | Flyout stays open (no gap flicker)            |
+| Mouse leaves flyout              | Close flyout after 150ms delay (grace period)        |
+| Mouse moves from icon to flyout  | Flyout stays open (no gap flicker)                   |
 
 ---
 
@@ -183,19 +183,22 @@ Use `NxPanelContentStack` (from `frontend/packages/syntara-ui/src/components/lay
 
 The following four compositions are the canonical page structures. Storybook documents each as a composed story under `NxPage`.
 
-| Archetype          | Structure                                                                                                                        |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| **List page**      | `NxPageHeader` (Create CTA) → `NxPageBody` → `NxPanel isFullHeight` → `NxPanelContentStack variant="inset"` → filter bar + table |
-| **Detail page**    | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight` → `NxPanelContentStack` (default) → tabs + content                 |
+| Archetype          | Structure                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **List page**      | `NxPageHeader` (Create CTA) → `NxPageBody` → `NxPanel isFullHeight` → `NxPanelContentStack variant="inset"` → filter bar + table  |
+| **Detail page**    | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight` → `NxPanelContentStack` (default) → tabs + content                  |
 | **Form page**      | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight footer={<ActionGroup>…</ActionGroup>}` → form body (max-width 600px) |
-| **Error in panel** | Same shell as list page → `NxPageBody isCentered` + `NxErrorState` **inside** `NxPanel` (page header and shell remain visible)   |
+| **Error in panel** | Same shell as list page → `NxPageBody isCentered` + `NxErrorState` **inside** `NxPanel` (page header and shell remain visible)    |
 
 ### Sticky Form Footer
 
 Form submit and cancel buttons live in a **pinned footer at the bottom of the content panel**, not in the page header toolbar. Use the `NxPanel` `footer` prop:
 
 ```tsx
-<NxPanel isFullHeight footer={<ActionGroup>{/* Save + Cancel buttons */}</ActionGroup>}>
+<NxPanel
+  isFullHeight
+  footer={<ActionGroup>{/* Save + Cancel buttons */}</ActionGroup>}
+>
   {/* form body */}
 </NxPanel>
 ```
@@ -656,12 +659,12 @@ Use for single-field quick edits.
 
 Use when users need to inspect structured data (JSON, policy definitions, configuration) without leaving the list page. Triggered from a kebab menu action (e.g., "View policy JSON").
 
-| Element       | Specification                                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Element       | Specification                                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Modal variant | Large — PatternFly's [Modal Sizes](https://www.patternfly.org/components/modal#modal-sizes); dense read-only content (e.g., JSON) needs the extra width |
-| Title         | Descriptive label (e.g., "Policy definition")                                                                                     |
-| Body          | Read-only content with PatternFly's [Clipboard Copy](https://www.patternfly.org/components/clipboard-copy) when copying is useful |
-| Close button  | `variant="primary"` — the only action (no Cancel, no secondary)                                                                   |
+| Title         | Descriptive label (e.g., "Policy definition")                                                                                                           |
+| Body          | Read-only content with PatternFly's [Clipboard Copy](https://www.patternfly.org/components/clipboard-copy) when copying is useful                       |
+| Close button  | `variant="primary"` — the only action (no Cancel, no secondary)                                                                                         |
 
 ### Confirmation Dialog — Three-Tier Severity Model
 
@@ -833,11 +836,11 @@ The My Profile page (`/my-profile`) reuses the existing `UserDetail` component w
 
 Modal size is chosen by content, not a single fixed default — pick the [variant](https://www.patternfly.org/components/modal#modal-sizes) that matches what the modal actually contains:
 
-| Variant    | When to use                                                                                                  | Examples                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Small**  | Confirmation dialogs (`NxConfirmationDialog` defaults to `small` — see §6) and single-purpose forms with ~1–3 fields | Publish workflow, edit version name/description, assign a single role, import workflow           |
+| Variant    | When to use                                                                                                                                                                                                | Examples                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Small**  | Confirmation dialogs (`NxConfirmationDialog` defaults to `small` — see §6) and single-purpose forms with ~1–3 fields                                                                                       | Publish workflow, edit version name/description, assign a single role, import workflow           |
 | **Medium** | The default for most create/edit forms — typeahead/multi-select fields, dynamic schema-driven forms, JSON editors used for input. This is the right starting point for a new create/edit modal, not Small. | Create/edit credential, create/edit project, assign roles, add member, run workflow (mock input) |
-| **Large**  | Read-only dense content or review panels with substantial body content                                       | View JSON/policy definition, expanded code block, run-step mock data editor, approval review     |
+| **Large**  | Read-only dense content or review panels with substantial body content                                                                                                                                     | View JSON/policy definition, expanded code block, run-step mock data editor, approval review     |
 
 - Delete modals should use PatternFly's [Title Icon Modal component](https://www.patternfly.org/components/modal#title-icon)
 - **Buttons:**
@@ -992,13 +995,13 @@ Use `Label` only when visual distinction is needed — for statuses, categorical
 ### Component Selection
 
 | Content type                                                                          | Component                                           | Visual treatment            |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------- |
-| Live status of a monitored entity (execution, activity, approval, integration health) | `NxLabel variant="outline"` with `status` + icon     | Outlined with status color   |
-| Categorical metadata (System, Project, Built-in)                                      | `NxLabel` with `color`                              | Filled                        |
-| Counts, callouts (single-value, no type distinction)                                  | `NxLabel color="grey"`                              | Filled grey                   |
-| Informational context (e.g., "Test run", "Default")                                  | `NxLabel color="purple"` or `color="blue"`          | Filled colored                 |
-| User-authored tags, workflow tags                                                     | `NxUserTag`                                         | Outlined compact                |
-| Filter chips (active filters)                                                        | `Label variant="outline" isCompact` in `LabelGroup` | Outlined compact, removable      |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------- |
+| Live status of a monitored entity (execution, activity, approval, integration health) | `NxLabel variant="outline"` with `status` + icon    | Outlined with status color  |
+| Categorical metadata (System, Project, Built-in)                                      | `NxLabel` with `color`                              | Filled                      |
+| Counts, callouts (single-value, no type distinction)                                  | `NxLabel color="grey"`                              | Filled grey                 |
+| Informational context (e.g., "Test run", "Default")                                   | `NxLabel color="purple"` or `color="blue"`          | Filled colored              |
+| User-authored tags, workflow tags                                                     | `NxUserTag`                                         | Outlined compact            |
+| Filter chips (active filters)                                                         | `Label variant="outline" isCompact` in `LabelGroup` | Outlined compact, removable |
 
 **`NxLabel`** (from `frontend/packages/syntara-ui/src/components/labels/NxLabel.tsx`) — thin wrapper over PF `Label` with UX defaults: `isCompact={true}`, `variant="filled"`. Never use PF `Label` directly.
 
@@ -1008,12 +1011,12 @@ Use `Label` only when visual distinction is needed — for statuses, categorical
 
 The distinguishing axis is **"live status of a monitored entity" vs. "fixed categorical/contextual metadata,"** not how often the value happens to change:
 
-| Variant                           | When to use                                                                                                                              | Examples                                      |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Variant                           | When to use                                                                                                                              | Examples                                                                                                                                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Outline** (`variant="outline"`) | The label reports the current condition of a monitored entity — a process, resource, or decision whose state is determined by the system | Execution status (Running, Completed, Failed), activity status (Pending, Retrying), approval decisions (Approved, Rejected), "Pending approval" badge, integration health (Available, Error, Validating) |
-| **Filled** (default)              | The label classifies a resource into a fixed category, or conveys single-value contextual info                                          | Version status (Published, Draft), role type (Built-in, Custom), scope (System, Project), counts, informational badges (Test run, Default) |
+| **Filled** (default)              | The label classifies a resource into a fixed category, or conveys single-value contextual info                                           | Version status (Published, Draft), role type (Built-in, Custom), scope (System, Project), counts, informational badges (Test run, Default)                                                               |
 
-**Rule of thumb:** If the label is reporting the *live health/state of an entity* (an execution's progress, an integration's connectivity, an approval's decision) — regardless of how often that state actually changes — use **outline**. If the label is classifying *what kind of thing this is* (a role is built-in, a version is a draft) or conveying a one-off contextual fact (a count, "Test run"), use **filled**.
+**Rule of thumb:** If the label is reporting the _live health/state of an entity_ (an execution's progress, an integration's connectivity, an approval's decision) — regardless of how often that state actually changes — use **outline**. If the label is classifying _what kind of thing this is_ (a role is built-in, a version is a draft) or conveying a one-off contextual fact (a count, "Test run"), use **filled**.
 
 This mirrors common status-indicator conventions in comparable products (CI/CD pipeline status, service health badges): a single, consistent treatment is used for "current condition of a monitored entity" everywhere it appears, rather than varying by how volatile the state happens to be. A lighter outline treatment for statuses that repeat down a table column (executions list, integrations list) also keeps dense lists scannable — reserve heavier filled/saturated labels for lower-frequency categorical or single-value badges to avoid visual fatigue.
 
@@ -1022,25 +1025,28 @@ This mirrors common status-indicator conventions in comparable products (CI/CD p
 All domain status labels follow a consistent implementation pattern — a status-to-variant map, a status-to-icon map, and a thin component:
 
 ```tsx
-const statusMap: Record<MyStatus, 'success' | 'danger' | 'warning' | 'info' | 'custom'> = {
-  completed: 'success',
-  failed: 'danger',
-  running: 'custom',
-}
+const statusMap: Record<
+  MyStatus,
+  "success" | "danger" | "warning" | "info" | "custom"
+> = {
+  completed: "success",
+  failed: "danger",
+  running: "custom",
+};
 
 const statusIcons: Record<MyStatus, React.ComponentType> = {
   completed: RhUiCheckCircleIcon,
   failed: RhUiCloseCircleIcon,
   running: RhUiSyncIcon,
-}
+};
 
 export function MyStatusLabel({ status }: Readonly<{ status: MyStatus }>) {
-  const Icon = statusIcons[status]
+  const Icon = statusIcons[status];
   return (
     <NxLabel variant="outline" status={statusMap[status]} icon={<Icon />}>
       {displayLabels[status]}
     </NxLabel>
-  )
+  );
 }
 ```
 
@@ -1082,28 +1088,28 @@ Keep display labels in a separate constants file (e.g., `executionStatusConstant
 
 **Workflow builder**
 
-| Context              | Style          |
-| -------------------- | -------------- |
-| Test run badge       | Filled purple  |
-| Viewing version date | Filled grey    |
+| Context              | Style         |
+| -------------------- | ------------- |
+| Test run badge       | Filled purple |
+| Viewing version date | Filled grey   |
 
 **Integrations**
 
-| Context           | Style        |
-| ----------------- | ------------ |
-| Default model     | Filled blue  |
+| Context       | Style       |
+| ------------- | ----------- |
+| Default model | Filled blue |
 
 **Access Management — Assignments**
 
-| Dimension       | Value            | Style         |
-| --------------- | ---------------- | ------------- |
-| Type            | User             | Filled teal   |
-| Type            | Group            | Filled orange |
-| Type            | Service Account  | Filled purple |
-| Scope           | System           | Filled blue   |
-| Scope           | Project          | Filled green  |
-| Role name       | *(any)*          | Plain text (`Truncate`) — not a label |
-| Policy names    | *(any)*          | Filled grey   |
+| Dimension    | Value           | Style                                 |
+| ------------ | --------------- | ------------------------------------- |
+| Type         | User            | Filled teal                           |
+| Type         | Group           | Filled orange                         |
+| Type         | Service Account | Filled purple                         |
+| Scope        | System          | Filled blue                           |
+| Scope        | Project         | Filled green                          |
+| Role name    | _(any)_         | Plain text (`Truncate`) — not a label |
+| Policy names | _(any)_         | Filled grey                           |
 
 **Assignment table columns**
 
@@ -1213,18 +1219,18 @@ Every domain creates a `use{Domain}Permissions()` hook that encapsulates all per
 ```tsx
 // Return type pattern
 type WorkflowPermissions = {
-  canCreate: boolean
-  canUpdate: boolean
-  canDelete: boolean
-  canRun: boolean
-  isLoading: boolean
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canRun: boolean;
+  isLoading: boolean;
   tooltips: {
-    create: string
-    update: string
-    delete: string
-    run: string
-  }
-}
+    create: string;
+    update: string;
+    delete: string;
+    run: string;
+  };
+};
 ```
 
 **Naming conventions:**
@@ -1273,7 +1279,10 @@ Can user read this section?
 **Toolbar buttons — `DisabledWithTooltip` wrapper:**
 
 ```tsx
-<DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
+<DisabledWithTooltip
+  isDisabled={!permissions.canCreate}
+  content={permissions.tooltips.create}
+>
   <Button
     variant="primary"
     isAriaDisabled={!permissions.canCreate}
@@ -1436,7 +1445,7 @@ Workflows use a **Draft → Publish → Unpublish** model instead of enable/disa
 **Status badges (`WorkflowPublishStatusBadge`):**
 
 | State                            | Label               | Style                              |
-| -------------------------------- | -------------------- | ---------------------------------- |
+| -------------------------------- | ------------------- | ---------------------------------- |
 | Never published                  | Draft               | Grey filled                        |
 | Current version = published      | Published           | Green filled (`status="success"`)  |
 | Saved changes after last publish | Unpublished changes | Yellow filled (`status="warning"`) |
@@ -1526,10 +1535,10 @@ The version history side panel lets users browse, compare, and manage published 
 
 Trigger configuration supports two scheduling types:
 
-| Type | UI control | Validation |
-| ---- | ---------- | ---------- |
-| **Interval** | `DurationInput` component (hours/minutes/seconds fields) | Minimum > 0 |
-| **Cron** | `TextInput` with 5-field cron expression (`* * * * *`) | Must be valid 5-field cron syntax |
+| Type         | UI control                                               | Validation                        |
+| ------------ | -------------------------------------------------------- | --------------------------------- |
+| **Interval** | `DurationInput` component (hours/minutes/seconds fields) | Minimum > 0                       |
+| **Cron**     | `TextInput` with 5-field cron expression (`* * * * *`)   | Must be valid 5-field cron syntax |
 
 - "Continuous" trigger type has been **removed** — replaced by interval scheduling
 - Cron input uses a plain `TextInput` (not a specialized cron builder component); helper text below the input explains the 5-field format (`minute hour day-of-month month day-of-week`)
@@ -1602,10 +1611,10 @@ Verify validates the entire workflow graph against the backend and surfaces erro
 
 Validation findings have two severity levels that drive different UI behavior:
 
-| Severity | Save behavior | Publish behavior | Banner variant |
-| -------- | ------------- | ---------------- | -------------- |
-| **Error** (`severity: 'error'`) | Save still succeeds; issues are surfaced inline | Always blocks publish | `danger` |
-| **Warning** (`severity: 'warning'`) | Save succeeds | Does not block publish | `warning` |
+| Severity                            | Save behavior                                   | Publish behavior       | Banner variant |
+| ----------------------------------- | ----------------------------------------------- | ---------------------- | -------------- |
+| **Error** (`severity: 'error'`)     | Save still succeeds; issues are surfaced inline | Always blocks publish  | `danger`       |
+| **Warning** (`severity: 'warning'`) | Save succeeds                                   | Does not block publish | `warning`      |
 
 **Save flow (`useBuilderSaveWorkflow`) — single request, no retry:** Save is always one request. The save response includes `has_validation_issues: boolean` plus an inline `validation_result` with the findings. When `has_validation_issues` is true, `reportSaveValidationIssues()` extracts the findings from `validation_result` and calls `onSaveWithValidationIssues` / `onValidationFindings` for node-level display — there is no second request, no `force_save` query parameter, and no retry loop. (This replaces an earlier two-request `force_save=true` retry flow, which was removed; `ImportWorkflowDialog`'s corresponding "Save anyway" retry option was removed at the same time since there's no longer a save-rejection case for warnings.)
 
@@ -1637,17 +1646,17 @@ Every activity node form uses `NodeFormTabsLayout` to split configuration into *
 
 ### Explaining Non-Obvious Node Semantics
 
-For node types whose purpose is easy to misread (e.g., a Converge node can look "unnecessary" at first glance, since edges can be dragged directly between other steps), add a collapsed-by-default, expandable info `Alert` (`variant="info" isInline isExpandable`) at the top of the node's Parameters tab explaining when the step is and isn't needed. This is distinct from the always-visible trigger "activation" alerts described in Schedule Trigger Form, which explain *publish timing*, not *step purpose* — don't conflate the two; a purpose-explainer stays collapsed by default since it's reference material, not a warning.
+For node types whose purpose is easy to misread (e.g., a Converge node can look "unnecessary" at first glance, since edges can be dragged directly between other steps), add a collapsed-by-default, expandable info `Alert` (`variant="info" isInline isExpandable`) at the top of the node's Parameters tab explaining when the step is and isn't needed. This is distinct from the always-visible trigger "activation" alerts described in Schedule Trigger Form, which explain _publish timing_, not _step purpose_ — don't conflate the two; a purpose-explainer stays collapsed by default since it's reference material, not a warning.
 
 ### Three-Column Node Editor Layout
 
 When a node is opened for editing, the builder can display a three-column layout for advanced node types:
 
-| Column | Content | Panel style |
-| ------ | ------- | ----------- |
-| **Left** | Input data (upstream output / trigger data) | Default `NxPanel` |
-| **Center** | Node parameters (the form) | `NxPanel variant="raised"` — visually elevated to signal "this is where you edit" |
-| **Right** | Output data (downstream preview / schema) | Default `NxPanel` |
+| Column     | Content                                     | Panel style                                                                       |
+| ---------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
+| **Left**   | Input data (upstream output / trigger data) | Default `NxPanel`                                                                 |
+| **Center** | Node parameters (the form)                  | `NxPanel variant="raised"` — visually elevated to signal "this is where you edit" |
+| **Right**  | Output data (downstream preview / schema)   | Default `NxPanel`                                                                 |
 
 - Input/Output panels support Schema / Table / JSON view toggle (see Data Panel View Modes)
 - **Branching nodes** (Condition, Switch): The center column header includes a branch-handle dropdown (`MenuToggle` with branch icon) for selecting which output path to inspect in the Output panel
@@ -1774,7 +1783,7 @@ The run history panel displays execution history for a workflow using a scrollab
 - **Dropzone layout:** Use vertical layout for `MultipleFileUpload` (not `isHorizontal`)
 - **Collapsible file list:** Use `ExpandableSection` (not `MultipleFileUploadStatus`) for the attached file list. The section auto-expands when new files are dropped and can start collapsed via `defaultStatusExpanded={false}`.
 - **Status text:** Use "N files attached" (or "1 file attached") when all files are successfully uploaded — not "N/N files uploaded". Show "N/M files uploaded" only during active upload or when errors occur.
-- **Disabled opacity:** Use `var(--nexus-disabled-opacity)` CSS variable for disabled dropzone opacity, not hardcoded `0.5`.
+- **Disabled opacity:** Use `var(--syntara-disabled-opacity)` CSS variable for disabled dropzone opacity, not hardcoded `0.5`.
 - **Post-upload download:** Once a file has successfully uploaded, show a download icon button on its list item that fetches the file and triggers a browser download preserving the server-provided filename. While the download is in progress, show a loading spinner plus a "Cancel" link in place of the download button, and hide the remove action for that item until the download finishes or is cancelled.
 
 ### Schedule Trigger Form
@@ -1865,8 +1874,8 @@ p {
 
 ```tsx
 /* ✅ GOOD: apply the scoped class in the component */
-import styles from './MyComponent.module.css'
-;<MenuItem className={styles.menuItem} />
+import styles from "./MyComponent.module.css";
+<MenuItem className={styles.menuItem} />;
 ```
 
 ### Styling Priority Order

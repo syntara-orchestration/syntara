@@ -13,8 +13,8 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 
 ### Existing Test Infrastructure
 
-| Component     | Location                                     |
-| ------------- | -------------------------------------------- |
+| Component     | Location                                                |
+| ------------- | ------------------------------------------------------- |
 | Config        | `frontend/packages/syntara-ui/playwright.config.ts`     |
 | Test files    | `frontend/packages/syntara-ui/e2e/*.spec.ts`            |
 | Fixtures      | `frontend/packages/syntara-ui/e2e/fixtures.ts`          |
@@ -62,12 +62,12 @@ If you bypass the runner (e.g. `SYNTARA_E2E_SKIP_WEB_SERVER=1`) and manage serve
 
 ### Real Backend Mode
 
-To test against the real Nexus backend instead of the mock API:
+To test against the real Syntara backend instead of the mock API:
 
 1. **Start the real backend** (see backend repo README):
 
    ```bash
-   cd ../nexus
+   cd ../syntara
    # Follow backend setup instructions — runs on http://localhost:8000
    ```
 
@@ -224,48 +224,50 @@ Tests run with `fullyParallel: true` and must be completely independent.
 
    ```typescript
    // ❌ BAD: Conflicts in parallel execution
-   const workflowName = 'test-workflow'
+   const workflowName = "test-workflow";
 
    // ✅ GOOD: Unique per test run
-   const workflowName = buildUniqueName('e2e-workflow')
+   const workflowName = buildUniqueName("e2e-workflow");
    ```
 
 2. **Each test creates its own data** — Never assume resources exist
 
    ```typescript
    // ❌ BAD: Assumes "Default Workflow" exists
-   await app.goto(toAppUrl('/workflows/default-workflow'))
+   await app.goto(toAppUrl("/workflows/default-workflow"));
 
    // ✅ GOOD: Create what you need
-   const workflowName = buildUniqueName('e2e-test')
-   await createBasicWorkflow(app, workflowName, 'Test action')
+   const workflowName = buildUniqueName("e2e-test");
+   await createBasicWorkflow(app, workflowName, "Test action");
    ```
 
 3. **NEVER assume a clean database** — The backend may have pre-existing data
 
    ```typescript
    // ❌ BAD: Assumes exact row count from mock seed data
-   await expect(app.getByText(/20 integrations/i)).toBeVisible()
-   const rows = await app.getByRole('row').count()
-   expect(rows).toBeGreaterThan(1)
+   await expect(app.getByText(/20 integrations/i)).toBeVisible();
+   const rows = await app.getByRole("row").count();
+   expect(rows).toBeGreaterThan(1);
 
    // ❌ BAD: Assumes created row is visible on first page without filtering
-   await createBasicWorkflow(app, workflowName, 'Test action')
-   await app.goto(toAppUrl('/workflows'))
-   await expect(app.getByRole('row', { name: workflowName })).toBeVisible()
+   await createBasicWorkflow(app, workflowName, "Test action");
+   await app.goto(toAppUrl("/workflows"));
+   await expect(app.getByRole("row", { name: workflowName })).toBeVisible();
 
    // ✅ GOOD: Filter by unique name to find your data regardless of what else exists
-   await createBasicWorkflow(app, workflowName, 'Test action')
-   await app.goto(toAppUrl('/workflows'))
-   await app.getByPlaceholder('Filter by name').fill(workflowName)
-   await app.getByRole('button', { name: 'Apply filter' }).click()
-   await expect(app.getByRole('row', { name: new RegExp(workflowName) })).toBeVisible()
+   await createBasicWorkflow(app, workflowName, "Test action");
+   await app.goto(toAppUrl("/workflows"));
+   await app.getByPlaceholder("Filter by name").fill(workflowName);
+   await app.getByRole("button", { name: "Apply filter" }).click();
+   await expect(
+     app.getByRole("row", { name: new RegExp(workflowName) }),
+   ).toBeVisible();
 
    // ✅ GOOD: Assert on relative changes, not absolute counts
-   const firstPageText = await footer.textContent()
-   await nextButton.click()
-   const secondPageText = await footer.textContent()
-   expect(secondPageText).not.toBe(firstPageText) // Different page, different count
+   const firstPageText = await footer.textContent();
+   await nextButton.click();
+   const secondPageText = await footer.textContent();
+   expect(secondPageText).not.toBe(firstPageText); // Different page, different count
    ```
 
    **Why:** The real backend may have data from previous test runs, manual testing, or other users. Tests that hardcode counts like "20 integrations" or assume rows are visible without filtering break when the database isn't a clean slate.
@@ -273,8 +275,8 @@ Tests run with `fullyParallel: true` and must be completely independent.
 4. **Clean up in try-finally** — Cleanup must run even if test fails
 
    ```typescript
-   const workflowName = buildUniqueName('e2e-test')
-   await createBasicWorkflow(app, workflowName, 'Test action')
+   const workflowName = buildUniqueName("e2e-test");
+   await createBasicWorkflow(app, workflowName, "Test action");
    try {
      // assertions and further actions
    } finally {
@@ -303,22 +305,24 @@ With `fullyParallel: true`, Playwright runs tests concurrently. If tests share n
 ### Test Structure — AAA Pattern with Custom Fixtures
 
 ```typescript
-import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName, createBasicWorkflow } from './helpers/workflows'
+import { test, expect, toAppUrl } from "./fixtures";
+import { buildUniqueName, createBasicWorkflow } from "./helpers/workflows";
 
-test('user creates and verifies a workflow', async ({ app }) => {
+test("user creates and verifies a workflow", async ({ app }) => {
   // Arrange — app is already navigated to base URL by fixture
-  const workflowName = buildUniqueName('e2e-workflow')
+  const workflowName = buildUniqueName("e2e-workflow");
 
   // Act — create workflow
-  await createBasicWorkflow(app, workflowName, 'Test action')
+  await createBasicWorkflow(app, workflowName, "Test action");
 
   // Assert — verify workflow exists in list
-  await app.goto(toAppUrl('/workflows'))
-  await app.getByPlaceholder('Filter by name').fill(workflowName)
-  await app.getByRole('button', { name: 'Apply filter' }).click()
-  await expect(app.getByRole('row', { name: new RegExp(workflowName) })).toBeVisible()
-})
+  await app.goto(toAppUrl("/workflows"));
+  await app.getByPlaceholder("Filter by name").fill(workflowName);
+  await app.getByRole("button", { name: "Apply filter" }).click();
+  await expect(
+    app.getByRole("row", { name: new RegExp(workflowName) }),
+  ).toBeVisible();
+});
 ```
 
 **Key patterns:**
@@ -331,35 +335,35 @@ test('user creates and verifies a workflow', async ({ app }) => {
 
 **Asserting API calls**
 
-
 ```typescript
 // Register the response waiter BEFORE the action that triggers it
-const responsePromise = app.waitForResponse('**/api/v1/workflows')
-await app.getByRole('button', { name: 'Save' }).click()
-const response = await responsePromise
-expect(response.status()).toBe(200)
+const responsePromise = app.waitForResponse("**/api/v1/workflows");
+await app.getByRole("button", { name: "Save" }).click();
+const response = await responsePromise;
+expect(response.status()).toBe(200);
 
 // Also useful for asserting request payload
-const requestPromise = app.waitForRequest('**/api/v1/workflows')
-await app.getByRole('button', { name: 'Save' }).click()
-const request = await requestPromise
-expect(request.postDataJSON()).toMatchObject({ name: workflowName })
+const requestPromise = app.waitForRequest("**/api/v1/workflows");
+await app.getByRole("button", { name: "Save" }).click();
+const request = await requestPromise;
+expect(request.postDataJSON()).toMatchObject({ name: workflowName });
 ```
 
 **Parameterized Tests**
 
-
 ```typescript
 // Run the same test block for multiple roles using forEach + describe
 // Each describe gets its own beforeEach scope
-;(['admin', 'viewer', 'auditor'] as const).forEach(role => {
+(["admin", "viewer", "auditor"] as const).forEach((role) => {
   test.describe(`${role}: workflow list`, () => {
     test(`sees the workflows table`, async ({ app }) => {
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('grid', { name: 'Workflows table' })).toBeVisible()
-    })
-  })
-})
+      await app.goto(toAppUrl("/workflows"));
+      await expect(
+        app.getByRole("grid", { name: "Workflows table" }),
+      ).toBeVisible();
+    });
+  });
+});
 ```
 
 Note: placing `beforeEach` inside the `forEach`'s `describe` block scopes it per-iteration. Placing it outside runs it globally for all iterations.
@@ -367,25 +371,27 @@ Note: placing `beforeEach` inside the `forEach`'s `describe` block scopes it per
 **Grouping related tests:**
 
 ```typescript
-test.describe('Workflow Filtering', () => {
-  test('full user flow: add filters → view results → clear filters', async ({ app }) => {
+test.describe("Workflow Filtering", () => {
+  test("full user flow: add filters → view results → clear filters", async ({
+    app,
+  }) => {
     // ...
-  })
+  });
 
-  test('filter state persists across navigation', async ({ app }) => {
+  test("filter state persists across navigation", async ({ app }) => {
     // ...
-  })
-})
+  });
+});
 ```
 
 **Conditional skipping** for data-dependent tests:
 
 ```typescript
 const hasRunning = await runningRow
-  .waitFor({ state: 'visible', timeout: 5000 })
+  .waitFor({ state: "visible", timeout: 5000 })
   .then(() => true)
-  .catch(() => false)
-test.skip(!hasRunning, 'Mock API has no running execution; seed data required')
+  .catch(() => false);
+test.skip(!hasRunning, "Mock API has no running execution; seed data required");
 ```
 
 **When `test.skip()` is and is not acceptable:**
@@ -393,11 +399,11 @@ test.skip(!hasRunning, 'Mock API has no running execution; seed data required')
 ```typescript
 // ✅ ACCEPTABLE — data that is impossible to create programmatically
 // (e.g., an approval that must have been approved by a human via the real backend)
-test.skip(!hasApprovalData, 'Requires pre-existing human-approved records')
+test.skip(!hasApprovalData, "Requires pre-existing human-approved records");
 
 // ❌ NOT ACCEPTABLE — if the test can create the data itself, it must do so
 // Do not skip because setup is complex; use beforeAll + API helpers instead
-test.skip(!hasWorkflows, 'No workflows exist') // ❌ create them via API instead
+test.skip(!hasWorkflows, "No workflows exist"); // ❌ create them via API instead
 ```
 
 ---
@@ -414,56 +420,60 @@ Follow this priority:
 
 ```typescript
 // ✅ BEST: Accessible queries
-await app.getByRole('button', { name: 'Save' }).click()
-await app.getByLabel('Name').fill('My Workflow')
-await app.getByPlaceholder('Filter by name').fill('test')
-await app.getByRole('heading', { name: /workflows/i })
-await app.getByRole('grid', { name: 'Workflows table' })
+await app.getByRole("button", { name: "Save" }).click();
+await app.getByLabel("Name").fill("My Workflow");
+await app.getByPlaceholder("Filter by name").fill("test");
+await app.getByRole("heading", { name: /workflows/i });
+await app.getByRole("grid", { name: "Workflows table" });
 
 // ⚠️ ACCEPTABLE: When no semantic alternative exists
-await app.getByTestId('workflow-builder-canvas').click()
+await app.getByTestId("workflow-builder-canvas").click();
 
 // ❌ BAD: CSS selectors
-await app.locator('.pf-v6-c-button').click()
+await app.locator(".pf-v6-c-button").click();
 ```
 
 **Scoping locators to containers:**
 
 ```typescript
 // ✅ Scoped to Add step panel (helper name is addNodePanel)
-const panel = addNodePanel(app)
-await panel.getByRole('button', { name: 'Action', exact: true }).click()
+const panel = addNodePanel(app);
+await panel.getByRole("button", { name: "Action", exact: true }).click();
 
 // ✅ Scoped to a row
-const row = app.getByRole('row', { name: new RegExp(workflowName) })
+const row = app.getByRole("row", { name: new RegExp(workflowName) });
 await row
-  .getByRole('button', { name: /Actions|Kebab toggle/i })
+  .getByRole("button", { name: /Actions|Kebab toggle/i })
   .first()
-  .click({ force: true })
+  .click({ force: true });
 
 // ✅ Scoped to toolbar (PatternFly filter chips)
-const nameChipGroup = app.locator('#filter-toolbar').getByRole('list', { name: 'Name' })
-await expect(nameChipGroup.getByText('workflow')).toBeVisible()
+const nameChipGroup = app
+  .locator("#filter-toolbar")
+  .getByRole("list", { name: "Name" });
+await expect(nameChipGroup.getByText("workflow")).toBeVisible();
 ```
 
 **Use heading level to avoid strict mode violations in empty states:**
 
 ```typescript
 // ❌ BAD: Matches both h1 "Integrations" and h2 "No integrations..." in empty state
-await expect(app.getByRole('heading', { name: 'Integrations' })).toBeVisible()
+await expect(app.getByRole("heading", { name: "Integrations" })).toBeVisible();
 
 // ✅ GOOD: Targets only the h1 page title
-await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
+await expect(
+  app.getByRole("heading", { level: 1, name: "Integrations" }),
+).toBeVisible();
 ```
 
 **Use exact matching to avoid ambiguity:**
 
 ```typescript
 // ✅ Exact match — won't match "Add step panel" or "Add step type"
-await app.getByRole('button', { name: /^Add step$/ }).click()
+await app.getByRole("button", { name: /^Add step$/ }).click();
 
 // ✅ Exact flag
-await panel.getByRole('button', { name: 'Script', exact: true }).click()
+await panel.getByRole("button", { name: "Script", exact: true }).click();
 ```
 
 ---
@@ -474,13 +484,13 @@ Playwright assertions auto-retry until the condition is met or timeout. Always u
 
 ```typescript
 // ✅ GOOD: Auto-retrying assertion — waits for element
-await expect(app.getByRole('heading', { name: 'Workflows' })).toBeVisible()
-await expect(app).toHaveURL(/workflow-builder\/.+/)
-await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
+await expect(app.getByRole("heading", { name: "Workflows" })).toBeVisible();
+await expect(app).toHaveURL(/workflow-builder\/.+/);
+await expect(app.getByPlaceholder("Workflow name")).toHaveValue(workflowName);
 
 // ❌ BAD: Manual check — no retry, flaky
-const heading = await app.getByRole('heading').textContent()
-expect(heading).toBe('Workflows')
+const heading = await app.getByRole("heading").textContent();
+expect(heading).toBe("Workflows");
 ```
 
 **Common web-first assertions:**
@@ -497,53 +507,59 @@ expect(heading).toBe('Workflows')
 
 **Additional assertions teams commonly miss**
 
-
 ```typescript
 // Accessibility assertions — critical for a11y-focused teams
-await expect(locator).toHaveAccessibleName('Submit form')
-await expect(locator).toHaveAccessibleDescription('Opens a modal dialog')
-await expect(locator).toHaveRole('button')
+await expect(locator).toHaveAccessibleName("Submit form");
+await expect(locator).toHaveAccessibleDescription("Opens a modal dialog");
+await expect(locator).toHaveRole("button");
 
 // Viewport and layout
-await expect(locator).toBeInViewport()
+await expect(locator).toBeInViewport();
 
 // Multi-select
-await expect(locator).toHaveValues(['option-a', 'option-b'])
+await expect(locator).toHaveValues(["option-a", "option-b"]);
 
 // ARIA snapshot — assert full accessibility tree structure
 await expect(locator).toMatchAriaSnapshot(`
   - button "Save"
   - button "Cancel"
-`)
+`);
 
 // API responses
-await expect(response).toBeOK() // status in 200–299
+await expect(response).toBeOK(); // status in 200–299
 ```
 
 **Soft assertions — collect all failures before stopping**
 
-
 ```typescript
 // Use when you want to see all broken fields at once (e.g., form validation)
-await expect.soft(app.getByRole('textbox', { name: 'Name' })).toHaveValue('')
-await expect.soft(app.getByRole('alert', { name: 'Name is required' })).toBeVisible()
-await expect.soft(app.getByRole('alert', { name: 'Email is required' })).toBeVisible()
+await expect.soft(app.getByRole("textbox", { name: "Name" })).toHaveValue("");
+await expect
+  .soft(app.getByRole("alert", { name: "Name is required" }))
+  .toBeVisible();
+await expect
+  .soft(app.getByRole("alert", { name: "Email is required" }))
+  .toBeVisible();
 // All three failures are reported; the test doesn't stop at the first
 ```
 
 **`expect.poll` — retry any async value until it passes**
 
-
 ```typescript
 // Use instead of waitForTimeout when waiting for an external condition
-await expect.poll(async () => {
-  const response = await app.request.get('/api/v1/workflows')
-  return response.status()
-}, {
-  message: 'API should return 200 after processing',
-  timeout: 10_000,
-  intervals: [1_000, 2_000, 5_000],
-}).toBe(200)
+await expect
+  .poll(
+    async () => {
+      const response = await app.request.get("/api/v1/workflows");
+      return response.status();
+    },
+    {
+      message: "API should return 200 after processing",
+      timeout: 10_000,
+      intervals: [1_000, 2_000, 5_000],
+    },
+  )
+  .toBe(200);
 ```
 
 ---
@@ -554,45 +570,45 @@ Playwright auto-waits for elements to be actionable before performing actions. *
 
 ```typescript
 // ❌ BAD: Manual timeout — fragile, slow
-await app.waitForTimeout(2000)
-await app.getByRole('button', { name: 'Save' }).click()
+await app.waitForTimeout(2000);
+await app.getByRole("button", { name: "Save" }).click();
 
 // ✅ GOOD: Playwright auto-waits for button to be actionable
-await app.getByRole('button', { name: 'Save' }).click()
+await app.getByRole("button", { name: "Save" }).click();
 
 // ✅ GOOD: Wait for specific UI condition before proceeding
-await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+await expect(
+  app.getByRole("heading", { name: "Select a trigger step" }),
+).toBeVisible();
 ```
 
 **When you need longer timeouts** (e.g., slow backend operations):
 
 ```typescript
-await expect(app.getByText(/completed/i)).toBeVisible({ timeout: 30_000 })
+await expect(app.getByText(/completed/i)).toBeVisible({ timeout: 30_000 });
 ```
 
 **`test.slow()` — triple the configured timeout without hardcoding milliseconds**
 
-
 ```typescript
 // test.slow() triples the configured timeout — simpler than hardcoding ms
 // Use for tests that exercise genuinely slow operations without picking a magic number
-test('executes a long-running workflow', async ({ app }) => {
-  test.slow()
+test("executes a long-running workflow", async ({ app }) => {
+  test.slow();
   // now has 3× the configured test timeout
-})
+});
 ```
 
 **Critical: missing `await` causes silent test passes**
-
 
 Forgetting `await` on a Playwright assertion means the assertion never runs — the test passes vacuously. Enable the ESLint rule `@typescript-eslint/no-floating-promises` to catch this at write time.
 
 ```typescript
 // ❌ BAD — no await; assertion is never evaluated; test always passes
-expect(app.getByText('Success')).toBeVisible()
+expect(app.getByText("Success")).toBeVisible();
 
 // ✅ GOOD
-await expect(app.getByText('Success')).toBeVisible()
+await expect(app.getByText("Success")).toBeVisible();
 ```
 
 ---
@@ -602,41 +618,43 @@ await expect(app.getByText('Success')).toBeVisible()
 When tests create resources, clean up in try-finally so cleanup runs even if assertions fail:
 
 ```typescript
-test('edits a workflow name', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-edit')
-  await createBasicWorkflow(app, workflowName, 'Initial task')
+test("edits a workflow name", async ({ app }) => {
+  const workflowName = buildUniqueName("e2e-edit");
+  await createBasicWorkflow(app, workflowName, "Initial task");
 
   try {
-    await app.goto(toAppUrl('/workflows'))
-    await app.getByPlaceholder('Filter by name').fill(workflowName)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-    await app.getByRole('button', { name: workflowName, exact: true }).click()
+    await app.goto(toAppUrl("/workflows"));
+    await app.getByPlaceholder("Filter by name").fill(workflowName);
+    await app.getByRole("button", { name: "Apply filter" }).click();
+    await app.getByRole("button", { name: workflowName, exact: true }).click();
 
-    const updatedName = `${workflowName}-updated`
-    await app.getByPlaceholder('Workflow name').fill(updatedName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    const updatedName = `${workflowName}-updated`;
+    await app.getByPlaceholder("Workflow name").fill(updatedName);
+    await app.getByRole("button", { name: "Save" }).click();
 
-    await app.goto(toAppUrl('/workflows'))
-    await app.getByPlaceholder('Filter by name').fill(updatedName)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-    await expect(app.getByRole('button', { name: updatedName, exact: true })).toBeVisible()
+    await app.goto(toAppUrl("/workflows"));
+    await app.getByPlaceholder("Filter by name").fill(updatedName);
+    await app.getByRole("button", { name: "Apply filter" }).click();
+    await expect(
+      app.getByRole("button", { name: updatedName, exact: true }),
+    ).toBeVisible();
   } finally {
     // Delete via UI kebab menu
-    await app.goto(toAppUrl('/workflows'))
-    const searchTerm = workflowName.slice(0, 20)
-    await app.getByPlaceholder('Filter by name').fill(searchTerm)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-    const row = app.getByRole('row', { name: new RegExp(workflowName) })
+    await app.goto(toAppUrl("/workflows"));
+    const searchTerm = workflowName.slice(0, 20);
+    await app.getByPlaceholder("Filter by name").fill(searchTerm);
+    await app.getByRole("button", { name: "Apply filter" }).click();
+    const row = app.getByRole("row", { name: new RegExp(workflowName) });
     if ((await row.count()) > 0) {
       await row
-        .getByRole('button', { name: /Actions|Kebab toggle/i })
+        .getByRole("button", { name: /Actions|Kebab toggle/i })
         .first()
-        .click({ force: true })
-      await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
-      await app.getByRole('button', { name: 'Delete' }).click()
+        .click({ force: true });
+      await app.getByRole("menuitem", { name: "Delete workflow" }).click();
+      await app.getByRole("button", { name: "Delete" }).click();
     }
   }
-})
+});
 ```
 
 **Read-only tests** (filtering, viewing, accessibility scans) that don't create resources don't need cleanup.
@@ -649,33 +667,35 @@ Tests that depend on pre-existing data (filtering, pagination, approvals) must g
 
 ```typescript
 // Skip individual tests when required data is missing
-const table = app.getByRole('grid', { name: 'Approvals table' })
+const table = app.getByRole("grid", { name: "Approvals table" });
 const hasTable = await table
-  .waitFor({ state: 'visible', timeout: 5000 })
+  .waitFor({ state: "visible", timeout: 5000 })
   .then(() => true)
-  .catch(() => false)
-test.skip(!hasTable, 'No approval data available; seed data required')
+  .catch(() => false);
+test.skip(!hasTable, "No approval data available; seed data required");
 ```
 
 For test suites that all depend on the same data, use `test.beforeEach`:
 
 ```typescript
-test.describe('Integration Filtering', () => {
+test.describe("Integration Filtering", () => {
   test.beforeEach(async ({ app }) => {
-    await app.goto(toAppUrl('/configuration/integrations'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    await app.goto(toAppUrl("/configuration/integrations"));
+    await expect(
+      app.getByRole("heading", { level: 1, name: "Integrations" }),
+    ).toBeVisible();
+    const table = app.getByRole("grid", { name: "Integrations table" });
     const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
       .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No integration data available; seed data required')
-  })
+      .catch(() => false);
+    test.skip(!hasTable, "No integration data available; seed data required");
+  });
 
-  test('keyword search: filter by name', async ({ app }) => {
+  test("keyword search: filter by name", async ({ app }) => {
     // Only runs when integrations exist
-  })
-})
+  });
+});
 ```
 
 This ensures tests work against both mock API (with seed data) and real backend (without seed data).
@@ -720,18 +740,26 @@ For real backend tests, the worker-scoped `roleSetup` fixture (via `roleSetup.ts
 #### Writing permission gating tests
 
 ```typescript
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect, toAppUrl } from "./fixtures";
 
-test('viewer: create button is disabled with tooltip', async ({ viewerApp }) => {
-  await viewerApp.goto(toAppUrl('/workflows'))
-  const createBtn = viewerApp.getByRole('button', { name: /Create workflow/i })
-  await expect(createBtn).toHaveAttribute('aria-disabled', 'true')
-})
+test("viewer: create button is disabled with tooltip", async ({
+  viewerApp,
+}) => {
+  await viewerApp.goto(toAppUrl("/workflows"));
+  const createBtn = viewerApp.getByRole("button", { name: /Create workflow/i });
+  await expect(createBtn).toHaveAttribute("aria-disabled", "true");
+});
 
-test('auditor: direct URL to Create User shows access denied', async ({ auditorApp }) => {
-  await auditorApp.goto(toAppUrl('/system-administration/access-management/users/create'))
-  await expect(auditorApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
-})
+test("auditor: direct URL to Create User shows access denied", async ({
+  auditorApp,
+}) => {
+  await auditorApp.goto(
+    toAppUrl("/system-administration/access-management/users/create"),
+  );
+  await expect(
+    auditorApp.getByRole("heading", { name: "Access denied", level: 2 }),
+  ).toBeVisible();
+});
 ```
 
 #### Self-contained tests with API setup
@@ -739,15 +767,18 @@ test('auditor: direct URL to Create User shows access denied', async ({ auditorA
 Permission tests that validate gated actions on existing resources must create those resources via API, not assume seed data:
 
 ```typescript
-test('viewer: workflow kebab actions are disabled', async ({ app, viewerApp }) => {
-  const workflowId = await createTestWorkflow(app)
+test("viewer: workflow kebab actions are disabled", async ({
+  app,
+  viewerApp,
+}) => {
+  const workflowId = await createTestWorkflow(app);
   try {
-    await viewerApp.goto(toAppUrl('/workflows'))
+    await viewerApp.goto(toAppUrl("/workflows"));
     // ... assert kebab actions are aria-disabled
   } finally {
-    await deleteTestWorkflow(app, workflowId)
+    await deleteTestWorkflow(app, workflowId);
   }
-})
+});
 ```
 
 Use `app` (admin) to create resources, then `viewerApp`/`auditorApp`/`userApp` to verify gating. Always clean up in `finally`.
@@ -769,51 +800,58 @@ For faster test setup/teardown when running against a real backend, create API-b
 
 ```typescript
 // packages/syntara-ui/e2e/utils/workflows.ts
-import { type Page } from '@playwright/test'
-import { buildUniqueName } from '../helpers/workflows'
+import { type Page } from "@playwright/test";
+import { buildUniqueName } from "../helpers/workflows";
 
-const apiBaseUrl = process.env.VITE_API_URL ?? 'http://localhost:3300'
+const apiBaseUrl = process.env.VITE_API_URL ?? "http://localhost:3300";
 
 export const WorkflowResource = {
   api: {
-    create: async (app: Page, options: { name?: string; description?: string } = {}) => {
-      const name = options.name ?? buildUniqueName('e2e-workflow')
-      const response = await app.request.post(`${apiBaseUrl}/api/v1/workflows`, {
-        data: {
-          name,
-          description: options.description ?? 'Created via API for E2E testing',
-          trigger: { type: 'manual' },
-          actions: [],
+    create: async (
+      app: Page,
+      options: { name?: string; description?: string } = {},
+    ) => {
+      const name = options.name ?? buildUniqueName("e2e-workflow");
+      const response = await app.request.post(
+        `${apiBaseUrl}/api/v1/workflows`,
+        {
+          data: {
+            name,
+            description:
+              options.description ?? "Created via API for E2E testing",
+            trigger: { type: "manual" },
+            actions: [],
+          },
         },
-      })
-      const workflow = (await response.json()) as { id: string; name: string }
-      return { id: workflow.id, name: workflow.name }
+      );
+      const workflow = (await response.json()) as { id: string; name: string };
+      return { id: workflow.id, name: workflow.name };
     },
 
     delete: async (app: Page, workflowId: string) => {
-      await app.request.delete(`${apiBaseUrl}/api/v1/workflows/${workflowId}`)
+      await app.request.delete(`${apiBaseUrl}/api/v1/workflows/${workflowId}`);
     },
   },
-}
+};
 ```
 
 **Usage:**
 
 ```typescript
-test('user executes a workflow', async ({ app }) => {
+test("user executes a workflow", async ({ app }) => {
   // Fast API-based setup
-  const { id } = await WorkflowResource.api.create(app)
+  const { id } = await WorkflowResource.api.create(app);
 
   try {
     // Test via UI (what users actually do)
-    await app.goto(toAppUrl(`/workflows/${id}`))
-    await app.getByRole('button', { name: 'Execute' }).click()
-    await expect(app.getByText(/execution started/i)).toBeVisible()
+    await app.goto(toAppUrl(`/workflows/${id}`));
+    await app.getByRole("button", { name: "Execute" }).click();
+    await expect(app.getByText(/execution started/i)).toBeVisible();
   } finally {
     // Fast API-based cleanup
-    await WorkflowResource.api.delete(app, id)
+    await WorkflowResource.api.delete(app, id);
   }
-})
+});
 ```
 
 **Benefits:** Fast setup (skips UI), reliable cleanup, test what matters (use UI for assertions, API for setup/teardown).
@@ -827,20 +865,22 @@ test('user executes a workflow', async ({ app }) => {
 Some tests verify URL shareability by opening a URL in a new tab. Use the `context` fixture:
 
 ```typescript
-test('shareable URLs: filters restored from URL', async ({ app, context }) => {
+test("shareable URLs: filters restored from URL", async ({ app, context }) => {
   // Apply filters...
-  const urlWithFilters = app.url()
+  const urlWithFilters = app.url();
 
   // Open in new tab (simulate sharing URL)
-  const newPage = await context.newPage()
-  await newPage.goto(urlWithFilters)
+  const newPage = await context.newPage();
+  await newPage.goto(urlWithFilters);
 
   // Assert filters restored
-  await expect(newPage.getByRole('heading', { name: 'Workflows' })).toBeVisible()
+  await expect(
+    newPage.getByRole("heading", { name: "Workflows" }),
+  ).toBeVisible();
   // ...verify filter chips
 
-  await newPage.close()
-})
+  await newPage.close();
+});
 ```
 
 ---
@@ -858,19 +898,18 @@ test('shareable URLs: filters restored from URL', async ({ app, context }) => {
 
 ### Accessibility Testing with axe-core
 
-
 **Scan components after interaction (modals, flyouts, dropdowns):**
 
 ```typescript
 // Hidden content is not scanned — always trigger the state first
-await app.getByRole('button', { name: 'Open settings' }).click()
-await app.getByRole('dialog', { name: 'Settings' }).waitFor() // wait for it to render
+await app.getByRole("button", { name: "Open settings" }).click();
+await app.getByRole("dialog", { name: "Settings" }).waitFor(); // wait for it to render
 
 const results = await new AxeBuilder({ page })
-  .include('[role="dialog"]')   // scope to just the opened element
-  .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
-  .analyze()
-expect(results.violations).toEqual([])
+  .include('[role="dialog"]') // scope to just the opened element
+  .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+  .analyze();
+expect(results.violations).toEqual([]);
 ```
 
 **Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in jsdom — requires manual testing. Automated scans are a floor, not a ceiling.
@@ -934,10 +973,10 @@ Playwright's `.click()` simulates a real user interaction (scrolls into view, ho
 
 ```typescript
 // ❌ BAD — synthetic event, bypasses real interaction
-await app.locator('#submit').dispatchEvent('click')
+await app.locator("#submit").dispatchEvent("click");
 
 // ✅ GOOD — real user interaction
-await app.getByRole('button', { name: 'Submit' }).click()
+await app.getByRole("button", { name: "Submit" }).click();
 ```
 
 ### Register Route Handlers Before Navigation
@@ -946,13 +985,13 @@ When using `page.route()` to mock API responses, register handlers **before** th
 
 ```typescript
 // ❌ BAD — route handlers may miss the request
-await app.getByRole('button', { name: 'Login' }).click()
-await app.route('**/auth/login', handler)
+await app.getByRole("button", { name: "Login" }).click();
+await app.route("**/auth/login", handler);
 
 // ✅ GOOD — handlers ready before navigation
-await app.route('**/auth/login', handler)
-await app.route('**/auth/providers', handler)
-await app.getByRole('button', { name: 'Login' }).click()
+await app.route("**/auth/login", handler);
+await app.route("**/auth/providers", handler);
+await app.getByRole("button", { name: "Login" }).click();
 ```
 
 ### No Try-Catch to Silently Skip Assertions
@@ -962,13 +1001,13 @@ When test data is mocked deterministically, assertions should fail naturally. Wr
 ```typescript
 // ❌ BAD — silently skips if mock data is wrong
 try {
-  await expect(toggle).toBeEnabled()
+  await expect(toggle).toBeEnabled();
 } catch {
-  test.skip(true, 'Toggle not enabled')
+  test.skip(true, "Toggle not enabled");
 }
 
 // ✅ GOOD — fails clearly if mock data is wrong
-await expect(toggle).toBeEnabled()
+await expect(toggle).toBeEnabled();
 ```
 
 ### Extract Shared Mock Fixtures
@@ -989,69 +1028,68 @@ import { mockAdminUser } from './fixtures/mock-users'
 
 ### Route handlers: `page.route()` vs `browserContext.route()`
 
-
 ```typescript
 // page.route() — intercepts requests on this page only
-await page.route('**/api/**', handler)
+await page.route("**/api/**", handler);
 
 // browserContext.route() — intercepts requests on ALL pages in this context
 // including popups and child pages opened from links
-await app.context().route('**/api/**', handler)
+await app.context().route("**/api/**", handler);
 // Use this when testing flows that open new tabs or popup windows
 ```
 
 ### Service Worker Interference
 
-
 If the project uses Mock Service Worker (MSW) or any service worker, `page.route()` handlers may silently never fire because the service worker intercepts first. Block service workers in tests that use route interception:
 
 ```typescript
 // playwright.config.ts or specific test
-const context = await browser.newContext({ serviceWorkers: 'block' })
+const context = await browser.newContext({ serviceWorkers: "block" });
 ```
 
 ### Modifying Real API Responses (Partial Mocking)
 
-
 When you need to patch one field rather than fully mock an endpoint:
 
 ```typescript
-await app.route('**/api/v1/workflows', async route => {
-  const response = await route.fetch()       // fetch the real response
-  const json = await response.json()
-  json.items.push({ id: 'injected', name: 'Extra workflow' }) // patch
-  await route.fulfill({ response, json })    // original headers preserved
-})
+await app.route("**/api/v1/workflows", async (route) => {
+  const response = await route.fetch(); // fetch the real response
+  const json = await response.json();
+  json.items.push({ id: "injected", name: "Extra workflow" }); // patch
+  await route.fulfill({ response, json }); // original headers preserved
+});
 ```
 
 ### WebSocket Testing
 
-
 **Observing WebSocket traffic (without blocking):**
+
 ```typescript
-app.on('websocket', ws => {
-  ws.on('framesent',     e => console.log('→', e.payload))
-  ws.on('framereceived', e => console.log('←', e.payload))
-  ws.on('close', () => console.log('WebSocket closed'))
-})
+app.on("websocket", (ws) => {
+  ws.on("framesent", (e) => console.log("→", e.payload));
+  ws.on("framereceived", (e) => console.log("←", e.payload));
+  ws.on("close", () => console.log("WebSocket closed"));
+});
 ```
 
 **Mocking WebSocket responses:**
+
 ```typescript
-await app.routeWebSocket('wss://example.com/ws', ws => {
-  ws.onMessage(message => {
-    if (message === 'ping') ws.send('pong')
-  })
-})
+await app.routeWebSocket("wss://example.com/ws", (ws) => {
+  ws.onMessage((message) => {
+    if (message === "ping") ws.send("pong");
+  });
+});
 ```
 
 **Intercepting and relaying to real server:**
+
 ```typescript
-await app.routeWebSocket('wss://example.com/ws', ws => {
-  const server = ws.connectToServer()
-  ws.onMessage(msg => server.send(msg === 'status' ? 'status-v2' : msg))
-  server.onMessage(msg => ws.send(msg))
-})
+await app.routeWebSocket("wss://example.com/ws", (ws) => {
+  const server = ws.connectToServer();
+  ws.onMessage((msg) => server.send(msg === "status" ? "status-v2" : msg));
+  server.onMessage((msg) => ws.send(msg));
+});
 ```
 
 ---

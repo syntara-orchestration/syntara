@@ -137,23 +137,23 @@ test('increments count on button click', async () => {
 
 ```ts
 // File: packages/syntara-ui/e2e/workflows.spec.ts
-import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName } from './helpers/workflows'
+import { test, expect, toAppUrl } from "./fixtures";
+import { buildUniqueName } from "./helpers/workflows";
 
-test('user creates a workflow', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-test')
+test("user creates a workflow", async ({ app }) => {
+  const workflowName = buildUniqueName("e2e-test");
 
   try {
-    await app.goto(toAppUrl('/workflows'))
-    await app.getByRole('button', { name: 'Create workflow' }).click()
-    await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
-    await expect(app.getByText('Workflow created successfully')).toBeVisible()
+    await app.goto(toAppUrl("/workflows"));
+    await app.getByRole("button", { name: "Create workflow" }).click();
+    await app.getByPlaceholder("Workflow name").fill(workflowName);
+    await app.getByRole("button", { name: "Save" }).click();
+    await expect(app.getByText("Workflow created successfully")).toBeVisible();
   } finally {
     // Cleanup — delete created resources (especially when testing against real backend)
     // ... cleanup logic
   }
-})
+});
 ```
 
 **Important:** When running against the real backend, always clean up created resources (they persist in a real database). See the [Playwright E2E skill](../frontend-playwright-e2e/SKILL.md) for both mock API and real backend setup.
@@ -186,28 +186,28 @@ Use Playwright's `@pr-check` tag to mark critical E2E tests that should run on e
 
 ```typescript
 // Single test tagging
-test('user can log in @pr-check', async ({ page }) => {
-  await page.goto('/login')
-  await page.fill('[name="username"]', 'admin')
-  await page.fill('[name="password"]', 'password')
-  await page.click('button[type="submit"]')
-  await expect(page).toHaveURL('/dashboard')
-})
+test("user can log in @pr-check", async ({ page }) => {
+  await page.goto("/login");
+  await page.fill('[name="username"]', "admin");
+  await page.fill('[name="password"]', "password");
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL("/dashboard");
+});
 
 // Describe block tagging (all tests inherit the tag)
-test.describe('Workflow CRUD @pr-check', () => {
-  test('create minimal workflow', async ({ page }) => {
-    await page.goto('/workflows/new')
-    await page.fill('[name="name"]', 'Test Workflow')
-    await page.click('button[type="submit"]')
-    await expect(page.locator('.success-message')).toBeVisible()
-  })
-})
+test.describe("Workflow CRUD @pr-check", () => {
+  test("create minimal workflow", async ({ page }) => {
+    await page.goto("/workflows/new");
+    await page.fill('[name="name"]', "Test Workflow");
+    await page.click('button[type="submit"]');
+    await expect(page.locator(".success-message")).toBeVisible();
+  });
+});
 
 // No tag - runs in full suite only
-test('complex workflow validation', async ({ page }) => {
+test("complex workflow validation", async ({ page }) => {
   // Runs in full suite, not in PR checks
-})
+});
 ```
 
 **Running tagged tests:**
@@ -308,12 +308,12 @@ Follow Testing Library query priority:
 
 ```typescript
 // ✅ GOOD: Accessible queries verify real user experience
-screen.getByRole('switch', { name: 'Enabled' })
-screen.getByRole('button', { name: 'Submit' })
-screen.getByLabelText('Email address')
-screen.getByRole('heading', { name: /welcome/i })
-screen.getByRole('status') // or screen.getByText(/loading/i)
-screen.getByRole('alert') // for error states
+screen.getByRole("switch", { name: "Enabled" });
+screen.getByRole("button", { name: "Submit" });
+screen.getByLabelText("Email address");
+screen.getByRole("heading", { name: /welcome/i });
+screen.getByRole("status"); // or screen.getByText(/loading/i)
+screen.getByRole("alert"); // for error states
 ```
 
 Rules with many pre-existing violations are set to `warn` (not `error`) to allow gradual migration. **New test code must produce zero warnings** -- these rules will be promoted to `error` once existing violations are cleaned up. See [.claude/skills/frontend-coding-standards/SKILL.md section 8 -- Zero New Warnings Policy](../frontend-coding-standards/SKILL.md).
@@ -324,41 +324,45 @@ Rules with many pre-existing violations are set to `warn` (not `error`) to allow
 
 ```typescript
 // ❌ Redundant — waitFor wrapping getBy* is what findBy* already does
-const button = await waitFor(() => screen.getByRole('button', { name: 'Save' }))
+const button = await waitFor(() =>
+  screen.getByRole("button", { name: "Save" }),
+);
 
 // ✅ Correct — findBy* handles the wait internally with better error output
-const button = await screen.findByRole('button', { name: 'Save' })
-await userEvent.click(button)
+const button = await screen.findByRole("button", { name: "Save" });
+await userEvent.click(button);
 ```
 
 Also: use `query*` **only** for asserting absence. Using `query*` when the element should exist produces poor error messages:
 
 ```typescript
 // ❌ Poor error message when element is missing
-expect(screen.queryByRole('alert')).toBeInTheDocument()
+expect(screen.queryByRole("alert")).toBeInTheDocument();
 
 // ✅ Clear failure message
-expect(screen.getByRole('alert')).toBeInTheDocument()
+expect(screen.getByRole("alert")).toBeInTheDocument();
 
 // ✅ query* is correct only for asserting absence
-expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 ```
 
 **Scope assertions with `within()`:** When asserting on elements inside a specific container (dialog footer, form group, select dropdown), use `within()` to scope queries. This prevents false positives from matching elements elsewhere on the page.
 
 ```typescript
 // ❌ BAD: Could match buttons from any part of the page
-const buttons = screen.getAllByRole('button')
+const buttons = screen.getAllByRole("button");
 
 // ✅ GOOD: Scoped to the dialog footer
-const footer = within(dialog).getByRole('contentinfo')
-const buttons = within(footer).getAllByRole('button')
-expect(buttons[0]).toHaveTextContent('Save')
-expect(buttons[1]).toHaveTextContent('Cancel')
+const footer = within(dialog).getByRole("contentinfo");
+const buttons = within(footer).getAllByRole("button");
+expect(buttons[0]).toHaveTextContent("Save");
+expect(buttons[1]).toHaveTextContent("Cancel");
 
 // ✅ GOOD: Scoped to a specific select
-const projectSelect = screen.getByLabelText('Credential project')
-expect(within(projectSelect).getByRole('option', { name: 'Project Alpha' })).toBeInTheDocument()
+const projectSelect = screen.getByLabelText("Credential project");
+expect(
+  within(projectSelect).getByRole("option", { name: "Project Alpha" }),
+).toBeInTheDocument();
 ```
 
 ### 2. Every New Component Must Have a `vitest-axe` Test
@@ -407,23 +411,26 @@ New reusable hooks (`use*.ts`) must have a corresponding `use*.test.ts(x)` file 
 // No useDebouncedValue.test.ts exists
 
 // ✅ GOOD — dedicated hook test
-import { renderHook, act } from '@testing-library/react'
-import { useDebouncedValue } from './useDebouncedValue'
+import { renderHook, act } from "@testing-library/react";
+import { useDebouncedValue } from "./useDebouncedValue";
 
-beforeEach(() => vi.useFakeTimers())
-afterEach(() => vi.useRealTimers())
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
-it('returns debounced value after delay', async () => {
-  const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
-    initialProps: { value: 'hello' },
-  })
+it("returns debounced value after delay", async () => {
+  const { result, rerender } = renderHook(
+    ({ value }) => useDebouncedValue(value, 300),
+    {
+      initialProps: { value: "hello" },
+    },
+  );
 
-  rerender({ value: 'world' })
-  expect(result.current).toBe('hello') // not yet debounced
+  rerender({ value: "world" });
+  expect(result.current).toBe("hello"); // not yet debounced
 
-  await act(() => vi.advanceTimersByTime(300))
-  expect(result.current).toBe('world') // debounced
-})
+  await act(() => vi.advanceTimersByTime(300));
+  expect(result.current).toBe("world"); // debounced
+});
 ```
 
 This ensures the 80% coverage threshold is met on the hook file independently, and prevents regressions when the consuming component changes.
@@ -438,16 +445,16 @@ When testing that a specific field shows a required validation error, fill in al
 
 ```typescript
 // ❌ BAD — only fills name, leaves other fields empty; assertion depends on validation order
-await user.type(screen.getByLabelText('Name'), 'Test')
-await user.click(screen.getByRole('button', { name: 'Create' }))
-await screen.findByText('Project is required')
+await user.type(screen.getByLabelText("Name"), "Test");
+await user.click(screen.getByRole("button", { name: "Create" }));
+await screen.findByText("Project is required");
 
 // ✅ GOOD — fills all required fields except the one under test
-await user.type(screen.getByLabelText('Name'), 'Test')
-await user.selectOptions(screen.getByLabelText('Type'), 'type-1')
+await user.type(screen.getByLabelText("Name"), "Test");
+await user.selectOptions(screen.getByLabelText("Type"), "type-1");
 // intentionally skip project
-await user.click(screen.getByRole('button', { name: 'Create' }))
-await screen.findByText('Project is required')
+await user.click(screen.getByRole("button", { name: "Create" }));
+await screen.findByText("Project is required");
 ```
 
 ### 6. Assert Element Absence Explicitly
@@ -456,11 +463,13 @@ When verifying that a UI element is hidden in a certain state, assert its absenc
 
 ```typescript
 // ❌ BAD — only asserts the empty state is visible, doesn't verify the header button is gone
-expect(screen.getByText('No credentials')).toBeInTheDocument()
+expect(screen.getByText("No credentials")).toBeInTheDocument();
 
 // ✅ GOOD — explicitly asserts the create button is absent in empty state
-expect(screen.getByText('No credentials')).toBeInTheDocument()
-expect(screen.queryByRole('button', { name: 'Create credential' })).not.toBeInTheDocument()
+expect(screen.getByText("No credentials")).toBeInTheDocument();
+expect(
+  screen.queryByRole("button", { name: "Create credential" }),
+).not.toBeInTheDocument();
 ```
 
 ### 7. Typed Mock Functions
@@ -469,10 +478,10 @@ Use generic type parameters on `vi.fn()` instead of double-casting (`vi.fn() as 
 
 ```typescript
 // ❌ BAD — double cast, loses type safety
-const setError = vi.fn() as unknown as UseFormSetError<FormData>
+const setError = vi.fn() as unknown as UseFormSetError<FormData>;
 
 // ✅ GOOD — typed mock function
-const setError = vi.fn<UseFormSetError<FormData>>()
+const setError = vi.fn<UseFormSetError<FormData>>();
 ```
 
 ### 8. Test Names Must Be Accurate, Unique, and Current
@@ -516,19 +525,19 @@ expect(screen.queryByTestId('globe-icon')).not.toBeInTheDocument()
 When a test exercises an async code path (Promise, callback, conditional), assertions may never run — the test passes vacuously. Add a guard at the top:
 
 ```typescript
-it('calls error handler on rejection', async () => {
-  expect.hasAssertions() // fails if zero assertions fire
+it("calls error handler on rejection", async () => {
+  expect.hasAssertions(); // fails if zero assertions fire
 
-  await doThing().catch(err => {
-    expect(err.message).toMatch(/network error/i)
-  })
-})
+  await doThing().catch((err) => {
+    expect(err.message).toMatch(/network error/i);
+  });
+});
 
 // Or when you know the exact count:
-it('validates three required fields', async () => {
-  expect.assertions(3)
+it("validates three required fields", async () => {
+  expect.assertions(3);
   // ... 3 assertions must fire or the test fails
-})
+});
 ```
 
 ### 12. Use `toStrictEqual` When `undefined` Keys Matter
@@ -537,51 +546,49 @@ it('validates three required fields', async () => {
 
 ```typescript
 // Passes with toEqual — may mask a missing field bug
-expect({ a: undefined, b: 2 }).toEqual({ b: 2 })
+expect({ a: undefined, b: 2 }).toEqual({ b: 2 });
 
 // Fails with toStrictEqual — correctly catches the extra undefined key
-expect({ a: undefined, b: 2 }).toStrictEqual({ b: 2 }) // ❌
+expect({ a: undefined, b: 2 }).toStrictEqual({ b: 2 }); // ❌
 
 // Practical use: asserting an API response shape
 expect(workflowResponse).toStrictEqual({
   id: expect.any(String),
-  name: 'My Workflow',
+  name: "My Workflow",
   description: undefined, // field must be explicitly absent
-})
+});
 ```
 
 ### 13. Avoid Three `waitFor` Anti-Patterns
 
 ```typescript
 // ❌ Anti-pattern 1: Empty callback — next assertion runs at the wrong time
-await waitFor(() => {})
-expect(window.fetch).toHaveBeenCalledWith('/api') // race condition
+await waitFor(() => {});
+expect(window.fetch).toHaveBeenCalledWith("/api"); // race condition
 
 // ✅ Correct: assertion belongs inside waitFor
-await waitFor(() => expect(window.fetch).toHaveBeenCalledWith('/api'))
-
+await waitFor(() => expect(window.fetch).toHaveBeenCalledWith("/api"));
 
 // ❌ Anti-pattern 2: Side effects inside waitFor — callback runs multiple times on retry
 await waitFor(() => {
-  fireEvent.keyDown(input, { key: 'ArrowDown' }) // fires multiple times!
-  expect(screen.getAllByRole('option')).toHaveLength(3)
-})
+  fireEvent.keyDown(input, { key: "ArrowDown" }); // fires multiple times!
+  expect(screen.getAllByRole("option")).toHaveLength(3);
+});
 
 // ✅ Correct: side effect outside, assertion inside
-fireEvent.keyDown(input, { key: 'ArrowDown' })
-await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(3))
-
+fireEvent.keyDown(input, { key: "ArrowDown" });
+await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(3));
 
 // ❌ Anti-pattern 3: Multiple assertions in one waitFor — hides which one failed
 // and waits the full timeout before reporting
 await waitFor(() => {
-  expect(window.fetch).toHaveBeenCalledWith('/api')
-  expect(window.fetch).toHaveBeenCalledTimes(1)
-})
+  expect(window.fetch).toHaveBeenCalledWith("/api");
+  expect(window.fetch).toHaveBeenCalledTimes(1);
+});
 
 // ✅ Correct: only the async assertion inside; synchronous ones follow
-await waitFor(() => expect(window.fetch).toHaveBeenCalledWith('/api'))
-expect(window.fetch).toHaveBeenCalledTimes(1)
+await waitFor(() => expect(window.fetch).toHaveBeenCalledWith("/api"));
+expect(window.fetch).toHaveBeenCalledTimes(1);
 ```
 
 ### 14. `vi.mock` Is Hoisted — Avoid Referencing Outer Variables in the Factory
@@ -590,18 +597,18 @@ Vitest hoists `vi.mock()` calls to the top of the file before any other code run
 
 ```typescript
 // ❌ WRONG — myMock is undefined when the factory runs
-const myMock = vi.fn()
-vi.mock('./api', () => ({ fetchWorkflows: myMock }))
+const myMock = vi.fn();
+vi.mock("./api", () => ({ fetchWorkflows: myMock }));
 
 // ✅ CORRECT option 1 — use vi.hoisted() to create refs before hoisting
-const { myMock } = vi.hoisted(() => ({ myMock: vi.fn() }))
-vi.mock('./api', () => ({ fetchWorkflows: myMock }))
+const { myMock } = vi.hoisted(() => ({ myMock: vi.fn() }));
+vi.mock("./api", () => ({ fetchWorkflows: myMock }));
 
 // ✅ CORRECT option 2 — partial mock, preserving real exports
-vi.mock('./api', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('./api')>()
-  return { ...mod, fetchWorkflows: vi.fn() }
-})
+vi.mock("./api", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./api")>();
+  return { ...mod, fetchWorkflows: vi.fn() };
+});
 ```
 
 **Also: mocks do not auto-reset between tests.** Add `clearMocks: true` to `vitest.config.ts` to prevent cross-test contamination from stale `mockReturnValue` calls:
@@ -610,11 +617,11 @@ vi.mock('./api', async (importOriginal) => {
 // vitest.config.ts
 export default defineConfig({
   test: {
-    clearMocks: true,    // clears mock.calls and mock.results between tests
+    clearMocks: true, // clears mock.calls and mock.results between tests
     unstubGlobals: true, // restores vi.stubGlobal() stubs between tests
-    unstubEnvs: true,    // restores vi.stubEnv() stubs between tests
+    unstubEnvs: true, // restores vi.stubEnv() stubs between tests
   },
-})
+});
 ```
 
 ---
@@ -650,12 +657,16 @@ it('shows a fallback title while loading', () => {
 When mocking `useCanI`, always include all three fields — `allowed`, `isChecking`, and `isError`:
 
 ```typescript
-vi.mock('../../hooks/useCanI', () => ({
+vi.mock("../../hooks/useCanI", () => ({
   useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
-}))
+}));
 
 // Per-test override
-vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+vi.mocked(useCanI).mockReturnValue({
+  allowed: false,
+  isChecking: false,
+  isError: false,
+});
 ```
 
 When a component uses a domain hook (e.g. `useWorkflowPermissions`, `useUserPermissions`), mock the domain hook instead of `useCanI`:
@@ -675,12 +686,12 @@ mockPermissions.canCreate = false
 ### Testing disabled-with-tooltip actions
 
 ```typescript
-const button = screen.getByRole('button', { name: /Create/i })
-expect(button).toHaveAttribute('aria-disabled', 'true')
+const button = screen.getByRole("button", { name: /Create/i });
+expect(button).toHaveAttribute("aria-disabled", "true");
 
 // For kebab menu items
-const menuItem = screen.getByRole('menuitem', { name: /Edit/i })
-expect(menuItem).toHaveAttribute('aria-disabled', 'true')
+const menuItem = screen.getByRole("menuitem", { name: /Edit/i });
+expect(menuItem).toHaveAttribute("aria-disabled", "true");
 ```
 
 ### Testing page-level access denied
@@ -716,16 +727,19 @@ Use `safeParse` for invalid-input tests — no try/catch needed:
 
 ```typescript
 // ✅ Use safeParse for asserting on errors
-const result = cronTriggerSchema.safeParse({ scheduleType: 'cron', cron: '' })
-expect(result.success).toBe(false)
+const result = cronTriggerSchema.safeParse({ scheduleType: "cron", cron: "" });
+expect(result.success).toBe(false);
 if (!result.success) {
-  expect(result.error.issues[0].path).toEqual(['cron'])
-  expect(result.error.issues[0].message).toMatch(/invalid/i)
+  expect(result.error.issues[0].path).toEqual(["cron"]);
+  expect(result.error.issues[0].message).toMatch(/invalid/i);
 }
 
 // ✅ Use parse (or safeParse) for asserting valid input
-const valid = cronTriggerSchema.safeParse({ scheduleType: 'cron', cron: '0 9 * * 1-5' })
-expect(valid.success).toBe(true)
+const valid = cronTriggerSchema.safeParse({
+  scheduleType: "cron",
+  cron: "0 9 * * 1-5",
+});
+expect(valid.success).toBe(true);
 ```
 
 Always assert `.path` alongside `.message` — the same message can appear on different fields.
@@ -735,23 +749,26 @@ Always assert `.path` alongside `.message` — the same message can appear on di
 Test each rule in isolation. Do not pass multiple invalid fields at once — it masks which rule triggered:
 
 ```typescript
-describe('workflowSchema', () => {
-  it('accepts a valid workflow', () => {
-    expect(workflowSchema.safeParse(validWorkflow).success).toBe(true)
-  })
+describe("workflowSchema", () => {
+  it("accepts a valid workflow", () => {
+    expect(workflowSchema.safeParse(validWorkflow).success).toBe(true);
+  });
 
-  it('rejects missing name', () => {
-    const result = workflowSchema.safeParse({ ...validWorkflow, name: undefined })
-    expect(result.success).toBe(false)
-    expect(result.error!.issues[0].path).toEqual(['name'])
-  })
+  it("rejects missing name", () => {
+    const result = workflowSchema.safeParse({
+      ...validWorkflow,
+      name: undefined,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].path).toEqual(["name"]);
+  });
 
-  it('rejects empty name', () => {
-    const result = workflowSchema.safeParse({ ...validWorkflow, name: '' })
-    expect(result.success).toBe(false)
-    expect(result.error!.issues[0].path).toEqual(['name'])
-  })
-})
+  it("rejects empty name", () => {
+    const result = workflowSchema.safeParse({ ...validWorkflow, name: "" });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].path).toEqual(["name"]);
+  });
+});
 ```
 
 ### Boundary Values: `undefined` vs `null` vs Empty String
@@ -763,11 +780,11 @@ Zod treats these differently — test all three when a field could legitimately 
 // .nullable() allows null but NOT undefined
 // .min(1) rejects empty string but allows whitespace — consider .trim()
 
-it('distinguishes null from undefined', () => {
-  expect(schema.safeParse({ field: undefined }).success).toBe(true)  // .optional()
-  expect(schema.safeParse({ field: null }).success).toBe(false)      // not .nullable()
-  expect(schema.safeParse({ field: '' }).success).toBe(false)        // .min(1)
-})
+it("distinguishes null from undefined", () => {
+  expect(schema.safeParse({ field: undefined }).success).toBe(true); // .optional()
+  expect(schema.safeParse({ field: null }).success).toBe(false); // not .nullable()
+  expect(schema.safeParse({ field: "" }).success).toBe(false); // .min(1)
+});
 ```
 
 ### Testing `.refine()` and `.superRefine()`
@@ -775,17 +792,17 @@ it('distinguishes null from undefined', () => {
 Test both the passing and failing branch:
 
 ```typescript
-describe('cron expression refinement', () => {
-  it('passes for valid 5-field cron', () => {
-    expect(schema.safeParse({ cron: '0 9 * * 1-5' }).success).toBe(true)
-  })
+describe("cron expression refinement", () => {
+  it("passes for valid 5-field cron", () => {
+    expect(schema.safeParse({ cron: "0 9 * * 1-5" }).success).toBe(true);
+  });
 
-  it('fails for 3-field cron', () => {
-    const result = schema.safeParse({ cron: '* * *' })
-    expect(result.success).toBe(false)
-    expect(result.error!.issues[0].message).toMatch(/invalid cron/i)
-  })
-})
+  it("fails for 3-field cron", () => {
+    const result = schema.safeParse({ cron: "* * *" });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].message).toMatch(/invalid cron/i);
+  });
+});
 ```
 
 ### Testing `.transform()`
@@ -793,14 +810,14 @@ describe('cron expression refinement', () => {
 Test input type and output type separately using `z.input<>` and `z.output<>`:
 
 ```typescript
-type SchemaInput = z.input<typeof mySchema>    // pre-transform shape
-type SchemaOutput = z.output<typeof mySchema>  // post-transform shape
+type SchemaInput = z.input<typeof mySchema>; // pre-transform shape
+type SchemaOutput = z.output<typeof mySchema>; // post-transform shape
 
-it('transforms string to Date', () => {
-  const result = dateSchema.safeParse('2026-06-23')
-  expect(result.success).toBe(true)
-  expect(result.data).toBeInstanceOf(Date)
-})
+it("transforms string to Date", () => {
+  const result = dateSchema.safeParse("2026-06-23");
+  expect(result.success).toBe(true);
+  expect(result.data).toBeInstanceOf(Date);
+});
 ```
 
 ### Fixture Drift Detection
@@ -808,11 +825,14 @@ it('transforms string to Date', () => {
 Prevent mock data from silently diverging from the schema as the schema evolves:
 
 ```typescript
-import { mockWorkflows } from '../mocks/mockData'
+import { mockWorkflows } from "../mocks/mockData";
 
-it.each(mockWorkflows)('mock fixture #%# conforms to workflowSchema', (fixture) => {
-  expect(() => workflowSchema.parse(fixture)).not.toThrow()
-})
+it.each(mockWorkflows)(
+  "mock fixture #%# conforms to workflowSchema",
+  (fixture) => {
+    expect(() => workflowSchema.parse(fixture)).not.toThrow();
+  },
+);
 ```
 
 ### Async Schemas
@@ -820,10 +840,12 @@ it.each(mockWorkflows)('mock fixture #%# conforms to workflowSchema', (fixture) 
 If a schema uses `.refine(async fn)`, you must use `safeParseAsync()`. Calling `safeParse()` on an async schema throws synchronously — it does not skip the refinement silently:
 
 ```typescript
-it('rejects non-unique names', async () => {
-  const result = await asyncWorkflowSchema.safeParseAsync({ name: 'existing-name' })
-  expect(result.success).toBe(false)
-})
+it("rejects non-unique names", async () => {
+  const result = await asyncWorkflowSchema.safeParseAsync({
+    name: "existing-name",
+  });
+  expect(result.success).toBe(false);
+});
 ```
 
 ### Using `expect.schemaMatching` in Assertions
@@ -836,7 +858,7 @@ expect(apiResponse).toEqual({
   id: expect.any(String),
   email: expect.schemaMatching(z.string().email()),
   createdAt: expect.schemaMatching(z.string().datetime()),
-})
+});
 ```
 
 ---
@@ -869,23 +891,25 @@ The `toHaveNoViolations()` matcher is globally available via test setup.
 `@axe-core/playwright` runs axe-core scans in real browser E2E tests. Tests live in `e2e/accessibility.spec.ts`.
 
 ```typescript
-import AxeBuilder from '@axe-core/playwright'
-import { type Page } from '@playwright/test'
-import { test, expect, toAppUrl } from './fixtures'
+import AxeBuilder from "@axe-core/playwright";
+import { type Page } from "@playwright/test";
+import { test, expect, toAppUrl } from "./fixtures";
 
-const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const
+const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] as const;
 
 async function expectNoA11yViolations(page: Page) {
-  const results = await new AxeBuilder({ page }).withTags([...WCAG_TAGS]).analyze()
-  expect(results.violations).toEqual([])
+  const results = await new AxeBuilder({ page })
+    .withTags([...WCAG_TAGS])
+    .analyze();
+  expect(results.violations).toEqual([]);
 }
 
-test('page has no a11y violations', async ({ app }) => {
-  await app.goto(toAppUrl('/workflows'))
-  await expect(app.getByRole('heading', { name: /workflows/i })).toBeVisible()
+test("page has no a11y violations", async ({ app }) => {
+  await app.goto(toAppUrl("/workflows"));
+  await expect(app.getByRole("heading", { name: /workflows/i })).toBeVisible();
 
-  await expectNoA11yViolations(app)
-})
+  await expectNoA11yViolations(app);
+});
 ```
 
 **Running accessibility E2E tests:**
@@ -914,36 +938,39 @@ test: {
 
 Automated scans are a floor, not a ceiling. The following require manual testing beyond vitest-axe and @axe-core/playwright:
 
-| Check | vitest-axe (jsdom) | @axe-core/playwright | Manual required |
-|---|---|---|---|
-| ARIA roles and labels | ✅ | ✅ | — |
-| Color contrast | ❌ (jsdom has no CSS) | ✅ | Supplement |
-| Focus management (modals) | ❌ | Partial | ✅ |
-| Keyboard navigation flow | ❌ | ❌ | ✅ |
-| Screen reader announcement quality | ❌ | ❌ | ✅ |
-| Dynamic/hidden content (post-interaction) | Only if pre-rendered | ✅ | — |
-| Touch targets, WCAG 2.5.x | ❌ | ❌ | ✅ |
+| Check                                     | vitest-axe (jsdom)    | @axe-core/playwright | Manual required |
+| ----------------------------------------- | --------------------- | -------------------- | --------------- |
+| ARIA roles and labels                     | ✅                    | ✅                   | —               |
+| Color contrast                            | ❌ (jsdom has no CSS) | ✅                   | Supplement      |
+| Focus management (modals)                 | ❌                    | Partial              | ✅              |
+| Keyboard navigation flow                  | ❌                    | ❌                   | ✅              |
+| Screen reader announcement quality        | ❌                    | ❌                   | ✅              |
+| Dynamic/hidden content (post-interaction) | Only if pre-rendered  | ✅                   | —               |
+| Touch targets, WCAG 2.5.x                 | ❌                    | ❌                   | ✅              |
 
 **Also inspect `results.incomplete`** — axe flags these as "needs manual review":
 
 ```typescript
-const results = await axe(container)
-expect(results).toHaveNoViolations()
+const results = await axe(container);
+expect(results).toHaveNoViolations();
 // Optionally review ambiguous findings:
 if (results.incomplete.length > 0) {
-  console.warn('axe incomplete checks (need manual review):', results.incomplete.map(r => r.id))
+  console.warn(
+    "axe incomplete checks (need manual review):",
+    results.incomplete.map((r) => r.id),
+  );
 }
 ```
 
 **Suppress known jsdom false positives with `configureAxe`:**
 
 ```typescript
-import { configureAxe } from 'vitest-axe'
+import { configureAxe } from "vitest-axe";
 
 // color-contrast always passes in jsdom (no CSS) — test it via Playwright instead
 const axe = configureAxe({
-  rules: { 'color-contrast': { enabled: false } },
-})
+  rules: { "color-contrast": { enabled: false } },
+});
 ```
 
 ---
@@ -960,18 +987,18 @@ const axe = configureAxe({
 **Example — Button Component:**
 
 ```typescript
-describe('Button', () => {
-  it('renders with label', () => {
+describe("Button", () => {
+  it("renders with label", () => {
     /* ... */
-  }) // Happy path
-  it('calls onClick when clicked', () => {
+  }); // Happy path
+  it("calls onClick when clicked", () => {
     /* ... */
-  }) // Interaction
-  it('renders as disabled when disabled prop', () => {}) // Edge case
-  it('shows loading state', () => {
+  }); // Interaction
+  it("renders as disabled when disabled prop", () => {}); // Edge case
+  it("shows loading state", () => {
     /* ... */
-  }) // State variation
-})
+  }); // State variation
+});
 ```
 
 ### Why 80%?
