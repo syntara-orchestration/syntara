@@ -50,7 +50,7 @@ describe('useApprovalDecideUsers', () => {
       error: undefined,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -70,7 +70,7 @@ describe('useApprovalDecideUsers', () => {
         })
     )
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -86,7 +86,7 @@ describe('useApprovalDecideUsers', () => {
       error: mockError,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -122,23 +122,24 @@ describe('useApprovalDecideUsers', () => {
     })
   })
 
-  it('omits resource_project when projectId is null', async () => {
-    mockPOST.mockResolvedValue({
-      data: { resources: [], next: null },
-      error: undefined,
-    })
-
-    renderHook(() => useApprovalDecideUsers(null), {
+  it('does not fetch when projectId is null', () => {
+    const { result } = renderHook(() => useApprovalDecideUsers(null), {
       wrapper: createWrapper(),
     })
 
-    await waitFor(() => {
-      expect(mockPOST).toHaveBeenCalled()
+    expect(mockPOST).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.users).toEqual([])
+  })
+
+  it('does not fetch when projectId is undefined', () => {
+    const { result } = renderHook(() => useApprovalDecideUsers(), {
+      wrapper: createWrapper(),
     })
 
-    const firstCall = mockPOST.mock.calls[0] as [string, { body: Record<string, unknown> }]
-    const callBody = firstCall[1].body
-    expect(callBody).not.toHaveProperty('resource_project')
+    expect(mockPOST).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.users).toEqual([])
   })
 
   it('fetches all pages when pagination is present', async () => {
@@ -158,7 +159,7 @@ describe('useApprovalDecideUsers', () => {
         error: undefined,
       })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -203,7 +204,7 @@ describe('useApprovalDecideUsers', () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(QueryClientProvider, { client: retryEnabledClient }, children)
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), { wrapper })
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -219,7 +220,7 @@ describe('useApprovalDecideUsers', () => {
       error: undefined,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 

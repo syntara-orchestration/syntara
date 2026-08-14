@@ -112,6 +112,13 @@ function ApproverUsersSelect({
 }>) {
   const showFallback = !hasProjectContext || isPermissionDenied
 
+  let placeholderText = APPROVER_USERS_PLACEHOLDER
+  if (!hasProjectContext) {
+    placeholderText = 'Select a project to load approval users'
+  } else if (isPermissionDenied) {
+    placeholderText = 'Type a username and press Enter'
+  }
+
   return (
     <Stack hasGutter>
       <StackItem>
@@ -124,7 +131,7 @@ function ApproverUsersSelect({
           getItemId={(item) => item.id}
           getItemValue={(item) => item.username}
           getItemLabel={(item) => item.username}
-          placeholderText={showFallback ? 'Type a username and press Enter' : APPROVER_USERS_PLACEHOLDER}
+          placeholderText={placeholderText}
           emptyText={showFallback ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
           loadingText={APPROVER_USERS_LOADING}
           helperText={APPROVER_USERS_HELPER_TEXT}
