@@ -4,8 +4,8 @@ These endpoints expose raw in-memory metrics from the MetricsStore for use
 by external performance-test harnesses.
 
 Security model:
-    * ``include_in_schema=False`` keeps them out of ``/docs`` and
-      ``/openapi.json``.
+    * ``include_in_schema=False`` keeps them out of ``/api_docs/v1/docs`` and
+      ``/api_docs/v1/openapi.json``.
     * Each handler checks the ``metrics.perf_test_mode`` runtime setting
       and returns 404 when disabled.  Toggling the setting enables the
       endpoints (and the backing in-memory store) without a restart.
