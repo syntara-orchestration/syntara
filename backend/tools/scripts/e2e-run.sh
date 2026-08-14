@@ -49,7 +49,7 @@ APP_SEGMENT_ENDPOINT="http://mock-segment:9999" \
 APP_SEGMENT_MAX_RETRIES=2 \
 APP_SEGMENT_TIMEOUT=5 \
 APP_COLLECTION_INTERVAL_SECONDS=10 \
-${COMPOSE_CMD} --profile telemetry-e2e up -d --force-recreate temporal temporal-worker temporal-background-worker mock-segment mcp-server mcp-server-scenarios syntara \
+${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios up -d --force-recreate temporal temporal-worker temporal-background-worker mock-segment mcp-server mcp-server-scenarios syntara \
     >> /tmp/syntara-e2e-infra.log 2>&1
 
 echo "⏳ Waiting for mock Segment server..."
@@ -71,9 +71,9 @@ until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${MCP_AUTH_
     && "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${MCP_FORBIDDEN_PORT:-8767}/health" 2>/dev/null)" == "403" ]]; do
     sleep 1
     TRIES=$((TRIES + 1))
-    if [[ $TRIES -ge 30 ]]; then
-        echo "❌ MCP scenario servers failed to start. Logs:"
-        ${COMPOSE_CMD} --profile telemetry-e2e logs mcp-server-scenarios 2>&1 | tail -20
+    if [[ $TRIES -ge 60 ]]; then
+        echo "❌ MCP scenario servers failed to start after 60s. Logs:"
+        ${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios logs mcp-server-scenarios 2>&1 | tail -20
         exit 1
     fi
 done

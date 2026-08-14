@@ -48,6 +48,32 @@ MCP_FORBIDDEN_PROVIDER_URL = os.environ.get(
     "MCP_FORBIDDEN_BASE_URL", f"http://mcp-server-scenarios:{MCP_FORBIDDEN_PORT}/mcp"
 )
 
+# Guard: skip auth/forbidden tests when the scenario server is not deployed
+# (e.g. Konflux pipelines that only wire the happy-path MCP server).
+_SCENARIO_SERVERS_AVAILABLE: bool | None = None
+
+
+def _check_scenario_servers_available() -> bool:
+    """Return True if mcp-server-scenarios health endpoints respond."""
+    global _SCENARIO_SERVERS_AVAILABLE  # noqa: PLW0603
+    if _SCENARIO_SERVERS_AVAILABLE is not None:
+        return _SCENARIO_SERVERS_AVAILABLE
+    import urllib.request
+
+    auth_health = MCP_AUTH_PROVIDER_URL.rsplit("/mcp", 1)[0] + "/health"
+    try:
+        urllib.request.urlopen(auth_health, timeout=3)  # noqa: S310
+        _SCENARIO_SERVERS_AVAILABLE = True
+    except Exception:
+        _SCENARIO_SERVERS_AVAILABLE = False
+    return _SCENARIO_SERVERS_AVAILABLE
+
+
+requires_scenario_servers = pytest.mark.skipif(
+    "not _check_scenario_servers_available()",
+    reason="mcp-server-scenarios not deployed (requires compose profile or k8s manifests)",
+)
+
 
 TRANSIENT_STATUSES = {HTTPStatus.INTERNAL_SERVER_ERROR, HTTPStatus.BAD_GATEWAY, HTTPStatus.SERVICE_UNAVAILABLE}
 
@@ -206,6 +232,7 @@ class TestMCPProviderIntegration:
         assert len(tools_list.resources) == 0
 
     @pytest.mark.mcp
+    @requires_scenario_servers
     def test_mcp_provider_connection_failure_unauthorized(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration validation fails when the server requires auth.
 
@@ -243,6 +270,7 @@ class TestMCPProviderIntegration:
         assert len(tools_list.resources) == 0
 
     @pytest.mark.mcp
+    @requires_scenario_servers
     def test_mcp_provider_connection_failure_forbidden(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration validation fails when the server returns 403.
 

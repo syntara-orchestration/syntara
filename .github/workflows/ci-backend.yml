@@ -582,7 +582,7 @@ jobs:
           # --no-deps: start all containers immediately without health dependency ordering.
           # On Podman 5.x (events_logger=file), healthcheck timers are never created,
           # so compose would hang waiting for depends_on service_healthy conditions.
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d --no-deps \
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios up --build -d --no-deps \
             database redis moto mcp-server mcp-server-scenarios mock-segment \
             temporal syntara temporal-worker temporal-background-worker
 
@@ -647,12 +647,12 @@ jobs:
         if: failure()
         run: |
           echo "=== Compose logs ==="
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs database temporal syntara temporal-worker temporal-background-worker mcp-server mcp-server-scenarios mock-segment
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios logs database temporal syntara temporal-worker temporal-background-worker mcp-server mcp-server-scenarios mock-segment
 
       - name: Cleanup
         if: always()
         run: |
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e down -v || true
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios down -v || true
 
 
   combine:

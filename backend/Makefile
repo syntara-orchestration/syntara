@@ -469,7 +469,7 @@ services-run: _ensure-secrets _ensure-certs ## Start all services (database + ca
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
@@ -539,7 +539,7 @@ mcp-scenarios-start: ## Start auxiliary auth/forbidden MCP servers (used by test
 	@echo "🚀 Starting MCP scenario servers..."
 	@echo "📍 Auth-required MCP Server: http://localhost:$${MCP_AUTH_PORT:-8766}/mcp"
 	@echo "📍 Forbidden MCP Server: http://localhost:$${MCP_FORBIDDEN_PORT:-8767}/mcp"
-	$(COMPOSE_FINAL_CMD) up --build --force-recreate -d mcp-server-scenarios
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d mcp-server-scenarios
 	@echo "✅ MCP scenario servers started in background"
 	@echo "   Use 'make mcp-scenarios-logs' to view logs"
 	@echo "   Use 'make mcp-scenarios-stop' to stop servers"

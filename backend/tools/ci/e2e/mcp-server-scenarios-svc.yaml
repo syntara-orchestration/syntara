@@ -1,3 +1,5 @@
+# Reference manifest for local/manual k8s deployment only.
+# See mcp-server-scenarios-pod.yaml header for Konflux scope note.
 ---
 apiVersion: v1
 kind: Service

@@ -1,3 +1,7 @@
+# Reference manifest for local/manual k8s deployment only.
+# Konflux pipelines (run-ao-api-tests / deploy-ao-using-aap-dev) do not
+# consume these files; operator-based wiring for Konflux is out of scope
+# for the initial PR and will be added when test phases are enabled there.
 ---
 apiVersion: v1
 kind: Pod

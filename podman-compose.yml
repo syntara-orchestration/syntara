@@ -384,6 +384,8 @@ services:
   # Kubernetes pods and, under Podman's pasta network backend, resolves to a
   # 169.254.0.0/16 address that SSRF cloud-metadata protection always blocks.
   mcp-server-scenarios:
+    profiles:
+      - mcp-scenarios
     build:
       context: ./backend
       dockerfile: containers/mcp/Containerfile
