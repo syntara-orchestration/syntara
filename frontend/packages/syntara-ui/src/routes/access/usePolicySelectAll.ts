@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { detachPromise } from '../../utils/detachPromise'
 
@@ -24,7 +24,9 @@ export function usePolicySelectAll({
   const [isSelectingAll, setIsSelectingAll] = useState(false)
   const isSelectingAllRef = useRef(false)
   const selectedRef = useRef(selected)
-  selectedRef.current = selected
+  useEffect(() => {
+    selectedRef.current = selected
+  })
 
   const runSelectAll = useCallback(() => {
     if (isSelectingAllRef.current) return
