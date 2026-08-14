@@ -46,7 +46,7 @@ spec:
     - name: hermetic
       value: 'true'
     - name: prefetch-input
-      value: '{"type": "npm", "path": "frontend"}'
+      value: '[{"type": "npm", "path": "frontend"}, {"type": "rpm", "path": "frontend"}]'
   pipelineRef:
     params:
       - name: name

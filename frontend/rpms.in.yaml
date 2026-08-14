@@ -1,0 +1,11 @@
+---
+contentOrigin:
+  repofiles:
+    - repositories/ubi-9.repo
+packages:
+  - name: python3
+  - name: python3-libs
+arches:
+  - x86_64
+  - aarch64
+installWeakDeps: false

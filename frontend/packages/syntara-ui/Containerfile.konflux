@@ -50,6 +50,9 @@ FROM registry.redhat.io/ubi9/nginx-124:latest@sha256:d0dea12c26ab29734d15590f2a9
 
 USER 0
 
+# Apply available security patches for python3
+RUN dnf update -y --nobest python3 python3-libs && dnf clean all
+
 # Copy licenses from builder stage for Red Hat certification (HasLicense check)
 COPY --from=builder /licenses /licenses
 
