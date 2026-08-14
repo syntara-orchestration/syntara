@@ -14,7 +14,7 @@
  * - Dialog state resets when closed
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import {
   buildUniqueName,
   clickAddConnectedStep,
@@ -30,7 +30,7 @@ import {
 import { ensureProject } from './utils/api'
 
 /** Create trigger → First action → Second action workflow from scratch. */
-async function createTwoNodeWorkflow(app: import('@playwright/test').Page, workflowName: string) {
+async function createTwoNodeWorkflow(app: Page, workflowName: string) {
   await ensureProject(app)
   await app.goto(toAppUrl('/workflow-builder/new'))
   await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
@@ -75,7 +75,7 @@ async function createTwoNodeWorkflow(app: import('@playwright/test').Page, workf
  * Click a React Flow node's kebab menu by its visible text label.
  * Avoid Reset layout here — layout animation remounts nodes and detaches the menu.
  */
-async function openNodeKebabMenu(app: import('@playwright/test').Page, nodeText: string) {
+async function openNodeKebabMenu(app: Page, nodeText: string) {
   await waitForUIReady(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
   await expect(node).toBeVisible({ timeout: 15_000 })
@@ -99,7 +99,7 @@ async function openNodeKebabMenu(app: import('@playwright/test').Page, nodeText:
  * Retries the full kebab → menuitem flow when React Flow remounts mid-click
  * ("element is not stable" / "element was detached from the DOM").
  */
-async function openRunStepDialog(app: import('@playwright/test').Page, nodeText: string) {
+async function openRunStepDialog(app: Page, nodeText: string) {
   const dialogHeading = app.getByRole('heading', { name: `Run ${nodeText}?` })
   await expect(async () => {
     // Close a leftover menu from a prior attempt so we start from a clean toggle

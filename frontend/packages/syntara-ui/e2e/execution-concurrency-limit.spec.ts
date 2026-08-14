@@ -47,8 +47,8 @@ test.describe('Execution Concurrency Limit', () => {
       await app.getByRole('button', { name: 'Run now' }).click()
       await responsePromise
 
-      // PF6 toast AlertGroup uses role="list"; individual items have class pf-v6-c-alert
-      const alert = app.locator('.pf-v6-c-alert-group .pf-v6-c-alert')
+      // PF6 toast alerts render with role="alert"
+      const alert = app.getByRole('alert')
       await expect(alert.filter({ hasText: /concurrency limit/i })).toBeVisible()
       await expect(alert.filter({ hasText: /10\/10 active workflows/i })).toBeVisible()
     } finally {

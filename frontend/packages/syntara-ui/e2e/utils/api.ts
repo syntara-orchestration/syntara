@@ -5,9 +5,7 @@
  * and clean up resources via the API — faster and more reliable than
  * UI-based setup, especially for fixtures.
  */
-import { expect, type Page } from '@playwright/test'
-
-import { appBaseUrl } from '../fixtures'
+import { appBaseUrl, expect, type Page } from '../fixtures'
 
 /** Get the API base URL (proxied through the UI server) */
 function apiUrl(path: string): string {

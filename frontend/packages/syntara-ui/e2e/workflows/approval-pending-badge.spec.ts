@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
@@ -161,7 +160,6 @@ test.describe('Approval Pending Badge', () => {
       const reachedTerminal = await app
         .getByRole('row')
         .filter({ hasText: /Successful|Failed/ })
-        .nth(0)
         .waitFor({ state: 'visible', timeout: 30_000 })
         .then(() => true)
         .catch(() => false)
@@ -181,7 +179,6 @@ test.describe('Approval Pending Badge', () => {
 
       // Navigate to executions list
       await app.goto('/executions')
-      await app.waitForLoadState('networkidle')
       await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
 
       // Wait for any WebSocket updates to settle after page load

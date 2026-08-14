@@ -157,12 +157,12 @@ test.describe('Cursor-Based Pagination', () => {
   })
 
   test('pagination footer displays credential count', async ({ app }) => {
-    const credentialCountText = app.locator('.pf-v6-c-pagination').getByText(/of \d+/)
+    const credentialCountText = app.getByRole('navigation', { name: /pagination/i }).getByText(/of \d+/)
     await expect(credentialCountText).toBeVisible()
   })
 
   test('next/previous controls navigate between pages when available', async ({ app }) => {
-    const pagination = app.locator('.pf-v6-c-pagination')
+    const pagination = app.getByRole('navigation', { name: /pagination/i })
     const nextButton = pagination.getByRole('button', { name: /next/i })
     const hasNext = await nextButton
       .waitFor({ state: 'visible', timeout: 3000 })

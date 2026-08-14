@@ -6,8 +6,7 @@
  * - UI-29: Self-contained approve flow — create workflow with approval node,
  *   run it, find the pending approval in the queue, approve it, verify execution resumes
  */
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
@@ -78,11 +77,12 @@ test('user filters approvals by name and status', async ({ app }) => {
   await expect(nameChipGroup.getByText('Policy')).toBeVisible()
   await expect(app).toHaveURL(/name%5Bcontains%5D=Policy/)
 
-  // Step 2: Switch to Status field in attribute search and apply filter
-  await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true }).click()
-  await app.getByRole('option', { name: 'Status' }).click()
+  // Step 2: Add status filter (standalone MULTISELECT)
   await app.getByRole('button', { name: 'Filter by status' }).click()
-  await app.getByRole('listbox').getByText('Approved').click()
+  await app
+    .getByRole('menu', { name: /filter by status/i })
+    .getByText('Approved')
+    .click()
 
   const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
   await expect(nameChipGroup.getByText('Policy')).toBeVisible()
@@ -106,10 +106,6 @@ test('user filters approvals by name and status', async ({ app }) => {
   await expect(app).not.toHaveURL(/status/)
 
   // Step 5: Empty state when filters match nothing
-  // Switch field selector back to Name (still on Status from step 2)
-  await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Status', exact: true }).click()
-  await app.getByRole('option', { name: 'Name' }).click()
-
   const impossibleName = buildUniqueName('zzz-nonexistent')
   await app.getByPlaceholder('Filter by name').fill(impossibleName)
   await app.getByRole('button', { name: 'Apply filter' }).click()

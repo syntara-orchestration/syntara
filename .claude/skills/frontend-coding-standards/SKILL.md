@@ -1974,3 +1974,47 @@ Rules of thumb:
 - Skip `useOptimistic` when the success path is entangled with conflict handling, dirty client stores, or multi-step workflows (e.g. workflow publish).
 
 Reference implementation: `useOptimisticCredentialEnabled` (credentials list enable/disable).
+
+---
+
+## 41. Derive Named Booleans for Repeated Conditions
+
+**When a boolean check is used more than once, extract it into a named constant at the top of the function or component.**
+
+```typescript
+// ❌ BAD: CREDENTIAL_REQUIRED_TYPES.has(integrationType) repeated 4× inline
+const isDisabled = CREDENTIAL_REQUIRED_TYPES.has(integrationType) ? !credentialId : false
+const label = CREDENTIAL_REQUIRED_TYPES.has(integrationType) ? 'Required' : 'Optional'
+const showWarning = CREDENTIAL_REQUIRED_TYPES.has(integrationType) && !credentialId
+
+// ✅ GOOD: derived once, used everywhere
+const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationType)
+const isDisabled = isCredentialRequired && !credentialId
+const label = isCredentialRequired ? 'Required' : 'Optional'
+const showWarning = isCredentialRequired && !credentialId
+```
+
+Named booleans also communicate intent — `isCredentialRequired` is self-documenting; `CREDENTIAL_REQUIRED_TYPES.has(integrationType)` is not. Apply the same rule in hooks and utility functions, not just components.
+
+---
+
+## 42. Use `ReactNode` Lists for Multi-Item Toast/Alert Content — Not `join('\n')`
+
+**When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse whitespace including `\n` in HTML, so two warnings joined with a newline appear merged on one line.
+
+```typescript
+// ❌ BAD: \n is collapsed in HTML — two warnings appear on one line
+description: data.warnings.join('\n')
+
+// ✅ GOOD: ReactNode list renders correctly
+description:
+  data.warnings.length === 1 ? (
+    data.warnings[0]
+  ) : (
+    <ul style={{ margin: 0, paddingLeft: 'var(--pf-t--global--spacer--md)' }}>
+      {data.warnings.map((w) => <li key={w}>{w}</li>)}
+    </ul>
+  ),
+```
+
+The `description` prop of `showAlert` / `showWarning` accepts `ReactNode`, so structured markup is always valid.

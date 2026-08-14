@@ -55,7 +55,8 @@ function filterNavItems(items: readonly TNavigationItem[], permissions: Record<s
     if (hadVisibleChildren && !filteredChildren.some((c) => !c.hidden)) continue
 
     const unchanged =
-      filteredChildren.length === item.children.length && filteredChildren.every((c, i) => c === item.children![i])
+      filteredChildren.length === item.children.length &&
+      filteredChildren.every((c, i) => c === item.children?.[i])
 
     filtered.push(unchanged ? item : { ...item, children: filteredChildren })
   }

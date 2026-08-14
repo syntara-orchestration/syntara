@@ -70,7 +70,7 @@ test.describe('UI-26: Workflow Runs Table with Filtering', () => {
     await expect(table.getByRole('columnheader', { name: 'Completed at' })).toBeVisible()
 
     // At least one data row must be present (created in beforeAll)
-    const firstDataRow = table.getByRole('row').nth(1)
+    const firstDataRow = table.locator('tbody tr:first-child')
     await expect(firstDataRow).toBeVisible()
   })
 
