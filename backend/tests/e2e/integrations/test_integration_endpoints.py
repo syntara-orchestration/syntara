@@ -30,8 +30,8 @@ from syntara_api_client.models.aap_configuration import AAPConfiguration
 from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
 from syntara_api_client.models.integration_create import IntegrationCreate
-from syntara_api_client.models.integration_patch import IntegrationPatch
 from syntara_api_client.models.integration_type import IntegrationType
+from syntara_api_client.models.integration_update import IntegrationUpdate
 from syntara_api_client.models.llm_provider_configuration import LLMProviderConfiguration
 from syntara_api_client.models.llm_provider_hint import LLMProviderHint
 from syntara_api_client.models.mcp_server_configuration_input import MCPServerConfigurationInput
@@ -250,7 +250,7 @@ class TestPatchIntegration:
         new_name = unique_name("e2e-renamed")
         updated = syntara_api.integrations.update(
             integration_id=UUID(created["id"]),
-            body=IntegrationPatch(name=new_name),
+            body=IntegrationUpdate(name=new_name),
         ).assert_and_get()
         assert updated.name == new_name
 
@@ -260,7 +260,7 @@ class TestPatchIntegration:
         created = integration_factory(_mcp_create())
         updated = syntara_api.integrations.update(
             integration_id=UUID(created["id"]),
-            body=IntegrationPatch(enabled=False),
+            body=IntegrationUpdate(enabled=False),
         ).assert_and_get()
         assert updated.enabled is False
 
@@ -272,7 +272,7 @@ class TestPatchIntegration:
         other = integration_factory(_mcp_create())
         resp = syntara_api.integrations.update(
             integration_id=UUID(other["id"]),
-            body=IntegrationPatch(name=taken_name),
+            body=IntegrationUpdate(name=taken_name),
         )
         assert resp.status_code == HTTPStatus.CONFLICT
 
@@ -282,7 +282,7 @@ class TestPatchIntegration:
         created = integration_factory(_mcp_create())
         resp = syntara_api.integrations.update(
             integration_id=UUID(created["id"]),
-            body=IntegrationPatch(
+            body=IntegrationUpdate(
                 configuration=LLMProviderConfiguration(
                     base_url="https://api.openai.com", provider_hint=LLMProviderHint.OPENAI
                 ),

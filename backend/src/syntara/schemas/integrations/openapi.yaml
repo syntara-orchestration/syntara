@@ -233,7 +233,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/IntegrationPatch"
+              $ref: "#/components/schemas/IntegrationUpdate"
       responses:
         "200":
           description: Successful Response
@@ -1245,7 +1245,7 @@ components:
       title: InitialModelSelection
       type: object
 
-    IntegrationPatch:
+    IntegrationUpdate:
       description: "Schema for partially updating an integration (user-facing)."
       additionalProperties: false
       properties:
@@ -1305,7 +1305,7 @@ components:
             - type: "null"
           title: Labels
           description: Key-value labels
-      title: IntegrationPatch
+      title: IntegrationUpdate
       type: object
 
     IntegrationTestConnection:

@@ -214,6 +214,11 @@ class ProjectService(BaseService):
 
             msg = f"The built-in '{project.name}' project cannot be deleted"
             raise BuiltinProtectionError(msg)
+        if project.is_default:
+            from syntara.authz.exceptions import DefaultProjectProtectionError  # noqa: PLC0415
+
+            msg = "Default project cannot be deleted"
+            raise DefaultProjectProtectionError(msg)
         await self._cascade_cleanup_project_resources(project_id)
         project.soft_delete(self.user.id)
         self.session.add(project)

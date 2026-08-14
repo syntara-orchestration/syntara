@@ -28,11 +28,11 @@ from syntara.integrations.models import (
     IntegrationCreate,
     IntegrationListParams,
     IntegrationListResponse,
-    IntegrationPatch,
     IntegrationProjectAssignmentListParams,
     IntegrationProjectAssignmentListResponse,
     IntegrationProjectAssignmentRead,
     IntegrationRead,
+    IntegrationUpdate,
 )
 from syntara.integrations.models.integration import (
     Integration,
@@ -215,11 +215,11 @@ async def get_integration(
 @audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
 async def update_integration(
     integration_id: UUID,
-    data: IntegrationPatch,
+    data: IntegrationUpdate,
     service: Annotated[IntegrationService, Depends(get_integration_service)],
 ) -> IntegrationRead:
     """Update an integration."""
-    return await service.patch_integration(integration_id, data)
+    return await service.update_integration(integration_id, data)
 
 
 @router.delete(

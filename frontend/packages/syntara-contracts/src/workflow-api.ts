@@ -47,6 +47,10 @@ export interface paths {
     /**
      * Validate workflow definition
      * @description Validate a workflow definition without saving it.
+     *
+     *     Requires authentication but no specific workflow/project permission:
+     *     validation is a stateless, side-effect-free check of caller-supplied
+     *     data with no workflow_id or project_id in scope to authorize against.
      */
     post: operations['validate_workflow_definition']
     delete?: never

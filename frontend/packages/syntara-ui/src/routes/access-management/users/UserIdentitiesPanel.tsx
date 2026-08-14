@@ -34,7 +34,7 @@ import type { UserIdentity } from './identityUtils'
 import { applyLocalFilters, useLocalFilterState } from './identityUtils'
 import { useUserIdentityPermissions } from './useUserIdentityPermissions'
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 type IdentityTableRow =
   | { kind: 'connected'; identity: UserIdentity }

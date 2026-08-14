@@ -136,11 +136,11 @@ class TestAsyncToolInvocationEventDispatch:
             msg = "Access denied"
             raise PermissionError(msg)
 
-        # Mock the tool disable functionality to avoid side effects
+        # Mock failure reporting to avoid side effects
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
+                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure",
                 new_callable=AsyncMock,
             ),
         ):
@@ -287,11 +287,11 @@ class TestSyncToolInvocationEventDispatch:
             msg = "Invalid operation"
             raise ValueError(msg)
 
-        # Mock the tool disable functionality to avoid side effects
+        # Mock failure reporting to avoid side effects
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch(
-                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id",
+                "syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure",
                 new_callable=AsyncMock,
             ),
         ):

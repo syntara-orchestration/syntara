@@ -5,6 +5,10 @@ This is a monorepo with two components. General guidelines apply to both; compon
 - **Backend**: [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md)
 - **Frontend**: [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md)
 
+How maintainers evaluate, accept, and maintain external contributions (including
+what is in or out of scope for custom node types and custom agents) is documented
+in [GOVERNANCE.md](GOVERNANCE.md).
+
 ## Prerequisites
 
 - **Python 3.12+** and [uv](https://docs.astral.sh/uv/)

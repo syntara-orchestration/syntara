@@ -2925,7 +2925,7 @@ export const handlers = [
   }),
 
   // Directory handlers (lightweight id + username/name only)
-  http.get('/api/v1/users_directory', ({ request }) => {
+  http.get('/api/v1/users/directory', ({ request }) => {
     const url = new URL(request.url)
     const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
@@ -3015,7 +3015,7 @@ export const handlers = [
     return HttpResponse.json(paginate(resources, cursor, limit, includeTotal))
   }),
 
-  http.get('/api/v1/groups_directory', ({ request }) => {
+  http.get('/api/v1/groups/directory', ({ request }) => {
     const url = new URL(request.url)
     const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)

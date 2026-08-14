@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import pytest
 
+from syntara.authz.models import Project
 from tests.helpers.workflow import create_minimal_workflow_definition
+from tests.integration.api.conftest import make_project_user
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from httpx import AsyncClient
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from syntara.core.models import User
 
 
 @pytest.mark.asyncio
@@ -402,3 +410,148 @@ async def test_validate_converge_valid(jwt_client: AsyncClient) -> None:
     data = response.json()
     assert data["is_valid"] is True
     assert data["findings"] == []
+
+
+@pytest.mark.asyncio
+async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
+    """Invalid IANA timezone on a scheduled trigger returns 422 with a scheduled-trigger finding.
+
+    Builder's handleVerify calls POST /workflows/validate; invalid timezones
+    must fail here (not only on publish) so verify and publish share one
+    semantic contract.
+    """
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "scheduled-invalid-tz",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "cron",
+                        "cron": "0 9 * * *",
+                        "timezone": "Invalid/Not_A_Real_Zone",
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "name": "Node 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "pass"},
+                }
+            ],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["type"] == "https://api.example.com/errors/validation-error"
+    assert data["code"] == "WORKFLOW_DEFINITION_INVALID"
+    assert data["retryable"] is False
+    vr = data["validation_result"]
+    assert vr["is_valid"] is False
+    scheduled = [e for e in vr["findings"] if "scheduled trigger config" in e["message"]]
+    assert len(scheduled) == 1
+    assert scheduled[0]["node_id"] == "sched_1"
+    assert scheduled[0]["field_path"] == "parameters.timezone"
+
+
+@pytest.mark.asyncio
+async def test_validate_invalid_iso8601_interval(jwt_client: AsyncClient) -> None:
+    """Invalid ISO 8601 interval on a scheduled trigger returns 422 with a scheduled-trigger finding.
+
+    Interval was previously an unconstrained string that only failed later in
+    publish's Temporal schedule conversion, so verify (this endpoint) must reject
+    it up front too.
+    """
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "scheduled-invalid-interval",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {
+                        "schedule_type": "interval",
+                        "interval": "not-an-interval",
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "name": "Node 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "pass"},
+                }
+            ],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == "WORKFLOW_DEFINITION_INVALID"
+    vr = data["validation_result"]
+    assert vr["is_valid"] is False
+    scheduled = [e for e in vr["findings"] if "scheduled trigger config" in e["message"]]
+    assert len(scheduled) == 1
+    assert scheduled[0]["node_id"] == "sched_1"
+    assert scheduled[0]["field_path"] == "parameters.interval"
+
+
+class TestValidateProjectScopedUser:
+    """Project-scoped users can call POST /workflows/validate without workflow:create.
+
+    Before the fix, ``/workflows/validate`` was gated by a PermissionChecker
+    that could never resolve a project scope from the request body (it has
+    no ``project_id``/``workflow_id``), so it silently required a
+    system-wide grant that project-scoped-only users never have — this is
+    what produced "Not authorized to perform create on workflow" for
+    Builder users with only project-scoped roles.
+    """
+
+    @pytest.mark.asyncio
+    async def test_project_scoped_user_can_validate(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        user_factory: Callable[..., Awaitable[User]],
+        auth_as: Callable[[User], None],
+    ) -> None:
+        """A user with only a project-scoped role (no system-wide grant) can validate."""
+        project = Project(name=f"validate-test-{uuid4().hex[:8]}", description="")
+        test_db_session.add(project)
+        await test_db_session.commit()
+        await test_db_session.refresh(project)
+
+        user = await user_factory(
+            username=f"proj-user-{uuid4().hex[:6]}", email=f"proj-user-{uuid4().hex[:6]}@test.com"
+        )
+        await make_project_user(test_db_session, user, project)
+        auth_as(user)
+
+        payload = {
+            "workflow_definition": create_minimal_workflow_definition(
+                name="project-scoped-validate",
+                description="Validated by a project-scoped-only user",
+            ),
+        }
+
+        response = await auth_client.post("/api/v1/workflows/validate", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_valid"] is True
+        assert data["findings"] == []
+        assert data["error_count"] == 0
+        assert data["warning_count"] == 0
