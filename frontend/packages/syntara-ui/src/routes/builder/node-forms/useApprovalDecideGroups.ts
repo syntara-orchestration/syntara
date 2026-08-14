@@ -1,14 +1,14 @@
 import type { UsersAPI } from '@syntara/contracts'
 import { useQuery } from '@tanstack/react-query'
 
+import { usersFetchClient } from '../../../client'
 import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
-import { accessFetchClient } from '../../access/accessClient'
 
 type GroupDirectoryEntry = UsersAPI.components['schemas']['GroupDirectoryEntry']
 
 async function fetchAllGroupDirectory(): Promise<GroupDirectoryEntry[]> {
   return fetchAllPages<GroupDirectoryEntry>((cursor) =>
-    accessFetchClient.GET('/groups_directory', {
+    usersFetchClient.GET('/groups_directory', {
       params: { query: { sort: 'name', limit: MAX_PAGE_SIZE, cursor } },
     })
   )

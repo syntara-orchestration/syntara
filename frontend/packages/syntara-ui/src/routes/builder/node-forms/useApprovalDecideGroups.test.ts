@@ -4,24 +4,21 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../client', () => ({
+vi.mock('../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
-}))
-
-vi.mock('../../access/accessClient', () => ({
-  accessFetchClient: {
+  usersFetchClient: {
     GET: vi.fn(),
   },
 }))
 
-import { accessFetchClient } from '../../access/accessClient'
+import { usersFetchClient } from '../../../client'
 
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
 
 type GroupDirectoryEntry = UsersAPI.components['schemas']['GroupDirectoryEntry']
 
-const mockGET = vi.mocked(accessFetchClient.GET)
+const mockGET = vi.mocked(usersFetchClient.GET)
 
 function createWrapper() {
   const queryClient = new QueryClient({
