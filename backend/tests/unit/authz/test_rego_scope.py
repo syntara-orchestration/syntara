@@ -227,8 +227,8 @@ class TestOwnScope:
         )
         assert result["allow"] is False
 
-    def test_own_scope_no_project_context_allowed(self, opa_evaluate):
-        """Own scope without project field (system-level) allows if owner matches."""
+    def test_own_scope_no_project_context_denied(self, opa_evaluate):
+        """Own scope without project field denies even if owner matches."""
         user_id = "user-uuid-123"
         policies = [
             allow_policy("credential:update:own", ["credential:update"], scope="own"),
@@ -242,7 +242,7 @@ class TestOwnScope:
                 effective_policies=policies,
             )
         )
-        assert result["allow"] is True
+        assert result["allow"] is False
 
     def test_own_scope_missing_metadata_denied(self, opa_evaluate):
         """Own scope denies when resource has no created_by metadata."""

@@ -65,11 +65,6 @@ _scope_matches(policy) if {
     input.resource.metadata.created_by == input.user.id
     policy.project == input.resource.project
 }
-_scope_matches(policy) if {
-    policy.scope == "own"
-    input.resource.metadata.created_by == input.user.id
-    not policy.project
-}
 # Explicit any-project check (can_i check_any_project=true). Does NOT treat
 # empty resource.project as a wildcard — that flag must be set.
 _scope_matches(policy) if {

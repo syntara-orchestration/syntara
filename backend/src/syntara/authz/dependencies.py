@@ -28,6 +28,9 @@ from syntara.core.models.user import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
+# Must match the key used in authz.rego: input.resource.metadata.created_by
+_OWNER_METADATA_KEY = "created_by"
+
 
 def _record_authz_duration(start: float, resource_type: str, action: str) -> None:
     """Record authz check duration via the metrics recorder (fire-and-forget)."""
@@ -356,7 +359,7 @@ class PermissionChecker:
         if self.owner_field and resource_id:
             owner_id = await self._resolve_resource_owner(db, resource_id)
             if owner_id:
-                resource_metadata["created_by"] = owner_id
+                resource_metadata[_OWNER_METADATA_KEY] = owner_id
 
         authz_request = AuthzRequest(
             user_id=current_user.id,

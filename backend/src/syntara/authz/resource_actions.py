@@ -118,8 +118,8 @@ def validate_project_statements(statements: list[dict[str, Any]]) -> str | None:
 
     for stmt in statements:
         scope = stmt.get("scope", "any")
-        if scope != "project":
-            return f"Project policies only accept scope='project', got scope='{scope}'"
+        if scope not in ("project", "own"):
+            return f"Project policies only accept scope='project' or 'own', got scope='{scope}'"
 
         for action_str in stmt.get("actions", []):
             if ":" not in action_str:

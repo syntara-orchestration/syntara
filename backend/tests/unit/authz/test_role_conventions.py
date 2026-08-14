@@ -240,12 +240,16 @@ class TestRegistryIntegrity:  # noqa: D101
     def test_all_builtin_policies_have_test_coverage(self) -> None:
         from tests.e2e.authz.policies.conftest import (
             E2E_COVERAGE_EXEMPT,
+            OWN_SCOPED_CASES,
             PROJECT_SCOPED_CASES,
             SELF_SCOPED_CASES,
             SYSTEM_SCOPED_REPRESENTATIVE,
         )
 
-        e2e_covered = {c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES}
+        e2e_covered = {
+            c.policy
+            for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
+        }
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
         all_builtin = {p.name for p in BUILTIN_POLICIES}
 
