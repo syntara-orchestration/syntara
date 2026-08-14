@@ -3703,7 +3703,7 @@ dev = [
 
 [[package]]
 name = "syntara-api-client"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "src/api_client" }
 dependencies = [
     { name = "attrs" },
