@@ -53,8 +53,7 @@ class TestCertificateAuthenticationBypass:
         """PermissionChecker returns early when request is cert-authenticated."""
         checker = PermissionChecker("workflow", "read")
         # Should return None without calling evaluator
-        result = await checker(mock_request, mock_user, mock_db)
-        assert result is None
+        assert await checker(mock_request, mock_user, mock_db) is None  # type: ignore[func-returns-value]
 
     async def test_project_scope_filter_bypasses_cert_auth(
         self, mock_request: MagicMock, mock_user: User, mock_db: AsyncMock
