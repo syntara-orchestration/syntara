@@ -429,6 +429,15 @@ components:
         status:
           $ref: '#/components/schemas/FileStatus'
           description: Processing status (pending_conversion)
+        is_project_deleted:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          default: null
+          description: >-
+            True when the owning project has been soft-deleted; the file is
+            retained as an orphan. Null when not computed (e.g. upload response).
+          title: Is Project Deleted
 
     FileDetailResponse:
       type: object

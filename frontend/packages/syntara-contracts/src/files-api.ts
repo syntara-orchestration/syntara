@@ -201,6 +201,12 @@ export interface components {
       mime_type: string
       /** @description Processing status (pending_conversion) */
       status: components['schemas']['FileStatus']
+      /**
+       * Is Project Deleted
+       * @description True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
+       * @default null
+       */
+      is_project_deleted?: boolean | null
     }
     /**
      * FileDetailResponse
