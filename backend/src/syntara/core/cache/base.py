@@ -8,13 +8,13 @@ differentiated log messages and implement domain-specific operations.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from typing import TYPE_CHECKING, Any, Self
 
 import redis.asyncio as redis
 import structlog
-from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import ResponseError
+from redis.exceptions import BusyLoadingError, ConnectionError as RedisConnectionError, ResponseError
 
 from syntara.core.config.base import get_settings
 
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Pool exhaustion is retryable; use exponential backoff
+_POOL_EXHAUSTION_RETRYABLE_ERRORS = (BusyLoadingError,)
 
 
 @contextlib.asynccontextmanager
@@ -47,6 +50,66 @@ async def redis_error_handler(operation: str, **log_context: Any) -> AsyncGenera
         logger.exception("redis_network_error", operation=operation, **log_context)
         msg = f"Network error: {e}"
         raise RedisConnectionError(msg) from e
+
+
+async def redis_operation_with_backoff(
+    operation_fn: Any,  # noqa: ANN401
+    operation_name: str,
+    max_retries: int = 3,
+    initial_backoff_ms: int = 10,
+    **log_context: Any,  # noqa: ANN401
+) -> Any:  # noqa: ANN401
+    """Execute a Redis operation with exponential backoff for transient failures.
+
+    Handles pool exhaustion and other transient errors with exponential backoff.
+    Operations like cache writes can safely retry; operations like cache reads
+    should only retry for recoverable errors (not "key not found").
+
+    Args:
+        operation_fn: Async callable to execute (should raise RedisConnectionError on failure)
+        operation_name: Log name for the operation (e.g., "cache_setex")
+        max_retries: Maximum number of retries (default: 3)
+        initial_backoff_ms: Initial backoff in milliseconds (default: 10)
+        **log_context: Extra log context to pass through
+
+    Returns:
+        The result of operation_fn() if successful
+
+    Raises:
+        RedisConnectionError: If all retries exhausted
+
+    """
+    backoff_ms = initial_backoff_ms
+    last_error: RedisConnectionError | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return await operation_fn()
+        except RedisConnectionError as e:
+            last_error = e
+            if attempt < max_retries:
+                logger.warning(
+                    "redis_operation_retry",
+                    operation=operation_name,
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    backoff_ms=backoff_ms,
+                    **log_context,
+                )
+                await asyncio.sleep(backoff_ms / 1000.0)
+                backoff_ms = min(backoff_ms * 2, 500)  # Cap backoff at 500ms
+            else:
+                logger.error(
+                    "redis_operation_failed_retries_exhausted",
+                    operation=operation_name,
+                    attempts=max_retries + 1,
+                    **log_context,
+                )
+
+    if last_error:
+        raise last_error
+    msg = f"Redis operation '{operation_name}' failed"
+    raise RedisConnectionError(msg)
 
 
 _NOT_CONNECTED_SUFFIX = " client not connected"
