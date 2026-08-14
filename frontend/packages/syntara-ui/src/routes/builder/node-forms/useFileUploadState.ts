@@ -43,7 +43,7 @@ function handleBatchDeleteFailure(
   replacements: UploadedFile[],
   deleted: UploadedFile[],
   err: unknown,
-  ctx: DeleteFailureContext,
+  ctx: DeleteFailureContext
 ): void {
   const { clearDeletingState, showError } = ctx
   const file = replacements[failedIndex]
@@ -65,7 +65,7 @@ async function deleteSessionReplacements(
   replacements: UploadedFile[],
   beginDeleting: (id: string) => boolean,
   clearDeletingState: (id: string) => void,
-  showError: (opts: { title: string }) => void,
+  showError: (opts: { title: string }) => void
 ): Promise<BatchDeleteResult> {
   for (const file of replacements) {
     beginDeleting(file.id)
@@ -263,7 +263,7 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
               sessionReplacements,
               beginDeleting,
               clearDeletingState,
-              showError,
+              showError
             )
             for (const file of batch.deleted) {
               removeLocalFile(file.id)
