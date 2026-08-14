@@ -16,15 +16,24 @@ from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
 
+_SANITIZE_MAX_ROUNDS = 10
+
 
 def _sanitize_notes(v: str | None) -> str | None:
     if not isinstance(v, str):
         return v
-    # Strip HTML tags then restore entity-encoded plain-text characters.
-    # Two passes: entity-encoded HTML (e.g. &lt;script&gt;) becomes real
-    # tags after the first unescape and is stripped by the second pass.
-    first_pass = html.unescape(nh3.clean(v, tags=set()))
-    return html.unescape(nh3.clean(first_pass, tags=set()))
+    # Fixed-point loop: keep unescaping entity-encoded HTML and stripping
+    # tags until the output stabilises.  Handles arbitrary encoding depth
+    # (e.g. &amp;lt;script&amp;gt;).  Bounded to prevent infinite loops.
+    result = v
+    for _ in range(_SANITIZE_MAX_ROUNDS):
+        cleaned = html.unescape(nh3.clean(result, tags=set()))
+        if cleaned == result:
+            return result
+        result = cleaned
+    # Loop exhausted without converging — input has deeply nested encoding
+    # that could decode into unsafe HTML.  Reject rather than store it.
+    return ""
 
 
 class ApproverUserSummary(SQLModel):

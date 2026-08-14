@@ -37,6 +37,11 @@ class TestDecisionNotesSanitization:
             ('<svg onload="alert(1)">', ""),
             ("<iframe src=evil></iframe>", ""),
             ("&lt;script&gt;alert(1)&lt;/script&gt;", ""),
+            # Double-encoded HTML (e.g. &amp;lt; → &lt; → <)
+            ("&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;", ""),
+            ("&amp;lt;img src=x onerror=alert(1)&amp;gt;", ""),
+            # Triple-encoded HTML
+            ("&amp;amp;lt;script&amp;amp;gt;alert(1)&amp;amp;lt;/script&amp;amp;gt;", ""),
             # Nested/obfuscated tag bypass (single-pass regex failure)
             ("<<script>script>alert(1)</script>", "<"),
             ("<<<script>>script>alert(1)</script>", "<<"),
@@ -65,6 +70,9 @@ class TestDecisionNotesSanitization:
             "svg-onload",
             "iframe",
             "entity-encoded-html-stripped",
+            "double-encoded-script",
+            "double-encoded-img-onerror",
+            "triple-encoded-script",
             "nested-obfuscated-script",
             "triple-nested-obfuscated",
             "unclosed-script",
@@ -90,6 +98,9 @@ class TestDecisionNotesSanitization:
             "<script",
             "<b>text</b>",
             '<svg onload="alert(1)">',
+            "&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;",
+            "&amp;lt;img src=x onerror=alert(1)&amp;gt;",
+            "&amp;amp;lt;script&amp;amp;gt;alert(1)&amp;amp;lt;/script&amp;amp;gt;",
         ],
         ids=[
             "script",
@@ -99,6 +110,9 @@ class TestDecisionNotesSanitization:
             "unclosed",
             "bold",
             "svg",
+            "double-encoded-script",
+            "double-encoded-img",
+            "triple-encoded-script",
         ],
     )
     def test_result_contains_no_tag_like_sequences(self, raw: str) -> None:
@@ -113,8 +127,21 @@ class TestDecisionNotesSanitization:
             ('<img src=x onerror="alert(1)">', ""),
             ("clean text", "clean text"),
             ("<<script>script>alert(1)</script>", "<"),
+            ("&lt;script&gt;alert(1)&lt;/script&gt;", ""),
+            ("&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;", ""),
+            ("&amp;amp;lt;script&amp;amp;gt;alert(1)&amp;amp;lt;/script&amp;amp;gt;", ""),
+            ("Tom & Jerry", "Tom & Jerry"),
         ],
-        ids=["script-tag", "img-onerror", "clean-text", "nested-obfuscated"],
+        ids=[
+            "script-tag",
+            "img-onerror",
+            "clean-text",
+            "nested-obfuscated",
+            "entity-encoded",
+            "double-encoded",
+            "triple-encoded",
+            "plain-text-special-chars",
+        ],
     )
     def test_batch_decision_strips_html(self, raw: str, expected: str) -> None:
         decision = BatchApprovalDecision(approval_id=uuid4(), status="approved", notes=raw)
@@ -151,3 +178,15 @@ class TestDecisionNotesSanitization:
         tagged = f"<b>{inner}</b>"
         request = ApprovalDecisionRequest(status="approved", notes=tagged)
         assert request.notes == inner
+
+    def test_deeply_encoded_input_returns_empty(self) -> None:
+        """Input encoded beyond _SANITIZE_MAX_ROUNDS must be rejected, not stored partially decoded."""
+        from syntara.approvals.models.api_models import _SANITIZE_MAX_ROUNDS
+
+        payload = "alert(1)"
+        for _ in range(_SANITIZE_MAX_ROUNDS + 5):
+            payload = f"<script>{payload}</script>"
+            payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        request = ApprovalDecisionRequest(status="approved", notes=payload)
+        assert request.notes == ""
+        assert not _TAG_LIKE_RE.search(request.notes)
