@@ -2,6 +2,7 @@ import { Button, Popover } from '@patternfly/react-core'
 import { type ReactNode, useRef } from 'react'
 
 import { FieldHelpIcon } from './FieldHelpIcon'
+import styles from './FieldHelpIcon.module.css'
 
 export type FieldHelpPopoverProps = Readonly<{
   /** Body content for the popover (plain text or rich React nodes). */
@@ -34,7 +35,7 @@ export function FieldHelpPopover({
         ref={triggerRef}
         variant="plain"
         aria-label={triggerAriaLabel}
-        style={{ padding: 0 }}
+        className={styles.trigger}
         icon={<FieldHelpIcon />}
       />
     </Popover>
