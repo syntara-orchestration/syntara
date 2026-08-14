@@ -478,7 +478,7 @@ paths:
 
   /proxies/aap/credentials:
     get:
-      summary: List credentials
+      summary: List AAP credentials
       description: List Ansible Automation Platform credentials (not organization-scoped).
       operationId: list_aap_credentials
       x-app-permission:

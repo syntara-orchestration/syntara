@@ -899,6 +899,90 @@ class TestApprovalNodeValidation:
         assert warnings[0].node_id == "approval_1"
 
 
+class TestScheduledTriggerConfigFindings:
+    """collect_findings enforces ScheduledTriggerConfig (IANA timezone) beyond JSON Schema."""
+
+    def _scheduled_definition(self, *, timezone: str | None) -> dict[str, Any]:
+        params: dict[str, Any] = {"schedule_type": "cron", "cron": "0 9 * * *"}
+        if timezone is not None:
+            params["timezone"] = timezone
+        return {
+            "schema_version": "2.0.0",
+            "name": "scheduled-wf",
+            "triggers": [{"id": "sched_1", "type": "scheduled_trigger", "parameters": params}],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        }
+
+    def _interval_definition(self, *, interval: str) -> dict[str, Any]:
+        return {
+            "schema_version": "2.0.0",
+            "name": "interval-wf",
+            "triggers": [
+                {
+                    "id": "sched_1",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "interval", "interval": interval},
+                }
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_1", "to": "n1"}],
+        }
+
+    def test_invalid_interval_is_error(self, validator: WorkflowValidator) -> None:
+        """An unparseable interval must fail collect_findings, not only publish."""
+        result = validator.collect_findings(self._interval_definition(interval="not-an-interval"))
+        assert result.is_valid is False
+        scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]
+        assert len(scheduled) == 1
+        assert scheduled[0].node_id == "sched_1"
+        assert scheduled[0].field_path == "parameters.interval"
+
+    def test_valid_interval_passes(self, validator: WorkflowValidator) -> None:
+        result = validator.collect_findings(self._interval_definition(interval="R/2024-01-01T10:00:00Z/P1D"))
+        assert result.is_valid is True
+        assert result.findings == []
+
+    def test_invalid_iana_timezone_is_error(self, validator: WorkflowValidator) -> None:
+        result = validator.collect_findings(self._scheduled_definition(timezone="Invalid/Not_A_Real_Zone"))
+        assert result.is_valid is False
+        scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]
+        assert len(scheduled) == 1
+        assert scheduled[0].node_id == "sched_1"
+        assert scheduled[0].field_path == "parameters.timezone"
+
+    def test_valid_iana_timezone_passes(self, validator: WorkflowValidator) -> None:
+        result = validator.collect_findings(self._scheduled_definition(timezone="America/New_York"))
+        assert result.is_valid is True
+        assert result.findings == []
+
+    def test_multiple_invalid_triggers_accumulate_findings(self, validator: WorkflowValidator) -> None:
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "multi-scheduled-wf",
+            "triggers": [
+                {
+                    "id": "sched_a",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 9 * * *", "timezone": "Fake/A"},
+                },
+                {
+                    "id": "sched_b",
+                    "type": "scheduled_trigger",
+                    "parameters": {"schedule_type": "cron", "cron": "0 10 * * *", "timezone": "Fake/B"},
+                },
+            ],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "sched_a", "to": "n1"}, {"from": "sched_b", "to": "n1"}],
+        }
+        result = validator.collect_findings(definition)
+        scheduled = [f for f in result.findings if "scheduled trigger config" in f.message]
+        assert result.is_valid is False
+        assert len(scheduled) == 2
+        assert {f.node_id for f in scheduled} == {"sched_a", "sched_b"}
+        assert all(f.field_path == "parameters.timezone" for f in scheduled)
+
+
 class TestBestBranchMessages:
     """Direct tests for _best_branch_messages edge cases."""
 

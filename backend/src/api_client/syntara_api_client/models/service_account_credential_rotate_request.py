@@ -8,11 +8,11 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="SACredentialRotateRequest")
+T = TypeVar("T", bound="ServiceAccountCredentialRotateRequest")
 
 
 @_attrs_define
-class SACredentialRotateRequest:
+class ServiceAccountCredentialRotateRequest:
     """Schema for rotating a credential's secret.
 
     Attributes:
@@ -51,12 +51,12 @@ class SACredentialRotateRequest:
 
         grace_period_seconds = _parse_grace_period_seconds(d.pop("grace_period_seconds", UNSET))
 
-        sa_credential_rotate_request = cls(
+        service_account_credential_rotate_request = cls(
             grace_period_seconds=grace_period_seconds,
         )
 
-        sa_credential_rotate_request.additional_properties = d
-        return sa_credential_rotate_request
+        service_account_credential_rotate_request.additional_properties = d
+        return service_account_credential_rotate_request
 
     @property
     def additional_keys(self) -> list[str]:

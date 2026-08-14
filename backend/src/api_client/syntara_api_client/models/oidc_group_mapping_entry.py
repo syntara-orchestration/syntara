@@ -18,23 +18,23 @@ class OIDCGroupMappingEntry:
 
         Attributes:
             idp_group_value (str): Group value from the IdP token (e.g. GUID or role name)
-            nexus_group_id (UUID): ID of the Nexus group to map to
+            mapped_group_id (UUID): ID of the group to map to
     """
 
     idp_group_value: str
-    nexus_group_id: UUID
+    mapped_group_id: UUID
 
     def to_dict(self) -> dict[str, Any]:
         idp_group_value = self.idp_group_value
 
-        nexus_group_id = str(self.nexus_group_id)
+        mapped_group_id = str(self.mapped_group_id)
 
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
             {
                 "idp_group_value": idp_group_value,
-                "nexus_group_id": nexus_group_id,
+                "mapped_group_id": mapped_group_id,
             }
         )
 
@@ -45,11 +45,11 @@ class OIDCGroupMappingEntry:
         d = dict(src_dict)
         idp_group_value = d.pop("idp_group_value")
 
-        nexus_group_id = UUID(d.pop("nexus_group_id"))
+        mapped_group_id = UUID(d.pop("mapped_group_id"))
 
         oidc_group_mapping_entry = cls(
             idp_group_value=idp_group_value,
-            nexus_group_id=nexus_group_id,
+            mapped_group_id=mapped_group_id,
         )
 
         return oidc_group_mapping_entry

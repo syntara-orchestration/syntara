@@ -25,10 +25,12 @@ import { Controller } from 'react-hook-form'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxSelect } from '../../../components/NxSelect'
 import { useAllGroups } from '../../access/useAllGroups'
+import { excludeAuthenticatedGroup } from '../adminConstants'
 import { PASSWORD_CHARACTER_CLASSES_MESSAGE, PASSWORD_MIN_LENGTH_MESSAGE } from '../passwordComplexity'
 import type { UserFormData } from '../userFormSchema'
 
 import { userHelp } from './userFieldHelp'
+import { GROUPS_AUTHENTICATED_HINT } from './userFieldHelpText'
 
 type ControlledTextFieldProps = {
   name: 'username' | 'first_name' | 'last_name' | 'email' | 'password'
@@ -232,7 +234,7 @@ type UserFormFieldsProps = {
 function GroupField({ control }: Readonly<{ control: Control<UserFormData> }>) {
   const { groups, isLoading: isLoadingGroups } = useAllGroups()
   const groupOptions = useMemo(
-    () => groups.map((g) => ({ name: g.name, description: g.description ?? null })),
+    () => excludeAuthenticatedGroup(groups).map((g) => ({ name: g.name, description: g.description ?? null })),
     [groups]
   )
   return (
@@ -247,6 +249,11 @@ function GroupField({ control }: Readonly<{ control: Control<UserFormData> }>) {
             isLoading={isLoadingGroups}
             groupOptions={groupOptions}
           />
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem>{GROUPS_AUTHENTICATED_HINT}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
         </FormGroup>
       )}
     />

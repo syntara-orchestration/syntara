@@ -83,8 +83,8 @@ describe('groupMappingUtils', () => {
       const config: GroupMappingConfig = {
         group_jmespath_expression: 'groups[*]',
         group_mapping_entries: [
-          { idp_group_value: 'admin', nexus_group_id: 'g1' },
-          { idp_group_value: 'users', nexus_group_id: 'g2' },
+          { idp_group_value: 'admin', mapped_group_id: 'g1' },
+          { idp_group_value: 'users', mapped_group_id: 'g2' },
         ],
       }
       const result = toFormEntries(config)
@@ -128,8 +128,8 @@ describe('groupMappingUtils', () => {
         provider_type: 'oidc',
         group_jmespath_expression: 'groups[*]',
         group_mapping_entries: [
-          { idp_group_value: 'admin', nexus_group_id: 'g1' },
-          { idp_group_value: 'users', nexus_group_id: 'g2' },
+          { idp_group_value: 'admin', mapped_group_id: 'g1' },
+          { idp_group_value: 'users', mapped_group_id: 'g2' },
         ],
       })
     })

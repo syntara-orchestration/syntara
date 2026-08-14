@@ -7,15 +7,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.identity_provider_patch import IdentityProviderPatch
-from ...models.identity_provider_response import IdentityProviderResponse
+from ...models.identity_provider_read import IdentityProviderRead
+from ...models.identity_provider_update import IdentityProviderUpdate
 from ...types import Response
 
 
 def _get_kwargs(
     provider_id: UUID,
     *,
-    body: IdentityProviderPatch,
+    body: IdentityProviderUpdate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -34,9 +34,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | IdentityProviderResponse | None:
+) -> ErrorData | IdentityProviderRead | None:
     if response.status_code == 200:
-        response_200 = IdentityProviderResponse.from_dict(response.json())
+        response_200 = IdentityProviderRead.from_dict(response.json())
 
         return response_200
 
@@ -88,7 +88,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | IdentityProviderResponse]:
+) -> Response[ErrorData | IdentityProviderRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -103,22 +103,22 @@ def sync_detailed(
     provider_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IdentityProviderPatch,
-) -> Response[ErrorData | IdentityProviderResponse]:
-    """Patch identity provider
+    body: IdentityProviderUpdate,
+) -> Response[ErrorData | IdentityProviderRead]:
+    """Update identity provider
 
-     Patch an identity provider.
+     Update an identity provider.
 
     Args:
         provider_id (UUID):
-        body (IdentityProviderPatch): Schema for partially updating an identity provider.
+        body (IdentityProviderUpdate): Schema for partially updating an identity provider.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -137,22 +137,22 @@ def sync(
     provider_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IdentityProviderPatch,
-) -> ErrorData | IdentityProviderResponse | None:
-    """Patch identity provider
+    body: IdentityProviderUpdate,
+) -> ErrorData | IdentityProviderRead | None:
+    """Update identity provider
 
-     Patch an identity provider.
+     Update an identity provider.
 
     Args:
         provider_id (UUID):
-        body (IdentityProviderPatch): Schema for partially updating an identity provider.
+        body (IdentityProviderUpdate): Schema for partially updating an identity provider.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return sync_detailed(
@@ -166,22 +166,22 @@ async def asyncio_detailed(
     provider_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IdentityProviderPatch,
-) -> Response[ErrorData | IdentityProviderResponse]:
-    """Patch identity provider
+    body: IdentityProviderUpdate,
+) -> Response[ErrorData | IdentityProviderRead]:
+    """Update identity provider
 
-     Patch an identity provider.
+     Update an identity provider.
 
     Args:
         provider_id (UUID):
-        body (IdentityProviderPatch): Schema for partially updating an identity provider.
+        body (IdentityProviderUpdate): Schema for partially updating an identity provider.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IdentityProviderResponse]
+        Response[ErrorData | IdentityProviderRead]
     """
 
     kwargs = _get_kwargs(
@@ -198,22 +198,22 @@ async def asyncio(
     provider_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: IdentityProviderPatch,
-) -> ErrorData | IdentityProviderResponse | None:
-    """Patch identity provider
+    body: IdentityProviderUpdate,
+) -> ErrorData | IdentityProviderRead | None:
+    """Update identity provider
 
-     Patch an identity provider.
+     Update an identity provider.
 
     Args:
         provider_id (UUID):
-        body (IdentityProviderPatch): Schema for partially updating an identity provider.
+        body (IdentityProviderUpdate): Schema for partially updating an identity provider.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IdentityProviderResponse
+        ErrorData | IdentityProviderRead
     """
 
     return (

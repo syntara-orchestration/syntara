@@ -567,7 +567,7 @@ paths:
         - bearerAuth: []
 
   # ── Users Directory ─────────────────────────────────────────────────
-  /users_directory:
+  /users/directory:
     get:
       summary: List users directory
       description: Return a lightweight directory of users (id + username only).
@@ -620,7 +620,7 @@ paths:
         - bearerAuth: []
 
   # ── Groups Directory ───────────────────────────────────────────────
-  /groups_directory:
+  /groups/directory:
     get:
       summary: List groups directory
       description: Return a lightweight directory of groups (id + name only).

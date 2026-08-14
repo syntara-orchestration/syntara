@@ -721,7 +721,7 @@ async def _create_mapping_entry(
     entry = IdpGroupMappingEntry(
         identity_provider_id=provider_id,
         idp_group_value=idp_value,
-        nexus_group_id=group_id,
+        mapped_group_id=group_id,
     )
     session.add(entry)
     await session.commit()
