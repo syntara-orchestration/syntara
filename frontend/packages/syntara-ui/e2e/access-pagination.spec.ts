@@ -107,7 +107,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
   })
 
   test('Add Member modal shows users in the typeahead dropdown', async ({ app }) => {
-    test.skip(!!process.env.NEXUS_E2E_SKIP_WEB_SERVER, 'Group typeahead unreliable against real backend')
+    test.skip(!!process.env.SYNTARA_E2E_SKIP_WEB_SERVER, 'Group typeahead unreliable against real backend')
 
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()

@@ -19,7 +19,7 @@ import logging
 
 import structlog
 
-from syntara.core.logging.logging import build_nexus_formatter
+from syntara.core.logging.logging import build_syntara_formatter
 
 # Logger name for audit event stdout output
 AUDIT_LOGGER_NAME = "syntara.audit"
@@ -43,7 +43,7 @@ def configure_audit_logging() -> None:
     # This ensures audit events are ALWAYS visible in standard logs,
     # regardless of OTEL export configuration
     stdout_handler = logging.StreamHandler()
-    stdout_handler.setFormatter(build_nexus_formatter())
+    stdout_handler.setFormatter(build_syntara_formatter())
     stdout_handler.setLevel(logging.NOTSET)
 
     # Always attach stdout handler

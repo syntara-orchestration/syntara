@@ -73,8 +73,6 @@ __all__ = (
     "ApprovalRequestStatus",
     "ApproverGroupSummary",
     "ApproverUserSummary",
-    "Authentication",
-    "AuthenticationType",
     "AuthProviderInfo",
     "AuthProvidersResponse",
     "AuthType",

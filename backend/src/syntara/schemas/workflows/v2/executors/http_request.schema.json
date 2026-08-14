@@ -77,30 +77,6 @@
       },
       "credential_id": {
         "$ref": "../common-definitions.schema.json#/$defs/credential_id"
-      },
-      "authentication": {
-        "type": "object",
-        "description": "Authentication configuration",
-        "required": [
-          "type"
-        ],
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "basic",
-              "bearer",
-              "api_key",
-              "oauth2"
-            ],
-            "description": "Authentication type"
-          },
-          "credentials": {
-            "type": "string",
-            "description": "Reference to stored credentials"
-          }
-        },
-        "additionalProperties": true
       }
     },
     "additionalProperties": false
