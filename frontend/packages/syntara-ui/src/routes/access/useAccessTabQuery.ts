@@ -13,6 +13,7 @@ type UseAccessTabQueryOptions = {
   baseFilterDefs: FilterFieldDefinition[]
   sortFields: Record<number, string>
   defaultSortField: string
+  initialSortIndex?: number
   transformFilters: (filters: FilterConfig[]) => FilterConfig[]
 }
 
@@ -20,6 +21,7 @@ export function useAccessTabQuery({
   baseFilterDefs,
   sortFields,
   defaultSortField,
+  initialSortIndex,
   transformFilters,
 }: UseAccessTabQueryOptions) {
   const {
@@ -34,6 +36,7 @@ export function useAccessTabQuery({
   } = useCursorPagination()
 
   const { activeSortIndex, sortDirection, getSortParams } = useTableSort({
+    initialSortIndex,
     initialDirection: 'asc',
     onSortChange: resetPagination,
   })
