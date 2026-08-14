@@ -8,7 +8,7 @@ type GroupDirectoryEntry = UsersAPI.components['schemas']['GroupDirectoryEntry']
 
 async function fetchAllGroupDirectory(): Promise<GroupDirectoryEntry[]> {
   return fetchAllPages<GroupDirectoryEntry>((cursor) =>
-    usersFetchClient.GET('/groups_directory', {
+    usersFetchClient.GET('/groups/directory', {
       params: { query: { sort: 'name', limit: MAX_PAGE_SIZE, cursor } },
     })
   )
@@ -17,7 +17,7 @@ async function fetchAllGroupDirectory(): Promise<GroupDirectoryEntry[]> {
 /**
  * Hook to fetch groups for the approval node approver-groups dropdown.
  *
- * Uses the lightweight `/groups_directory` endpoint (id + name only),
+ * Uses the lightweight `/groups/directory` endpoint (id + name only),
  * which is accessible to the `user` role via `group-directory:read`.
  */
 export function useApprovalDecideGroups() {

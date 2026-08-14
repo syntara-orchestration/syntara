@@ -35,7 +35,7 @@ describe('useApprovalDecideGroups', () => {
     vi.clearAllMocks()
   })
 
-  it('fetches and returns groups from groups_directory endpoint', async () => {
+  it('fetches and returns groups from groups/directory endpoint', async () => {
     const mockGroups: GroupDirectoryEntry[] = [
       { id: 'group-1', name: 'approvers' },
       { id: 'group-2', name: 'admins' },
@@ -54,7 +54,7 @@ describe('useApprovalDecideGroups', () => {
 
     expect(result.current.groups).toEqual(mockGroups)
     expect(result.current.error).toBeNull()
-    expect(mockGET).toHaveBeenCalledWith('/groups_directory', {
+    expect(mockGET).toHaveBeenCalledWith('/groups/directory', {
       params: {
         query: expect.objectContaining({
           sort: 'name',
