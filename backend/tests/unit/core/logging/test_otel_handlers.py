@@ -41,7 +41,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 
@@ -56,7 +56,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 
@@ -73,7 +73,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_api_key=SecretStr(api_key),
             otel_auth_header_name="X-API-Key",
         ):
@@ -99,7 +99,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_ca_cert_file="/etc/ssl/ca.crt",
             otel_client_cert_file="/etc/ssl/client.crt",
             otel_client_key_file="/etc/ssl/client.key",
@@ -129,7 +129,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="http://localhost:4318/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             create_otel_handler()
 
@@ -147,14 +147,14 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test-service",
+            otel_service_name="syntara-test-service",
         ):
             handler = create_otel_handler()
 
             assert handler is not None
             # Verify service name is in the resource (access via _logger_provider)
             resource_attrs = handler._logger_provider._resource.attributes  # type: ignore[attr-defined]
-            assert resource_attrs.get("service.name") == "nexus-test-service"
+            assert resource_attrs.get("service.name") == "syntara-test-service"
 
     @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_includes_service_instance_id_in_resource(self, mock_exporter: MagicMock, override_settings) -> None:
@@ -166,7 +166,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 

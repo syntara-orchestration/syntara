@@ -29,9 +29,9 @@ jobs:
   update-baselines:
     name: Generate & Commit Baselines
     # Baselines must run with mock webServer; do not inherit org/repo env that sets
-    # NEXUS_E2E_SKIP_WEB_SERVER for real-backend E2E (would skip all snapshot tests).
+    # SYNTARA_E2E_SKIP_WEB_SERVER for real-backend E2E (would skip all snapshot tests).
     env:
-      NEXUS_E2E_SKIP_WEB_SERVER: ''
+      SYNTARA_E2E_SKIP_WEB_SERVER: ''
     runs-on: ubuntu-24.04
     steps:
       - name: Validate inputs

@@ -124,7 +124,7 @@ test('increments count on button click', async () => {
   - `npm run e2e` - Run headless
   - `npm run e2e:ui` - Run with Playwright UI
 - **Default:** Playwright starts mock API (port 3300) + UI (port 4173)
-- **Real backend:** Set `NEXUS_E2E_SKIP_WEB_SERVER=1` and run UI separately against backend
+- **Real backend:** Set `SYNTARA_E2E_SKIP_WEB_SERVER=1` and run UI separately against backend
 
 **When to use Playwright E2E:**
 

@@ -27,20 +27,20 @@ async function fillLoginForm(page: Page, username: string, password: string): Pr
 }
 
 test('switching users reflects new permissions without hard refresh', async ({ page }) => {
-  const adminPassword = process.env.NEXUS_E2E_PASSWORD
-  // NEXUS_E2E_SKIP_WEB_SERVER=1 is the project-wide signal for real-backend runs.
-  const isRealBackend = !!process.env.NEXUS_E2E_SKIP_WEB_SERVER
+  const adminPassword = process.env.SYNTARA_E2E_PASSWORD
+  // SYNTARA_E2E_SKIP_WEB_SERVER=1 is the project-wide signal for real-backend runs.
+  const isRealBackend = !!process.env.SYNTARA_E2E_SKIP_WEB_SERVER
 
   const viewerUsername = buildUniqueName('e2e-perm-viewer')
   let viewerId: string | null = null
 
   try {
     if (isRealBackend) {
-      if (!adminPassword) throw new Error('NEXUS_E2E_PASSWORD must be set when running against the real backend')
+      if (!adminPassword) throw new Error('SYNTARA_E2E_PASSWORD must be set when running against the real backend')
 
       // Call the backend directly rather than through the UI proxy to avoid
       // stale proxy config from a previously-started dev server.
-      const backendUrl = process.env.VITE_API_URL ?? process.env.NEXUS_E2E_BASE_URL ?? 'http://localhost:8000'
+      const backendUrl = process.env.VITE_API_URL ?? process.env.SYNTARA_E2E_BASE_URL ?? 'http://localhost:8000'
 
       const tokenResp = await page.request.post(`${backendUrl}/api/v1/auth/login`, {
         data: { username: 'admin', password: adminPassword },
@@ -106,7 +106,7 @@ test('switching users reflects new permissions without hard refresh', async ({ p
     await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
   } finally {
     if (viewerId) {
-      const backendUrl = process.env.VITE_API_URL ?? process.env.NEXUS_E2E_BASE_URL ?? 'http://localhost:8000'
+      const backendUrl = process.env.VITE_API_URL ?? process.env.SYNTARA_E2E_BASE_URL ?? 'http://localhost:8000'
       const tokenResp = await page.request.post(`${backendUrl}/api/v1/auth/login`, {
         data: { username: 'admin', password: adminPassword },
       })

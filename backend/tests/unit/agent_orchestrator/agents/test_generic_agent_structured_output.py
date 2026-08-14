@@ -214,6 +214,8 @@ class TestGenericAgentStructuredOutputWithTools:
         assert result_state["result"] is not None
         assert result_state["result"]["content"] == extracted_output
         assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "native"
+        # Case A: tools present → standard tool-loop path (bind_tools), then extraction.
+        mock_llm.bind_tools.assert_called()
         # Standard tool-loop call (100+50) + extraction call (40+15)
         assert result_state["llm_token_usage_log"] == [
             {
