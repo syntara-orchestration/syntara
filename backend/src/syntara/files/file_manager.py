@@ -534,10 +534,7 @@ class FileManager:
         result = await session.exec(select(Project).where(col(Project.id).in_(project_ids)))
         projects = {p.id: p for p in result.all()}
 
-        return {
-            pid: (pid not in projects or projects[pid].deleted_at is not None)
-            for pid in project_ids
-        }
+        return {pid: (pid not in projects or projects[pid].deleted_at is not None) for pid in project_ids}
 
     async def update_file_status(
         self,
