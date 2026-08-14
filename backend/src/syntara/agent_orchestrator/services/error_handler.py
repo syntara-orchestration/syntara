@@ -54,7 +54,10 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
         return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/tool-discovery-error",
             title="Tool Discovery Failed",
-            detail="Required tools could not be discovered or provisioned. Check integration connectivity and tool configuration.",
+            detail=(
+                "Required tools could not be discovered or provisioned."
+                " Check integration connectivity and tool configuration."
+            ),
             code="TOOL_DISCOVERY_FAILED",
             retryable=False,
             instance=instance,
