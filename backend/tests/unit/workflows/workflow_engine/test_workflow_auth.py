@@ -105,6 +105,17 @@ class TestWorkflowAuth:
             decoded_args = converter.from_payloads(converter.to_payloads(raw_args))
             assert verify_workflow("wf-1", "orchestrator_workflow", decoded_args, token)
 
+    def test_fingerprint_args_distinct_for_concatenation_collisions(self) -> None:
+        with patch(
+            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            return_value=_TEST_KEY,
+        ):
+            from syntara.workflows.workflow_engine.workflow_auth import _fingerprint_args
+
+            assert _fingerprint_args([12, 3]) != _fingerprint_args([1, 23])
+            assert _fingerprint_args([]) != _fingerprint_args([None])
+            assert _fingerprint_args([None]) != _fingerprint_args([None, None])
+
     def test_schedule_launcher_timestamp_suffix_accepted(self) -> None:
         with patch(
             "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",

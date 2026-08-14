@@ -15,6 +15,7 @@ pre-existing schedules must be republished to acquire headers.
 import hashlib
 import hmac as hmac_mod
 import re
+import struct
 from collections.abc import Sequence
 from typing import Any
 
@@ -70,8 +71,11 @@ def _fingerprint_args(args: Sequence[Any]) -> str:
     """
     payloads = DataConverter.default.payload_converter.to_payloads(args)
     digest = hashlib.sha256()
+    digest.update(struct.pack(">I", len(payloads)))
     for payload in payloads:
-        digest.update(payload.data)
+        data = payload.data or b""
+        digest.update(struct.pack(">I", len(data)))
+        digest.update(data)
     return digest.hexdigest()
 
 
