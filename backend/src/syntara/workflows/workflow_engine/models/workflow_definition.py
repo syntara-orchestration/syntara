@@ -276,15 +276,6 @@ class HTTPMethod(str, Enum):
     TRACE = "TRACE"
 
 
-class AuthenticationType(str, Enum):
-    """Supported authentication types for API requests."""
-
-    BASIC = "basic"
-    BEARER = "bearer"
-    API_KEY = "api_key"
-    OAUTH2 = "oauth2"
-
-
 # Node-level settings models
 
 
@@ -361,16 +352,6 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
         return v
 
 
-class Authentication(TemplateAwareBaseModel):
-    """Authentication configuration for API requests."""
-
-    type: AuthenticationType = Field(description="Authentication type")
-    credentials: str = Field(
-        description="Reference to stored credentials",
-        pattern=r"^\$\{secrets\.[a-zA-Z0-9_]+\}$",
-    )
-
-
 class APIExecutorParameters(TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
@@ -379,10 +360,9 @@ class APIExecutorParameters(TemplateAwareBaseModel):
     headers: dict[str, Any] = Field(default_factory=dict)
     body: dict[str, Any] | str | None = None
     query_params: dict[str, Any] = Field(default_factory=dict)
-    authentication: Authentication | None = None
     credential_id: str | None = Field(
         default=None,
-        description="Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.",
+        description="Nexus credential UUID for authentication or Secret URL.",
     )
 
     @field_validator("url")

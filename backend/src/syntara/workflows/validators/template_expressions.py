@@ -18,7 +18,6 @@ BUILTIN_SCOPES: frozenset[str] = frozenset(
         "input",
         "inputs",
         "variables",
-        "secrets",
         "trigger",
         "workflow_context",
     }

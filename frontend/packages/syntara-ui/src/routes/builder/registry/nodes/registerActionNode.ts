@@ -62,7 +62,6 @@ export default function registerActionNode() {
                 headers: data.headers,
                 body: data.body,
                 inputs: data.parameters,
-                authentication: data.authentication,
                 credentialId: data.credential_id,
               })
             }
