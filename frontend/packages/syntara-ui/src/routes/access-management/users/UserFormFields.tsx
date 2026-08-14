@@ -15,7 +15,6 @@ import {
   TextInputGroup,
   TextInputGroupMain,
   TextInputGroupUtilities,
-  Tooltip,
 } from '@patternfly/react-core'
 import { RhUiCloseIcon, RhUiErrorIcon, RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
 import { type ReactElement, type Ref, useCallback, useMemo, useRef, useState } from 'react'
@@ -25,12 +24,10 @@ import { Controller } from 'react-hook-form'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxSelect } from '../../../components/NxSelect'
 import { useAllGroups } from '../../access/useAllGroups'
-import { excludeAuthenticatedGroup } from '../adminConstants'
 import { PASSWORD_CHARACTER_CLASSES_MESSAGE, PASSWORD_MIN_LENGTH_MESSAGE } from '../passwordComplexity'
 import type { UserFormData } from '../userFormSchema'
 
 import { userHelp } from './userFieldHelp'
-import { GROUPS_AUTHENTICATED_HINT } from './userFieldHelpText'
 
 type ControlledTextFieldProps = {
   name: 'username' | 'first_name' | 'last_name' | 'email' | 'password'
@@ -227,14 +224,12 @@ type UserFormFieldsProps = {
   isBuiltinUser?: boolean
   isBuiltinSelf?: boolean
   isFederatedUser?: boolean
-  /** When set, the status toggle is disabled and this text is shown in a tooltip. */
-  statusToggleDisabledReason?: string
 }
 
 function GroupField({ control }: Readonly<{ control: Control<UserFormData> }>) {
   const { groups, isLoading: isLoadingGroups } = useAllGroups()
   const groupOptions = useMemo(
-    () => excludeAuthenticatedGroup(groups).map((g) => ({ name: g.name, description: g.description ?? null })),
+    () => groups.map((g) => ({ name: g.name, description: g.description ?? null })),
     [groups]
   )
   return (
@@ -249,11 +244,6 @@ function GroupField({ control }: Readonly<{ control: Control<UserFormData> }>) {
             isLoading={isLoadingGroups}
             groupOptions={groupOptions}
           />
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>{GROUPS_AUTHENTICATED_HINT}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
         </FormGroup>
       )}
     />
@@ -328,7 +318,6 @@ export function UserFormFields({
   isBuiltinUser = false,
   isBuiltinSelf = false,
   isFederatedUser,
-  statusToggleDisabledReason,
 }: Readonly<UserFormFieldsProps>) {
   const federatedUser = Boolean(isFederatedUser)
   const emailLabelHelp = isEdit && federatedUser ? userHelp.emailFederatedEdit : userHelp.email
@@ -388,35 +377,23 @@ export function UserFormFields({
         />
       )}
       {!isEdit && <GroupField control={control} />}
-      <Controller
-        name="is_enabled"
-        control={control}
-        render={({ field }) => {
-          const statusSwitch = (
-            <Switch
-              id="user-is-enabled"
-              aria-label="Enabled"
-              label={field.value ? 'Enabled' : 'Disabled'}
-              isChecked={field.value}
-              isDisabled={!!statusToggleDisabledReason}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )
-
-          return (
+      {!isEdit && (
+        <Controller
+          name="is_enabled"
+          control={control}
+          render={({ field }) => (
             <FormGroup label="Status" fieldId="user-is-enabled" labelHelp={userHelp.status}>
-              {statusToggleDisabledReason ? (
-                <Tooltip content={statusToggleDisabledReason}>
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>{statusSwitch}</span>
-                </Tooltip>
-              ) : (
-                statusSwitch
-              )}
+              <Switch
+                id="user-is-enabled"
+                aria-label="Enabled"
+                label={field.value ? 'Enabled' : 'Disabled'}
+                isChecked={field.value}
+                onChange={(_event, checked) => field.onChange(checked)}
+              />
             </FormGroup>
-          )
-        }}
-      />
+          )}
+        />
+      )}
     </>
   )
 }

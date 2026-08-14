@@ -1,10 +1,10 @@
-import { Button, Content, Flex, FlexItem, StackItem, Truncate } from '@patternfly/react-core'
+import { Button, Content, Flex, FlexItem, StackItem, Switch, Tooltip, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiBanIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction } from '@patternfly/react-table'
 import type { User } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
@@ -18,21 +18,23 @@ import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagina
 import { useDeleteAction } from '../../hooks/useDeleteAction'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useTableSort } from '../../hooks/useTableSort'
+import { useAuthStore } from '../../stores/useAuthStore'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
+import { getUserIdFromToken } from '../../utils/jwtUtils'
 import { accessClient } from '../access/accessClient'
 
 import { getUserDetailPath } from './accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from './adminConstants'
 import { BuiltInAdminCard } from './BuiltInAdminCard'
-import { DisabledBadge } from './DisabledBadge'
 import { useAdminToggle } from './useAdminToggle'
 import { useRevokeUserTokens } from './useRevokeUserTokens'
 import { getAuthSourceFilterDefinition } from './userFilters'
 import { userDisplayName } from './users/userDisplayName'
 import { useUserPermissions } from './useUserPermissions'
+import { useUsersEnabledToggle } from './useUsersEnabledToggle'
 
 const SORT_FIELDS = ['username', 'first_name', 'last_name', 'email', 'last_login'] as const
 
@@ -123,9 +125,138 @@ function getRowActions(
   ]
 }
 
+function disableConfirmCopy(
+  user: User | undefined,
+  currentUserId: string | null | undefined
+): {
+  title: string
+  confirmLabel: string
+  body: ReactNode
+} {
+  if (!user) {
+    return {
+      title: 'Disable user?',
+      confirmLabel: 'Disable',
+      body: null,
+    }
+  }
+  if (user.is_builtin) {
+    return {
+      title: 'Disable administrator account?',
+      confirmLabel: 'Disable and sign out',
+      body: (
+        <>
+          Disabling the built-in administrator account will immediately end your current session. You will need to sign
+          in with another admin account to re-enable it.
+        </>
+      ),
+    }
+  }
+  if (user.id === currentUserId) {
+    return {
+      title: 'Disable your account?',
+      confirmLabel: 'Disable and sign out',
+      body: (
+        <>
+          Disabling your own account will immediately end your current session. You will need another admin to re-enable
+          it.
+        </>
+      ),
+    }
+  }
+  return {
+    title: 'Disable user?',
+    confirmLabel: 'Disable',
+    body: (
+      <>
+        The user <strong>{user.username}</strong> will be disabled and will no longer be able to sign in.
+      </>
+    ),
+  }
+}
+
+function UserStateSwitch({
+  user,
+  disabledReason,
+  onToggle,
+}: Readonly<{
+  user: User
+  disabledReason: string | undefined
+  onToggle: (user: User) => void
+}>) {
+  const stateSwitch = (
+    <Switch
+      id={`user-toggle-${user.id}`}
+      label="Enabled"
+      isChecked={user.is_enabled}
+      isDisabled={!!disabledReason}
+      onChange={() => onToggle(user)}
+      aria-label={`Toggle ${user.username} status`}
+    />
+  )
+
+  if (!disabledReason) {
+    return stateSwitch
+  }
+
+  return <Tooltip content={disabledReason}>{stateSwitch}</Tooltip>
+}
+
+function UserTableRow({
+  user,
+  permissions,
+  toggleDisabledReason,
+  onToggleEnabled,
+  onDelete,
+  onRevoke,
+  onNavigate,
+}: Readonly<{
+  user: User
+  permissions: ReturnType<typeof useUserPermissions>
+  toggleDisabledReason: string | undefined
+  onToggleEnabled: (user: User) => void
+  onDelete: (user: User) => void
+  onRevoke: (user: User) => void
+  onNavigate: (path: string) => void
+}>) {
+  return (
+    <Tr>
+      <Td dataLabel="Username">
+        <NxLink to={getUserDetailPath(user.id)}>
+          <Truncate content={user.username} />
+        </NxLink>
+      </Td>
+      <Td dataLabel="Name">
+        <Truncate content={userDisplayName(user)} />
+      </Td>
+      <Td dataLabel="Email">
+        <Truncate content={user.email ?? ''} />
+      </Td>
+      <Td dataLabel="Authentication">
+        <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
+          {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
+            <FlexItem key={source}>
+              <NxLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</NxLabel>
+            </FlexItem>
+          ))}
+        </Flex>
+      </Td>
+      <Td dataLabel="Last login">{formatDateTime(user.last_login)}</Td>
+      <Td dataLabel="State" onClick={(e) => e.stopPropagation()}>
+        <UserStateSwitch user={user} disabledReason={toggleDisabledReason} onToggle={onToggleEnabled} />
+      </Td>
+      <Td isActionCell>
+        {!user.is_builtin && <ActionsColumn items={getRowActions(user, onDelete, onRevoke, permissions, onNavigate)} />}
+      </Td>
+    </Tr>
+  )
+}
+
 export function UsersTab() {
   const navigate = useNavigate()
   const permissions = useUserPermissions()
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const currentUserId = getUserIdFromToken(accessToken)
 
   const {
     cursor,
@@ -152,19 +283,24 @@ export function UsersTab() {
 
   const query = accessClient.useQuery('get', '/users', { params: { query: finalQueryParams } })
   const data = query.data
-  const users = data?.resources ?? []
-  const builtinUser = users.find((u) => u.is_builtin)
+  const serverUsers = data?.resources ?? []
+  const builtinUser = serverUsers.find((u) => u.is_builtin)
   const isAdminEnabled = builtinUser?.is_enabled ?? true
-  const refetch = useCallback(() => detachPromise(query.refetch()), [query])
+  const refetch = useCallback(() => query.refetch(), [query])
 
-  useCursorReset(users.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset(serverUsers.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
 
   const handleCreateUser = permissions.canCreate
     ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.CreateUser }))
     : undefined
   const handleRowNavigate = (path: string) => detachPromise(navigate({ to: path }))
 
-  const adminToggle = useAdminToggle(builtinUser, refetch)
+  const adminToggle = useAdminToggle(builtinUser, () => detachPromise(refetch()))
+
+  const { users, getToggleDisabledReason, handleToggleEnabled, disableConfirm } = useUsersEnabledToggle(
+    serverUsers,
+    refetch
+  )
 
   const deleteDialog = useDialogState<User>()
 
@@ -175,9 +311,11 @@ export function UsersTab() {
     buildParams: buildDeleteParams,
     entityLabel: 'user',
     getItemName: (user: User) => user.username,
-    onSuccess: refetch,
+    onSuccess: () => detachPromise(refetch()),
     onSettled: deleteDialog.close,
   })
+
+  const disableCopy = disableConfirmCopy(disableConfirm.user, currentUserId)
 
   return (
     <>
@@ -187,7 +325,7 @@ export function UsersTab() {
         isPending={query.isPending}
         isFetching={query.isFetching}
         error={query.error}
-        onRetry={refetch}
+        onRetry={() => detachPromise(refetch())}
         isEmpty={users.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
@@ -245,48 +383,22 @@ export function UsersTab() {
                   <Th sort={getSortParams(3)}>Email</Th>
                   <Th>Authentication</Th>
                   <Th sort={getSortParams(4)}>Last login</Th>
+                  <Th>State</Th>
                   <Th screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <Tbody>
                 {users.map((user) => (
-                  <Tr key={user.id}>
-                    <Td dataLabel="Username">
-                      <NxLink to={getUserDetailPath(user.id)}>
-                        <Truncate content={user.username} />
-                      </NxLink>
-                      {!user.is_enabled && <DisabledBadge />}
-                    </Td>
-                    <Td dataLabel="Name">
-                      <Truncate content={userDisplayName(user)} />
-                    </Td>
-                    <Td dataLabel="Email">
-                      <Truncate content={user.email ?? ''} />
-                    </Td>
-                    <Td dataLabel="Authentication">
-                      <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
-                        {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
-                          <FlexItem key={source}>
-                            <NxLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</NxLabel>
-                          </FlexItem>
-                        ))}
-                      </Flex>
-                    </Td>
-                    <Td dataLabel="Last login">{formatDateTime(user.last_login)}</Td>
-                    <Td isActionCell>
-                      {!user.is_builtin && (
-                        <ActionsColumn
-                          items={getRowActions(
-                            user,
-                            deleteDialog.open,
-                            revokeDialog.open,
-                            permissions,
-                            handleRowNavigate
-                          )}
-                        />
-                      )}
-                    </Td>
-                  </Tr>
+                  <UserTableRow
+                    key={user.id}
+                    user={user}
+                    permissions={permissions}
+                    toggleDisabledReason={getToggleDisabledReason(user)}
+                    onToggleEnabled={handleToggleEnabled}
+                    onDelete={deleteDialog.open}
+                    onRevoke={revokeDialog.open}
+                    onNavigate={handleRowNavigate}
+                  />
                 ))}
               </Tbody>
             </NxListPanelTable>
@@ -315,6 +427,15 @@ export function UsersTab() {
       >
         Disabling the built-in administrator account will immediately end your current session. You will need to sign in
         with another admin account to re-enable it.
+      </NxConfirmationDialog>
+      <NxConfirmationDialog
+        isOpen={disableConfirm.isOpen}
+        onClose={disableConfirm.close}
+        onConfirm={disableConfirm.confirm}
+        title={disableCopy.title}
+        confirmLabel={disableCopy.confirmLabel}
+      >
+        {disableCopy.body}
       </NxConfirmationDialog>
       <NxConfirmationDialog
         isOpen={revokeDialog.isOpen}

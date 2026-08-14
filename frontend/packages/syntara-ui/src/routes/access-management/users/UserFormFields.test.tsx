@@ -11,14 +11,7 @@ import { PASSWORD_CHARACTER_CLASSES_MESSAGE, PASSWORD_MIN_LENGTH_MESSAGE } from 
 import { COMPLIANT_TEST_PASSWORD } from '../passwordComplexity.testFixtures'
 import type { UserFormData } from '../userFormSchema'
 
-import {
-  EMAIL_FEDERATED_EDIT_HELP,
-  EMAIL_HELP,
-  GROUPS_AUTHENTICATED_HINT,
-  GROUPS_HELP,
-  STATUS_HELP,
-  USERNAME_HELP,
-} from './userFieldHelpText'
+import { EMAIL_FEDERATED_EDIT_HELP, EMAIL_HELP, GROUPS_HELP, STATUS_HELP, USERNAME_HELP } from './userFieldHelpText'
 import { UserFormFields } from './UserFormFields'
 
 vi.mock('../../access/useAllGroups', () => ({
@@ -27,7 +20,6 @@ vi.mock('../../access/useAllGroups', () => ({
       { id: 'g1', name: 'users', description: 'Default user group' },
       { id: 'g2', name: 'admins', description: 'Administrator group' },
       { id: 'g3', name: 'auditors', description: 'Auditor group' },
-      { id: 'g4', name: 'authenticated', description: 'an implicit group for all authenticated users' },
     ],
     isLoading: false,
     error: null,
@@ -121,6 +113,13 @@ describe('UserFormFields', () => {
     render(<TestWrapper />)
 
     expect(screen.getByText('Enabled')).toBeInTheDocument()
+  })
+
+  it('hides the status switch in edit mode', () => {
+    render(<TestWrapper isEdit />)
+
+    expect(screen.queryByLabelText('Enabled')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More info for Status' })).not.toBeInTheDocument()
   })
 
   it('shows "Disabled" label when status switch is toggled off', async () => {
@@ -368,31 +367,6 @@ describe('UserFormFields', () => {
       await user.click(screen.getByRole('textbox', { name: 'Filter groups' }))
 
       expect(screen.getByRole('checkbox', { name: /admins/i })).toBeInTheDocument()
-    })
-
-    it('does not show the authenticated group in the dropdown', async () => {
-      const user = userEvent.setup()
-      render(<TestWrapper isEdit={false} />)
-
-      await user.click(screen.getByRole('textbox', { name: 'Filter groups' }))
-
-      expect(screen.queryByRole('checkbox', { name: /authenticated/i })).not.toBeInTheDocument()
-    })
-
-    it('shows helper text about authenticated group membership', () => {
-      render(<TestWrapper isEdit={false} />)
-
-      expect(screen.getByText(GROUPS_AUTHENTICATED_HINT)).toBeInTheDocument()
-    })
-
-    it('has no accessibility violations with groups dropdown open', async () => {
-      const user = userEvent.setup()
-      const { container } = render(<TestWrapper isEdit={false} />)
-
-      await user.click(screen.getByRole('textbox', { name: 'Filter groups' }))
-
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
     })
   })
 })
