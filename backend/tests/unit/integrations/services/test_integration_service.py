@@ -793,7 +793,7 @@ class TestIntegrationSsrfValidation:
             },
         )
         with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
-            await integration_service.patch_integration(created.id, patch_data)
+            await integration_service.update_integration(created.id, patch_data)
 
     @pytest.mark.asyncio
     async def test_discover_rejects_cloud_metadata(
