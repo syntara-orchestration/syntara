@@ -400,8 +400,11 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock()
+        mock_retriever = AsyncMock()
+        mock_retriever.delete_file = AsyncMock(return_value=True)
         mock_file_manager = Mock()
         mock_file_manager.get_files_metadata = AsyncMock(return_value=mock_file_metadata)
+        mock_file_manager.get_retriever = Mock(return_value=mock_retriever)
 
         service = InvocationService(
             session=mock_session,
@@ -410,8 +413,7 @@ class TestInvocationServiceCancelAuditEvents:
         )
 
         # Act
-        with patch("syntara.files.utils.cleanup_files", new_callable=AsyncMock):
-            await service.cancel_invocation(invocation_id, reason="Cleanup test")
+        await service.cancel_invocation(invocation_id, reason="Cleanup test")
 
         # Assert
         assert mock_do_emit.call_count == 1

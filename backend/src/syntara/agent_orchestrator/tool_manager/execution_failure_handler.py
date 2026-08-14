@@ -1,4 +1,4 @@
-"""Tool execution failure retry and auto-disable logic for FR-009 compliance.
+"""Tool execution failure retry and error reporting logic.
 
 This module provides retry policy configuration and failure handling for LangGraph
 ToolNode integration. Uses LangGraph's built-in retry_policy instead of custom retry
@@ -340,7 +340,7 @@ def create_tool_awrapper(
     """Create an async tool call wrapper that handles failures with tool context.
 
     This wrapper intercepts tool execution, provides access to the actual BaseTool,
-    and handles failures with proper tool auto-disable functionality.
+    and reports failures back to Tool Manager.
 
     Args:
         session_id: Session identifier for multi-tenant isolation
@@ -399,7 +399,7 @@ def create_tool_awrapper(
             caught_error = error
             tool_id, error_msg = _handle_tool_execution_error(ctx, request, error)
             if tool_id is not None:
-                await _disable_tool_by_id(tool_id, error)
+                await _report_tool_failure(tool_id, error)
             return error_msg
         finally:
             duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
@@ -425,7 +425,7 @@ def create_tool_wrapper(
     """Create a synchronous tool call wrapper that handles failures with tool context.
 
     This wrapper intercepts tool execution, provides access to the actual BaseTool,
-    and handles failures with proper tool auto-disable functionality for synchronous tools.
+    and reports failures back to Tool Manager for synchronous tools.
 
     Args:
         session_id: Session identifier for multi-tenant isolation
@@ -505,7 +505,7 @@ def create_tool_wrapper(
             caught_error = error
             tool_id, error_msg = _handle_tool_execution_error(ctx, request, error)
             if tool_id is not None:
-                _run_coroutine_from_sync(_disable_tool_by_id(tool_id, error), loop, "tool auto-disable")
+                _run_coroutine_from_sync(_report_tool_failure(tool_id, error), loop, "tool failure report")
             return error_msg
         finally:
             duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
@@ -596,13 +596,14 @@ def _run_coroutine_from_sync(
             logger.warning("Failed to run %s (no event loop)", description, details=str(e))
 
 
-async def _disable_tool_by_id(tool_id: UUID, error: Exception) -> None:
-    """Disable tool by ID after failure.
+async def _report_tool_failure(tool_id: UUID, error: Exception) -> None:
+    """Record an execution failure against a tool.
 
-    This method directly disables the tool using the Tool Manager API.
+    Sets status and refresh_error only. The enabled flag is administrator-owned
+    and is never changed as a result of execution.
 
     Args:
-        tool_id: ID of the tool to disable
+        tool_id: ID of the tool that failed
         error: The exception that caused the failure
 
     """
@@ -618,11 +619,11 @@ async def _disable_tool_by_id(tool_id: UUID, error: Exception) -> None:
                 refresh_error=error_message,
             )
 
-            logger.info("Successfully auto-disabled failed tool", tool_id=tool_id)
+            logger.info("Recorded tool execution failure", tool_id=tool_id)
 
     except Exception:
         logger.exception(
-            "Failed to auto-disable tool after execution failure",
+            "Failed to record tool execution failure",
             tool_id=tool_id,
             error=f"{error.__class__.__name__}: {error!s}",
         )
