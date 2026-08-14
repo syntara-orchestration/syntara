@@ -29,7 +29,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
 import { getProjectDetailPath } from './accessManagementPaths'
-import { AssignRoleModal, type AssignedRolesByScope } from './AssignRoleModal'
+import { AssignRoleModal } from './AssignRoleModal'
 import type { RoleAssignmentColumnKey, ColumnDefinition } from './roleAssignmentColumns'
 import {
   allFilterFieldDefinitions,
@@ -296,31 +296,6 @@ function TableContent({
   )
 }
 
-function computeAssignedRoles(rows: RoleAssignmentRow[]): AssignedRolesByScope {
-  const system = new Set<string>()
-  const byProject = new Map<string, Set<string>>()
-  for (const row of rows) {
-    if (row.scopeType === 'system') {
-      system.add(row.roleName)
-    } else if (row.scopeType === 'project') {
-      if (row.projectId) {
-        let projectSet = byProject.get(row.projectId)
-        if (!projectSet) {
-          projectSet = new Set<string>()
-          byProject.set(row.projectId, projectSet)
-        }
-        projectSet.add(row.roleName)
-      } else {
-        // Defensive: project-scoped role missing projectId (data inconsistency).
-        // Filter from system-scope dropdown; project-scope filtering is best-effort
-        // since we cannot enumerate all projects here.
-        system.add(row.roleName)
-      }
-    }
-  }
-  return { system, byProject }
-}
-
 function ForbiddenAlert({ visible }: Readonly<{ visible: boolean }>) {
   if (!visible) return null
   return (
@@ -360,8 +335,6 @@ export function RoleAssignmentsPanel({
     principalType,
     principalId
   )
-
-  const assignedRoles = useMemo(() => computeAssignedRoles(rows), [rows])
 
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
@@ -445,7 +418,6 @@ export function RoleAssignmentsPanel({
           isOpen={assignModalOpen}
           onClose={() => setAssignModalOpen(false)}
           onSuccess={refetchAndInvalidateAuthz}
-          assignedRoles={assignedRoles}
         />
       </>
     )
@@ -519,7 +491,6 @@ export function RoleAssignmentsPanel({
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onSuccess={refetchAndInvalidateAuthz}
-        assignedRoles={assignedRoles}
       />
 
       <NxConfirmationDialog

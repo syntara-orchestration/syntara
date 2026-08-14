@@ -11,7 +11,7 @@ import {
   SelectList,
   SelectOption,
 } from '@patternfly/react-core'
-import { type Ref, useEffect, useMemo, useState } from 'react'
+import { type Ref, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -23,15 +23,11 @@ import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiError
 import { batchedAllSettled } from '../../utils/batchedSettled'
 import { accessClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
+import { useAlreadyAssignedRoles } from '../access/useAlreadyAssignedRoles'
 
 import styles from './AssignRoleModal.module.css'
 import { MultiRoleSelect, type RoleOption } from './MultiRoleSelect'
 import { buildAssignmentBody, RolePrincipalType } from './RoleAssignmentTypes'
-
-export type AssignedRolesByScope = {
-  system: Set<string>
-  byProject: Map<string, Set<string>>
-}
 
 const assignRoleSchema = z.discriminatedUnion('scope', [
   z.object({
@@ -49,7 +45,6 @@ const assignRoleSchema = z.discriminatedUnion('scope', [
 type AssignRoleFormData = z.infer<typeof assignRoleSchema>
 
 const ROLE_PAGE_SIZE = 20
-const EMPTY_SET = new Set<string>()
 
 type AssignRoleModalProps = {
   principalType: RolePrincipalType
@@ -57,7 +52,6 @@ type AssignRoleModalProps = {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  assignedRoles?: AssignedRolesByScope
 }
 
 function SingleSelect({
@@ -154,7 +148,6 @@ export function AssignRoleModal({
   isOpen,
   onClose,
   onSuccess,
-  assignedRoles,
 }: Readonly<AssignRoleModalProps>) {
   const { showAlert } = useAlerts()
   const defaultScope = principalType === RolePrincipalType.SERVICE_ACCOUNT ? 'project' : 'system'
@@ -185,12 +178,7 @@ export function AssignRoleModal({
     },
   })
 
-  const alreadyAssigned = useMemo((): Set<string> => {
-    if (!assignedRoles) return EMPTY_SET
-    if (scope === 'system') return assignedRoles.system
-    if (projectId) return assignedRoles.byProject.get(projectId) ?? EMPTY_SET
-    return EMPTY_SET
-  }, [scope, projectId, assignedRoles])
+  const alreadyAssigned = useAlreadyAssignedRoles(principalType, principalId, scope === 'project', projectId ?? '')
 
   const roleOptions = useMemo((): RoleOption[] => {
     const roles = rolesQuery.data?.resources ?? []
@@ -221,6 +209,7 @@ export function AssignRoleModal({
 
   const handleClose = () => {
     setRoleSearch('')
+    reset({ scope: defaultScope, projectId: '', roleIds: [] })
     onClose()
   }
 
@@ -236,20 +225,13 @@ export function AssignRoleModal({
       })
     })
     const successCount = showAssignmentResult(results, showAlert)
-    handleClose()
     if (successCount > 0) {
       onSuccess()
     }
+    handleClose()
   })
 
   const roleIds = useWatch({ control, name: 'roleIds' })
-
-  // Reset form when modal opens (not when it closes)
-  useEffect(() => {
-    if (isOpen) {
-      reset({ scope: defaultScope, projectId: '', roleIds: [] })
-    }
-  }, [isOpen, reset, defaultScope])
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="medium">

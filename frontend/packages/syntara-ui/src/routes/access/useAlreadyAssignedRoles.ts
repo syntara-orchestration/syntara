@@ -1,13 +1,43 @@
+import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
+import { fetchAllPages, MAX_PAGE_SIZE } from '../../utils/fetchAllPages'
 import { RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
-import { accessClient } from './accessClient'
+import { accessFetchClient } from './accessClient'
 
 export const PRINCIPAL_ID_FIELD: Record<RolePrincipalType, 'userId' | 'groupId' | 'serviceAccountId'> = {
   [RolePrincipalType.USER]: 'userId',
   [RolePrincipalType.GROUP]: 'groupId',
   [RolePrincipalType.SERVICE_ACCOUNT]: 'serviceAccountId',
+}
+
+type RoleAssignment = {
+  role_name: string
+  project_id?: string | null
+}
+
+function fetchAssignments(principalType: RolePrincipalType, principalId: string): Promise<RoleAssignment[]> {
+  switch (principalType) {
+    case RolePrincipalType.USER:
+      return fetchAllPages<RoleAssignment>((cursor) =>
+        accessFetchClient.GET('/users/{user_id}/role_assignments', {
+          params: { path: { user_id: principalId }, query: { limit: MAX_PAGE_SIZE, cursor } },
+        })
+      )
+    case RolePrincipalType.GROUP:
+      return fetchAllPages<RoleAssignment>((cursor) =>
+        accessFetchClient.GET('/groups/{group_id}/role_assignments', {
+          params: { path: { group_id: principalId }, query: { limit: MAX_PAGE_SIZE, cursor } },
+        })
+      )
+    case RolePrincipalType.SERVICE_ACCOUNT:
+      return fetchAllPages<RoleAssignment>((cursor) =>
+        accessFetchClient.GET('/role_assignments', {
+          params: { query: { principal_id: principalId, limit: MAX_PAGE_SIZE, cursor } },
+        })
+      )
+  }
 }
 
 export function useAlreadyAssignedRoles(
@@ -16,35 +46,16 @@ export function useAlreadyAssignedRoles(
   isProjectScoped: boolean,
   projectId: string
 ) {
-  const userAssignmentsQuery = accessClient.useQuery(
-    'get',
-    '/users/{user_id}/role_assignments',
-    { params: { path: { user_id: principalId || '' } } },
-    { enabled: principalType === RolePrincipalType.USER && !!principalId }
-  )
-  const groupAssignmentsQuery = accessClient.useQuery(
-    'get',
-    '/groups/{group_id}/role_assignments',
-    { params: { path: { group_id: principalId || '' } } },
-    { enabled: principalType === RolePrincipalType.GROUP && !!principalId }
-  )
-  const saAssignmentsQuery = accessClient.useQuery(
-    'get',
-    '/role_assignments',
-    { params: { query: { principal_id: principalId || '' } } },
-    { enabled: principalType === RolePrincipalType.SERVICE_ACCOUNT && !!principalId }
-  )
-
-  const activeData = {
-    [RolePrincipalType.USER]: userAssignmentsQuery.data,
-    [RolePrincipalType.GROUP]: groupAssignmentsQuery.data,
-    [RolePrincipalType.SERVICE_ACCOUNT]: saAssignmentsQuery.data,
-  }[principalType]
+  const { data: assignments } = useQuery({
+    queryKey: ['role-assignments', principalType, principalId],
+    queryFn: () => fetchAssignments(principalType, principalId),
+    enabled: !!principalId,
+  })
 
   return useMemo(() => {
-    const assignments = activeData?.resources ?? []
+    const items = assignments ?? []
     const assigned = new Set<string>()
-    for (const a of assignments) {
+    for (const a of items) {
       const aIsProject = !!a.project_id
       if (isProjectScoped && aIsProject && a.project_id === projectId) {
         assigned.add(a.role_name)
@@ -53,5 +64,5 @@ export function useAlreadyAssignedRoles(
       }
     }
     return assigned
-  }, [activeData, isProjectScoped, projectId])
+  }, [assignments, isProjectScoped, projectId])
 }

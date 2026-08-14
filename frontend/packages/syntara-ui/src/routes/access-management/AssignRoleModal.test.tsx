@@ -1,21 +1,24 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { AlertProvider } from '../../providers/alerts'
-import { accessClient } from '../access/accessClient'
+import { accessClient, accessFetchClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
 
-import { AssignRoleModal, type AssignedRolesByScope } from './AssignRoleModal'
+import { AssignRoleModal } from './AssignRoleModal'
 import type { RolePrincipalType } from './RoleAssignmentTypes'
 
 vi.mock('../access/accessClient', () => ({
   accessClient: {
     useQuery: vi.fn(),
     useMutation: vi.fn(),
+  },
+  accessFetchClient: {
+    GET: vi.fn(),
   },
 }))
 
@@ -147,6 +150,10 @@ describe('AssignRoleModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupMocks()
+    vi.mocked(accessFetchClient.GET).mockResolvedValue({
+      data: { resources: [], next: null },
+      error: undefined,
+    } as never)
   })
 
   function renderModal(
@@ -154,7 +161,6 @@ describe('AssignRoleModal', () => {
       principalType: RolePrincipalType
       principalId: string
       isOpen: boolean
-      assignedRoles: AssignedRolesByScope
     }> = {}
   ) {
     return render(
@@ -164,7 +170,6 @@ describe('AssignRoleModal', () => {
         isOpen={props.isOpen ?? true}
         onClose={mockOnClose}
         onSuccess={mockOnSuccess}
-        assignedRoles={props.assignedRoles}
       />,
       { wrapper }
     )
@@ -172,9 +177,12 @@ describe('AssignRoleModal', () => {
 
   describe('Accessibility', () => {
     it('has no accessibility violations', async () => {
+      let results: Awaited<ReturnType<typeof axe>>
       const { container } = renderModal()
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
+      await act(async () => {
+        results = await axe(container)
+      })
+      expect(results!).toHaveNoViolations()
     })
   })
 
@@ -633,20 +641,23 @@ describe('AssignRoleModal', () => {
     it('filters out already-assigned system roles from dropdown', async () => {
       const user = userEvent.setup()
 
-      renderModal({
-        principalType: 'user',
-        principalId: 'user-1',
-        assignedRoles: {
-          system: new Set(['admin-role']),
-          byProject: new Map(),
+      vi.mocked(accessFetchClient.GET).mockResolvedValue({
+        data: {
+          resources: [{ role_name: 'admin-role', project_id: null }],
+          next: null,
         },
-      })
+        error: undefined,
+      } as never)
+
+      renderModal({ principalType: 'user', principalId: 'user-1' })
 
       // Open role dropdown
       await user.click(screen.getByPlaceholderText('Search for roles...'))
 
-      // admin-role should not appear (already assigned)
-      expect(screen.queryByRole('option', { name: /admin-role/i })).not.toBeInTheDocument()
+      // admin-role should not appear (already assigned at system scope)
+      await waitFor(() => {
+        expect(screen.queryByRole('option', { name: /admin-role/i })).not.toBeInTheDocument()
+      })
 
       // Other roles should still appear
       expect(screen.getByRole('option', { name: /viewer-role/i })).toBeInTheDocument()
@@ -655,14 +666,15 @@ describe('AssignRoleModal', () => {
     it('filters out already-assigned project roles for selected project', async () => {
       const user = userEvent.setup()
 
-      renderModal({
-        principalType: 'user',
-        principalId: 'user-1',
-        assignedRoles: {
-          system: new Set(),
-          byProject: new Map([['proj1', new Set(['project-admin'])]]),
+      vi.mocked(accessFetchClient.GET).mockResolvedValue({
+        data: {
+          resources: [{ role_name: 'project-admin', project_id: 'proj1' }],
+          next: null,
         },
-      })
+        error: undefined,
+      } as never)
+
+      renderModal({ principalType: 'user', principalId: 'user-1' })
 
       // Switch to project scope
       const scopeToggle = screen.getByRole('button', { name: 'System' })
@@ -678,19 +690,18 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
 
       // project-admin should not appear for proj1 (already assigned)
-      expect(screen.queryByRole('option', { name: /project-admin/i })).not.toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByRole('option', { name: /project-admin/i })).not.toBeInTheDocument()
+      })
 
       // Other project roles should appear
       expect(screen.getByRole('option', { name: /project-auditor/i })).toBeInTheDocument()
     })
 
-    it('shows all roles when no assignedRoles prop provided', async () => {
+    it('shows all roles when no assignments exist', async () => {
       const user = userEvent.setup()
 
-      renderModal({
-        principalType: 'user',
-        principalId: 'user-1',
-      })
+      renderModal({ principalType: 'user', principalId: 'user-1' })
 
       // Open role dropdown
       await user.click(screen.getByPlaceholderText('Search for roles...'))
