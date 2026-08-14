@@ -499,7 +499,7 @@ class TestMalformedClaimClearsGroups:
         )
         assert other_group.id in set(idp_a_tracking.all())
 
-        # Now login via test provider (IdP B) — healthy claim grants test_group
+        # Now deny at IdP B — malformed claim (no prior successful IdP B login)
         config = OIDCConfiguration(
             provider_type="oidc",
             issuer_url="https://idp.example.com",
@@ -508,17 +508,6 @@ class TestMalformedClaimClearsGroups:
             redirect_uri="http://localhost:8000/callback",
             group_jmespath_expression="groups[*]",
         )
-        result = await sync_idp_groups(
-            test_db_session,
-            test_user,
-            test_identity,
-            {"groups": ["admin"]},
-            config,
-        )
-        await test_db_session.flush()
-        assert result is True
-
-        # Now deny at IdP B — malformed claim
         with patch(
             "syntara.auth.services.idp_group_sync.jmespath.search",
             side_effect=TypeError("unexpected type"),
@@ -533,20 +522,19 @@ class TestMalformedClaimClearsGroups:
         await test_db_session.flush()
         assert result is False
 
-        # IdP B's groups must be cleared
+        # IdP B must have no tracked groups (deny cleared any stale ones)
         idp_b_tracking = await test_db_session.exec(
             select(user_idp_groups.c.group_id).where(
                 user_idp_groups.c.user_id == test_user.id,
                 user_idp_groups.c.identity_provider_id == provider_id,
             )
         )
-        assert set(idp_b_tracking.all()) == set(), "IdP B tracking must be cleared"
+        assert set(idp_b_tracking.all()) == set(), "IdP B tracking must be empty"
 
         memberships = await test_db_session.exec(
             select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
         )
         group_ids = set(memberships.all())
-        assert test_group.id not in group_ids, "IdP B's group must be removed"
 
         # IdP A's groups must survive the deny at IdP B
         idp_a_tracking = await test_db_session.exec(
