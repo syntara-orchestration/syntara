@@ -149,7 +149,7 @@ describe('EditGroupMapping', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+          group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
         },
       },
       isLoading: false,
@@ -220,7 +220,7 @@ describe('EditGroupMapping', () => {
         configuration: {
           ...mockProvider.configuration,
           group_jmespath_expression: 'groups[*]',
-          group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+          group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
         },
       },
       isLoading: false,
@@ -262,7 +262,7 @@ describe('EditGroupMapping', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+          group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
         },
       },
       isLoading: false,
@@ -296,7 +296,7 @@ describe('EditGroupMapping', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+          group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
         },
       },
       isLoading: false,

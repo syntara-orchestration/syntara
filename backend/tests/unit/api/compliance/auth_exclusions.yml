@@ -24,7 +24,7 @@ authenticated:
     justification: Returns own user info; scoped to caller
 
   - method: POST
-    path: /api/v1/auth/ws-ticket
+    path: /api/v1/auth/ws_ticket
     justification: Exchanges Bearer JWT for single-use WS ticket; scoped to caller
 
   # -- authz: introspection / reference data --
@@ -142,6 +142,11 @@ authenticated:
   - method: GET
     path: /api/v1/tool_manager/metrics/executions
     justification: Internal observability; no user data
+
+  # -- workflows: stateless validation --
+  - method: POST
+    path: /api/v1/workflows/validate
+    justification: Stateless, side-effect-free validation of caller-supplied definition; no project_id/workflow_id to authorize against
 
 public:
   # -- auth: pre-authentication flow --

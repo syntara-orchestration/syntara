@@ -22,8 +22,8 @@ from syntara.identity_providers.models.aap_setup import AAPOIDCSetupRequest
 from syntara.identity_providers.models.identity_provider import (
     IdentityProviderCreate,
     IdentityProviderListResponse,
-    IdentityProviderPatch,
-    IdentityProviderResponse,
+    IdentityProviderRead,
+    IdentityProviderUpdate,
 )
 from syntara.identity_providers.services.aap_oidc_setup_service import AAPOIDCSetupService
 from syntara.identity_providers.services.identity_provider_service import IdentityProviderService
@@ -101,7 +101,7 @@ async def test_identity_provider(
 async def setup_aap_oidc_provider(
     setup_request: AAPOIDCSetupRequest,
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
-) -> IdentityProviderResponse:
+) -> IdentityProviderRead:
     """Set up an AAP OIDC identity provider."""
     settings = get_settings()
     setup_service = AAPOIDCSetupService(idp_service=service, settings=settings)
@@ -147,7 +147,7 @@ async def list_identity_providers(
 async def create_identity_provider(
     provider_create: IdentityProviderCreate,
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
-) -> IdentityProviderResponse:
+) -> IdentityProviderRead:
     """Create a new identity provider."""
     return await service.create_provider(provider_create)
 
@@ -162,25 +162,25 @@ async def create_identity_provider(
 async def get_identity_provider(
     provider_id: UUID,
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
-) -> IdentityProviderResponse:
+) -> IdentityProviderRead:
     """Get identity provider details by ID."""
     return await service.get_provider(provider_id)
 
 
 @router.patch(
     "/{provider_id}",
-    summary="Patch identity provider",
+    summary="Update identity provider",
     dependencies=[Depends(_idp_update)],
-    operation_id="patch_identity_provider",
+    operation_id="update_identity_provider",
 )
 @audit(EventCategory.USER_ACTION, event_action="identity_provider_update", capture_args={"provider_id"})
-async def patch_identity_provider(
+async def update_identity_provider(
     provider_id: UUID,
-    provider_patch: IdentityProviderPatch,
+    provider_update: IdentityProviderUpdate,
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
-) -> IdentityProviderResponse:
-    """Patch an identity provider."""
-    return await service.patch_provider(provider_id, provider_patch)
+) -> IdentityProviderRead:
+    """Update an identity provider."""
+    return await service.update_provider(provider_id, provider_update)
 
 
 @router.delete(

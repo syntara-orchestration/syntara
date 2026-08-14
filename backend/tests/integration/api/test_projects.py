@@ -257,13 +257,13 @@ async def test_invalid_role_name_rejected(
 
 
 @pytest.mark.asyncio
-async def test_admin_can_delete_default_project(
+async def test_admin_cannot_delete_default_project(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
     test_user: User,
     user_factory: Callable[..., Awaitable[User]],
 ) -> None:
-    """An admin can delete the default project like any other project."""
+    """Default project delete is blocked even for admins (AAP-87623)."""
     from uuid import uuid4
 
     from sqlmodel import select
@@ -290,9 +290,16 @@ async def test_admin_can_delete_default_project(
     default_project = result.first()
     assert default_project is not None
 
-    # Admin should be able to delete it
     response = await auth_client.delete(f"/api/v1/projects/{default_project.id}")
-    assert response.status_code == 204
+    assert response.status_code == 403
+    body = response.json()
+    assert body["detail"] == "Default project cannot be deleted"
+    assert body["code"] == "DEFAULT_PROJECT_PROTECTED"
+    assert body["title"] == "Default Project Protected"
+
+    await test_db_session.refresh(default_project)
+    assert default_project.deleted_at is None
+    assert default_project.is_default is True
 
     _auth_as(test_user)
 

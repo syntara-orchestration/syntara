@@ -9,13 +9,14 @@ import { breadcrumbsIdentityProviderGroupMappingForm } from '../../../../app/bre
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
 import { identityProvidersClient } from '../../../../client'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useMutationErrorHandler } from '../../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorStatus } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { isValidUUID } from '../../../../utils/generateUUID'
 import { useAllGroups } from '../../../access/useAllGroups'
-import { BUILTIN_AUTHENTICATED_GROUP_NAME } from '../../adminConstants'
+import { excludeAuthenticatedGroup } from '../../adminConstants'
 
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
@@ -35,7 +36,7 @@ import { identityProviderDetailBasePath, identityProviderGroupMappingTabPath } f
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 import { useTestSignIn } from './useTestSignIn'
 
-type IdentityProviderResponse = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProviderRead = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 export type GroupMappingEditPanelState = {
   signInAlert: { variant: 'success' | 'warning' | 'danger'; message: string } | null
@@ -66,7 +67,7 @@ export type UseGroupMappingFormMetadataResult = {
   isAddFlow: boolean
   openDiscoverOnMount: boolean
   providerId: string | undefined
-  providerData: IdentityProviderResponse | undefined
+  providerData: IdentityProviderRead | undefined
   config: OIDCConfigurationResponse | undefined
   defaultExpression: string | null
   idpType: string | null | undefined
@@ -196,10 +197,7 @@ export function useGroupMappingEditForm({
   )
 
   const { groups: allGroupsRaw, refetch: refetchGroups } = useAllGroups()
-  const nexusGroups = useMemo(
-    () => allGroupsRaw.filter((g) => g.name !== BUILTIN_AUTHENTICATED_GROUP_NAME),
-    [allGroupsRaw]
-  )
+  const nexusGroups = useMemo(() => excludeAuthenticatedGroup(allGroupsRaw), [allGroupsRaw])
 
   const handleTestResult = useCallback(
     (claims: Record<string, unknown>) => {
@@ -238,6 +236,7 @@ export function useGroupMappingEditForm({
       {
         onSuccess: () => {
           showSuccess({ title: 'Group mapping saved' })
+          dismiss()
           navigateToTab()
         },
         onError: handleMutationError({ title: 'Failed to save group mapping' }),
@@ -259,6 +258,13 @@ export function useGroupMappingEditForm({
       setCreateGroupForIndex(null)
     }
   }, [refetchGroups, createGroupForIndex, form])
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty: form.formState.isDirty,
+    onDiscard: () => form.reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to group mapping. Your changes will be lost if you leave.',
+  })
 
   const panel: GroupMappingEditPanelState = {
     signInAlert,

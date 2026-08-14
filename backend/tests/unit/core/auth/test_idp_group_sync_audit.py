@@ -106,13 +106,13 @@ class TestIdpGroupSyncMembershipAudit:
         user = _make_user()
         provider_id = uuid4()
         identity = _make_identity(user, provider_id)
-        nexus_group_id = uuid4()
+        mapped_group_id = uuid4()
         config = _make_config()
         mapping_entry = IdpGroupMappingEntry(
             id=uuid4(),
             identity_provider_id=provider_id,
             idp_group_value="admin",
-            nexus_group_id=nexus_group_id,
+            mapped_group_id=mapped_group_id,
         )
         db = _make_db([mapping_entry])
 
@@ -125,7 +125,7 @@ class TestIdpGroupSyncMembershipAudit:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.structured_data.username == "testuser"
         assert event.structured_data.user_id == str(user.id)
-        assert event.structured_data.group_id == str(nexus_group_id)
+        assert event.structured_data.group_id == str(mapped_group_id)
 
     @pytest.mark.asyncio
     @patch("syntara.audit.emitter._do_emit_audit_event")
@@ -140,7 +140,7 @@ class TestIdpGroupSyncMembershipAudit:
             id=uuid4(),
             identity_provider_id=provider_id,
             idp_group_value="admin",
-            nexus_group_id=uuid4(),
+            mapped_group_id=uuid4(),
         )
         db = _make_db([mapping_entry], idp_rows=[(stale_group_id, provider_id)])
 

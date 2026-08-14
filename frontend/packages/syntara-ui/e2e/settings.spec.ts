@@ -12,7 +12,9 @@
  * - UI-8:  Modify float setting (0.1-step), save, reload, restore
  * - UI-9:  Modify string setting with allowed values dropdown
  * - UI-10: Modify JSON list setting (add/remove items)
- * - UI-11: Modify freeform string setting
+ * - UI-11: (removed) Modify freeform string setting — no plain-text-input
+ *   setting currently exists in the catalog; all remaining STRING settings
+ *   use allowed_values and render as dropdowns (see UI-9).
  * - UI-12: Validation — out of range value shows inline error
  * - UI-13: Reset single setting via kebab menu
  * - UI-14: Reset all settings via confirmation modal
@@ -444,34 +446,6 @@ test.describe('Settings', () => {
       const kebab = app.getByLabel('Actions for Priority order')
       await kebab.scrollIntoViewIfNeeded()
       await resetSingleSetting(app, 'Priority order')
-    }
-  })
-
-  test('modify freeform string setting', async ({ app }) => {
-    await goToSystem(app)
-
-    const formGroup = app.locator('[id="telemetry.segment_endpoint"]').locator('..')
-    await formGroup.scrollIntoViewIfNeeded()
-    await expect(formGroup).toBeVisible({ timeout: 5000 })
-    const input = formGroup.locator('input')
-
-    try {
-      // Change value
-      await input.fill('https://test.segment.io')
-
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
-
-      // Reload and verify persisted
-      await goToSystem(app)
-      const reloadedInput = app.locator('[id="telemetry.segment_endpoint"]').locator('..').locator('input')
-      await expect(reloadedInput).toHaveValue('https://test.segment.io')
-    } finally {
-      await goToSystem(app)
-      await resetSingleSetting(app, 'Segment endpoint URL')
     }
   })
 

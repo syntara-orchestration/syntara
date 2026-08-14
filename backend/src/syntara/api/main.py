@@ -37,6 +37,7 @@ from syntara.auth.session.cleanup import get_session_cleanup_worker
 from syntara.authz.evaluator import RegoEvaluator
 from syntara.authz.exceptions import (  # noqa: F401
     BuiltinProtectionError,
+    DefaultProjectProtectionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
     RoleNameConflictError,
@@ -191,10 +192,6 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     # runtime override has been set by an operator).
     await apply_runtime_log_level()
 
-    # Import telemetry watcher so @watch_setting("telemetry.segment_write_key")
-    # is registered before start_watching() applies pending watchers.
-    import syntara.telemetry.client  # noqa: F401, PLC0415
-
     # Watch for runtime log level changes and start polling
     runtime_settings.start_watching()
 
@@ -251,7 +248,6 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     # Initialize periodic analytics collector
     periodic_collector = PeriodicCollector(
         registry=get_telemetry_registry(),
-        settings_cache=runtime_settings,
     )
 
     completion_poller = get_completion_poller()

@@ -11,11 +11,11 @@ from dateutil.parser import isoparse
 from ..models.service_account_credential_type import ServiceAccountCredentialType
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="SACredentialCreate")
+T = TypeVar("T", bound="ServiceAccountCredentialCreate")
 
 
 @_attrs_define
-class SACredentialCreate:
+class ServiceAccountCredentialCreate:
     """Schema for creating a new service account credential.
 
     Attributes:
@@ -81,14 +81,14 @@ class SACredentialCreate:
 
         grace_period_seconds = d.pop("grace_period_seconds", UNSET)
 
-        sa_credential_create = cls(
+        service_account_credential_create = cls(
             credential_type=credential_type,
             expires_at=expires_at,
             grace_period_seconds=grace_period_seconds,
         )
 
-        sa_credential_create.additional_properties = d
-        return sa_credential_create
+        service_account_credential_create.additional_properties = d
+        return service_account_credential_create
 
     @property
     def additional_keys(self) -> list[str]:

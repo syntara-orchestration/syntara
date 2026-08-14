@@ -18,12 +18,12 @@ from syntara.integrations.exceptions import (
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
-    IntegrationPatch,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
     IntegrationType,
+    IntegrationUpdate,
 )
 from syntara.integrations.services.integration_service import IntegrationService
 
@@ -532,16 +532,16 @@ class TestResolveVisibleIntegrationIds:
 
 
 class TestPatchIntegration:
-    """Tests for IntegrationService.patch_integration."""
+    """Tests for IntegrationService.update_integration."""
 
     @pytest.mark.asyncio
     async def test_patch_partial_fields(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(name="Updated Name", enabled=False)
+        patch = IntegrationUpdate(name="Updated Name", enabled=False)
 
-        result = await integration_service.patch_integration(created.id, patch)
+        result = await integration_service.update_integration(created.id, patch)
 
         assert result.name == "Updated Name"
         assert result.enabled is False
@@ -555,14 +555,14 @@ class TestPatchIntegration:
         second = await integration_service.create_integration(_mcp_create(name="Second"))
 
         with pytest.raises(IntegrationNameConflictError):
-            await integration_service.patch_integration(second.id, IntegrationPatch(name="First"))
+            await integration_service.update_integration(second.id, IntegrationUpdate(name="First"))
 
     @pytest.mark.asyncio
     async def test_patch_configuration_type_mismatch_raises(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(
+        patch = IntegrationUpdate(
             configuration={
                 "integration_type": "llm_provider",
                 "base_url": "https://api.openai.com",
@@ -571,18 +571,18 @@ class TestPatchIntegration:
         )
 
         with pytest.raises(ValueError, match="does not match integration type"):
-            await integration_service.patch_integration(created.id, patch)
+            await integration_service.update_integration(created.id, patch)
 
     @pytest.mark.asyncio
     async def test_patch_configuration_matching_type_succeeds(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(
+        patch = IntegrationUpdate(
             configuration={"integration_type": "mcp_server", "base_url": "https://updated.example.com"},
         )
 
-        result = await integration_service.patch_integration(created.id, patch)
+        result = await integration_service.update_integration(created.id, patch)
         assert result.configuration.base_url == "https://updated.example.com"
 
     @pytest.mark.asyncio
@@ -590,7 +590,7 @@ class TestPatchIntegration:
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         with pytest.raises(IntegrationNotFoundError):
-            await integration_service.patch_integration(uuid4(), IntegrationPatch(name="x"))
+            await integration_service.update_integration(uuid4(), IntegrationUpdate(name="x"))
 
 
 class TestUpdateValidationStatus:

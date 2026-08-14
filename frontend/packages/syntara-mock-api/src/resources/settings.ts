@@ -16,7 +16,7 @@ export const settingsCategories: SettingCategory[] = [
     slug: 'system',
     name: 'System',
     description: 'System-level settings including observability and diagnostics',
-    group_names: ['Observability', 'Segment'],
+    group_names: ['Observability'],
   },
   {
     slug: 'context_manager',
@@ -368,17 +368,6 @@ export const settings: RuntimeSetting[] = [
     validation_schema: {
       allowed_values: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
     } as unknown as Record<string, never>,
-  }),
-  makeSetting({
-    key: 'telemetry.segment_endpoint',
-    name: 'Segment endpoint URL',
-    description:
-      'Segment API endpoint URL. When set, overrides the static APP_SEGMENT_ENDPOINT environment variable. Changing this reinitializes the telemetry client across all instances. Set to an empty string to fall back to the environment variable.',
-    helper_text: 'Full URL (e.g. https://api.segment.io). Leave empty to use the environment variable.',
-    category: 'system',
-    group: 'Segment',
-    value_type: 'string',
-    default_value: '',
   }),
   makeSetting({
     key: 'metrics.perf_test_mode',
