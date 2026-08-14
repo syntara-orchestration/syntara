@@ -31,7 +31,7 @@ def _make_payload(*, token_type: str = "access") -> TokenPayload:  # noqa: S107
 
 
 class TestCreateWsTicketServiceAccountRejection:
-    """Service account JWTs must be rejected at ws-ticket issuance."""
+    """Service account JWTs must be rejected at ws_ticket issuance."""
 
     @pytest.mark.asyncio
     async def test_service_account_jwt_rejected(self) -> None:

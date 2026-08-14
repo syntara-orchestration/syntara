@@ -18,8 +18,8 @@ from syntara.core.models import User
 from syntara.integrations.exceptions import IntegrationNameConflictError, IntegrationNotFoundError
 from syntara.integrations.models.integration import (
     IntegrationCreate,
-    IntegrationPatch,
     IntegrationType,
+    IntegrationUpdate,
 )
 from syntara.integrations.services.integration_service import IntegrationService
 
@@ -127,17 +127,17 @@ class TestIntegrationServiceAuditEvents:
 
     @pytest.mark.asyncio
     @patch("syntara.audit.emitter._do_emit_audit_event")
-    async def test_patch_integration_success_emits_audit_event(
+    async def test_update_integration_success_emits_audit_event(
         self,
         mock_do_emit: object,
         integration_service: IntegrationService,
     ) -> None:
-        """Successful patch_integration should emit IntegrationUpdateEvent with tracked fields."""
+        """Successful update_integration should emit IntegrationUpdateEvent with tracked fields."""
         created = await integration_service.create_integration(_mcp_create("Original Name"))
         mock_do_emit.reset_mock()  # type: ignore[attr-defined]
 
-        patch_data = IntegrationPatch(name="Updated Name", description="New description")
-        await integration_service.patch_integration(created.id, patch_data)
+        patch_data = IntegrationUpdate(name="Updated Name", description="New description")
+        await integration_service.update_integration(created.id, patch_data)
 
         assert mock_do_emit.call_count == 1  # type: ignore[attr-defined]
         event: AuditEvent = mock_do_emit.call_args.args[0]  # type: ignore[attr-defined]
@@ -153,17 +153,17 @@ class TestIntegrationServiceAuditEvents:
 
     @pytest.mark.asyncio
     @patch("syntara.audit.emitter._do_emit_audit_event")
-    async def test_patch_integration_tracks_only_set_fields(
+    async def test_update_integration_tracks_only_set_fields(
         self,
         mock_do_emit: object,
         integration_service: IntegrationService,
     ) -> None:
-        """patch_integration should emit audit event with only the fields that were set."""
+        """update_integration should emit audit event with only the fields that were set."""
         created = await integration_service.create_integration(_mcp_create("Integration"))
         mock_do_emit.reset_mock()  # type: ignore[attr-defined]
 
-        patch_data = IntegrationPatch(description="Updated description only")
-        await integration_service.patch_integration(created.id, patch_data)
+        patch_data = IntegrationUpdate(description="Updated description only")
+        await integration_service.update_integration(created.id, patch_data)
 
         assert mock_do_emit.call_count == 1  # type: ignore[attr-defined]
         event: AuditEvent = mock_do_emit.call_args.args[0]  # type: ignore[attr-defined]

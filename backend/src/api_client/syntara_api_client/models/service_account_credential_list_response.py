@@ -9,18 +9,18 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.sa_credential_read import SACredentialRead
+    from ..models.service_account_credential_read import ServiceAccountCredentialRead
 
 
-T = TypeVar("T", bound="SACredentialListResponse")
+T = TypeVar("T", bound="ServiceAccountCredentialListResponse")
 
 
 @_attrs_define
-class SACredentialListResponse:
+class ServiceAccountCredentialListResponse:
     """Paginated list response for service account credentials.
 
     Attributes:
-        resources (list[SACredentialRead]): Array of resources in current page
+        resources (list[ServiceAccountCredentialRead]): Array of resources in current page
         next_ (None | str | Unset): Cursor for next page of results
         prev (None | str | Unset): Cursor for previous page of results
         total (int | None | Unset): Total count of resources (only when include_total=true)
@@ -30,7 +30,7 @@ class SACredentialListResponse:
         max_lifetime_days (int | Unset): Maximum credential lifetime in days (-1 for unlimited) Default: 180.
     """
 
-    resources: list[SACredentialRead]
+    resources: list[ServiceAccountCredentialRead]
     next_: None | str | Unset = UNSET
     prev: None | str | Unset = UNSET
     total: int | None | Unset = UNSET
@@ -93,13 +93,13 @@ class SACredentialListResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.sa_credential_read import SACredentialRead
+        from ..models.service_account_credential_read import ServiceAccountCredentialRead
 
         d = dict(src_dict)
         resources = []
         _resources = d.pop("resources")
         for resources_item_data in _resources:
-            resources_item = SACredentialRead.from_dict(resources_item_data)
+            resources_item = ServiceAccountCredentialRead.from_dict(resources_item_data)
 
             resources.append(resources_item)
 
@@ -136,7 +136,7 @@ class SACredentialListResponse:
 
         max_lifetime_days = d.pop("max_lifetime_days", UNSET)
 
-        sa_credential_list_response = cls(
+        service_account_credential_list_response = cls(
             resources=resources,
             next_=next_,
             prev=prev,
@@ -146,8 +146,8 @@ class SACredentialListResponse:
             max_lifetime_days=max_lifetime_days,
         )
 
-        sa_credential_list_response.additional_properties = d
-        return sa_credential_list_response
+        service_account_credential_list_response.additional_properties = d
+        return service_account_credential_list_response
 
     @property
     def additional_keys(self) -> list[str]:

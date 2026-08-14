@@ -11,15 +11,15 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.identity_provider_response_labels import IdentityProviderResponseLabels
+    from ..models.identity_provider_read_labels import IdentityProviderReadLabels
     from ..models.oidc_configuration_response import OIDCConfigurationResponse
 
 
-T = TypeVar("T", bound="IdentityProviderResponse")
+T = TypeVar("T", bound="IdentityProviderRead")
 
 
 @_attrs_define
-class IdentityProviderResponse:
+class IdentityProviderRead:
     """Schema for IdentityProvider response with configuration details (excludes secrets).
 
     Attributes:
@@ -29,7 +29,7 @@ class IdentityProviderResponse:
         id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
         created_at (datetime.datetime | Unset): Timestamp when resource was created Example: 2025-10-09T12:00:00Z.
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
-        labels (IdentityProviderResponseLabels | Unset): Key-value pairs for resource labeling and filtering Example:
+        labels (IdentityProviderReadLabels | Unset): Key-value pairs for resource labeling and filtering Example:
             {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
         updated_by (None | Unset | UUID): User (or automation) that last updated the resource Example:
             880e8400-e29b-41d4-a716-446655440000.
@@ -44,7 +44,7 @@ class IdentityProviderResponse:
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
-    labels: IdentityProviderResponseLabels | Unset = UNSET
+    labels: IdentityProviderReadLabels | Unset = UNSET
     updated_by: None | Unset | UUID = UNSET
     description: None | str | Unset = UNSET
     enabled: bool | Unset = True
@@ -116,7 +116,7 @@ class IdentityProviderResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.identity_provider_response_labels import IdentityProviderResponseLabels
+        from ..models.identity_provider_read_labels import IdentityProviderReadLabels
         from ..models.oidc_configuration_response import OIDCConfigurationResponse
 
         d = dict(src_dict)
@@ -148,11 +148,11 @@ class IdentityProviderResponse:
             updated_at = isoparse(_updated_at)
 
         _labels = d.pop("labels", UNSET)
-        labels: IdentityProviderResponseLabels | Unset
+        labels: IdentityProviderReadLabels | Unset
         if isinstance(_labels, Unset):
             labels = UNSET
         else:
-            labels = IdentityProviderResponseLabels.from_dict(_labels)
+            labels = IdentityProviderReadLabels.from_dict(_labels)
 
         def _parse_updated_by(data: object) -> None | Unset | UUID:
             if data is None:
@@ -182,7 +182,7 @@ class IdentityProviderResponse:
 
         enabled = d.pop("enabled", UNSET)
 
-        identity_provider_response = cls(
+        identity_provider_read = cls(
             created_by=created_by,
             name=name,
             configuration=configuration,
@@ -195,4 +195,4 @@ class IdentityProviderResponse:
             enabled=enabled,
         )
 
-        return identity_provider_response
+        return identity_provider_read

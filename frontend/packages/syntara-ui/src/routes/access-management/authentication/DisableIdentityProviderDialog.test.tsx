@@ -6,7 +6,7 @@ import { axe } from 'vitest-axe'
 
 import { DisableIdentityProviderDialog } from './DisableIdentityProviderDialog'
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 const mockProvider = {
   id: 'idp-1',

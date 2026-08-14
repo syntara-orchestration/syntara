@@ -3,7 +3,7 @@ import type { IdentityProvidersAPI } from '@syntara/contracts'
 
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 type DisableIdentityProviderDialogProps = {
   provider: IdentityProvider | null

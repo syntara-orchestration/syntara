@@ -505,6 +505,8 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'off',
       // Testing Library rules target RTL/vitest patterns; Playwright specs use locator-based APIs
       'testing-library/prefer-screen-queries': 'off',
+      // Playwright worker-scoped fixtures require destructured first arg even when no deps are needed
+      'no-empty-pattern': 'off',
     },
   },
   {

@@ -410,7 +410,7 @@ class IntegrationRead(NamedResource, UserOwnedResource):
     enabled_model_count: int = Field(default=0, description="Number of enabled models linked to this integration")
 
 
-class IntegrationPatch(SQLModel):
+class IntegrationUpdate(SQLModel):
     """Schema for partially updating an integration (user-facing)."""
 
     name: str | None = Field(

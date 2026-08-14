@@ -19,7 +19,7 @@ vi.mock('../../../hooks/useMutationErrorHandler', () => ({
   useMutationErrorHandler: vi.fn(),
 }))
 
-type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
 const enabledProvider = {
   id: 'idp-1',

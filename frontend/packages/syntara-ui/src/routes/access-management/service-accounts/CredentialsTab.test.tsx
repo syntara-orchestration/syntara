@@ -9,7 +9,7 @@ import { AlertProvider } from '../../../providers/alerts'
 import { accessClient, accessFetchClient } from '../../access/accessClient'
 
 import { CredentialsTab } from './CredentialsTab'
-import type { SACredentialRead } from './serviceAccountTypes'
+import type { ServiceAccountCredentialRead } from './serviceAccountTypes'
 
 vi.mock('../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -25,7 +25,7 @@ vi.mock('../../access/accessClient', () => ({
   },
 }))
 
-const mockCredentials: SACredentialRead[] = [
+const mockCredentials: ServiceAccountCredentialRead[] = [
   {
     id: 'cred-1',
     service_account_id: 'sa-1',
@@ -343,7 +343,7 @@ describe('CredentialsTab', () => {
 
     it('shows active grace period warning when credential has old_secret_valid_until', async () => {
       const futureDate = new Date(Date.now() + 3_600_000).toISOString()
-      const credsWithGracePeriod: SACredentialRead[] = [
+      const credsWithGracePeriod: ServiceAccountCredentialRead[] = [
         {
           ...mockCredentials[0],
           old_secret_valid_until: futureDate,
