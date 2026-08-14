@@ -178,6 +178,55 @@ class TestRegisterRouters:
         assert "Failed to register router" in call_args[0][0]
         assert call_args[1]["domain"] == router_info.domain
 
+    def test_static_routes_registered_before_parameterized(self) -> None:
+        """Static-prefix routes must be registered before parameterized siblings.
+
+        /groups/directory must be matched before /groups/{group_id},
+        otherwise FastAPI routes the request to the parameterized handler.
+        """
+        app = FastAPI()
+
+        parameterized_router = APIRouter(prefix="/groups")
+
+        @parameterized_router.get("/{group_id}")
+        def get_group(group_id: str) -> dict[str, str]:
+            return {"id": group_id}
+
+        static_router = APIRouter(prefix="/groups/directory")
+
+        @static_router.get("")
+        def list_directory() -> list[dict[str, str]]:
+            return [{"id": "1", "name": "admins"}]
+
+        # Pass parameterized first — register_routers should re-order
+        routers = [
+            RouterInfo(
+                domain="users",
+                module_path="syntara.users.groups_router",
+                router=parameterized_router,
+                router_prefix="groups_",
+                source_file=Path("/users/groups_router.py"),
+            ),
+            RouterInfo(
+                domain="users",
+                module_path="syntara.users.groups_directory_router",
+                router=static_router,
+                router_prefix="groups_directory_",
+                source_file=Path("/users/groups_directory_router.py"),
+            ),
+        ]
+
+        register_routers(app, routers, prefix="/api/v1")
+
+        from starlette.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.get("/api/v1/groups/directory")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert data[0]["name"] == "admins"
+
 
 class TestDiscoverAndRegisterRouters:
     """Tests for discover_and_register_routers function."""

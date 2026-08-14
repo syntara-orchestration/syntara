@@ -8,7 +8,8 @@ Provides three query patterns:
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar, Literal, Self
 from uuid import UUID
 
@@ -657,6 +658,50 @@ async def _user_has_authz_query_permission(
     return result.allowed
 
 
+async def _can_edit_workflow_in_project(
+    user: User,
+    evaluator: AuthzEvaluator,
+    db: AsyncSession,
+    resource_project: str,
+) -> bool:
+    """Check if user can create or update workflows in the given project."""
+    for action in ("update", "create"):
+        result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=user.id,
+                action=action,
+                resource_type="workflow",
+                resource_id="",
+                resource_project=resource_project,
+                user_labels=user.labels,
+                user_metadata=user.authz_metadata,
+            ),
+        )
+        if result.allowed:
+            return True
+    return False
+
+
+@dataclass(frozen=True)
+class _WhoCanGateRule:
+    """Maps a (resource_type, action) query pair to its required permission check."""
+
+    resource_type: str
+    action: str
+    check: Callable[[User, AuthzEvaluator, AsyncSession, str], Awaitable[bool]]
+
+
+_WHO_CAN_GATE_RULES: tuple[_WhoCanGateRule, ...] = (
+    _WhoCanGateRule("approval", "decide", _can_edit_workflow_in_project),
+)
+
+_WHO_CAN_GATE_LOOKUP: dict[tuple[str, str], _WhoCanGateRule] = {
+    (r.resource_type, r.action): r for r in _WHO_CAN_GATE_RULES
+}
+
+
 async def _enforce_who_can_permission(
     body: WhoCanRequest,
     current_user: User,
@@ -664,48 +709,27 @@ async def _enforce_who_can_permission(
     evaluator: AuthzEvaluator,
     resource_project: str,
 ) -> None:
-    """Enforce three-tier authorization gate for who_can queries.
+    """Enforce two-tier authorization gate for who_can queries.
 
-    Tier 1: resource_id provided — user must be able to read that specific resource.
-    Tier 2: resource_project provided (no resource_id) — user must be able to read
-            the resource type within that project.
-    Tier 3: Neither provided — system-wide query, requires authz:query (admin).
+    Tier 1: resource_project or resource_id provided — the query's
+            (resource_type, action) pair must match a gate rule in
+            _WHO_CAN_GATE_RULES, and the user must pass that rule's
+            permission check. Each rule binds the allowed query pair
+            to its required permission, so adding a new pair forces
+            the developer to specify how it is authorized.
+    Tier 2: No project context — system-wide query, requires authz:query (admin).
+
+    Client-supplied resource_labels/resource_metadata are NOT used in the gate
+    to prevent forged attributes from influencing authorization.
     """
-    if body.resource_id:
-        authz_result = await authorize(
-            db,
-            evaluator,
-            AuthzRequest(
-                user_id=current_user.id,
-                action="read",
-                resource_type=body.resource_type,
-                resource_id=body.resource_id,
-                resource_labels=body.resource_labels,
-                resource_metadata=body.resource_metadata,
-                resource_project=resource_project,
-                user_labels=current_user.labels,
-                user_metadata=current_user.authz_metadata,
-            ),
-        )
-        if not authz_result.allowed:
-            msg = f"Not authorized to query {body.resource_type}/{body.resource_id}"
+    if resource_project or body.resource_id:
+        query_pair = (body.resource_type, body.action)
+        rule = _WHO_CAN_GATE_LOOKUP.get(query_pair)
+        if rule is None:
+            msg = f"who_can query for {body.resource_type}:{body.action} is not permitted for non-admin users"
             raise AuthorizationDeniedError(msg)
 
-    elif resource_project:
-        authz_result = await authorize(
-            db,
-            evaluator,
-            AuthzRequest(
-                user_id=current_user.id,
-                action="read",
-                resource_type=body.resource_type,
-                resource_id="",
-                resource_project=resource_project,
-                user_labels=current_user.labels,
-                user_metadata=current_user.authz_metadata,
-            ),
-        )
-        if not authz_result.allowed:
+        if not await rule.check(current_user, evaluator, db, resource_project):
             msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
             raise AuthorizationDeniedError(msg)
 

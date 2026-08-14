@@ -19,6 +19,8 @@ async function fetchAllGroupDirectory(): Promise<GroupDirectoryEntry[]> {
  *
  * Uses the lightweight `/groups/directory` endpoint (id + name only),
  * which is accessible to the `user` role via `group-directory:read`.
+ * Note: groups are not filtered by approval:decide capability — the backend
+ * validates group membership at decision time.
  */
 export function useApprovalDecideGroups() {
   const {
