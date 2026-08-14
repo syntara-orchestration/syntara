@@ -121,6 +121,38 @@ class TestDecisionNotesSanitization:
         assert not _TAG_LIKE_RE.search(request.notes or "")
 
     @pytest.mark.parametrize(
+        "raw",
+        [
+            "<script>alert(1)</script>",
+            "<<script>script>alert(1)</script>",
+            "<<<script>>script>alert(1)</script>",
+            '<img src=x onerror="alert(1)">',
+            "<script",
+            "<b>text</b>",
+            '<svg onload="alert(1)">',
+            "&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;",
+            "&amp;lt;img src=x onerror=alert(1)&amp;gt;",
+            "&amp;amp;lt;script&amp;amp;gt;alert(1)&amp;amp;lt;/script&amp;amp;gt;",
+        ],
+        ids=[
+            "script",
+            "nested-script",
+            "triple-nested",
+            "img-onerror",
+            "unclosed",
+            "bold",
+            "svg",
+            "double-encoded-script",
+            "double-encoded-img",
+            "triple-encoded-script",
+        ],
+    )
+    def test_batch_result_contains_no_tag_like_sequences(self, raw: str) -> None:
+        """Post-condition: batch model sanitized output must not contain tag-like sequences."""
+        decision = BatchApprovalDecision(approval_id=uuid4(), status="approved", notes=raw)
+        assert not _TAG_LIKE_RE.search(decision.notes or "")
+
+    @pytest.mark.parametrize(
         ("raw", "expected"),
         [
             ("<script>alert('xss')</script>", ""),
@@ -179,14 +211,42 @@ class TestDecisionNotesSanitization:
         request = ApprovalDecisionRequest(status="approved", notes=tagged)
         assert request.notes == inner
 
-    def test_deeply_encoded_input_returns_empty(self) -> None:
-        """Input encoded beyond _SANITIZE_MAX_ROUNDS must be rejected, not stored partially decoded."""
+    def test_near_limit_encoded_input_accepted(self) -> None:
+        """_SANITIZE_MAX_ROUNDS - 1 layers must converge via the final check, not reject."""
         from syntara.approvals.models.api_models import _SANITIZE_MAX_ROUNDS
 
-        payload = "alert(1)"
-        for _ in range(_SANITIZE_MAX_ROUNDS + 5):
-            payload = f"<script>{payload}</script>"
+        payload = "<script>alert(1)</script>"
+        for _ in range(_SANITIZE_MAX_ROUNDS - 1):
             payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         request = ApprovalDecisionRequest(status="approved", notes=payload)
         assert request.notes == ""
-        assert not _TAG_LIKE_RE.search(request.notes)
+
+    def test_boundary_encoded_input_rejected_with_422(self) -> None:
+        """N encoding layers leave real HTML tags in result — must reject."""
+        from syntara.approvals.models.api_models import _SANITIZE_MAX_ROUNDS
+
+        payload = "<script>alert(1)</script>"
+        for _ in range(_SANITIZE_MAX_ROUNDS):
+            payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        with pytest.raises(ValidationError, match="deeply nested HTML encoding"):
+            ApprovalDecisionRequest(status="approved", notes=payload)
+
+    def test_deeply_encoded_input_rejected_with_422(self) -> None:
+        """Input encoded beyond _SANITIZE_MAX_ROUNDS must be rejected, not stored partially decoded."""
+        from syntara.approvals.models.api_models import _SANITIZE_MAX_ROUNDS
+
+        payload = "<script>alert(1)</script>"
+        for _ in range(_SANITIZE_MAX_ROUNDS + 1):
+            payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        with pytest.raises(ValidationError, match="deeply nested HTML encoding"):
+            ApprovalDecisionRequest(status="approved", notes=payload)
+
+    def test_batch_deeply_encoded_input_rejected_with_422(self) -> None:
+        """Batch model must also reject deeply encoded input."""
+        from syntara.approvals.models.api_models import _SANITIZE_MAX_ROUNDS
+
+        payload = "<script>alert(1)</script>"
+        for _ in range(_SANITIZE_MAX_ROUNDS + 1):
+            payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        with pytest.raises(ValidationError, match="deeply nested HTML encoding"):
+            BatchApprovalDecision(approval_id=uuid4(), status="approved", notes=payload)

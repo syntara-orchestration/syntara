@@ -17,6 +17,7 @@ from sqlmodel import SQLModel
 from syntara.core.constants import FieldLimits
 
 _SANITIZE_MAX_ROUNDS = 10
+_SANITIZE_ERROR = "Decision notes contain deeply nested HTML encoding that cannot be safely sanitized"
 
 
 def _sanitize_notes(v: str | None) -> str | None:
@@ -31,9 +32,12 @@ def _sanitize_notes(v: str | None) -> str | None:
         if cleaned == result:
             return result
         result = cleaned
-    # Loop exhausted without converging — input has deeply nested encoding
-    # that could decode into unsafe HTML.  Reject rather than store it.
-    return ""
+    # One extra convergence check: the last peel may have produced a safe
+    # result that simply had no iteration left to verify stability.
+    final = html.unescape(nh3.clean(result, tags=set()))
+    if final == result:
+        return result
+    raise ValueError(_SANITIZE_ERROR)
 
 
 class ApproverUserSummary(SQLModel):
