@@ -737,13 +737,15 @@ async def _enforce_who_can_permission(
 ) -> None:
     """Enforce two-tier authorization gate for who_can queries.
 
+    Tier 0 (always): authz:query holders (admins, CLI) pass unconditionally,
+            preserving backwards compatibility with the old PermissionChecker gate.
     Tier 1: resource_project or resource_id provided — the query's
             (resource_type, action) pair must match a gate rule in
             _WHO_CAN_GATE_RULES, and the user must pass that rule's
             permission check. Each rule binds the allowed query pair
             to its required permission, so adding a new pair forces
             the developer to specify how it is authorized.
-    Tier 2: No project context — system-wide query, requires authz:query (admin).
+    Tier 2: No project context and no authz:query — denied.
 
     Certificate-authenticated requests (service-to-service) bypass the gate,
     matching the behavior of PermissionChecker.
@@ -752,6 +754,9 @@ async def _enforce_who_can_permission(
     to prevent forged attributes from influencing authorization.
     """
     if getattr(request.state, "is_cert_authenticated", False):
+        return
+
+    if await _user_has_authz_query_permission(current_user, evaluator, db):
         return
 
     if resource_project or body.resource_id:
@@ -767,7 +772,7 @@ async def _enforce_who_can_permission(
             _dispatch_who_can_denied(current_user, body)
             raise AuthorizationDeniedError(msg)
 
-    elif not await _user_has_authz_query_permission(current_user, evaluator, db):
+    else:
         msg = "System-wide who_can queries require authz:query permission"
         _dispatch_who_can_denied(current_user, body)
         raise AuthorizationDeniedError(msg)

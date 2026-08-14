@@ -200,14 +200,17 @@ type ApprovalNodeFormProps = {
   onSubmit: (data: ApprovalFormSubmitData) => void
   initialData?: Partial<ApprovalFormSubmitData>
   onHeaderContentChange?: (content: ReactNode | null) => void
+  projectId?: string
 }
 
 function ApprovalFormFields({
   onHeaderContentChange,
   validationErrors,
+  projectId,
 }: {
   onHeaderContentChange?: (content: ReactNode | null) => void
   validationErrors?: { approver_users?: { message?: string }; approver_groups?: { message?: string } }
+  projectId?: string
 }) {
   const isVersionView = useIsVersionView()
   const { register, control, setValue } = useFormContext<ApprovalFormData>()
@@ -215,15 +218,15 @@ function ApprovalFormFields({
   const { defaults } = useWorkflowEngineDefaults()
   const approvalTimeoutDefault = defaults?.timeoutSeconds.approval ?? null
 
-  // Get the workflow's project ID (not the UI-selected project, which can diverge on deep links / navigation)
-  const workflowProjectId = useWorkflowStore((state) => state.projectId)
+  const storeProjectId = useWorkflowStore((state) => state.projectId)
+  const effectiveProjectId = projectId ?? storeProjectId
 
   // Fetch users with approval:decide permission and all groups
   const {
     users,
     isLoading: isLoadingUsers,
     isPermissionDenied: usersPermissionDenied,
-  } = useApprovalDecideUsers(workflowProjectId)
+  } = useApprovalDecideUsers(effectiveProjectId)
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
@@ -390,7 +393,11 @@ export function ApprovalNodeForm(props: ApprovalNodeFormProps) {
   return (
     <FormProvider {...methods}>
       <NodeFormContainer formId="approval-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
-        <ApprovalFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
+        <ApprovalFormFields
+          onHeaderContentChange={props.onHeaderContentChange}
+          validationErrors={errors}
+          projectId={props.projectId}
+        />
       </NodeFormContainer>
     </FormProvider>
   )
