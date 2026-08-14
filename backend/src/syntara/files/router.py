@@ -343,7 +343,7 @@ async def get_files_metadata(
     )
     files_info: list[FileUploadInfo] = []
     for m in metadata_list:
-        files_info.append(
+        files_info.append(  # noqa: PERF401 (await inside loop — not a list comprehension candidate)
             FileUploadInfo(
                 file_id=m.id,
                 filename=m.filename,
