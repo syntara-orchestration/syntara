@@ -5,7 +5,7 @@ Tests WebSocketStreamingHandler and StreamingService classes.
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -215,7 +215,7 @@ class TestAAP86853InvocationStatusLookupRegression:
 
         assert row_shaped[0] == InvocationStatus.RUNNING
         with pytest.raises(AttributeError):
-            _ = row_shaped.status
+            _ = row_shaped.status  # type: ignore[attr-defined]
 
 
 class TestWebSocketStreamingHandlerCheckInvocationExists:
