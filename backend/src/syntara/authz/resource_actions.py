@@ -162,6 +162,8 @@ def validate_project_statements(statements: list[dict[str, Any]]) -> str | None:
     if own_error:
         return own_error
 
+    # Validate that all actions reference project-eligible resource types
+    for stmt in statements:
         for action_str in stmt.get("actions", []):
             if ":" not in action_str:
                 continue

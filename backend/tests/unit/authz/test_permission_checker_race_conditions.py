@@ -7,14 +7,13 @@ authorization flow, particularly around ownership-based checks.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from fastapi import Request
 
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.models.user import User
 
 if TYPE_CHECKING:
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
     strict=True,
 )
 async def test_toctou_ownership_change_during_request(
-    db_session: AsyncSession,
+    test_db_session: AsyncSession,
 ) -> None:
     """XFAIL: Demonstrates TOCTOU race where credential owner changes mid-request.
 
@@ -82,14 +81,14 @@ async def test_toctou_ownership_change_during_request(
     mock_request.state.is_cert_authenticated = False
 
     # Mock authz evaluator that allows the update (initial check passes)
-    mock_evaluator = AsyncMock()
-    mock_evaluator.authorize = AsyncMock(return_value=None)  # No exception = allowed
+    mock_evaluator = MagicMock()
+    mock_evaluator.evaluate = MagicMock(return_value={"allow": True, "deny": False})
 
     # Patch dependencies
     with (
         patch("syntara.authz.dependencies.get_current_user", return_value=user_a),
         patch("syntara.authz.dependencies.get_authz_evaluator", return_value=mock_evaluator),
-        patch("syntara.authz.dependencies.get_db", return_value=db_session),
+        patch("syntara.authz.dependencies.get_db", return_value=test_db_session),
     ):
         # RACE CONDITION SIMULATION:
         # 1. _resolve_resource_owner returns user_a_id (correct at time of check)
@@ -109,23 +108,23 @@ async def test_toctou_ownership_change_during_request(
         checker._resolve_resource_owner = resolve_then_transfer  # type: ignore[method-assign]
 
         # Mock the database query that returns the credential
-        async def mock_exec(query):  # noqa: ANN001, ANN202
+        async def mock_exec(query):  # noqa: ANN202
             result = MagicMock()
             result.first = MagicMock(return_value=str(user_a_id))  # Stale owner at check time
             return result
 
-        db_session.exec = mock_exec  # type: ignore[method-assign]
+        test_db_session.exec = mock_exec  # type: ignore[method-assign]
 
         # Call PermissionChecker - should pass because check uses stale owner
-        await checker(mock_request, user_a, db_session)
+        await checker(mock_request, user_a, test_db_session)
 
         # Verify the authorization was called with stale metadata
-        assert mock_evaluator.authorize.called
-        authz_call_args = mock_evaluator.authorize.call_args
-        authz_request = authz_call_args[0][0]  # First positional arg
+        assert mock_evaluator.evaluate.called
+        authz_call_args = mock_evaluator.evaluate.call_args
+        authz_input = authz_call_args[0][0]  # First positional arg is the authz_input dict
 
         # The authz check used created_by=user_a_id (stale)
-        assert authz_request.resource_metadata.get("created_by") == str(user_a_id)
+        assert authz_input["resource"]["metadata"].get("created_by") == str(user_a_id)
 
         # But the credential now belongs to user_b
         assert mock_credential.created_by == user_b_id
@@ -146,7 +145,7 @@ async def test_toctou_ownership_change_during_request(
 
 @pytest.mark.asyncio
 async def test_ownership_metadata_not_populated_for_create(
-    db_session: AsyncSession,
+    test_db_session: AsyncSession,
 ) -> None:
     """Verify PermissionChecker populates ownership metadata for CREATE operations.
 
@@ -160,8 +159,6 @@ async def test_ownership_metadata_not_populated_for_create(
     Expected behavior: For CREATE, use current_user.id as created_by metadata
     since the user performing the CREATE will be the owner.
     """
-    from syntara.credentials.models import Credential
-
     user_id = uuid4()
     user = User(
         id=user_id,
@@ -183,20 +180,20 @@ async def test_ownership_metadata_not_populated_for_create(
     mock_request.state.is_cert_authenticated = False
 
     # Mock authz evaluator
-    mock_evaluator = AsyncMock()
-    mock_evaluator.authorize = AsyncMock(return_value=None)
+    mock_evaluator = MagicMock()
+    mock_evaluator.evaluate = MagicMock(return_value={"allow": True, "deny": False})
 
     with (
         patch("syntara.authz.dependencies.get_current_user", return_value=user),
         patch("syntara.authz.dependencies.get_authz_evaluator", return_value=mock_evaluator),
-        patch("syntara.authz.dependencies.get_db", return_value=db_session),
+        patch("syntara.authz.dependencies.get_db", return_value=test_db_session),
     ):
-        await checker(mock_request, user, db_session)
+        await checker(mock_request, user, test_db_session)
 
         # Verify authorization was called
-        assert mock_evaluator.authorize.called
-        authz_call_args = mock_evaluator.authorize.call_args
-        authz_request = authz_call_args[0][0]
+        assert mock_evaluator.evaluate.called
+        authz_call_args = mock_evaluator.evaluate.call_args
+        authz_input = authz_call_args[0][0]  # First positional arg is the authz_input dict
 
         # CURRENT BEHAVIOR: resource_metadata is empty for CREATE
         # This is actually CORRECT because:
@@ -207,8 +204,8 @@ async def test_ownership_metadata_not_populated_for_create(
         # This test verifies the fail-secure behavior: if someone creates a
         # nonsensical policy like "credential:create:own", it will deny all requests
         # because metadata.created_by will be empty.
-        assert authz_request.resource_metadata == {}
+        assert authz_input["resource"]["metadata"] == {}
 
         # The proper fix is to add validation that rejects policies using "own" scope
         # for CREATE actions, not to populate fake ownership metadata for CREATE.
-        # See: validate_own_scope_only_for_existing_resources
+        # This validation is implemented in validate_own_scope_actions() function.
