@@ -4,7 +4,7 @@ This document defines the service layer patterns for the Nexus project — how s
 
 ## BaseService
 
-All services MUST inherit from `BaseService` in `src/syntara/core/services/base.py`. This ensures consistent filtering, sorting, pagination, and label handling across the system.
+All services MUST inherit from `BaseService` in `src/syntara/core/services/base.py`. This ensures consistent filtering, sorting, pagination, and label handling across the system. This requirement is not currently enforced by tooling — several services predate it and use custom implementations (see [API Response Format — Custom List Implementations](api-response-format.md#custom-list-implementations)).
 
 ```python
 from syntara.core.services.base import BaseService
@@ -16,15 +16,7 @@ class WorkflowService(BaseService):
 
 ### `list_resources()` — Unified Pagination
 
-`BaseService.list_resources()` is the **only** way to handle list queries. It provides:
-
-- Cursor-based keyset pagination (N+1 fetch pattern)
-- Filter parsing and application
-- Sort parsing with stable ordering (tiebreak on `id`)
-- Label filtering via JSONB operators
-- Optional total count
-
-All services use this method for collection endpoints. Do not implement custom pagination.
+`BaseService.list_resources()` is the **only** way to handle list queries. It provides cursor-based keyset pagination, filter parsing, sort with stable ordering (ID tiebreaker), label filtering, and optional total count. See [API Response Format — List Endpoints](api-response-format.md#list-endpoints) for the full pagination, filtering, and sorting contract.
 
 ## Extension Protocols
 
@@ -174,9 +166,9 @@ Set `coordinate=False` for tasks that must run in every process (e.g., per-proce
 - `PeriodicWorker` advisory lock coordination prevents duplicate execution
 - FastAPI `Depends()` manages service lifecycle per request
 
-**Convention only:**
+**Convention only (not yet enforced by tooling):**
 
-- Inheriting from `BaseService` for all services
+- Inheriting from `BaseService` for all services (MUST per standard, not yet enforced)
 - Provider function pattern (`get_{domain}_service()`)
 - Extension mixin usage (EnrichQuery, ConvertResource, PostProcessing)
 - Middleware registration order

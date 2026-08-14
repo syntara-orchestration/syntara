@@ -1,187 +1,10 @@
 # API Response Format Standards
 
-This document defines the standard response formats, endpoint conventions, and compliance testing for Nexus REST API endpoints. It covers shared conventions (model naming, URL paths, base models), list endpoint patterns (pagination, filtering, sorting), and CRUD endpoint patterns (status codes, error responses, service layer patterns).
+This document defines the standard response formats, endpoint conventions, and compliance testing for Syntara REST API endpoints. It covers shared conventions (model naming, URL paths, base models), list endpoint patterns (pagination, filtering, sorting), and CRUD endpoint patterns (status codes, error responses, service layer patterns).
 
-## List Response Shape
+## Shared Conventions
 
-All list/collection endpoints return a `ResourcesResponse[T]`:
-
-```json
-{
-  "resources": [ ... ],
-  "next": "eyJpZCI6Ii4uLiIsImNyZWF0ZWRfYXQiOiIuLi4iLCJkaXJlY3Rpb24iOiJuZXh0In0=",
-  "prev": null,
-  "total": 42
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `resources` | `list[T]` | Array of resources (max 100 items) |
-| `next` | `str \| null` | Opaque cursor for the next page |
-| `prev` | `str \| null` | Opaque cursor for the previous page |
-| `total` | `int \| null` | Total count (only present when `include_total=true`) |
-
-The response model is defined generically in `syntara.core.models.pagination`:
-
-```python
-class ResourcesResponse[T](ResourcesResponseBase):
-    resources: list[T]
-    next: str | None
-    prev: str | None
-    total: int | None
-```
-
-## Pagination
-
-### Strategy: Cursor-Based Keyset Pagination
-
-Nexus uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
-
-### Query Parameters
-
-Pagination parameters are defined in `BaseListParams`:
-
-```python
-class BaseListParams(SQLModel):
-    limit: int = Field(default=20, gt=0, le=100)
-    cursor: str | None = Field(default=None)
-    sort: str | None = Field(default=None)
-    include_total: bool = Field(default=False)
-```
-
-| Parameter | Default | Constraints | Description |
-|---|---|---|---|
-| `limit` | 20 | 1–100 | Maximum items to return |
-| `cursor` | `null` | Max 1024 bytes | Opaque pagination token |
-| `sort` | `-created_at` | Must be in `__sortable_fields__` | Sort field and direction |
-| `include_total` | `false` | — | Include total count in response |
-
-### Cursor Format
-
-Cursors are opaque Base64-encoded JSON tokens. Clients must not parse or construct them.
-
-**Default sort** (sorting by `created_at`):
-
-```json
-{
-    "id": "uuid-of-boundary-item",
-    "created_at": "2025-01-01T12:00:00.000000",
-    "direction": "next"
-}
-```
-
-**Custom sort** (sorting by a non-default field, e.g., `?sort=name`):
-
-```json
-{
-    "id": "uuid-of-boundary-item",
-    "created_at": "2025-01-01T12:00:00.000000",
-    "direction": "next",
-    "sort_field": "name",
-    "sort_direction": "asc",
-    "sort_value": "my-resource"
-}
-```
-
-The `sort_field`, `sort_direction`, and `sort_value` fields are only present when the client requests a non-default sort. They store the boundary item's sort column value so the next page fetch can use keyset comparison on the custom sort field.
-
-### N+1 Fetch Pattern
-
-The pagination implementation fetches `limit + 1` items to definitively detect whether more pages exist, then trims the response to `limit` items. This avoids an extra count query.
-
-### Stable Ordering
-
-The resource `id` is always appended as a tiebreaker to the sort order. This prevents duplicate or missing items when multiple resources share the same sort value (e.g., identical `created_at` timestamps). Without a deterministic tiebreaker, cursor boundaries between items sharing the same sort value would be ambiguous, causing items to appear on multiple pages or be skipped entirely.
-
-## Constants
-
-Defined in `syntara.core.constants`:
-
-| Constant | Value | Description |
-|---|---|---|
-| `MAX_ITEMS_PER_PAGE` | 100 | Absolute maximum for `limit` |
-| `MAX_CURSOR_SIZE` | 1024 | Maximum cursor token size in bytes |
-
-## Filtering
-
-### Query Parameter Syntax
-
-Two formats are supported:
-
-1. **Shorthand equality:** `?field=value`
-2. **Bracket notation:** `?field[operator]=value`
-
-### Supported Operators
-
-| Operator | Description | Example |
-|---|---|---|
-| `eq` | Exact equality (default) | `?status=ACTIVE` or `?status[eq]=ACTIVE` |
-| `in` | Multi-value equality (OR) | `?status[in]=pending,expired` |
-| `contains` | Substring match (case-insensitive) | `?name[contains]=test` |
-| `starts_with` | Prefix match (case-insensitive) | `?name[starts_with]=prod` |
-| `gt` | Greater than | `?created_at[gt]=2025-01-01` |
-| `gte` | Greater than or equal | `?created_at[gte]=2025-01-01` |
-| `lt` | Less than | `?size[lt]=1000` |
-| `lte` | Less than or equal | `?size[lte]=1000` |
-
-### Label Filters
-
-Labels use bracket notation with the label key:
-
-- `?labels[environment]=production` — filter by label key-value pair
-- `?labels[environment]=` — check label key exists (any value)
-
-### Filterable Fields
-
-Each model declares which fields can be filtered via `__filterable_fields__`:
-
-```python
-class MyModel(BaseResource, table=True):
-    __filterable_fields__: ClassVar[list[str]] = [
-        *BaseResource.__filterable_fields__,
-        "status",
-        "name",
-    ]
-```
-
-Requests filtering on undeclared fields return a `422` error (`SafeValueError`).
-
-### Filter Combination Logic
-
-Filters are combined using AND/OR semantics based on how they are specified:
-
-| Pattern | Logic | Example | Effect |
-|---|---|---|---|
-| Same field, same operator, comma-separated values | **OR** | `?status=active,pending` | `status='active' OR status='pending'` |
-| Same field, different operators | **AND** | `?created_at[gte]=2025-01-01&created_at[lte]=2025-06-01` | Range filter (both conditions must match) |
-| Different fields | **AND** | `?name[contains]=test&status=active` | Both conditions must match |
-| Multiple label filters | **AND** | `?labels[env]=prod&labels[team]=platform` | All label conditions must match |
-
-Comma-separated values on the same parameter create multiple `Filter` objects with the same `(field, operator)` tuple, which are grouped and combined with `or_()`. All other filter groups are combined with `and_()`.
-
-## Sorting
-
-### Query Parameter Syntax
-
-`?sort=field` for ascending, `?sort=-field` for descending.
-
-**Default sort:** `-created_at` (newest first).
-
-### Sortable Fields
-
-Each model declares sortable fields via `__sortable_fields__`:
-
-```python
-class MyModel(BaseResource, table=True):
-    __sortable_fields__: ClassVar[list[str]] = [
-        *BaseResource.__sortable_fields__,
-        "name",
-        "status",
-    ]
-```
-
-## URL Path Conventions
+### URL Path Conventions
 
 Router URL prefixes use **snake_case** (underscores), matching the Python module name:
 
@@ -212,7 +35,9 @@ summary="Create service account credential"   # Correct — unique across domain
 summary="Create credential"                   # Wrong — conflicts with project credentials
 ```
 
-## Model Naming Conventions
+**Enforcement:** `tools/ci/check_api_path_naming.py` scans all router definitions under `src/syntara/` for hyphenated path segments. Run via `make check-api-paths`.
+
+### Model Naming Conventions
 
 ### Resource Model vs Action Response Naming
 
@@ -240,7 +65,7 @@ WebSocketTicketResponse  # Action result — ephemeral ticket
 
 Schema names must use readable, unabbreviated resource names matching the parent resource (e.g., `ServiceAccountCredentialCreate`, not `SACredentialCreate`).
 
-## Base Resource Model Hierarchy
+### Base Resource Model Hierarchy
 
 All database-backed resources inherit from the base model hierarchy:
 
@@ -276,7 +101,7 @@ Choose the appropriate base class:
 | `SoftDeletableResource` | Resource supports soft delete |
 | `Resource` | Full-featured (name + ownership + soft delete) |
 
-## Soft Delete
+### Soft Delete
 
 Resources inheriting `SoftDeletableResource`:
 
@@ -292,7 +117,7 @@ resource.is_deleted()                           # returns bool
 resource.restore()                              # clears deleted_at + deleted_by
 ```
 
-### cascade_delete Configuration
+#### cascade_delete Configuration
 
 Relationships to soft-deletable resources use `cascade_delete=False` when the database has `RESTRICT` constraints (prevents deletion if related records exist):
 
@@ -304,9 +129,9 @@ versions: list["WorkflowVersion"] = Relationship(
 
 Exception: relationships where parent deletion should remove children (e.g., tool-manager domain) use `cascade_delete=True`.
 
-## Field Validators
+### Field Validators
 
-### Labels Validation
+#### Labels Validation
 
 `BaseResource` validates the `labels` JSONB field before Pydantic coercion:
 
@@ -320,14 +145,14 @@ def validate_labels(cls, v):
     # Raises SafeValueError with messages from ValidationMessages
 ```
 
-### Server Defaults
+#### Server Defaults
 
 All `BaseResource` fields use PostgreSQL server defaults to ensure consistency for direct SQL inserts:
 
 - `created_at`, `updated_at`: `server_default=text("now()")`
 - `labels`: `server_default=text("'{}'::jsonb")`
 
-### JSONB GIN Index
+#### JSONB GIN Index
 
 Resources with label filtering should define a GIN index for performance:
 
@@ -376,7 +201,7 @@ class ResourcesResponse[T](ResourcesResponseBase):
 
 #### Strategy: Cursor-Based Keyset Pagination
 
-Nexus uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
+Syntara uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
 
 #### Query Parameters
 
@@ -396,6 +221,15 @@ class BaseListParams(SQLModel):
 | `cursor` | `null` | Max 1024 bytes | Opaque pagination token |
 | `sort` | `-created_at` | Must be in `__sortable_fields__` | Sort field and direction |
 | `include_total` | `false` | — | Include total count in response |
+
+#### Constants
+
+Defined in `syntara.core.constants`:
+
+| Constant | Value | Description |
+|---|---|---|
+| `MAX_ITEMS_PER_PAGE` | 100 | Absolute maximum for `limit` |
+| `MAX_CURSOR_SIZE` | 1024 | Maximum cursor token size in bytes |
 
 #### Cursor Format
 
@@ -434,15 +268,6 @@ The pagination implementation fetches `limit + 1` items to definitively detect w
 
 The resource `id` is always appended as a tiebreaker to the sort order. This prevents duplicate or missing items when multiple resources share the same sort value (e.g., identical `created_at` timestamps). Without a deterministic tiebreaker, cursor boundaries between items sharing the same sort value would be ambiguous, causing items to appear on multiple pages or be skipped entirely.
 
-### Constants
-
-Defined in `syntara.core.constants`:
-
-| Constant | Value | Description |
-|---|---|---|
-| `MAX_ITEMS_PER_PAGE` | 100 | Absolute maximum for `limit` |
-| `MAX_CURSOR_SIZE` | 1024 | Maximum cursor token size in bytes |
-
 ### Filtering
 
 #### Query Parameter Syntax
@@ -457,6 +282,7 @@ Two formats are supported:
 | Operator | Description | Example |
 |---|---|---|
 | `eq` | Exact equality (default) | `?status=ACTIVE` or `?status[eq]=ACTIVE` |
+| `in` | Multi-value equality (OR) | `?status[in]=pending,expired` |
 | `contains` | Substring match (case-insensitive) | `?name[contains]=test` |
 | `starts_with` | Prefix match (case-insensitive) | `?name[starts_with]=prod` |
 | `gt` | Greater than | `?created_at[gt]=2025-01-01` |
@@ -530,23 +356,7 @@ class ApprovalListParams(BaseListParams):
     execution_id: UUID | None = None
 ```
 
-These fields are injected via `Depends()` in the router:
-
-```python
-@router.get("")
-async def list_approvals(
-    request: Request,
-    service: Annotated[ApprovalService, Depends(get_approval_service)],
-    params: Annotated[ApprovalListParams, Depends()],
-) -> ApprovalListResponse:
-    return await service.list(
-        limit=params.limit,
-        cursor=params.cursor,
-        sort=params.sort,
-        query_params_items=request.query_params.items(),
-        include_total=params.include_total,
-    )
-```
+These fields are injected via `Depends()` in the router — see [Adding a New List Endpoint](#adding-a-new-list-endpoint) step 4 for the full wiring pattern.
 
 ### Error Responses for Invalid List Parameters
 
@@ -618,52 +428,15 @@ Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller A
 | Sorting | `-field` prefix notation with ID tiebreaker | None (upstream order) |
 | Default page size | 20 (max 100) | 50 (max 200) |
 
-**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `list_compliance_exclusions.yaml`.
+**Rationale:** These endpoints proxy an external system (AAP Controller) that has its own pagination contract. Conforming to cursor-based pagination would require caching the upstream result set. AAP proxy endpoints are excluded from both list and CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via the exclusions YAML files.
 
 #### Custom List Implementations
 
-Some services bypass `BaseService.list_resources()` when they need to sort by joined columns, merge in-memory builtins with database results, or evaluate authorization per-row via OPA. These include `RoleAssignmentService`, `RoleService`, `PolicyService`, `GroupService` (member/group listing), and the `who_can` endpoint. They follow cursor-based keyset pagination conceptually but with custom implementations. Non-compliant spec-level details (e.g., missing filter operators) are tracked in the exclusions YAML below.
+Some services bypass `BaseService.list_resources()` when they need to sort by joined columns, merge in-memory builtins with database results, or evaluate authorization per-row via OPA. These include `RoleAssignmentService`, `RoleService`, `PolicyService`, `GroupService` (member/group listing), and the `who_can` endpoint. They follow cursor-based keyset pagination conceptually but with custom implementations. Non-compliant spec-level details (e.g., missing filter operators) are tracked in the exclusions YAML (see [Exclusion Mechanism](#exclusion-mechanism)).
 
 #### Other Exclusions
 
-All other endpoints that do not conform to the list operation standards are tracked in `tests/unit/api/compliance/list_compliance_exclusions.yaml`. This YAML file is the canonical registry and is enforced by the compliance test suite (stale exclusions are detected automatically). Exclusions fall into two categories:
-
-- **Permanent (by design):** Endpoints that return non-list shapes (metrics aggregations, batch operations, validation results) and will never conform.
-- **Temporary (tech debt):** Endpoints that use simple value filters instead of the operator-based pattern, or have non-standard response shapes. These should be migrated over time.
-
-### List Compliance Test Suite
-
-The list endpoint compliance test suite (`tests/unit/api/compliance/test_list_endpoint_compliance.py` and `test_list_endpoint_discovery.py`) automatically discovers all list endpoints from the OpenAPI specification and validates each conforms to the standards defined in this document.
-
-#### Scope: API Contract, Not Runtime Behavior
-
-**IMPORTANT:** These tests validate the **OpenAPI specification** (the API contract), not runtime behavior. They check:
-
-- ✅ "Does the spec **declare** pagination parameters?" (NOT "Does pagination **work**?")
-- ✅ "Does the spec **declare** filter operators?" (NOT "Does filtering **work correctly**?")
-- ✅ "Does the response schema **define** required fields?" (NOT "Does the endpoint **return** those fields?")
-
-**Runtime behavior** (does it actually sort/filter/paginate correctly?) is the responsibility of each endpoint's integration/functional tests in `tests/integration/`.
-
-#### What it checks
-
-| Test | What it validates |
-|------|-------------------|
-| `***REMOVED***` | Response schema **declares** all pagination fields from `ResourcesResponse[T]` (`resources`, `next`, `prev`, `total`) |
-| `test_declares_pagination_parameters` | Endpoint **declares** `limit`, `cursor`, `sort`, `include_total` query parameters in the spec |
-| `test_sort_parameter_constrains_values` | Sort parameter **declares** an `enum` or `pattern` constraint to prevent arbitrary string values |
-| `***REMOVED***` | All non-pagination query parameters **declare** allOf schema with type-appropriate operators (string: all 7, datetime: comparison only, boolean/enum/UUID: eq only) |
-| `test_exclusions_have_justifications` | All excluded endpoints have meaningful justification (≥20 characters) |
-| `test_exclusions_reference_existing_endpoints` | All exclusions reference endpoints that still exist (prevents stale exclusions from deleted endpoints) |
-| `test_excluded_endpoints_are_still_noncompliant` | All excluded endpoints still fail at least one compliance check (prevents stale exclusions from fixed endpoints) |
-
-#### Exclusion mechanism
-
-Endpoints that return collections but don't follow the standard pattern (e.g., aggregations, batch operations, non-standard legacy endpoints) can be excluded from compliance testing via `tests/unit/api/compliance/list_compliance_exclusions.yaml`.
-
-Each exclusion requires:
-- `operation_id` — the OpenAPI operationId
-- `reason` — why this endpoint is excluded (minimum 20 characters, should reference a ticket for temporary exclusions)
+All other non-conforming list endpoints are tracked in `tests/unit/api/compliance/list_compliance_exclusions.yaml`. See [Exclusion Mechanism](#exclusion-mechanism) for the format and enforcement details.
 
 ### Adding a New List Endpoint
 
@@ -851,7 +624,7 @@ async def delete_credential(
 
 ### Error Responses for CRUD Operations
 
-All error responses use the RFC 9457 Problem Details format (`application/problem+json`). See [Exception and Error Handling Standards](exceptions.md) for the full exception hierarchy, `@fastapi_exception` decorator, and `PROBLEM_TYPES` registry.
+All error responses use the RFC 9457 Problem Details format (`application/problem+json`). See [Exception and Error Handling Standards](exceptions.md) for the full exception hierarchy, `@fastapi_exception` decorator, and `PROBLEM_TYPES` registry. The `ErrorData` model fields are documented in [Error Responses for Invalid List Parameters](#error-responses-for-invalid-list-parameters).
 
 | Status | Condition | Exception Pattern | Example |
 |---|---|---|---|
@@ -914,69 +687,13 @@ A catch-all `IntegrityError` handler in `core/error_handlers.py` provides a safe
 
 ### Known CRUD Exceptions
 
-#### AAP Proxy Endpoints
-
-Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
-
 #### Action Endpoints
 
-Action endpoints are POST operations that trigger a side effect rather than creating a new resource (disable, enable, publish, unpublish, restore, rotate, retry, validate, discover, etc.). They use the implicit 200 status code and are filtered from CRUD compliance testing by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py` (see [CRUD Compliance Test Suite](#crud-compliance-test-suite)). They do not need entries in the exclusions YAML.
+Action endpoints are POST operations that trigger a side effect rather than creating a new resource (disable, enable, publish, unpublish, restore, rotate, retry, validate, discover, etc.). They use the implicit 200 status code and are filtered from CRUD compliance testing by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. They do not need entries in the exclusions YAML.
 
 #### Other Exclusions
 
-All other endpoints that do not conform to the CRUD operation standards are tracked in `tests/unit/api/compliance/crud_compliance_exclusions.yaml`. This YAML file is the canonical registry and is enforced by the compliance test suite (stale exclusions are detected automatically). Exclusions fall into two categories:
-
-- **Permanent (by design):** Endpoints that use non-standard status codes because they don't follow the typical create/read/update/delete lifecycle (async job submissions, short-lived tokens) and will never conform.
-- **Temporary (tech debt):** Endpoints that should conform but don't yet declare the correct status codes or 404 responses. These should be migrated over time.
-
-### CRUD Compliance Test Suite
-
-The CRUD endpoint compliance test suite (`tests/unit/api/compliance/test_crud_endpoint_compliance.py` and `test_crud_endpoint_discovery.py`) automatically discovers all CRUD endpoints from the OpenAPI specification and validates each declares the correct HTTP status codes and error responses.
-
-#### Scope: API Contract, Not Runtime Behavior
-
-Like the list compliance tests, these validate the **OpenAPI specification**, not runtime behavior:
-
-- ✅ "Does a POST create endpoint **declare** a 201 response?" (NOT "Does it **return** 201?")
-- ✅ "Does a DELETE endpoint **declare** a 404 response?" (NOT "Does it **return** 404?")
-
-#### What it checks
-
-| CRUD Type | Expected Status | Requires 404 |
-|---|---|---|
-| read (GET single) | 200 | Yes |
-| create (POST) | 201 | No |
-| update (PATCH/PUT) | 200 | Yes |
-| delete (DELETE) | 204 | Yes |
-
-For each discovered endpoint, the tests validate:
-
-| Test | What it validates |
-|------|-------------------|
-| `test_returns_expected_status` | Endpoint **declares** its expected success status code (200, 201, or 204) |
-| `test_declares_404` | Read, update, and delete endpoints **declare** a 404 response for missing resources |
-| `test_exclusions_have_justifications` | All exclusions have `operation_id`, `crud_type`, and meaningful `reason` (≥20 characters) |
-| `test_exclusions_reference_existing_endpoints` | All exclusions reference endpoints found by their discovery function |
-| `test_excluded_endpoints_are_still_noncompliant` | Excluded endpoints still fail at least one check (prevents stale exclusions) |
-
-#### Discovery mechanism
-
-Endpoints are classified by operation_id prefix and HTTP method:
-
-- **Read**: GET endpoints with a path parameter (e.g., `get_credential`, `get_workflow`)
-- **Create**: POST endpoints with `create_` prefix or structural match (new resource creation)
-- **Update**: PATCH and PUT endpoints with a path parameter
-- **Delete**: DELETE endpoints
-
-AAP proxy endpoints (tagged `"Ansible Automation Platform Proxy"` in the OpenAPI spec) are excluded from CRUD discovery, same as for list compliance. Action endpoints (disable, enable, publish, unpublish, restore, rotate, retry) are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
-
-#### Exclusion mechanism
-
-Non-standard CRUD endpoints are excluded via `tests/unit/api/compliance/crud_compliance_exclusions.yaml`. Each exclusion requires:
-
-- `operation_id` — the OpenAPI operationId
-- `crud_type` — one of `read`, `create`, `update`, `delete`
-- `reason` — why this endpoint is excluded (minimum 20 characters)
+All other non-conforming CRUD endpoints are tracked in `tests/unit/api/compliance/crud_compliance_exclusions.yaml`. See [Exclusion Mechanism](#exclusion-mechanism) for the format and enforcement details.
 
 Current permanent exclusions:
 
@@ -985,10 +702,6 @@ Current permanent exclusions:
 | `create_invocation` | create | Async job submission, returns 202 Accepted |
 | `create_invocation_chat` | create | Same async pattern as `create_invocation` |
 | `create_ws_ticket` | create | Short-lived WS ticket, not a persisted resource — returns 200 |
-
-### CI Integration
-
-Both list and CRUD compliance tests run as part of `make test-api-compliance` and `make test-unit`. They are unit tests (no Docker/DB required) that validate OpenAPI spec structure.
 
 ### Adding a New CRUD Endpoint
 
@@ -1051,6 +764,84 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 
 ---
 
+## Compliance Testing
+
+### Scope: API Contract, Not Runtime Behavior
+
+**IMPORTANT:** Compliance tests validate the **OpenAPI specification** (the API contract), not runtime behavior:
+
+- "Does the spec **declare** pagination parameters?" (NOT "Does pagination **work**?")
+- "Does a POST create endpoint **declare** a 201 response?" (NOT "Does it **return** 201?")
+- "Does the response schema **define** required fields?" (NOT "Does the endpoint **return** those fields?")
+
+Runtime behavior (correct sorting, filtering, pagination, status codes) is the responsibility of each endpoint's integration/functional tests in `tests/integration/`.
+
+### List Compliance Tests
+
+The list compliance test suite (`test_list_endpoint_compliance.py` and `test_list_endpoint_discovery.py`) automatically discovers all list endpoints from the OpenAPI specification and validates:
+
+| Test | What it validates |
+|------|-------------------|
+| `***REMOVED***` | Response schema declares all pagination fields from `ResourcesResponse[T]` (`resources`, `next`, `prev`, `total`) |
+| `test_declares_pagination_parameters` | Endpoint declares `limit`, `cursor`, `sort`, `include_total` query parameters |
+| `test_sort_parameter_constrains_values` | Sort parameter declares an `enum` or `pattern` constraint to prevent arbitrary string values |
+| `***REMOVED***` | All non-pagination query parameters declare allOf schema with type-appropriate operators (string: all 7, datetime: comparison only, boolean/enum/UUID: eq only) |
+
+### CRUD Compliance Tests
+
+The CRUD compliance test suite (`test_crud_endpoint_compliance.py` and `test_crud_endpoint_discovery.py`) automatically discovers all CRUD endpoints from the OpenAPI specification and validates:
+
+| CRUD Type | Expected Status | Requires 404 |
+|---|---|---|
+| read (GET single) | 200 | Yes |
+| create (POST) | 201 | No |
+| update (PATCH/PUT) | 200 | Yes |
+| delete (DELETE) | 204 | Yes |
+
+| Test | What it validates |
+|------|-------------------|
+| `test_returns_expected_status` | Endpoint declares its expected success status code (200, 201, or 204) |
+| `test_declares_404` | Read, update, and delete endpoints declare a 404 response for missing resources |
+
+#### Discovery Mechanism
+
+Endpoints are classified by operation_id prefix and HTTP method:
+
+- **Read**: GET endpoints with a path parameter (e.g., `get_credential`, `get_workflow`)
+- **Create**: POST endpoints with `create_` prefix or structural match (new resource creation)
+- **Update**: PATCH and PUT endpoints with a path parameter
+- **Delete**: DELETE endpoints
+
+AAP proxy endpoints (tagged `"Ansible Automation Platform Proxy"` in the OpenAPI spec) are excluded from both list and CRUD discovery. Action endpoints are filtered out by `_ACTION_OPERATION_PREFIXES` in `endpoint_discovery.py`. Neither requires an entry in the exclusions YAML.
+
+### Exclusion Mechanism
+
+Both list and CRUD compliance suites use YAML exclusion files:
+
+- **List:** `tests/unit/api/compliance/list_compliance_exclusions.yaml`
+- **CRUD:** `tests/unit/api/compliance/crud_compliance_exclusions.yaml`
+
+Each exclusion requires an `operation_id` and a `reason` (minimum 20 characters). CRUD exclusions also require a `crud_type` (`read`, `create`, `update`, `delete`).
+
+Both suites enforce exclusion hygiene:
+
+| Test | What it validates |
+|------|-------------------|
+| `test_exclusions_have_justifications` | All exclusions have meaningful justification |
+| `test_exclusions_reference_existing_endpoints` | All exclusions reference endpoints that still exist (prevents stale entries from deleted endpoints) |
+| `test_excluded_endpoints_are_still_noncompliant` | All excluded endpoints still fail at least one check (prevents stale entries from fixed endpoints) |
+
+Exclusions fall into two categories:
+
+- **Permanent (by design):** Endpoints that will never conform — metrics aggregations, batch operations, async job submissions, short-lived tokens.
+- **Temporary (tech debt):** Endpoints that should be migrated over time — non-standard filters, missing status codes, non-standard response shapes.
+
+### CI Integration
+
+Both suites run as part of `make test-api-compliance` and `make test-unit`. They are unit tests (no Docker/DB required) that validate OpenAPI spec structure.
+
+---
+
 ## Tooling vs Convention
 
 **Enforced by tooling:**
@@ -1091,6 +882,7 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 | `src/syntara/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
 | `src/syntara/core/exceptions.py` | `SafeValueError` definition |
 | `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator |
+| `tools/ci/check_api_path_naming.py` | Snake_case URL path enforcement (`make check-api-paths`) |
 | `src/syntara/aap/router.py` | AAP proxy endpoints (known exception) |
 | `src/syntara/aap/models/responses.py` | `AAPListResponse` model (known exception) |
 | `src/syntara/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
@@ -1103,5 +895,3 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 | `tests/unit/api/compliance/endpoint_discovery.py` | Discovery logic and helpers |
 | `tests/unit/api/compliance/list_compliance_exclusions.yaml` | List exclusion registry with justifications |
 | `tests/unit/api/compliance/crud_compliance_exclusions.yaml` | CRUD exclusion registry with justifications |
-
-Generated By: Claude Code
