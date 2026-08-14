@@ -222,16 +222,16 @@ class APIDocsSettings(BaseSettings):
 
     Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
     endpoints are served at /api_docs/v1/. A convenience redirect
-    from /docs is also registered. Enabled by default so customers
-    can access API docs without extra configuration.
+    from /docs is also registered. Disabled by default so production
+    deployments do not expose the API schema.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
-        default=True,
+        default=False,
         description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
-        "(docs, redoc, openapi.json). Set to false to disable in locked-down environments.",
+        "(docs, redoc, openapi.json). Enable for development environments.",
     )
 
     enable_try_it_out: bool = Field(
@@ -610,7 +610,7 @@ class ServerSettings(BaseSettings):
 
     server_public_url: HttpUrl | None = Field(
         default=None,
-        description="Public base URL for this Syntara instance (e.g., 'https://example.com:8000'). "
+        description="Public base URL for this Nexus instance (e.g., 'https://example.com:8000'). "
         "Used as the JWT issuer, post-logout redirect, and frontend origin fallback. "
         "If not set, falls back to server_scheme://server_host:server_port. "
         "Required when server_host is a bind address like 0.0.0.0.",
@@ -631,7 +631,7 @@ class ServerSettings(BaseSettings):
     workflow_base_url: str | None = Field(
         default=None,
         description=(
-            "Workflow API base URL for callback URL generation (e.g., 'http://syntara:8000/api/v1'). "
+            "Workflow API base URL for callback URL generation (e.g., 'http://example.com:8000/api/v1'). "
             "If not set, will be constructed from server_host and server_port. "
             "Used by workflow activities to generate callback URLs for external services."
         ),
@@ -1251,18 +1251,7 @@ class TemporalSettings(BaseSettings):
     max_concurrent_activities: int = Field(
         default=50,
         ge=1,
-        description="Maximum concurrent activity executions for the main workflow worker",
-    )
-
-    background_worker_max_concurrent_activities: int = Field(
-        default=10,
-        ge=1,
-        description=(
-            "Maximum concurrent activity executions for the background worker "
-            "(Agent Execution, Document Conversion). Lower than the main worker default "
-            "because LLM/agent activities are memory-heavy and background-worker pods "
-            "have a smaller memory budget. Set via APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES."
-        ),
+        description="Maximum concurrent activity executions",
     )
 
     max_concurrent_workflows: int = Field(
@@ -1423,7 +1412,7 @@ class TelemetrySettings(BaseSettings):
 
     entitlement_id: str = Field(
         default="",
-        description="Unique Syntara installation identifier for anonymized telemetry tracking",
+        description="Unique Nexus installation identifier for anonymized telemetry tracking",
         exclude=True,
     )
 
@@ -2048,7 +2037,7 @@ class Settings(
     @computed_field  # type: ignore[prop-decorator]
     @property
     def jwt_issuer(self) -> str:
-        """JWT issuer claim (iss) identifying this Syntara instance.
+        """JWT issuer claim (iss) identifying this Nexus instance.
 
         Uses server_public_url when set, otherwise falls back to
         server_scheme://server_host:server_port.

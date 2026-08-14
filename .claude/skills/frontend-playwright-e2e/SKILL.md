@@ -62,12 +62,12 @@ If you bypass the runner (e.g. `SYNTARA_E2E_SKIP_WEB_SERVER=1`) and manage serve
 
 ### Real Backend Mode
 
-To test against the real Nexus backend instead of the mock API:
+To test against the real Syntara backend instead of the mock API:
 
 1. **Start the real backend** (see backend repo README):
 
    ```bash
-   cd ../nexus
+   cd ../syntara
    # Follow backend setup instructions — runs on http://localhost:8000
    ```
 

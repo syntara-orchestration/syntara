@@ -12,7 +12,7 @@
 }
 
 .toolbarDisabled {
-  opacity: var(--nexus-disabled-opacity);
+  opacity: var(--syntara-disabled-opacity);
   cursor: not-allowed;
 }
 

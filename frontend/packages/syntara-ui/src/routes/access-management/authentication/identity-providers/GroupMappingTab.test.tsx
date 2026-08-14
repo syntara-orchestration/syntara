@@ -38,7 +38,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
-const mockNexusGroups = [
+const mockMappedGroups = [
   { id: 'g1', name: 'admin', description: 'Admins', created_at: '2026-01-01T00:00:00Z' },
   { id: 'g2', name: 'users', description: 'Users', created_at: '2026-01-02T00:00:00Z' },
 ]
@@ -52,7 +52,7 @@ describe('GroupMappingTab', () => {
   beforeEach(() => {
     routerTestState.navigate.mockClear()
     vi.mocked(useAllGroups).mockReturnValue({
-      groups: mockNexusGroups.map((g) => ({
+      groups: mockMappedGroups.map((g) => ({
         ...g,
         is_builtin: false,
         updated_at: g.created_at,
@@ -63,7 +63,7 @@ describe('GroupMappingTab', () => {
     })
 
     vi.mocked(usersClient.useQuery).mockReturnValue({
-      data: { resources: mockNexusGroups },
+      data: { resources: mockMappedGroups },
       isPending: false,
       isError: false,
       error: null,

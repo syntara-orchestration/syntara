@@ -1,5 +1,5 @@
 .collapsedLogo {
-  height: var(--nexus-nav-logo-size);
-  width: var(--nexus-nav-logo-size);
+  height: var(--syntara-nav-logo-size);
+  width: var(--syntara-nav-logo-size);
   object-fit: contain;
 }

@@ -1,5 +1,5 @@
-export const DRAG_TYPE_FIELD = 'nexus/input-field'
-export const DRAG_TYPE_CONTEXT = 'nexus/context-variable'
+export const DRAG_TYPE_FIELD = 'syntara/input-field'
+export const DRAG_TYPE_CONTEXT = 'syntara/context-variable'
 
 export const DROP_TARGET_OUTLINE: React.CSSProperties = {
   outline: '2px solid var(--pf-t--global--color--brand--default)',
