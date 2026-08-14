@@ -34,7 +34,6 @@ from syntara.core.config.base import get_settings
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
-    LEGACY_SCHEDULE_ID_PREFIX,
     SCHEDULE_ID_PREFIX,
     build_schedule_id,
     config_to_temporal_schedule,
@@ -45,7 +44,6 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 logger = structlog.stdlib.get_logger(__name__)
 
 SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkflowId")
-SA_LEGACY_WORKFLOW_ID = SearchAttributeKey.for_keyword("NexusWorkflowId")
 
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
@@ -457,39 +455,29 @@ class ScheduledTriggerService:
     async def _list_workflow_schedules(self, client: Client, workflow_id: str) -> set[str]:
         """List all Temporal Schedule IDs belonging to a workflow.
 
-        Queries both legacy (NexusWorkflowId) and current (OrchestratorWorkflowId)
-        search attributes to find schedules created before and after the rename.
-        Falls back to a dual-prefix scan unless *both* queries succeed — trusting
-        a partial result (e.g. the legacy attribute failing while the new one
-        succeeds) would silently hide pre-rename schedules from the caller.
+        Uses the OrchestratorWorkflowId search attribute for server-side
+        filtering when available, falling back to prefix scan otherwise.
         """
         can_use_search_attr = await _ensure_search_attribute(client) and workflow_id.replace("-", "").isalnum()
         if can_use_search_attr:
-            new_result = await self._list_schedules_by_query(
+            result = await self._list_schedules_by_query(
                 client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} = "{workflow_id}"'
             )
-            legacy_result = await self._list_schedules_by_query(
-                client, f'{SA_LEGACY_WORKFLOW_ID.name} = "{workflow_id}"'
-            )
-            if new_result is not None and legacy_result is not None:
-                return new_result | legacy_result
+            if result is not None:
+                return result
 
         return await self.list_schedules_by_prefix(client, workflow_id)
 
     async def list_all_schedules(self, client: Client) -> set[str]:
         """List all orchestrator-managed Temporal Schedule IDs.
 
-        Queries both legacy (NexusWorkflowId) and current (OrchestratorWorkflowId)
-        search attributes to capture schedules from before and after the rename.
-        Falls back to a dual-prefix scan unless *both* queries succeed — trusting
-        a partial result (e.g. the legacy attribute failing while the new one
-        succeeds) would silently hide pre-rename schedules from the caller.
+        Uses the OrchestratorWorkflowId search attribute for server-side
+        filtering when available, falling back to prefix scan otherwise.
         """
         if await _ensure_search_attribute(client):
-            new_result = await self._list_schedules_by_query(client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} != ""')
-            legacy_result = await self._list_schedules_by_query(client, f'{SA_LEGACY_WORKFLOW_ID.name} != ""')
-            if new_result is not None and legacy_result is not None:
-                return new_result | legacy_result
+            result = await self._list_schedules_by_query(client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} != ""')
+            if result is not None:
+                return result
 
         return await self.list_schedules_by_prefix(client)
 
@@ -513,18 +501,11 @@ class ScheduledTriggerService:
 
     @staticmethod
     async def list_schedules_by_prefix(client: Client, prefix: str = "") -> set[str]:
-        """List orchestrator-managed Temporal Schedule IDs, optionally narrowed by *prefix*.
-
-        Matches both current (``orchestrator-sched-``) and legacy (``nexus-sched-``)
-        prefixes to discover schedules created before and after the rename.
-        """
-        if prefix:
-            match_prefixes = (f"{SCHEDULE_ID_PREFIX}{prefix}-", f"{LEGACY_SCHEDULE_ID_PREFIX}{prefix}-")
-        else:
-            match_prefixes = (SCHEDULE_ID_PREFIX, LEGACY_SCHEDULE_ID_PREFIX)
+        """List orchestrator-managed Temporal Schedule IDs, optionally narrowed by *prefix*."""
+        match_prefix = f"{SCHEDULE_ID_PREFIX}{prefix}-" if prefix else SCHEDULE_ID_PREFIX
         schedule_ids: set[str] = set()
         async for entry in await client.list_schedules():
-            if any(entry.id.startswith(p) for p in match_prefixes):
+            if entry.id.startswith(match_prefix):
                 schedule_ids.add(entry.id)
         return schedule_ids
 

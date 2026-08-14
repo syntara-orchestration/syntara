@@ -264,29 +264,6 @@ class TestReconcileScheduledTriggers:
             assert mock_svc_cls.delete_schedule.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_legacy_nexus_schedules_treated_as_orphans(self) -> None:
-        """Legacy nexus-sched-* schedules should be deleted when new-prefix equivalents are expected."""
-        wf_id = str(uuid4())
-        triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
-        session_factory = _make_session_factory([(wf_id, triggers)])
-
-        legacy_id = f"nexus-sched-{wf_id}-t1"
-        expected_id = f"orchestrator-sched-{wf_id}-t1"
-
-        with patch(_PATCH_SVC) as mock_svc_cls:
-            mock_client = MagicMock()
-            mock_svc = mock_svc_cls.return_value
-            mock_svc.get_client = AsyncMock(return_value=mock_client)
-            mock_svc.list_all_schedules = AsyncMock(return_value={legacy_id})
-            mock_svc.create_schedule = AsyncMock(return_value=expected_id)
-            mock_svc_cls.delete_schedule = AsyncMock(return_value=True)
-
-            await reconcile_scheduled_triggers(session_factory)
-
-            mock_svc.create_schedule.assert_called_once()
-            mock_svc_cls.delete_schedule.assert_called_once_with(mock_client, legacy_id)
-
-    @pytest.mark.asyncio
     async def test_none_session_factory_returns_early(self) -> None:
         """Should return immediately if session_factory is None."""
         await reconcile_scheduled_triggers(None)
