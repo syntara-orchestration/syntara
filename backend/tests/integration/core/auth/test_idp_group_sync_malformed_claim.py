@@ -558,6 +558,125 @@ class TestMalformedClaimClearsGroups:
         assert other_group.id in set(idp_a_tracking.all()), "IdP A tracking must survive deny at IdP B"
         assert other_group.id in group_ids, "IdP A's group membership must survive deny at IdP B"
 
+    @pytest.mark.asyncio
+    async def test_soft_nomatch_does_not_wipe_other_provider_groups(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """A soft no-match at IdP B (valid token, no mapping hit) must NOT clear IdP A's groups.
+
+        Unlike hard deny (extraction failure), this tests the path where
+        extraction succeeds but returns groups that don't match any mappings,
+        resulting in has_matched=False.
+        """
+        other_provider = IdentityProvider(
+            name=f"other-idp-{uuid4().hex[:8]}",
+            enabled=True,
+            created_by=test_user.id,
+            configuration={
+                "provider_type": "oidc",
+                "issuer_url": "https://other-idp.example.com",
+                "client_id": f"client-{uuid4().hex[:8]}",
+                "redirect_uri": "http://localhost:8000/callback",
+            },
+        )
+        test_db_session.add(other_provider)
+        await test_db_session.flush()
+
+        other_group = Group(
+            name=f"other-group-{uuid4().hex[:8]}",
+            description="Group from other IdP",
+            created_by=test_user.id,
+        )
+        test_db_session.add(other_group)
+        await test_db_session.flush()
+
+        other_identity = UserIdentity(
+            user_id=test_user.id,
+            identity_provider_id=other_provider.id,
+            issuer="https://other-idp.example.com",
+            subject=f"sub-{uuid4().hex[:8]}",
+        )
+        test_db_session.add(other_identity)
+        await test_db_session.flush()
+
+        other_mapping = IdpGroupMappingEntry(
+            identity_provider_id=other_provider.id,
+            idp_group_value="devs",
+            mapped_group_id=other_group.id,
+        )
+        test_db_session.add(other_mapping)
+        await test_db_session.flush()
+
+        other_config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://other-idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # Login via other_provider (IdP A) — grants other_group
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            other_identity,
+            {"groups": ["devs"]},
+            other_config,
+        )
+        await test_db_session.flush()
+        assert result is True
+
+        # Verify IdP A's group is tracked
+        idp_a_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == other_provider.id,
+            )
+        )
+        assert other_group.id in set(idp_a_tracking.all())
+
+        # Login via test provider (IdP B) — valid token but groups don't match any mapping
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {"groups": ["unknown-group-no-mapping"]},  # Valid extraction, no mapping hit
+            config,
+        )
+        await test_db_session.flush()
+        assert result is False, "Soft no-match must deny login"
+
+        # IdP A's groups must survive the soft no-match at IdP B
+        idp_a_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == other_provider.id,
+            )
+        )
+        assert other_group.id in set(idp_a_tracking.all()), "IdP A tracking must survive soft no-match at IdP B"
+
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        group_ids = set(memberships.all())
+        assert other_group.id in group_ids, "IdP A's group membership must survive soft no-match at IdP B"
+
 
 class TestSyncRouterInteraction:
     """Lock the sync_idp_groups ↔ _resolve_and_login_user interaction.
@@ -723,3 +842,150 @@ class TestSyncRouterInteraction:
             )
 
         assert result_user.id == test_user.id, "Manual group must admit user even when sync fails"
+
+    @pytest.mark.asyncio
+    async def test_idp_tracked_group_does_not_satisfy_fallback_via_router(
+        self,
+        test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        identity_provider: IdentityProvider,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """IdP-A tracked group must NOT satisfy the router's manual-group fallback.
+
+        Scenario: user has IdP-A tracked membership, IdP-B denies (malformed
+        claim).  The router's NOT IN subquery must exclude the IdP-A tracked
+        group so it doesn't pass the 'other groups' check.  Login must fail
+        with NO_GROUP_MATCH and IdP-A rows must remain in the DB.
+
+        This test fails if either:
+        - provider-scoped clear regresses to session-scoped wipe, OR
+        - the notin_(idp_managed_subq) clause is removed from the router.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode
+        from syntara.auth.router import _resolve_and_login_user
+
+        other_provider = IdentityProvider(
+            name=f"other-idp-{uuid4().hex[:8]}",
+            enabled=True,
+            created_by=test_user.id,
+            configuration={
+                "provider_type": "oidc",
+                "issuer_url": "https://other-idp.example.com",
+                "client_id": f"client-{uuid4().hex[:8]}",
+                "redirect_uri": "http://localhost:8000/callback",
+            },
+        )
+        test_db_session.add(other_provider)
+        await test_db_session.flush()
+
+        other_group = Group(
+            name=f"other-group-{uuid4().hex[:8]}",
+            description="Group from other IdP",
+            created_by=test_user.id,
+        )
+        test_db_session.add(other_group)
+        await test_db_session.flush()
+
+        other_identity = UserIdentity(
+            user_id=test_user.id,
+            identity_provider_id=other_provider.id,
+            issuer="https://other-idp.example.com",
+            subject=f"sub-{uuid4().hex[:8]}",
+        )
+        test_db_session.add(other_identity)
+        await test_db_session.flush()
+
+        other_mapping = IdpGroupMappingEntry(
+            identity_provider_id=other_provider.id,
+            idp_group_value="devs",
+            mapped_group_id=other_group.id,
+        )
+        test_db_session.add(other_mapping)
+        await test_db_session.flush()
+
+        other_config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://other-idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # Login via IdP A — grants other_group
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            other_identity,
+            {"groups": ["devs"]},
+            other_config,
+        )
+        await test_db_session.commit()
+        assert result is True
+
+        # Verify IdP A's group is tracked
+        idp_a_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == other_provider.id,
+            )
+        )
+        assert other_group.id in set(idp_a_tracking.all())
+
+        # Now attempt login via IdP B — malformed claim triggers deny
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        provider_mock = MagicMock(spec=IdentityProvider)
+        provider_mock.name = identity_provider.name
+        provider_mock.configuration = config
+
+        mock_resolve = AsyncMock(return_value=(test_user, test_identity))
+
+        with (
+            patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
+            patch(
+                "syntara.auth.services.idp_group_sync.jmespath.search",
+                side_effect=TypeError("unexpected type"),
+            ),
+            pytest.raises(OIDCCallbackError) as exc_info,
+        ):
+            await _resolve_and_login_user(
+                test_db_session,
+                {"email": test_user.email, "sub": "sub-1"},
+                {"groups": "admin"},
+                provider_mock,
+                None,
+            )
+
+        assert exc_info.value.error_code == OIDCErrorCode.NO_GROUP_MATCH
+
+        # Verify IdP-A rows survive (provider-scoped clear only touched IdP B)
+        async with test_db_session_factory() as verify_session:
+            idp_a_tracking = await verify_session.exec(
+                select(user_idp_groups.c.group_id).where(
+                    user_idp_groups.c.user_id == test_user.id,
+                    user_idp_groups.c.identity_provider_id == other_provider.id,
+                )
+            )
+            assert other_group.id in set(idp_a_tracking.all()), "IdP A tracking must survive denied login at IdP B"
+
+            memberships = await verify_session.exec(
+                select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+            )
+            group_ids = set(memberships.all())
+            assert other_group.id in group_ids, "IdP A's group membership must survive denied login at IdP B"

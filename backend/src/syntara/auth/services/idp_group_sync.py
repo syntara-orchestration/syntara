@@ -267,8 +267,10 @@ async def sync_idp_groups(
     has_claim_based = bool(mapping_entries)
     if not has_claim_based and not aap_role_mapping:
         desired = await _resolve_allow_all_groups(db, user.id, config)
+        if not desired:
+            return await _clear_and_deny(db, user, provider_id)
         await _apply_group_membership_diff(db, user.id, provider_id, desired, username=user.username)
-        return bool(desired)
+        return True
 
     desired_group_ids = await _resolve_allow_all_groups(db, user.id, config)
 
@@ -296,9 +298,12 @@ async def sync_idp_groups(
 
     has_matched = len(desired_group_ids) > 0 or aap_validated or config.allow_all_authenticated
 
+    if not has_matched:
+        return await _clear_and_deny(db, user, provider_id)
+
     await _apply_group_membership_diff(db, user.id, provider_id, desired_group_ids, username=user.username)
 
-    return has_matched
+    return True
 
 
 async def _clear_provider_idp_groups(
