@@ -63,10 +63,16 @@ Only use manual lifecycle when:
 
 Connection pools are configured automatically via `CacheSettings`:
 
-- `cache_connection_pool_size` (default: 10)
+- `cache_connection_pool_size` (default: 50, configurable via `APP_CACHE_CONNECTION_POOL_SIZE`)
 - Lazy connection on first operation
 - Shared pool across all operations
 - No manual pool management required
+- Pool size must be ≥ 1 (validated at startup)
+
+**Sizing guidance**: each long-lived Redis client (settings, rate-limit,
+websocket tickets) opens its own pool. Under load, a single replica may hold
+up to `pool_size × number_of_clients` connections. Size the pool relative to
+Redis `maxclients` in shared environments.
 
 ## Configuration
 
@@ -78,7 +84,7 @@ cache_port: int = 6379
 cache_db: int = 0
 cache_password: SecretStr  # Required — no default; set via APP_CACHE_PASSWORD
 cache_stream_ttl_seconds: int = 86400  # 24 hours
-cache_connection_pool_size: int = 10
+cache_connection_pool_size: int = 50  # Must be >= 1; validated at startup
 ```
 
 `cache_password` has no default value — it must be provided via `APP_CACHE_PASSWORD` in all environments. For local development, set it in `.env`. For production, use secrets management. Ensure Redis is bound to internal networks and not exposed to the public internet.

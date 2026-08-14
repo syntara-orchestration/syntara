@@ -267,19 +267,28 @@ test.describe('Re-enable Built-in Admin', () => {
       })
     )
 
-    const BUILT_IN_ADMIN_USER_READ_DISABLED = { ...BUILT_IN_ADMIN_USER_READ, is_enabled: false }
+    let builtinEnabled = false
+    const builtinUser = () => ({ ...BUILT_IN_ADMIN_USER_READ, is_enabled: builtinEnabled })
 
     await page.route('**/api/v1/users**', (route) => {
       const url = new URL(route.request().url())
       const isListRequest = url.pathname.endsWith('/users')
 
+      if (route.request().method() === 'PATCH') {
+        builtinEnabled = true
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(builtinUser()),
+        })
+      }
       if (route.request().method() === 'GET') {
         if (isListRequest) {
           return route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
-              resources: [BUILT_IN_ADMIN_USER_READ_DISABLED, AAP_ADMIN_USER_READ],
+              resources: [builtinUser(), AAP_ADMIN_USER_READ],
               next: null,
               prev: null,
             }),
@@ -288,7 +297,7 @@ test.describe('Re-enable Built-in Admin', () => {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(BUILT_IN_ADMIN_USER_READ_DISABLED),
+          body: JSON.stringify(builtinUser()),
         })
       }
       return route.continue()
@@ -307,12 +316,7 @@ test.describe('Re-enable Built-in Admin', () => {
     const toggle = page.getByRole('switch', { name: /Built-in administrator account/ })
     await expect(toggle).toBeVisible()
     await expect(toggle).not.toBeChecked()
-
-    await page.goto(toAppUrl(USER_MANAGEMENT_ACCESS_URL + '/' + BUILT_IN_ADMIN_USER_READ_DISABLED.id + '/edit'))
-    const enabledToggle = page.getByRole('switch', { name: /Enabled/ })
-    await expect(enabledToggle).toBeVisible()
-    await expect(enabledToggle).not.toBeChecked()
-    await enabledToggle.click({ force: true })
-    await expect(enabledToggle).toBeChecked()
+    await toggle.click({ force: true })
+    await expect(toggle).toBeChecked()
   })
 })

@@ -230,7 +230,7 @@ class TestBuildScheduleId:
     async def test_basic_id(self) -> None:
         """Schedule ID should follow convention."""
         schedule_id = build_schedule_id("abc-123", "trigger_1")
-        assert schedule_id == "nexus-sched-abc-123-trigger_1"
+        assert schedule_id == "orchestrator-sched-abc-123-trigger_1"
 
     async def test_id_is_deterministic(self) -> None:
         """Same inputs should always produce the same ID."""

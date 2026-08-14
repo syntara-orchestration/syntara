@@ -573,6 +573,7 @@ jobs:
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_SEGMENT_WRITE_KEY: test-e2e-write-key
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"
@@ -629,6 +630,7 @@ jobs:
           retry_wait_seconds: 30
           command: cd backend && make test-e2e
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000
           APP_WORKER_BASE_URL: https://host.containers.internal:8000
           APP_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

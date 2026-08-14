@@ -61,7 +61,9 @@ class TemporalWorkerService:
                 Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
             max_cached_workflows: Maximum workflow states cached in memory for replay.
             max_concurrent_workflow_tasks: Maximum concurrent workflow task executions.
-            max_concurrent_activities: Maximum concurrent activity executions.
+            max_concurrent_activities: Maximum concurrent activity executions. When the limit is
+                reached, new activity tasks queue in Temporal and wait for a slot. Standard
+                Temporal queuing behavior — no failures, just backpressure.
 
         """
         self.temporal_address = temporal_address
@@ -272,6 +274,7 @@ async def start_worker(
     namespace: str | None = None,
     task_queue: str | None = None,
     activity_registry: dict[ActivityName, Callable[..., Any]] = ACTIVITY_REGISTRY,
+    max_concurrent_activities: int | None = None,
 ) -> TemporalWorkerService:
     """Start the global Temporal worker service.
 
@@ -283,6 +286,9 @@ async def start_worker(
         task_queue: Task queue name (default from settings)
         activity_registry: Activity registry to use (defaults to full ACTIVITY_REGISTRY).
             Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
+        max_concurrent_activities: Override max concurrent activities. Defaults to
+            ``settings.max_concurrent_activities``. Background workers should pass
+            ``settings.background_worker_max_concurrent_activities``.
 
     Returns:
         TemporalWorkerService instance
@@ -306,7 +312,9 @@ async def start_worker(
         activity_registry=activity_registry,
         max_cached_workflows=settings.max_cached_workflows,
         max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
-        max_concurrent_activities=settings.max_concurrent_activities,
+        max_concurrent_activities=(
+            max_concurrent_activities if max_concurrent_activities is not None else settings.max_concurrent_activities
+        ),
     )
 
     logger.info("temporal_worker_service_created")

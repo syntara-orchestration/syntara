@@ -238,6 +238,7 @@ services:
       - APP_TEMPORAL_ADDRESS=temporal:7233
       - APP_TEMPORAL_NAMESPACE=default
       - APP_TASK_QUEUE=orchestrator-workflow-queue
+      - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis

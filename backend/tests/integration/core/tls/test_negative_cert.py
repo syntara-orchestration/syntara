@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.integration]
 
-_ALLOWED_CNS = frozenset({"backend.nexus.svc", "worker.nexus.svc"})
+_ALLOWED_CNS = frozenset({"backend.orchestrator.svc", "worker.orchestrator.svc"})
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ def neg_certs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     ca_key, ca_cert = generate_ca(certs_dir)
 
     backend_cert, backend_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="backend.nexus.svc", filename="backend"
+        certs_dir, ca_key, ca_cert, common_name="backend.orchestrator.svc", filename="backend"
     )
     rogue_cert, rogue_key = generate_service_cert(
         certs_dir, ca_key, ca_cert, common_name="rogue-service", filename="rogue"
@@ -156,7 +156,7 @@ class TestNEG1WrongCN:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["cn"] == "backend.nexus.svc"
+        assert body["cn"] == "backend.orchestrator.svc"
 
     def test_validate_client_cert_extracts_cn_without_allowlist_check(self) -> None:
         """Unit-level: _validate_client_cert returns CN (allowlist is checked by middleware)."""

@@ -71,7 +71,6 @@ export function useUserFormSubmit({
                   last_name: formData.last_name || undefined,
                   email,
                 }),
-            is_enabled: formData.is_enabled,
             ...(formData.password && !isFederatedUser && (!isBuiltinUser || isSelf)
               ? { password: formData.password }
               : {}),
@@ -79,10 +78,6 @@ export function useUserFormSubmit({
         },
         {
           onSuccess: () => {
-            if (isSelf && !formData.is_enabled) {
-              logoutWithAlert(logout, showAlert, 'Account disabled — signing out')
-              return
-            }
             if (formData.password) {
               handlePasswordChangeSuccess()
               return

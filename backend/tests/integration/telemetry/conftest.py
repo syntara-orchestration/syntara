@@ -1,6 +1,6 @@
 """Fixtures for telemetry integration tests."""
 
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,6 +9,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.database.session import get_db
+from tests.fixtures.settings import enable_script_nodes
+
+
+@pytest.fixture(autouse=True)
+def _enable_script_nodes() -> Generator[None, None, None]:
+    """Enable script nodes for telemetry tests that call execute_script_activity directly."""
+    with enable_script_nodes():
+        yield
 
 
 @pytest.fixture

@@ -304,9 +304,19 @@ class CacheSettings(BaseSettings):
     )
 
     cache_connection_pool_size: int = Field(
-        default=10,
-        description="Maximum number of cache connections in pool",
+        default=50,
+        description=(
+            "Maximum number of cache connections in pool. Workflow workers with high concurrency may need larger pools."
+        ),
     )
+
+    @field_validator("cache_connection_pool_size")
+    @classmethod
+    def _validate_cache_connection_pool_size(cls, v: int) -> int:
+        if v < 1:
+            msg = "cache_connection_pool_size must be at least 1"
+            raise ValueError(msg)
+        return v
 
 
 # =============================================================================
@@ -1241,7 +1251,18 @@ class TemporalSettings(BaseSettings):
     max_concurrent_activities: int = Field(
         default=50,
         ge=1,
-        description="Maximum concurrent activity executions",
+        description="Maximum concurrent activity executions for the main workflow worker",
+    )
+
+    background_worker_max_concurrent_activities: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Maximum concurrent activity executions for the background worker "
+            "(Agent Execution, Document Conversion). Lower than the main worker default "
+            "because LLM/agent activities are memory-heavy and background-worker pods "
+            "have a smaller memory budget. Set via APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES."
+        ),
     )
 
     max_concurrent_workflows: int = Field(
@@ -1458,6 +1479,17 @@ class WorkflowEngineSettings(BaseSettings):
         default=32768,
         description="Maximum length per environment variable in bytes (32KB)",
         ge=1024,
+    )
+
+    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
+    # directly in the Temporal worker process without additional sandboxing. Enabling this
+    # grants any user with workflow:create + execution:run permissions the ability
+    # to run arbitrary commands on the worker infrastructure, with access to all
+    # environment variables.
+    # Enabling Script Node is not recommended for production deployments.
+    script_nodes_enabled: bool = Field(
+        default=False,
+        description="Enable Script node execution in workflows (Developer Preview)",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

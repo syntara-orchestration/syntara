@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -342,3 +343,71 @@ class TestPublishExecutionPatch:
             call_args = mock_stream_client.publish.call_args
             message_data = call_args[0][1]
             assert len(message_data["ops"]) == 2
+
+
+class TestRedisFailurePropagates:
+    """Publisher methods must raise on failure, not swallow it.
+
+    ActivitySyncService (the only real caller) already wraps every call in
+    try/except Exception and logs "non-fatal" — that's the single place
+    Redis-outage handling belongs. If the publisher swallowed failures too,
+    the sync service's success-path debug log would fire even when nothing
+    was published, silently hiding the outage.
+    """
+
+    @staticmethod
+    def _unavailable_stream_client() -> AsyncMock:
+        """A StreamClient mock whose publish() always raises RedisConnectionError."""
+        mock_client = AsyncMock()
+        mock_client.publish = AsyncMock(side_effect=RedisConnectionError("pool exhausted"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        return mock_client
+
+    @pytest.mark.asyncio
+    async def test_publish_snapshot_raises_on_redis_failure(self, execution_with_activities: Execution) -> None:
+        publisher = ActivityUpdatePublisher()
+        unavailable_client = self._unavailable_stream_client()
+
+        with (
+            mock_patch(
+                "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+            ),
+            pytest.raises(RedisConnectionError),
+        ):
+            await publisher.publish_snapshot(execution_with_activities, snapshot_type="initial_snapshot")
+
+    @pytest.mark.asyncio
+    async def test_publish_activity_patch_raises_on_redis_failure(self) -> None:
+        publisher = ActivityUpdatePublisher()
+        execution_id = uuid4()
+        patch = JsonPatch.from_diff(
+            [{"activity_id": "step1", "status": "running"}],
+            [{"activity_id": "step1", "status": "completed"}],
+        )
+        unavailable_client = self._unavailable_stream_client()
+
+        with (
+            mock_patch(
+                "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+            ),
+            pytest.raises(RedisConnectionError),
+        ):
+            await publisher.publish_activity_patch(execution_id, [patch])
+
+    @pytest.mark.asyncio
+    async def test_publish_execution_patch_raises_on_redis_failure(self) -> None:
+        from syntara.workflows.models.visualization import JsonPatchOperation
+
+        publisher = ActivityUpdatePublisher()
+        execution_id = uuid4()
+        ops = [JsonPatchOperation(op="replace", path="/status", value="running")]
+        unavailable_client = self._unavailable_stream_client()
+
+        with (
+            mock_patch(
+                "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=unavailable_client
+            ),
+            pytest.raises(RedisConnectionError),
+        ):
+            await publisher.publish_execution_patch(execution_id, ops)

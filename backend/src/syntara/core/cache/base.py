@@ -8,7 +8,10 @@ differentiated log messages and implement domain-specific operations.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import random
+import time
 from typing import TYPE_CHECKING, Any, Self
 
 import redis.asyncio as redis
@@ -17,9 +20,11 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
 from syntara.core.config.base import get_settings
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.types import MetricType
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Callable, Coroutine
     from types import TracebackType
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -27,10 +32,22 @@ logger = structlog.stdlib.get_logger(__name__)
 
 @contextlib.asynccontextmanager
 async def redis_error_handler(operation: str, **log_context: Any) -> AsyncGenerator[None, None]:  # noqa: ANN401
-    """Standardised error handling for Redis operations.
+    """Standardised error classification for Redis operations.
 
-    Catches ``RedisConnectionError``, ``ResponseError`` (logged and
-    re-raised) and ``OSError`` (wrapped in ``RedisConnectionError``).
+    Wraps ``OSError`` as ``RedisConnectionError`` so callers only need to
+    handle one connection-failure type, then re-raises. Deliberately does
+    NOT log ``RedisConnectionError``/``OSError``: these are the transient,
+    often-retried failures (see :func:`redis_operation_with_backoff`), and
+    every real caller already logs them at the appropriate level and
+    frequency (a warning per retry, one exception on final exhaustion, or
+    its own de-duplicated warning for non-retried callers like
+    ``cache_get``). Logging here too would emit a full traceback on every
+    single retry attempt under sustained pool exhaustion — exactly the
+    scenario this exists to survive gracefully.
+
+    ``ResponseError`` is different: it is never retried and has no other
+    logging path, so it is logged here with a full traceback since it
+    signals a real bug (bad command, wrong data type, etc.).
 
     Args:
         operation: Short label used as the log-event prefix
@@ -40,13 +57,112 @@ async def redis_error_handler(operation: str, **log_context: Any) -> AsyncGenera
     """
     try:
         yield
-    except (RedisConnectionError, ResponseError):
+    except ResponseError:
         logger.exception("redis_operation_error", operation=operation, **log_context)
         raise
+    except RedisConnectionError:
+        raise
     except OSError as e:
-        logger.exception("redis_network_error", operation=operation, **log_context)
         msg = f"Network error: {e}"
         raise RedisConnectionError(msg) from e
+
+
+_MAX_BACKOFF_MS = 500
+
+
+async def redis_operation_with_backoff[T](
+    operation_fn: Callable[[], Coroutine[Any, Any, T]],
+    operation_name: str,
+    max_retries: int = 3,
+    initial_backoff_ms: int = 10,
+    retry_on: tuple[type[Exception], ...] = (RedisConnectionError,),
+    **log_context: Any,  # noqa: ANN401
+) -> T:
+    """Execute a Redis operation with exponential backoff for transient failures.
+
+    Retries on ``retry_on`` exceptions (default: any ``RedisConnectionError``)
+    with exponential backoff **plus full jitter**, giving in-flight operations
+    a chance to return connections before retrying and preventing retry
+    stampedes when many coroutines fail simultaneously on a shared pool.
+    Use ``retry_on=(MaxConnectionsError,)`` for non-idempotent operations
+    (e.g. XADD): ``MaxConnectionsError`` is raised while acquiring a
+    connection, before any command reaches Redis, so retrying is safe.
+    Other ``RedisConnectionError`` subtypes may have reached Redis already
+    and must not retry non-idempotent commands. Idempotent writes
+    (SETEX, DELETE) may keep the default broad catch.
+
+    Emits ``MetricType.CACHE_POOL_RETRY`` (counter) and
+    ``MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION`` (histogram) so pool
+    saturation is visible on the ``/metrics`` endpoint.
+
+    Args:
+        operation_fn: Zero-arg async callable to execute (raises RedisConnectionError on failure)
+        operation_name: Log/metric label for the operation (e.g., "cache_setex")
+        max_retries: Maximum number of retries (default: 3)
+        initial_backoff_ms: Initial backoff ceiling in milliseconds (default: 10).
+            Actual sleep is ``uniform(0, backoff_ms)`` (full jitter) to
+            desynchronise concurrent retries on a shared pool.
+        retry_on: Exception types that trigger a retry (default: ``(RedisConnectionError,)``).
+            Use ``(MaxConnectionsError,)`` for non-idempotent operations.
+        **log_context: Extra log context to pass through
+
+    Returns:
+        The result of operation_fn() if successful
+
+    Raises:
+        RedisConnectionError: If all retries exhausted
+
+    """
+    recorder = get_metrics_recorder()
+    backoff_ms = initial_backoff_ms
+    last_error: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return await operation_fn()
+        except retry_on as e:
+            last_error = e
+            if attempt < max_retries:
+                logger.warning(
+                    "redis_operation_retry",
+                    operation=operation_name,
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    backoff_ms=backoff_ms,
+                    **log_context,
+                )
+                recorder.record(
+                    MetricType.CACHE_POOL_RETRY,
+                    value=1,
+                    labels={"component": "redis", "operation": operation_name, "outcome": "retry"},
+                )
+                jittered_ms = random.uniform(0, backoff_ms)  # noqa: S311
+                start = time.monotonic()
+                await asyncio.sleep(jittered_ms / 1000.0)
+                recorder.record(
+                    MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION,
+                    value=(time.monotonic() - start) * 1000,
+                    unit="ms",
+                    labels={"component": "redis", "operation": operation_name},
+                )
+                backoff_ms = min(backoff_ms * 2, _MAX_BACKOFF_MS)
+            else:
+                logger.exception(
+                    "redis_operation_failed_retries_exhausted",
+                    operation=operation_name,
+                    attempts=max_retries + 1,
+                    **log_context,
+                )
+                recorder.record(
+                    MetricType.CACHE_POOL_RETRY,
+                    value=1,
+                    labels={"component": "redis", "operation": operation_name, "outcome": "failed"},
+                )
+
+    if last_error is not None:
+        raise last_error
+    msg = f"Redis operation '{operation_name}' failed"
+    raise RedisConnectionError(msg)
 
 
 _NOT_CONNECTED_SUFFIX = " client not connected"

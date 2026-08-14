@@ -85,9 +85,9 @@ class DocumentConversionService:
         # Get retriever for saving converted file
         output_retriever = self.file_manager.get_retriever()
 
-        # Use nexus-{file_id}-content.md to match FileMetadata convention
+        # Use orchestrator-{file_id}-content.md to match FileMetadata convention
         # and avoid collisions when multiple files share the same stem
-        storage_key = f"nexus-{file_metadata.id}-content.md"
+        storage_key = f"orchestrator-{file_metadata.id}-content.md"
 
         output_path: str = await output_retriever.save_file(
             conversion_result.converted_content.encode("utf-8"), storage_key

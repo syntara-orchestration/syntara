@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.core.config.base import get_settings
 from syntara.workflows.workflow_engine.activities.script_activity import (
     SAFE_ENV_ALLOWLIST,
     ScriptExecutionError,
@@ -1154,3 +1155,63 @@ class TestMemoryLimitIntegration:
                 None,
             )
         assert result["output"]["stdout"].strip() == "wrapped"
+
+
+class TestScriptNodesGate:
+    """Test the APP_SCRIPT_NODES_ENABLED script node gate."""
+
+    @pytest.mark.asyncio
+    async def test_disabled_raises_application_error(self) -> None:
+        """When script_nodes_enabled is False, the activity fails immediately."""
+        settings = get_settings()
+        object.__setattr__(settings, "script_nodes_enabled", False)
+        try:
+            with pytest.raises(ApplicationError) as exc_info:
+                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
+
+            assert exc_info.value.non_retryable is True
+            assert exc_info.value.type == "ScriptNodeDisabled"
+        finally:
+            object.__setattr__(settings, "script_nodes_enabled", True)
+
+    @pytest.mark.asyncio
+    async def test_disabled_error_message_is_opaque(self) -> None:
+        """Error message must not reference the setting name."""
+        settings = get_settings()
+        object.__setattr__(settings, "script_nodes_enabled", False)
+        try:
+            with pytest.raises(ApplicationError) as exc_info:
+                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
+
+            message = str(exc_info.value)
+            assert "APP_SCRIPT_NODES_ENABLED" not in message
+            assert "script_nodes_enabled" not in message
+            assert "setting" not in message.lower()
+            assert "Script node execution is not enabled" in message
+        finally:
+            object.__setattr__(settings, "script_nodes_enabled", True)
+
+    @pytest.mark.asyncio
+    async def test_disabled_does_not_execute_script(self) -> None:
+        """When disabled, no subprocess should be spawned."""
+        settings = get_settings()
+        object.__setattr__(settings, "script_nodes_enabled", False)
+        try:
+            with (
+                patch(
+                    "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                ) as mock_exec,
+                pytest.raises(ApplicationError),
+            ):
+                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
+
+            mock_exec.assert_not_called()
+        finally:
+            object.__setattr__(settings, "script_nodes_enabled", True)
+
+    @pytest.mark.asyncio
+    async def test_enabled_executes_normally(self) -> None:
+        """When script_nodes_enabled is True (autouse fixture), scripts execute."""
+        result = await execute_script_activity({"language": "bash", "code": "echo gate-open"}, None)
+        assert result["output"]["return_code"] == 0
+        assert "gate-open" in result["output"]["stdout"]
