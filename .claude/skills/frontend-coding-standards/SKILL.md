@@ -1981,15 +1981,21 @@ Named booleans also communicate intent — `isCredentialRequired` is self-docume
 // ❌ BAD: \n is collapsed in HTML — two warnings appear on one line
 description: data.warnings.join('\n')
 
-// ✅ GOOD: ReactNode list renders correctly
-description:
-  data.warnings.length === 1 ? (
-    data.warnings[0]
-  ) : (
-    <ul style={{ margin: 0, paddingLeft: 'var(--pf-t--global--spacer--md)' }}>
-      {data.warnings.map((w) => <li key={w}>{w}</li>)}
-    </ul>
-  ),
+// ✅ GOOD: module-scoped helper so the toast call stays readable
+function WarningDescription({ warnings = [] }: { warnings?: string[] }) {
+  if (warnings.length === 0) return null
+  if (warnings.length === 1) return warnings[0]
+
+  return (
+    <List>
+      {warnings.map((warning) => (
+        <ListItem key={warning}>{warning}</ListItem>
+      ))}
+    </List>
+  )
+}
+
+description: <WarningDescription warnings={data.warnings} />
 ```
 
-The `description` prop of `showAlert` / `showWarning` accepts `ReactNode`, so structured markup is always valid.
+The `description` prop of `showAlert` / `showWarning` accepts `ReactNode`, so structured markup is always valid. Keep `WarningDescription` at **module scope** (not inside another component). Use PatternFly `List` / `ListItem`, not a raw `<ul>` or inline `style`.
