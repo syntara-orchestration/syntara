@@ -859,7 +859,7 @@ All error responses use the RFC 9457 Problem Details format (`application/proble
 | 409 | Name conflict | Domain `*NameConflictError` | `CredentialNameConflictError`, `IntegrationNameConflictError` |
 | 409 | State conflict | Domain-specific conflict exceptions | `ApprovalAlreadyDecidedError`, `WorkflowVersionConflictError` |
 | 422 | Validation error | `SafeValueError` or Pydantic `RequestValidationError` | Invalid field values, type mismatches |
-| 403 | Forbidden | `BuiltinProtectionError`, permission checks | Modifying builtin project, insufficient role |
+| 403 | Forbidden | `BuiltinProtectionError`, `DefaultProjectProtectionError`, permission checks | Modifying builtin project, deleting default project, insufficient role |
 
 ### Service Layer Patterns
 
