@@ -1,5 +1,5 @@
 import { Content, ContentVariants, EmptyState, EmptyStateBody, Label, StackItem, Title } from '@patternfly/react-core'
-import { RhUiKeyIcon } from '@patternfly/react-icons'
+import { RhUiCubesFillIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useState } from 'react'
 
@@ -73,35 +73,50 @@ export function SelectUserStep({
   onSelect: (user: UserSummary) => void
 }>) {
   const hasActiveFilters = usersFilter.filters.length > 0
+  const showSelectionUi = users.length > 0 || hasActiveFilters
 
   return (
     <NxPanelContentStack>
-      <StackItem>
-        <Title headingLevel="h2" className={styles.stepTitle}>
-          Select a user
-        </Title>
-        <Content component={ContentVariants.p} className={styles.stepDescription}>
-          Choose the user whose federated identity you want to transfer. The selected identity will be moved from this
-          user to <strong>{targetUsername}</strong>.
-        </Content>
-      </StackItem>
-      <StackItem className={styles.filterBar}>
-        <FilterBar
-          fieldDefinitions={USER_FILTER_DEFS}
-          filters={usersFilter.filters}
-          onFilterChange={(f) => {
-            usersFilter.setAllFilters(f)
-            onResetPage()
-          }}
-          showClearAll
-          isCompact
-        />
-      </StackItem>
-      {users.length === 0 && hasActiveFilters ? (
+      {showSelectionUi && (
+        <>
+          <StackItem>
+            <Title headingLevel="h2" className={styles.stepTitle}>
+              Select a user
+            </Title>
+            <Content component={ContentVariants.p} className={styles.stepDescription}>
+              Choose the user whose federated identity you want to transfer. The selected identity will be moved from
+              this user to <strong>{targetUsername}</strong>.
+            </Content>
+          </StackItem>
+          <StackItem className={styles.filterBar}>
+            <FilterBar
+              fieldDefinitions={USER_FILTER_DEFS}
+              filters={usersFilter.filters}
+              onFilterChange={(f) => {
+                usersFilter.setAllFilters(f)
+                onResetPage()
+              }}
+              showClearAll
+              isCompact
+            />
+          </StackItem>
+        </>
+      )}
+      {!showSelectionUi && (
+        <StackItem isFilled style={flexCenteredBothAxes}>
+          <EmptyState headingLevel="h4" titleText="No users yet" icon={RhUiCubesFillIcon} variant="sm">
+            <EmptyStateBody>
+              There must be at least one other user before you can transfer a federated identity.
+            </EmptyStateBody>
+          </EmptyState>
+        </StackItem>
+      )}
+      {users.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
           <NxEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
         </StackItem>
-      ) : (
+      )}
+      {users.length > 0 && (
         <NxScrollableTableContainer caption="Select a user" footer={footerProps} useFixedLayout={false}>
           <Thead>
             <Tr>
@@ -172,42 +187,47 @@ export function SelectIdentityStep({
   const paginatedIdentities = identities.slice((page - 1) * perPage, page * perPage)
 
   const hasActiveFilters = identitiesFilter.filters.length > 0
+  const showSelectionUi = identities.length > 0 || hasActiveFilters
 
   return (
     <NxPanelContentStack>
-      <StackItem>
-        <Title headingLevel="h2" className={styles.stepTitle}>
-          Select an identity
-        </Title>
-        <Content component={ContentVariants.p} className={styles.stepDescription}>
-          Choose one of <strong>{selectedUserDisplayName}</strong>&apos;s federated identities to attach to the current
-          user. This will log <strong>{selectedUserDisplayName}</strong> out of any pre-existing sessions.
-        </Content>
-      </StackItem>
-      <StackItem className={styles.filterBar}>
-        <FilterBar
-          fieldDefinitions={IDENTITY_FILTER_DEFS}
-          filters={identitiesFilter.filters}
-          onFilterChange={(f) => {
-            identitiesFilter.setAllFilters(f)
-            setPage(1)
-          }}
-          clearAllFilters={() => {
-            identitiesFilter.clearAllFilters()
-            setPage(1)
-          }}
-          showClearAll
-          isCompact
-        />
-      </StackItem>
+      {showSelectionUi && (
+        <>
+          <StackItem>
+            <Title headingLevel="h2" className={styles.stepTitle}>
+              Select an identity
+            </Title>
+            <Content component={ContentVariants.p} className={styles.stepDescription}>
+              Choose one of <strong>{selectedUserDisplayName}</strong>&apos;s federated identities to attach to the
+              current user. This will log <strong>{selectedUserDisplayName}</strong> out of any pre-existing sessions.
+            </Content>
+          </StackItem>
+          <StackItem className={styles.filterBar}>
+            <FilterBar
+              fieldDefinitions={IDENTITY_FILTER_DEFS}
+              filters={identitiesFilter.filters}
+              onFilterChange={(f) => {
+                identitiesFilter.setAllFilters(f)
+                setPage(1)
+              }}
+              clearAllFilters={() => {
+                identitiesFilter.clearAllFilters()
+                setPage(1)
+              }}
+              showClearAll
+              isCompact
+            />
+          </StackItem>
+        </>
+      )}
       {identities.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
           <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       )}
-      {identities.length === 0 && !hasActiveFilters && (
+      {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No identities" icon={RhUiKeyIcon}>
+          <EmptyState headingLevel="h4" titleText="No identities" icon={RhUiKeyIcon} variant="sm">
             <EmptyStateBody>This user has no federated identities to attach.</EmptyStateBody>
           </EmptyState>
         </StackItem>
