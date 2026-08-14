@@ -123,15 +123,19 @@ class TestRedisOperationWithBackoff:
         no_real_sleep.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_backoff_doubles_each_retry_capped_at_max(self, no_real_sleep: AsyncMock) -> None:
+    async def test_backoff_doubles_each_retry_capped_at_max_with_jitter(self, no_real_sleep: AsyncMock) -> None:
         operation = AsyncMock(side_effect=RedisConnectionError("pool exhausted"))
 
         with pytest.raises(RedisConnectionError):
             await redis_operation_with_backoff(operation, "test_op", max_retries=4, initial_backoff_ms=100)
 
-        # 100ms -> 200ms -> 400ms -> 500ms (capped, since 400*2=800 > 500)
+        # Full jitter: each sleep is uniform(0, ceiling) where ceiling doubles
+        # 100 -> 200 -> 400 -> 500 (capped, since 400*2=800 > 500)
         sleep_calls = [call.args[0] for call in no_real_sleep.await_args_list]
-        assert sleep_calls == [0.1, 0.2, 0.4, 0.5]
+        assert len(sleep_calls) == 4
+        ceilings_seconds = [0.1, 0.2, 0.4, 0.5]
+        for actual, ceiling in zip(sleep_calls, ceilings_seconds, strict=True):
+            assert 0 <= actual <= ceiling, f"sleep {actual} not in [0, {ceiling}]"
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("no_real_sleep")

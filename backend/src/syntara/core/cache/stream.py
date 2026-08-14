@@ -77,6 +77,18 @@ class StreamClient(BaseRedisClient):
         ``RedisConnectionError`` subtypes indicate a mid-flight drop where
         Redis may have accepted the write; they are never retried.
 
+        **Scope note**: callers currently create a fresh ``StreamClient``
+        (and therefore a fresh pool) per publish via ``async with
+        StreamClient()``. A brand-new pool cannot hit ``MaxConnectionsError``
+        for a single XADD, so this retry path is effectively a no-op today.
+        It exists as a forward-compatible safety net for when publish callers
+        adopt a shared singleton ``StreamClient`` (see
+        ``docs/standards/redis.md § Singleton Client per Domain``), at which
+        point a long-lived pool *can* saturate. Until then, pool-exhaustion
+        recovery primarily benefits the long-lived singleton clients
+        (``SettingsRedisClient``, rate-limit, websocket tickets) via
+        ``cache_setex`` / ``cache_delete``.
+
         EXPIRE is best-effort: single attempt, warning on failure. The event
         is durably written by the time EXPIRE runs; a missed TTL only delays
         cleanup and never justifies a second XADD.

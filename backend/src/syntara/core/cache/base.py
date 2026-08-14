@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import random
 import time
 from typing import TYPE_CHECKING, Any, Self
 
@@ -80,12 +81,14 @@ async def redis_operation_with_backoff[T](
     """Execute a Redis operation with exponential backoff for transient failures.
 
     Retries on ``retry_on`` exceptions (default: any ``RedisConnectionError``)
-    with exponential backoff, giving in-flight operations a chance to return
-    connections before retrying. Use ``retry_on=(MaxConnectionsError,)`` for
-    non-idempotent operations (e.g. XADD): ``MaxConnectionsError`` is raised
-    while acquiring a connection, before any command reaches Redis, so retrying
-    is safe. Other ``RedisConnectionError`` subtypes may have reached Redis
-    already and must not retry non-idempotent commands. Idempotent writes
+    with exponential backoff **plus full jitter**, giving in-flight operations
+    a chance to return connections before retrying and preventing retry
+    stampedes when many coroutines fail simultaneously on a shared pool.
+    Use ``retry_on=(MaxConnectionsError,)`` for non-idempotent operations
+    (e.g. XADD): ``MaxConnectionsError`` is raised while acquiring a
+    connection, before any command reaches Redis, so retrying is safe.
+    Other ``RedisConnectionError`` subtypes may have reached Redis already
+    and must not retry non-idempotent commands. Idempotent writes
     (SETEX, DELETE) may keep the default broad catch.
 
     Emits ``MetricType.CACHE_POOL_RETRY`` (counter) and
@@ -96,7 +99,9 @@ async def redis_operation_with_backoff[T](
         operation_fn: Zero-arg async callable to execute (raises RedisConnectionError on failure)
         operation_name: Log/metric label for the operation (e.g., "cache_setex")
         max_retries: Maximum number of retries (default: 3)
-        initial_backoff_ms: Initial backoff in milliseconds (default: 10)
+        initial_backoff_ms: Initial backoff ceiling in milliseconds (default: 10).
+            Actual sleep is ``uniform(0, backoff_ms)`` (full jitter) to
+            desynchronise concurrent retries on a shared pool.
         retry_on: Exception types that trigger a retry (default: ``(RedisConnectionError,)``).
             Use ``(MaxConnectionsError,)`` for non-idempotent operations.
         **log_context: Extra log context to pass through
@@ -131,8 +136,9 @@ async def redis_operation_with_backoff[T](
                     value=1,
                     labels={"component": "redis", "operation": operation_name, "outcome": "retry"},
                 )
+                jittered_ms = random.uniform(0, backoff_ms)  # noqa: S311
                 start = time.monotonic()
-                await asyncio.sleep(backoff_ms / 1000.0)
+                await asyncio.sleep(jittered_ms / 1000.0)
                 recorder.record(
                     MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION,
                     value=(time.monotonic() - start) * 1000,
