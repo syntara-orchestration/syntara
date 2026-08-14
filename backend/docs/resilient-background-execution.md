@@ -463,7 +463,7 @@ out-of-memory pod restarts. The fix involves two coordinated changes:
 1. **Activity concurrency cap**: `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES` (default: 10)
    controls the maximum concurrent Temporal activities per pod. This is the primary knob. LLM activities
    consume ~200-500MB each; 10 concurrent activities fit within a 1Gi pod budget.
-   
+
    **Behavior when cap is reached**: Activities do not fail when the concurrency limit is reached. Instead,
    incoming activity tasks queue in the Temporal task queue until a worker slot becomes available. The
    worker polls the queue and processes tasks in FIFO order. This is standard Temporal behavior — the queue
