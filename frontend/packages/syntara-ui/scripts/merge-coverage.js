@@ -53,3 +53,11 @@ const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 execFileSync(npmCommand, ['run', 'test:coverage:report', '--silent'], { stdio: 'inherit' })
 
 console.log(`Merged ${coverageFiles.length} coverage shard(s) into ${COVERAGE_DIR}`)
+
+const COVERAGE_THRESHOLD = '85'
+
+execFileSync(
+  npmCommand,
+  ['exec', '--', 'nyc', 'check-coverage', '--temp-dir', NYC_OUTPUT_DIR, '--statements', COVERAGE_THRESHOLD],
+  { stdio: 'inherit' }
+)

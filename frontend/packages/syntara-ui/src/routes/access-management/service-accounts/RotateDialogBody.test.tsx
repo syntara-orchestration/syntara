@@ -5,9 +5,9 @@ import { axe } from 'vitest-axe'
 
 import { RotateDialogBody } from './RotateDialogBody'
 import { GRACE_PERIOD_HELP } from './serviceAccountFieldHelpText'
-import type { SACredentialRead } from './serviceAccountTypes'
+import type { ServiceAccountCredentialRead } from './serviceAccountTypes'
 
-const mockCredential: SACredentialRead = {
+const mockCredential: ServiceAccountCredentialRead = {
   id: 'cred-1',
   identifier: 'test-cred',
   credential_type: 'client_credentials',
@@ -80,7 +80,7 @@ describe('RotateDialogBody', () => {
     })
 
     it('shows warning when credential has an active grace period', () => {
-      const credWithGrace: SACredentialRead = {
+      const credWithGrace: ServiceAccountCredentialRead = {
         ...mockCredential,
         old_secret_valid_until: '2026-07-15T15:00:00Z',
       }
@@ -92,7 +92,7 @@ describe('RotateDialogBody', () => {
     })
 
     it('does not show warning when grace period has already expired', () => {
-      const credWithExpiredGrace: SACredentialRead = {
+      const credWithExpiredGrace: ServiceAccountCredentialRead = {
         ...mockCredential,
         old_secret_valid_until: '2026-07-15T11:00:00Z',
       }
@@ -113,7 +113,7 @@ describe('RotateDialogBody', () => {
 
     it('has no accessibility violations when active grace period warning is shown', async () => {
       const futureDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
-      const credWithGrace: SACredentialRead = {
+      const credWithGrace: ServiceAccountCredentialRead = {
         ...mockCredential,
         old_secret_valid_until: futureDate,
       }

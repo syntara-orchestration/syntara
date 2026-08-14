@@ -43,6 +43,22 @@ router = NexusRouter(prefix="/invocations", tags=["Invocation"])
 
 logger = structlog.stdlib.get_logger(__name__)
 
+_INTERNAL_ONLY_CONTEXT_KEYS = frozenset({"callback_url"})
+
+
+def _sanitize_context_data(context_data: dict[str, object], request: Request) -> dict[str, object]:
+    """Strip internal-only fields from externally-supplied context_data."""
+    if getattr(request.state, "is_cert_authenticated", False):
+        return context_data
+    stripped = _INTERNAL_ONLY_CONTEXT_KEYS & context_data.keys()
+    if stripped:
+        logger.warning(
+            "Stripped internal-only fields from client-supplied context_data",
+            stripped_fields=sorted(stripped),
+        )
+    return {k: v for k, v in context_data.items() if k not in _INTERNAL_ONLY_CONTEXT_KEYS}
+
+
 _invocation_perm_create_json = PermissionChecker("invocation", "create", body_project_field="project_id")
 _invocation_perm_create_form = PermissionChecker("invocation", "create", form_project_field="project_id")
 _invocation_perm_read = PermissionChecker("invocation", "read")
@@ -172,12 +188,14 @@ def _validate_multipart_required_fields(prompt: str | None, session_id: str | No
     },
 )
 async def create_invocation(
+    request: Request,
     request_body: InvocationCreateRequest,
     service: Annotated[InvocationService, Depends(get_invocation_service_with_temporal)],
 ) -> Invocation:
     """Accept async invocation request (JSON).
 
     Args:
+        request: FastAPI request object
         request_body: JSON request body with prompt, session_id, and optional context_data
         service: Invocation service (with background tasks support)
 
@@ -192,7 +210,7 @@ async def create_invocation(
         prompt=request_body.prompt,
         session_id=request_body.session_id,
         project_id=request_body.project_id,
-        context_data=request_body.context_data,
+        context_data=_sanitize_context_data(request_body.context_data, request),
         files=None,
     )
 
@@ -207,12 +225,14 @@ async def create_invocation(
     response_description="Invocation accepted",
 )
 async def create_invocation_chat(
+    request: Request,
     service: Annotated[InvocationService, Depends(get_invocation_service_with_temporal)],
     form: Annotated[InvocationRequestWithFile, Form(media_type="multipart/form-data")],
 ) -> Invocation:
     """Accept async invocation request with optional file uploads (multipart/form-data).
 
     Args:
+        request: FastAPI request object
         service: Invocation service (with background tasks support)
         form: Multipart form body with prompt, session_id, optional context_data and files
 
@@ -237,7 +257,7 @@ async def create_invocation_chat(
         prompt=prompt,
         session_id=session_id,
         project_id=project_id,
-        context_data=context_data,
+        context_data=_sanitize_context_data(context_data, request) if context_data else context_data,
         files=form.files,
     )
 

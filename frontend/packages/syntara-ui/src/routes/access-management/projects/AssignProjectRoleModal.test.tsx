@@ -146,7 +146,7 @@ describe('AssignProjectRoleModal', () => {
       refetch: vi.fn(),
     })
     vi.mocked(accessClient.useQuery).mockImplementation((_method: string, path: string) => {
-      if (path === '/users_directory') {
+      if (path === '/users/directory') {
         return {
           data: { resources: mockUsers, next: null },
           isPending: false,
@@ -157,7 +157,7 @@ describe('AssignProjectRoleModal', () => {
           refetch: vi.fn(),
         } as never
       }
-      if (path === '/groups_directory') {
+      if (path === '/groups/directory') {
         return {
           data: { resources: mockGroups, next: null },
           isPending: false,

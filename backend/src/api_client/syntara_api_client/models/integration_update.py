@@ -11,16 +11,16 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
-    from ..models.integration_patch_labels_type_0 import IntegrationPatchLabelsType0
+    from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
 
-T = TypeVar("T", bound="IntegrationPatch")
+T = TypeVar("T", bound="IntegrationUpdate")
 
 
 @_attrs_define
-class IntegrationPatch:
+class IntegrationUpdate:
     """Schema for partially updating an integration (user-facing).
 
     Attributes:
@@ -31,7 +31,7 @@ class IntegrationPatch:
         management_credential_id (None | Unset | UUID): Optional credential for admin operations
         enabled (bool | None | Unset): Whether the integration is active
         scope (IntegrationScope | None | Unset): Visibility scope: global or project
-        labels (IntegrationPatchLabelsType0 | None | Unset): Key-value labels
+        labels (IntegrationUpdateLabelsType0 | None | Unset): Key-value labels
     """
 
     name: None | str | Unset = UNSET
@@ -40,11 +40,11 @@ class IntegrationPatch:
     management_credential_id: None | Unset | UUID = UNSET
     enabled: bool | None | Unset = UNSET
     scope: IntegrationScope | None | Unset = UNSET
-    labels: IntegrationPatchLabelsType0 | None | Unset = UNSET
+    labels: IntegrationUpdateLabelsType0 | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.aap_configuration import AAPConfiguration
-        from ..models.integration_patch_labels_type_0 import IntegrationPatchLabelsType0
+        from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -97,7 +97,7 @@ class IntegrationPatch:
         labels: dict[str, Any] | None | Unset
         if isinstance(self.labels, Unset):
             labels = UNSET
-        elif isinstance(self.labels, IntegrationPatchLabelsType0):
+        elif isinstance(self.labels, IntegrationUpdateLabelsType0):
             labels = self.labels.to_dict()
         else:
             labels = self.labels
@@ -125,7 +125,7 @@ class IntegrationPatch:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.aap_configuration import AAPConfiguration
-        from ..models.integration_patch_labels_type_0 import IntegrationPatchLabelsType0
+        from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -227,7 +227,7 @@ class IntegrationPatch:
 
         scope = _parse_scope(d.pop("scope", UNSET))
 
-        def _parse_labels(data: object) -> IntegrationPatchLabelsType0 | None | Unset:
+        def _parse_labels(data: object) -> IntegrationUpdateLabelsType0 | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -235,16 +235,16 @@ class IntegrationPatch:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                labels_type_0 = IntegrationPatchLabelsType0.from_dict(data)
+                labels_type_0 = IntegrationUpdateLabelsType0.from_dict(data)
 
                 return labels_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(IntegrationPatchLabelsType0 | None | Unset, data)
+            return cast(IntegrationUpdateLabelsType0 | None | Unset, data)
 
         labels = _parse_labels(d.pop("labels", UNSET))
 
-        integration_patch = cls(
+        integration_update = cls(
             name=name,
             description=description,
             configuration=configuration,
@@ -254,4 +254,4 @@ class IntegrationPatch:
             labels=labels,
         )
 
-        return integration_patch
+        return integration_update

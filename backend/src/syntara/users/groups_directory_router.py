@@ -17,7 +17,7 @@ from syntara.core.models.user import User
 from syntara.core.nexus_router import NexusRouter
 from syntara.core.services.base import BaseService
 
-router = NexusRouter(prefix="/groups_directory", tags=["Groups Directory"])
+router = NexusRouter(prefix="/groups/directory", tags=["Groups Directory"])
 
 _group_directory_read = PermissionChecker("group-directory", "read")
 

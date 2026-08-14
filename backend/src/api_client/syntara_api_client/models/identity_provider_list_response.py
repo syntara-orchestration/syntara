@@ -9,7 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.identity_provider_response import IdentityProviderResponse
+    from ..models.identity_provider_read import IdentityProviderRead
 
 
 T = TypeVar("T", bound="IdentityProviderListResponse")
@@ -20,13 +20,13 @@ class IdentityProviderListResponse:
     """Paginated list response for identity providers.
 
     Attributes:
-        resources (list[IdentityProviderResponse]): Array of resources in current page
+        resources (list[IdentityProviderRead]): Array of resources in current page
         next_ (None | str | Unset): Cursor for next page of results
         prev (None | str | Unset): Cursor for previous page of results
         total (int | None | Unset): Total count of resources (only when include_total=true)
     """
 
-    resources: list[IdentityProviderResponse]
+    resources: list[IdentityProviderRead]
     next_: None | str | Unset = UNSET
     prev: None | str | Unset = UNSET
     total: int | None | Unset = UNSET
@@ -74,13 +74,13 @@ class IdentityProviderListResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.identity_provider_response import IdentityProviderResponse
+        from ..models.identity_provider_read import IdentityProviderRead
 
         d = dict(src_dict)
         resources = []
         _resources = d.pop("resources")
         for resources_item_data in _resources:
-            resources_item = IdentityProviderResponse.from_dict(resources_item_data)
+            resources_item = IdentityProviderRead.from_dict(resources_item_data)
 
             resources.append(resources_item)
 

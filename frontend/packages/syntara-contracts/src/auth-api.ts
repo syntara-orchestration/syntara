@@ -76,7 +76,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/auth/ws-ticket': {
+  '/auth/ws_ticket': {
     parameters: {
       query?: never
       header?: never

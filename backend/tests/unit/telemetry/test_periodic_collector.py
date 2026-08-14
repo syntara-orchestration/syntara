@@ -256,3 +256,25 @@ class TestPeriodicCollectorIntegration:
             await collector._worker._callback(session_factory)
 
             mock_collect.assert_called_once_with(session_factory, mock_registry)
+
+
+class TestPeriodicCollectorRestart:
+    """Tests for PeriodicCollector.restart()."""
+
+    async def test_restart_stops_starts_and_collects_immediately(self, mock_registry: MagicMock) -> None:
+        collector = PeriodicCollector(
+            registry=mock_registry,
+            session_factory=_mock_session_factory(),
+        )
+        collector._worker = MagicMock()
+        collector._worker.stop = AsyncMock()
+
+        with patch(
+            "syntara.telemetry.periodic_collector._collect_and_send",
+            new_callable=AsyncMock,
+        ) as mock_collect:
+            await collector.restart()
+
+        collector._worker.stop.assert_awaited_once()
+        collector._worker.start.assert_called_once()
+        mock_collect.assert_awaited_once_with(collector._session_factory, mock_registry)

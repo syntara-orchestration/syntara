@@ -333,7 +333,7 @@ async def list_execution_environments(
     return result
 
 
-@router.get("/credentials", summary="List credentials", operation_id="list_aap_credentials")
+@router.get("/credentials", summary="List AAP credentials", operation_id="list_aap_credentials")
 async def list_credentials(
     query: Annotated[AAPBaseQuery, Depends()],
     current_user: Annotated[User, Depends(get_current_user)],

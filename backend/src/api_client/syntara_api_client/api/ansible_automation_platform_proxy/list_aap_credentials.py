@@ -137,7 +137,7 @@ def sync_detailed(
     integration_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[AAPListResponseAAPCredential | ErrorData]:
-    """List credentials
+    """List AAP credentials
 
      List Ansible Automation Platform credentials (not organization-scoped).
 
@@ -178,7 +178,7 @@ def sync(
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
 ) -> AAPListResponseAAPCredential | ErrorData | None:
-    """List credentials
+    """List AAP credentials
 
      List Ansible Automation Platform credentials (not organization-scoped).
 
@@ -213,7 +213,7 @@ async def asyncio_detailed(
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
 ) -> Response[AAPListResponseAAPCredential | ErrorData]:
-    """List credentials
+    """List AAP credentials
 
      List Ansible Automation Platform credentials (not organization-scoped).
 
@@ -251,7 +251,7 @@ async def asyncio(
     credential_id: None | Unset | UUID = UNSET,
     integration_id: None | Unset | UUID = UNSET,
 ) -> AAPListResponseAAPCredential | ErrorData | None:
-    """List credentials
+    """List AAP credentials
 
      List Ansible Automation Platform credentials (not organization-scoped).
 

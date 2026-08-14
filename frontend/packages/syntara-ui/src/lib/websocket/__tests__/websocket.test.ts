@@ -570,7 +570,7 @@ describe('WebSocket ticket auth', () => {
 
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(mockPost).toHaveBeenCalledWith('/auth/ws-ticket')
+    expect(mockPost).toHaveBeenCalledWith('/auth/ws_ticket')
     expect(mockWebSocketInstances).toHaveLength(1)
     expect(mockWebSocketInstances[0].url).toContain('ticket=test-ticket-123')
   })

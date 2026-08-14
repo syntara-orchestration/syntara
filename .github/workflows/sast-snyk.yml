@@ -12,6 +12,13 @@ on:
       - '.github/workflows/sast-snyk.yml'
   workflow_dispatch:
   workflow_call:
+    secrets:
+      SNYK_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   snyk-sast:

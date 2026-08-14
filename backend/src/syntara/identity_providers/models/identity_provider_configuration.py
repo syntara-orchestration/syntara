@@ -45,7 +45,7 @@ class OIDCGroupMappingEntry(SQLModel):
     """
 
     idp_group_value: str = Field(min_length=1, description="Group value from the IdP token (e.g. GUID or role name)")
-    nexus_group_id: UUID = Field(description="ID of the Nexus group to map to")
+    mapped_group_id: UUID = Field(description="ID of the group to map to")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -287,8 +287,8 @@ IdentityProviderConfiguration = Annotated[
 ]
 
 
-class OIDCConfigurationPatch(BaseConsumerConfiguration):
-    """Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
+class OIDCConfigurationUpdate(BaseConsumerConfiguration):
+    """Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
 
     provider_type: Literal["oidc"] = "oidc"
 
@@ -383,9 +383,9 @@ class OIDCConfigurationPatch(BaseConsumerConfiguration):
         return frozenset({"client_secret"})
 
 
-IdentityProviderConfigurationPatchTypes = OIDCConfigurationPatch
-IdentityProviderConfigurationPatch = Annotated[
-    IdentityProviderConfigurationPatchTypes,
+IdentityProviderConfigurationUpdateTypes = OIDCConfigurationUpdate
+IdentityProviderConfigurationUpdate = Annotated[
+    IdentityProviderConfigurationUpdateTypes,
     Field(discriminator="provider_type"),
 ]
 

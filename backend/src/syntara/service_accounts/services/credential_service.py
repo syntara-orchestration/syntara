@@ -15,10 +15,10 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.credential_schemas import (
-    SACredentialCreateResponse,
-    SACredentialListResponse,
-    SACredentialRead,
-    SACredentialRotateResponse,
+    ServiceAccountCredentialCreateResponse,
+    ServiceAccountCredentialListResponse,
+    ServiceAccountCredentialRead,
+    ServiceAccountCredentialRotateResponse,
 )
 from syntara.service_accounts.exceptions import (
     CredentialExpirationExceededError,
@@ -35,12 +35,12 @@ from syntara.service_accounts.models.service_account_credential import (
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class SACredentialConvertMixin(ConvertResourceMixin):
-    """Convert ServiceAccountCredential model to SACredentialRead response."""
+class ServiceAccountCredentialConvertMixin(ConvertResourceMixin):
+    """Convert ServiceAccountCredential model to ServiceAccountCredentialRead response."""
 
-    def convert_resource(self, resource: ServiceAccountCredential) -> SACredentialRead:  # type: ignore[override]
+    def convert_resource(self, resource: ServiceAccountCredential) -> ServiceAccountCredentialRead:  # type: ignore[override]
         """Convert credential to read schema."""
-        return SACredentialRead.model_validate(resource)
+        return ServiceAccountCredentialRead.model_validate(resource)
 
 
 class ServiceAccountCredentialService(BaseService):
@@ -48,7 +48,7 @@ class ServiceAccountCredentialService(BaseService):
 
     def __init__(self, session: AsyncSession, user: User) -> None:
         """Initialize with database session and current user."""
-        super().__init__(session, user, convert_resource_mixin=SACredentialConvertMixin())
+        super().__init__(session, user, convert_resource_mixin=ServiceAccountCredentialConvertMixin())
 
     @staticmethod
     def _generate_credential(
@@ -262,13 +262,13 @@ class ServiceAccountCredentialService(BaseService):
         query_params_items: list[tuple[str, str]] | None = None,
         *,
         include_total: bool = False,
-    ) -> SACredentialListResponse:
+    ) -> ServiceAccountCredentialListResponse:
         """List credentials for a service account."""
         sa_filter = [("service_account_id", str(service_account_id))]
         all_params = sa_filter + list(query_params_items or [])
         response = await self.list_resources(
             model=ServiceAccountCredential,
-            response_type=SACredentialListResponse,
+            response_type=ServiceAccountCredentialListResponse,
             limit=limit,
             cursor=cursor,
             sort=sort,
@@ -283,24 +283,24 @@ class ServiceAccountCredentialService(BaseService):
         response.max_lifetime_days = settings.sa_credential_max_lifetime_days
         return response
 
-    def to_read(self, credential: ServiceAccountCredential) -> SACredentialRead:
+    def to_read(self, credential: ServiceAccountCredential) -> ServiceAccountCredentialRead:
         """Convert a credential to a read response."""
-        return SACredentialRead.model_validate(credential)
+        return ServiceAccountCredentialRead.model_validate(credential)
 
     def to_create_response(
         self,
         credential: ServiceAccountCredential,
         plaintext_secret: str,
-    ) -> SACredentialCreateResponse:
+    ) -> ServiceAccountCredentialCreateResponse:
         """Convert a credential to a create response with one-time secret."""
-        read_data = SACredentialRead.model_validate(credential).model_dump()
-        return SACredentialCreateResponse(**read_data, client_secret=plaintext_secret)
+        read_data = ServiceAccountCredentialRead.model_validate(credential).model_dump()
+        return ServiceAccountCredentialCreateResponse(**read_data, client_secret=plaintext_secret)
 
     def to_rotate_response(
         self,
         credential: ServiceAccountCredential,
         plaintext_secret: str,
-    ) -> SACredentialRotateResponse:
+    ) -> ServiceAccountCredentialRotateResponse:
         """Convert a credential to a rotate response with new secret."""
-        read_data = SACredentialRead.model_validate(credential).model_dump()
-        return SACredentialRotateResponse(**read_data, client_secret=plaintext_secret)
+        read_data = ServiceAccountCredentialRead.model_validate(credential).model_dump()
+        return ServiceAccountCredentialRotateResponse(**read_data, client_secret=plaintext_secret)
