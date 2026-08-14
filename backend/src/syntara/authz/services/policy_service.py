@@ -67,8 +67,9 @@ class PolicyService(BaseService):
         or 'any' if all statements have scope='any'.
         """
         for s in statements:
-            if s.get("scope") in ("project", "self", "own"):
-                return s["scope"]
+            scope = s.get("scope")
+            if scope in ("project", "self", "own"):
+                return str(scope)
         return "any"
 
     @staticmethod
