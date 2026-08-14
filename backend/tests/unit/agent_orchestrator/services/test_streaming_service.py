@@ -196,6 +196,28 @@ class TestWebSocketStreamingHandlerWaitForStreamReady:
             )
 
 
+class TestAAP86853InvocationStatusLookupRegression:
+    """Regression tests for AAP-86853 Row vs Invocation model status access."""
+
+    def test_row_shaped_lookup_result_lacks_status_attribute_aap_86853(self) -> None:
+        """Row-like one_or_none() results are not ORM models and lack .status."""
+
+        class RowShapedLookup:
+            """Minimal stand-in for sqlalchemy Row returned by one_or_none()."""
+
+            def __init__(self, status_value: InvocationStatus) -> None:
+                self._values = (status_value,)
+
+            def __getitem__(self, index: int) -> InvocationStatus:
+                return self._values[index]
+
+        row_shaped = RowShapedLookup(InvocationStatus.RUNNING)
+
+        assert row_shaped[0] == InvocationStatus.RUNNING
+        with pytest.raises(AttributeError):
+            _ = row_shaped.status
+
+
 class TestWebSocketStreamingHandlerCheckInvocationExists:
     """Test _check_invocation_exists method."""
 
