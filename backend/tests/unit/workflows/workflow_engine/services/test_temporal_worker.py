@@ -776,7 +776,7 @@ class TestBackgroundWorkerConfiguration:
         async def mock_run_worker(start_fn: object, **_: object) -> None:
             # Actually invoke the _start callback so start_worker gets called
             if callable(start_fn):
-                await start_fn()  # type: ignore[operator]
+                await start_fn()
 
         with (
             patch("syntara.workflows.background_worker.start_worker", side_effect=mock_start_worker),
