@@ -138,7 +138,7 @@ export function AssignProjectRoleModal({
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const debouncedUserSearch = useDebouncedValue(userSearchTerm)
 
-  const usersQuery = accessClient.useQuery('get', '/users_directory', {
+  const usersQuery = accessClient.useQuery('get', '/users/directory', {
     params: {
       query: {
         sort: 'username',
@@ -152,7 +152,7 @@ export function AssignProjectRoleModal({
   const [groupSearchTerm, setGroupSearchTerm] = useState('')
   const debouncedGroupSearch = useDebouncedValue(groupSearchTerm)
 
-  const groupsQuery = accessClient.useQuery('get', '/groups_directory', {
+  const groupsQuery = accessClient.useQuery('get', '/groups/directory', {
     params: {
       query: {
         sort: 'name',

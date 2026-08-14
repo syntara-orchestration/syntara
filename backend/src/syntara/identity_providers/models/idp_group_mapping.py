@@ -18,9 +18,9 @@ class IdpGroupMappingEntry(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     identity_provider_id: UUID = Field(foreign_key="identity_providers.id", ondelete="CASCADE", index=True)
     idp_group_value: str = Field(min_length=1)
-    nexus_group_id: UUID = Field(foreign_key="groups.id", ondelete="CASCADE", index=True)
+    mapped_group_id: UUID = Field(foreign_key="groups.id", ondelete="CASCADE", index=True)
 
-    __table_args__ = (UniqueConstraint("identity_provider_id", "idp_group_value", "nexus_group_id"),)
+    __table_args__ = (UniqueConstraint("identity_provider_id", "idp_group_value", "mapped_group_id"),)
 
 
 class IdpGroupMappingEntryRead(SQLModel):
@@ -28,11 +28,11 @@ class IdpGroupMappingEntryRead(SQLModel):
 
     id: UUID
     idp_group_value: str
-    nexus_group_id: UUID
+    mapped_group_id: UUID
 
 
 class IdpGroupMappingEntryCreate(SQLModel):
     """Create schema for a group mapping entry."""
 
     idp_group_value: str = Field(min_length=1)
-    nexus_group_id: UUID
+    mapped_group_id: UUID

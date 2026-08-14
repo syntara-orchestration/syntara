@@ -15,14 +15,14 @@ import { NxSelect } from '../../../components/NxSelect'
 
 import { computeRemainingGracePeriod, DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { serviceAccountHelp } from './serviceAccountFieldHelp'
-import type { SACredentialRead } from './serviceAccountTypes'
+import type { ServiceAccountCredentialRead } from './serviceAccountTypes'
 
 export function RotateDialogBody({
   credential,
   gracePeriod,
   onGracePeriodChange,
 }: Readonly<{
-  credential: SACredentialRead | null
+  credential: ServiceAccountCredentialRead | null
   gracePeriod: number
   onGracePeriodChange: (value: number) => void
 }>) {

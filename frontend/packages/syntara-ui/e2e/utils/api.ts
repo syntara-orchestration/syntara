@@ -247,7 +247,7 @@ export type IdentityProviderResource = {
   name?: string
   configuration?: {
     group_jmespath_expression?: string | null
-    group_mapping_entries?: Array<{ idp_group_value: string; nexus_group_id: string }>
+    group_mapping_entries?: Array<{ idp_group_value: string; mapped_group_id: string }>
     claim_mapping?: Record<string, string | null>
   }
 }

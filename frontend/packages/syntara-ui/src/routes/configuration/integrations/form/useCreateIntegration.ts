@@ -14,6 +14,7 @@ import type { IntegrationFormData } from './integrationFormSchema'
 
 type UseCreateIntegrationOptions = {
   handleError: ReturnType<typeof useFormMutationErrorHandler>
+  onBeforeNavigate?: () => void
 }
 
 type InitialToolSelection = {
@@ -25,7 +26,7 @@ type InitialToolSelection = {
 
 type InitialModelSelection = IntegrationsAPI.components['schemas']['InitialModelSelection']
 
-export function useCreateIntegration({ handleError }: UseCreateIntegrationOptions) {
+export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreateIntegrationOptions) {
   const { mutateAsync: createIntegration } = integrationsClient.useMutation('post', '/integrations')
   const { syncAssignments } = useProjectAssignmentSync()
   const queryClient = useQueryClient()
@@ -70,6 +71,7 @@ export function useCreateIntegration({ handleError }: UseCreateIntegrationOption
                   variant: 'warning',
                   autoDismiss: true,
                 })
+                onBeforeNavigate?.()
                 navigateToList()
                 return
               }
@@ -81,6 +83,7 @@ export function useCreateIntegration({ handleError }: UseCreateIntegrationOption
               variant: 'success',
               autoDismiss: true,
             })
+            onBeforeNavigate?.()
             navigateToList()
           } catch (error: unknown) {
             handleError({ title: 'Failed to add integration', context })(error)
@@ -88,6 +91,6 @@ export function useCreateIntegration({ handleError }: UseCreateIntegrationOption
         })()
       )
     },
-    [createIntegration, syncAssignments, queryClient, handleError, showAlert]
+    [createIntegration, syncAssignments, queryClient, handleError, showAlert, onBeforeNavigate]
   )
 }

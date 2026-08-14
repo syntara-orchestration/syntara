@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="IdentityProviderResponseLabels")
+T = TypeVar("T", bound="IdentityProviderReadLabels")
 
 
 @_attrs_define
-class IdentityProviderResponseLabels:
+class IdentityProviderReadLabels:
     """Key-value pairs for resource labeling and filtering
 
     Example:
@@ -29,10 +29,10 @@ class IdentityProviderResponseLabels:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        identity_provider_response_labels = cls()
+        identity_provider_read_labels = cls()
 
-        identity_provider_response_labels.additional_properties = d
-        return identity_provider_response_labels
+        identity_provider_read_labels.additional_properties = d
+        return identity_provider_read_labels
 
     @property
     def additional_keys(self) -> list[str]:

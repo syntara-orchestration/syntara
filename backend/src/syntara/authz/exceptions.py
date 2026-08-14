@@ -81,6 +81,22 @@ class BuiltinProtectionError(NexusError):
     """Raised when attempting to modify or delete a builtin resource."""
 
 
+def _default_project_protection_handler(request: Request, exc: NexusError) -> JSONResponse:
+    return create_problem_details_response(
+        status_code=status.HTTP_403_FORBIDDEN,
+        problem_type=PROBLEM_TYPES["forbidden"],
+        title="Default Project Protected",
+        detail=exc.message,
+        code="DEFAULT_PROJECT_PROTECTED",
+        instance=str(request.url),
+    )
+
+
+@fastapi_exception(handler=_default_project_protection_handler)
+class DefaultProjectProtectionError(NexusError):
+    """Raised when attempting to delete the default project."""
+
+
 @fastapi_exception(handler=_conflict_handler)
 class PolicyNameConflictError(NexusError):
     """Raised when a policy name already exists in the same scope."""

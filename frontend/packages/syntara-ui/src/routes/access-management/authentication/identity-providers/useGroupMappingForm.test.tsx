@@ -120,7 +120,7 @@ describe('useGroupMappingFormMetadata', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+          group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
         },
       },
       isLoading: false,
@@ -317,11 +317,11 @@ describe('useGroupMappingEditForm', () => {
           providerId: VALID_PROVIDER_ID,
           config: {
             ...mockProvider.configuration,
-            group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+            group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
           },
           defaultExpression: 'groups[*]',
           groupMappingConfig: {
-            group_mapping_entries: [{ idp_group_value: 'admin', nexus_group_id: MOCK_GROUP_ID }],
+            group_mapping_entries: [{ idp_group_value: 'admin', mapped_group_id: MOCK_GROUP_ID }],
           },
           idpType: 'custom',
         }),

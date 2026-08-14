@@ -266,13 +266,11 @@ class ToolManagerClient:
 
     @retry_with_backoff
     async def update_tool_status(self, tool_id: UUID, status: ToolStatus, refresh_error: str | None = None) -> None:
-        """Update tool status in Tool Manager.
+        """Report tool ``ERROR`` status and optional ``refresh_error`` to Tool Manager.
 
-        Reports tool execution status back to Tool Manager for operational visibility.
-        Used to update tool status to ERROR when execution fails, or back to
-        AVAILABLE when tools recover. Tools are automatically disabled when their
-        status is set to MISSING or ERROR, and automatically enabled when their
-        status is set to AVAILABLE.
+        Production callers use this after execution failures. Records ``status`` /
+        ``refresh_error`` only; the ``enabled`` flag is administrator-owned and is
+        never modified here.
 
         Args:
             tool_id: UUID of the tool to update
@@ -290,15 +288,7 @@ class ToolManagerClient:
             msg = "Tool ID cannot be None"
             raise SafeValueError(msg)
 
-        # Build request payload
-        update_data: dict[str, str | None | bool] = {"status": status.value, "refresh_error": refresh_error}
-
-        # Disable tool if status is missing or error
-        if status in (ToolStatus.MISSING, ToolStatus.ERROR):
-            update_data["enabled"] = False
-        # Enable tool if status is available
-        elif status == ToolStatus.AVAILABLE:
-            update_data["enabled"] = True
+        update_data: dict[str, str | None] = {"status": status.value, "refresh_error": refresh_error}
 
         logger.debug(
             "Updating tool status",

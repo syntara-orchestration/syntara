@@ -12,8 +12,8 @@ from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client import Client
 from syntara_api_client.models.body_token import BodyToken
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
 from syntara_api_client.models.service_account_create import ServiceAccountCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ def create_sa_with_credential(
 
     cred = api.service_account_credentials.create(
         service_account_id=sa.id,
-        body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+        body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
     ).assert_and_get()
 
     return sa, cred.identifier, cred.client_secret

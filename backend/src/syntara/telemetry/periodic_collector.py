@@ -11,7 +11,7 @@ cross-instance coordination via PostgreSQL advisory locks.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -42,7 +42,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from syntara.settings.cache.settings_cache import SettingsCache
     from syntara.telemetry.client import TelemetryClientRegistry
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -129,16 +128,12 @@ class PeriodicCollector:
         self,
         registry: TelemetryClientRegistry,
         session_factory: async_sessionmaker[AsyncSession] = AsyncSessionLocal,
-        settings_cache: SettingsCache | None = None,
     ) -> None:
         """Initialize the periodic collector.
 
         Args:
             registry: Telemetry client registry for sending events.
             session_factory: Async session maker for database access.
-            settings_cache: Optional settings cache; when provided, the
-                collector restarts automatically when Segment settings
-                change at runtime.
 
         """
         self._registry = registry
@@ -160,28 +155,9 @@ class PeriodicCollector:
             coordinate=True,
         )
 
-        if settings_cache is not None:
-            self._watch_settings(settings_cache)
-
     def start(self) -> None:
         """Start the background collection task."""
         self._worker.start()
-
-    def _watch_settings(self, cache: SettingsCache) -> None:
-        """Register for telemetry setting changes to restart the collector."""
-
-        async def _on_segment_change(_key: str, _value: Any) -> None:  # noqa: ANN401
-            await self.restart()
-
-        async def _on_interval_change(_key: str, value: Any) -> None:  # noqa: ANN401
-            interval = int(value) if value else get_settings().collection_interval_seconds
-            self._worker._interval_seconds = interval  # noqa: SLF001
-            logger.info("periodic_collector_interval_updated", interval_seconds=interval)
-            await self.restart()
-
-        cache.on_change("telemetry.segment_write_key", _on_segment_change)
-        cache.on_change("telemetry.segment_endpoint", _on_segment_change)
-        cache.on_change("telemetry.collection_interval_seconds", _on_interval_change)
 
     async def restart(self) -> None:
         """Restart the background task and run an immediate collection cycle."""

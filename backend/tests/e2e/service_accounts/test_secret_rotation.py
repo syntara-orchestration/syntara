@@ -18,9 +18,9 @@ from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client import Client
 from syntara_api_client.api.authentication.token import sync_detailed
 from syntara_api_client.models.body_token import BodyToken
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
-from syntara_api_client.models.sa_credential_rotate_request import SACredentialRotateRequest
 from syntara_api_client.models.service_account_create import ServiceAccountCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
+from syntara_api_client.models.service_account_credential_rotate_request import ServiceAccountCredentialRotateRequest
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ class TestSecretRotationGracePeriod:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+                body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
 
             old_secret = cred.client_secret
@@ -66,7 +66,7 @@ class TestSecretRotationGracePeriod:
             rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
-                body=SACredentialRotateRequest(grace_period_seconds=3600),
+                body=ServiceAccountCredentialRotateRequest(grace_period_seconds=3600),
             ).assert_and_get()
 
             new_secret = rotated.client_secret
@@ -101,7 +101,7 @@ class TestSecretRotationGraceExpiry:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+                body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
 
             old_secret = cred.client_secret
@@ -110,7 +110,7 @@ class TestSecretRotationGraceExpiry:
             rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
-                body=SACredentialRotateRequest(grace_period_seconds=self.GRACE_PERIOD_SECONDS),
+                body=ServiceAccountCredentialRotateRequest(grace_period_seconds=self.GRACE_PERIOD_SECONDS),
             ).assert_and_get()
 
             new_secret = rotated.client_secret

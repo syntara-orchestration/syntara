@@ -90,7 +90,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | ErrorData]:
-    """Delete credential
+    """Delete service account credential
 
      Hard-delete a credential.
 
@@ -124,7 +124,7 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> Any | ErrorData | None:
-    """Delete credential
+    """Delete service account credential
 
      Hard-delete a credential.
 
@@ -153,7 +153,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | ErrorData]:
-    """Delete credential
+    """Delete service account credential
 
      Hard-delete a credential.
 
@@ -185,7 +185,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> Any | ErrorData | None:
-    """Delete credential
+    """Delete service account credential
 
      Hard-delete a credential.
 
