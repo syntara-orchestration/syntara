@@ -161,7 +161,6 @@ class ExpressionResolver:
     Supports:
     - ${input.field_name} - workflow inputs
     - ${variables.var_name} - workflow variables
-    - ${secrets.secret_name} - workflow secrets
     - ${activity_id.field} - activity outputs (direct field access)
     - ${activity_id.output.field} - activity outputs (via output key)
     - ${iteration_index} - loop iteration index
@@ -339,10 +338,6 @@ class ExpressionResolver:
         if parts[0] == "variables":
             return self._resolve_variable_reference(parts, workflow_state)
 
-        # Handle secrets references
-        if parts[0] == "secrets":
-            return self._resolve_secrets_reference(parts, workflow_state)
-
         # Handle special loop variables
         if expr in workflow_state:
             return workflow_state[expr]
@@ -400,20 +395,6 @@ class ExpressionResolver:
 
         """
         value = workflow_state.get("variables", {})
-        return self._navigate_nested_path(value, parts[1:])
-
-    def _resolve_secrets_reference(self, parts: list[str], workflow_state: dict[str, Any]) -> object:
-        """Resolve secrets reference expression.
-
-        Args:
-            parts: Expression parts (e.g., ['secrets', 'secret_name'])
-            workflow_state: Current workflow state
-
-        Returns:
-            Resolved secret value
-
-        """
-        value = workflow_state.get("secrets", {})
         return self._navigate_nested_path(value, parts[1:])
 
     def _resolve_activity_output(self, parts: list[str], workflow_state: dict[str, Any]) -> object:

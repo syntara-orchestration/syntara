@@ -38354,16 +38354,12 @@ components:
           additionalProperties: true
           type: object
           title: Query Params
-        authentication:
-          anyOf:
-            - $ref: '#/components/schemas/Authentication'
-            - type: 'null'
         credential_id:
           anyOf:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+          description: Nexus credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -38814,31 +38810,6 @@ components:
         All fields default to None — the engine merges with global catalog values
         (workflow_engine.retry_*) for any unset field. Set max_retries=0 to
         explicitly disable retry, overriding global defaults.
-    Authentication:
-      properties:
-        type:
-          $ref: '#/components/schemas/AuthenticationType'
-          description: Authentication type
-        credentials:
-          type: string
-          pattern: ^\$\{secrets\.[a-zA-Z0-9_]+\}$
-          title: Credentials
-          description: Reference to stored credentials
-      type: object
-      required:
-        - type
-        - credentials
-      title: Authentication
-      description: Authentication configuration for API requests.
-    AuthenticationType:
-      type: string
-      enum:
-        - basic
-        - bearer
-        - api_key
-        - oauth2
-      title: AuthenticationType
-      description: Supported authentication types for API requests.
     HTTPMethod:
       type: string
       enum:
