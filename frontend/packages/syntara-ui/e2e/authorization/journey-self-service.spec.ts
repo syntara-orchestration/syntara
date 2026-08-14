@@ -6,7 +6,7 @@
  * lead independently onboards a new team member, verifies their access, and
  * later revokes it — all without admin intervention.
  *
- * Requires a live backend — skipped when NEXUS_E2E_PASSWORD is not set.
+ * Requires a live backend — skipped when SYNTARA_E2E_PASSWORD is not set.
  */
 import { test } from '../fixtures'
 import { buildUniqueName } from '../helpers/workflows'
@@ -32,16 +32,16 @@ import {
   createUserApi,
 } from './fixtures'
 
-const isLiveBackend = !!process.env.NEXUS_E2E_PASSWORD
+const isLiveBackend = !!process.env.SYNTARA_E2E_PASSWORD
 
 test.describe('Self-service delegation journey', () => {
-  test.skip(!isLiveBackend, 'Journey tests require a live backend with NEXUS_E2E_PASSWORD')
+  test.skip(!isLiveBackend, 'Journey tests require a live backend with SYNTARA_E2E_PASSWORD')
 
   test('TC-2.2: team lead delegates and revokes access for newcomer', async ({ app }) => {
     const suffix = buildUniqueName('j2')
 
     const adminToken = (await getAuthToken(app))!
-    const adminPassword = process.env.NEXUS_E2E_PASSWORD!
+    const adminPassword = process.env.SYNTARA_E2E_PASSWORD!
 
     const createdUserIds: string[] = []
     let projectId: string | undefined

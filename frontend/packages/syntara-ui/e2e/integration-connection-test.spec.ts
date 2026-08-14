@@ -21,7 +21,7 @@ const processEnv: Record<string, string | undefined> = (
 ).env
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
-const mcpServerUrl = processEnv['NEXUS_E2E_MCP_SERVER_URL']
+const mcpServerUrl = processEnv['SYNTARA_E2E_MCP_SERVER_URL']
 
 async function createLlmCredential(app: Page, name: string): Promise<string> {
   const project = await ensureProject(app)
@@ -40,7 +40,7 @@ test.describe('Integration Wizard @pr-check', () => {
   test('connection test succeeds and discovers resources within 10s', async ({ app }) => {
     test.skip(
       isRealBackend && !mcpServerUrl,
-      'NEXUS_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
+      'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
     )
     const mcpUrl = isRealBackend ? mcpServerUrl! : 'https://mcp-test.example.com/mcp'
     const name = buildUniqueName('e2e-wizard-t7')
@@ -341,7 +341,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
   test('health check status transitions between available and error', async ({ app }) => {
     test.skip(!isRealBackend, 'Requires real backend — mock API validate always returns success')
-    test.skip(!mcpServerUrl, 'NEXUS_E2E_MCP_SERVER_URL not set; requires running MCP server')
+    test.skip(!mcpServerUrl, 'SYNTARA_E2E_MCP_SERVER_URL not set; requires running MCP server')
     test.slow() // validate against unreachable port takes up to ~10s
 
     const name = buildUniqueName('e2e-wizard-t11')
@@ -450,7 +450,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
   test('health check error classifications appear correctly on integration detail page', async ({ app }) => {
     test.skip(!isRealBackend, 'Requires real backend — mock API validate always returns success')
-    test.skip(!mcpServerUrl, 'NEXUS_E2E_MCP_SERVER_URL not set; requires running MCP server')
+    test.skip(!mcpServerUrl, 'SYNTARA_E2E_MCP_SERVER_URL not set; requires running MCP server')
     test.slow() // validate against unreachable port takes up to ~10s
 
     const name = buildUniqueName('e2e-wizard-t13')

@@ -17,8 +17,8 @@
  *   npm run e2e -- v2-workflow-migration.spec.ts
  *
  * Run against real backend:
- *   NEXUS_E2E_BASE_URL=http://localhost:5173 \
- *   NEXUS_E2E_SKIP_WEB_SERVER=true \
+ *   SYNTARA_E2E_BASE_URL=http://localhost:5173 \
+ *   SYNTARA_E2E_SKIP_WEB_SERVER=true \
  *   npm run e2e -- v2-workflow-migration.spec.ts
  */
 import { test, expect, toAppUrl } from './fixtures'

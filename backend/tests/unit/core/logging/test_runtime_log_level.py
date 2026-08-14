@@ -42,8 +42,8 @@ class TestBuildUvicornLoggingConfig:
         config = build_uvicorn_logging_config("INFO")
         assert config["version"] == 1
         assert config["disable_existing_loggers"] is False
-        assert "nexus" in config["formatters"]
-        assert "nexus" in config["handlers"]
+        assert "syntara" in config["formatters"]
+        assert "syntara" in config["handlers"]
 
     def test_uses_provided_log_level(self) -> None:
         config = build_uvicorn_logging_config("DEBUG")

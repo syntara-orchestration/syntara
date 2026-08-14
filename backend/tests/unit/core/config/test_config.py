@@ -275,6 +275,24 @@ class TestServerSettings:
         assert settings.server_port == 8000
         assert settings.server_reload is False
 
+    def test_product_name_defaults_to_community(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Upstream/community build: product_name is 'Syntara' when APP_PRODUCT_NAME is unset."""
+        monkeypatch.delenv("APP_PRODUCT_NAME", raising=False)
+        settings = Settings(_env_file=None)
+        assert settings.product_name == "Syntara"
+
+    def test_product_name_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Product build: product_name uses APP_PRODUCT_NAME when set."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Custom Product")
+        settings = Settings(_env_file=None)
+        assert settings.product_name == "Custom Product"
+
+    def test_product_name_rejects_invalid_characters(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Product name must match the alphanumeric+space pattern."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Bad<Name>!")
+        with pytest.raises(ValidationError, match="pattern"):
+            Settings(_env_file=None)
+
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
         monkeypatch.setenv("APP_SERVER_HOST", "127.0.0.1")

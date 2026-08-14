@@ -11,6 +11,22 @@ function BrandConsumer() {
   return <span data-testid="app-title">{brand.appTitle}</span>
 }
 
+function FullBrandConsumer() {
+  const brand = useBrand()
+  return (
+    <>
+      <span data-testid="app-title">{brand.appTitle}</span>
+      <span data-testid="shell-theme">{brand.shellTheme}</span>
+      <span data-testid="favicon">{brand.faviconPath}</span>
+      <span data-testid="logo-light">{brand.logoExpandedLight}</span>
+      <span data-testid="logo-dark">{brand.logoExpandedDark}</span>
+      <span data-testid="logo-collapsed">{brand.logoCollapsed}</span>
+      <span data-testid="login-light">{brand.logoLoginLight}</span>
+      <span data-testid="login-dark">{brand.logoLoginDark}</span>
+    </>
+  )
+}
+
 function LoginBrandConsumer() {
   const brand = useBrand()
   return (
@@ -141,7 +157,7 @@ describe('BrandProvider', () => {
       expect(document.documentElement.classList.contains('pf-v6-theme-felt')).toBe(false)
     })
 
-    it('adds pf-v6-theme-felt for downstream/product config', () => {
+    it('adds pf-v6-theme-felt for product config', () => {
       render(
         <BrandProvider config={feltShellConfig}>
           <BrandConsumer />
@@ -159,6 +175,115 @@ describe('BrandProvider', () => {
       expect(document.documentElement.classList.contains('pf-v6-theme-felt')).toBe(true)
       unmount()
       expect(document.documentElement.classList.contains('pf-v6-theme-felt')).toBe(false)
+    })
+  })
+
+  describe('upstream defaults (no brand config)', () => {
+    it('shows community app title', () => {
+      render(
+        <BrandProvider>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('app-title')).toHaveTextContent('Syntara')
+    })
+
+    it('uses default shell theme (no Felt)', () => {
+      render(
+        <BrandProvider>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('shell-theme')).toHaveTextContent('default')
+      expect(document.documentElement.classList.contains('pf-v6-theme-felt')).toBe(false)
+    })
+
+    it('points favicon at community icon', () => {
+      render(
+        <BrandProvider>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('favicon').textContent).toMatch(/icon/)
+    })
+
+    it('uses identical login assets for light and dark', () => {
+      render(
+        <BrandProvider>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      const light = screen.getByTestId('login-light').textContent
+      const dark = screen.getByTestId('login-dark').textContent
+      expect(light).toBe(dark)
+    })
+  })
+
+  describe('product config (brand config with product values)', () => {
+    const productConfig: BrandConfig = {
+      appTitle: 'Custom Product',
+      faviconPath: '/custom-favicon.svg',
+      logoExpandedLight: '/custom-logo-light.svg',
+      logoExpandedDark: '/custom-logo-dark.svg',
+      logoCollapsed: '/custom-icon.svg',
+      logoLoginLight: '/custom-login-light.svg',
+      logoLoginDark: '/custom-login-dark.svg',
+      shellTheme: 'felt',
+    }
+
+    afterEach(() => {
+      document.documentElement.classList.remove('pf-v6-theme-felt')
+    })
+
+    it('shows product app title', () => {
+      render(
+        <BrandProvider config={productConfig}>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('app-title')).toHaveTextContent('Custom Product')
+    })
+
+    it('applies Felt theme', () => {
+      render(
+        <BrandProvider config={productConfig}>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('shell-theme')).toHaveTextContent('felt')
+      expect(document.documentElement.classList.contains('pf-v6-theme-felt')).toBe(true)
+    })
+
+    it('uses product favicon', () => {
+      render(
+        <BrandProvider config={productConfig}>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      expect(screen.getByTestId('favicon')).toHaveTextContent('/custom-favicon.svg')
+    })
+
+    it('uses distinct login assets for light and dark', () => {
+      render(
+        <BrandProvider config={productConfig}>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      const light = screen.getByTestId('login-light').textContent
+      const dark = screen.getByTestId('login-dark').textContent
+      expect(light).toBe('/custom-login-light.svg')
+      expect(dark).toBe('/custom-login-dark.svg')
+      expect(light).not.toBe(dark)
+    })
+
+    it('has no accessibility violations', async () => {
+      const { container } = render(
+        <BrandProvider config={productConfig}>
+          <FullBrandConsumer />
+        </BrandProvider>
+      )
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
     })
   })
 })
