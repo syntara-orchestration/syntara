@@ -305,7 +305,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
                     <RhUiHistoryIcon />
                   </Icon>
                   <Title headingLevel="h2" size={TitleSizes.md}>
-                    Run History
+                    Run history
                   </Title>
                 </Flex>
                 <Content component={ContentVariants.small}>View past runs of this workflow.</Content>
