@@ -120,7 +120,7 @@ function ApproverUsersSelect({
           getItemId={(item) => item.id}
           getItemValue={(item) => item.username}
           getItemLabel={(item) => item.username}
-          placeholderText={APPROVER_USERS_PLACEHOLDER}
+          placeholderText={isPermissionDenied ? 'Type a username and press Enter' : APPROVER_USERS_PLACEHOLDER}
           emptyText={isPermissionDenied ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
           loadingText={APPROVER_USERS_LOADING}
           helperText={APPROVER_USERS_HELPER_TEXT}
