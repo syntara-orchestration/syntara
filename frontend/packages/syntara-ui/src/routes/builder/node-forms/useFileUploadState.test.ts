@@ -523,6 +523,8 @@ describe('useFileUploadState', () => {
 
     await waitFor(() => {
       expect(removeFile).toHaveBeenCalledWith('session-a')
+    })
+    await waitFor(() => {
       expect(removeFile).toHaveBeenCalledWith('session-b')
     })
     await waitFor(() => {
@@ -531,10 +533,11 @@ describe('useFileUploadState', () => {
   })
 
   it('multi-file replace stops on first DELETE failure and only clears prior successes', async () => {
-    vi.mocked(deleteFileById).mockImplementation(async (fileId: string) => {
+    vi.mocked(deleteFileById).mockImplementation((fileId: string) => {
       if (fileId === 'session-b') {
-        throw new Error('network')
+        return Promise.reject(new Error('network'))
       }
+      return Promise.resolve()
     })
 
     const { result, rerender } = renderHook(({ ctx }) => useFileUploadState(ctx, 'project-1'), {
@@ -695,6 +698,8 @@ describe('useFileUploadState', () => {
     })
     await waitFor(() => {
       expect(removeFile).toHaveBeenCalledWith('session-a')
+    })
+    await waitFor(() => {
       expect(removeFile).toHaveBeenCalledWith('session-b')
     })
   })
