@@ -183,7 +183,14 @@ def validate_url_no_ssrf(
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").lower()
 
+    # Mirror the scheme-layer loopback exception (see _parse_and_validate): loopback hosts
+    # are always permitted over HTTP. Without this, the scheme layer accepts
+    # http://localhost while this SSRF gate rejects it as "scheme 'http' not allowed",
+    # so an allowlisted loopback host with allow_http=False would fail here. Reachability
+    # is still gated by allow_private below, which requires the host to be allowlisted.
+    effective_allow_http = allow_http or _is_loopback(hostname)
+
     if hostname in allowed:
-        validate_safe_url(url, allow_private=True, allow_http=allow_http)
+        validate_safe_url(url, allow_private=True, allow_http=effective_allow_http)
     else:
-        validate_safe_url(url, allow_private=False, allow_http=allow_http)
+        validate_safe_url(url, allow_private=False, allow_http=effective_allow_http)

@@ -769,6 +769,26 @@ class TestIntegrationSsrfValidation:
         assert result.configuration.base_url == "http://localhost:8080"
 
     @pytest.mark.asyncio
+    async def test_create_allows_loopback_when_allowlisted_with_default_allow_http(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # The documented make dev path: a user only adds localhost to
+        # APP_INTEGRATION_URL_ALLOWED_HOSTS and keeps the default allow_http=False. Loopback
+        # is always reachable over HTTP, so create must succeed — the scheme and SSRF layers
+        # agree that http://localhost is permitted once the host is allowlisted.
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://localhost:8080",
+                "allow_http": False,
+            },
+        )
+        settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
+        with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
+            result = await integration_service.create_integration(data)
+        assert result.configuration.base_url == "http://localhost:8080"
+
+    @pytest.mark.asyncio
     async def test_patch_rejects_cloud_metadata(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:

@@ -53,6 +53,17 @@ class TestValidateUrlNoSsrf:
         with patch(_PATCH_GET_SETTINGS, return_value=_settings(["localhost"])):
             validate_integration_url_no_ssrf("http://localhost:8765", allow_http=True)
 
+    def test_localhost_accepted_when_allowlisted_and_allow_http_false(self) -> None:
+        """Accept allowlisted loopback over HTTP even when allow_http is False.
+
+        Mirrors the scheme layer, which always permits loopback over HTTP: the documented
+        ``make dev`` path (allowlist localhost for a local MCP server on 127.0.0.1:8765)
+        uses http://localhost with the default allow_http=False and must not be rejected
+        here after passing the scheme validator.
+        """
+        with patch(_PATCH_GET_SETTINGS, return_value=_settings(["localhost"])):
+            validate_integration_url_no_ssrf("http://localhost:8765", allow_http=False)
+
     def test_loopback_ipv4_accepted_when_allowlisted(self) -> None:
         """Accept 127.0.0.1 loopback when the host is allowlisted."""
         with patch(_PATCH_GET_SETTINGS, return_value=_settings(["127.0.0.1"])):
