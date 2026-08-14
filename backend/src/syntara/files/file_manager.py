@@ -91,52 +91,6 @@ class FileManager:
             raise FileStorageUnavailableError(msg)
         return self._retriever
 
-    async def load_file_with_integrity_check(self, file_metadata: FileMetadata) -> bytes:
-        """Load file content and verify SHA-256 hash integrity.
-
-        Skips verification for legacy files without a stored content_hash.
-
-        Args:
-            file_metadata: FileMetadata with file_path and content_hash
-
-        Returns:
-            File content as bytes
-
-        Raises:
-            FileIntegrityError: If computed hash doesn't match stored hash
-
-        """
-        retriever = self.get_retriever()
-        content = await retriever.load_file(file_metadata.file_path)
-
-        if file_metadata.content_hash is not None:
-            actual_hash = hashlib.sha256(content).hexdigest()
-            if actual_hash != file_metadata.content_hash:
-                logger.critical(
-                    "File integrity check failed",
-                    file_id=str(file_metadata.id),
-                    filename=file_metadata.filename,
-                    storage_backend="s3",
-                    expected_hash=file_metadata.content_hash,
-                    actual_hash=actual_hash,
-                )
-                AuditEventDispatcher.dispatch(
-                    FileIntegrityFailedEvent(
-                        file_id=file_metadata.id,
-                        filename=file_metadata.filename,
-                        storage_backend="s3",
-                        expected_hash=file_metadata.content_hash,
-                        actual_hash=actual_hash,
-                    ),
-                )
-                msg = (
-                    f"File integrity check failed for {file_metadata.id}: "
-                    f"expected {file_metadata.content_hash}, got {actual_hash}"
-                )
-                raise FileIntegrityError(msg)
-
-        return content
-
     async def stream_file_with_integrity_check(self, file_metadata: FileMetadata) -> AsyncGenerator[bytes]:
         """Stream file content while computing SHA-256 incrementally.
 

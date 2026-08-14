@@ -117,7 +117,7 @@ async def save_file_stream(
 ) -> tuple[str, int]:
     """Save uploaded file to storage by streaming chunks.
 
-    Files are saved with the naming pattern: nexus-{file_id}-{sanitized_filename}
+    Files are saved with the naming pattern: orchestrator-{file_id}-{sanitized_filename}
 
     Args:
         stream: Async generator yielding file content chunks
@@ -130,7 +130,7 @@ async def save_file_stream(
 
     """
     safe_filename = sanitize_filename(safe_filename)
-    file_path = f"nexus-{file_id}-{safe_filename}"
+    file_path = f"orchestrator-{file_id}-{safe_filename}"
 
     try:
         saved_path, total_bytes = await retriever.save_file_stream(stream, file_path)
