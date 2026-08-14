@@ -364,6 +364,7 @@ class TestListApprovalsContract:
 
         Validates:
         - Invalid status values return 422 Unprocessable Entity
+        - Invalid UUIDs return 422 Unprocessable Entity
         - Invalid limit values return 422 Unprocessable Entity
         - Error responses match RFC 9457 format
         """
@@ -377,6 +378,21 @@ class TestListApprovalsContract:
             detail=(
                 "Invalid value 'invalid' for field 'status'. "
                 "Valid values are: pending, approved, rejected, expired, cancelled"
+            ),
+            code="VALIDATION_ERROR",
+            retryable=False,
+        )
+
+        # Act & Assert - Invalid execution_id format (validated by parse_filters → _convert_uuid_value)
+        response = await auth_client.get("/api/v1/approvals?execution_id=not-a-uuid")
+        assert response.status_code == 422
+        assert_error_data(
+            response,
+            error_type="https://api.example.com/errors/validation-error",
+            title="Validation Error",
+            detail=(
+                "Invalid UUID value 'not-a-uuid' for field 'execution_id'. "
+                "Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             ),
             code="VALIDATION_ERROR",
             retryable=False,
