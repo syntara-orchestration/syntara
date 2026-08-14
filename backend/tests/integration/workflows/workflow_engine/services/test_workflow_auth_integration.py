@@ -17,6 +17,7 @@ from temporalio.client import (
     Interceptor,
     OutboundInterceptor,
     Schedule,
+    ScheduleActionExecutionStartWorkflow,
     ScheduleActionStartWorkflow,
     ScheduleIntervalSpec,
     ScheduleSpec,
@@ -178,8 +179,10 @@ class TestWorkflowAuthIntegration:
                 for _ in range(60):
                     desc = await schedule_handle.describe()
                     if desc.info.recent_actions:
-                        fired_workflow_id = desc.info.recent_actions[-1].action.workflow_id
-                        break
+                        action_exec = desc.info.recent_actions[-1].action
+                        if isinstance(action_exec, ScheduleActionExecutionStartWorkflow):
+                            fired_workflow_id = action_exec.workflow_id
+                            break
                     await asyncio.sleep(1)
 
                 assert fired_workflow_id is not None, "schedule did not fire within timeout"
