@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures'
 import { navigateToApprovalAndOpen } from '../helpers/approvals'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest } from '../utils/api'
+import { apiRequest, pollExecutionStatus } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -35,12 +35,13 @@ async function createPendingApproval(app: Page): Promise<{ workflowId: string; a
     .catch(() => false)
   test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-  const reachedApproval = await app
-    .getByText('Paused')
-    .waitFor({ state: 'visible', timeout: 30_000 })
+  const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+  test.skip(!executionId, 'Could not extract execution ID from URL')
+
+  const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
     .then(() => true)
     .catch(() => false)
-  test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+  test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
   return { workflowId, approvalName }
 }
