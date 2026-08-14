@@ -7,7 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.sa_credential_list_response import SACredentialListResponse
+from ...models.service_account_credential_list_response import ServiceAccountCredentialListResponse
 from ...models.service_account_credential_status import ServiceAccountCredentialStatus
 from ...models.service_account_credential_type import ServiceAccountCredentialType
 from ...types import UNSET, Response, Unset
@@ -77,9 +77,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | SACredentialListResponse | None:
+) -> ErrorData | ServiceAccountCredentialListResponse | None:
     if response.status_code == 200:
-        response_200 = SACredentialListResponse.from_dict(response.json())
+        response_200 = ServiceAccountCredentialListResponse.from_dict(response.json())
 
         return response_200
 
@@ -131,7 +131,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | SACredentialListResponse]:
+) -> Response[ErrorData | ServiceAccountCredentialListResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -153,8 +153,8 @@ def sync_detailed(
     credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
     status: None | ServiceAccountCredentialStatus | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[ErrorData | SACredentialListResponse]:
-    """List credentials
+) -> Response[ErrorData | ServiceAccountCredentialListResponse]:
+    """List service account credentials
 
      List credentials for a service account with pagination.
 
@@ -172,7 +172,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialListResponse]
+        Response[ErrorData | ServiceAccountCredentialListResponse]
     """
 
     kwargs = _get_kwargs(
@@ -203,8 +203,8 @@ def sync(
     include_total: bool | Unset = False,
     credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
     status: None | ServiceAccountCredentialStatus | Unset = UNSET,
-) -> ErrorData | SACredentialListResponse | None:
-    """List credentials
+) -> ErrorData | ServiceAccountCredentialListResponse | None:
+    """List service account credentials
 
      List credentials for a service account with pagination.
 
@@ -222,7 +222,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialListResponse
+        ErrorData | ServiceAccountCredentialListResponse
     """
 
     return sync_detailed(
@@ -247,8 +247,8 @@ async def asyncio_detailed(
     include_total: bool | Unset = False,
     credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
     status: None | ServiceAccountCredentialStatus | Unset = UNSET,
-) -> Response[ErrorData | SACredentialListResponse]:
-    """List credentials
+) -> Response[ErrorData | ServiceAccountCredentialListResponse]:
+    """List service account credentials
 
      List credentials for a service account with pagination.
 
@@ -266,7 +266,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialListResponse]
+        Response[ErrorData | ServiceAccountCredentialListResponse]
     """
 
     kwargs = _get_kwargs(
@@ -294,8 +294,8 @@ async def asyncio(
     include_total: bool | Unset = False,
     credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
     status: None | ServiceAccountCredentialStatus | Unset = UNSET,
-) -> ErrorData | SACredentialListResponse | None:
-    """List credentials
+) -> ErrorData | ServiceAccountCredentialListResponse | None:
+    """List service account credentials
 
      List credentials for a service account with pagination.
 
@@ -313,7 +313,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialListResponse
+        ErrorData | ServiceAccountCredentialListResponse
     """
 
     return (

@@ -6,7 +6,7 @@ import { generateUUID } from '../../../../utils/generateUUID'
 const PROVIDER_TYPE_OIDC = 'oidc' as const
 
 export type OIDCConfigurationResponse = IdentityProvidersAPI.components['schemas']['OIDCConfigurationResponse']
-type IdentityProviderPatch = IdentityProvidersAPI.components['schemas']['IdentityProviderPatch']
+type IdentityProviderUpdate = IdentityProvidersAPI.components['schemas']['IdentityProviderUpdate']
 
 export type GroupMappingEntry = {
   key: string
@@ -51,12 +51,12 @@ export function validateGroupJmespathExpression(expression: string): string | nu
 
 export type GroupMappingConfig = {
   group_jmespath_expression?: string | null
-  group_mapping_entries?: { idp_group_value: string; nexus_group_id: string }[]
+  group_mapping_entries?: { idp_group_value: string; mapped_group_id: string }[]
 }
 
 type GroupMappingConfigSource = {
   group_jmespath_expression?: string | null
-  group_mapping_entries?: { idp_group_value: string; nexus_group_id: string }[]
+  group_mapping_entries?: { idp_group_value: string; mapped_group_id: string }[]
 }
 
 export function buildGroupMappingConfig(config: GroupMappingConfigSource | undefined): GroupMappingConfig | null {
@@ -76,7 +76,7 @@ export function toFormEntries(config: GroupMappingConfig | null | undefined): Gr
   return config.group_mapping_entries.map((e) => ({
     key: nextKey(),
     idpGroupValue: e.idp_group_value,
-    nexusGroupId: e.nexus_group_id,
+    nexusGroupId: e.mapped_group_id,
   }))
 }
 
@@ -84,7 +84,7 @@ export function buildSavePayload(
   providerConfig: OIDCConfigurationResponse,
   expression: string,
   entries: GroupMappingFormEntry[]
-): IdentityProviderPatch {
+): IdentityProviderUpdate {
   return {
     configuration: {
       ...providerConfig,
@@ -95,7 +95,7 @@ export function buildSavePayload(
       group_jmespath_expression: expression,
       group_mapping_entries: entries
         .filter((e) => e.idpGroupValue && e.nexusGroupId)
-        .map((e) => ({ idp_group_value: e.idpGroupValue, nexus_group_id: e.nexusGroupId })),
+        .map((e) => ({ idp_group_value: e.idpGroupValue, mapped_group_id: e.nexusGroupId })),
     },
   }
 }

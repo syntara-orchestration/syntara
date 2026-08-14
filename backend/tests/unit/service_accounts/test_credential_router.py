@@ -15,11 +15,11 @@ from syntara.service_accounts.credential_router import (
     rotate_credential,
 )
 from syntara.service_accounts.credential_schemas import (
-    SACredentialCreate,
-    SACredentialCreateResponse,
-    SACredentialRead,
-    SACredentialRotateRequest,
-    SACredentialRotateResponse,
+    ServiceAccountCredentialCreate,
+    ServiceAccountCredentialCreateResponse,
+    ServiceAccountCredentialRead,
+    ServiceAccountCredentialRotateRequest,
+    ServiceAccountCredentialRotateResponse,
 )
 from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredential,
@@ -75,15 +75,15 @@ class TestCreateCredential:
         secret = "the-plaintext-secret"  # noqa: S105
 
         mock_service.create_credential.return_value = (cred, secret)
-        mock_service.to_create_response.return_value = SACredentialCreateResponse(
-            **SACredentialRead.model_validate(cred).model_dump(),
+        mock_service.to_create_response.return_value = ServiceAccountCredentialCreateResponse(
+            **ServiceAccountCredentialRead.model_validate(cred).model_dump(),
             client_secret=secret,
         )
 
-        request = SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS)
+        request = ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS)
         result = await create_credential(sa_id, request, mock_service)
 
-        assert isinstance(result, SACredentialCreateResponse)
+        assert isinstance(result, ServiceAccountCredentialCreateResponse)
         assert result.client_secret == secret
         mock_service.create_credential.assert_called_once()
 
@@ -96,10 +96,10 @@ class TestGetCredentialEndpoint:
         sa_id = uuid4()
         cred = _make_credential()
         mock_service.get_credential.return_value = cred
-        mock_service.to_read.return_value = SACredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
 
         result = await get_credential(sa_id, cred.id, mock_service)
-        assert isinstance(result, SACredentialRead)
+        assert isinstance(result, ServiceAccountCredentialRead)
         mock_service.get_credential.assert_called_once_with(cred.id, service_account_id=sa_id)
 
 
@@ -124,15 +124,15 @@ class TestRotateCredentialEndpoint:
         secret = "new-secret"  # noqa: S105
 
         mock_service.rotate_credential.return_value = (cred, secret)
-        mock_service.to_rotate_response.return_value = SACredentialRotateResponse(
-            **SACredentialRead.model_validate(cred).model_dump(),
+        mock_service.to_rotate_response.return_value = ServiceAccountCredentialRotateResponse(
+            **ServiceAccountCredentialRead.model_validate(cred).model_dump(),
             client_secret=secret,
         )
 
-        request = SACredentialRotateRequest()
+        request = ServiceAccountCredentialRotateRequest()
         result = await rotate_credential(sa_id, cred.id, request, mock_service)
 
-        assert isinstance(result, SACredentialRotateResponse)
+        assert isinstance(result, ServiceAccountCredentialRotateResponse)
         mock_service.rotate_credential.assert_called_once_with(
             cred.id,
             service_account_id=sa_id,
@@ -149,10 +149,10 @@ class TestDisableCredentialEndpoint:
         cred = _make_credential()
         cred.status = ServiceAccountCredentialStatus.DISABLED
         mock_service.disable_credential.return_value = cred
-        mock_service.to_read.return_value = SACredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
 
         result = await disable_credential(sa_id, cred.id, mock_service)
-        assert isinstance(result, SACredentialRead)
+        assert isinstance(result, ServiceAccountCredentialRead)
         mock_service.disable_credential.assert_called_once_with(cred.id, service_account_id=sa_id)
 
 
@@ -164,8 +164,8 @@ class TestEnableCredentialEndpoint:
         sa_id = uuid4()
         cred = _make_credential()
         mock_service.enable_credential.return_value = cred
-        mock_service.to_read.return_value = SACredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
 
         result = await enable_credential(sa_id, cred.id, mock_service)
-        assert isinstance(result, SACredentialRead)
+        assert isinstance(result, ServiceAccountCredentialRead)
         mock_service.enable_credential.assert_called_once_with(cred.id, service_account_id=sa_id)

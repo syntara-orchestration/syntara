@@ -109,15 +109,7 @@ make sync-requirements
 
 **Option 1: Full Stack with Containers (Recommended)**
 
-**NOTE**: The UI image is private and requires authentication to the Quay Container Registry (quay.io) and read permissions.
-
-You can authenticate with:
-
-```bash
-podman login quay.io -u <your_quay_username> -p <your_quay_password>
-```
-
-**IMPORTANT**: Before starting the services for the first time, you must build the container images:
+Container images are not published to a public registry. Build them locally with `make build-images`, `podman-compose up --build` from the repo root, or `podman-compose -f frontend/compose.yml up --build` for frontend only. No registry login is required.
 
 ```bash
 # Build container images (required before first run)
@@ -280,9 +272,9 @@ The `podman-compose.yml` defines the following services:
 | **redis** | Cache service | 6379 | `redis-6-c9s` |
 | **temporal** | Temporal workflow engine | 7233 | `temporalio/auto-setup:1.25.1` |
 | **temporal-ui** | Temporal web UI (dev only) | 8081 | `temporalio/ui:2.31.2` |
-| **temporal-worker** | Temporal workflow worker | - | Built from `containers/nexus/Containerfile` |
-| **nexus** | Nexus API service | 8000 | Built from `containers/nexus/Containerfile` |
-| **syntara-ui** | Nexus web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
+| **temporal-worker** | Temporal workflow worker | - | Built from `containers/syntara/Containerfile` |
+| **syntara** | Syntara API service | 8000 | Built from `containers/syntara/Containerfile` |
+| **syntara-ui** | Syntara web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
 
 #### Container Commands
 
@@ -364,7 +356,7 @@ APP_API_PORT=8000
 # UI Configuration
 APP_API_URL=http://localhost:8000
 APP_UI_PORT=8080
-APP_UI_IMAGE=ghcr.io/syntara-orchestration/syntara-ui
+APP_UI_IMAGE=localhost/syntara-ui
 APP_UI_VERSION=latest
 
 # Database Configuration

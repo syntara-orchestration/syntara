@@ -22,6 +22,7 @@ import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
 import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../../components/NxPageTitle'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage } from '../../../../utils/apiErrors'
@@ -249,7 +250,16 @@ export function IntegrationForm() {
   // zodResolver with discriminated unions produces a resolver type that react-hook-form
   // cannot reconcile — the TFieldValues generic diverges. This is a known @hookform/resolvers
   // limitation. The cast is safe because the schema defines the actual validation.
-  const { control, handleSubmit, setError, trigger, setValue, getValues } = useForm<IntegrationFormData>({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    trigger,
+    setValue,
+    getValues,
+    formState: { isDirty },
+    reset,
+  } = useForm<IntegrationFormData>({
     resolver: zodResolver(integrationFormSchema, undefined, { mode: 'sync' }) as Resolver<IntegrationFormData>,
     defaultValues: {
       name: '',
@@ -268,7 +278,14 @@ export function IntegrationForm() {
     },
   })
   const handleError = useFormMutationErrorHandler<IntegrationFormData>(setError)
-  const createIntegration = useCreateIntegration({ handleError })
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
+  })
+  const createIntegration = useCreateIntegration({ handleError, onBeforeNavigate: dismiss })
   const credentialId = useWatch({ control, name: 'management_credential_id' })
   const integrationTypeValue = useWatch({ control, name: 'integration_type' })
   const scopeValue = useWatch({ control, name: 'scope' })

@@ -203,16 +203,20 @@ async def test_file_upload_creates_db_records(
 
 
 @pytest.mark.asyncio
-async def test_callback_url_stored_in_context_data(
+async def test_callback_url_stripped_from_external_context_data(
     auth_client_with_mocked_llm, test_user, test_db_session, test_project_id
 ) -> None:
-    """Verify callback_url in context_data is preserved in invocation."""
+    """Verify callback_url in context_data is stripped for non-cert-authenticated requests.
+
+    External callers must not be able to inject callback_url — the SSRF mitigation
+    in the router strips internal-only fields before persisting.
+    """
     callback_url = "http://example.com/executions/123/activities/456/signal"
     data = {
         "prompt": "Test prompt",
         "session_id": f"callback-test-{uuid4().hex[:8]}",
         "project_id": str(test_project_id),
-        "context_data": f'{{"callback_url": "{callback_url}"}}',
+        "context_data": f'{{"callback_url": "{callback_url}", "agent": "my-agent"}}',
     }
 
     response = await auth_client_with_mocked_llm.post("/api/v1/invocations/chat", data=data)
@@ -222,4 +226,5 @@ async def test_callback_url_stored_in_context_data(
     invocation = await test_db_session.get(Invocation, UUID(invocation_id))
     assert invocation is not None
     assert invocation.context_data is not None
-    assert invocation.context_data.get("callback_url") == callback_url
+    assert invocation.context_data.get("callback_url") is None
+    assert invocation.context_data.get("agent") == "my-agent"

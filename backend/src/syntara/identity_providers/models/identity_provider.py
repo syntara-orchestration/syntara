@@ -18,9 +18,9 @@ from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB
 from syntara.identity_providers.models.identity_provider_configuration import (
     IdentityProviderConfiguration,
-    IdentityProviderConfigurationPatch,
     IdentityProviderConfigurationResponseTypes,
     IdentityProviderConfigurationTypes,
+    IdentityProviderConfigurationUpdate,
 )
 
 
@@ -88,7 +88,7 @@ class IdentityProvider(IdentityProviderBase, table=True):
 # ============================================================================
 
 
-class IdentityProviderResponse(IdentityProviderBase):
+class IdentityProviderRead(IdentityProviderBase):
     """Schema for IdentityProvider response with configuration details (excludes secrets)."""
 
     configuration: IdentityProviderConfigurationResponseTypes = Field(
@@ -112,7 +112,7 @@ class IdentityProviderCreate(SQLModel):
     )
 
 
-class IdentityProviderPatch(SQLModel):
+class IdentityProviderUpdate(SQLModel):
     """Schema for partially updating an identity provider."""
 
     name: str | None = Field(
@@ -128,7 +128,7 @@ class IdentityProviderPatch(SQLModel):
         description="Detailed description of the provider",
     )
 
-    configuration: IdentityProviderConfigurationPatch | None = Field(
+    configuration: IdentityProviderConfigurationUpdate | None = Field(
         default=None,
         description="Provider-specific configuration (client_secret optional — preserves existing if omitted)",
         discriminator="provider_type",
@@ -146,5 +146,5 @@ class IdentityProviderPatch(SQLModel):
 # ============================================================================
 
 
-class IdentityProviderListResponse(ResourcesResponse[IdentityProviderResponse]):
+class IdentityProviderListResponse(ResourcesResponse[IdentityProviderRead]):
     """Paginated list response for identity providers."""
