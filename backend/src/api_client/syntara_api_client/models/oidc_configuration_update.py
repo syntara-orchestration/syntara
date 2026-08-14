@@ -12,12 +12,12 @@ if TYPE_CHECKING:
     from ..models.oidc_group_mapping_entry import OIDCGroupMappingEntry
 
 
-T = TypeVar("T", bound="OIDCConfigurationPatch")
+T = TypeVar("T", bound="OIDCConfigurationUpdate")
 
 
 @_attrs_define
-class OIDCConfigurationPatch:
-    """Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted).
+class OIDCConfigurationUpdate:
+    """Update schema for OIDC configuration (client_secret optional — preserves existing if omitted).
 
     Attributes:
         issuer_url (str): OIDC issuer URL (e.g. https://accounts.google.com)
@@ -391,7 +391,7 @@ class OIDCConfigurationPatch:
 
         disable_tls_verify = _parse_disable_tls_verify(d.pop("disable_tls_verify", UNSET))
 
-        oidc_configuration_patch = cls(
+        oidc_configuration_update = cls(
             issuer_url=issuer_url,
             client_id=client_id,
             redirect_uri=redirect_uri,
@@ -414,4 +414,4 @@ class OIDCConfigurationPatch:
             disable_tls_verify=disable_tls_verify,
         )
 
-        return oidc_configuration_patch
+        return oidc_configuration_update

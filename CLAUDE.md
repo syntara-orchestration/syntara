@@ -36,6 +36,10 @@ Read the component docs when working in that area — they contain detailed stan
 
 ### Skills
 
+Upstream AI agent policy (no executable hooks; private local settings; who may
+change `.claude/`) is documented in
+[`.github/AI_AGENT_POLICY.md`](.github/AI_AGENT_POLICY.md).
+
 Skills live in `.claude/skills/` at the repo root, prefixed by workspace:
 
 - **`frontend-*`** — Frontend-specific skills (coding standards, PR review, PatternFly UX, testing, Playwright E2E, library references)

@@ -50,7 +50,6 @@ from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
     IntegrationListResponse,
-    IntegrationPatch,
     IntegrationProjectAssignment,
     IntegrationProjectAssignmentListResponse,
     IntegrationProjectAssignmentRead,
@@ -61,6 +60,7 @@ from syntara.integrations.models.integration import (
     IntegrationSystemUpdate,
     IntegrationTestConnection,
     IntegrationType,
+    IntegrationUpdate,
     RefreshResult,
 )
 from syntara.integrations.models.llm_model import LLMModel
@@ -576,7 +576,7 @@ class IntegrationService(BaseService):
             return project_ids
         return list(set(rbac_ids) & set(project_ids))
 
-    async def patch_integration(self, integration_id: UUID, data: IntegrationPatch) -> IntegrationRead:
+    async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
             integration = await self._get_or_raise(integration_id)

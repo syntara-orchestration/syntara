@@ -926,7 +926,7 @@ async def _authenticate_websocket(websocket: WebSocket, channel_name: str) -> Us
     """Authenticate a WebSocket connection via single-use ticket.
 
     Clients must exchange their JWT for a short-lived ticket via
-    ``POST /auth/ws-ticket``, then connect with ``?ticket=<ticket>``.
+    ``POST /auth/ws_ticket``, then connect with ``?ticket=<ticket>``.
     This avoids leaking JWTs in server/proxy logs and browser history.
 
     Returns the authenticated User, or None if authentication fails.

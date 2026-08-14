@@ -107,6 +107,10 @@ def sync_detailed(
 
      Validate a workflow definition without saving it.
 
+    Requires authentication but no specific workflow/project permission:
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
+
     Args:
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
@@ -142,6 +146,10 @@ def sync(
 
      Validate a workflow definition without saving it.
 
+    Requires authentication but no specific workflow/project permission:
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
+
     Args:
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
@@ -171,6 +179,10 @@ async def asyncio_detailed(
     """Validate workflow definition
 
      Validate a workflow definition without saving it.
+
+    Requires authentication but no specific workflow/project permission:
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
 
     Args:
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
@@ -204,6 +216,10 @@ async def asyncio(
     """Validate workflow definition
 
      Validate a workflow definition without saving it.
+
+    Requires authentication but no specific workflow/project permission:
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
 
     Args:
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.

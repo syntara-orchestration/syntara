@@ -6,6 +6,7 @@ to send activity completion signals (both success and failure) to workflows.
 
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 import httpx
@@ -16,6 +17,80 @@ from syntara.core.tls.http_client import build_internal_http_client
 logger = structlog.stdlib.get_logger(__name__)
 
 _SIGNAL_HTTP_TIMEOUT_SECONDS = 10.0
+
+
+def validate_signal_url(callback_url: str) -> None:
+    """Validate that callback_url points to a well-formed internal signal endpoint.
+
+    Defense-in-depth against SSRF: validates that the URL path has the
+    canonical ``/executions/{id}/activities/{id}/signal`` shape by
+    round-tripping through ``generate_activity_signal_url``.  Host-level
+    SSRF prevention is handled by ``_sanitize_context_data`` (strips
+    ``callback_url`` from non-cert-authenticated requests) and by
+    ``build_internal_http_client`` (mTLS CA verification).
+
+    Raises:
+        ValueError: If the URL does not match the expected signal endpoint.
+
+    """
+    url_parsed = urlparse(callback_url)
+
+    if url_parsed.scheme not in ("https", "http"):
+        logger.critical(
+            "SECURITY: signal callback URL has invalid scheme",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL must use http or https scheme"
+        raise ValueError(msg)
+
+    if url_parsed.query or url_parsed.fragment:
+        logger.critical(
+            "SECURITY: signal callback URL contains query string or fragment",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL must not contain query string or fragment"
+        raise ValueError(msg)
+
+    parts = url_parsed.path.strip("/").split("/")
+
+    try:
+        exec_idx = parts.index("executions")
+        act_idx = parts.index("activities")
+        sig_idx = parts.index("signal")
+    except ValueError:
+        logger.critical(
+            "SECURITY: signal callback URL path is not a valid signal endpoint — potential SSRF",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg) from None
+
+    if act_idx != exec_idx + 2 or sig_idx != act_idx + 2 or sig_idx != len(parts) - 1:
+        logger.critical(
+            "SECURITY: signal callback URL path structure is invalid",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg)
+
+    try:
+        UUID(parts[exec_idx + 1])
+    except ValueError:
+        logger.critical(
+            "SECURITY: signal callback URL has invalid execution ID",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg) from None
+
+    activity_id = parts[act_idx + 1]
+    if not activity_id:
+        logger.critical(
+            "SECURITY: signal callback URL has empty activity ID",
+            callback_url=callback_url,
+        )
+        msg = "Signal callback URL path is not a valid signal endpoint"
+        raise ValueError(msg)
 
 
 async def _post_signal(callback_url: str, payload: dict[str, Any], invocation_id: UUID) -> None:
@@ -61,6 +136,8 @@ class WorkflowSignalClient:
             httpx.TimeoutException: If request times out
 
         """
+        validate_signal_url(callback_url)
+
         signal_payload = {
             "signal_data": {
                 "id": str(invocation_id),
@@ -118,6 +195,10 @@ class WorkflowSignalClient:
                 invocation_id=invocation_id,
             )
             return
+
+        # Validate URL before the best-effort block so security violations
+        # propagate instead of being silently swallowed.
+        validate_signal_url(callback_url)
 
         signal_payload = {
             "signal_data": {

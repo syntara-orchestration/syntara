@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.credential_schemas import (
-    SACredentialCreateResponse,
-    SACredentialListResponse,
-    SACredentialRead,
-    SACredentialRotateResponse,
+    ServiceAccountCredentialCreateResponse,
+    ServiceAccountCredentialListResponse,
+    ServiceAccountCredentialRead,
+    ServiceAccountCredentialRotateResponse,
 )
 from syntara.service_accounts.exceptions import (
     CredentialExpirationExceededError,
@@ -278,7 +278,7 @@ class TestConversionMethods:
             created_by=uuid4(),
         )
         read = service.to_read(cred)
-        assert isinstance(read, SACredentialRead)
+        assert isinstance(read, ServiceAccountCredentialRead)
         assert read.identifier == "nx_sa_abcdef1234567890"
 
     def test_to_create_response_client_credentials(self, service: ServiceAccountCredentialService) -> None:
@@ -290,7 +290,7 @@ class TestConversionMethods:
             created_by=uuid4(),
         )
         resp = service.to_create_response(cred, "the-secret")
-        assert isinstance(resp, SACredentialCreateResponse)
+        assert isinstance(resp, ServiceAccountCredentialCreateResponse)
         assert resp.client_secret == "the-secret"  # noqa: S105
 
     def test_to_rotate_response(self, service: ServiceAccountCredentialService) -> None:
@@ -302,7 +302,7 @@ class TestConversionMethods:
             created_by=uuid4(),
         )
         resp = service.to_rotate_response(cred, "new-secret")
-        assert isinstance(resp, SACredentialRotateResponse)
+        assert isinstance(resp, ServiceAccountCredentialRotateResponse)
         assert resp.client_secret == "new-secret"  # noqa: S105
 
 
@@ -499,7 +499,7 @@ class TestCredentialMaxLifetime:
 
 
 class TestReadSchemaIncludesRotationField:
-    """Tests that SACredentialRead exposes old_secret_valid_until (AAP-82027)."""
+    """Tests that ServiceAccountCredentialRead exposes old_secret_valid_until (AAP-82027)."""
 
     def test_old_secret_valid_until_populated_from_model(self) -> None:
         rotation_expiry = datetime.now(tz=UTC) + timedelta(hours=1)
@@ -511,7 +511,7 @@ class TestReadSchemaIncludesRotationField:
             old_secret_valid_until=rotation_expiry,
             created_by=uuid4(),
         )
-        read = SACredentialRead.model_validate(cred)
+        read = ServiceAccountCredentialRead.model_validate(cred)
         assert read.old_secret_valid_until == rotation_expiry
 
     def test_old_secret_valid_until_none_when_not_rotating(self) -> None:
@@ -522,23 +522,23 @@ class TestReadSchemaIncludesRotationField:
             hashed_secret="$argon2id$placeholder",  # noqa: S106
             created_by=uuid4(),
         )
-        read = SACredentialRead.model_validate(cred)
+        read = ServiceAccountCredentialRead.model_validate(cred)
         assert read.old_secret_valid_until is None
 
 
-class TestSACredentialListResponse:
-    """Tests for SACredentialListResponse schema fields."""
+class TestServiceAccountCredentialListResponse:
+    """Tests for ServiceAccountCredentialListResponse schema fields."""
 
     def test_max_credentials_defaults_to_constant(self) -> None:
-        response = SACredentialListResponse(resources=[])
+        response = ServiceAccountCredentialListResponse(resources=[])
         assert response.max_credentials == MAX_CREDENTIALS_PER_SA
 
     def test_total_credentials_defaults_to_zero(self) -> None:
-        response = SACredentialListResponse(resources=[])
+        response = ServiceAccountCredentialListResponse(resources=[])
         assert response.total_credentials == 0
 
     def test_total_credentials_can_be_set(self) -> None:
-        response = SACredentialListResponse(resources=[], total_credentials=7)
+        response = ServiceAccountCredentialListResponse(resources=[], total_credentials=7)
         assert response.total_credentials == 7
 
 
@@ -550,7 +550,7 @@ class TestListCredentials:
         self, service: ServiceAccountCredentialService, mock_session: AsyncMock
     ) -> None:
         sa_id = uuid4()
-        mock_response = SACredentialListResponse(resources=[])
+        mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=5)) as mock_count,
@@ -568,7 +568,7 @@ class TestListCredentials:
         self, service: ServiceAccountCredentialService, mock_session: AsyncMock
     ) -> None:
         sa_id = uuid4()
-        mock_response = SACredentialListResponse(resources=[])
+        mock_response = ServiceAccountCredentialListResponse(resources=[])
         extra_params = [("status", "active")]
         with (
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)) as mock_list,
@@ -591,7 +591,7 @@ class TestListCredentials:
         self, service: ServiceAccountCredentialService, mock_session: AsyncMock
     ) -> None:
         sa_id = uuid4()
-        mock_response = SACredentialListResponse(resources=[])
+        mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=3)) as mock_count,
@@ -610,7 +610,7 @@ class TestListCredentials:
     async def test_list_credentials_returns_max_credentials(
         self, service: ServiceAccountCredentialService, mock_session: AsyncMock
     ) -> None:
-        mock_response = SACredentialListResponse(resources=[])
+        mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=0)),

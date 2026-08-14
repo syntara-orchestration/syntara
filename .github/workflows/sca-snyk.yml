@@ -18,6 +18,14 @@ on:
       - '.github/workflows/sca-snyk.yml'
   workflow_dispatch:
   workflow_call:
+    secrets:
+      SNYK_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
 
 jobs:
   changes:

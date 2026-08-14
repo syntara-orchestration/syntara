@@ -1,9 +1,9 @@
 import type { Tool } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
-import { useUnsavedChanges } from '../../../app/useUnsavedChanges'
 import { integrationsClient } from '../../../client'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -19,7 +19,6 @@ export function useResourcesSave(opts: {
   const { integrationId, tools, enabledToolIds, isDirty, resetToServer, isActive } = opts
   const { showAlert } = useAlerts()
   const queryClient = useQueryClient()
-  const { registerDirtyCheck } = useUnsavedChanges()
   const { mutateAsync: updateTools } = integrationsClient.useMutation(
     'patch',
     '/integrations/{integration_id}/tools/bulk_update'
@@ -69,25 +68,15 @@ export function useResourcesSave(opts: {
     detachPromise(handleSaveRef.current?.() ?? Promise.resolve(false))
   }, [])
 
-  const isDirtyRef = useRef(false)
-  isDirtyRef.current = isDirty
-
-  const resetToServerRef = useRef(resetToServer)
-  resetToServerRef.current = resetToServer
-
-  useEffect(() => {
-    return registerDirtyCheck({
-      check: () => isActive && isDirtyRef.current,
-      saveAndExit: () => handleSaveRef.current?.() ?? Promise.resolve(false),
-      exitWithoutSaving: () => {
-        isDirtyRef.current = false
-        resetToServerRef.current()
-      },
-      title: 'Save resource changes?',
-      body: 'You have unsaved changes to enabled resources. Would you like to save before leaving?',
-      saveLabel: 'Save changes',
-    })
-  }, [registerDirtyCheck, isActive])
+  useDirtyFormGuard({
+    isDirty,
+    onSave: () => handleSaveRef.current?.() ?? Promise.resolve(false),
+    onDiscard: resetToServer,
+    title: 'Save resource changes?',
+    body: 'You have unsaved changes to enabled resources. Would you like to save before leaving?',
+    saveLabel: 'Save changes',
+    isActive,
+  })
 
   return { isSaving, handleSave }
 }

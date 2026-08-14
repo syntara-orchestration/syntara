@@ -1004,7 +1004,7 @@ describe('IdentityProviderDetail', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group: 'devs', nexus_group_id: 'g1' }],
+          group_mapping_entries: [{ idp_group_value: 'devs', mapped_group_id: 'g1' }],
         },
       }
       vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn({ data: providerWithMapping }))
@@ -1024,7 +1024,7 @@ describe('IdentityProviderDetail', () => {
         ...mockProvider,
         configuration: {
           ...mockProvider.configuration,
-          group_mapping_entries: [{ idp_group: 'devs', nexus_group_id: 'g1' }],
+          group_mapping_entries: [{ idp_group_value: 'devs', mapped_group_id: 'g1' }],
         },
       }
       vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn({ data: providerWithMapping }))

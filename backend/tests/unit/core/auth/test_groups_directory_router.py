@@ -14,7 +14,7 @@ from syntara.users.groups_directory_router import (
 
 
 class TestListGroupsDirectory:
-    """Tests for GET /groups_directory."""
+    """Tests for GET /groups/directory."""
 
     @pytest.mark.asyncio
     async def test_returns_lightweight_entries(self) -> None:

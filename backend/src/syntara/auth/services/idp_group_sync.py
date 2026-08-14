@@ -81,13 +81,13 @@ def match_group_entries(
         if pattern == "*":
             logger.warning(
                 "Wildcard '*' mapping matches all IdP groups — all provider users added to group",
-                nexus_group_id=str(entry.nexus_group_id),
+                mapped_group_id=str(entry.mapped_group_id),
             )
-            desired.add(entry.nexus_group_id)
+            desired.add(entry.mapped_group_id)
             continue
         for value in idp_group_values:
             if fnmatch(value, pattern):
-                desired.add(entry.nexus_group_id)
+                desired.add(entry.mapped_group_id)
                 break  # no need to check more values for this entry
     return desired
 

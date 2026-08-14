@@ -26,7 +26,7 @@ import { RotateDialogBody } from './RotateDialogBody'
 import { DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { RotationGraceIndicator } from './RotationGraceIndicator'
 import { SecretRevealModal } from './SecretRevealModal'
-import type { SACredentialRead } from './serviceAccountTypes'
+import type { ServiceAccountCredentialRead } from './serviceAccountTypes'
 import { useServiceAccountPermissions } from './useServiceAccountPermissions'
 
 type SecretRevealState = {
@@ -56,7 +56,7 @@ const credentialFilterDefs: FilterFieldDefinition[] = [
 function useCredentialActions(
   serviceAccountId: string,
   refetch: () => Promise<unknown>,
-  onDisableRequest: (cred: SACredentialRead) => void
+  onDisableRequest: (cred: ServiceAccountCredentialRead) => void
 ) {
   const { showSuccess } = useAlerts()
   const handleMutationError = useMutationErrorHandler()
@@ -113,7 +113,7 @@ function useCredentialActions(
   )
 
   const handleEnable = useCallback(
-    (cred: SACredentialRead) => {
+    (cred: ServiceAccountCredentialRead) => {
       enableCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
         {
@@ -126,7 +126,7 @@ function useCredentialActions(
   )
 
   const handleToggleStatus = useCallback(
-    (cred: SACredentialRead) => {
+    (cred: ServiceAccountCredentialRead) => {
       if (cred.status === 'active') {
         onDisableRequest(cred)
         return
@@ -137,7 +137,7 @@ function useCredentialActions(
   )
 
   const handleDisableConfirm = useCallback(
-    (cred: SACredentialRead | null, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, onSettled: () => void) => {
       if (!cred) return
       disableCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
@@ -152,7 +152,7 @@ function useCredentialActions(
   )
 
   const handleRotateConfirm = useCallback(
-    (cred: SACredentialRead | null, gracePeriodSeconds: number, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, gracePeriodSeconds: number, onSettled: () => void) => {
       if (!cred) return
       const validValues = GRACE_PERIOD_OPTIONS.map((opt) => opt.value as number)
       const sanitizedGracePeriod = validValues.includes(gracePeriodSeconds) ? gracePeriodSeconds : DEFAULT_GRACE_PERIOD
@@ -180,7 +180,7 @@ function useCredentialActions(
   )
 
   const handleDeleteConfirm = useCallback(
-    (cred: SACredentialRead | null, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, onSettled: () => void) => {
       if (!cred) return
       deleteCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
@@ -213,10 +213,10 @@ function useCredentialActions(
 }
 
 function getCredentialActions(
-  credential: SACredentialRead,
+  credential: ServiceAccountCredentialRead,
   permissions: ReturnType<typeof useServiceAccountPermissions>,
-  onRotate: (cred: SACredentialRead) => void,
-  onDelete: (cred: SACredentialRead) => void
+  onRotate: (cred: ServiceAccountCredentialRead) => void,
+  onDelete: (cred: ServiceAccountCredentialRead) => void
 ): KebabAction[] {
   return [
     {
@@ -246,12 +246,12 @@ function CredentialsTable({
   onToggleStatus,
   onDelete,
 }: Readonly<{
-  credentials: SACredentialRead[]
+  credentials: ServiceAccountCredentialRead[]
   getSortParams: ReturnType<typeof useTableSort>['getSortParams']
   permissions: ReturnType<typeof useServiceAccountPermissions>
-  onRotate: (cred: SACredentialRead) => void
-  onToggleStatus: (cred: SACredentialRead) => void
-  onDelete: (cred: SACredentialRead) => void
+  onRotate: (cred: ServiceAccountCredentialRead) => void
+  onToggleStatus: (cred: ServiceAccountCredentialRead) => void
+  onDelete: (cred: ServiceAccountCredentialRead) => void
 }>) {
   return (
     <>
@@ -318,9 +318,9 @@ export function CredentialsTab({
   resourceProject,
 }: Readonly<{ serviceAccountId: string; serviceAccountName?: string; resourceProject?: string }>) {
   const permissions = useServiceAccountPermissions({ resourceProject })
-  const deleteDialog = useDialogState<SACredentialRead>()
-  const disableDialog = useDialogState<SACredentialRead>()
-  const rotateDialog = useDialogState<SACredentialRead>()
+  const deleteDialog = useDialogState<ServiceAccountCredentialRead>()
+  const disableDialog = useDialogState<ServiceAccountCredentialRead>()
+  const rotateDialog = useDialogState<ServiceAccountCredentialRead>()
   const [rotateGracePeriod, setRotateGracePeriod] = useState(DEFAULT_GRACE_PERIOD)
 
   const {
