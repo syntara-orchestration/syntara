@@ -793,7 +793,7 @@ class TestListWorkflowSchedulesOptimized:
         result = await service._list_workflow_schedules(client, "wf-123")
 
         assert result == {"orchestrator-sched-wf-123-trigger_1"}
-        client.list_schedules.assert_called_once()
+        client.list_schedules.assert_called_once_with(query='OrchestratorWorkflowId = "wf-123"')
 
     async def test_falls_back_to_prefix_scan(self) -> None:
         """Should use prefix scan when search attr not available."""
@@ -1058,7 +1058,7 @@ class TestListAllSchedules:
         result = await service.list_all_schedules(client)
 
         assert result == {"orchestrator-sched-wf-1-t1", "orchestrator-sched-wf-2-t1"}
-        client.list_schedules.assert_called_once()
+        client.list_schedules.assert_called_once_with(query='OrchestratorWorkflowId != ""')
 
     async def test_falls_back_to_prefix_scan_when_search_attr_unavailable(self) -> None:
         """Should use prefix scan when search attribute is not available."""
