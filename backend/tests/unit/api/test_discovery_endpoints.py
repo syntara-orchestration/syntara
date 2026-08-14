@@ -279,7 +279,6 @@ class TestOldDocsEndpointsRemoved:
             get_settings.cache_clear()
             importlib.reload(main_module)
 
-
     def test_old_redoc_404(self, client: TestClient) -> None:
         assert client.get("/redoc").status_code == 404
 
