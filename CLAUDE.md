@@ -44,8 +44,9 @@ Skills live in `.claude/skills/` at the repo root, prefixed by workspace:
 
 - **`frontend-*`** — Frontend-specific skills (coding standards, PR review, PatternFly UX, testing, Playwright E2E, library references)
 - **`backend-*`** — Backend-specific skills (API spec drift detection)
+- **`maintain-my-prs`** — Rebase and keep the current user's open PRs merge-ready
 
-User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/backend-fix-api-spec-drift`. Reference skills (coding standards, testing guidelines, etc.) are loaded automatically by Claude when working on relevant files.
+User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/backend-fix-api-spec-drift`, `/maintain-my-prs`. Reference skills (coding standards, testing guidelines, etc.) are loaded automatically by Claude when working on relevant files.
 
 ## Development Workflow
 
