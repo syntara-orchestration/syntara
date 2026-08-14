@@ -253,7 +253,7 @@ describe('validateVariableReferences', () => {
   })
 
   describe('skipped namespaces', () => {
-    it.each(['secrets', 'workflow', 'workflow_context'])('does not error for ${%s.*} references', (namespace) => {
+    it.each(['workflow', 'workflow_context'])('does not error for ${%s.*} references', (namespace) => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',

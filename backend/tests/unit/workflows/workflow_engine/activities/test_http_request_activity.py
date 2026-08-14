@@ -10,10 +10,8 @@ from temporalio.exceptions import ApplicationError
 from syntara.workflows.workflow_engine.activities.common import ActivityExecutionError
 from syntara.workflows.workflow_engine.activities.http_request_activity import (
     _add_credential_auth_headers,
-    _apply_authentication,
     execute_http_request_activity,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import APIExecutorParameters
 
 
 @pytest.fixture(autouse=True)
@@ -110,60 +108,6 @@ class TestAddCredentialAuthHeaders:
         _add_credential_auth_headers(headers, {})
         assert "Authorization" not in headers
         assert "X-API-Key" not in headers
-
-
-# ---------------------------------------------------------------------------
-# _apply_authentication
-# ---------------------------------------------------------------------------
-
-
-class TestApplyAuthentication:
-    """Tests for _apply_authentication (config-based auth, pre-resolved credentials)."""
-
-    # credentials must match ${secrets.xxx} — simulate post-resolution by
-    # constructing the model with valid template refs
-    def _config(self, auth_type: str, credentials: str = "${secrets.token}") -> APIExecutorParameters:
-        return APIExecutorParameters.model_validate(
-            {
-                "method": "GET",
-                "url": "https://example.com",
-                "authentication": {"type": auth_type, "credentials": credentials},
-            }
-        )
-
-    def test_no_auth_is_noop(self) -> None:
-        config = APIExecutorParameters.model_validate({"method": "GET", "url": "https://example.com"})
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, config)
-        assert headers == {}
-
-    def test_bearer_sets_authorization(self) -> None:
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, self._config("bearer", "${secrets.token}"))
-        assert headers["Authorization"] == "Bearer ${secrets.token}"
-
-    def test_basic_sets_authorization(self) -> None:
-        import base64
-
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, self._config("basic", "${secrets.creds}"))
-        expected = base64.b64encode(b"${secrets.creds}").decode()
-        assert headers["Authorization"] == f"Basic {expected}"
-
-    def test_basic_without_colon_logs_warning(self) -> None:
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, self._config("basic", "${secrets.token}"))
-        assert "Authorization" in headers
-
-    def test_api_key_sets_header(self) -> None:
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, self._config("api_key", "${secrets.apikey}"))
-        assert headers["X-API-Key"] == "${secrets.apikey}"
-
-    def test_oauth2_sets_bearer(self) -> None:
-        headers: dict[str, Any] = {}
-        _apply_authentication(headers, self._config("oauth2", "${secrets.token}"))
-        assert headers["Authorization"] == "Bearer ${secrets.token}"
 
 
 # ---------------------------------------------------------------------------
@@ -332,19 +276,6 @@ class TestExecuteHttpRequestActivityAuth:
             await execute_http_request_activity(config, None)
         headers_sent = mock_req.call_args.kwargs["headers"]
         assert headers_sent.get("Authorization") == "Bearer mytoken"
-
-    @pytest.mark.asyncio
-    async def test_config_bearer_auth_injected(self) -> None:
-        resp = _mock_response(200, json_body={})
-        config = {
-            "method": "GET",
-            "url": "https://example.com/api",
-            "authentication": {"type": "bearer", "credentials": "${secrets.token}"},
-        }
-        with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
-            await execute_http_request_activity(config, None)
-        headers_sent = mock_req.call_args.kwargs["headers"]
-        assert headers_sent.get("Authorization") == "Bearer ${secrets.token}"
 
 
 _PATCH_GETADDRINFO = "socket.getaddrinfo"
