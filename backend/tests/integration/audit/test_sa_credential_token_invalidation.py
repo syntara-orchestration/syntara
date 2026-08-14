@@ -119,7 +119,7 @@ class TestCredentialDisableTokenInvalidation:
 
             mock_build_otel_log_record.reset_mock()
 
-            with patch("syntara.auth.middleware._check_cred_status", return_value="disabled"):
+            with patch("syntara.auth.middleware._check_cred_status", return_value=("disabled", None)):
                 me_resp2 = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
             assert me_resp2.status_code == 401, f"Expected 401 after disable, got {me_resp2.status_code}"
             assert me_resp2.json()["code"] == "SA_CREDENTIAL_DISABLED"

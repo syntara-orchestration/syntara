@@ -796,3 +796,23 @@ class TestStaleTokenMiddlewareSACredential:
 
         assert response.status_code == 401
         assert response.json()["code"] == "SA_DISABLED"
+
+    def test_disabled_credential_takes_priority_over_expired(self) -> None:
+        """Disabled credential rejection takes priority over expiration check."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+        past = datetime.now(UTC) - timedelta(minutes=5)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("disabled", past)),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "SA_CREDENTIAL_DISABLED"
