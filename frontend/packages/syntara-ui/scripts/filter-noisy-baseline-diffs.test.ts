@@ -14,6 +14,7 @@ import {
   decodePng,
   filterNoisyBaselineDiffs,
   formatRatio,
+  isUnchangedDialogBackdropDiff,
   shouldKeepDiff,
   summarizeResults,
   type ClassifyResult,
@@ -37,6 +38,32 @@ function solidRgba(width: number, height: number, r: number, g: number, b: numbe
     data[o + 3] = a
   }
   return data
+}
+
+/** Dimmed backdrop + centered near-white dialog card (synthetic PatternFly overlay). */
+function overlayFixture(
+  width: number,
+  height: number
+): {
+  rgba: Uint8Array
+  card: { x: number; y: number; w: number; h: number }
+} {
+  const rgba = solidRgba(width, height, 40, 40, 40)
+  const card = {
+    x: Math.floor(width * 0.25),
+    y: Math.floor(height * 0.2),
+    w: Math.floor(width * 0.5),
+    h: Math.floor(height * 0.55),
+  }
+  for (let y = card.y; y < card.y + card.h; y++) {
+    for (let x = card.x; x < card.x + card.w; x++) {
+      const o = (y * width + x) * 4
+      rgba[o] = 250
+      rgba[o + 1] = 250
+      rgba[o + 2] = 250
+    }
+  }
+  return { rgba, card }
 }
 
 describe('decodePng / countDifferingPixels', () => {
@@ -101,6 +128,30 @@ describe('shouldKeepDiff', () => {
   it('soft-keeps high-contrast sub-threshold text churn', () => {
     expect(shouldKeepDiff(0.002, SOFT_KEEP_MIN_CHANNEL_DELTA)).toBe(true)
     expect(shouldKeepDiff(0.002, SOFT_KEEP_MIN_CHANNEL_DELTA - 1)).toBe(false)
+  })
+})
+
+describe('isUnchangedDialogBackdropDiff', () => {
+  it('detects an unchanged centered card with backdrop-only edits', () => {
+    const w = 40
+    const h = 30
+    const { rgba: oldRgba } = overlayFixture(w, h)
+    const newRgba = oldRgba.slice()
+    newRgba[4] = 200
+    expect(
+      isUnchangedDialogBackdropDiff({ width: w, height: h, data: oldRgba }, { width: w, height: h, data: newRgba })
+    ).toBe(true)
+  })
+
+  it('does not treat a full-page light layout as a dialog card', () => {
+    const w = 40
+    const h = 30
+    const oldRgba = solidRgba(w, h, 250, 250, 250)
+    const newRgba = oldRgba.slice()
+    newRgba[0] = 0
+    expect(
+      isUnchangedDialogBackdropDiff({ width: w, height: h, data: oldRgba }, { width: w, height: h, data: newRgba })
+    ).toBe(false)
   })
 })
 
@@ -169,6 +220,46 @@ describe('classifyPngDiff', () => {
     )
     expect(result.action).toBe('keep')
     expect(result.reason).toMatch(/dimensions changed/)
+  })
+
+  it('restores keep-sized diffs that only hit a dimmed dialog backdrop', () => {
+    const w = 40
+    const h = 30
+    const { rgba: oldRgba, card } = overlayFixture(w, h)
+    const newRgba = oldRgba.slice()
+    for (let y = 1; y <= 8; y++) {
+      const o = (y * w + 1) * 4
+      newRgba[o] = 255
+      newRgba[o + 1] = 255
+      newRgba[o + 2] = 255
+    }
+    expect(card.x).toBeGreaterThan(1)
+    const result = classifyPngDiff(
+      'snapshots/credentials-edit-modal.png',
+      encodeRgbaPng(w, h, oldRgba),
+      encodeRgbaPng(w, h, newRgba)
+    )
+    expect(result.action).toBe('restore')
+    expect(result.reason).toMatch(/dialog backdrop only/)
+  })
+
+  it('keeps diffs on the dialog card itself', () => {
+    const w = 40
+    const h = 30
+    const { rgba: oldRgba, card } = overlayFixture(w, h)
+    const newRgba = oldRgba.slice()
+    for (let i = 0; i < 8; i++) {
+      const o = ((card.y + 2) * w + (card.x + 2 + i)) * 4
+      newRgba[o] = 0
+      newRgba[o + 1] = 0
+      newRgba[o + 2] = 0
+    }
+    const result = classifyPngDiff(
+      'snapshots/credentials-edit-modal.png',
+      encodeRgbaPng(w, h, oldRgba),
+      encodeRgbaPng(w, h, newRgba)
+    )
+    expect(result.action).toBe('keep')
   })
 })
 

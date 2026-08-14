@@ -8,6 +8,9 @@
  * KEEP when:
  *   ratio >= 0.005  (Playwright maxDiffPixelRatio)
  *   OR (ratio >= 0.001 AND max_channel_delta >= 30)  // small but high-contrast
+ * then RESTORE if the only diffs are in a dimmed modal backdrop (the dialog
+ * card itself is unchanged — otherwise list-page edits fan out into every
+ * overlay screenshot on that page).
  * else RESTORE (AA noise).
  *
  * Decode with pngjs; classify with exact RGBA diffs (ratio + max channel delta).
@@ -40,6 +43,20 @@ export const DEFAULT_MAX_DIFF_PIXEL_RATIO = 0.005
  */
 export const SOFT_KEEP_MIN_RATIO = 0.001
 export const SOFT_KEEP_MIN_CHANNEL_DELTA = 30
+
+/**
+ * PatternFly dialog cards are near-white; the backdrop is dimmed (~60%).
+ * Flood-fill uses this luma floor so the card is isolated from the overlay.
+ */
+export const OVERLAY_CARD_LUMA_MIN = 230
+/** Dialog cards occupy a slice of the viewport, not the full page or the sidebar. */
+export const OVERLAY_CARD_MIN_AREA_RATIO = 0.06
+export const OVERLAY_CARD_MAX_AREA_RATIO = 0.65
+export const OVERLAY_CARD_MAX_WIDTH_RATIO = 0.82
+export const OVERLAY_CARD_MAX_HEIGHT_RATIO = 0.97
+export const OVERLAY_CARD_MIN_LEFT_RATIO = 0.08
+/** Border AA on a tall modal; real form copy changes are far above this. */
+export const OVERLAY_CARD_MAX_INTERIOR_CHANGE_RATIO = 0.002
 
 export const SNAPSHOT_DIR_REL = 'e2e/visual-regression/page-screenshots.spec.ts-snapshots'
 
@@ -133,6 +150,132 @@ export function shouldKeepDiff(
   return false
 }
 
+function pixelLuma(data: Uint8Array, offset: number): number {
+  return (data[offset]! * 299 + data[offset + 1]! * 587 + data[offset + 2]! * 114) / 1000
+}
+
+export type OverlayCard = {
+  pixelCount: number
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  /** 1 if the pixel is in the largest bright-unchanged component */
+  membership: Uint8Array
+}
+
+/**
+ * Largest 4-connected region of pixels that are identical in both images and
+ * bright enough to be a PatternFly dialog card (not the dimmed backdrop).
+ */
+export function largestBrightUnchangedCard(oldPng: DecodedPng, newPng: DecodedPng): OverlayCard | null {
+  if (oldPng.width !== newPng.width || oldPng.height !== newPng.height) return null
+
+  const { width, height } = oldPng
+  const n = width * height
+  const a = oldPng.data
+  const b = newPng.data
+  const visited = new Uint8Array(n)
+  let best: OverlayCard | null = null
+
+  const isSeed = (i: number): boolean => {
+    const o = i * 4
+    return (
+      a[o] === b[o] &&
+      a[o + 1] === b[o + 1] &&
+      a[o + 2] === b[o + 2] &&
+      a[o + 3] === b[o + 3] &&
+      pixelLuma(b, o) >= OVERLAY_CARD_LUMA_MIN
+    )
+  }
+
+  for (let start = 0; start < n; start++) {
+    if (visited[start] || !isSeed(start)) continue
+
+    const membership = new Uint8Array(n)
+    const stack = [start]
+    visited[start] = 1
+    let count = 0
+    let x0 = width
+    let y0 = height
+    let x1 = 0
+    let y1 = 0
+
+    while (stack.length > 0) {
+      const i = stack.pop()!
+      membership[i] = 1
+      count++
+      const x = i % width
+      const y = (i / width) | 0
+      if (x < x0) x0 = x
+      if (y < y0) y0 = y
+      if (x > x1) x1 = x
+      if (y > y1) y1 = y
+
+      const neighbors = [
+        x > 0 ? i - 1 : -1,
+        x + 1 < width ? i + 1 : -1,
+        y > 0 ? i - width : -1,
+        y + 1 < height ? i + width : -1,
+      ]
+      for (const nb of neighbors) {
+        if (nb < 0 || visited[nb] || !isSeed(nb)) continue
+        visited[nb] = 1
+        stack.push(nb)
+      }
+    }
+
+    if (!best || count > best.pixelCount) {
+      best = { pixelCount: count, x0, y0, x1, y1, membership }
+    }
+  }
+
+  return best
+}
+
+function isDialogCardShape(card: OverlayCard, width: number, height: number): boolean {
+  const boxW = card.x1 - card.x0 + 1
+  const boxH = card.y1 - card.y0 + 1
+  const areaRatio = card.pixelCount / (width * height)
+  if (areaRatio < OVERLAY_CARD_MIN_AREA_RATIO || areaRatio > OVERLAY_CARD_MAX_AREA_RATIO) return false
+  if (boxW / width > OVERLAY_CARD_MAX_WIDTH_RATIO) return false
+  if (boxH / height > OVERLAY_CARD_MAX_HEIGHT_RATIO) return false
+  if (card.x0 / width < OVERLAY_CARD_MIN_LEFT_RATIO) return false
+  const cx = (card.x0 + card.x1) / 2
+  if (Math.abs(cx - width / 2) > width * 0.3) return false
+  return true
+}
+
+/**
+ * True when a keep-sized diff is only in the dimmed page behind an unchanged
+ * dialog card (list/table edits showing through create/edit/delete overlays).
+ */
+export function isUnchangedDialogBackdropDiff(oldPng: DecodedPng, newPng: DecodedPng): boolean {
+  const card = largestBrightUnchangedCard(oldPng, newPng)
+  if (!card || !isDialogCardShape(card, oldPng.width, oldPng.height)) return false
+
+  const { width, height } = oldPng
+  const a = oldPng.data
+  const b = newPng.data
+  const n = width * height
+  let changedOnCard = 0
+  let changedBackdrop = 0
+
+  for (let i = 0; i < n; i++) {
+    const o = i * 4
+    if (a[o] === b[o] && a[o + 1] === b[o + 1] && a[o + 2] === b[o + 2] && a[o + 3] === b[o + 3]) {
+      continue
+    }
+    const x = i % width
+    const y = (i / width) | 0
+    const onCard = x >= card.x0 && x <= card.x1 && y >= card.y0 && y <= card.y1
+    if (onCard) changedOnCard++
+    else changedBackdrop++
+  }
+
+  return changedOnCard / card.pixelCount <= OVERLAY_CARD_MAX_INTERIOR_CHANGE_RATIO && changedBackdrop > 0
+}
+
 export function classifyPngDiff(
   relativePath: string,
   oldBytes: Uint8Array | null,
@@ -176,6 +319,18 @@ export function classifyPngDiff(
       totalPixels: diff.totalPixels,
       maxChannelDelta: diff.maxChannelDelta,
       reason: `noise (ratio=${formatRatio(diff.ratio)}, maxΔ=${diff.maxChannelDelta})`,
+    }
+  }
+
+  if (isUnchangedDialogBackdropDiff(oldPng, newPng)) {
+    return {
+      path: relativePath,
+      action: 'restore',
+      changedPixelRatio: diff.ratio,
+      changedPixels: diff.changedPixels,
+      totalPixels: diff.totalPixels,
+      maxChannelDelta: diff.maxChannelDelta,
+      reason: `dialog backdrop only (ratio=${formatRatio(diff.ratio)}, maxΔ=${diff.maxChannelDelta})`,
     }
   }
 

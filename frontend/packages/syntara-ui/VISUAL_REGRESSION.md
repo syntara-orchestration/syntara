@@ -106,7 +106,9 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
 1. Checks out `devel` HEAD and regenerates every screenshot with `--update-snapshots`.
 2. Diffs the regenerated PNGs against what's checked in, then runs
    `scripts/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
-   are kept (AA / 1-pixel noise is restored). The filter decodes with `pngjs`
+   are kept (AA / 1-pixel noise is restored, and overlay screenshots whose
+   **dialog card** is unchanged are restored even when the dimmed list behind
+   them moved). The filter decodes with `pngjs`
    (MIT) and applies a hybrid keep rule on exact RGBA diffs. Playwright rewrites
    every file it captures with `--update-snapshots=all`, and the filter — not raw
    git bytes — decides which images belong in the weekly PR.
@@ -195,7 +197,10 @@ chrome rather than a particular logo asset.
 A single page can have multiple registry entries for different visual states:
 
 - **Empty/filtered state** — use `setup` to type a non-matching filter term
-- **Modals/dialogs** — use `setup` to click the button that opens the modal
+- **Modals/dialogs** — use `setup` to click the button that opens the modal.
+  Screenshots are still `fullPage`, so the dimmed list behind the overlay is in
+  the PNG. The noise filter restores those files when only the backdrop changed
+  (the dialog card itself is unchanged). A real change to the modal form is kept.
 - **Kebab menu actions** — use `setup` to open a row's kebab and trigger a dialog
 - **Detail pages** — use mock API IDs for `:id` parameters in the path
 - **Form pages** — navigate directly to the create/edit route
