@@ -108,12 +108,12 @@ async def test_toctou_ownership_change_during_request(
         checker._resolve_resource_owner = resolve_then_transfer  # type: ignore[method-assign]
 
         # Mock the database query that returns the credential
-        async def mock_exec(query):  # noqa: ANN202
+        async def mock_exec(query):  # noqa: ANN001, ANN202
             result = MagicMock()
             result.first = MagicMock(return_value=str(user_a_id))  # Stale owner at check time
             return result
 
-        test_db_session.exec = mock_exec  # type: ignore[method-assign]
+        test_db_session.exec = mock_exec  # type: ignore[assignment, method-assign]
 
         # Call PermissionChecker - should pass because check uses stale owner
         await checker(mock_request, user_a, test_db_session)
