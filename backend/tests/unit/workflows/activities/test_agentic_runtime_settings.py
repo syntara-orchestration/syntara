@@ -78,3 +78,9 @@ class TestExecuteAgenticActivitySettingsIntegration:
         with pytest.raises(ApplicationError) as exc_info:
             await execute_agentic_activity(config, None, project_id="")
         assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.message == (
+            "The AI Agent node could not determine the project context. "
+            "This is usually a system error. Try re-saving the workflow or contact your administrator."
+        )
+        assert "project_id" not in exc_info.value.message
+        assert "requires non-empty" not in exc_info.value.message
