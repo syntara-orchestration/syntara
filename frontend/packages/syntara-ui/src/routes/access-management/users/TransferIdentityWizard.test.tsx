@@ -130,11 +130,24 @@ function setupAccessClientMock() {
   })
 }
 
-function setupMocks({ identities = mockIdentities }: { identities?: unknown[] } = {}) {
-  vi.mocked(usersClient.useQuery).mockImplementation((_method, path) => {
+function setupMocks({
+  identities = mockIdentities,
+  users = mockUsers,
+  emptyUsersWhenFiltered = false,
+}: {
+  identities?: unknown[]
+  users?: typeof mockUsers
+  emptyUsersWhenFiltered?: boolean
+} = {}) {
+  vi.mocked(usersClient.useQuery).mockImplementation((_method, path, options) => {
     if (path === '/users') {
+      const query = (options as { params?: { query?: Record<string, unknown> } } | undefined)?.params?.query ?? {}
+      const hasApiFilters = Object.keys(query).some(
+        (key) => key !== 'limit' && key !== 'include_total' && key !== 'cursor'
+      )
+      const data = emptyUsersWhenFiltered && hasApiFilters ? { resources: [], next: null, total: 0 } : users
       return {
-        data: mockUsers,
+        data,
         isPending: false,
         isError: false,
         error: null,
@@ -233,6 +246,51 @@ describe('TransferIdentityWizard', () => {
       const radios = screen.getAllByRole('radio')
       expect(radios.length).toBeGreaterThan(0)
     })
+
+    it('shows no-data empty state when no selectable users exist', () => {
+      setupMocks({
+        users: {
+          resources: [
+            {
+              id: 'target-user',
+              username: 'targetuser',
+              email: 'target@example.com',
+              first_name: 'Target',
+              last_name: 'User',
+            },
+          ],
+          next: null,
+          total: 1,
+        },
+      })
+      render(<TransferIdentityWizard />, { wrapper })
+
+      expect(screen.getByText('No users yet')).toBeInTheDocument()
+      expect(
+        screen.getByText('There must be at least one other user before you can transfer a federated identity.')
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByText(/Choose the user whose federated identity you want to transfer/i)
+      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: /Username/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: /Email/i })).not.toBeInTheDocument()
+    })
+
+    it('shows filter empty state when no users match active filters', async () => {
+      setupMocks({ emptyUsersWhenFiltered: true })
+      const user = userEvent.setup()
+      render(<TransferIdentityWizard />, { wrapper })
+
+      const usernameInput = screen.getByRole('textbox', { name: /username filter/i })
+      await user.type(usernameInput, 'zzz-nonexistent')
+      await user.keyboard('{Enter}')
+
+      expect(await screen.findByText('No results found')).toBeInTheDocument()
+      expect(screen.getByText(/Choose the user whose federated identity you want to transfer/i)).toBeInTheDocument()
+      expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
+      expect(screen.queryByText('No users yet')).not.toBeInTheDocument()
+    })
   })
 
   describe('Step 2 - Select an identity', () => {
@@ -271,6 +329,23 @@ describe('TransferIdentityWizard', () => {
 
       expect(screen.getByText('No identities')).toBeInTheDocument()
       expect(screen.getByText('This user has no federated identities to attach.')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 2, name: 'Select an identity' })).not.toBeInTheDocument()
+      expect(screen.queryByText(/Choose one of/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: /Provider/i })).not.toBeInTheDocument()
+    })
+
+    it('shows filter empty state when no identities match active filters', async () => {
+      const user = await goToStep2()
+
+      const providerInput = screen.getByRole('textbox', { name: /provider filter/i })
+      await user.type(providerInput, 'zzz-nonexistent')
+      await user.keyboard('{Enter}')
+
+      expect(await screen.findByText('No results found')).toBeInTheDocument()
+      expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
+      expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
+      expect(screen.queryByText('No identities')).not.toBeInTheDocument()
     })
 
     it('has Transfer identity button disabled until an identity is selected', async () => {
