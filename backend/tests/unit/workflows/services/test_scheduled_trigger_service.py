@@ -779,21 +779,55 @@ class TestListWorkflowSchedulesOptimized:
     """Tests for _list_workflow_schedules with search attribute optimization."""
 
     async def test_uses_query_when_search_attr_available(self) -> None:
-        """Should pass query parameter to list_schedules."""
+        """Should query both OrchestratorWorkflowId and NexusWorkflowId."""
         client = _make_mock_client(search_attr_available=True)
-        client.list_schedules = AsyncMock(
-            return_value=_async_iter_from(
-                [
-                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1"),
-                ]
-            )
-        )
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "OrchestratorWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")])
+            return _async_iter_from([])
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
 
         service = ScheduledTriggerService(temporal_client=client)
         result = await service._list_workflow_schedules(client, "wf-123")
 
         assert result == {"orchestrator-sched-wf-123-trigger_1"}
-        client.list_schedules.assert_called_once_with(query='OrchestratorWorkflowId = "wf-123"')
+        assert client.list_schedules.call_count == 2
+
+    async def test_finds_legacy_nexus_schedules(self) -> None:
+        """Should find schedules tagged with the legacy NexusWorkflowId attribute."""
+        client = _make_mock_client(search_attr_available=True)
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "NexusWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("nexus-sched-wf-123-trigger_1")])
+            return _async_iter_from([])
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
+
+        service = ScheduledTriggerService(temporal_client=client)
+        result = await service._list_workflow_schedules(client, "wf-123")
+
+        assert result == {"nexus-sched-wf-123-trigger_1"}
+
+    async def test_merges_both_legacy_and_new_schedules(self) -> None:
+        """Should return union of schedules from both search attributes."""
+        client = _make_mock_client(search_attr_available=True)
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "OrchestratorWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")])
+            if query and "NexusWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("nexus-sched-wf-123-trigger_2")])
+            return _async_iter_from([])
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
+
+        service = ScheduledTriggerService(temporal_client=client)
+        result = await service._list_workflow_schedules(client, "wf-123")
+
+        assert result == {"orchestrator-sched-wf-123-trigger_1", "nexus-sched-wf-123-trigger_2"}
 
     async def test_falls_back_to_prefix_scan(self) -> None:
         """Should use prefix scan when search attr not available."""
@@ -816,18 +850,15 @@ class TestListWorkflowSchedulesOptimized:
         client.list_schedules.assert_called_once_with()
 
     async def test_query_error_falls_back_to_prefix(self) -> None:
-        """Should fall back to prefix scan if query fails with non-connection error."""
+        """Should fall back to prefix scan if all SA queries fail."""
         client = _make_mock_client(search_attr_available=True)
 
         query_error = RPCError("bad query", RPCStatusCode.INVALID_ARGUMENT, b"")
-        call_count = 0
 
         async def _list_schedules_side_effect(
             query: str | None = None,
         ) -> AsyncIterator[Any]:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1 and query is not None:
+            if query is not None:
                 raise query_error
             return _async_iter_from(
                 [
@@ -842,7 +873,6 @@ class TestListWorkflowSchedulesOptimized:
         result = await service._list_workflow_schedules(client, "wf-123")
 
         assert result == {"orchestrator-sched-wf-123-trigger_1"}
-        assert client.list_schedules.call_count == 2
 
     async def test_connection_error_in_query_reraises(self) -> None:
         """Connection errors during query should invalidate cache and re-raise."""
@@ -864,7 +894,11 @@ class TestListWorkflowSchedulesOptimized:
     async def test_list_schedules_returns_empty_set(self) -> None:
         """Empty schedule list should return empty set."""
         client = _make_mock_client(search_attr_available=True)
-        client.list_schedules = AsyncMock(return_value=_async_iter_from([]))
+
+        async def _empty_list(query: str | None = None) -> AsyncIterator[Any]:
+            return _async_iter_from([])
+
+        client.list_schedules = AsyncMock(side_effect=_empty_list)
 
         service = ScheduledTriggerService(temporal_client=client)
         result = await service._list_workflow_schedules(client, "wf-123")
@@ -1039,22 +1073,28 @@ class TestListAllSchedules:
     """Tests for the list_all_schedules method."""
 
     async def test_uses_query_when_search_attr_available(self) -> None:
-        """Should query with OrchestratorWorkflowId != '' for server-side filtering."""
+        """Should query both OrchestratorWorkflowId and NexusWorkflowId."""
         client = _make_mock_client(search_attr_available=True)
-        client.list_schedules = AsyncMock(
-            return_value=_async_iter_from(
-                [
-                    _make_schedule_list_entry("orchestrator-sched-wf-1-t1"),
-                    _make_schedule_list_entry("orchestrator-sched-wf-2-t1"),
-                ]
-            )
-        )
+
+        async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
+            if query and "OrchestratorWorkflowId" in query:
+                return _async_iter_from(
+                    [
+                        _make_schedule_list_entry("orchestrator-sched-wf-1-t1"),
+                        _make_schedule_list_entry("orchestrator-sched-wf-2-t1"),
+                    ]
+                )
+            if query and "NexusWorkflowId" in query:
+                return _async_iter_from([_make_schedule_list_entry("nexus-sched-wf-3-t1")])
+            return _async_iter_from([])
+
+        client.list_schedules = AsyncMock(side_effect=_list_side_effect)
 
         service = ScheduledTriggerService(temporal_client=client)
         result = await service.list_all_schedules(client)
 
-        assert result == {"orchestrator-sched-wf-1-t1", "orchestrator-sched-wf-2-t1"}
-        client.list_schedules.assert_called_once_with(query='OrchestratorWorkflowId != ""')
+        assert result == {"orchestrator-sched-wf-1-t1", "orchestrator-sched-wf-2-t1", "nexus-sched-wf-3-t1"}
+        assert client.list_schedules.call_count == 2
 
     async def test_falls_back_to_prefix_scan_when_search_attr_unavailable(self) -> None:
         """Should use prefix scan when search attribute is not available."""
@@ -1077,15 +1117,11 @@ class TestListAllSchedules:
         client.list_schedules.assert_called_once_with()
 
     async def test_query_error_falls_back_to_prefix_scan(self) -> None:
-        """Non-connection RPCError from query should fall back to prefix scan."""
+        """Non-connection RPCError from all queries should fall back to prefix scan."""
         client = _make_mock_client(search_attr_available=True)
 
-        call_count = 0
-
         async def _list_side_effect(query: str | None = None) -> AsyncIterator[Any]:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1 and query is not None:
+            if query is not None:
                 msg = "bad query"
                 raise RPCError(msg, RPCStatusCode.INVALID_ARGUMENT, b"")
             return _async_iter_from(
@@ -1101,20 +1137,19 @@ class TestListAllSchedules:
         result = await service.list_all_schedules(client)
 
         assert result == {"orchestrator-sched-wf-1-t1"}
-        assert client.list_schedules.call_count == 2
 
 
 class TestListSchedulesByPrefix:
     """Tests for the list_schedules_by_prefix static method."""
 
-    async def test_no_prefix_matches_all_orchestrator_schedules(self) -> None:
-        """Empty prefix should match all orchestrator-sched-* schedule IDs."""
+    async def test_no_prefix_matches_all_managed_schedules(self) -> None:
+        """Empty prefix should match both orchestrator-sched-* and nexus-sched-* IDs."""
         client = _make_mock_client()
         client.list_schedules = AsyncMock(
             return_value=_async_iter_from(
                 [
                     _make_schedule_list_entry("orchestrator-sched-wf-1-t1"),
-                    _make_schedule_list_entry("orchestrator-sched-wf-2-t2"),
+                    _make_schedule_list_entry("nexus-sched-wf-2-t2"),
                     _make_schedule_list_entry("other-system-schedule"),
                 ]
             )
@@ -1122,15 +1157,16 @@ class TestListSchedulesByPrefix:
 
         result = await ScheduledTriggerService.list_schedules_by_prefix(client)
 
-        assert result == {"orchestrator-sched-wf-1-t1", "orchestrator-sched-wf-2-t2"}
+        assert result == {"orchestrator-sched-wf-1-t1", "nexus-sched-wf-2-t2"}
 
     async def test_with_prefix_narrows_to_workflow(self) -> None:
-        """Non-empty prefix should match only schedules for that workflow."""
+        """Non-empty prefix should match schedules for that workflow under both prefixes."""
         client = _make_mock_client()
         client.list_schedules = AsyncMock(
             return_value=_async_iter_from(
                 [
                     _make_schedule_list_entry("orchestrator-sched-wf-123-t1"),
+                    _make_schedule_list_entry("nexus-sched-wf-123-t2"),
                     _make_schedule_list_entry("orchestrator-sched-wf-456-t1"),
                 ]
             )
@@ -1138,4 +1174,4 @@ class TestListSchedulesByPrefix:
 
         result = await ScheduledTriggerService.list_schedules_by_prefix(client, "wf-123")
 
-        assert result == {"orchestrator-sched-wf-123-t1"}
+        assert result == {"orchestrator-sched-wf-123-t1", "nexus-sched-wf-123-t2"}

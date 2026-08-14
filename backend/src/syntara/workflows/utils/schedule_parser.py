@@ -150,6 +150,7 @@ def build_schedule_policy(missed_policy: MissedSchedulePolicy) -> SchedulePolicy
 
 
 SCHEDULE_ID_PREFIX = "orchestrator-sched-"
+LEGACY_SCHEDULE_ID_PREFIX = "nexus-sched-"
 
 
 def build_schedule_id(workflow_id: str, trigger_node_id: str) -> str:
