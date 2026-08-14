@@ -106,9 +106,10 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
 1. Checks out `devel` HEAD and regenerates every screenshot with `--update-snapshots`.
 2. Diffs the regenerated PNGs against what's checked in, then runs
    `scripts/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
-   are kept (AA / 1-pixel noise is restored). Playwright rewrites every file it
-   captures with `--update-snapshots=all`; the filter — not raw git bytes — is
-   what decides which images belong in the weekly PR.
+   are kept (AA / 1-pixel noise is restored). The filter uses `pngjs` +
+   `pixelmatch` (ISC/MIT) with a hybrid keep rule; Playwright rewrites every
+   file it captures with `--update-snapshots=all`, and the filter — not raw
+   git bytes — decides which images belong in the weekly PR.
 3. If nothing meaningful changed, it writes a "no drift" job summary and stops — no PR, no noise.
 4. If something changed, it opens a PR (branch `visual-regression/weekly-refresh`, base `devel`) containing only the changed/new PNGs, requests review from `uxd-team`, and lists the added/modified counts in the PR body.
 

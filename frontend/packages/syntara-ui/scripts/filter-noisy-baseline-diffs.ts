@@ -10,6 +10,9 @@
  *   OR (ratio >= 0.001 AND max_channel_delta >= 30)  // small but high-contrast
  * else RESTORE (AA noise).
  *
+ * Image compare uses pngjs (decode) + pixelmatch (diff count; same family as
+ * Playwright). Soft-keep still needs max channel delta from an exact scan.
+ *
  * Usage:
  *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
  *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts --dry-run
@@ -26,7 +29,8 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inflateSync } from 'node:zlib'
+import pixelmatch from 'pixelmatch'
+import { PNG } from 'pngjs'
 
 /** Matches `SCREENSHOT_OPTIONS.maxDiffPixelRatio` in page-screenshots.spec.ts */
 export const DEFAULT_MAX_DIFF_PIXEL_RATIO = 0.005
@@ -67,197 +71,23 @@ export type DecodedPng = {
   data: Uint8Array
 }
 
-// ---------------------------------------------------------------------------
-// Minimal PNG decoder (8-bit RGB / RGBA / grayscale / gray+alpha, no interlacing)
-// Uses only Node builtins (zlib) — no pngjs/sharp required.
-// ---------------------------------------------------------------------------
-
-function readUInt32BE(buf: Uint8Array, offset: number): number {
-  return ((buf[offset]! << 24) | (buf[offset + 1]! << 16) | (buf[offset + 2]! << 8) | buf[offset + 3]!) >>> 0
-}
-
-function paeth(a: number, b: number, c: number): number {
-  const p = a + b - c
-  const pa = Math.abs(p - a)
-  const pb = Math.abs(p - b)
-  const pc = Math.abs(p - c)
-  if (pa <= pb && pa <= pc) return a
-  if (pb <= pc) return b
-  return c
-}
-
-function unfilterScanlines(
-  inflated: Uint8Array,
-  width: number,
-  height: number,
-  bytesPerPixel: number
-): Uint8Array {
-  const stride = width * bytesPerPixel
-  const out = new Uint8Array(stride * height)
-  let inOffset = 0
-
-  for (let y = 0; y < height; y++) {
-    const filter = inflated[inOffset++]!
-    const rowStart = y * stride
-    const prevStart = (y - 1) * stride
-
-    for (let i = 0; i < stride; i++) {
-      const x = inflated[inOffset++]!
-      const left = i >= bytesPerPixel ? out[rowStart + i - bytesPerPixel]! : 0
-      const up = y > 0 ? out[prevStart + i]! : 0
-      const upLeft = y > 0 && i >= bytesPerPixel ? out[prevStart + i - bytesPerPixel]! : 0
-
-      let value: number
-      switch (filter) {
-        case 0:
-          value = x
-          break
-        case 1:
-          value = (x + left) & 0xff
-          break
-        case 2:
-          value = (x + up) & 0xff
-          break
-        case 3:
-          value = (x + Math.floor((left + up) / 2)) & 0xff
-          break
-        case 4:
-          value = (x + paeth(left, up, upLeft)) & 0xff
-          break
-        default:
-          throw new Error(`Unsupported PNG filter type: ${filter}`)
-      }
-      out[rowStart + i] = value
-    }
-  }
-
-  return out
-}
-
-function toRgba(
-  raw: Uint8Array,
-  width: number,
-  height: number,
-  colorType: number,
-  bitDepth: number
-): Uint8Array {
-  if (bitDepth !== 8) {
-    throw new Error(`Unsupported PNG bit depth: ${bitDepth} (only 8-bit supported)`)
-  }
-
-  const rgba = new Uint8Array(width * height * 4)
-  const pixels = width * height
-
-  if (colorType === 6) {
-    // RGBA
-    rgba.set(raw.subarray(0, pixels * 4))
-    return rgba
-  }
-
-  if (colorType === 2) {
-    // RGB
-    for (let i = 0, j = 0; i < pixels; i++, j += 3) {
-      const o = i * 4
-      rgba[o] = raw[j]!
-      rgba[o + 1] = raw[j + 1]!
-      rgba[o + 2] = raw[j + 2]!
-      rgba[o + 3] = 255
-    }
-    return rgba
-  }
-
-  if (colorType === 0) {
-    // Grayscale
-    for (let i = 0; i < pixels; i++) {
-      const g = raw[i]!
-      const o = i * 4
-      rgba[o] = g
-      rgba[o + 1] = g
-      rgba[o + 2] = g
-      rgba[o + 3] = 255
-    }
-    return rgba
-  }
-
-  if (colorType === 4) {
-    // Grayscale + alpha
-    for (let i = 0, j = 0; i < pixels; i++, j += 2) {
-      const g = raw[j]!
-      const o = i * 4
-      rgba[o] = g
-      rgba[o + 1] = g
-      rgba[o + 2] = g
-      rgba[o + 3] = raw[j + 1]!
-    }
-    return rgba
-  }
-
-  throw new Error(`Unsupported PNG color type: ${colorType}`)
-}
-
-/** Decode a PNG buffer into RGBA pixel data. */
+/** Decode a PNG buffer into RGBA pixel data via pngjs. */
 export function decodePng(png: Uint8Array | Buffer): DecodedPng {
-  const buf = png instanceof Uint8Array ? png : new Uint8Array(png)
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
-  for (let i = 0; i < 8; i++) {
-    if (buf[i] !== signature[i]) {
-      throw new Error('Invalid PNG signature')
-    }
+  const img = PNG.sync.read(Buffer.from(png))
+  return {
+    width: img.width,
+    height: img.height,
+    // Copy so callers own a plain Uint8Array (pngjs returns a Buffer view).
+    data: Uint8Array.from(img.data),
   }
-
-  let width = 0
-  let height = 0
-  let bitDepth = 0
-  let colorType = 0
-  const idatParts: Uint8Array[] = []
-  let offset = 8
-
-  while (offset + 8 <= buf.length) {
-    const length = readUInt32BE(buf, offset)
-    const type = String.fromCharCode(buf[offset + 4]!, buf[offset + 5]!, buf[offset + 6]!, buf[offset + 7]!)
-    const dataStart = offset + 8
-    const dataEnd = dataStart + length
-    if (dataEnd + 4 > buf.length) {
-      throw new Error('Truncated PNG chunk')
-    }
-    const data = buf.subarray(dataStart, dataEnd)
-
-    if (type === 'IHDR') {
-      width = readUInt32BE(data, 0)
-      height = readUInt32BE(data, 4)
-      bitDepth = data[8]!
-      colorType = data[9]!
-      const interlace = data[12]!
-      if (interlace !== 0) {
-        throw new Error('Interlaced PNGs are not supported')
-      }
-    } else if (type === 'IDAT') {
-      idatParts.push(data)
-    } else if (type === 'IEND') {
-      break
-    }
-
-    offset = dataEnd + 4 // skip CRC
-  }
-
-  if (width === 0 || height === 0) {
-    throw new Error('PNG missing IHDR')
-  }
-
-  const compressed = Buffer.concat(idatParts.map((p) => Buffer.from(p)))
-  const inflated = inflateSync(compressed)
-
-  const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 4 ? 2 : 1
-  const bytesPerPixel = (bitDepth / 8) * channels
-  const raw = unfilterScanlines(inflated, width, height, bytesPerPixel)
-  const rgba = toRgba(raw, width, height, colorType, bitDepth)
-
-  return { width, height, data: rgba }
 }
 
 /**
- * Count pixels that differ in any RGBA channel (exact match, no AA softening).
+ * Count differing pixels (pixelmatch) and max exact channel delta (soft-keep).
  * Returns null when dimensions differ (treated as a meaningful keep).
+ *
+ * pixelmatch uses threshold 0 + includeAA so counts stay aligned with the
+ * hybrid rule validated on exact channel diffs (PR #213).
  */
 export function countDifferingPixels(
   oldPng: DecodedPng,
@@ -268,11 +98,10 @@ export function countDifferingPixels(
   }
 
   const totalPixels = oldPng.width * oldPng.height
-  let changedPixels = 0
-  let maxChannelDelta = 0
   const a = oldPng.data
   const b = newPng.data
 
+  let maxChannelDelta = 0
   for (let i = 0; i < totalPixels; i++) {
     const o = i * 4
     const d0 = Math.abs(a[o]! - b[o]!)
@@ -280,11 +109,15 @@ export function countDifferingPixels(
     const d2 = Math.abs(a[o + 2]! - b[o + 2]!)
     const d3 = Math.abs(a[o + 3]! - b[o + 3]!)
     if (d0 || d1 || d2 || d3) {
-      changedPixels++
       const localMax = Math.max(d0, d1, d2, d3)
       if (localMax > maxChannelDelta) maxChannelDelta = localMax
     }
   }
+
+  const changedPixels = pixelmatch(a, b, undefined, oldPng.width, oldPng.height, {
+    threshold: 0,
+    includeAA: true,
+  })
 
   return {
     changedPixels,
@@ -339,9 +172,7 @@ export function classifyPngDiff(
     }
   }
 
-  if (
-    !shouldKeepDiff(diff.ratio, diff.maxChannelDelta, maxDiffPixelRatio)
-  ) {
+  if (!shouldKeepDiff(diff.ratio, diff.maxChannelDelta, maxDiffPixelRatio)) {
     return {
       path: relativePath,
       action: 'restore',
