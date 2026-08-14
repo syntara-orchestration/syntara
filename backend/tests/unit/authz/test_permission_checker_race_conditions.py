@@ -22,28 +22,33 @@ if TYPE_CHECKING:
 
 @pytest.mark.asyncio
 @pytest.mark.xfail(
-    reason="TOCTOU race condition exists: owner can change between check and use",
-    strict=True,
+    reason="Theoretical TOCTOU race for future ownership-transfer APIs (credentials have no such API today)",
+    strict=False,
 )
 async def test_toctou_ownership_change_during_request(
     test_db_session: AsyncSession,
 ) -> None:
-    """XFAIL: Demonstrates TOCTOU race where credential owner changes mid-request.
+    """XFAIL: Theoretical TOCTOU race for resources with ownership-transfer APIs.
 
-    This test should FAIL to demonstrate the race condition exists. The fix
-    should make it pass by adding transaction isolation or optimistic locking.
+    NOTE: This test is currently THEORETICAL. Credentials have no ownership-transfer
+    API today (CredentialUpdate has no created_by field, and nothing mutates ownership
+    after create), so this race cannot happen for credentials. The test mocks a
+    fictional scenario to document the hazard for FUTURE resources that might allow
+    ownership transfer.
 
-    Attack scenario:
-    1. User A starts updating credential they own
+    If a future resource type allows ownership transfer (e.g., "transfer credential
+    to user B"), this test demonstrates the TOCTOU vulnerability that would need
+    to be addressed via:
+    - SELECT FOR UPDATE to lock the resource during ownership check
+    - Re-verify ownership immediately before UPDATE
+    - Optimistic locking (version field)
+
+    Attack scenario (for a hypothetical ownership-transfer API):
+    1. User A starts updating resource they own
     2. PermissionChecker resolves owner_id = User A (authorization passes)
     3. Before the actual UPDATE executes, User B transfers ownership to themselves
     4. The UPDATE executes with the now-stale authorization decision
-    5. Result: User A successfully updates a credential they no longer own
-
-    The fix should either:
-    - Use SELECT FOR UPDATE to lock the credential during ownership check
-    - Re-verify ownership immediately before the UPDATE
-    - Use optimistic locking (version field)
+    5. Result: User A successfully updates a resource they no longer own
     """
     from syntara.credentials.models import Credential
 

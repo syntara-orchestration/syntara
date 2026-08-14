@@ -54,21 +54,31 @@ def ownership_env(
 ) -> tuple[SyntaraApiRegistry, SyntaraApiRegistry, SyntaraApiRegistry, UUID]:
     """Set up two project-users (owner, non-owner) and a project-admin.
 
-    Returns (owner_api, non_owner_api, admin_api, project_id).
+    Returns (owner_api, non_owner_api, project_admin_api, project_id).
     """
     project_id, _ = create_project(admin_api, "own-scope")
 
     owner_id, owner_name, owner_pass = create_user(admin_api, "owner")
     other_id, other_name, other_pass = create_user(admin_api, "nonowner")
+    proj_admin_id, proj_admin_name, proj_admin_pass = create_user(admin_api, "proj-admin")
 
     role_name = create_project_role(admin_api, project_id, "own-updater", _OWN_UPDATE_POLICIES)
     assign_project_role_to_user(admin_api, project_id, owner_id, role_name)
     assign_project_role_to_user(admin_api, project_id, other_id, role_name)
 
+    # Assign built-in project-admin role
+    from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
+
+    admin_api.projects.create_role_assignment(
+        project_id=project_id,
+        body=RoleAssignmentCreate(principal_id=proj_admin_id, role_name="project-admin"),
+    ).assert_and_get()
+
     owner_api = api_for(syntara_base_url, owner_name, owner_pass)
     other_api = api_for(syntara_base_url, other_name, other_pass)
+    proj_admin_api = api_for(syntara_base_url, proj_admin_name, proj_admin_pass)
 
-    return owner_api, other_api, admin_api, project_id
+    return owner_api, other_api, proj_admin_api, project_id
 
 
 class TestOwnScopeCredentialUpdate:
@@ -122,7 +132,7 @@ class TestOwnScopeCredentialUpdate:
         self, ownership_env: tuple[SyntaraApiRegistry, SyntaraApiRegistry, SyntaraApiRegistry, UUID]
     ) -> None:
         """Project-admin (with credential:update:project) can update any credential."""
-        owner_api, _, admin_api, project_id = ownership_env
+        owner_api, _, proj_admin_api, project_id = ownership_env
         type_id = get_bearer_token_type_id(owner_api)
 
         cred = owner_api.credentials.create(
@@ -134,11 +144,113 @@ class TestOwnScopeCredentialUpdate:
             )
         ).assert_and_get()
 
-        resp = admin_api.credentials.update(
+        resp = proj_admin_api.credentials.update(
             credential_id=cred.id,
             body=CredentialUpdate(description="admin override"),
         )
         assert resp.is_success
+
+
+class TestBuiltinProjectUserOwnership:
+    """Verify builtin project-user role enforces own-scope for credential updates.
+
+    This test class addresses the original BOLA vulnerability: builtin project-user
+    used to have credential:update:project (allowing any project member to update
+    any credential). It now has credential:update:own, restricting updates to
+    the credential's owner.
+    """
+
+    def test_builtin_project_user_owner_can_update(
+        self,
+        admin_api: SyntaraApiRegistry,
+        create_user: UserFactory,
+        create_project: ProjectFactory,
+        syntara_base_url: str,
+    ) -> None:
+        """User with builtin project-user role can update their own credential."""
+        project_id, _ = create_project(admin_api, "builtin-own-test")
+        owner_id, owner_name, owner_pass = create_user(admin_api, "builtin-owner")
+
+        # Assign builtin project-user role
+        from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
+
+        admin_api.projects.create_role_assignment(
+            project_id=project_id,
+            body=RoleAssignmentCreate(principal_id=owner_id, role_name="project-user"),
+        ).assert_and_get()
+
+        owner_api = api_for(syntara_base_url, owner_name, owner_pass)
+        type_id = get_bearer_token_type_id(owner_api)
+
+        cred = owner_api.credentials.create(
+            body=CredentialCreate(
+                name=unique_name("builtin-own"),
+                credential_type_id=type_id,
+                project_id=project_id,
+                inputs=CredentialCreateInputs.from_dict({"token": "secret"}),
+            )
+        ).assert_and_get()
+
+        # Owner should be able to update their own credential
+        resp = owner_api.credentials.update(
+            credential_id=cred.id,
+            body=CredentialUpdate(description="owner updated"),
+        )
+        assert resp.is_success
+
+    def test_builtin_project_user_non_owner_denied(
+        self,
+        admin_api: SyntaraApiRegistry,
+        create_user: UserFactory,
+        create_project: ProjectFactory,
+        syntara_base_url: str,
+    ) -> None:
+        """User with builtin project-user role CANNOT update others' credentials.
+
+        This is the BOLA regression test: before the fix, builtin project-user
+        had credential:update:project, allowing any project member to update
+        any credential. After the fix, it has credential:update:own, which
+        should deny this update.
+        """
+        project_id, _ = create_project(admin_api, "builtin-bola-test")
+        owner_id, owner_name, owner_pass = create_user(admin_api, "builtin-victim")
+        other_id, other_name, other_pass = create_user(admin_api, "builtin-attacker")
+
+        # Assign builtin project-user role to both users
+        from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
+
+        admin_api.projects.create_role_assignment(
+            project_id=project_id,
+            body=RoleAssignmentCreate(principal_id=owner_id, role_name="project-user"),
+        ).assert_and_get()
+        admin_api.projects.create_role_assignment(
+            project_id=project_id,
+            body=RoleAssignmentCreate(principal_id=other_id, role_name="project-user"),
+        ).assert_and_get()
+
+        owner_api = api_for(syntara_base_url, owner_name, owner_pass)
+        other_api = api_for(syntara_base_url, other_name, other_pass)
+        type_id = get_bearer_token_type_id(owner_api)
+
+        # Owner creates credential
+        cred = owner_api.credentials.create(
+            body=CredentialCreate(
+                name=unique_name("builtin-bola-cred"),
+                credential_type_id=type_id,
+                project_id=project_id,
+                inputs=CredentialCreateInputs.from_dict({"token": "victim-secret"}),
+            )
+        ).assert_and_get()
+
+        # Non-owner with same builtin project-user role attempts update
+        resp = other_api.credentials.update(
+            credential_id=cred.id,
+            body=CredentialUpdate(description="BOLA attempt"),
+        )
+        assert resp.status_code == HTTPStatus.FORBIDDEN, (
+            "Non-owner with builtin project-user role should be denied. "
+            "If this passes, the BOLA vulnerability has regressed."
+        )
 
 
 class TestOwnScopeEdgeCases:

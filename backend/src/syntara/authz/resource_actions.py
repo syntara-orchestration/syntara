@@ -105,17 +105,21 @@ def get_project_eligible_resource_types() -> frozenset[str]:
 
 
 def validate_own_scope_actions(statements: list[dict[str, Any]]) -> str | None:
-    """Validate that 'own' scope is only used with actions on existing resources.
+    """Validate that 'own' scope is only used with actions that resolve ownership.
 
-    The 'own' scope checks resource.metadata.created_by == user.id, which only
-    makes sense for operations on existing resources (read, update, delete, use).
-    Using 'own' with 'create' is nonsensical (resource doesn't exist yet) and
-    will fail-secure (deny all requests).
+    The 'own' scope checks resource.metadata.created_by == user.id, which requires
+    the corresponding PermissionChecker to wire owner_field. Currently only
+    credential:update wires owner_field="created_by".
+
+    Actions like read/delete/use/decide/revoke would be valid semantically (they
+    operate on existing resources), but their checkers don't populate created_by
+    metadata, so an '*:action:own' policy for those actions would silently deny
+    all requests. Reject them upfront instead of fail-silent.
 
     Returns a descriptive error string, or ``None`` if valid.
     """
-    # Actions that make sense with own-scope (operate on existing resources)
-    valid_own_actions = {"read", "update", "delete", "use", "decide", "revoke"}
+    # Only actions whose PermissionChecker wires owner_field today
+    valid_own_actions = {"update"}
 
     for stmt in statements:
         if stmt.get("scope") != "own":
