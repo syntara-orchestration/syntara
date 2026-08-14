@@ -2141,6 +2141,12 @@ async def _resolve_and_login_user(
                 # Commit (not rollback) so the membership revocation from
                 # sync_idp_groups persists — rollback would restore stale
                 # IdP-managed groups that the current token no longer grants.
+                # Note: this also persists the JIT user/identity created by
+                # _resolve_oidc_user.  For returning users that is required
+                # (we need the user row to persist the revocation).  For
+                # first-login denials the user row stays but has no session
+                # and no elevated groups — the user would be created on the
+                # next attempt anyway.
                 await db.commit()
                 raise OIDCCallbackError(
                     _OIDC_ERR_NO_GROUP_MATCH, error_code=OIDCErrorCode.NO_GROUP_MATCH, origin=origin

@@ -214,6 +214,29 @@ async def _resolve_allow_all_groups(db: AsyncSession, user_id: UUID, config: OID
     return {users_group_id} if users_group_id else set()
 
 
+async def _clear_and_deny(
+    db: AsyncSession,
+    user: User,
+    provider_id: UUID,
+    *,
+    reason: str,
+) -> bool:
+    """Clear this provider's stale IdP-managed groups and deny login.
+
+    Provider-scoped: only removes groups tracked by *provider_id*, leaving
+    other providers' memberships intact.  Returns ``False`` so callers can
+    ``return await _clear_and_deny(...)``.
+    """
+    logger.warning(
+        "Login denied — clearing this provider's stale IdP-managed groups",
+        reason=reason,
+        user_id=str(user.id),
+        provider_id=str(provider_id),
+    )
+    await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
+    return False
+
+
 async def sync_idp_groups(
     db: AsyncSession,
     user: User,
@@ -223,8 +246,14 @@ async def sync_idp_groups(
 ) -> bool:
     """Sync Nexus group memberships based on IdP group mapping.
 
-    Session-scoped: clears all IdP-managed group memberships from every
-    provider and replaces them with groups from the current login's token.
+    On **successful resolution**, session-scoped: clears all IdP-managed
+    group memberships from every provider and replaces them with groups
+    from the current login's token (last-login-wins).
+
+    On **deny paths** (extraction failure, AAP validation failure),
+    provider-scoped: clears only *this* provider's IdP-managed groups,
+    leaving other providers' memberships intact.
+
     Manually-assigned groups (those without ``user_idp_groups`` tracking
     rows) are never affected.
 
@@ -254,16 +283,10 @@ async def sync_idp_groups(
     if has_claim_based:
         result = _resolve_claim_based_groups(user, raw_merged_claims, config, provider_id, mapping_entries)
         if result is None and not aap_role_mapping and not config.allow_all_authenticated:
-            logger.warning(
-                "JMESPath extraction failed — clearing stale IdP-managed groups before denying login",
-                user_id=str(user.id),
-                provider_id=str(provider_id),
-            )
-            await _apply_group_membership_diff(db, user.id, provider_id, set(), username=user.username)
-            return False
+            return await _clear_and_deny(db, user, provider_id, reason="jmespath_extraction_failed")
         if result is None:
             logger.warning(
-                "JMESPath extraction failed but login proceeding — clearing IdP-managed groups",
+                "JMESPath extraction failed — skipping claim-based groups",
                 reason="aap_role_mapping" if aap_role_mapping else "allow_all_authenticated",
                 user_id=str(user.id),
                 provider_id=str(provider_id),
@@ -275,13 +298,7 @@ async def sync_idp_groups(
     if aap_role_mapping:
         aap_group_ids = await _resolve_aap_role_groups(db, raw_merged_claims, user.id, config)
         if aap_group_ids is None:
-            logger.warning(
-                "AAP role validation failed — clearing stale IdP-managed groups before denying login",
-                user_id=str(user.id),
-                provider_id=str(provider_id),
-            )
-            await _apply_group_membership_diff(db, user.id, provider_id, set(), username=user.username)
-            return False
+            return await _clear_and_deny(db, user, provider_id, reason="aap_validation_failed")
         desired_group_ids = desired_group_ids | aap_group_ids
         aap_validated = True
 
@@ -290,6 +307,78 @@ async def sync_idp_groups(
     await _apply_group_membership_diff(db, user.id, provider_id, desired_group_ids, username=user.username)
 
     return has_matched
+
+
+async def _clear_provider_idp_groups(
+    db: AsyncSession,
+    user_id: UUID,
+    provider_id: UUID,
+    *,
+    username: str,
+) -> None:
+    """Clear only this provider's IdP-managed groups (used on deny paths).
+
+    Unlike ``_apply_group_membership_diff`` (session-scoped, replaces groups
+    from *all* providers), this removes only the groups tracked by
+    *provider_id*.  Groups tracked by other providers are left intact so a
+    denied login at IdP B does not wipe IdP A's memberships.
+
+    A ``user_groups`` row is removed only when no *other* provider still
+    tracks that group.  Manually-assigned groups (no tracking row) are
+    never affected.
+    """
+    provider_rows = await db.exec(
+        select(user_idp_groups.c.group_id).where(
+            user_idp_groups.c.user_id == user_id,
+            user_idp_groups.c.identity_provider_id == provider_id,
+        )
+    )
+    provider_group_ids: set[UUID] = set(provider_rows.all())
+
+    if not provider_group_ids:
+        return
+
+    other_tracked = await db.exec(
+        select(user_idp_groups.c.group_id).where(
+            user_idp_groups.c.user_id == user_id,
+            user_idp_groups.c.identity_provider_id != provider_id,
+            user_idp_groups.c.group_id.in_(provider_group_ids),
+        )
+    )
+    shared_with_other: set[UUID] = set(other_tracked.all())
+    to_remove = provider_group_ids - shared_with_other
+
+    if to_remove:
+        await db.exec(
+            sa_delete(user_groups).where(
+                user_groups.c.user_id == user_id,
+                user_groups.c.group_id.in_(to_remove),
+            )
+        )
+
+    await db.exec(
+        sa_delete(user_idp_groups).where(
+            user_idp_groups.c.user_id == user_id,
+            user_idp_groups.c.identity_provider_id == provider_id,
+        )
+    )
+
+    if to_remove:
+        logger.info(
+            "Provider-scoped IdP group clear on denied login",
+            user_id=str(user_id),
+            provider_id=str(provider_id),
+            removed=len(to_remove),
+            removed_group_ids=[str(gid) for gid in to_remove],
+        )
+
+    await dispatch_membership_diff_events(
+        db,
+        user_id=user_id,
+        username=username,
+        added=set(),
+        removed=to_remove,
+    )
 
 
 async def _apply_group_membership_diff(

@@ -4,12 +4,18 @@ Verifies that malformed OIDC group claims clear IdP-managed groups
 instead of keeping stale memberships from prior logins.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.services.idp_group_sync import sync_idp_groups
 from syntara.core.models import Group, User
@@ -310,9 +316,12 @@ class TestMalformedClaimClearsGroups:
         group_ids = set(memberships.all())
         assert test_group.id not in group_ids, "Stale IdP-managed group must be cleared on extraction failure"
 
-        # IdP tracking table must be empty
+        # IdP tracking table must be empty for this provider
         idp_tracking = await test_db_session.exec(
-            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == provider_id,
+            )
         )
         assert set(idp_tracking.all()) == set(), "IdP tracking must be cleared on extraction failure"
 
@@ -399,8 +408,318 @@ class TestMalformedClaimClearsGroups:
         assert test_group.id not in group_ids, "Stale claim-mapped group must be cleared on AAP deny"
         assert admins_group.id not in group_ids, "Stale AAP-resolved group must be cleared on AAP deny"
 
-        # IdP tracking table must be empty
+        # IdP tracking table must be empty for this provider
         idp_tracking = await test_db_session.exec(
-            select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == test_user.id)
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == provider_id,
+            )
         )
         assert set(idp_tracking.all()) == set(), "IdP tracking must be cleared on AAP deny"
+
+    @pytest.mark.asyncio
+    async def test_deny_does_not_wipe_other_provider_groups(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """A denied login at IdP B must NOT clear groups from IdP A.
+
+        Provider-scoped clearing ensures cross-provider groups survive.
+        """
+        other_provider = IdentityProvider(
+            name=f"other-idp-{uuid4().hex[:8]}",
+            enabled=True,
+            created_by=test_user.id,
+            configuration={
+                "provider_type": "oidc",
+                "issuer_url": "https://other-idp.example.com",
+                "client_id": f"client-{uuid4().hex[:8]}",
+                "redirect_uri": "http://localhost:8000/callback",
+            },
+        )
+        test_db_session.add(other_provider)
+        await test_db_session.flush()
+
+        other_group = Group(
+            name=f"other-group-{uuid4().hex[:8]}",
+            description="Group from other IdP",
+            created_by=test_user.id,
+        )
+        test_db_session.add(other_group)
+        await test_db_session.flush()
+
+        other_identity = UserIdentity(
+            user_id=test_user.id,
+            identity_provider_id=other_provider.id,
+            issuer="https://other-idp.example.com",
+            subject=f"sub-{uuid4().hex[:8]}",
+        )
+        test_db_session.add(other_identity)
+        await test_db_session.flush()
+
+        other_mapping = IdpGroupMappingEntry(
+            identity_provider_id=other_provider.id,
+            idp_group_value="devs",
+            mapped_group_id=other_group.id,
+        )
+        test_db_session.add(other_mapping)
+        await test_db_session.flush()
+
+        other_config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://other-idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # Login via other_provider (IdP A) — grants other_group
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            other_identity,
+            {"groups": ["devs"]},
+            other_config,
+        )
+        await test_db_session.flush()
+        assert result is True
+
+        idp_a_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == other_provider.id,
+            )
+        )
+        assert other_group.id in set(idp_a_tracking.all())
+
+        # Now login via test provider (IdP B) — healthy claim grants test_group
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {"groups": ["admin"]},
+            config,
+        )
+        await test_db_session.flush()
+        assert result is True
+
+        # Now deny at IdP B — malformed claim
+        with patch(
+            "syntara.auth.services.idp_group_sync.jmespath.search",
+            side_effect=TypeError("unexpected type"),
+        ):
+            result = await sync_idp_groups(
+                test_db_session,
+                test_user,
+                test_identity,
+                {"groups": "admin"},
+                config,
+            )
+        await test_db_session.flush()
+        assert result is False
+
+        # IdP B's groups must be cleared
+        idp_b_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == provider_id,
+            )
+        )
+        assert set(idp_b_tracking.all()) == set(), "IdP B tracking must be cleared"
+
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        group_ids = set(memberships.all())
+        assert test_group.id not in group_ids, "IdP B's group must be removed"
+
+        # IdP A's groups must survive the deny at IdP B
+        idp_a_tracking = await test_db_session.exec(
+            select(user_idp_groups.c.group_id).where(
+                user_idp_groups.c.user_id == test_user.id,
+                user_idp_groups.c.identity_provider_id == other_provider.id,
+            )
+        )
+        assert other_group.id in set(idp_a_tracking.all()), "IdP A tracking must survive deny at IdP B"
+        assert other_group.id in group_ids, "IdP A's group membership must survive deny at IdP B"
+
+
+class TestSyncRouterInteraction:
+    """Lock the sync_idp_groups ↔ _resolve_and_login_user interaction.
+
+    These tests exercise the full path: sync clears groups → router queries
+    other_groups with NOT IN subquery → commit persists the clear.
+    A test here would fail if either the empty-set provider clear or the
+    deny-path commit were reverted.
+    """
+
+    @pytest.mark.asyncio
+    async def test_deny_commits_membership_clear_to_db(
+        self,
+        test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        identity_provider: IdentityProvider,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """Malformed claim → sync clears → router commits → new session sees empty.
+
+        This is the regression test for the original fail-open bug: sync
+        would clear IdP rows, but router rolled back, restoring stale
+        memberships.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode
+        from syntara.auth.router import _resolve_and_login_user
+
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # First login: healthy claim grants test_group
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {"groups": ["admin"]},
+            config,
+        )
+        await test_db_session.commit()
+        assert result is True
+
+        # Verify group granted
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        assert test_group.id in set(memberships.all())
+
+        # Second login via router: malformed claim
+        provider_mock = MagicMock(spec=IdentityProvider)
+        provider_mock.name = identity_provider.name
+        provider_mock.configuration = config
+
+        mock_resolve = AsyncMock(return_value=(test_user, test_identity))
+
+        with (
+            patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
+            patch(
+                "syntara.auth.services.idp_group_sync.jmespath.search",
+                side_effect=TypeError("unexpected type"),
+            ),
+            pytest.raises(OIDCCallbackError) as exc_info,
+        ):
+            await _resolve_and_login_user(
+                test_db_session,
+                {"email": test_user.email, "sub": "sub-1"},
+                {"groups": "admin"},
+                provider_mock,
+                None,
+            )
+
+        assert exc_info.value.error_code == OIDCErrorCode.NO_GROUP_MATCH
+
+        # Verify on a NEW session that the membership clear was committed
+        async with test_db_session_factory() as verify_session:
+            memberships = await verify_session.exec(
+                select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+            )
+            group_ids = set(memberships.all())
+            assert test_group.id not in group_ids, "Stale IdP-managed group must be gone after deny-path commit"
+
+            idp_tracking = await verify_session.exec(
+                select(user_idp_groups.c.group_id).where(
+                    user_idp_groups.c.user_id == test_user.id,
+                    user_idp_groups.c.identity_provider_id == provider_id,
+                )
+            )
+            assert set(idp_tracking.all()) == set(), "IdP tracking must be empty after deny-path commit"
+
+    @pytest.mark.asyncio
+    async def test_manual_group_admits_user_when_sync_clears_idp_groups(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        identity_provider: IdentityProvider,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """A genuine manual group (no tracking row) must admit the user.
+
+        Even when sync_idp_groups returns False and IdP groups are cleared,
+        a manually-assigned group should pass the other_groups check and
+        allow login.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from syntara.auth.router import _resolve_and_login_user
+
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # Create a manually-assigned group (no user_idp_groups tracking row)
+        manual_group = Group(
+            name=f"manual-group-{uuid4().hex[:8]}",
+            description="Manually assigned group",
+            created_by=test_user.id,
+        )
+        test_db_session.add(manual_group)
+        await test_db_session.flush()
+        await test_db_session.exec(user_groups.insert().values(user_id=test_user.id, group_id=manual_group.id))
+        await test_db_session.flush()
+
+        provider_mock = MagicMock(spec=IdentityProvider)
+        provider_mock.name = identity_provider.name
+        provider_mock.configuration = config
+
+        mock_resolve = AsyncMock(return_value=(test_user, test_identity))
+
+        with (
+            patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
+            patch(
+                "syntara.auth.services.idp_group_sync.jmespath.search",
+                side_effect=TypeError("unexpected type"),
+            ),
+        ):
+            result_user, _, _is_first_login = await _resolve_and_login_user(
+                test_db_session,
+                {"email": test_user.email, "sub": "sub-1"},
+                {"groups": "admin"},
+                provider_mock,
+                None,
+            )
+
+        assert result_user.id == test_user.id, "Manual group must admit user even when sync fails"

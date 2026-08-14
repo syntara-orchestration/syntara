@@ -1333,6 +1333,93 @@ class TestResolveAndLoginUserDenyPath:
         db.commit.assert_awaited_once()
         db.rollback.assert_not_called()
 
+    @pytest.mark.asyncio
+    @patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock)
+    @patch("syntara.auth.router._resolve_oidc_user", new_callable=AsyncMock)
+    async def test_idp_tracked_group_does_not_satisfy_manual_fallback(
+        self,
+        mock_resolve: AsyncMock,
+        mock_sync: AsyncMock,
+    ) -> None:
+        """An IdP-tracked group must NOT satisfy the 'other groups' fallback.
+
+        If the only non-authenticated group the user has is tracked in
+        user_idp_groups, the NOT IN subquery must exclude it so login is
+        still denied with NO_GROUP_MATCH.
+        """
+        from syntara.auth.router import _resolve_and_login_user
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+
+        user = User(id=uuid4(), username="testuser", email="t@t.com", first_name="Test", is_enabled=True)
+        identity = MagicMock()
+        mock_resolve.return_value = (user, identity)
+        mock_sync.return_value = False
+
+        db = AsyncMock()
+        other_groups_result = MagicMock()
+        other_groups_result.first.return_value = None
+        db.exec.return_value = other_groups_result
+
+        provider = MagicMock(spec=IdentityProvider)
+        provider.name = "TestIdP"
+        provider.configuration = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+        )
+
+        with pytest.raises(OIDCCallbackError) as exc_info:
+            await _resolve_and_login_user(db, {"email": "t@t.com", "sub": "sub-1"}, {}, provider, None)
+
+        assert exc_info.value.error_code == OIDCErrorCode.NO_GROUP_MATCH
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock)
+    @patch("syntara.auth.router._resolve_oidc_user", new_callable=AsyncMock)
+    async def test_manual_group_allows_login_when_sync_returns_false(
+        self,
+        mock_resolve: AsyncMock,
+        mock_sync: AsyncMock,
+    ) -> None:
+        """A genuine manual group (no user_idp_groups row) must admit the user.
+
+        When sync_idp_groups returns False but the user has a manually-
+        assigned group, the other_groups query should find it and login
+        should proceed (no OIDCCallbackError raised).
+        """
+        from syntara.auth.router import _resolve_and_login_user
+        from syntara.identity_providers.models.identity_provider import IdentityProvider
+
+        user = User(id=uuid4(), username="testuser", email="t@t.com", first_name="Test", is_enabled=True)
+        identity = MagicMock()
+        mock_resolve.return_value = (user, identity)
+        mock_sync.return_value = False
+
+        db = AsyncMock()
+        manual_group_id = uuid4()
+        other_groups_result = MagicMock()
+        other_groups_result.first.return_value = manual_group_id
+        db.exec.return_value = other_groups_result
+
+        provider = MagicMock(spec=IdentityProvider)
+        provider.name = "TestIdP"
+        provider.configuration = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+        )
+
+        result = await _resolve_and_login_user(db, {"email": "t@t.com", "sub": "sub-1"}, {}, provider, None)
+
+        assert result[0] == user
+        db.commit.assert_not_awaited()
+        db.rollback.assert_not_called()
+
 
 class TestLoginAuditEvents:
     """Tests for audit event emission during login.
