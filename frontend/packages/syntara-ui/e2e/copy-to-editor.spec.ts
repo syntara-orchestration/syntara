@@ -29,9 +29,7 @@ async function runWorkflowFromList(app: Page, workflowName: string) {
   await waitForUIReady(app)
 
   // Open kebab menu and click "Run published version"
-  await row
-    .getByRole('button', { name: /Actions|Kebab toggle/i })
-    .click({ force: true })
+  await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
   await app.getByRole('menuitem', { name: 'Run published version' }).click()
 
   // Confirm run in the dialog

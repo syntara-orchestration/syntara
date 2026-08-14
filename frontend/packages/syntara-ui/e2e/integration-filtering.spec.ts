@@ -106,7 +106,9 @@ test.describe('Integration Filtering', () => {
     await expect(table).toBeVisible()
 
     // Act - Switch to Status field and apply "Available" status filter
-    const fieldSelector = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -141,10 +143,7 @@ test.describe('Integration Filtering', () => {
     await expect(app).not.toHaveURL(/status=available/)
 
     // Act - Remove status filter
-    await statusChipGroup
-      .getByRole('listitem', { name: 'Error' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await statusChipGroup.getByRole('listitem', { name: 'Error' }).getByRole('button', { name: /close/i }).click()
 
     // Assert - Status filter removed
     await expect(statusChipGroup).not.toBeVisible()
@@ -166,7 +165,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/name%5Bcontains%5D=integration/)
 
     // Act - Switch to Status and add status filter
-    const fieldSelector = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -178,7 +179,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/status=error/)
 
     // Act - Switch to Integration type and add filter (re-query field selector)
-    const fieldSelector2 = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Status', exact: true })
+    const fieldSelector2 = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Status', exact: true })
     await fieldSelector2.click()
     await app.getByRole('option', { name: 'Integration type' }).click()
     await app.getByRole('button', { name: 'Filter by integration type' }).click()
@@ -219,7 +222,9 @@ test.describe('Integration Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Apply status filter
-    const fieldSelector = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -324,7 +329,9 @@ test.describe('Integration Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Apply status filter
-    const fieldSelector = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -337,10 +344,7 @@ test.describe('Integration Filtering', () => {
     await expect(statusChipGroup.getByText('Available')).toBeVisible()
 
     // Act - Remove name filter chip
-    await nameChipGroup
-      .getByRole('listitem', { name: 'monitor' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await nameChipGroup.getByRole('listitem', { name: 'monitor' }).getByRole('button', { name: /close/i }).click()
 
     // Assert - Name filter removed, status filter remains
     await expect(nameChipGroup).not.toBeVisible()
@@ -351,10 +355,7 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/status=available/)
 
     // Act - Remove status filter chip
-    await statusChipGroup
-      .getByRole('listitem', { name: 'Available' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await statusChipGroup.getByRole('listitem', { name: 'Available' }).getByRole('button', { name: /close/i }).click()
 
     // Assert - All filters removed
     await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list')).toHaveCount(0)
@@ -446,7 +447,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/name%5Bcontains%5D=integration/)
 
     // Act - Add status filter (switch to Status field and select "Available")
-    const fieldSelector = app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
