@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models import Project
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.integrations.exceptions import (
     IntegrationNameConflictError,
@@ -22,6 +23,7 @@ from syntara.integrations.models.integration import (
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
+    IntegrationTestConnection,
     IntegrationType,
     IntegrationUpdate,
 )
@@ -699,3 +701,179 @@ class TestDeleteIntegration:
     ) -> None:
         with pytest.raises(IntegrationNotFoundError):
             await integration_service.delete_integration(uuid4())
+
+
+@pytest.mark.ssrf_enforced
+class TestIntegrationSsrfValidation:
+    """Write-time SSRF rejection at the create/patch boundary (autouse bypass disabled)."""
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_cloud_metadata(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://169.254.169.254",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_private_ip(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://10.0.0.1",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_loopback_without_allowlist(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # Loopback is opt-in: without an allowlist entry it must be rejected, otherwise any
+        # principal who can create an integration could probe services on the API host.
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://localhost:8080",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_allows_loopback_when_allowlisted(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # Local integrations work when localhost is explicitly opted in via the allowlist.
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://localhost:8080",
+                "allow_http": True,
+            },
+        )
+        settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
+        with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
+            result = await integration_service.create_integration(data)
+        assert result.configuration.base_url == "http://localhost:8080"
+
+    @pytest.mark.asyncio
+    async def test_create_allows_loopback_when_allowlisted_with_default_allow_http(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # The documented make dev path: a user only adds localhost to
+        # APP_INTEGRATION_URL_ALLOWED_HOSTS and keeps the default allow_http=False. Loopback
+        # is always reachable over HTTP, so create must succeed — the scheme and SSRF layers
+        # agree that http://localhost is permitted once the host is allowlisted.
+        data = _mcp_create(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://localhost:8080",
+                "allow_http": False,
+            },
+        )
+        settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
+        with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
+            result = await integration_service.create_integration(data)
+        assert result.configuration.base_url == "http://localhost:8080"
+
+    @pytest.mark.asyncio
+    async def test_patch_rejects_cloud_metadata(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # Allowlist localhost so the initial create succeeds; the patch to a metadata IP must
+        # still be rejected (cloud metadata is blocked regardless of the allowlist).
+        settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
+        with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
+            created = await integration_service.create_integration(
+                _mcp_create(
+                    configuration={
+                        "integration_type": "mcp_server",
+                        "base_url": "http://localhost:8080",
+                        "allow_http": True,
+                    },
+                )
+            )
+        patch_data = IntegrationUpdate(
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://169.254.169.254",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.update_integration(created.id, patch_data)
+
+    @pytest.mark.asyncio
+    async def test_discover_rejects_cloud_metadata(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # discover() bypasses create/patch but still makes an outbound request, so it must
+        # reject SSRF-prone targets before reaching the adapter.
+        data = IntegrationTestConnection(
+            integration_type=IntegrationType.MCP_SERVER,
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://169.254.169.254",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.discover(data)
+
+    @pytest.mark.asyncio
+    async def test_discover_rejects_private_ip(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = IntegrationTestConnection(
+            integration_type=IntegrationType.MCP_SERVER,
+            configuration={
+                "integration_type": "mcp_server",
+                "base_url": "http://10.0.0.1",
+                "allow_http": True,
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.discover(data)
+
+    @pytest.mark.asyncio
+    async def test_discover_rejects_metadata_for_aap(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        # AAP/LLM adapters have no request-time validate_safe_url of their own; discover must
+        # reject the metadata target at the service layer regardless of integration type.
+        data = IntegrationTestConnection(
+            integration_type=IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+            configuration={
+                "integration_type": "ansible_automation_platform",
+                "base_url": "https://169.254.169.254",
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.discover(data)
+
+    @pytest.mark.asyncio
+    async def test_discover_rejects_metadata_for_llm(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = IntegrationTestConnection(
+            integration_type=IntegrationType.LLM_PROVIDER,
+            configuration={
+                "integration_type": "llm_provider",
+                "base_url": "https://169.254.169.254",
+                "provider_hint": "openai",
+            },
+        )
+        with pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"):
+            await integration_service.discover(data)

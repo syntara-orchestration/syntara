@@ -319,10 +319,14 @@ _check_sa_status(sa_id) — raw SQL with 5s TTL cache
      -> 401, code=SA_TOKEN_REVOKED, X-Auth-Failure-Type: revoked_sa_token
      -> Dispatch MissingSACredentialClaimEvent
 
-  5. _check_cred_status(cred_id) — raw SQL with 5s TTL cache
+  5. _check_cred_status(cred_id) — raw SQL with 5s TTL cache (fetches status + expires_at)
      Credential not found (deleted) or status != "active" (disabled)?
      -> 401, code=SA_CREDENTIAL_DISABLED, X-Auth-Failure-Type: disabled_sa_credential
      -> Dispatch DisabledSACredentialRejectionEvent
+
+  6. Credential expires_at is set and now >= expires_at?
+     -> 401, code=SA_CREDENTIAL_EXPIRED, X-Auth-Failure-Type: expired_sa_credential
+     -> Dispatch ExpiredSACredentialRejectionEvent
 ```
 
 All rejection responses use RFC 9457 Problem Details format.
@@ -341,8 +345,8 @@ The `token_version` column on the `service_accounts` table works with the `token
 The `cred_id` JWT claim enables per-credential invalidation:
 
 - Each SA token embeds the UUID of the credential that was used to obtain it
-- The middleware checks the credential's status via `_check_cred_status()` (5s TTL cache)
-- Disabling or deleting a credential immediately invalidates only tokens from that credential — other credentials on the same SA remain unaffected
+- The middleware checks the credential's status and `expires_at` via `_check_cred_status()` (5s TTL cache)
+- Disabling, deleting, or letting a credential expire immediately invalidates only tokens from that credential — other credentials on the same SA remain unaffected
 - Tokens without a `cred_id` claim are rejected outright (no backward compatibility)
 
 ### Caching
@@ -477,9 +481,10 @@ Login attempts include `method=LoginMethod.CLIENT_CREDENTIALS` and `principal_ty
 | `DisabledSARejectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request from deleted or disabled SA rejected by middleware |
 | `StaleSATokenDetectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | INFO | Request with revoked (stale) SA token rejected by middleware |
 | `DisabledSACredentialRejectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request rejected because the SA credential is disabled or deleted |
+| `ExpiredSACredentialRejectionEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | Request rejected because the SA credential has expired |
 | `MissingSACredentialClaimEvent` | `src/syntara/auth/audit/sa_rejection.py` | SECURITY_EVENT | WARNING | SA token rejected for missing the `cred_id` claim |
 
-`DisabledSARejectionEvent` includes `is_alive` to distinguish deleted (`False`) from disabled (`True`). `StaleSATokenDetectionEvent` is throttled to at most one event per SA per 60 seconds to prevent audit log flooding. `DisabledSACredentialRejectionEvent` includes `credential_id` and `credential_status`.
+`DisabledSARejectionEvent` includes `is_alive` to distinguish deleted (`False`) from disabled (`True`). `StaleSATokenDetectionEvent` is throttled to at most one event per SA per 60 seconds to prevent audit log flooding. `DisabledSACredentialRejectionEvent` includes `credential_id` and `credential_status`. `ExpiredSACredentialRejectionEvent` includes `credential_id` and `expires_at`.
 
 ### Webhook auth audit events
 

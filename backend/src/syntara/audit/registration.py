@@ -22,8 +22,10 @@ import syntara.credentials.audit
 import syntara.files.audit
 import syntara.identity_providers.audit
 import syntara.integrations.audit
+import syntara.invocations.audit
 import syntara.settings.audit
 import syntara.telemetry.handlers
+import syntara.tool_manager.audit
 import syntara.workflows.audit
 from syntara.audit.discovery import discover_handlers
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -48,8 +50,10 @@ def _handler_packages() -> list[ModuleType]:
         syntara.files.audit,
         syntara.identity_providers.audit,
         syntara.integrations.audit,
+        syntara.invocations.audit,
         syntara.settings.audit,
         syntara.telemetry.handlers,
+        syntara.tool_manager.audit,
         syntara.workflows.audit,
     ]
 
