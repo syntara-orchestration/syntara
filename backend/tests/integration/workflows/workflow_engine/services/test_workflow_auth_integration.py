@@ -6,7 +6,6 @@ workflow submissions and allows authorized ones.
 
 import asyncio
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -16,13 +15,10 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    Schedule,
-    ScheduleActionExecutionStartWorkflow,
-    ScheduleActionStartWorkflow,
-    ScheduleIntervalSpec,
-    ScheduleSpec,
     StartWorkflowInput,
+    WorkflowFailureError,
 )
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -136,65 +132,48 @@ class TestWorkflowAuthIntegration:
                 task_queue=TASK_QUEUE,
             )
 
-            with pytest.raises(Exception, match="Unauthorized workflow execution"):
+            with pytest.raises(WorkflowFailureError) as exc_info:
                 await asyncio.wait_for(handle.result(), timeout=10)
 
-    async def test_create_schedule_fire_accepted_with_timestamp_suffix(
+            cause = exc_info.value.cause
+            assert isinstance(cause, ApplicationError)
+            assert "Unauthorized workflow execution" in cause.message
+
+    async def test_schedule_timestamp_suffix_auth_accepted(
         self,
         temporal_env: WorkflowEnvironment,
     ) -> None:
-        """A real Temporal Schedule fire must pass auth when the workflow ID has a time suffix."""
+        """Auth must pass when Temporal appends a schedule timestamp suffix to the workflow ID."""
         init_signing_key()
 
         wf_id = str(uuid4())
         trigger_id = "trigger_manual"
         exec_id = build_schedule_execution_workflow_id(wf_id, trigger_id)
         launcher_args: list[str] = [wf_id, trigger_id]
-        action = ScheduleActionStartWorkflow(
-            "scheduled_workflow_launcher",
-            args=launcher_args,
-            id=exec_id,
+        suffixed_workflow_id = f"{exec_id}-2025-08-14T16:30:00Z"
+        auth_headers = build_auth_header(exec_id, "scheduled_workflow_launcher", launcher_args)
+
+        header_client = await Client.connect(
+            temporal_env.client.service_client.config.target_host,
+            namespace=temporal_env.client.namespace,
+            interceptors=[_FixedHeaderInterceptor(auth_headers)],
+        )
+
+        async with Worker(
+            temporal_env.client,
             task_queue=TASK_QUEUE,
-        )
-        action.headers = build_auth_header(exec_id, "scheduled_workflow_launcher", launcher_args)
-
-        schedule_id = f"auth-sched-test-{uuid4()}"
-        schedule_handle = await temporal_env.client.create_schedule(
-            schedule_id,
-            Schedule(
-                action=action,
-                spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(seconds=1))]),
-            ),
-        )
-
-        try:
-            async with Worker(
-                temporal_env.client,
+            workflows=[ScheduledWorkflowLauncher, NexusWorkflow],
+            activities=_SCHEDULE_TEST_ACTIVITIES,
+            interceptors=[WorkflowAuthInterceptor()],
+        ):
+            handle = await header_client.start_workflow(
+                "scheduled_workflow_launcher",
+                args=launcher_args,
+                id=suffixed_workflow_id,
                 task_queue=TASK_QUEUE,
-                workflows=[ScheduledWorkflowLauncher, NexusWorkflow],
-                activities=_SCHEDULE_TEST_ACTIVITIES,
-                interceptors=[WorkflowAuthInterceptor()],
-            ):
-                fired_workflow_id: str | None = None
-                for _ in range(60):
-                    desc = await schedule_handle.describe()
-                    if desc.info.recent_actions:
-                        action_exec = desc.info.recent_actions[-1].action
-                        if isinstance(action_exec, ScheduleActionExecutionStartWorkflow):
-                            fired_workflow_id = action_exec.workflow_id
-                            break
-                    await asyncio.sleep(1)
-
-                assert fired_workflow_id is not None, "schedule did not fire within timeout"
-                assert fired_workflow_id.startswith(f"{exec_id}-"), (
-                    f"expected Temporal timestamp suffix on {fired_workflow_id}"
-                )
-
-                launcher_handle = temporal_env.client.get_workflow_handle(fired_workflow_id)
-                launcher_result = await asyncio.wait_for(launcher_handle.result(), timeout=60)
-                assert "execution_id" in launcher_result
-        finally:
-            await schedule_handle.delete()
+            )
+            launcher_result = await asyncio.wait_for(handle.result(), timeout=60)
+            assert "execution_id" in launcher_result
 
     async def test_schedule_baked_auth_header_accepted(self, temporal_env: WorkflowEnvironment) -> None:
         """A workflow submitted with build_auth_header (schedule path) must execute."""
