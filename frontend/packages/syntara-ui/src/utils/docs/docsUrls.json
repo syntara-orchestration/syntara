@@ -27,7 +27,6 @@
   "webhookTrigger": "__PLACEHOLDER__/webhook-trigger",
   "eventDrivenAnsibleTrigger": "__PLACEHOLDER__/event-driven-ansible-trigger",
   "taskAgent": "__PLACEHOLDER__/task-agent",
-  "script": "__PLACEHOLDER__/script",
   "restApi": "__PLACEHOLDER__/rest-api",
   "launchAapJobTemplate": "__PLACEHOLDER__/launch-aap-job-template",
   "launchAapWorkflowTemplate": "__PLACEHOLDER__/launch-aap-workflow-template",

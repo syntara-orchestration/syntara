@@ -23,7 +23,6 @@ describe('resolveStepDocKey', () => {
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_SCHEDULED, 'scheduleTrigger'],
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_WEBHOOK, 'webhookTrigger'],
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_EDA, 'eventDrivenAnsibleTrigger'],
-      [RegistryNodeId.ACTION, RegistryNodeId.ACTION_SCRIPT, 'script'],
       [RegistryNodeId.ACTION, RegistryNodeId.ACTION_API, 'restApi'],
       [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_CONDITION, 'conditional'],
       [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_CONVERGE, 'converge'],
@@ -41,6 +40,17 @@ describe('resolveStepDocKey', () => {
           selectedNode: null,
         })
       ).toBe(expectedKey)
+    })
+
+    it('returns null for script (no documentation link)', () => {
+      expect(
+        resolveStepDocKey({
+          mode: 'add',
+          nodeTypeId: RegistryNodeId.ACTION,
+          nodeSubtypeId: RegistryNodeId.ACTION_SCRIPT,
+          selectedNode: null,
+        })
+      ).toBeNull()
     })
 
     it('maps leaf nodeTypeId without subtype (agent, approval)', () => {
@@ -142,7 +152,6 @@ describe('resolveStepDocKey', () => {
     })
 
     it.each([
-      [ExecutorTypeEnum.SCRIPT, 'script'],
       [ExecutorTypeEnum.HTTP_REQUEST, 'restApi'],
       [ExecutorTypeEnum.AGENTIC, 'taskAgent'],
       [ExecutorTypeEnum.AAP_JOB_TEMPLATE, 'launchAapJobTemplate'],
@@ -158,7 +167,18 @@ describe('resolveStepDocKey', () => {
       ).toBe(expectedKey)
     })
 
-    it('maps task-reversed nodes using executor type', () => {
+    it('returns null for script task (no documentation link)', () => {
+      expect(
+        resolveStepDocKey({
+          mode: 'edit',
+          nodeTypeId: null,
+          nodeSubtypeId: null,
+          selectedNode: makeNode(FlowNodeType.TASK, { type: ExecutorTypeEnum.SCRIPT, name: 'Task' }),
+        })
+      ).toBeNull()
+    })
+
+    it('returns null for script task-reversed nodes', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
@@ -169,7 +189,21 @@ describe('resolveStepDocKey', () => {
             name: 'Task',
           }),
         })
-      ).toBe('script')
+      ).toBeNull()
+    })
+
+    it('maps non-script task-reversed nodes using executor type', () => {
+      expect(
+        resolveStepDocKey({
+          mode: 'edit',
+          nodeTypeId: null,
+          nodeSubtypeId: null,
+          selectedNode: makeNode(FlowNodeType.TASK_REVERSED, {
+            type: ExecutorTypeEnum.HTTP_REQUEST,
+            name: 'Task',
+          }),
+        })
+      ).toBe('restApi')
     })
 
     it.each([

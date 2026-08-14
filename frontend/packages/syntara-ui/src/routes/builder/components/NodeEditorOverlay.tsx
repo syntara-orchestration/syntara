@@ -52,7 +52,9 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
   } = props
 
   const stepDocKey = resolveStepDocKey({ mode, nodeTypeId, nodeSubtypeId, selectedNode })
-  const stepDocLink = useDocLink(stepDocKey)
+  // Hook must run unconditionally; ignore the result when this step has no docs.
+  const resolvedDocLink = useDocLink(stepDocKey ?? 'builder')
+  const stepDocLink = stepDocKey === null ? undefined : resolvedDocLink
 
   if (!isOpen) return null
 

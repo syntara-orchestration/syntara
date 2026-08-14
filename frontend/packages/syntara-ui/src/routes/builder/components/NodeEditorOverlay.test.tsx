@@ -59,10 +59,28 @@ describe('NodeEditorOverlay', () => {
     expect(screen.getByTestId('node-details-panel')).toHaveTextContent('add')
   })
 
-  it('passes step-specific docLink for edit mode based on executor type', () => {
+  it('omits docLink for script steps', () => {
     render(<NodeEditorOverlay {...baseProps} />)
-    expect(useDocLinkMock).toHaveBeenCalledWith('script')
-    expect(screen.getByTestId('doc-link')).toHaveTextContent('https://docs.example/script')
+    expect(screen.getByTestId('node-details-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('doc-link')).not.toBeInTheDocument()
+  })
+
+  it('passes step-specific docLink for edit mode based on executor type', () => {
+    render(
+      <NodeEditorOverlay
+        {...baseProps}
+        selectedNode={
+          {
+            id: 'task-1',
+            type: 'task',
+            position: { x: 0, y: 0 },
+            data: { id: 'task-1', type: ExecutorTypeEnum.HTTP_REQUEST, name: 'Task' },
+          } as never
+        }
+      />
+    )
+    expect(useDocLinkMock).toHaveBeenCalledWith('restApi')
+    expect(screen.getByTestId('doc-link')).toHaveTextContent('https://docs.example/restApi')
   })
 
   it('passes step-specific docLink for add mode based on subtype', () => {

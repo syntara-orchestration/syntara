@@ -8,13 +8,15 @@ import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 const FALLBACK_DOC_KEY: DocKey = 'builder'
 
+/** Registry / executor ids that intentionally have no step documentation link. */
+const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([RegistryNodeId.ACTION_SCRIPT, ExecutorTypeEnum.SCRIPT])
+
 /** Registry subtype / leaf ids → step-type documentation keys (must match docsUrls.json / overlay). */
 const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [RegistryNodeId.TRIGGER_MANUAL]: 'manualTrigger',
   [RegistryNodeId.TRIGGER_SCHEDULED]: 'scheduleTrigger',
   [RegistryNodeId.TRIGGER_WEBHOOK]: 'webhookTrigger',
   [RegistryNodeId.TRIGGER_EDA]: 'eventDrivenAnsibleTrigger',
-  [RegistryNodeId.ACTION_SCRIPT]: 'script',
   [RegistryNodeId.ACTION_API]: 'restApi',
   [RegistryNodeId.AGENT]: 'taskAgent',
   [RegistryNodeId.APPROVAL]: 'approval',
@@ -35,7 +37,6 @@ const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
 }
 
 const EXECUTOR_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
-  [ExecutorTypeEnum.SCRIPT]: 'script',
   [ExecutorTypeEnum.HTTP_REQUEST]: 'restApi',
   [ExecutorTypeEnum.AGENTIC]: 'taskAgent',
   [ExecutorTypeEnum.AAP_JOB_TEMPLATE]: 'launchAapJobTemplate',
@@ -73,6 +74,10 @@ function lookup(map: Readonly<Record<string, string>>, id: string | null | undef
   return key === undefined ? undefined : toDocKey(key)
 }
 
+function isWithoutDocumentation(...ids: Array<string | null | undefined>): boolean {
+  return ids.some((id) => id != null && STEPS_WITHOUT_DOCUMENTATION.has(id))
+}
+
 function resolveFromRegistryIds(nodeTypeId: string | null, nodeSubtypeId: string | null): DocKey | undefined {
   return lookup(REGISTRY_SUBTYPE_DOC_KEYS, nodeSubtypeId) ?? lookup(REGISTRY_SUBTYPE_DOC_KEYS, nodeTypeId)
 }
@@ -95,16 +100,27 @@ function resolveFromSelectedNode(node: Node<NodeType['data']>): DocKey | undefin
 
 /**
  * Maps the open step detail panel context to a documentation key.
+ * Returns `null` when the step type has no documentation (e.g. script).
  * Falls back to `builder` when the step type is unknown or only a category is selected.
  */
-export function resolveStepDocKey(input: ResolveStepDocKeyInput): DocKey {
+export function resolveStepDocKey(input: ResolveStepDocKeyInput): DocKey | null {
   const { mode, nodeTypeId, nodeSubtypeId, selectedNode } = input
 
   if (mode === 'add') {
+    if (isWithoutDocumentation(nodeSubtypeId, nodeTypeId)) {
+      return null
+    }
     return resolveFromRegistryIds(nodeTypeId, nodeSubtypeId) ?? FALLBACK_DOC_KEY
   }
 
   if (mode === 'edit' && selectedNode) {
+    const executor =
+      selectedNode.type === FlowNodeType.TASK || selectedNode.type === FlowNodeType.TASK_REVERSED
+        ? (selectedNode.data as { type?: string }).type
+        : undefined
+    if (isWithoutDocumentation(executor)) {
+      return null
+    }
     return resolveFromSelectedNode(selectedNode) ?? FALLBACK_DOC_KEY
   }
 

@@ -582,11 +582,11 @@ describe('NodeEditorLayout', () => {
       expect(link).not.toBeDisabled()
     })
 
-    it('renders a disabled button with tooltip when docLink is not provided', () => {
+    it('hides the Documentation control when docLink is not provided', () => {
       render(<NodeEditorLayout parametersContent={<div>Parameters</div>} showInputPanel={false} />)
 
-      const button = screen.getByRole('button', { name: /Documentation/i })
-      expect(button).toBeDisabled()
+      expect(screen.queryByRole('link', { name: /Documentation/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Documentation/i })).not.toBeInTheDocument()
     })
   })
 })
