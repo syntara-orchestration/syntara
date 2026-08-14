@@ -14,7 +14,7 @@ When this skill is invoked, follow the wizard below. Use `AskUserQuestion` to ga
 
 ## CRITICAL: Password Security
 
-The admin password (`NEXUS_E2E_PASSWORD`) is a secret. It must never appear in logs, tool output, or conversation text.
+The admin password (`SYNTARA_E2E_PASSWORD`) is a secret. It must never appear in logs, tool output, or conversation text.
 
 **Rules:**
 
@@ -22,7 +22,7 @@ The admin password (`NEXUS_E2E_PASSWORD`) is a secret. It must never appear in l
 2. **Never print, echo, or log the password.** Do not include the password value in any text output to the user.
 3. **Use `$(cat ...)` for runtime expansion only.** The shell command should contain the literal string `$(cat $REPO_ROOT/backend/.secrets/admin-password)` (or the user's custom path) so the value is only expanded at execution time by the shell, never captured in tool output.
 4. **Mask the password when previewing commands.** When showing the user what will run, display the `$(cat ...)` form — never the expanded value.
-5. **Never pass the password as a bare string in an env var.** Always read from file at runtime: `NEXUS_E2E_PASSWORD=$(cat $PATH)`, never `NEXUS_E2E_PASSWORD=theactualpassword`.
+5. **Never pass the password as a bare string in an env var.** Always read from file at runtime: `SYNTARA_E2E_PASSWORD=$(cat $PATH)`, never `SYNTARA_E2E_PASSWORD=theactualpassword`.
 
 If you accidentally read the password file, do not repeat its contents. Acknowledge the mistake and move on.
 
@@ -138,9 +138,9 @@ Construct the command based on the wizard answers.
 ```bash
 (cd $REPO_ROOT/frontend/packages/syntara-ui && \
 VITE_API_URL=https://localhost:8000 \
-NEXUS_E2E_SKIP_WEB_SERVER=1 \
-NEXUS_E2E_BASE_URL=http://localhost:5173 \
-NEXUS_E2E_PASSWORD=$(cat $REPO_ROOT/backend/.secrets/admin-password) \
+SYNTARA_E2E_SKIP_WEB_SERVER=1 \
+SYNTARA_E2E_BASE_URL=http://localhost:5173 \
+SYNTARA_E2E_PASSWORD=$(cat $REPO_ROOT/backend/.secrets/admin-password) \
 npx playwright test $TEST_ARGS)
 ```
 
@@ -188,11 +188,11 @@ Keep the report concise — the user should be able to see the result at a glanc
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_API_URL` | `http://localhost:3300` | Backend URL for direct API calls in test fixtures |
-| `NEXUS_E2E_SKIP_WEB_SERVER` | _(unset)_ | Set to `1` to skip auto-starting servers |
-| `NEXUS_E2E_BASE_URL` | `http://localhost:4173` | UI URL for browser navigation |
-| `NEXUS_E2E_PORT` | `4173` | UI server port (mock mode only) |
-| `NEXUS_E2E_API_PORT` | `3300` | Mock API port (mock mode only) |
-| `NEXUS_E2E_PASSWORD` | _(unset)_ | Admin password for real backend login |
+| `SYNTARA_E2E_SKIP_WEB_SERVER` | _(unset)_ | Set to `1` to skip auto-starting servers |
+| `SYNTARA_E2E_BASE_URL` | `http://localhost:4173` | UI URL for browser navigation |
+| `SYNTARA_E2E_PORT` | `4173` | UI server port (mock mode only) |
+| `SYNTARA_E2E_API_PORT` | `3300` | Mock API port (mock mode only) |
+| `SYNTARA_E2E_PASSWORD` | _(unset)_ | Admin password for real backend login |
 
 ### Admin password
 
@@ -248,7 +248,7 @@ npx playwright show-trace test-results/*/trace.zip
 | Problem | Cause | Fix |
 |---|---|---|
 | Connection refused | Servers not running | Start with `make dev` or check URLs |
-| NEXUS_E2E_PASSWORD required | Missing password env var | Set it: `NEXUS_E2E_PASSWORD=$(cat <path>)` |
+| SYNTARA_E2E_PASSWORD required | Missing password env var | Set it: `SYNTARA_E2E_PASSWORD=$(cat <path>)` |
 | "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
 | Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make -C backend secrets` then `make admin-password` |
 | API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |

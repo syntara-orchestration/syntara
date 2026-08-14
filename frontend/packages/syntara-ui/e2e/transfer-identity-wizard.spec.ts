@@ -35,7 +35,7 @@ async function apiDelete(app: Page, url: string, token: string) {
 
 test.describe('Transfer Identity Wizard (AAP-75585)', () => {
   const prefix = buildUniqueName('e2e-xfer')
-  const apiBase = process.env.NEXUS_E2E_BASE_URL ?? process.env.VITE_API_URL ?? 'http://localhost:3300'
+  const apiBase = process.env.SYNTARA_E2E_BASE_URL ?? process.env.VITE_API_URL ?? 'http://localhost:3300'
   let token = ''
   let sourceUserId = ''
   let source2UserId = ''
@@ -45,8 +45,8 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
     try {
-      const password = process.env.NEXUS_E2E_PASSWORD ?? 'coffee'
-      const username = process.env.NEXUS_E2E_PASSWORD ? 'admin' : 'demo'
+      const password = process.env.SYNTARA_E2E_PASSWORD ?? 'coffee'
+      const username = process.env.SYNTARA_E2E_PASSWORD ? 'admin' : 'demo'
       const loginResp = await page.request.post(`${apiBase}/api/v1/auth/login`, {
         data: { username, password },
       })
