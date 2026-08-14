@@ -205,7 +205,7 @@ class TestMCPProviderIntegration:
                     description="Test MCP integration with unreachable server",
                     integration_type=IntegrationType.MCP_SERVER,
                     configuration=MCPServerConfigurationInput(
-                        base_url="http://mcp-server:9999/nonexistent",
+                        base_url="https://mcp-server:9999/nonexistent",
                     ),
                 ),
             )
