@@ -363,9 +363,25 @@ class TestListApprovalsContract:
         """Test that invalid query parameters return proper error responses.
 
         Validates:
+        - Invalid status values return 422 Unprocessable Entity
         - Invalid limit values return 422 Unprocessable Entity
         - Error responses match RFC 9457 format
         """
+        # Act & Assert - Invalid status value (validated by parse_filters → _convert_enum_value)
+        response = await auth_client.get("/api/v1/approvals?status=invalid")
+        assert response.status_code == 422
+        assert_error_data(
+            response,
+            error_type="https://api.example.com/errors/validation-error",
+            title="Validation Error",
+            detail=(
+                "Invalid value 'invalid' for field 'status'. "
+                "Valid values are: pending, approved, rejected, expired, cancelled"
+            ),
+            code="VALIDATION_ERROR",
+            retryable=False,
+        )
+
         # Act & Assert - Invalid limit value
         response = await auth_client.get("/api/v1/approvals?limit=0")
         assert response.status_code == 422

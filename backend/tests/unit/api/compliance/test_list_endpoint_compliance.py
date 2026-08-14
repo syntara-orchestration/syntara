@@ -281,9 +281,7 @@ class TestListEndpointCompliance:
         filter_fields = {
             name: schema
             for name, schema in all_fields.items()
-            if name not in pagination_fields
-            and not schema.get("x-query-param")
-            and not self._is_const_param(schema)
+            if name not in pagination_fields and not schema.get("x-query-param") and not self._is_const_param(schema)
         }
 
         if not filter_fields:

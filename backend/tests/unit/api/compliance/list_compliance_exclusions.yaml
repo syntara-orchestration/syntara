@@ -78,6 +78,8 @@ exclusions:
   - operation_id: list_group_role_assignments
     reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"
 
+  - operation_id: list_integrations
+    reason: "project_id param used directly via params.project_id in router for visibility scoping — needs router/service refactor for operator format"
+
   - operation_id: get_tool_executions
     reason: "Filter params used directly via params.field_name in tool_metrics_service — needs service refactor for operator format"
-
