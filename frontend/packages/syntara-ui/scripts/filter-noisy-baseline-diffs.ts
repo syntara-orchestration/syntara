@@ -10,8 +10,8 @@
  *   OR (ratio >= 0.001 AND max_channel_delta >= 30)  // small but high-contrast
  * else RESTORE (AA noise).
  *
- * Image compare uses pngjs (decode) + pixelmatch (diff count; same family as
- * Playwright). Soft-keep still needs max channel delta from an exact scan.
+ * Decode with pngjs; classify with exact RGBA diffs (ratio + max channel delta).
+ * The hybrid rule was validated on exact equality, not YIQ / anti-alias ignore.
  *
  * Usage:
  *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
@@ -29,7 +29,6 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
 
 /** Matches `SCREENSHOT_OPTIONS.maxDiffPixelRatio` in page-screenshots.spec.ts */
@@ -83,11 +82,11 @@ export function decodePng(png: Uint8Array | Buffer): DecodedPng {
 }
 
 /**
- * Count differing pixels (pixelmatch) and max exact channel delta (soft-keep).
+ * Count differing pixels and max channel delta via exact RGBA equality.
  * Returns null when dimensions differ (treated as a meaningful keep).
  *
- * pixelmatch uses threshold 0 + includeAA so counts stay aligned with the
- * hybrid rule validated on exact channel diffs (PR #213).
+ * Ratio and soft-keep both come from this scan so classification cannot drift
+ * from the PR #213 hybrid rule (YIQ/AA libraries disagree on transparent pixels).
  */
 export function countDifferingPixels(
   oldPng: DecodedPng,
@@ -101,6 +100,7 @@ export function countDifferingPixels(
   const a = oldPng.data
   const b = newPng.data
 
+  let changedPixels = 0
   let maxChannelDelta = 0
   for (let i = 0; i < totalPixels; i++) {
     const o = i * 4
@@ -109,15 +109,11 @@ export function countDifferingPixels(
     const d2 = Math.abs(a[o + 2]! - b[o + 2]!)
     const d3 = Math.abs(a[o + 3]! - b[o + 3]!)
     if (d0 || d1 || d2 || d3) {
+      changedPixels++
       const localMax = Math.max(d0, d1, d2, d3)
       if (localMax > maxChannelDelta) maxChannelDelta = localMax
     }
   }
-
-  const changedPixels = pixelmatch(a, b, undefined, oldPng.width, oldPng.height, {
-    threshold: 0,
-    includeAA: true,
-  })
 
   return {
     changedPixels,

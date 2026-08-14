@@ -9,7 +9,6 @@
     "prettier",
     "nyc",
     "tsx",
-    "pixelmatch",
     "pngjs",
     "@types/pngjs"
   ],

@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 
 import {
   DEFAULT_MAX_DIFF_PIXEL_RATIO,
+  SNAPSHOT_DIR_REL,
   SOFT_KEEP_MIN_CHANNEL_DELTA,
   classifyPngDiff,
   countDifferingPixels,
   decodePng,
+  filterNoisyBaselineDiffs,
   formatRatio,
   shouldKeepDiff,
   summarizeResults,
@@ -119,6 +125,17 @@ describe('decodePng / countDifferingPixels', () => {
       { width: 10, height: 10, data: bData }
     )
     expect(diff).toEqual({ changedPixels: 3, totalPixels: 100, ratio: 0.03, maxChannelDelta: 255 })
+  })
+
+  it('counts RGB-only diffs even when both pixels are fully transparent', () => {
+    const aData = solidRgba(10, 10, 0, 0, 0, 0)
+    const bData = aData.slice()
+    bData[0] = 255
+    const diff = countDifferingPixels(
+      { width: 10, height: 10, data: aData },
+      { width: 10, height: 10, data: bData }
+    )
+    expect(diff).toEqual({ changedPixels: 1, totalPixels: 100, ratio: 0.01, maxChannelDelta: 255 })
   })
 
   it('returns null when dimensions differ', () => {
@@ -254,5 +271,62 @@ describe('summarizeResults / formatRatio', () => {
   it('formats small ratios', () => {
     expect(formatRatio(0)).toBe('0%')
     expect(formatRatio(0.005)).toBe('0.500%')
+    expect(formatRatio(0.00005)).toBe('0.0050%')
+    expect(formatRatio(0.0000001)).toBe('1.00e-5%')
+  })
+})
+
+describe('filterNoisyBaselineDiffs', () => {
+  it('restores AA noise on disk and keeps high-contrast diffs', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'vr-filter-'))
+    const git = (args: string[]) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' })
+
+    try {
+      git(['init'])
+      git(['config', 'user.email', 'test@example.com'])
+      git(['config', 'user.name', 'Test'])
+      git(['config', 'commit.gpgsign', 'false'])
+
+      const snapshotRepoRel = `frontend/packages/syntara-ui/${SNAPSHOT_DIR_REL}`
+      const snapshotDirAbs = join(repoRoot, snapshotRepoRel)
+      mkdirSync(snapshotDirAbs, { recursive: true })
+
+      const w = 20
+      const h = 50
+      const oldRgba = solidRgba(w, h, 100, 100, 100)
+      const noiseRgba = oldRgba.slice()
+      noiseRgba[0] = 101
+      const keepRgba = oldRgba.slice()
+      keepRgba[0] = 255
+
+      const noisePath = join(snapshotDirAbs, 'noise-linux.png')
+      const keepPath = join(snapshotDirAbs, 'keep-linux.png')
+      const oldPng = encodeRgbaPng(w, h, oldRgba)
+      writeFileSync(noisePath, oldPng)
+      writeFileSync(keepPath, oldPng)
+      git(['add', '.'])
+      git(['commit', '-m', 'baselines'])
+
+      writeFileSync(noisePath, encodeRgbaPng(w, h, noiseRgba))
+      writeFileSync(keepPath, encodeRgbaPng(w, h, keepRgba))
+
+      const summary = filterNoisyBaselineDiffs({
+        repoRoot,
+        snapshotDirAbs,
+        snapshotRepoRel,
+        baseRef: 'HEAD',
+        maxDiffPixelRatio: DEFAULT_MAX_DIFF_PIXEL_RATIO,
+        dryRun: false,
+      })
+
+      expect(summary.restored).toHaveLength(1)
+      expect(summary.kept).toHaveLength(1)
+      expect(summary.restored[0]?.path).toBe(`${snapshotRepoRel}/noise-linux.png`)
+      expect(summary.kept[0]?.path).toBe(`${snapshotRepoRel}/keep-linux.png`)
+      expect([...decodePng(readFileSync(noisePath)).data]).toEqual([...oldRgba])
+      expect([...decodePng(readFileSync(keepPath)).data]).toEqual([...keepRgba])
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true })
+    }
   })
 })
