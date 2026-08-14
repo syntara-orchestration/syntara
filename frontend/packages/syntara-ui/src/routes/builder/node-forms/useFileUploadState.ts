@@ -33,6 +33,34 @@ type BatchDeleteResult = {
   deleted: UploadedFile[]
 }
 
+type DeleteFailureContext = {
+  clearDeletingState: (id: string) => void
+  showError: (opts: { title: string }) => void
+}
+
+function handleBatchDeleteFailure(
+  failedIndex: number,
+  replacements: UploadedFile[],
+  deleted: UploadedFile[],
+  err: unknown,
+  ctx: DeleteFailureContext,
+): void {
+  const { clearDeletingState, showError } = ctx
+  const file = replacements[failedIndex]
+  const msg = err instanceof Error ? err.message : `Unable to delete ${file.file.name}. Please try again.`
+  showError({ title: msg })
+  clearDeletingState(file.id)
+  for (let j = failedIndex + 1; j < replacements.length; j++) {
+    clearDeletingState(replacements[j].id)
+  }
+  if (deleted.length > 0) {
+    const names = deleted.map((f) => f.file.name).join(', ')
+    showError({
+      title: `Replace aborted. ${names} ${deleted.length === 1 ? 'was' : 'were'} already removed.`,
+    })
+  }
+}
+
 async function deleteSessionReplacements(
   replacements: UploadedFile[],
   beginDeleting: (id: string) => boolean,
@@ -44,22 +72,11 @@ async function deleteSessionReplacements(
   }
   const deleted: UploadedFile[] = []
   for (let i = 0; i < replacements.length; i++) {
-    const file = replacements[i]
     try {
-      await deleteFileById(file.id)
-      deleted.push(file)
-    } catch {
-      showError({ title: `Unable to delete ${file.file.name}. Please try again.` })
-      clearDeletingState(file.id)
-      for (let j = i + 1; j < replacements.length; j++) {
-        clearDeletingState(replacements[j].id)
-      }
-      if (deleted.length > 0) {
-        const names = deleted.map((f) => f.file.name).join(', ')
-        showError({
-          title: `Replace aborted. ${names} ${deleted.length === 1 ? 'was' : 'were'} already removed.`,
-        })
-      }
+      await deleteFileById(replacements[i].id)
+      deleted.push(replacements[i])
+    } catch (err: unknown) {
+      handleBatchDeleteFailure(i, replacements, deleted, err, { clearDeletingState, showError })
       return { success: false, deleted }
     }
   }
@@ -204,8 +221,9 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
       try {
         await deleteFileById(fileId)
         return true
-      } catch {
-        showError({ title: `Unable to delete ${fileName}. Please try again.` })
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : `Unable to delete ${fileName}. Please try again.`
+        showError({ title: msg })
         clearDeletingState(fileId)
         return false
       }

@@ -214,7 +214,7 @@ describe('useFileUploadState', () => {
 
     await waitFor(() => {
       expect(showError).toHaveBeenCalledWith({
-        title: 'Unable to delete Report.pdf. Please try again.',
+        title: 'network',
       })
     })
     expect(removeFile).not.toHaveBeenCalled()
@@ -395,7 +395,7 @@ describe('useFileUploadState', () => {
 
     await waitFor(() => {
       expect(showError).toHaveBeenCalledWith({
-        title: 'Unable to delete Report.pdf. Please try again.',
+        title: 'network',
       })
     })
     expect(removeFile).not.toHaveBeenCalled()
@@ -572,7 +572,7 @@ describe('useFileUploadState', () => {
 
     await waitFor(() => {
       expect(showError).toHaveBeenCalledWith({
-        title: 'Unable to delete B.pdf. Please try again.',
+        title: 'network',
       })
     })
     // A was deleted on the server — clear its chip so it is not a zombie. Keep B.

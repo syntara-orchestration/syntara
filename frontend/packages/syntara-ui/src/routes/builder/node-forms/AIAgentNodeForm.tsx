@@ -427,18 +427,22 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     ...props.initialData,
   }
 
-  const handleSubmit = (data: AIAgentFormData) => {
-    const trimmed = data.responseSchema?.trim()
-    const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
+  const { onSubmit: onSubmitProp } = props
+  const handleSubmit = useCallback(
+    (data: AIAgentFormData) => {
+      const trimmed = data.responseSchema?.trim()
+      const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
-    const currentDeletingIds = deletingFileIdsRef.current
-    const fileIds: string[] = completedFiles
-      .filter((f) => f.status === 'success' && !currentDeletingIds.has(f.id))
-      .map((f) => f.id)
+      const currentDeletingIds = deletingFileIdsRef.current
+      const fileIds: string[] = completedFiles
+        .filter((f) => f.status === 'success' && !currentDeletingIds.has(f.id))
+        .map((f) => f.id)
 
-    props.onSubmit({ ...data, fileIds, parsedResponseSchema })
-    markPersisted?.(fileIds)
-  }
+      onSubmitProp({ ...data, fileIds, parsedResponseSchema })
+      markPersisted?.(fileIds)
+    },
+    [completedFiles, onSubmitProp, markPersisted]
+  )
 
   const methods = useForm<AIAgentFormData>({
     resolver: zodResolver(aiAgentFormSchema, undefined, { mode: 'sync' }),
@@ -446,6 +450,11 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     mode: 'onChange',
     reValidateMode: 'onChange',
   })
+
+  const onFormSubmit = useCallback(
+    (e: React.FormEvent) => methods.handleSubmit(handleSubmit)(e),
+    [methods, handleSubmit]
+  )
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
   useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
@@ -475,7 +484,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   return (
     <AIAgentFileContext.Provider value={fileContextValue}>
       <FormProvider {...methods}>
-        <NodeFormContainer formId="ai-agent-node-form" onSubmit={(e) => methods.handleSubmit(handleSubmit)(e)}>
+        <NodeFormContainer formId="ai-agent-node-form" onSubmit={onFormSubmit}>
           <AIAgentFormFields
             onHeaderContentChange={props.onHeaderContentChange}
             projectId={props.projectId}
