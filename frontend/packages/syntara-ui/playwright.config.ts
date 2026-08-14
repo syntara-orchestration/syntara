@@ -8,9 +8,9 @@ config({ path: new URL('.env.local', import.meta.url).pathname })
 
 import { isSkipWebServerForPlaywrightTests } from './e2e/playwrightWebServerEnv'
 
-const uiPort = process.env.NEXUS_E2E_PORT ?? '4173'
-const apiPort = process.env.NEXUS_E2E_API_PORT ?? '3300'
-const baseURL = process.env.NEXUS_E2E_BASE_URL ?? `http://localhost:${uiPort}`
+const uiPort = process.env.SYNTARA_E2E_PORT ?? '4173'
+const apiPort = process.env.SYNTARA_E2E_API_PORT ?? '3300'
+const baseURL = process.env.SYNTARA_E2E_BASE_URL ?? `http://localhost:${uiPort}`
 const useWebServer = !isSkipWebServerForPlaywrightTests()
 
 /**

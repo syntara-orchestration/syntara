@@ -183,8 +183,8 @@ set +e
     echo '--- Running visual regression tests ---'
     TEST_EXIT=0
     cd packages/syntara-ui
-    NEXUS_E2E_BASE_URL=http://localhost:${UI_PORT} \
-    NEXUS_E2E_API_PORT=${API_PORT} \
+    SYNTARA_E2E_BASE_URL=http://localhost:${UI_PORT} \
+    SYNTARA_E2E_API_PORT=${API_PORT} \
     npx playwright test e2e/visual-regression/page-screenshots.spec.ts ${UPDATE_FLAG} || TEST_EXIT=\$?
 
     echo ''
