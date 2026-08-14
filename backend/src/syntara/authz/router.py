@@ -702,12 +702,38 @@ _WHO_CAN_GATE_LOOKUP: dict[tuple[str, str], _WhoCanGateRule] = {
 }
 
 
+def _dispatch_who_can_denied(current_user: User, body: WhoCanRequest) -> None:
+    """Dispatch an audit event for a denied who_can query."""
+    from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+    from syntara.authz.audit.authorization_denied import AuthorizationDeniedEvent  # noqa: PLC0415
+
+    AuditEventDispatcher.dispatch(
+        AuthorizationDeniedEvent(
+            user_id=current_user.id,
+            username=current_user.username,
+            resource_id=body.resource_id,
+            resource_type=body.resource_type,
+            resource_name="",
+            action=body.action,
+            denied_by="who_can_gate",
+            principal_type=current_user.__dict__.get("__principal_type__"),
+        )
+    )
+    logger.info(
+        "Authorization denied for who_can query",
+        user_id=str(current_user.id),
+        resource_type=body.resource_type,
+        action=body.action,
+    )
+
+
 async def _enforce_who_can_permission(
     body: WhoCanRequest,
     current_user: User,
     db: AsyncSession,
     evaluator: AuthzEvaluator,
     resource_project: str,
+    request: Request,
 ) -> None:
     """Enforce two-tier authorization gate for who_can queries.
 
@@ -719,22 +745,31 @@ async def _enforce_who_can_permission(
             the developer to specify how it is authorized.
     Tier 2: No project context — system-wide query, requires authz:query (admin).
 
+    Certificate-authenticated requests (service-to-service) bypass the gate,
+    matching the behavior of PermissionChecker.
+
     Client-supplied resource_labels/resource_metadata are NOT used in the gate
     to prevent forged attributes from influencing authorization.
     """
+    if getattr(request.state, "is_cert_authenticated", False):
+        return
+
     if resource_project or body.resource_id:
         query_pair = (body.resource_type, body.action)
         rule = _WHO_CAN_GATE_LOOKUP.get(query_pair)
         if rule is None:
             msg = f"who_can query for {body.resource_type}:{body.action} is not permitted for non-admin users"
+            _dispatch_who_can_denied(current_user, body)
             raise AuthorizationDeniedError(msg)
 
         if not await rule.check(current_user, evaluator, db, resource_project):
             msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
+            _dispatch_who_can_denied(current_user, body)
             raise AuthorizationDeniedError(msg)
 
     elif not await _user_has_authz_query_permission(current_user, evaluator, db):
         msg = "System-wide who_can queries require authz:query permission"
+        _dispatch_who_can_denied(current_user, body)
         raise AuthorizationDeniedError(msg)
 
 
@@ -812,6 +847,7 @@ async def can_i(
     response_description="List of authorized users",
 )
 async def who_can(
+    request: Request,
     body: WhoCanRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -819,14 +855,14 @@ async def who_can(
 ) -> WhoCanResponse:
     """List users who can perform a specific action.
 
-    Three-tier authorization model:
-    1. resource_id provided — user must be able to read that specific resource.
-    2. resource_project provided (no resource_id) — user must be able to read the
-       queried resource_type within that project.  This is the path hit by the
-       workflow-builder approval-node form.
-    3. Neither provided — system-wide query, requires authz:query (admin).
+    Two-tier authorization model:
+    1. resource_project or resource_id provided — the (resource_type, action) pair
+       must match a gate rule, and the user must pass that rule's permission check
+       (e.g. workflow:update for approval:decide queries).
+    2. Neither provided — system-wide query, requires authz:query (admin).
 
     Args:
+        request: The HTTP request (used for cert-auth bypass check).
         body: Query parameters including action, resource_type, optional resource_id.
         current_user: Authenticated user (permission check happens inside).
         db: Database session.
@@ -840,7 +876,7 @@ async def who_can(
 
     """
     resource_project = await _resolve_project_input(db, body.resource_project)
-    await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project)
+    await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project, request)
 
     if body.cursor:
         cursor_data = decode_cursor(body.cursor)

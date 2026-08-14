@@ -116,13 +116,16 @@ export function ApproverMultiSelect<T extends SelectableItem>({
 
   const selectedChips = useMemo(
     () =>
-      selectedValues.map((val) => {
-        const item = items.find((i) => getItemValue(i) === val)
-        return item
-          ? { key: getItemId(item), label: getItemLabel(item), value: getItemValue(item) }
-          : { key: val, label: val, value: val }
-      }),
-    [selectedValues, items, getItemId, getItemValue, getItemLabel]
+      selectedValues
+        .map((val) => {
+          const item = items.find((i) => getItemValue(i) === val)
+          if (item) {
+            return { key: getItemId(item), label: getItemLabel(item), value: getItemValue(item) }
+          }
+          return allowCustomValue ? { key: val, label: val, value: val } : null
+        })
+        .filter((chip): chip is NonNullable<typeof chip> => chip !== null),
+    [selectedValues, items, getItemId, getItemValue, getItemLabel, allowCustomValue]
   )
 
   const handleRemoveSelection = useCallback(
