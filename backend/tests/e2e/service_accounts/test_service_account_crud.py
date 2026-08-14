@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 from syntara_api_client.models.service_account_status import ServiceAccountStatus
 from syntara_api_client.models.service_account_update import ServiceAccountUpdate
@@ -64,7 +64,7 @@ class TestCreateServiceAccount:
         try:
             cred_resp = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(
+                body=ServiceAccountCredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             )
@@ -94,7 +94,7 @@ class TestReadServiceAccount:
         try:
             syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(
+                body=ServiceAccountCredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
@@ -111,7 +111,7 @@ class TestReadServiceAccount:
         try:
             syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(
+                body=ServiceAccountCredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
@@ -130,7 +130,7 @@ class TestReadServiceAccount:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(
+                body=ServiceAccountCredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()
@@ -177,7 +177,7 @@ class TestUpdateServiceAccount:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(
+                body=ServiceAccountCredentialCreate(
                     credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
                 ),
             ).assert_and_get()

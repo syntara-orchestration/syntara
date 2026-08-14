@@ -104,13 +104,13 @@ export interface paths {
       cookie?: never
     }
     /**
-     * List credentials
+     * List service account credentials
      * @description List credentials for a service account with pagination.
      */
     get: operations['list_service_account_credentials']
     put?: never
     /**
-     * Create credential
+     * Create service account credential
      * @description Create a new credential for a service account; returns the one-time plaintext secret.
      */
     post: operations['create_service_account_credential']
@@ -128,14 +128,14 @@ export interface paths {
       cookie?: never
     }
     /**
-     * Get credential
+     * Get service account credential
      * @description Get a credential by ID (secret is never included).
      */
     get: operations['get_service_account_credential']
     put?: never
     post?: never
     /**
-     * Delete credential
+     * Delete service account credential
      * @description Hard-delete a credential.
      */
     delete: operations['delete_service_account_credential']
@@ -154,7 +154,7 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Rotate credential
+     * Rotate service account credential
      * @description Rotate a credential's secret; returns the new one-time plaintext secret.
      */
     post: operations['rotate_service_account_credential']
@@ -174,7 +174,7 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Disable credential
+     * Disable service account credential
      * @description Set a credential's status to disabled.
      */
     post: operations['disable_service_account_credential']
@@ -194,7 +194,7 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Enable credential
+     * Enable service account credential
      * @description Set a credential's status to active.
      */
     post: operations['enable_service_account_credential']
@@ -361,10 +361,10 @@ export interface components {
      */
     ServiceAccountCredentialStatus: 'active' | 'disabled'
     /**
-     * SACredentialCreate
+     * ServiceAccountCredentialCreate
      * @description Schema for creating a new service account credential.
      */
-    SACredentialCreate: {
+    ServiceAccountCredentialCreate: {
       /** @description Type of credential to create */
       credential_type: components['schemas']['ServiceAccountCredentialType']
       /**
@@ -380,10 +380,10 @@ export interface components {
       grace_period_seconds?: number
     }
     /**
-     * SACredentialRead
+     * ServiceAccountCredentialRead
      * @description Schema for credential responses (excludes secrets).
      */
-    SACredentialRead: {
+    ServiceAccountCredentialRead: {
       /**
        * Id
        * Format: uuid
@@ -425,10 +425,10 @@ export interface components {
       updated_at: string
     }
     /**
-     * SACredentialCreateResponse
+     * ServiceAccountCredentialCreateResponse
      * @description Schema for the create response — includes one-time plaintext secret(s).
      */
-    SACredentialCreateResponse: {
+    ServiceAccountCredentialCreateResponse: {
       /**
        * Id
        * Format: uuid
@@ -475,10 +475,10 @@ export interface components {
       client_secret?: string | null
     }
     /**
-     * SACredentialRotateRequest
+     * ServiceAccountCredentialRotateRequest
      * @description Schema for rotating a credential's secret.
      */
-    SACredentialRotateRequest: {
+    ServiceAccountCredentialRotateRequest: {
       /**
        * Grace Period Seconds
        * @description Override grace period for this rotation (uses credential default if omitted)
@@ -486,10 +486,10 @@ export interface components {
       grace_period_seconds?: number | null
     }
     /**
-     * SACredentialRotateResponse
+     * ServiceAccountCredentialRotateResponse
      * @description Schema for the rotate response — same shape as create response.
      */
-    SACredentialRotateResponse: {
+    ServiceAccountCredentialRotateResponse: {
       /**
        * Id
        * Format: uuid
@@ -536,7 +536,7 @@ export interface components {
       client_secret?: string | null
     }
     /**
-     * SACredentialListResponse
+     * ServiceAccountCredentialListResponse
      * @description Paginated list response for service account credentials.
      * @example {
      *       "next": "eyJpZCI6InV1aWQifQ",
@@ -547,7 +547,7 @@ export interface components {
      *       "prev": "eyJpZCI6InByZXYifQ"
      *     }
      */
-    SACredentialListResponse: {
+    ServiceAccountCredentialListResponse: {
       /**
        * Next
        * @description Cursor for next page of results
@@ -567,7 +567,7 @@ export interface components {
        * Resources
        * @description Array of resources in current page
        */
-      resources: components['schemas']['SACredentialRead'][]
+      resources: components['schemas']['ServiceAccountCredentialRead'][]
       /**
        * Max Credentials
        * @description Maximum number of credentials allowed per service account
@@ -1064,7 +1064,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialListResponse']
+          'application/json': components['schemas']['ServiceAccountCredentialListResponse']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1088,7 +1088,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['SACredentialCreate']
+        'application/json': components['schemas']['ServiceAccountCredentialCreate']
       }
     }
     responses: {
@@ -1098,7 +1098,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialCreateResponse']
+          'application/json': components['schemas']['ServiceAccountCredentialCreateResponse']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1129,7 +1129,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialRead']
+          'application/json': components['schemas']['ServiceAccountCredentialRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1183,7 +1183,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['SACredentialRotateRequest']
+        'application/json': components['schemas']['ServiceAccountCredentialRotateRequest']
       }
     }
     responses: {
@@ -1193,7 +1193,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialRotateResponse']
+          'application/json': components['schemas']['ServiceAccountCredentialRotateResponse']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1224,7 +1224,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialRead']
+          'application/json': components['schemas']['ServiceAccountCredentialRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1255,7 +1255,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['SACredentialRead']
+          'application/json': components['schemas']['ServiceAccountCredentialRead']
         }
       }
       400: components['responses']['BadRequestError']

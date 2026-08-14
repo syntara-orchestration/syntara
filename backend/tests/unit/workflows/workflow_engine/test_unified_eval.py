@@ -39,7 +39,10 @@ class TestBasicEvaluation:
 
     def test_variable_not_found_raises_key_error(self) -> None:
         namespace = {"status": "ok"}
-        with pytest.raises(KeyError, match="unknown"):
+        with pytest.raises(
+            KeyError,
+            match=r'The condition references "unknown" but no step with that name has produced output',
+        ):
             safe_eval_with_namespace("${unknown} == 'value'", namespace)
 
     def test_empty_expression_raises_error(self) -> None:
@@ -365,8 +368,15 @@ class TestErrorMessages:
             safe_eval_with_namespace("${status} ==", {"status": "ok"})
 
     def test_variable_not_found_error_message(self) -> None:
-        with pytest.raises(KeyError, match="'unknown' not found"):
+        with pytest.raises(KeyError) as exc_info:
             safe_eval_with_namespace("${unknown} == 'value'", {})
+
+        error_msg = str(exc_info.value)
+        assert 'The condition references "unknown"' in error_msg
+        assert "no step with that name has produced output" in error_msg
+        assert "runs before this condition" in error_msg
+        assert "Variable" not in error_msg
+        assert "namespace" not in error_msg.lower()
 
     def test_unsupported_operation_error_message(self) -> None:
         """Function calls are not supported."""

@@ -6,6 +6,9 @@ on:
     - cron: "0 8 * * 1"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   dast:
     # TODO(alex): temporal workaround, actions/runner-images#14473 will fix it

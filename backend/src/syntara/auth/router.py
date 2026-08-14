@@ -473,7 +473,7 @@ async def token(
 
 
 @router.post(
-    "/ws-ticket",
+    "/ws_ticket",
     operation_id="create_ws_ticket",
     dependencies=[NO_PERMISSION],
     summary="Exchange JWT for a WebSocket connection ticket",

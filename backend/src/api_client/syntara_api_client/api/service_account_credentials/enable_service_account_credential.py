@@ -7,7 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.sa_credential_read import SACredentialRead
+from ...models.service_account_credential_read import ServiceAccountCredentialRead
 from ...types import Response
 
 
@@ -25,9 +25,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | SACredentialRead | None:
+) -> ErrorData | ServiceAccountCredentialRead | None:
     if response.status_code == 200:
-        response_200 = SACredentialRead.from_dict(response.json())
+        response_200 = ServiceAccountCredentialRead.from_dict(response.json())
 
         return response_200
 
@@ -79,7 +79,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | SACredentialRead]:
+) -> Response[ErrorData | ServiceAccountCredentialRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -95,8 +95,8 @@ def sync_detailed(
     credential_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[ErrorData | SACredentialRead]:
-    """Enable credential
+) -> Response[ErrorData | ServiceAccountCredentialRead]:
+    """Enable service account credential
 
      Set a credential's status to active.
 
@@ -109,7 +109,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialRead]
+        Response[ErrorData | ServiceAccountCredentialRead]
     """
 
     kwargs = _get_kwargs(
@@ -129,8 +129,8 @@ def sync(
     credential_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> ErrorData | SACredentialRead | None:
-    """Enable credential
+) -> ErrorData | ServiceAccountCredentialRead | None:
+    """Enable service account credential
 
      Set a credential's status to active.
 
@@ -143,7 +143,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialRead
+        ErrorData | ServiceAccountCredentialRead
     """
 
     return sync_detailed(
@@ -158,8 +158,8 @@ async def asyncio_detailed(
     credential_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[ErrorData | SACredentialRead]:
-    """Enable credential
+) -> Response[ErrorData | ServiceAccountCredentialRead]:
+    """Enable service account credential
 
      Set a credential's status to active.
 
@@ -172,7 +172,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialRead]
+        Response[ErrorData | ServiceAccountCredentialRead]
     """
 
     kwargs = _get_kwargs(
@@ -190,8 +190,8 @@ async def asyncio(
     credential_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> ErrorData | SACredentialRead | None:
-    """Enable credential
+) -> ErrorData | ServiceAccountCredentialRead | None:
+    """Enable service account credential
 
      Set a credential's status to active.
 
@@ -204,7 +204,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialRead
+        ErrorData | ServiceAccountCredentialRead
     """
 
     return (
