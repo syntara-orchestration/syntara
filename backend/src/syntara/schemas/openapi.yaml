@@ -8753,18 +8753,6 @@ paths:
                 code: NOT_FOUND
                 retryable: false
                 instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
         '422':
           description: Validation Error
           content:

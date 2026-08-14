@@ -375,10 +375,15 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   const [userFiles, setUserFiles] = useState<UploadedFile[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [markPersisted, setMarkPersisted] = useState<MarkPersistedFn | null>(null)
+  const [deletingFileIds, setDeletingFileIds] = useState<Set<string>>(() => new Set())
 
   const onMarkPersistedReady = useCallback((fn: MarkPersistedFn | null) => {
     // Functional update so a function value is stored, not invoked as a setState updater.
     setMarkPersisted(() => fn)
+  }, [])
+
+  const onDeletingFileIdsChange = useCallback((ids: Set<string>) => {
+    setDeletingFileIds(ids)
   }, [])
 
   const completedFiles = useMemo(() => {
@@ -427,7 +432,11 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     const trimmed = data.responseSchema?.trim()
     const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
-    const fileIds: string[] = completedFiles.filter((f) => f.status === 'success').map((f) => f.id)
+    // Exclude files with an in-flight DELETE — they may already be removed from S3
+    // even though the chip is still visible pending batch UI clear.
+    const fileIds: string[] = completedFiles
+      .filter((f) => f.status === 'success' && !deletingFileIds.has(f.id))
+      .map((f) => f.id)
 
     props.onSubmit({ ...data, fileIds, parsedResponseSchema })
     // File IDs are now in durable node state — remove becomes detach-only (no hard DELETE).
@@ -452,8 +461,18 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
       removeFilesByName,
       isFilesError: isFilesError && !!props.existingFileIds?.length,
       onMarkPersistedReady,
+      onDeletingFileIdsChange,
     }),
-    [completedFiles, addFiles, removeFile, removeFilesByName, isFilesError, props.existingFileIds, onMarkPersistedReady]
+    [
+      completedFiles,
+      addFiles,
+      removeFile,
+      removeFilesByName,
+      isFilesError,
+      props.existingFileIds,
+      onMarkPersistedReady,
+      onDeletingFileIdsChange,
+    ]
   )
 
   return (

@@ -91,6 +91,13 @@ class FileUploadInfo(BaseModel):
         title="MIME Type", description="Detected MIME type of the file", examples=["application/pdf"]
     )
     status: FileStatus = Field(description="Processing status (pending_conversion)")
+    is_project_deleted: bool | None = Field(
+        default=None,
+        description=(
+            "True when the owning project has been soft-deleted; the file is "
+            "retained as an orphan. Null when not computed (e.g. upload response)."
+        ),
+    )
 
 
 class FileUploadResponse(BaseModel):
@@ -334,18 +341,19 @@ async def get_files_metadata(
         db,
         allowed_projects=visibility.to_allowed_projects(),
     )
-    return FilesMetadataResponse(
-        files=[
+    files_info: list[FileUploadInfo] = []
+    for m in metadata_list:
+        files_info.append(
             FileUploadInfo(
                 file_id=m.id,
                 filename=m.filename,
                 size_bytes=m.size_bytes,
                 mime_type=m.mime_type,
                 status=m.status,
+                is_project_deleted=await file_manager.is_project_deleted(m.project_id, db),
             )
-            for m in metadata_list
-        ],
-    )
+        )
+    return FilesMetadataResponse(files=files_info)
 
 
 @router.get(

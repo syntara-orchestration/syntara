@@ -636,7 +636,6 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']

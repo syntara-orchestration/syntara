@@ -35,6 +35,7 @@ export function AIAgentFileUploadSection({
   const [downloadingFileIds, setDownloadingFileIds] = useState<Set<string>>(() => new Set())
   const downloadControllersRef = useRef(new Map<string, AbortController>())
   const onMarkPersistedReady = fileContext.onMarkPersistedReady
+  const onDeletingFileIdsChange = fileContext.onDeletingFileIdsChange
 
   useEffect(() => {
     onMarkPersistedReady?.(markPersisted)
@@ -42,6 +43,10 @@ export function AIAgentFileUploadSection({
       onMarkPersistedReady?.(null)
     }
   }, [markPersisted, onMarkPersistedReady])
+
+  useEffect(() => {
+    onDeletingFileIdsChange?.(deletingFileIds)
+  }, [deletingFileIds, onDeletingFileIdsChange])
 
   const clearDownloadState = useCallback((fileId: string) => {
     downloadControllersRef.current.delete(fileId)

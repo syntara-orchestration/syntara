@@ -488,10 +488,7 @@ describe('useFileUploadState', () => {
     vi.mocked(removeFilesByName).mockClear()
     vi.mocked(uploadFiles).mockClear()
     uploadFiles.mockResolvedValue({
-      files: [
-        { file_id: 'session-a-2' },
-        { file_id: 'session-b-2' },
-      ],
+      files: [{ file_id: 'session-a-2' }, { file_id: 'session-b-2' }],
     })
 
     act(() => {

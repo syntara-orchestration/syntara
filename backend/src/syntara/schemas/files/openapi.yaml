@@ -256,8 +256,6 @@ paths:
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
         '404':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
-        '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
         '422':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
         '429':
