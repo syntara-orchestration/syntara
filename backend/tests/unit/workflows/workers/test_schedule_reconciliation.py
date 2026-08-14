@@ -69,8 +69,8 @@ class TestExtractExpectedSchedules:
         lookup = _extract_expected_schedules([(wf_id, triggers)])
 
         assert len(lookup) == 2
-        assert f"nexus-sched-{wf_id}-t1" in lookup
-        assert f"nexus-sched-{wf_id}-t2" in lookup
+        assert f"orchestrator-sched-{wf_id}-t1" in lookup
+        assert f"orchestrator-sched-{wf_id}-t2" in lookup
 
     def test_ignores_non_scheduled_triggers(self) -> None:
         wf_id = str(uuid4())
@@ -95,7 +95,7 @@ class TestReconcileScheduledTriggers:
         triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
         session_factory = _make_session_factory([(wf_id, triggers)])
 
-        expected_schedule_id = f"nexus-sched-{wf_id}-t1"
+        expected_schedule_id = f"orchestrator-sched-{wf_id}-t1"
 
         with patch(_PATCH_SVC) as mock_svc_cls:
             mock_svc = mock_svc_cls.return_value
@@ -131,7 +131,7 @@ class TestReconcileScheduledTriggers:
     async def test_deletes_orphan_schedules(self) -> None:
         """Orphan schedules (actual - expected) should be deleted."""
         session_factory = _make_session_factory([])
-        orphan_id = "nexus-sched-dead-workflow-trigger_1"
+        orphan_id = "orchestrator-sched-dead-workflow-trigger_1"
 
         with patch(_PATCH_SVC) as mock_svc_cls:
             mock_client = MagicMock()
@@ -151,9 +151,9 @@ class TestReconcileScheduledTriggers:
         triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
         session_factory = _make_session_factory([(wf_id, triggers)])
 
-        expected_id = f"nexus-sched-{wf_id}-t1"
-        stale_id = f"nexus-sched-{wf_id}-old_trigger"
-        orphan_id = "nexus-sched-dead-wf-orphan"
+        expected_id = f"orchestrator-sched-{wf_id}-t1"
+        stale_id = f"orchestrator-sched-{wf_id}-old_trigger"
+        orphan_id = "orchestrator-sched-dead-wf-orphan"
 
         with patch(_PATCH_SVC) as mock_svc_cls:
             mock_client = MagicMock()
@@ -194,7 +194,7 @@ class TestReconcileScheduledTriggers:
     async def test_no_published_workflows_checks_orphans_only(self) -> None:
         """With no published workflows, should still clean up orphans."""
         session_factory = _make_session_factory([])
-        orphan_id = "nexus-sched-old-wf-old-trigger"
+        orphan_id = "orchestrator-sched-old-wf-old-trigger"
 
         with patch(_PATCH_SVC) as mock_svc_cls:
             mock_client = MagicMock()
@@ -239,8 +239,8 @@ class TestReconcileScheduledTriggers:
     async def test_delete_error_does_not_block_others(self) -> None:
         """A failure deleting one schedule should not prevent others from being deleted."""
         session_factory = _make_session_factory([])
-        orphan_a = "nexus-sched-dead-wf-a"
-        orphan_b = "nexus-sched-dead-wf-b"
+        orphan_a = "orchestrator-sched-dead-wf-a"
+        orphan_b = "orchestrator-sched-dead-wf-b"
 
         call_count = 0
 

@@ -1257,25 +1257,6 @@ export interface components {
      */
     HTTPMethod: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE'
     /**
-     * AuthenticationType
-     * @description Supported authentication types for API requests.
-     * @enum {string}
-     */
-    AuthenticationType: 'basic' | 'bearer' | 'api_key' | 'oauth2'
-    /**
-     * Authentication
-     * @description Authentication configuration for API requests.
-     */
-    Authentication: {
-      /** @description Authentication type */
-      type: components['schemas']['AuthenticationType']
-      /**
-       * Credentials
-       * @description Reference to stored credentials
-       */
-      credentials: string
-    }
-    /**
      * APIExecutorParameters
      * @description Parameters for API executor (http_request activity).
      */
@@ -1302,10 +1283,9 @@ export interface components {
       query_params?: {
         [key: string]: unknown
       }
-      authentication?: components['schemas']['Authentication'] | null
       /**
        * Credential Id
-       * @description Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+       * @description Nexus credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
     }

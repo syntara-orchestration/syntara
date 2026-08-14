@@ -11,10 +11,11 @@ The ``TestAPIDocsSettings`` class separately verifies that the
 Together the two layers confirm that the wiring in ``main.py`` will
 produce the right result when the real setting is read at startup.
 
-Note: The production app now serves custom authenticated doc endpoints
-at ``/api/v1/docs``, ``/api/v1/redoc``, and ``/api/v1/openapi.json``
-(see ``test_discovery_endpoints.py``).  The standalone ``_make_app``
-tests here verify the abstract toggling logic in isolation.
+Note: The production app now serves unauthenticated doc endpoints
+at ``/api_docs/v1/docs``, ``/api_docs/v1/redoc``, and
+``/api_docs/v1/openapi.json`` (gated by ``enable_api_docs``).
+The standalone ``_make_app`` tests here verify the abstract toggling
+logic in isolation.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from syntara.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.constants import API_DOCS_V1_PATH_PREFIX, API_V1_PATH_PREFIX, API_V1_VERSION
 from syntara.api.main import swagger_ui_parameters
 from syntara.core.config.base import get_settings
 from syntara.core.router_discovery import iter_api_routes
@@ -267,7 +268,7 @@ class TestDocsEnabledWiring:
             client = TestClient(main_module.app, raise_server_exceptions=False)
             response = client.get(f"{API_V1_PATH_PREFIX}/version")
             assert response.status_code == 200
-            assert response.json()["links"]["docs"] == f"{API_V1_PATH_PREFIX}/docs"
+            assert response.json()["links"]["docs"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
         finally:
             object.__setattr__(main_module._settings, "enable_api_docs", original)
             main_module.app.dependency_overrides.pop(get_current_user, None)
@@ -283,9 +284,10 @@ class TestDocsEnabledWiring:
         try:
             importlib.reload(main_module)
             route_paths = [r.path for r in iter_api_routes(main_module.app)]
-            assert f"{API_V1_PATH_PREFIX}/docs" in route_paths
-            assert f"{API_V1_PATH_PREFIX}/redoc" in route_paths
-            assert f"{API_V1_PATH_PREFIX}/openapi.json" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/docs" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/redoc" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/openapi.json" in route_paths
+            assert "/docs" in route_paths
         finally:
             # Force production defaults so later tests are not polluted by .env.
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
@@ -297,25 +299,18 @@ class TestDocsEnabledWiring:
         import importlib
 
         import syntara.api.main as main_module
-        from syntara.auth.dependencies import get_current_user
-        from syntara.core.models.user import User
-
-        async def mock_user() -> User:
-            return User(username="testuser", email="test@test.com", first_name="Test")
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
-            main_module.app.dependency_overrides[get_current_user] = mock_user
             client = TestClient(main_module.app, raise_server_exceptions=False)
-            response = client.get(f"{API_V1_PATH_PREFIX}/docs")
+            response = client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
             assert response.status_code == 200
             assert '"tryItOutEnabled": false' in response.text
             assert '"supportedSubmitMethods": []' in response.text
         finally:
-            main_module.app.dependency_overrides.pop(get_current_user, None)
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
             get_settings.cache_clear()
@@ -325,27 +320,38 @@ class TestDocsEnabledWiring:
         import importlib
 
         import syntara.api.main as main_module
-        from syntara.auth.dependencies import get_current_user
-        from syntara.core.models.user import User
-
-        async def mock_user() -> User:
-            return User(username="testuser", email="test@test.com", first_name="Test")
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "true")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
-            main_module.app.dependency_overrides[get_current_user] = mock_user
             client = TestClient(main_module.app, raise_server_exceptions=False)
-            response = client.get(f"{API_V1_PATH_PREFIX}/docs")
+            response = client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
             assert response.status_code == 200
             assert '"tryItOutEnabled": true' in response.text
             assert '"supportedSubmitMethods": []' not in response.text
         finally:
-            main_module.app.dependency_overrides.pop(get_current_user, None)
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
+            get_settings.cache_clear()
+            importlib.reload(main_module)
+
+    def test_docs_redirect_to_api_docs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import importlib
+
+        import syntara.api.main as main_module
+
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
+        get_settings.cache_clear()
+        try:
+            importlib.reload(main_module)
+            client = TestClient(main_module.app, raise_server_exceptions=False)
+            response = client.get("/docs", follow_redirects=False)
+            assert response.status_code == 307
+            assert response.headers["location"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
+        finally:
+            monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             get_settings.cache_clear()
             importlib.reload(main_module)
 

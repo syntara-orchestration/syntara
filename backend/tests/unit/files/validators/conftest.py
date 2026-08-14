@@ -20,7 +20,7 @@ def _mock_s3_retriever(monkeypatch: pytest.MonkeyPatch) -> None:
     def patched_init(self: FileManager) -> None:
         original_init(self)
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-file.pdf")
+        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-file.pdf")
         self._retriever = mock_retriever
 
     monkeypatch.setattr(FileManager, "__init__", patched_init)

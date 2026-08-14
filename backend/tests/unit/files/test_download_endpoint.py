@@ -18,7 +18,7 @@ def _make_metadata() -> FileMetadata:
         filename="test.pdf",
         mime_type="application/pdf",
         size_bytes=100,
-        file_path="nexus-abc-test.pdf",
+        file_path="orchestrator-abc-test.pdf",
         status=FileStatus.CONVERTED,
     )
 
@@ -37,7 +37,7 @@ class TestDownloadEndpoint:
             filename="report.pdf",
             mime_type="application/pdf",
             size_bytes=len(file_content),
-            file_path="/storage/nexus-abc-report.pdf",
+            file_path="/storage/orchestrator-abc-report.pdf",
             status=FileStatus.CONVERTED,
         )
 

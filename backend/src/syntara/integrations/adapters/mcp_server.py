@@ -22,7 +22,6 @@ import httpx
 import structlog
 from httpx import HTTPStatusError
 from httpx_sse import SSEError
-from langchain_core._security._ssrf_protection import validate_safe_url
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
@@ -38,6 +37,7 @@ from syntara.integrations.adapters.protocol import (
     ValidateResult,
     classify_http_error,
 )
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import IntegrationType
 from syntara.integrations.models.integration_configuration import MCPServerConfigurationInput  # noqa: TC001
 from syntara.tool_manager.lib.providers.mcp.mcp_provider import MCPProvider
@@ -79,10 +79,8 @@ class MCPServerAdapter:
         Note: This creates a fresh MCP session for each ping. MCPProvider (used by discover())
         manages sessions via MultiServerMCPClient from langchain-mcp-adapters. These two
         session management approaches could be unified in future work.
-
-        See AAP-81945 for session reuse optimization investigation.
         """
-        ssrf_error = _check_ssrf(self._config.base_url)
+        ssrf_error = _check_ssrf(self._config)
         if ssrf_error:
             return ssrf_error
 
@@ -256,7 +254,7 @@ class MCPServerAdapter:
         DiscoveredTool list includes parameter information, enabling
         _sync_mcp_tools to perform a full upsert from this result alone.
         """
-        ssrf_error = _check_ssrf(self._config.base_url)
+        ssrf_error = _check_ssrf(self._config)
         if ssrf_error:
             return DiscoverResult(
                 success=False,
@@ -353,14 +351,20 @@ class MCPServerAdapter:
         )
 
 
-def _check_ssrf(base_url: str) -> ValidateResult | None:
-    """Return a failure result if the URL targets a cloud metadata endpoint, None otherwise."""
+def _check_ssrf(config: MCPServerConfigurationInput) -> ValidateResult | None:
+    """Return a failure result if the base_url is blocked by the integration SSRF policy.
+
+    Routes through the shared :func:`validate_integration_configuration_no_ssrf` choke point
+    (same allowlist policy as write time and the other runtime boundaries), so a base_url
+    that resolves to a private/reserved/metadata address is rejected unless allowlisted —
+    not merely the cloud-metadata endpoints that the previous allow_private check permitted.
+    """
     try:
-        validate_safe_url(base_url, allow_private=True, allow_http=True)
+        validate_integration_configuration_no_ssrf(config)
     except ValueError as e:
         logger.warning(
             "MCP validate blocked by SSRF protection",
-            base_url=base_url,
+            base_url=config.base_url,
             error=str(e),
         )
         return ValidateResult(

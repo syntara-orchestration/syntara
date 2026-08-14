@@ -281,11 +281,12 @@ class TestCreateTemporalExecutionService:
             assert service.temporal_client is mock_client
             assert service.task_queue == get_settings().task_queue
 
-            mock_client_class.connect.assert_awaited_once_with(
-                get_settings().temporal_address,
-                namespace=get_settings().temporal_namespace,
-                tls=None,
-            )
+            mock_client_class.connect.assert_awaited_once()
+            call_args = mock_client_class.connect.await_args
+            assert call_args[0][0] == get_settings().temporal_address
+            assert call_args[1]["namespace"] == get_settings().temporal_namespace
+            assert call_args[1]["tls"] is None
+            assert len(call_args[1]["interceptors"]) == 1
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_custom_params(self) -> None:
@@ -303,11 +304,12 @@ class TestCreateTemporalExecutionService:
 
             assert service.task_queue == "prod-queue"
 
-            mock_client_class.connect.assert_awaited_once_with(
-                "temporal.example.com:7233",
-                namespace="production",
-                tls=None,
-            )
+            mock_client_class.connect.assert_awaited_once()
+            call_args = mock_client_class.connect.await_args
+            assert call_args[0][0] == "temporal.example.com:7233"
+            assert call_args[1]["namespace"] == "production"
+            assert call_args[1]["tls"] is None
+            assert len(call_args[1]["interceptors"]) == 1
 
 
 class TestBuiltinWorkflowRouting:

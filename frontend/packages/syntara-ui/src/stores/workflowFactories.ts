@@ -66,7 +66,6 @@ export type CreateApiActivityOptions = {
   headers?: Array<{ id: string; key: string; value: string }>
   body?: string
   inputs?: string
-  authentication?: string
   credentialId?: string
   settings?: NodeSettings
 }
@@ -80,7 +79,7 @@ function headersEntriesToRecord(entries: Array<{ key: string; value: string }> |
 
 /** Create an HTTP request node (v2). */
 export function createApiActivity(options: CreateApiActivityOptions): Activity {
-  const { id, name, method, url, headers, body, authentication, credentialId, settings } = options
+  const { id, name, method, url, headers, body, credentialId, settings } = options
   const config: Record<string, unknown> = {
     ...(method !== undefined && { method }),
     ...(url !== undefined && { url }),
@@ -89,14 +88,6 @@ export function createApiActivity(options: CreateApiActivityOptions): Activity {
   const headerRecord = headersEntriesToRecord(headers)
   if (headerRecord) {
     config.headers = headerRecord
-  }
-
-  if (authentication) {
-    const existingHeaders = config.headers as Record<string, string> | undefined
-    config.headers = {
-      ...existingHeaders,
-      Authorization: authentication,
-    }
   }
 
   if (body) {

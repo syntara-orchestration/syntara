@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
+import { pollExecutionStatus } from '../utils/api'
 
 /**
  * E2E Tests: Approval Pending Badge Display
@@ -51,13 +52,11 @@ async function createPendingApproval(
   const executionId = app.url().match(/executions\/([^/?]+)/)?.[1]
   if (!executionId) throw new Error('Failed to extract execution ID')
 
-  // Wait for execution to reach approval and pause
-  const reachedApproval = await app
-    .getByText('Paused')
-    .waitFor({ state: 'visible', timeout: 30_000 })
+  // Poll API for "paused" status instead of relying on UI updates
+  const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'])
     .then(() => true)
     .catch(() => false)
-  test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+  test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
   return { workflowId, executionId, workflowName }
 }

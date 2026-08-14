@@ -120,7 +120,7 @@ def _opa_evaluate(opa_input: dict[str, Any]) -> dict[str, Any]:
             "-I",
             "--format",
             "json",
-            "data.syntara.authz",
+            "data.orchestrator.authz",
         ],
         input=json.dumps(opa_input),
         capture_output=True,

@@ -1,6 +1,6 @@
 # Compatibility shim — copy of syntara/authz/rego/authz.rego.
 # Remove once aap-dev deployments.yaml references src/syntara/ directly.
-package syntara.authz
+package orchestrator.authz
 import rego.v1
 
 default allow := false

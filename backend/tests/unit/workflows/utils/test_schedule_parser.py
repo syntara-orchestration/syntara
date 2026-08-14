@@ -18,6 +18,7 @@ from temporalio.client import ScheduleOverlapPolicy, ScheduleRange
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.utils.schedule_parser import (
     _interval_to_calendar_spec,
+    build_schedule_execution_workflow_id,
     build_schedule_id,
     build_schedule_policy,
     config_to_temporal_schedule,
@@ -230,13 +231,21 @@ class TestBuildScheduleId:
     async def test_basic_id(self) -> None:
         """Schedule ID should follow convention."""
         schedule_id = build_schedule_id("abc-123", "trigger_1")
-        assert schedule_id == "nexus-sched-abc-123-trigger_1"
+        assert schedule_id == "orchestrator-sched-abc-123-trigger_1"
 
     async def test_id_is_deterministic(self) -> None:
         """Same inputs should always produce the same ID."""
         id1 = build_schedule_id("wf-id", "node-id")
         id2 = build_schedule_id("wf-id", "node-id")
         assert id1 == id2
+
+
+class TestBuildScheduleExecutionWorkflowId:
+    """Tests for schedule launcher workflow ID generation."""
+
+    async def test_basic_id(self) -> None:
+        exec_id = build_schedule_execution_workflow_id("abc-123", "trigger_1")
+        assert exec_id == "sched-exec-abc-123-trigger_1"
 
 
 class TestConfigToTemporalSchedule:

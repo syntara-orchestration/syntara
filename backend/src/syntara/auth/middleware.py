@@ -11,6 +11,8 @@ accounts with a 401 response.
 Uses in-process TTLCaches (5s) to avoid a DB query on every request.
 """
 
+from datetime import UTC, datetime
+
 import structlog
 from cachetools import TTLCache
 from fastapi import status
@@ -33,9 +35,9 @@ _stale_audit_cache: TTLCache[str, bool] = TTLCache(maxsize=4096, ttl=60)
 
 _GET_USER_STATUS_SQL = "SELECT token_version, is_enabled FROM users WHERE id = :uid"
 _GET_SA_STATUS_SQL = "SELECT sa.status, sa.token_version FROM service_accounts sa WHERE sa.id = :sa_id"
-_SA_CRED_NOT_FOUND: str = "__cred_not_found__"
-_cred_status_cache: TTLCache[str, str] = TTLCache(maxsize=4096, ttl=5)
-_GET_CRED_STATUS_SQL = "SELECT sac.status FROM service_account_credentials sac WHERE sac.id = :cred_id"
+_SA_CRED_NOT_FOUND: tuple[str, None] = ("__cred_not_found__", None)
+_cred_status_cache: TTLCache[str, tuple[str, datetime | None]] = TTLCache(maxsize=4096, ttl=5)
+_GET_CRED_STATUS_SQL = "SELECT sac.status, sac.expires_at FROM service_account_credentials sac WHERE sac.id = :cred_id"
 
 
 async def _check_sa_status(sa_id: str) -> tuple[str, int] | None:
@@ -58,8 +60,8 @@ async def _check_sa_status(sa_id: str) -> tuple[str, int] | None:
         return None
 
 
-async def _check_cred_status(cred_id: str) -> str | None:
-    """Look up credential status (cached 5s). Returns status string or None if not found."""
+async def _check_cred_status(cred_id: str) -> tuple[str, datetime | None] | None:
+    """Look up credential status and expiry (cached 5s). Returns (status, expires_at) or None if not found."""
     cached = _cred_status_cache.get(cred_id)
     if cached is not None:
         return None if cached is _SA_CRED_NOT_FOUND else cached
@@ -71,9 +73,9 @@ async def _check_cred_status(cred_id: str) -> str | None:
         )
         row = result.one_or_none()
         if row:
-            status_val = str(row[0])
-            _cred_status_cache[cred_id] = status_val
-            return status_val
+            val = (str(row[0]), row[1])
+            _cred_status_cache[cred_id] = val
+            return val
         _cred_status_cache[cred_id] = _SA_CRED_NOT_FOUND
         return None
 
@@ -178,16 +180,16 @@ async def _check_sa_credential(request: Request, sa_id: str, cred_id: str | None
         )
 
     try:
-        cred_status = await _check_cred_status(cred_id)
+        cred_result = await _check_cred_status(cred_id)
     except Exception:  # noqa: BLE001
         logger.debug("Credential status check failed, skipping", exc_info=True)
         return None
 
-    if cred_status is None or cred_status != "active":
+    if cred_result is None or cred_result[0] != "active":
         from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
         from syntara.auth.audit.sa_rejection import DisabledSACredentialRejectionEvent  # noqa: PLC0415
 
-        resolved_status = cred_status or "deleted"
+        resolved_status = cred_result[0] if cred_result else "deleted"
         AuditEventDispatcher.dispatch(
             DisabledSACredentialRejectionEvent(
                 service_account_id=sa_id, credential_id=cred_id, credential_status=resolved_status
@@ -204,6 +206,27 @@ async def _check_sa_credential(request: Request, sa_id: str, cred_id: str | None
             detail="Service account credential is disabled",
             code="SA_CREDENTIAL_DISABLED",
             failure_type="disabled_sa_credential",
+        )
+
+    _, expires_at = cred_result
+    if expires_at is not None and datetime.now(UTC) >= expires_at:
+        from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+        from syntara.auth.audit.sa_rejection import ExpiredSACredentialRejectionEvent  # noqa: PLC0415
+
+        AuditEventDispatcher.dispatch(
+            ExpiredSACredentialRejectionEvent(service_account_id=sa_id, credential_id=cred_id, expires_at=expires_at)
+        )
+        logger.warning(
+            "Rejected request: SA credential expired",
+            service_account_id=sa_id,
+            credential_id=cred_id,
+            expires_at=expires_at.isoformat(),
+        )
+        return _make_sa_rejection(
+            request,
+            detail="Service account credential has expired",
+            code="SA_CREDENTIAL_EXPIRED",
+            failure_type="expired_sa_credential",
         )
 
     return None

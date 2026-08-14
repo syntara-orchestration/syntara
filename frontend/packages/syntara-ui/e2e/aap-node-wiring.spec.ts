@@ -12,6 +12,9 @@ import { deleteIntegrationViaApi } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
+// Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
+// mcp-server host (override via NEXUS_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
+const ssrfSafeIntegrationHost = process.env.NEXUS_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 async function createAAPIntegration(
   app: import('@playwright/test').Page,
@@ -42,7 +45,7 @@ async function createAAPIntegration(
       integration_type: 'ansible_automation_platform',
       configuration: {
         integration_type: 'ansible_automation_platform',
-        base_url: `https://${name}.example.com`,
+        base_url: isRealBackend ? ssrfSafeIntegrationHost : `https://${name}.example.com`,
       },
       management_credential_id: cred.id,
       scope: 'global',

@@ -19,6 +19,7 @@ Environment Variables:
     APP_TEMPORAL_ADDRESS: Temporal server address (default: localhost:7233)
     APP_TEMPORAL_NAMESPACE: Temporal namespace (default: default)
     APP_BACKGROUND_TASK_QUEUE: Background task queue name (default: orchestrator-background-queue)
+    APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES: Max in-flight activities (default: 10)
     APP_FALLBACK_LOG_LEVEL: Logging level before runtime settings load (default: INFO)
 
 """
@@ -48,6 +49,7 @@ async def main() -> None:
         return await start_worker(
             task_queue=settings.background_task_queue,
             activity_registry=BACKGROUND_ACTIVITY_REGISTRY,
+            max_concurrent_activities=settings.background_worker_max_concurrent_activities,
         )
 
     try:

@@ -740,7 +740,7 @@ curl http://localhost:8000/metrics
 
 ### `/_internal/metrics/*` — Performance-Testing JSON API
 
-A set of hidden JSON endpoints for querying raw, in-memory metric records during performance-testing or debugging sessions. These routes are **not** listed in `/docs` or `/openapi.json`.
+A set of hidden JSON endpoints for querying raw, in-memory metric records during performance-testing or debugging sessions. These routes are **not** listed in `/api_docs/v1/docs` or `/api_docs/v1/openapi.json`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|

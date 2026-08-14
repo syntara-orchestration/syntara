@@ -60,6 +60,19 @@ class PolicyService(BaseService):
         super().__init__(session, user)
 
     @staticmethod
+    def _derive_scope_from_statements(statements: list[dict[str, Any]]) -> str:
+        """Derive policy scope from statement scopes.
+
+        Returns the first non-any scope found (project, self, or own),
+        or 'any' if all statements have scope='any'.
+        """
+        for s in statements:
+            scope = s.get("scope")
+            if scope in ("project", "self", "own"):
+                return str(scope)
+        return "any"
+
+    @staticmethod
     def _validate_resource_actions(statements: list[dict[str, Any]]) -> None:
         """Reject statements that reference unregistered resource:action pairs."""
         from syntara.authz.resource_actions import validate_statements  # noqa: PLC0415
@@ -114,11 +127,7 @@ class PolicyService(BaseService):
             raise PolicyNameConflictError(msg)
         await self._check_name_conflict(name, project_id)
 
-        scope = "any"
-        for s in statements:
-            if s.get("scope") in ("project", "self"):
-                scope = s["scope"]
-                break
+        scope = self._derive_scope_from_statements(statements)
 
         policy = Policy(
             name=name,
@@ -440,6 +449,7 @@ class PolicyService(BaseService):
             if policy.project_id is not None:
                 self._validate_project_statements(statements)
             policy.statements = statements
+            policy.scope = self._derive_scope_from_statements(statements)
         if labels is not None:
             policy.labels = labels
 
@@ -529,7 +539,10 @@ class PolicyService(BaseService):
 
         reads = []
         for p in BUILTIN_POLICIES:
-            if effective_scope and p.scope != effective_scope:
+            scope_matches = (
+                not effective_scope or p.scope == effective_scope or (effective_scope == "project" and p.scope == "own")
+            )
+            if not scope_matches:
                 continue
             if not matches_query_param(p.scope, "scope", query_params):
                 continue

@@ -58,6 +58,7 @@ _cred_perm_update = PermissionChecker(
     "update",
     resource_model=Credential,
     resource_id_param="credential_id",
+    owner_field="created_by",
 )
 _cred_perm_delete = PermissionChecker(
     "credential",

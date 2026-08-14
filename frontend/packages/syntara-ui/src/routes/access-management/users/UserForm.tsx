@@ -53,26 +53,6 @@ function PasswordWarningAlert({ isSelf }: Readonly<{ isSelf: boolean }>) {
   )
 }
 
-function UserFormWarningAlerts({
-  showDisableWarning,
-  showPasswordWarning,
-  isSelf,
-}: Readonly<{ showDisableWarning: boolean; showPasswordWarning: boolean; isSelf: boolean }>) {
-  return (
-    <>
-      {showDisableWarning ? (
-        <StackItem>
-          <Alert variant="warning" title="You will be signed out" isInline>
-            Disabling your own account will immediately end your current session. You will need another admin to
-            re-enable it.
-          </Alert>
-        </StackItem>
-      ) : null}
-      {showPasswordWarning ? <PasswordWarningAlert isSelf={isSelf} /> : null}
-    </>
-  )
-}
-
 function userFormBreadcrumbTrail(
   isEdit: boolean,
   pageTitle: string,
@@ -96,8 +76,6 @@ type UserFormMainPanelProps = {
   isBuiltinUser: boolean
   isFederatedUser: boolean
   isSelf: boolean
-  statusToggleDisabledReason?: string
-  showDisableWarning: boolean
   showPasswordWarning: boolean
   onFormSubmit: (event?: BaseSyntheticEvent) => Promise<void>
   footer: ReactNode
@@ -109,8 +87,6 @@ function UserFormMainPanel({
   isBuiltinUser,
   isFederatedUser,
   isSelf,
-  statusToggleDisabledReason,
-  showDisableWarning,
   showPasswordWarning,
   onFormSubmit,
   footer,
@@ -123,11 +99,7 @@ function UserFormMainPanel({
       panelMainBodyProps={{ style: { padding: 'var(--pf-t--global--spacer--xl)' } }}
     >
       <Stack hasGutter style={{ maxWidth: '600px' }}>
-        <UserFormWarningAlerts
-          showDisableWarning={showDisableWarning}
-          showPasswordWarning={showPasswordWarning}
-          isSelf={isSelf}
-        />
+        {showPasswordWarning ? <PasswordWarningAlert isSelf={isSelf} /> : null}
         <StackItem>
           <Form id="user-form" onSubmit={onFormSubmit}>
             <UserFormFields
@@ -136,7 +108,6 @@ function UserFormMainPanel({
               isBuiltinUser={isBuiltinUser}
               isBuiltinSelf={isBuiltinUser && isSelf}
               isFederatedUser={isFederatedUser}
-              statusToggleDisabledReason={statusToggleDisabledReason}
             />
           </Form>
         </StackItem>
@@ -176,16 +147,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const pageTitle = isEdit ? 'Edit User' : 'Create User'
   const submitLabel = isEdit ? 'Save' : 'Create user'
 
-  const {
-    userId,
-    isValidId,
-    userQuery,
-    isBuiltinUser,
-    isFederatedUser,
-    isSelf,
-    statusToggleDisabledReason,
-    formValues,
-  } = useUserFormData(isEdit)
+  const { userId, isValidId, userQuery, isBuiltinUser, isFederatedUser, isSelf, formValues } = useUserFormData(isEdit)
 
   const schema = isEdit ? userFormSchema : userCreateSchema
   const {
@@ -224,9 +186,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   })
 
   const passwordValue = useWatch({ control, name: 'password' })
-  const isActiveValue = useWatch({ control, name: 'is_enabled' })
   const showPasswordWarning = isEdit && !isFederatedUser && !!passwordValue
-  const showDisableWarning = isEdit && isSelf && isActiveValue === false
 
   const refetchUser = userQuery.refetch
   const queryState = useQueryState(userQuery, {
@@ -262,8 +222,6 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
           isBuiltinUser={isBuiltinUser}
           isFederatedUser={isFederatedUser}
           isSelf={isSelf}
-          statusToggleDisabledReason={statusToggleDisabledReason}
-          showDisableWarning={showDisableWarning}
           showPasswordWarning={showPasswordWarning}
           onFormSubmit={handleSubmit(onSubmit)}
           footer={

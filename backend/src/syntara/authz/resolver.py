@@ -69,7 +69,7 @@ async def _resolve_roles_to_policies(
 
 def _scope_entry_to_project(entry: dict[str, Any], project: str) -> dict[str, Any]:
     """Return a copy of *entry* scoped to *project*."""
-    if entry.get("scope") == "self":
+    if entry.get("scope") in ("self", "own"):
         return {**entry, "project": project}
     return {**entry, "scope": "project", "project": project}
 

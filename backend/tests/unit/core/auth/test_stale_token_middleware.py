@@ -8,7 +8,7 @@ Tests cover:
 - Disabled user rejection with 401
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -504,7 +504,7 @@ class TestStaleTokenMiddlewareSA:
         with (
             patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
             patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
-            patch("syntara.auth.middleware._check_cred_status", return_value="active"),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", None)),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -605,7 +605,7 @@ class TestStaleTokenMiddlewareSACredential:
         with (
             patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
             patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
-            patch("syntara.auth.middleware._check_cred_status", return_value="disabled"),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("disabled", None)),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -643,7 +643,7 @@ class TestStaleTokenMiddlewareSACredential:
         with (
             patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
             patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
-            patch("syntara.auth.middleware._check_cred_status", return_value="active"),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", None)),
         ):
             client = TestClient(app)
             response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
@@ -693,6 +693,92 @@ class TestStaleTokenMiddlewareSACredential:
 
         assert response.status_code == 200
 
+    def test_expired_credential_returns_401(self) -> None:
+        """Active SA with expired credential returns 401 SA_CREDENTIAL_EXPIRED."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+        past = datetime.now(UTC) - timedelta(minutes=5)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", past)),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "SA_CREDENTIAL_EXPIRED"
+        assert response.json()["detail"] == "Service account credential has expired"
+
+    def test_expired_credential_dispatches_audit_event(self) -> None:
+        """Expired credential rejection dispatches ExpiredSACredentialRejectionEvent."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+        past = datetime.now(UTC) - timedelta(minutes=5)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", past)),
+            patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch") as mock_dispatch,
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 401
+        mock_dispatch.assert_called_once()
+        dispatched = mock_dispatch.call_args[0][0]
+        from syntara.auth.audit.sa_rejection import ExpiredSACredentialRejectionEvent
+
+        assert isinstance(dispatched, ExpiredSACredentialRejectionEvent)
+        assert dispatched.service_account_id == "sa-456"
+        assert dispatched.credential_id == "cred-001"
+        assert dispatched.expires_at == past
+
+    def test_non_expired_credential_passes(self) -> None:
+        """Active SA with non-expired credential (future expires_at) passes through."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+        future = datetime.now(UTC) + timedelta(hours=1)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", future)),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 200
+
+    def test_null_expires_at_passes(self) -> None:
+        """Active SA with no expiration (expires_at=None) passes through."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("active", None)),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 200
+
     def test_disabled_sa_takes_priority_over_credential(self) -> None:
         """Disabled SA rejection takes priority over credential check."""
         app = _build_app()
@@ -710,3 +796,23 @@ class TestStaleTokenMiddlewareSACredential:
 
         assert response.status_code == 401
         assert response.json()["code"] == "SA_DISABLED"
+
+    def test_disabled_credential_takes_priority_over_expired(self) -> None:
+        """Disabled credential rejection takes priority over expiration check."""
+        app = _build_app()
+        payload = _make_sa_payload(sub="sa-456", token_version=1, credential_id="cred-001")
+        past = datetime.now(UTC) - timedelta(minutes=5)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_sa_async_session(sa_status="active", token_version=1)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+            patch("syntara.auth.middleware._check_cred_status", return_value=("disabled", past)),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": "Bearer sa-jwt"})
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "SA_CREDENTIAL_DISABLED"

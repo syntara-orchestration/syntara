@@ -17,7 +17,7 @@
 import { test, expect, toAppUrl } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest } from '../utils/api'
+import { apiRequest, pollExecutionStatus } from '../utils/api'
 
 const MOCK_APPROVAL_ID = '550e8400-e29b-41d4-a716-446655440050'
 const MOCK_EXECUTION_ID = 'exec-approval'
@@ -155,6 +155,7 @@ test.describe('Approval Side Panel — deep-link', () => {
 })
 
 test.describe('Approval Side Panel — self-contained', () => {
+  // API polling fix applied but test times out during workflow build/run setup — separate root cause to investigate
   test.skip('UI-28: execution shows Paused status and Waiting for approval indicator', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-approval-panel')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-approval step')
@@ -180,14 +181,14 @@ test.describe('Approval Side Panel — self-contained', () => {
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
 
-      // UI-28: Verify pending approval display
-      // Skip if the execution stays Pending — Temporal worker is not running
-      const reachedApproval = await app
-        .getByText('Paused')
-        .waitFor({ state: 'visible', timeout: 30_000 })
+      // Poll API for "paused" status instead of relying on UI updates
+      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+      test.skip(!executionId, 'Could not extract execution ID from URL')
+
+      const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
         .then(() => true)
         .catch(() => false)
-      test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+      test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
       await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
       await expect(app.getByRole('button', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
     } finally {
@@ -197,6 +198,7 @@ test.describe('Approval Side Panel — self-contained', () => {
     }
   })
 
+  // API polling fix applied but test times out during workflow build/run setup — separate root cause to investigate
   test.skip('UI-30: rejecting an approval terminates workflow execution', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-reject')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-rejection step')
@@ -219,14 +221,14 @@ test.describe('Approval Side Panel — self-contained', () => {
         .catch(() => false)
       test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-      // Wait for execution to pause at the approval node
-      // Skip if Temporal worker is not running (execution stays Pending)
-      const reachedApproval = await app
-        .getByText('Paused')
-        .waitFor({ state: 'visible', timeout: 30_000 })
+      // Poll API for "paused" status instead of relying on UI updates
+      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
+      test.skip(!executionId, 'Could not extract execution ID from URL')
+
+      const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
         .then(() => true)
         .catch(() => false)
-      test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may not be running')
+      test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
       await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
 
       // Open approval panel

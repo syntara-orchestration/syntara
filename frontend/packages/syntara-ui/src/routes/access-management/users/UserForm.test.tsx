@@ -356,7 +356,6 @@ describe('UserForm', () => {
           first_name: 'John',
           last_name: 'Doe',
           email: 'updated@example.com',
-          is_enabled: true,
         },
       })
     })

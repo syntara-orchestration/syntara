@@ -59,7 +59,7 @@ class TestFileNotFoundErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/files/abc/download"
 
-        exc = FileContentNotFoundError("File not found: nexus-abc-report.pdf")
+        exc = FileContentNotFoundError("File not found: orchestrator-abc-report.pdf")
         response = file_not_found_error_handler(request, exc)
 
         assert response.status_code == 404
