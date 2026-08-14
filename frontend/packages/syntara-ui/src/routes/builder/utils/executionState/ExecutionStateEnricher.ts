@@ -341,14 +341,11 @@ export class ExecutionStateEnricher {
     triggerDisplayToRealId: Map<string, string> | undefined,
     edges: EdgeConnection[]
   ): 'passed' | 'pending' {
-    const resolvedEdges = edges
-    const targetStarted = this.targetHasStarted(edge.target, activityStates, resolvedEdges)
+    const targetStarted = this.targetHasStarted(edge.target, activityStates, edges)
 
     if (edge.source.startsWith('trigger-')) {
       const triggerRealId = triggerDisplayToRealId?.get(edge.source)
-      const sourceCompleted = triggerRealId
-        ? this.sourceIsTerminal(triggerRealId, activityStates, resolvedEdges)
-        : false
+      const sourceCompleted = triggerRealId ? this.sourceIsTerminal(triggerRealId, activityStates, edges) : false
       return sourceCompleted && targetStarted ? 'passed' : 'pending'
     }
 
@@ -356,7 +353,7 @@ export class ExecutionStateEnricher {
       return targetStarted ? 'passed' : 'pending'
     }
 
-    if (this.sourceIsTerminal(edge.source, activityStates, resolvedEdges)) {
+    if (this.sourceIsTerminal(edge.source, activityStates, edges)) {
       return targetStarted ? 'passed' : 'pending'
     }
 

@@ -8,6 +8,7 @@
 import { expect, type Page } from '@playwright/test'
 
 import { AppRoute } from '../../src/app/AppRoute'
+import { toAppUrl } from '../fixtures'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -27,6 +28,53 @@ export const EXECUTION_STATUS_BADGE_TOLERANCE = 0.015
 export async function waitForCanvasReady(page: Page) {
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 30_000 })
+}
+
+/**
+ * Enters builder version view with a superseded published version so the page header
+ * renders the version-view title row: 2xl workflow name, "Viewing …" label, status badge.
+ * Unpublishes afterward so the shared mock store is not left in a published state.
+ */
+async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string) {
+  // Best-effort reset — other tests in the same run may leave this workflow published.
+  await page.request.post(`/api/v1/workflows/${workflowId}/unpublish`).catch(() => {})
+
+  const getResp = await page.request.get(`/api/v1/workflows/${workflowId}`)
+  if (!getResp.ok()) throw new Error(`GET workflow ${workflowId} failed: ${getResp.status()}`)
+  const workflow = (await getResp.json()) as {
+    name?: string
+    version?: { version?: number; workflow_definition?: Record<string, unknown> }
+    current_version?: number
+  }
+  const currentVersion = workflow.version?.version ?? workflow.current_version ?? 1
+  const workflowDefinition = workflow.version?.workflow_definition
+  if (!workflowDefinition) throw new Error(`Workflow ${workflowId} has no definition`)
+
+  const publishResp = await page.request.post(`/api/v1/workflows/${workflowId}/versions/${currentVersion}/publish`, {
+    data: {},
+  })
+  if (!publishResp.ok()) throw new Error(`Publish v${currentVersion} failed: ${publishResp.status()}`)
+
+  const patchResp = await page.request.patch(`/api/v1/workflows/${workflowId}`, {
+    data: { workflow_definition: workflowDefinition },
+  })
+  if (!patchResp.ok()) throw new Error(`PATCH workflow ${workflowId} failed: ${patchResp.status()}`)
+
+  const unpublishResp = await page.request.post(`/api/v1/workflows/${workflowId}/unpublish`)
+  if (!unpublishResp.ok()) throw new Error(`Unpublish workflow ${workflowId} failed: ${unpublishResp.status()}`)
+
+  const builderPath = AppRoute.WorkflowBuilder.Edit.replace(':workflowId', workflowId)
+  await page.goto(toAppUrl(`${builderPath}?version=${currentVersion}`))
+
+  await expect(page.getByRole('heading', { level: 1, name: workflow.name ?? 'conditional-demo' })).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect(page.getByText(/Viewing/i)).toBeVisible()
+  // Collapse the panel first — version rows also render "Previously published" badges,
+  // which makes an unscoped getByText hit multiple elements (strict mode violation).
+  await page.getByRole('button', { name: 'Collapse version history' }).click()
+  await expect(page.getByRole('heading', { name: 'Version history', level: 2 })).not.toBeVisible()
+  await expect(page.getByText('Previously published', { exact: true })).toBeVisible()
 }
 
 /**
@@ -629,6 +677,18 @@ export const workflowDialogPages: CanvasPageEntry[] = [
           // Panel may be empty (no versions yet) — confirm the empty state rendered instead
           await expect(page.getByRole('heading', { name: 'Version history' })).toBeVisible()
         })
+    },
+  },
+  {
+    section: 'workflows',
+    name: 'builder-edit-version-view-header',
+    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    perceptual: true,
+    waitFor: async (page) => {
+      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
+    },
+    setup: async (page) => {
+      await enterBuilderVersionViewHeaderState(page, MOCK_WORKFLOW_ID)
     },
   },
   {

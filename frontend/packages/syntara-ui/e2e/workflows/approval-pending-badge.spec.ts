@@ -119,28 +119,15 @@ test.describe('Approval Pending Badge', () => {
       await expect(pausedStatus).toBeVisible()
 
       // ===================================================================
-      // VERIFICATION: Filter by "Approval pending"
+      // VERIFICATION: Filter by "Pending approval" status
       // ===================================================================
-      // Open the filter dropdown for approval_pending
-      const filterButton = app.getByRole('button', { name: /Filter|Add filter/ })
-      if (await filterButton.isVisible()) {
-        await filterButton.click()
-
-        // Select "Pending approval" filter
-        const approvalPendingOption = app.getByRole('option', { name: /Pending approval/i })
-        if (await approvalPendingOption.isVisible()) {
-          await approvalPendingOption.click()
-
-          // Select "Yes" value
-          const yesOption = app.getByRole('option', { name: 'Yes' })
-          if (await yesOption.isVisible()) {
-            await yesOption.click()
-
-            // Verify our execution still appears (it has approval_pending=true)
-            await expect(badgeInList).toBeVisible()
-          }
-        }
-      }
+      const filterToolbar = app.getByRole('search', { name: 'Filters' })
+      await filterToolbar.getByRole('button', { name: 'Workflow name', exact: true }).click()
+      await app.getByRole('option', { name: 'Status' }).click()
+      await filterToolbar.getByRole('button', { name: 'Filter by status' }).click()
+      await app.getByRole('option', { name: 'Pending approval' }).click()
+      await expect(app).toHaveURL(/approval_pending=true/)
+      await expect(badgeInList).toBeVisible()
     } finally {
       // Cleanup: Delete the workflow
       if (workflowName) {
