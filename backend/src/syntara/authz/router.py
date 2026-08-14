@@ -734,7 +734,7 @@ async def _enforce_who_can_permission(
     evaluator: AuthzEvaluator,
     resource_project: str,
     request: Request,
-) -> None:
+) -> bool:
     """Enforce two-tier authorization gate for who_can queries.
 
     Tier 0 (always): authz:query holders (admins, CLI) pass unconditionally,
@@ -751,12 +751,19 @@ async def _enforce_who_can_permission(
 
     Client-supplied resource_labels/resource_metadata are NOT used in the gate
     to prevent forged attributes from influencing authorization.
+
+    Returns:
+        True if the caller is fully trusted (admin or cert-auth) and may
+        supply arbitrary query parameters including resource_labels/metadata.
+        False if the caller passed via a scoped gate rule (Tier 1) and
+        client-supplied labels/metadata should be stripped.
+
     """
     if getattr(request.state, "is_cert_authenticated", False):
-        return
+        return True
 
     if await _user_has_authz_query_permission(current_user, evaluator, db):
-        return
+        return True
 
     if resource_project:
         query_pair = (body.resource_type, body.action)
@@ -771,10 +778,11 @@ async def _enforce_who_can_permission(
             _dispatch_who_can_denied(current_user, body)
             raise AuthorizationDeniedError(msg)
 
-    else:
-        msg = "System-wide who_can queries require authz:query permission"
-        _dispatch_who_can_denied(current_user, body)
-        raise AuthorizationDeniedError(msg)
+        return False
+
+    msg = "System-wide who_can queries require authz:query permission"
+    _dispatch_who_can_denied(current_user, body)
+    raise AuthorizationDeniedError(msg)
 
 
 # ============================================================================
@@ -880,7 +888,13 @@ async def who_can(
 
     """
     resource_project = await _resolve_project_input(db, body.resource_project)
-    await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project, request)
+    is_trusted = await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project, request)
+
+    if not is_trusted:
+        # Tier 1 callers must not influence per-user OPA evaluation with
+        # forged labels/metadata — only admins and cert-auth may supply them.
+        # Use model_copy to avoid mutating the original request body.
+        body = body.model_copy(update={"resource_labels": {}, "resource_metadata": {}})
 
     if body.cursor:
         cursor_data = decode_cursor(body.cursor)
