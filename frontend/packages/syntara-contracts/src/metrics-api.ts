@@ -53,11 +53,11 @@ export interface paths {
     }
     /**
      * Metrics store KPIs
-     * @description Return a computed KPI dashboard covering all Nexus components.
+     * @description Return a computed KPI dashboard covering all Syntara components.
      *
-     *     Maps metrics to the KPIs defined in the Nexus KPI documents:
-     *     - Nexus Key Performance Indicators (KPIs)
-     *     - Nexus LLM/Agent Performance KPIs
+     *     Maps metrics to the KPIs defined in the Syntara KPI documents:
+     *     - Syntara Key Performance Indicators (KPIs)
+     *     - Syntara LLM/Agent Performance KPIs
      */
     get: operations['get_internal_metrics_kpis']
     put?: never
@@ -118,7 +118,7 @@ export interface components {
   schemas: {
     /**
      * ComponentKPISummary
-     * @description KPI summary for a single Nexus component.
+     * @description KPI summary for a single Syntara component.
      */
     ComponentKPISummary: {
       /**
@@ -141,7 +141,7 @@ export interface components {
     }
     /**
      * KPIDashboard
-     * @description Full KPI dashboard covering all Nexus components.
+     * @description Full KPI dashboard covering all Syntara components.
      */
     KPIDashboard: {
       /**
