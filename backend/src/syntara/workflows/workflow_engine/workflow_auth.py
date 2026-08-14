@@ -24,6 +24,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import DataConverter
 
+from syntara.workflows.utils.schedule_parser import build_schedule_execution_workflow_id
+
 HEADER_NAME = "x-workflow-auth"
 
 _SCHEDULE_LAUNCHER_TYPE = "scheduled_workflow_launcher"
@@ -89,7 +91,7 @@ def _auth_workflow_id(workflow_id: str, workflow_type: str, args: Sequence[Any])
     if workflow_type != _SCHEDULE_LAUNCHER_TYPE or len(args) < _SCHEDULE_LAUNCHER_ARG_COUNT:
         return workflow_id
 
-    base_id = f"sched-exec-{args[0]}-{args[1]}"
+    base_id = build_schedule_execution_workflow_id(str(args[0]), str(args[1]))
     prefix = f"{base_id}-"
     if not workflow_id.startswith(prefix):
         return workflow_id
