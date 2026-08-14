@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { deflateSync } from 'node:zlib'
+import { PNG } from 'pngjs'
 
 import {
   DEFAULT_MAX_DIFF_PIXEL_RATIO,
@@ -20,64 +20,11 @@ import {
   type DecodedPng,
 } from './filter-noisy-baseline-diffs'
 
-/** Minimal CRC32 + PNG encoder for synthetic test fixtures (RGBA only). */
-function crc32(buf: Uint8Array): number {
-  let c = 0xffffffff
-  for (let i = 0; i < buf.length; i++) {
-    c ^= buf[i]!
-    for (let k = 0; k < 8; k++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    }
-  }
-  return (c ^ 0xffffffff) >>> 0
-}
-
-function chunk(type: string, data: Uint8Array): Uint8Array {
-  const typeBytes = Uint8Array.from(type, (ch) => ch.charCodeAt(0))
-  const len = new Uint8Array(4)
-  new DataView(len.buffer).setUint32(0, data.length)
-  const crcInput = new Uint8Array(typeBytes.length + data.length)
-  crcInput.set(typeBytes)
-  crcInput.set(data, typeBytes.length)
-  const crc = new Uint8Array(4)
-  new DataView(crc.buffer).setUint32(0, crc32(crcInput))
-  const out = new Uint8Array(4 + 4 + data.length + 4)
-  out.set(len, 0)
-  out.set(typeBytes, 4)
-  out.set(data, 8)
-  out.set(crc, 8 + data.length)
-  return out
-}
-
-/** Encode an RGBA buffer (width*height*4) as a PNG. */
+/** Encode RGBA pixels as a PNG via pngjs (same library the filter uses to decode). */
 function encodeRgbaPng(width: number, height: number, rgba: Uint8Array): Uint8Array {
-  const stride = width * 4
-  const raw = new Uint8Array((stride + 1) * height)
-  for (let y = 0; y < height; y++) {
-    raw[y * (stride + 1)] = 0 // filter None
-    raw.set(rgba.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1)
-  }
-
-  const ihdr = new Uint8Array(13)
-  const dv = new DataView(ihdr.buffer)
-  dv.setUint32(0, width)
-  dv.setUint32(4, height)
-  ihdr[8] = 8 // bit depth
-  ihdr[9] = 6 // RGBA
-  ihdr[10] = 0
-  ihdr[11] = 0
-  ihdr[12] = 0
-
-  const signature = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10)
-  const parts = [signature, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array())]
-  const total = parts.reduce((n, p) => n + p.length, 0)
-  const out = new Uint8Array(total)
-  let offset = 0
-  for (const p of parts) {
-    out.set(p, offset)
-    offset += p.length
-  }
-  return out
+  const png = new PNG({ width, height, colorType: 6, inputHasAlpha: true, fill: true })
+  png.data.set(rgba)
+  return Uint8Array.from(PNG.sync.write(png, { colorType: 6, inputHasAlpha: true }))
 }
 
 function solidRgba(width: number, height: number, r: number, g: number, b: number, a = 255): Uint8Array {
