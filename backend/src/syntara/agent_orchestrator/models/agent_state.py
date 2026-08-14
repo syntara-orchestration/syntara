@@ -81,6 +81,9 @@ class AgentState(TypedDict):
     routing_duration_ms: NotRequired[float | None]
     """Time spent in the routing decision, in milliseconds"""
 
+    llm_duration_ms: NotRequired[float | None]
+    """Accumulated wall-clock time of LLM provider calls, in milliseconds"""
+
 
 class AgentStateFactory:
     """Factory for creating AgentState instances."""

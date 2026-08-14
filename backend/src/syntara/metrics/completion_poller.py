@@ -36,6 +36,7 @@ from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.workers.periodic import PeriodicWorker
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics, emitted_invocations
+from syntara.metrics.instrumentation import LLM_DURATION_METADATA_KEY
 from syntara.metrics.types import MetricType
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 
@@ -87,12 +88,13 @@ def _emit_agent_duration(
     if invocation.started_at and invocation.completed_at:
         duration_ms = (invocation.completed_at - invocation.started_at).total_seconds() * 1000
         status = "success" if invocation.status == InvocationStatus.COMPLETED else invocation.status.value
-        recorder.record(
-            MetricType.AGENT_INVOCATION_DURATION,
-            duration_ms,
-            unit="ms",
-            labels={"invocation_id": str(invocation.id), "status": status},
-        )
+        if duration_ms > 0:
+            recorder.record(
+                MetricType.AGENT_INVOCATION_DURATION,
+                duration_ms,
+                unit="ms",
+                labels={"invocation_id": str(invocation.id), "status": status},
+            )
         recorder.record(
             MetricType.AGENT_STATUS,
             value=1,
@@ -116,16 +118,16 @@ def _emit_invocation_agent_metrics(
 ) -> bool:
     """Emit agent and LLM metrics for a completed invocation.
 
-    Reads ``routing_duration_ms`` and invocation timing from the
-    persisted result metadata and records AGENT_ROUTING_DURATION,
-    AGENT_INVOCATION_DURATION, and AGENT_STATUS.
+    Reads ``routing_duration_ms``, ``llm_duration_ms``, and invocation
+    timing from the persisted result metadata and records
+    AGENT_ROUTING_DURATION, AGENT_INVOCATION_DURATION, and AGENT_STATUS.
 
     When a *token_record* is provided, also bridges LLM metrics
     (LLM_TOKENS_INPUT, LLM_TOKENS_OUTPUT, LLM_DURATION, LLM_STATUS)
-    from the persisted ``TokenUsageRecord`` into the API server's
-    in-memory store.  The Temporal worker records these metrics in its
-    own process memory; this poller makes them visible to the internal
-    metrics API.
+    from the persisted ``TokenUsageRecord`` and result metadata into the
+    API server's in-memory store.  The Temporal worker records these
+    metrics in its own process memory; this poller makes them visible to
+    the internal metrics API.
 
     Returns True if metrics were emitted, False if skipped.
     """
@@ -141,8 +143,18 @@ def _emit_invocation_agent_metrics(
     emitted_any = _emit_routing_duration(inv_id, meta, recorder)
     emitted_any = _emit_agent_duration(invocation, recorder) or emitted_any
 
-    if token_record is not None:
-        emitted_any = _emit_llm_metrics(invocation, token_record, recorder) or emitted_any
+    llm_ms = meta.get(LLM_DURATION_METADATA_KEY) if isinstance(meta, dict) else None
+    llm_ms_val = float(llm_ms) if isinstance(llm_ms, (int, float)) else None
+    if token_record is not None or llm_ms_val is not None:
+        emitted_any = (
+            _emit_llm_metrics(
+                invocation,
+                token_record,
+                recorder,
+                llm_duration_ms=llm_ms_val,
+            )
+            or emitted_any
+        )
 
     if emitted_any:
         emitted_invocations.add(invocation.id)
@@ -152,25 +164,33 @@ def _emit_invocation_agent_metrics(
 
 def _emit_llm_metrics(
     invocation: Invocation,
-    token_record: TokenUsageRecord,
+    token_record: TokenUsageRecord | None,
     recorder: MetricsRecorder,
+    *,
+    llm_duration_ms: float | None = None,
 ) -> bool:
     """Bridge LLM token and duration metrics from the database.
 
-    The Temporal worker records these via ``record_llm_call`` in its own
-    process memory.  This function re-emits them from persisted data so
-    they appear in the API server's internal metrics store.
+    Prefers persisted ``response_metadata.llm_duration_ms`` (real provider
+    call time from the worker).  Falls back to invocation wall-clock when
+    that field is absent (older backends).  Always labels with
+    ``invocation_id`` so Suite 11 can pair total vs LLM per invocation.
     """
-    prompt_tokens = token_record.prompt_tokens or 0
-    completion_tokens = token_record.completion_tokens or 0
+    prompt_tokens = (token_record.prompt_tokens or 0) if token_record is not None else 0
+    completion_tokens = (token_record.completion_tokens or 0) if token_record is not None else 0
 
-    if prompt_tokens == 0 and completion_tokens == 0:
+    if prompt_tokens == 0 and completion_tokens == 0 and llm_duration_ms is None:
         return False
 
     model = invocation.model_name or "unknown"
     provider = model.split("/", 1)[0] if "/" in model else "unknown"
     status = "success" if invocation.status == InvocationStatus.COMPLETED else invocation.status.value
-    llm_labels = {"model": model, "provider": provider, "status": status}
+    llm_labels = {
+        "model": model,
+        "provider": provider,
+        "status": status,
+        "invocation_id": str(invocation.id),
+    }
 
     if prompt_tokens > 0:
         recorder.record(
@@ -188,10 +208,14 @@ def _emit_llm_metrics(
             labels=llm_labels,
         )
 
-    # LLM_DURATION approximated from invocation wall-clock time
-    if invocation.started_at and invocation.completed_at:
+    if llm_duration_ms is not None and float(llm_duration_ms) > 0:
+        recorder.record(MetricType.LLM_DURATION, float(llm_duration_ms), unit="ms", labels=llm_labels)
+    elif invocation.started_at and invocation.completed_at:
+        # Backward-compatible fallback for deployments that do not yet
+        # persist real LLM call duration in response_metadata.
         duration_ms = (invocation.completed_at - invocation.started_at).total_seconds() * 1000
-        recorder.record(MetricType.LLM_DURATION, duration_ms, unit="ms", labels=llm_labels)
+        if duration_ms > 0:
+            recorder.record(MetricType.LLM_DURATION, duration_ms, unit="ms", labels=llm_labels)
 
     recorder.record(MetricType.LLM_STATUS, 1.0, labels=llm_labels)
     recorder.increment("llm_calls")

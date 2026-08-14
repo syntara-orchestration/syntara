@@ -211,7 +211,24 @@ class TestEmitLlmMetrics:
         assert len(outputs) == 1
         assert outputs[0].value == pytest.approx(80.0)
 
-    def test_emits_duration_when_timestamps_present(self, recorder: MetricsRecorder) -> None:
+    def test_prefers_persisted_llm_duration_ms(self, recorder: MetricsRecorder) -> None:
+        now = datetime.now(UTC)
+        inv = _make_invocation(
+            status=InvocationStatus.COMPLETED,
+            started_at=now - timedelta(seconds=3),
+            completed_at=now,
+        )
+        inv.model_name = "anthropic/claude-3"
+        token_rec = _make_token_record()
+
+        _emit_llm_metrics(inv, token_rec, recorder, llm_duration_ms=450.0)
+
+        durations = list(recorder.query(metric_types={MetricType.LLM_DURATION}))
+        assert len(durations) == 1
+        assert durations[0].value == pytest.approx(450.0)
+        assert durations[0].labels.get("invocation_id") == str(inv.id)
+
+    def test_falls_back_to_wall_clock_when_llm_duration_missing(self, recorder: MetricsRecorder) -> None:
         now = datetime.now(UTC)
         inv = _make_invocation(
             status=InvocationStatus.COMPLETED,
@@ -226,6 +243,7 @@ class TestEmitLlmMetrics:
         durations = list(recorder.query(metric_types={MetricType.LLM_DURATION}))
         assert len(durations) == 1
         assert durations[0].value == pytest.approx(3000.0)
+        assert durations[0].labels.get("invocation_id") == str(inv.id)
 
     def test_skips_duration_without_started_at(self, recorder: MetricsRecorder) -> None:
         inv = _make_invocation(status=InvocationStatus.COMPLETED)

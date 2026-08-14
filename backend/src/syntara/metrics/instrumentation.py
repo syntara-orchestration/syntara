@@ -49,6 +49,11 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
+# Stashed on LangChain response_metadata and persisted on invocation
+# result.response_metadata so the API server's completion poller can bridge
+# real LLM duration (worker and API have separate MetricsRecorders).
+LLM_DURATION_METADATA_KEY = "llm_duration_ms"
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -119,6 +124,43 @@ def _resolve_model_provider(
         resolved_provider = resolved_model.split("/", 1)[0]
 
     return resolved_model, resolved_provider
+
+
+def _attach_llm_duration(response: Any, duration_ms: float) -> None:  # noqa: ANN401
+    """Persist measured LLM call duration onto the response when possible."""
+    if response is None:
+        return
+    # with_structured_output(..., include_raw=True) returns {"raw": AIMessage, ...}
+    if isinstance(response, dict) and "raw" in response:
+        _attach_llm_duration(response.get("raw"), duration_ms)
+        return
+    if not hasattr(response, "response_metadata"):
+        return
+    meta = getattr(response, "response_metadata", None)
+    if meta is None:
+        try:
+            response.response_metadata = {LLM_DURATION_METADATA_KEY: duration_ms}
+        except (AttributeError, TypeError):
+            return
+    elif isinstance(meta, dict):
+        meta[LLM_DURATION_METADATA_KEY] = duration_ms
+
+
+def extract_llm_duration_ms(response: Any) -> float | None:  # noqa: ANN401
+    """Read ``llm_duration_ms`` from a LangChain response, if present."""
+    if response is None:
+        return None
+    if isinstance(response, dict) and "raw" in response:
+        return extract_llm_duration_ms(response.get("raw"))
+    if not hasattr(response, "response_metadata"):
+        return None
+    meta = getattr(response, "response_metadata", None)
+    if not isinstance(meta, dict):
+        return None
+    value = meta.get(LLM_DURATION_METADATA_KEY)
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _record_llm_metrics(
@@ -230,6 +272,12 @@ async def record_llm_call[T](
             provider=resp_provider,
             status=status,
         )
+
+        # Attachment is best-effort and must not block the core metrics flush.
+        try:
+            _attach_llm_duration(result, duration_ms)
+        except Exception:  # noqa: BLE001
+            logger.debug("Failed to attach LLM duration to response", exc_info=True)
 
         try:
             _record_llm_metrics(recorder, collected)
