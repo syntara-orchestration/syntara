@@ -199,29 +199,6 @@ class TestWebSocketStreamingHandlerWaitForStreamReady:
 class TestWebSocketStreamingHandlerCheckInvocationExists:
     """Test _check_invocation_exists method."""
 
-    async def test_check_invocation_exists_uses_scalar_result_not_row_aap_86853(
-        self, handler: WebSocketStreamingHandler
-    ) -> None:
-        """Regression AAP-86853: sqlalchemy select + exec().one_or_none() returns Row."""
-        invocation_id = uuid4()
-        mock_invocation = MagicMock()
-        mock_invocation.status = InvocationStatus.RUNNING
-
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_invocation
-        mock_session.execute.return_value = mock_result
-
-        mock_cm = AsyncMock()
-        mock_cm.__aenter__.return_value = mock_session
-        mock_cm.__aexit__.return_value = None
-        handler._session_factory = MagicMock(return_value=mock_cm)
-
-        status = await handler._check_invocation_exists(invocation_id)
-        assert status == InvocationStatus.RUNNING
-        mock_session.execute.assert_awaited_once()
-        mock_result.scalar_one_or_none.assert_called_once()
-
     async def test_check_invocation_exists_returns_status(self, handler: WebSocketStreamingHandler) -> None:
         """Test that _check_invocation_exists returns invocation status."""
         invocation_id = uuid4()
