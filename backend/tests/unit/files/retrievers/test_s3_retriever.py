@@ -57,7 +57,7 @@ async def _chunks(data: bytes, chunk_size: int = 1024 * 1024) -> AsyncGenerator[
 async def test_save_file_stream_roundtrip(s3_retriever: S3FileRetriever) -> None:
     """Test streaming upload produces the same bytes when loaded back."""
     content = os.urandom(3 * 1024 * 1024)  # 3 MB — multiple chunks
-    key = "nexus-test-uuid-stream-upload.bin"
+    key = "orchestrator-test-uuid-stream-upload.bin"
 
     saved_key, total_bytes = await s3_retriever.save_file_stream(_chunks(content), key)
     assert saved_key == key
@@ -71,7 +71,7 @@ async def test_save_file_stream_roundtrip(s3_retriever: S3FileRetriever) -> None
 async def test_save_file_stream_hash_preserved(s3_retriever: S3FileRetriever) -> None:
     """Test SHA-256 is preserved across streaming upload + download."""
     content = os.urandom(6 * 1024 * 1024)  # 6 MB — exceeds multipart threshold
-    key = "nexus-test-uuid-stream-upload-hash.bin"
+    key = "orchestrator-test-uuid-stream-upload-hash.bin"
     expected_hash = hashlib.sha256(content).hexdigest()
 
     await s3_retriever.save_file_stream(_chunks(content), key)
@@ -84,7 +84,7 @@ async def test_save_file_stream_hash_preserved(s3_retriever: S3FileRetriever) ->
 async def test_save_file_stream_small_file(s3_retriever: S3FileRetriever) -> None:
     """Test streaming upload with a small file (single chunk, below multipart threshold)."""
     content = b"small file content"
-    key = "nexus-test-uuid-stream-upload-small.txt"
+    key = "orchestrator-test-uuid-stream-upload-small.txt"
 
     saved_key, total_bytes = await s3_retriever.save_file_stream(_chunks(content), key)
     assert saved_key == key
@@ -124,7 +124,7 @@ async def test_save_file_stream_error_aborts_multipart(s3_retriever: S3FileRetri
         ),
     ):
         with pytest.raises(FileError, match="S3 storage unavailable"):
-            await s3_retriever.save_file_stream(_failing_stream(), "nexus-test-fail.bin")
+            await s3_retriever.save_file_stream(_failing_stream(), "orchestrator-test-fail.bin")
 
     assert abort_called, "abort_multipart_upload was not called after upload failure"
 
@@ -132,7 +132,7 @@ async def test_save_file_stream_error_aborts_multipart(s3_retriever: S3FileRetri
 @pytest.mark.asyncio
 async def test_save_file_stream_empty(s3_retriever: S3FileRetriever) -> None:
     """Test streaming upload with zero bytes falls back to put_object."""
-    key = "nexus-test-uuid-stream-upload-empty.txt"
+    key = "orchestrator-test-uuid-stream-upload-empty.txt"
 
     async def _empty_stream() -> AsyncGenerator[bytes]:
         return
@@ -325,7 +325,7 @@ async def test_get_metadata_nonexistent_file(s3_retriever: S3FileRetriever) -> N
 async def test_stream_file_roundtrip(s3_retriever: S3FileRetriever) -> None:
     """Test streaming download produces the same bytes as load_file."""
     content = os.urandom(3 * 1024 * 1024)  # 3 MB — spans multiple chunks
-    key = "nexus-test-uuid-stream.bin"
+    key = "orchestrator-test-uuid-stream.bin"
 
     await s3_retriever.save_file(content, key)
 
@@ -340,7 +340,7 @@ async def test_stream_file_roundtrip(s3_retriever: S3FileRetriever) -> None:
 async def test_stream_file_hash_matches(s3_retriever: S3FileRetriever) -> None:
     """Test SHA-256 computed from streamed chunks matches the original."""
     content = os.urandom(2 * 1024 * 1024)
-    key = "nexus-test-uuid-stream-hash.bin"
+    key = "orchestrator-test-uuid-stream-hash.bin"
     expected_hash = hashlib.sha256(content).hexdigest()
 
     await s3_retriever.save_file(content, key)
@@ -355,7 +355,7 @@ async def test_stream_file_hash_matches(s3_retriever: S3FileRetriever) -> None:
 @pytest.mark.asyncio
 async def test_stream_file_empty(s3_retriever: S3FileRetriever) -> None:
     """Test streaming an empty file yields no chunks."""
-    key = "nexus-test-uuid-stream-empty.txt"
+    key = "orchestrator-test-uuid-stream-empty.txt"
     await s3_retriever.save_file(b"", key)
 
     chunks: list[bytes] = []
@@ -388,7 +388,7 @@ async def test_stream_file_cancellation(s3_retriever: S3FileRetriever) -> None:
     queue.put() and aclose() never returns — the 5s timeout fails the test.
     """
     content = os.urandom(5 * 1024 * 1024)  # 5 MB — multiple chunks at 512 KB each
-    key = "nexus-test-uuid-stream-cancel.bin"
+    key = "orchestrator-test-uuid-stream-cancel.bin"
 
     await s3_retriever.save_file(content, key)
 
@@ -438,7 +438,7 @@ async def test_stream_file_mid_read_error(s3_retriever: S3FileRetriever) -> None
     would look like a successful truncated download.
     """
     content = os.urandom(1024 * 1024)
-    key = "nexus-test-uuid-stream-read-error.bin"
+    key = "orchestrator-test-uuid-stream-read-error.bin"
     await s3_retriever.save_file(content, key)
 
     original_get_object = s3_retriever._client.get_object
