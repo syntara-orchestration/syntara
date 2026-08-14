@@ -46,6 +46,7 @@ from syntara.integrations.exceptions import (
     IntegrationScopeError,
 )
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
@@ -63,6 +64,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -383,6 +385,26 @@ class IntegrationService(BaseService):
             include_total=include_total,
         )
 
+    def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
+        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+
+        Called at write time (create/patch) and again in this service's outbound
+        entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
+        The same policy is re-run at the runtime outbound boundaries that read the stored
+        base_url directly (AAP proxy, workflow AAP resolution, LLM invocation, MCP tool
+        connect); all boundaries route through the shared
+        :func:`validate_integration_configuration_no_ssrf` choke point so the policy cannot
+        drift. Loopback and other private hosts are rejected unless allowlisted via
+        integration_url_allowed_hosts. The DNS-resolving SSRF check cannot live in the
+        configuration model validators because those also run when configurations are
+        deserialized from the database on every read.
+        """
+        try:
+            validate_integration_configuration_no_ssrf(configuration)
+        except ValueError as e:
+            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            raise SafeValueError(msg) from e
+
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:
         """Create a new integration.
 
@@ -397,6 +419,8 @@ class IntegrationService(BaseService):
             await self._validate_credential_type(data.integration_type, data.management_credential_id)
         elif data.integration_type in CREDENTIAL_REQUIRED_TYPES:
             raise IntegrationCredentialRequiredError(data.integration_type.value)
+
+        self._validate_configuration_ssrf(data.configuration)
 
         integration = Integration(
             name=data.name,
@@ -576,6 +600,26 @@ class IntegrationService(BaseService):
             return project_ids
         return list(set(rbac_ids) & set(project_ids))
 
+    async def _validate_patch(self, integration: Integration, data: IntegrationUpdate) -> None:
+        """Validate a patch payload against the existing integration before applying updates."""
+        if data.configuration is not None:
+            if data.configuration.integration_type != integration.integration_type.value:
+                msg = (
+                    f"configuration.integration_type '{data.configuration.integration_type}' "
+                    f"does not match integration type '{integration.integration_type.value}'"
+                )
+                raise SafeValueError(msg)
+            self._validate_configuration_ssrf(data.configuration)
+
+        if "management_credential_id" in data.model_fields_set:
+            if data.management_credential_id is not None:
+                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
+                raise IntegrationCredentialRequiredError(integration.integration_type.value)
+
+        if data.name is not None and data.name != integration.name:
+            await self._raise_if_name_exists(data.name)
+
     async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
@@ -590,21 +634,7 @@ class IntegrationService(BaseService):
             )
             raise
 
-        if data.configuration is not None and data.configuration.integration_type != integration.integration_type.value:
-            msg = (
-                f"configuration.integration_type '{data.configuration.integration_type}' "
-                f"does not match integration type '{integration.integration_type.value}'"
-            )
-            raise SafeValueError(msg)
-
-        if "management_credential_id" in data.model_fields_set:
-            if data.management_credential_id is not None:
-                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
-            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
-                raise IntegrationCredentialRequiredError(integration.integration_type.value)
-
-        if data.name is not None and data.name != integration.name:
-            await self._raise_if_name_exists(data.name)
+        await self._validate_patch(integration, data)
 
         if data.scope == IntegrationScope.GLOBAL and integration.scope == IntegrationScope.PROJECT:
             stmt = delete(IntegrationProjectAssignment).where(
@@ -811,6 +841,9 @@ class IntegrationService(BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+        # Re-check at call time (defense in depth): the stored base_url passed the write-time
+        # check, but DNS could have been re-pointed to a private/metadata target since.
+        self._validate_configuration_ssrf(integration.configuration)
         adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
@@ -859,6 +892,10 @@ class IntegrationService(BaseService):
         Resolves the credential, creates an adapter from the provided
         configuration, and runs discover(). No database writes.
         """
+        # Reject SSRF-prone base_url before any outbound request. discover() bypasses
+        # create/patch, so without this the adapter would hit private/metadata targets.
+        self._validate_configuration_ssrf(data.configuration)
+
         if data.credential_id is None and data.integration_type in CREDENTIAL_REQUIRED_TYPES:
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
@@ -945,6 +982,9 @@ class IntegrationService(BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+        # Re-check at call time (defense in depth): the stored base_url passed the write-time
+        # check, but DNS could have been re-pointed to a private/metadata target since.
+        self._validate_configuration_ssrf(integration.configuration)
         adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0

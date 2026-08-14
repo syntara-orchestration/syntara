@@ -25,6 +25,7 @@ from syntara.agent_orchestrator.tool_manager.types import (
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.sanitization import CREDENTIAL_PATTERNS, REDACTED
 from syntara.core.config.base import get_settings
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import IntegrationRead, IntegrationType
 from syntara.tool_manager.lib.providers.factory import ProviderFactory, get_provider_factory
 from syntara.tool_manager.models.tool import ToolStatus, ToolWithParameters
@@ -224,6 +225,11 @@ async def _process_single_integration(
         api_key: str | None = None
         if credential_resolver:
             api_key = await credential_resolver(integration.id)
+
+        # Re-run the integration SSRF policy at request time: the stored base_url may have
+        # been re-pointed to a private/metadata address (DNS rebinding) since write time.
+        # A block raises ValueError, caught below and handled as a skipped integration.
+        validate_integration_configuration_no_ssrf(integration.configuration)
 
         config_params = _prepare_config_params(integration, api_key=api_key)
         provider_type = "mcp"
