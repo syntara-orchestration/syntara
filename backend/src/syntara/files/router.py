@@ -30,7 +30,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.files.audit.file_downloaded import FileDownloadedEvent
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.health import FileStorageStatus, check_file_storage_health
@@ -40,7 +40,7 @@ from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
-router = NexusRouter(prefix="/files", tags=["Files"])
+router = SyntaraRouter(prefix="/files", tags=["Files"])
 logger = structlog.stdlib.get_logger(__name__)
 
 _files_perm_upload = PermissionChecker(

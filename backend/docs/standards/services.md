@@ -1,6 +1,6 @@
 # Service Architecture Standards
 
-This document defines the service layer patterns for the Nexus project — how services are structured, how they integrate with FastAPI, and how background workers operate.
+This document defines the service layer patterns for the Syntara project — how services are structured, how they integrate with FastAPI, and how background workers operate.
 
 ## BaseService
 

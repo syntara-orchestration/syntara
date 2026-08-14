@@ -1,6 +1,6 @@
 # Resilient Background Execution
 
-Nexus originally processed system operations — document conversion, agent execution — inside
+Syntara originally processed system operations — document conversion, agent execution — inside
 FastAPI `BackgroundTasks`. These are fire-and-forget callbacks that run in the same process as the
 HTTP request that triggered them: no retry, no durability, no visibility, and critically, they share
 a single-process execution slot with user workflows. A burst of file uploads could saturate the
@@ -30,7 +30,7 @@ own dedicated queue, served by their own dedicated worker deployment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Nexus API (FastAPI)                                                        │
+│  Syntara API (FastAPI)                                                        │
 │                                                                             │
 │  POST /executions  →  ExecutionService.start_workflow(is_builtin=False)    │
 │       ↓ task_queue = orchestrator-workflow-queue                                   │
@@ -82,7 +82,7 @@ conditional at the Temporal client call:
 
 ```python
 handle = await self.temporal_client.start_workflow(
-    NexusWorkflow.run,
+    OrchestratorWorkflow.run,
     args=[...],
     id=temporal_workflow_id,
     task_queue=self.background_task_queue if is_builtin else self.task_queue,
@@ -452,7 +452,7 @@ await execution_service.start_workflow(
 The service looks up `background_task_queue` from settings and routes the Temporal workflow
 there. From this point, execution is identical to any other workflow — visible in the Temporal
 UI under `orchestrator-background-queue`, status synced to the DB via `ActivitySyncService`, and
-surfaced in the Nexus UI for administrators with the builtin toggle enabled.
+surfaced in the Syntara UI for administrators with the builtin toggle enabled.
 
 ## Constraints and Known Gaps
 
@@ -472,7 +472,7 @@ correct; the CPU trigger just responds to load with some lag rather than immedia
 
 ## Related Documentation
 
-- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `NexusWorkflow` executes both user and built-in workflows identically
+- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `OrchestratorWorkflow` executes both user and built-in workflows identically
 - [Execution Runtime](execution-runtime.md) — `POST /executions` API, two-phase creation, live status
 - [Observability Standards](standards/observability.md) — `MetricsRecorder` usage, Prometheus gauge patterns
 - [Configuration Standards](standards/configuration.md) — adding new settings, Pydantic Settings patterns

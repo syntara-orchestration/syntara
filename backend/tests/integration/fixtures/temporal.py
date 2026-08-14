@@ -16,7 +16,7 @@ from syntara.workflows.workflow_engine.activities.internal_activity import execu
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
@@ -49,7 +49,7 @@ async def _create_temporal_worker(
         async with Worker(
             temporal_env.client,
             task_queue="test-workflow-queue",
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=_TEST_WORKER_ACTIVITIES,
         ) as worker:
             yield worker

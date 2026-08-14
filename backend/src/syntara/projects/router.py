@@ -42,7 +42,7 @@ from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
 from syntara.credentials.models import (
     CredentialCreate,
@@ -68,7 +68,7 @@ from syntara.workflows.models import WorkflowListParams
 from syntara.workflows.models.workflow import WorkflowListResponse
 from syntara.workflows.services import WorkflowService
 
-router = NexusRouter(prefix="/projects", tags=["Projects"])
+router = SyntaraRouter(prefix="/projects", tags=["Projects"])
 
 _perm_project_read = PermissionChecker("project", "read", project_param="project_id")
 _perm_project_update = PermissionChecker("project", "update", project_param="project_id")

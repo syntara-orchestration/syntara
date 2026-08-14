@@ -200,16 +200,16 @@ class TestStartWorkflow:
 class TestTriggerSelection:
     """Test trigger node selection logic for multi-trigger workflows."""
 
-    # NexusWorkflow.run signature: (workflow_def, execution_id, trigger_node_id, ...)
+    # OrchestratorWorkflow.run signature: (workflow_def, execution_id, trigger_node_id, ...)
     TRIGGER_NODE_ID_ARG_INDEX = 2
 
     def _get_trigger_node_id_from_call(self, mock_client: Mock) -> str:
-        """Extract trigger_node_id passed to NexusWorkflow.run from the mock call."""
+        """Extract trigger_node_id passed to OrchestratorWorkflow.run from the mock call."""
         call_kwargs = mock_client.start_workflow.call_args
         temporal_args = call_kwargs.kwargs.get("args") or call_kwargs[1].get("args")
         expected_min = self.TRIGGER_NODE_ID_ARG_INDEX + 1
         assert len(temporal_args) >= expected_min, (
-            f"Expected at least {expected_min} args to NexusWorkflow.run, got {len(temporal_args)}"
+            f"Expected at least {expected_min} args to OrchestratorWorkflow.run, got {len(temporal_args)}"
         )
         return str(temporal_args[self.TRIGGER_NODE_ID_ARG_INDEX])
 

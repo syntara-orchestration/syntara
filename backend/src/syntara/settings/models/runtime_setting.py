@@ -1,6 +1,6 @@
 """RuntimeSetting SQLModel and related enums.
 
-Defines the database-backed runtime configuration settings for the Nexus
+Defines the database-backed runtime configuration settings for the Syntara
 application. Settings are user-managed key-value pairs that can be
 changed without restarting the application (for those with
 ``requires_restart=False``).

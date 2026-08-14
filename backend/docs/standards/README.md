@@ -1,6 +1,6 @@
-# Nexus Development Standards
+# Syntara Development Standards
 
-This directory contains prescriptive standards for the Nexus project. Each document covers a specific domain and defines both tooling-enforced rules and conventions that require human/agent judgment.
+This directory contains prescriptive standards for the Syntara project. Each document covers a specific domain and defines both tooling-enforced rules and conventions that require human/agent judgment.
 
 ## Standards Index
 
@@ -51,7 +51,7 @@ These existing documents define core standards and should be consulted first:
 
 ## How to Use These Standards
 
-**For AI agents:** AGENTS.md references this directory. When working on Nexus, consult the relevant standard before making changes. Standards define what the codebase expects — follow them unless there's a documented reason to deviate.
+**For AI agents:** AGENTS.md references this directory. When working on Syntara, consult the relevant standard before making changes. Standards define what the codebase expects — follow them unless there's a documented reason to deviate.
 
 **For developers:** These standards codify existing patterns. If you find the codebase diverges from a standard, either update the code to match or propose an amendment to the standard via PR.
 

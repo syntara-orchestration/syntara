@@ -1,6 +1,6 @@
 # Database Standards
 
-This document defines database patterns for the Nexus project. PostgreSQL is the primary data store; Redis is used only for ephemeral caching (see [Redis](redis.md)).
+This document defines database patterns for the Syntara project. PostgreSQL is the primary data store; Redis is used only for ephemeral caching (see [Redis](redis.md)).
 
 ## Connection Management
 
@@ -58,7 +58,7 @@ async def list_resources(db: Annotated[AsyncSession, Depends(get_db)]):
 
 ### Single-Database Architecture
 
-Nexus uses a **single PostgreSQL database** for all application data, including the audit outbox. Audit events are written to the outbox table in the main database and asynchronously exported to the OTEL collector by the `AuditOutboxWorker`.
+Syntara uses a **single PostgreSQL database** for all application data, including the audit outbox. Audit events are written to the outbox table in the main database and asynchronously exported to the OTEL collector by the `AuditOutboxWorker`.
 
 - Use `get_db()` for all database access (domain models, audit outbox, etc.)
 - Schema is managed via a single Alembic migration tree in `src/syntara/core/database/migrations/`

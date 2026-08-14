@@ -21,7 +21,7 @@ _VALIDITY_DAYS = 365
 def generate_local_certs(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ca_key, ca_cert = generate_ca(output_dir, common_name="Nexus Local Dev CA", validity_days=_VALIDITY_DAYS)
+    ca_key, ca_cert = generate_ca(output_dir, common_name="Syntara Local Dev CA", validity_days=_VALIDITY_DAYS)
 
     not_valid_before = ca_cert.not_valid_before_utc
     not_valid_after = ca_cert.not_valid_after_utc

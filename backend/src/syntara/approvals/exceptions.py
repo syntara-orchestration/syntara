@@ -8,10 +8,10 @@ from uuid import UUID
 
 from syntara.approvals.models import ApprovalRequestStatus
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
-class ApprovalError(NexusError):
+class ApprovalError(SyntaraError):
     """Base exception for all approval errors."""
 
 

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_settings_requires_nexus_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_requires_app_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that settings only reads environment variables with APP_ prefix."""
     monkeypatch.setenv("APP_OPENROUTER_MODEL", "prefixed-model")
 

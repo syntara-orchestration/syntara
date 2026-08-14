@@ -1,11 +1,11 @@
 """Domain exceptions for credential management."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.credentials.error_handlers.credential_error_handler")
-class CredentialError(NexusError):
+class CredentialError(SyntaraError):
     """Base exception for all credential management errors."""
 
 

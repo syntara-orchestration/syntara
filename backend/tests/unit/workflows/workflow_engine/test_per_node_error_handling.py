@@ -1,7 +1,7 @@
 """Unit tests for per-node error handling in the workflow engine (task 5.1).
 
 Tests verify that:
-- NexusWorkflow tracks failed nodes separately from skipped nodes
+- OrchestratorWorkflow tracks failed nodes separately from skipped nodes
 - Failed nodes store error information in the resolver
 - Downstream nodes of a failed node are marked as skipped
 - _is_unreachable treats failed nodes as unreachable
@@ -16,7 +16,7 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
@@ -37,9 +37,9 @@ def _make_workflow(
     resolver: NamespaceResolver | None = None,
     node_inputs: dict[str, dict[str, object]] | None = None,
     node_control_data: dict[str, dict[str, object]] | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = skipped_nodes if skipped_nodes is not None else set()
     wf.failed_nodes = failed_nodes if failed_nodes is not None else {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()

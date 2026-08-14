@@ -146,12 +146,11 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
-packages = ["src/syntara", "src/nexus"]
+packages = ["src/syntara"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
     "src/syntara",
-    "src/nexus",
     "README.md",
     "LICENSE",
     "uv.lock",

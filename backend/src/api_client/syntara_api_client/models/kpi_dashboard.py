@@ -18,7 +18,7 @@ T = TypeVar("T", bound="KPIDashboard")
 
 @_attrs_define
 class KPIDashboard:
-    """Full KPI dashboard covering all Nexus components.
+    """Full KPI dashboard covering all Syntara components.
 
     Attributes:
         generated_at (datetime.datetime): Timestamp of generation

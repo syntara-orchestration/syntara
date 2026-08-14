@@ -10,12 +10,12 @@ from typing import Any
 import structlog
 import yaml
 
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class ValidationError(NexusError):
+class ValidationError(SyntaraError):
     """Raised when message validation fails."""
 
     def __init__(self, error_type: str, message: str, field: str | None = None) -> None:

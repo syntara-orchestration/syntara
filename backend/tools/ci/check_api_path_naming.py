@@ -21,7 +21,7 @@ RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
 
-PREFIX_RE = re.compile(r"""(?:APIRouter|NexusRouter)\(\s*prefix\s*=\s*["']([^"']+)["']""")
+PREFIX_RE = re.compile(r"""(?:APIRouter|SyntaraRouter)\(\s*prefix\s*=\s*["']([^"']+)["']""")
 ROUTE_RE = re.compile(r"""@\w+\.(?:get|post|put|patch|delete|head|options)\(\s*["']([^"']+)["']""")
 ROUTE_OPEN_RE = re.compile(r"""@\w+\.(?:get|post|put|patch|delete|head|options)\(\s*$""")
 PATH_ARG_RE = re.compile(r"""^\s*["']([^"']+)["']""")

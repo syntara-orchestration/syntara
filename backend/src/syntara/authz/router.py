@@ -32,8 +32,8 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models.base.query_params import BasePaginatedRequest
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
 from syntara.core.services.base import BaseService
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.utils.cursor import (
     CursorData,
     PaginationDirection,
@@ -49,7 +49,7 @@ from syntara.core.utils.sorting import apply_sorting, parse_sort
 
 logger = structlog.stdlib.get_logger(__name__)
 
-router = NexusRouter(prefix="/authz", tags=["Authorization"])
+router = SyntaraRouter(prefix="/authz", tags=["Authorization"])
 
 
 # ============================================================================

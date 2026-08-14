@@ -13,7 +13,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.service_accounts.schemas import (
     ServiceAccountCreate,
@@ -24,7 +24,7 @@ from syntara.service_accounts.schemas import (
 )
 from syntara.service_accounts.services.service_account_service import ServiceAccountService
 
-router = NexusRouter(prefix="/service_accounts", tags=["Service Accounts"])
+router = SyntaraRouter(prefix="/service_accounts", tags=["Service Accounts"])
 
 _sa_create = PermissionChecker("service_account", "create", body_project_field="project_id")
 _sa_read = PermissionChecker(

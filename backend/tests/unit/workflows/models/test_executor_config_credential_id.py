@@ -72,7 +72,7 @@ class TestAAPJobTemplateExecutorParametersCredentialId:
         assert dumped["credential_id"] == "550e8400-e29b-41d4-a716-446655440000"
 
     def test_credential_id_coexists_with_job_credentials(self) -> None:
-        """credential_id (Nexus) and job_credentials (AAP IDs) can coexist."""
+        """credential_id (Syntara) and job_credentials (AAP IDs) can coexist."""
         config = AAPJobTemplateExecutorParameters(
             job_template_id=1,
             credential_id="550e8400-e29b-41d4-a716-446655440000",

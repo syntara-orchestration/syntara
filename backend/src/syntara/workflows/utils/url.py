@@ -13,7 +13,7 @@ def get_api_base_url() -> str:
     """Get the workflow API base URL from settings or construct it from host/port.
 
     Returns:
-        Base URL for the workflow API (e.g., 'http://nexus:8000/api/v1' or 'http://localhost:8000/api/v1')
+        Base URL for the workflow API (e.g., 'http://syntara:8000/api/v1' or 'http://localhost:8000/api/v1')
 
     """
     settings = get_settings()

@@ -576,12 +576,12 @@ def scan_handler_specs() -> dict[str, dict[str, Any]]:
     _HANDLER_MODULE_CACHE.clear()
 
     current_file = Path(_get_module_file())
-    nexus_dir = current_file.parent.parent.parent  # src/syntara/
-    project_root = nexus_dir.parent.parent
+    syntara_dir = current_file.parent.parent.parent  # src/syntara/
+    project_root = syntara_dir.parent.parent
 
     # First, collect all components with ws/ directories
     components_with_ws: set[str] = set()
-    for component_dir in nexus_dir.iterdir():
+    for component_dir in syntara_dir.iterdir():
         if _is_scannable_component_dir(component_dir):
             components_with_ws.add(component_dir.name)
 
@@ -620,7 +620,7 @@ def scan_handler_specs() -> dict[str, dict[str, Any]]:
 
     component_specs: dict[str, dict[str, Any]] = {}
 
-    for component_dir in nexus_dir.iterdir():
+    for component_dir in syntara_dir.iterdir():
         if not _is_scannable_component_dir(component_dir):
             continue
 

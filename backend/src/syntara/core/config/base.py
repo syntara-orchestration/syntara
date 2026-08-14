@@ -599,7 +599,7 @@ class ServerSettings(BaseSettings):
 
     server_public_url: HttpUrl | None = Field(
         default=None,
-        description="Public base URL for this Nexus instance (e.g., 'https://example.com:8000'). "
+        description="Public base URL for this Syntara instance (e.g., 'https://example.com:8000'). "
         "Used as the JWT issuer, post-logout redirect, and frontend origin fallback. "
         "If not set, falls back to server_scheme://server_host:server_port. "
         "Required when server_host is a bind address like 0.0.0.0.",
@@ -620,7 +620,7 @@ class ServerSettings(BaseSettings):
     workflow_base_url: str | None = Field(
         default=None,
         description=(
-            "Workflow API base URL for callback URL generation (e.g., 'http://nexus:8000/api/v1'). "
+            "Workflow API base URL for callback URL generation (e.g., 'http://syntara:8000/api/v1'). "
             "If not set, will be constructed from server_host and server_port. "
             "Used by workflow activities to generate callback URLs for external services."
         ),
@@ -1401,7 +1401,7 @@ class TelemetrySettings(BaseSettings):
 
     entitlement_id: str = Field(
         default="",
-        description="Unique Nexus installation identifier for anonymized telemetry tracking",
+        description="Unique Syntara installation identifier for anonymized telemetry tracking",
         exclude=True,
     )
 
@@ -2015,7 +2015,7 @@ class Settings(
     @computed_field  # type: ignore[prop-decorator]
     @property
     def jwt_issuer(self) -> str:
-        """JWT issuer claim (iss) identifying this Nexus instance.
+        """JWT issuer claim (iss) identifying this Syntara instance.
 
         Uses server_public_url when set, otherwise falls back to
         server_scheme://server_host:server_port.

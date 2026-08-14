@@ -23,7 +23,7 @@ from syntara.telemetry.client import flush_telemetry, initialize_telemetry
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
 from syntara.workflows.workflow_engine.activities.registry import ACTIVITY_REGISTRY
 from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.interceptors.credential_output_interceptor import CredentialOutputInterceptor
 from syntara.workflows.workflow_engine.interceptors.monitoring_interceptor import MonitoringWorkflowInterceptor
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -159,7 +159,7 @@ class TemporalWorkerService:
             self.worker = Worker(
                 self.client,
                 task_queue=self.task_queue,
-                workflows=[NexusWorkflow, ScheduledWorkflowLauncher],
+                workflows=[OrchestratorWorkflow, ScheduledWorkflowLauncher],
                 activities=activities,
                 interceptors=[MonitoringWorkflowInterceptor(), CredentialOutputInterceptor()],
                 max_cached_workflows=self.max_cached_workflows,

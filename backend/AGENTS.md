@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Nexus is a distributed multi-agent system that enables coordinated AI agents to work together on complex tasks. The project uses Python 3, `uv` for dependency management, and enforces strict code quality standards.
+Syntara is a distributed multi-agent system that enables coordinated AI agents to work together on complex tasks. The project uses Python 3, `uv` for dependency management, and enforces strict code quality standards.
 
 ## General Instructions
 

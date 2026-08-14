@@ -20,7 +20,7 @@ from temporalio.worker import Worker
 
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 _expire_calls: list[tuple[str, str]] = []
@@ -157,7 +157,7 @@ class TestApprovalTimeoutIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=task_queue,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[
                 manual_trigger,
                 _test_approval_activity,
@@ -203,7 +203,7 @@ class TestApprovalTimeoutIntegration:
         async with Worker(
             temporal_env.client,
             task_queue=task_queue,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[
                 manual_trigger,
                 _test_approval_activity,

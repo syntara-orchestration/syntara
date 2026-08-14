@@ -2,11 +2,11 @@
 """Domain exceptions for service account management."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.service_accounts.error_handlers.service_account_error_handler")
-class ServiceAccountError(NexusError):
+class ServiceAccountError(SyntaraError):
     """Base exception for all service account errors."""
 
 

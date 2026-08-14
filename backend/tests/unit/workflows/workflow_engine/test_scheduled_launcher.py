@@ -222,7 +222,7 @@ class TestSetupActivityNoTemporalStart:
     """Tests that the setup activity does NOT start workflows via TemporalExecutionService.
 
     After the child-workflow refactor (AAP-82536), the activity only handles
-    DB operations. Starting NexusWorkflow is the launcher workflow's
+    DB operations. Starting OrchestratorWorkflow is the launcher workflow's
     responsibility via execute_child_workflow.
     """
 
@@ -500,7 +500,7 @@ class TestActivityRegistration:
         """Activity must be named 'setup_scheduled_execution'.
 
         The old name 'launch_scheduled_execution' reflected the fire-and-forget
-        pattern where the activity started NexusWorkflow. After the child-workflow
+        pattern where the activity started OrchestratorWorkflow. After the child-workflow
         refactor (AAP-82536), the activity only sets up DB records.
         """
         from syntara.workflows.workflow_engine.scheduled_launcher import _LAUNCHER_ACTIVITY_NAME

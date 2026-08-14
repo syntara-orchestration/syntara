@@ -4,7 +4,7 @@ info:
   title: Syntara Users & Groups API
   version: 1.0.0
   description: |
-    User and group management endpoints for the Nexus platform.
+    User and group management endpoints for the Syntara platform.
 
     ## Key Features
     - User CRUD (local user account management)

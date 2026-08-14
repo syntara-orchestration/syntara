@@ -1,6 +1,6 @@
 """Base async Redis client with shared connection lifecycle.
 
-All Redis client classes in Nexus should inherit from
+All Redis client classes in Syntara should inherit from
 :class:`BaseRedisClient` to share connection setup, teardown, and
 context-manager support.  Subclasses set :attr:`_client_name` for
 differentiated log messages and implement domain-specific operations.

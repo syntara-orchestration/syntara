@@ -9,7 +9,7 @@ A distributed multi-agent system. Syntara enables coordinated AI agents to work 
 
 ## Architecture
 
-Nexus is built with Python 3, FastAPI, SQLModel, and PostgreSQL.
+Syntara is built with Python 3, FastAPI, SQLModel, and PostgreSQL.
 
 The system follows a domain-driven design with automatic router discovery and standardized patterns.
 
@@ -27,7 +27,7 @@ The system follows a domain-driven design with automatic router discovery and st
 
 ```
 src/
-└── nexus/
+└── syntara/
     ├── agent_orchestrator/    # Agent lifecycle management and request routing
     ├── api/                   # Legacy FastAPI routes (favour use of "domains")
     ├── audit/                 # Audit event tracking for system activities and user actions
@@ -188,7 +188,7 @@ export APP_DATABASE_URL="postgresql+asyncpg://user:pass@host:port/dbname?sslmode
 
 ### Data Modeling with SQLModel
 
-**Important**: Nexus uses SQLModel as the single source of truth for both API schemas and database tables. **Never create separate Pydantic models** - SQLModel serves both purposes.
+**Important**: Syntara uses SQLModel as the single source of truth for both API schemas and database tables. **Never create separate Pydantic models** - SQLModel serves both purposes.
 
 Most domain models should extend the `Resource` base class:
 
@@ -260,7 +260,7 @@ make services-clean  # Stop and remove all data (database + temporal)
 
 ### Containerized Deployment
 
-Nexus provides a complete containerized stack using `podman-compose` for easy deployment and development.
+Syntara provides a complete containerized stack using `podman-compose` for easy deployment and development.
 
 #### Available Services
 
@@ -310,10 +310,10 @@ make temporal-ui-logs     # Temporal UI logs
 
 #### Running Multiple Instances
 
-You can run multiple isolated instances of Nexus simultaneously using the `PODMAN_PROJECT` environment variable. This is useful for:
+You can run multiple isolated instances of Syntara simultaneously using the `PODMAN_PROJECT` environment variable. This is useful for:
 - Running different feature branches side-by-side
 - Maintaining separate dev/staging environments locally
-- Testing interactions between multiple Nexus instances
+- Testing interactions between multiple Syntara instances
 
 **Example: Running two instances**:
 ```bash
@@ -342,12 +342,12 @@ make services-run
 **Environment Variables**:
 
 All services can be configured via `.env` file or environment variables:
-Set `APP_ENV_FILE_PATH` to point at an alternate `.env` file if you want Nexus to load settings from a non-default location.
+Set `APP_ENV_FILE_PATH` to point at an alternate `.env` file if you want Syntara to load settings from a non-default location.
 
 ```bash
 # Project Configuration
 PODMAN_PROJECT=syntara  # Project name for container orchestration (default: syntara)
-                      # Use this to run multiple isolated instances of Nexus
+                      # Use this to run multiple isolated instances of Syntara
                       # Example: PODMAN_PROJECT=syntara-dev make services-run
 
 # API Configuration
@@ -385,7 +385,7 @@ APP_FALLBACK_LOG_LEVEL=INFO
 
 ### LLM and Agent Configuration
 
-Nexus uses LangChain with OpenRouter for intelligent agent responses. The GenericAgent handles information queries using various LLMs.
+Syntara uses LangChain with OpenRouter for intelligent agent responses. The GenericAgent handles information queries using various LLMs.
 
 **OpenRouter Setup**:
 
@@ -410,7 +410,7 @@ Nexus uses LangChain with OpenRouter for intelligent agent responses. The Generi
 
 **Agent Routing**:
 
-Nexus automatically routes requests to the appropriate agent:
+Syntara automatically routes requests to the appropriate agent:
 - **GenericAgent**: Information queries, questions, explanations
   - Uses LangChain + OpenRouter LLM
   - Returns natural language responses
@@ -536,7 +536,7 @@ If `APP_BASE_URL` is not set, the target automatically starts the database and d
 
 > **Note:** The E2E tests use an auto-generated Python API client. If you change the OpenAPI schema, regenerate the client with `make generate-api-client` before running E2E tests.
 
-### Nexus Test SDK
+### Syntara Test SDK
 
 Reusable pytest fixtures for integration and E2E tests live in `test-sdk/`. The package is a pytest plugin (`pytest11` entry point), so fixtures are available automatically once installed — no `conftest.py` imports needed.
 
@@ -718,7 +718,7 @@ Telemetry is configured via environment variables:
 
 ## Observability & Metrics
 
-Nexus exposes two metrics surfaces: a Prometheus-compatible scrape endpoint for production monitoring, and an internal JSON API for ad-hoc performance testing.
+Syntara exposes two metrics surfaces: a Prometheus-compatible scrape endpoint for production monitoring, and an internal JSON API for ad-hoc performance testing.
 
 ### `GET /metrics` — Prometheus / OpenMetrics
 

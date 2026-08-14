@@ -34,7 +34,7 @@ from fastapi import APIRouter, FastAPI
 from filelock import FileLock
 
 from syntara.core.config.base import get_settings
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.core.router import validate_routes
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ def _get_lock_file_path() -> Path:
     return Path(tempfile.gettempdir()) / lock_filename
 
 
-class RouterDiscoveryError(NexusError):
+class RouterDiscoveryError(SyntaraError):
     """Error during router discovery or registration."""
 
 
