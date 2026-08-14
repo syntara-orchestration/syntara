@@ -13,6 +13,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.models.credential import Credential
@@ -74,17 +75,30 @@ def _mcp_create(name: str = "Test MCP", **kwargs: object) -> IntegrationCreate:
 
 
 async def _insert_integration_direct(
-    session: AsyncSession, user: User, *, integration_type: IntegrationType, name: str = "Test Integration"
+    session: AsyncSession,
+    user: User,
+    *,
+    integration_type: IntegrationType,
+    name: str = "Test Integration",
+    base_url: str | None = None,
 ) -> Integration:
-    """Insert an Integration directly, bypassing create_integration() validation."""
+    """Insert an Integration directly, bypassing create_integration() validation.
+
+    ``base_url`` overrides the default host; use it to plant a value that passes the
+    format-only model validators but would fail the DNS-resolving SSRF check (simulating
+    a host that resolved publicly at write time and later rebinds to a private target).
+    """
     configuration: LLMProviderConfiguration | AAPConfiguration
     if integration_type == IntegrationType.LLM_PROVIDER:
         configuration = LLMProviderConfiguration(
-            integration_type="llm_provider", base_url="https://api.example.com", provider_hint="openai"
+            integration_type="llm_provider",
+            base_url=base_url or "https://api.example.com",
+            provider_hint="openai",
         )
     else:
         configuration = AAPConfiguration(
-            integration_type="ansible_automation_platform", base_url="https://aap.example.com"
+            integration_type="ansible_automation_platform",
+            base_url=base_url or "https://aap.example.com",
         )
 
     integration = Integration(
@@ -1178,3 +1192,78 @@ class TestRefreshIntegrationResources:
         mock_audit.dispatch.assert_called_once()
         event = mock_audit.dispatch.call_args[0][0]
         assert event.error_type == "CredentialDisabledError"
+
+
+@pytest.mark.ssrf_enforced
+class TestRequestTimeSsrfRevalidation:
+    """Request-time SSRF re-check before adapter dispatch (guards DNS rebinding).
+
+    Write-time validation is only a snapshot: a host that resolves publicly at create
+    can later rebind to a private/metadata target. These integrations are inserted with
+    a base_url that passes the format-only model validators but resolves to the cloud
+    metadata IP, so only the request-time re-check can catch it. The check lives in the
+    service (type-agnostic), so it covers AAP and LLM — which have no adapter-level
+    validate_safe_url — not just MCP.
+    """
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_validate_rejects_rebound_host_before_dispatch(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+        test_user: User,
+    ) -> None:
+        integration = await _insert_integration_direct(
+            test_db_session,
+            test_user,
+            integration_type=IntegrationType.LLM_PROVIDER,
+            base_url="https://169.254.169.254",
+        )
+        cred, _ = await _create_credential(test_db_session, integration_service.user, with_secret=False)
+        integration.management_credential_id = cred.id
+        await test_db_session.flush()
+        mock_settings.return_value = _mock_runtime_settings()
+
+        with (
+            patch.object(integration_service, "_resolve_credential", new_callable=AsyncMock, return_value={}),
+            pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"),
+        ):
+            await integration_service.validate_integration(integration.id)
+
+        mock_adapter_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_refresh_rejects_rebound_host_before_dispatch(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+        test_user: User,
+    ) -> None:
+        integration = await _insert_integration_direct(
+            test_db_session,
+            test_user,
+            integration_type=IntegrationType.LLM_PROVIDER,
+            base_url="https://169.254.169.254",
+        )
+        cred, _ = await _create_credential(test_db_session, integration_service.user, with_secret=False)
+        integration.management_credential_id = cred.id
+        await test_db_session.flush()
+        mock_settings.return_value = _mock_runtime_settings()
+
+        with (
+            patch.object(integration_service, "_resolve_credential", new_callable=AsyncMock, return_value={}),
+            pytest.raises(SafeValueError, match="private, reserved, or cloud metadata"),
+        ):
+            await integration_service.refresh_resources(integration.id)
+
+        mock_adapter_factory.assert_not_called()

@@ -1690,10 +1690,9 @@ export interface components {
       query_params?: {
         [key: string]: unknown
       }
-      authentication?: components['schemas']['Authentication'] | null
       /**
        * Credential Id
-       * @description Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+       * @description Nexus credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
     }
@@ -2043,25 +2042,6 @@ export interface components {
        */
       backoff_coefficient?: number | null
     }
-    /**
-     * Authentication
-     * @description Authentication configuration for API requests.
-     */
-    Authentication: {
-      /** @description Authentication type */
-      type: components['schemas']['AuthenticationType']
-      /**
-       * Credentials
-       * @description Reference to stored credentials
-       */
-      credentials: string
-    }
-    /**
-     * AuthenticationType
-     * @description Supported authentication types for API requests.
-     * @enum {string}
-     */
-    AuthenticationType: 'basic' | 'bearer' | 'api_key' | 'oauth2'
     /**
      * HTTPMethod
      * @description Supported HTTP methods for API requests.

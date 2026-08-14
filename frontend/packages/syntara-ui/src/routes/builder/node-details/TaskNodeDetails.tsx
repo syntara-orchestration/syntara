@@ -131,20 +131,7 @@ function buildActivityConfig(
   }
 
   const parsedHeaders = parseHeaders(data.headers)
-  const mergedHeaders = mergeAuthHeaders(parsedHeaders, data.authentication)
-  return buildHTTPConfig(data, mergedHeaders)
-}
-
-/**
- * Merge headers with authentication if present.
- */
-function mergeAuthHeaders(
-  headers: Record<string, string> | undefined,
-  authentication: string | undefined
-): Record<string, string> | undefined {
-  if (!authentication) return headers
-  if (!headers) return { Authorization: authentication }
-  return { ...headers, Authorization: authentication }
+  return buildHTTPConfig(data, parsedHeaders)
 }
 
 /**

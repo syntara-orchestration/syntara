@@ -111,32 +111,17 @@ describe('taskNodeSubmitHelpers', () => {
       expect((activity.parameters as { code: string }).code).toBe('pass')
     })
 
-    it('converts header entries and merges authentication for http_request', () => {
+    it('converts header entries for http_request', () => {
       const data: ActionFormData = {
         name: 'H',
         executor: ExecutorTypeEnum.HTTP_REQUEST,
         method: 'POST',
         url: 'https://api',
         headers: [{ id: 'h1', key: 'X-A', value: '1' }],
-        authentication: 'Bearer t',
       }
       const activity = buildRegistryActivityUpdate(baseTask, data)
       const config = activity.parameters as { headers: Record<string, string> }
-      expect(config.headers).toEqual({ 'X-A': '1', Authorization: 'Bearer t' })
-    })
-
-    it('uses only Authorization when headers are empty but authentication is set', () => {
-      const data: ActionFormData = {
-        name: 'H',
-        executor: ExecutorTypeEnum.HTTP_REQUEST,
-        method: 'GET',
-        url: 'https://api',
-        headers: [],
-        authentication: 'Basic x',
-      }
-      const activity = buildRegistryActivityUpdate(baseTask, data)
-      const config = activity.parameters as { headers: Record<string, string> }
-      expect(config.headers).toEqual({ Authorization: 'Basic x' })
+      expect(config.headers).toEqual({ 'X-A': '1' })
     })
 
     it('skips entries with empty keys', () => {
@@ -149,12 +134,10 @@ describe('taskNodeSubmitHelpers', () => {
           { id: 'h1', key: '', value: 'ignored' },
           { id: 'h2', key: 'Accept', value: 'application/json' },
         ],
-        authentication: 'Bearer t',
       }
       const activity = buildRegistryActivityUpdate(baseTask, data)
       expect((activity.parameters as { headers: Record<string, string> }).headers).toEqual({
         Accept: 'application/json',
-        Authorization: 'Bearer t',
       })
     })
 
@@ -189,7 +172,7 @@ describe('taskNodeSubmitHelpers', () => {
       expect((withRaw.parameters as { body: string }).body).toBe('not-json')
     })
 
-    it('omits headers when http_request has no headers and no authentication', () => {
+    it('omits headers when http_request has no headers', () => {
       const data: ActionFormData = {
         name: 'H',
         executor: ExecutorTypeEnum.HTTP_REQUEST,

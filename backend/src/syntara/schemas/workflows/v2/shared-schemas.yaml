@@ -2001,16 +2001,12 @@ components:
           additionalProperties: true
           type: object
           title: Query Params
-        authentication:
-          anyOf:
-            - $ref: '#/components/schemas/Authentication'
-            - type: 'null'
         credential_id:
           anyOf:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+          description: Nexus credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -2452,31 +2448,6 @@ components:
         - python
       title: ScriptLanguage
       description: Supported script languages for script executor.
-    AuthenticationType:
-      type: string
-      enum:
-        - basic
-        - bearer
-        - api_key
-        - oauth2
-      title: AuthenticationType
-      description: Supported authentication types for API requests.
-    Authentication:
-      properties:
-        type:
-          $ref: '#/components/schemas/AuthenticationType'
-          description: Authentication type
-        credentials:
-          type: string
-          pattern: ^\$\{secrets\.[a-zA-Z0-9_]+\}$
-          title: Credentials
-          description: Reference to stored credentials
-      type: object
-      required:
-        - type
-        - credentials
-      title: Authentication
-      description: Authentication configuration for API requests.
     ConvergeStrategy:
       type: string
       enum:

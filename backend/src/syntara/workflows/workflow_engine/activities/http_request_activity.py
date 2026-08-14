@@ -19,7 +19,6 @@ from syntara.workflows.workflow_engine import constants
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     APIExecutorParameters,
-    AuthenticationType,
     HttpRequestOutput,
 )
 from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
@@ -32,7 +31,6 @@ logger = structlog.stdlib.get_logger(__name__)
 def _add_credential_auth_headers(headers: dict[str, Any], extra_vars: dict[str, Any]) -> None:
     """Apply authentication from Nexus credential system.
 
-    Takes priority over config-based authentication when a credential is attached.
     Raises ActivityExecutionError if credential values are empty.
     """
     auth_type = extra_vars.get("auth_type", "")
@@ -68,32 +66,6 @@ def _add_credential_auth_headers(headers: dict[str, Any], extra_vars: dict[str, 
         logger.warning("Credential resolved but auth_type is missing from extra_vars — proceeding without auth")
 
 
-def _apply_authentication(headers: dict[str, Any], config: APIExecutorParameters) -> None:
-    """Apply authentication to request headers based on config.
-
-    Mutates the headers dict in place. Credentials references (e.g. ${secrets.token})
-    are expected to have been resolved before the activity is called.
-    """
-    auth = config.authentication
-    if auth is None:
-        return
-
-    credential_value = auth.credentials
-
-    if auth.type == AuthenticationType.BEARER:
-        headers["Authorization"] = f"Bearer {credential_value}"
-    elif auth.type == AuthenticationType.BASIC:
-        # credentials expected as "username:password"
-        if ":" not in credential_value:
-            logger.warning("BASIC auth credentials should be in 'username:password' format")
-        encoded = base64.b64encode(credential_value.encode()).decode()
-        headers["Authorization"] = f"Basic {encoded}"
-    elif auth.type == AuthenticationType.API_KEY:
-        headers["X-API-Key"] = credential_value
-    elif auth.type == AuthenticationType.OAUTH2:
-        headers["Authorization"] = f"Bearer {credential_value}"
-
-
 def _resolve_credentials_and_url(
     input_config: dict[str, Any],
     config: APIExecutorParameters,
@@ -124,8 +96,6 @@ def _resolve_credentials_and_url(
             url_from_credential = True
         else:
             _add_credential_auth_headers(headers, extra_vars)
-    else:
-        _apply_authentication(headers, config)
 
     if not request_url:
         msg = "No URL provided. Set a URL in the node configuration or attach a Secret URL credential."

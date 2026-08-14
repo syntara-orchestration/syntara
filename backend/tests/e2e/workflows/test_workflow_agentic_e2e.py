@@ -1011,13 +1011,21 @@ def test_agentic_disabled_mcp_credential_fails_eagerly(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.mcp
 def test_unreachable_llm_endpoint_produces_identifiable_error(
     syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
     llm_model: str,
     worker_id: str,
+    require_mcp_server: None,
 ) -> None:
-    """Workflow execution fails with an identifiable error when the LLM endpoint is unreachable."""
+    """Workflow execution fails with an identifiable error when the LLM endpoint is unreachable.
+
+    Gated on ``require_mcp_server``: the endpoint uses the allowlisted-but-unreachable
+    ``mcp-server`` host, which is only allowlisted in environments that provision the MCP
+    test server, so this skips where that host is not allowlisted (the write-time SSRF
+    check would otherwise return 422).
+    """
     types_list = syntara_api.credentials.list_types().assert_and_get()
     llm_type_id: UUID | None = None
     for ct in types_list.resources:
@@ -1046,7 +1054,10 @@ def test_unreachable_llm_endpoint_produces_identifiable_error(
                 integration_type=IntegrationType.LLM_PROVIDER,
                 configuration=LLMProviderConfiguration(
                     provider_hint=LLMProviderHint.CUSTOM,
-                    base_url="https://unreachable-llm-endpoint.invalid:9999",
+                    # Allowlisted host (mcp-server is in integration_url_allowed_hosts, so it
+                    # passes the write-time SSRF check) with a closed port, so the endpoint is
+                    # unreachable at execution time and the connection is refused deterministically.
+                    base_url="https://mcp-server:9999",
                 ),
                 management_credential_id=UUID(cred_id),
                 discovered_models=[

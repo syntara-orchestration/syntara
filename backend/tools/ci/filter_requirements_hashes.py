@@ -30,8 +30,8 @@ ALLOWED_PLATFORM_PATTERNS = re.compile(
     r"|none-any"  # other pure Python variants
     r"|cp31[23]-cp31[23]-manylinux[_0-9]*_(x86_64|aarch64)"  # CPython manylinux
     r"|cp31[23]-cp31[23]-musllinux[_0-9]*_(x86_64|aarch64)"  # CPython musllinux
-    r"|cp31[23]-abi3-manylinux[_0-9]*_(x86_64|aarch64)"  # stable ABI manylinux
-    r"|cp31[23]-abi3-musllinux[_0-9]*_(x86_64|aarch64)"  # stable ABI musllinux
+    r"|cp3[0-9]+-abi3-manylinux[_0-9]*_(x86_64|aarch64)"  # stable ABI manylinux (any base CPython)
+    r"|cp3[0-9]+-abi3-musllinux[_0-9]*_(x86_64|aarch64)"  # stable ABI musllinux (any base CPython)
     r")"
 )
 
