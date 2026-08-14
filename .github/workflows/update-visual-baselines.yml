@@ -139,8 +139,11 @@ jobs:
             frontend/packages/syntara-ui/playwright-report/
           retention-days: 7
 
+      # Run on success OR failure: screenshots uses continue-on-error, so a
+      # mid-suite failure can still leave rewritten PNGs that Detect would
+      # otherwise stage unfiltered.
       - name: Filter noisy baseline diffs
-        if: steps.checkout.outcome != 'failure' && steps.screenshots.outcome == 'success'
+        if: always() && steps.checkout.outcome != 'failure' && steps.screenshots.outcome != 'skipped'
         working-directory: frontend/packages/syntara-ui
         run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
 

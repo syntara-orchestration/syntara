@@ -85,8 +85,11 @@ jobs:
       # Filter drops AA/byte-noise under the hybrid keep rule so git only sees
       # meaningful diffs (validated on PR #213). Same filter is used by
       # update-visual-baselines.yml for /update-screenshots.
+      # Run on success OR failure: screenshots uses continue-on-error, so a
+      # mid-suite failure can still leave rewritten PNGs that Detect would
+      # otherwise stage unfiltered.
       - name: Filter noisy baseline diffs
-        if: steps.screenshots.outcome == 'success'
+        if: always() && steps.screenshots.outcome != 'skipped'
         working-directory: frontend/packages/syntara-ui
         run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
 
