@@ -116,9 +116,6 @@ npx openapi-typescript /path/to/syntara/src/syntara/schemas/invocations/openapi.
 npx openapi-typescript /path/to/syntara/src/syntara/schemas/metrics/openapi.yaml \
   --output ./src/metrics-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/syntara/src/syntara/schemas/tool_manager/metrics.yaml \
-  --output ./src/tool-manager-metrics.ts --default-non-nullable false
-
 # Copy example workflows to mock API
 cp -r /path/to/syntara/tests/integration/workflow/examples ../syntara-mock-api/src/
 
@@ -157,7 +154,6 @@ This will:
 | `executions-api.ts`             | `schemas/workflows/executions_openapi.yaml`     | Execution endpoints                  |
 | `activity-types-api.ts`         | `schemas/workflows/activity_types_openapi.yaml` | Activity type metadata               |
 | `tool-manager.ts`               | `schemas/tool_manager/openapi.yaml`             | Tool and provider management         |
-| `tool-manager-metrics.ts`       | `schemas/tool_manager/metrics.yaml`             | Tool manager metrics                 |
 | `files-api.ts`                  | `schemas/files/openapi.yaml`                    | File upload and management           |
 | `approvals-api.ts`              | `schemas/approvals/openapi.yaml`                | Approval requests                    |
 | `invocations-api.ts`            | `schemas/invocations/openapi.yaml`              | Invocations                          |
