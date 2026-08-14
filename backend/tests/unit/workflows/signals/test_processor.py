@@ -9,7 +9,10 @@ from temporalio.exceptions import ApplicationError
 from syntara.workflows.workflow_engine.activities.common import (
     ActivityExecutionError,
 )
-from syntara.workflows.workflow_engine.signals.processor import WorkflowSignalProcessor
+from syntara.workflows.workflow_engine.signals.processor import (
+    EMPTY_SIGNAL_ERROR_MESSAGE,
+    WorkflowSignalProcessor,
+)
 
 
 class TestWorkflowSignalProcessorProcessSignal:
@@ -98,11 +101,7 @@ class TestWorkflowSignalProcessorProcessSignal:
             WorkflowSignalProcessor.process_signal(signal_data, "task_minimal", "exec-minimal")
 
         assert exc_info.value.non_retryable is True
-        assert exc_info.value.message == (
-            "The AI Agent encountered an error but did not provide details. "
-            "Try running the workflow again. If this persists, check the agent "
-            "configuration or contact your administrator."
-        )
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
         assert "Agent execution failed" not in exc_info.value.message
         assert not exc_info.value.message.startswith("UnknownError:")
 
@@ -120,11 +119,7 @@ class TestWorkflowSignalProcessorProcessSignal:
             WorkflowSignalProcessor.process_signal(signal_data, "task_no_error", "exec-no-error")
 
         assert exc_info.value.non_retryable is True
-        assert exc_info.value.message == (
-            "The AI Agent encountered an error but did not provide details. "
-            "Try running the workflow again. If this persists, check the agent "
-            "configuration or contact your administrator."
-        )
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
         assert "Agent execution failed" not in exc_info.value.message
 
     def test_process_signal_failure_with_empty_error_message(self) -> None:
@@ -141,11 +136,7 @@ class TestWorkflowSignalProcessorProcessSignal:
             WorkflowSignalProcessor.process_signal(signal_data, "task_blank", "exec-blank")
 
         assert exc_info.value.non_retryable is True
-        assert exc_info.value.message == (
-            "The AI Agent encountered an error but did not provide details. "
-            "Try running the workflow again. If this persists, check the agent "
-            "configuration or contact your administrator."
-        )
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
         assert "SomeError:" not in exc_info.value.message
 
     def test_process_signal_failure_preserves_real_error_message(self) -> None:

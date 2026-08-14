@@ -51,6 +51,33 @@ EMPTY_SIGNAL_ERROR_MESSAGE = (
 )
 
 
+def resolve_signal_failure_message(error_info: object) -> tuple[str, str, bool]:
+    """Resolve user-facing failure text from a signal/callback error payload.
+
+    Returns:
+        Tuple of (message, error_type, has_error_detail). When ``has_error_detail``
+        is False, ``message`` is ``EMPTY_SIGNAL_ERROR_MESSAGE`` and callers should
+        not prefix ``error_type``.
+
+    """
+    if isinstance(error_info, dict):
+        raw_message = error_info.get("message")
+        error_type = error_info.get("error_type", "UnknownError")
+    elif error_info:
+        raw_message = str(error_info)
+        error_type = "UnknownError"
+    else:
+        raw_message = None
+        error_type = "UnknownError"
+
+    if not isinstance(error_type, str) or not error_type:
+        error_type = "UnknownError"
+
+    if isinstance(raw_message, str) and raw_message.strip():
+        return raw_message.strip(), error_type, True
+    return EMPTY_SIGNAL_ERROR_MESSAGE, error_type, False
+
+
 class WorkflowSignalProcessor:
     """Processor for workflow activity signals.
 
@@ -94,19 +121,7 @@ class WorkflowSignalProcessor:
 
         if signal_status == "failed":
             # Extract error information and raise exception
-            error_info = signal_data.get("error") or {}
-            if not isinstance(error_info, dict):
-                error_info = {}
-            raw_message = error_info.get("message")
-            if isinstance(raw_message, str) and raw_message.strip():
-                has_error_detail = True
-                error_message = raw_message.strip()
-            else:
-                has_error_detail = False
-                error_message = EMPTY_SIGNAL_ERROR_MESSAGE
-            error_type = error_info.get("error_type", "UnknownError")
-            if not isinstance(error_type, str) or not error_type:
-                error_type = "UnknownError"
+            error_message, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))
 
             # Log only if in workflow context (workflow.logger requires workflow event loop)
             with contextlib.suppress(Exception):  # Silently skip logging if not in workflow context
