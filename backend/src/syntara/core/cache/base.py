@@ -31,10 +31,22 @@ logger = structlog.stdlib.get_logger(__name__)
 
 @contextlib.asynccontextmanager
 async def redis_error_handler(operation: str, **log_context: Any) -> AsyncGenerator[None, None]:  # noqa: ANN401
-    """Standardised error handling for Redis operations.
+    """Standardised error classification for Redis operations.
 
-    Catches ``RedisConnectionError``, ``ResponseError`` (logged and
-    re-raised) and ``OSError`` (wrapped in ``RedisConnectionError``).
+    Wraps ``OSError`` as ``RedisConnectionError`` so callers only need to
+    handle one connection-failure type, then re-raises. Deliberately does
+    NOT log ``RedisConnectionError``/``OSError``: these are the transient,
+    often-retried failures (see :func:`redis_operation_with_backoff`), and
+    every real caller already logs them at the appropriate level and
+    frequency (a warning per retry, one exception on final exhaustion, or
+    its own de-duplicated warning for non-retried callers like
+    ``cache_get``). Logging here too would emit a full traceback on every
+    single retry attempt under sustained pool exhaustion — exactly the
+    scenario this exists to survive gracefully.
+
+    ``ResponseError`` is different: it is never retried and has no other
+    logging path, so it is logged here with a full traceback since it
+    signals a real bug (bad command, wrong data type, etc.).
 
     Args:
         operation: Short label used as the log-event prefix
@@ -44,11 +56,12 @@ async def redis_error_handler(operation: str, **log_context: Any) -> AsyncGenera
     """
     try:
         yield
-    except (RedisConnectionError, ResponseError):
+    except ResponseError:
         logger.exception("redis_operation_error", operation=operation, **log_context)
         raise
+    except RedisConnectionError:
+        raise
     except OSError as e:
-        logger.exception("redis_network_error", operation=operation, **log_context)
         msg = f"Network error: {e}"
         raise RedisConnectionError(msg) from e
 

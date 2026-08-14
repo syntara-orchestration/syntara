@@ -273,6 +273,47 @@ async def test_publish_does_not_retry_response_error() -> None:
     mock_sleep.assert_not_awaited()
 
 
+async def test_publish_expire_failure_does_not_rerun_xadd() -> None:
+    """If XADD succeeds but EXPIRE keeps failing, publish must not re-run XADD.
+
+    Retrying the pair as one unit would duplicate the stream entry (XADD is
+    not idempotent). EXPIRE failure is best-effort: the event is already
+    durably written, so publish() must still return its event_id.
+    """
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(return_value="1234567890-0")
+    mock_client.expire = AsyncMock(side_effect=RedisConnectionError("Too many connections"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            event_id = await client.publish("test_stream", {"key": "value"})
+
+    assert event_id == "1234567890-0"
+    mock_client.xadd.assert_awaited_once()  # never re-run despite expire retries
+    assert mock_client.expire.await_count == 4  # initial attempt + 3 retries, then gives up
+
+
+async def test_publish_expire_retries_then_succeeds_without_rerunning_xadd() -> None:
+    """EXPIRE recovering after a transient failure also must not trigger a second XADD."""
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(return_value="1234567890-0")
+    mock_client.expire = AsyncMock(side_effect=[RedisConnectionError("Too many connections"), True])
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            event_id = await client.publish("test_stream", {"key": "value"})
+
+    assert event_id == "1234567890-0"
+    mock_client.xadd.assert_awaited_once()
+    assert mock_client.expire.await_count == 2
+
+
 async def test_events_connection_error_propagates() -> None:
     """Test that connection errors during read are propagated."""
     mock_client = AsyncMock()
