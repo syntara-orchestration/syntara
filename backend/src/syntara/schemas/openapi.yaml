@@ -26587,15 +26587,20 @@ paths:
   /workflows/validate:
     post:
       summary: Validate workflow definition
-      description: Validate a workflow definition without saving it.
+      description: |
+        Validate a workflow definition without saving it.
+
+        Requires authentication but no specific workflow/project permission:
+        validation is a stateless, side-effect-free check of caller-supplied
+        data with no workflow_id or project_id in scope to authorize against.
       operationId: validate_workflow_definition
       tags:
         - Workflows
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: workflow
-        action: create
+        resource: null
+        action: null
       requestBody:
         required: true
         content:
@@ -31295,7 +31300,7 @@ components:
         ``idp_group_mapping_entries`` table.
       required:
         - idp_group_value
-        - nexus_group_id
+        - mapped_group_id
       additionalProperties: false
       properties:
         idp_group_value:
@@ -31303,11 +31308,11 @@ components:
           minLength: 1
           title: Idp Group Value
           description: Group value from the IdP token (e.g. GUID or role name)
-        nexus_group_id:
+        mapped_group_id:
           type: string
           format: uuid
-          title: Nexus Group Id
-          description: ID of the Nexus group to map to
+          title: Mapped Group Id
+          description: ID of the group to map to
     OIDCConfiguration:
       type: object
       title: OIDCConfiguration

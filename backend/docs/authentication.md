@@ -992,7 +992,7 @@ Mapping entries are stored in the `idp_group_mapping_entries` table (not in JSON
 
 - `identity_provider_id` — FK to `identity_providers` (CASCADE on delete)
 - `idp_group_value` — the pattern to match (exact or wildcard)
-- `nexus_group_id` — FK to `groups` (CASCADE on delete)
+- `mapped_group_id` — FK to `groups` (CASCADE on delete)
 - Unique constraint on `(identity_provider_id, idp_group_value)`
 
 Deleting a group automatically removes any mapping entries pointing to it. Deleting a provider removes all its mapping entries.

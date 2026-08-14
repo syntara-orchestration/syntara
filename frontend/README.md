@@ -175,55 +175,9 @@ npm run podman:build:mock-api      # Build mock API image only
 npm run podman:run                 # Run all containers (UI on 4000, API on 3000)
 npm run podman:run:ui              # Run UI container only
 npm run podman:run:mock-api        # Run mock API container only
-
-# Multi-architecture builds (AMD64 + ARM64)
-./build-multiarch.sh               # Build multi-arch images with Podman
-./build-multiarch.sh push          # Build and push to registry
 ```
 
-## Multi-Architecture Container Builds
-
-The project uses **Podman** for local container builds and supports multiple architectures (AMD64 and ARM64).
-
-### Local Development (Podman)
-
-All local container operations use Podman:
-
-```bash
-# Multi-architecture builds (AMD64 + ARM64)
-./build-multiarch.sh               # Build for both architectures
-./build-multiarch.sh push          # Build and push to registry
-
-# Single-architecture builds (faster for development)
-podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest .
-podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest .
-
-# Run containers
-podman run -p 4000:80 syntara-ui:latest
-podman run -p 3000:3000 syntara-mock-api:latest
-```
-
-### Custom Registry Configuration
-
-```bash
-# Build and push to custom registry
-REGISTRY=ghcr.io REPOSITORY_OWNER=your-org ./build-multiarch.sh push
-```
-
-### CI/CD (Docker Buildx)
-
-GitHub Actions uses Docker Buildx for automated builds. When you push to `main`:
-
-- Builds images for both `linux/amd64` and `linux/arm64`
-- Pushes multi-arch manifests to GitHub Container Registry
-- Creates a single image that works on both architectures
-
-### Supported Platforms
-
-- **linux/amd64** - Intel/AMD x86_64 processors
-- **linux/arm64** - ARM64/AArch64 processors (Apple Silicon, ARM servers, Raspberry Pi 4+)
-
-Multi-arch images automatically select the correct architecture when pulled.
+Pre-built container images are **not** published to any public registry. All container images must be built locally using the commands above.
 
 ## Code Quality
 

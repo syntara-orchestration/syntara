@@ -145,11 +145,11 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
         """Insert group mapping entries into the DB table.
 
         Raises:
-            GroupNotFoundError: If any nexus_group_id does not exist or is soft-deleted.
+            GroupNotFoundError: If any mapped_group_id does not exist or is soft-deleted.
 
         """
         if entries:
-            requested_ids = {e.nexus_group_id for e in entries}
+            requested_ids = {e.mapped_group_id for e in entries}
             result = await self.session.exec(
                 select(Group.id).where(
                     col(Group.id).in_(requested_ids),
@@ -165,7 +165,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
             row = IdpGroupMappingEntry(
                 identity_provider_id=provider_id,
                 idp_group_value=entry.idp_group_value,
-                nexus_group_id=entry.nexus_group_id,
+                mapped_group_id=entry.mapped_group_id,
             )
             self.session.add(row)
 
@@ -188,7 +188,7 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
         return [
             OIDCGroupMappingEntry(
                 idp_group_value=row.idp_group_value,
-                nexus_group_id=row.nexus_group_id,
+                mapped_group_id=row.mapped_group_id,
             )
             for row in result.all()
         ]
