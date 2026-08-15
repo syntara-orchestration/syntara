@@ -64,7 +64,7 @@ class FileMetadata(BaseResource, table=True):
         filename: Sanitize filename from original filename from upload
         mime_type: Detected MIME type of the file
         size_bytes: File size in bytes
-        file_path: Internal storage path (pattern: nexus-{file_id}-{filename})
+        file_path: Internal storage path (pattern: orchestrator-{file_id}-{filename})
         converted_content_path: Path to converted markdown (optional)
         status: Conversion lifecycle status
         conversion_error: Error message if conversion failed
@@ -101,12 +101,12 @@ class FileMetadata(BaseResource, table=True):
     # Storage paths (internal only - not exposed in API)
     file_path: str = Field(
         max_length=500,
-        description="Internal storage path: nexus-{file_id}-{filename}",
+        description="Internal storage path: orchestrator-{file_id}-{filename}",
     )
     converted_content_path: str | None = Field(
         default=None,
         max_length=500,
-        description="Path to converted markdown: nexus-{file_id}-content.md",
+        description="Path to converted markdown: orchestrator-{file_id}-content.md",
     )
 
     # Integrity

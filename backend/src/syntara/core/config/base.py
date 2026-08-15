@@ -220,17 +220,18 @@ class OpenAPIValidationSettings(BaseSettings):
 class APIDocsSettings(BaseSettings):
     """API documentation endpoint configuration.
 
-    Controls whether Swagger UI (/docs), ReDoc (/redoc), and the raw
-    OpenAPI JSON (/openapi.json) endpoints are served. Disabled by
-    default so production deployments do not expose the API schema.
+    Controls whether Swagger UI, ReDoc, and the raw OpenAPI JSON
+    endpoints are served at /api_docs/v1/. A convenience redirect
+    from /docs is also registered. Enabled by default so customers
+    can access API docs without extra configuration.
 
     Note: This class should not be instantiated directly. Use Settings via get_settings().
     """
 
     enable_api_docs: bool = Field(
-        default=False,
-        description="Serve OpenAPI documentation endpoints (/docs, /redoc, /openapi.json). "
-        "Enable for development environments.",
+        default=True,
+        description="Serve OpenAPI documentation endpoints at /api_docs/v1/ "
+        "(docs, redoc, openapi.json). Set to false to disable in locked-down environments.",
     )
 
     enable_try_it_out: bool = Field(
@@ -303,9 +304,19 @@ class CacheSettings(BaseSettings):
     )
 
     cache_connection_pool_size: int = Field(
-        default=10,
-        description="Maximum number of cache connections in pool",
+        default=50,
+        description=(
+            "Maximum number of cache connections in pool. Workflow workers with high concurrency may need larger pools."
+        ),
     )
+
+    @field_validator("cache_connection_pool_size")
+    @classmethod
+    def _validate_cache_connection_pool_size(cls, v: int) -> int:
+        if v < 1:
+            msg = "cache_connection_pool_size must be at least 1"
+            raise ValueError(msg)
+        return v
 
 
 # =============================================================================
@@ -599,7 +610,7 @@ class ServerSettings(BaseSettings):
 
     server_public_url: HttpUrl | None = Field(
         default=None,
-        description="Public base URL for this Nexus instance (e.g., 'https://example.com:8000'). "
+        description="Public base URL for this Syntara instance (e.g., 'https://example.com:8000'). "
         "Used as the JWT issuer, post-logout redirect, and frontend origin fallback. "
         "If not set, falls back to server_scheme://server_host:server_port. "
         "Required when server_host is a bind address like 0.0.0.0.",
@@ -620,7 +631,7 @@ class ServerSettings(BaseSettings):
     workflow_base_url: str | None = Field(
         default=None,
         description=(
-            "Workflow API base URL for callback URL generation (e.g., 'http://nexus:8000/api/v1'). "
+            "Workflow API base URL for callback URL generation (e.g., 'http://syntara:8000/api/v1'). "
             "If not set, will be constructed from server_host and server_port. "
             "Used by workflow activities to generate callback URLs for external services."
         ),
@@ -702,6 +713,14 @@ class ServerSettings(BaseSettings):
         description="Hostnames that workflow HTTP request nodes are permitted to target "
         "despite resolving to private IPs. Set via APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS "
         "as a JSON array.",
+    )
+
+    integration_url_allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description="Hostnames that integration base_url fields are permitted to use "
+        "despite resolving to private or loopback IPs (e.g. add 'localhost' to allow a "
+        "local MCP server). Cloud metadata endpoints are always blocked regardless of "
+        "this allowlist. Set via APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
     )
 
 
@@ -1232,7 +1251,18 @@ class TemporalSettings(BaseSettings):
     max_concurrent_activities: int = Field(
         default=50,
         ge=1,
-        description="Maximum concurrent activity executions",
+        description="Maximum concurrent activity executions for the main workflow worker",
+    )
+
+    background_worker_max_concurrent_activities: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Maximum concurrent activity executions for the background worker "
+            "(Agent Execution, Document Conversion). Lower than the main worker default "
+            "because LLM/agent activities are memory-heavy and background-worker pods "
+            "have a smaller memory budget. Set via APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES."
+        ),
     )
 
     max_concurrent_workflows: int = Field(
@@ -1393,7 +1423,7 @@ class TelemetrySettings(BaseSettings):
 
     entitlement_id: str = Field(
         default="",
-        description="Unique Nexus installation identifier for anonymized telemetry tracking",
+        description="Unique Syntara installation identifier for anonymized telemetry tracking",
         exclude=True,
     )
 
@@ -1449,6 +1479,17 @@ class WorkflowEngineSettings(BaseSettings):
         default=32768,
         description="Maximum length per environment variable in bytes (32KB)",
         ge=1024,
+    )
+
+    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
+    # directly in the Temporal worker process without additional sandboxing. Enabling this
+    # grants any user with workflow:create + execution:run permissions the ability
+    # to run arbitrary commands on the worker infrastructure, with access to all
+    # environment variables.
+    # Enabling Script Node is not recommended for production deployments.
+    script_nodes_enabled: bool = Field(
+        default=False,
+        description="Enable Script node execution in workflows (Developer Preview)",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
@@ -2007,7 +2048,7 @@ class Settings(
     @computed_field  # type: ignore[prop-decorator]
     @property
     def jwt_issuer(self) -> str:
-        """JWT issuer claim (iss) identifying this Nexus instance.
+        """JWT issuer claim (iss) identifying this Syntara instance.
 
         Uses server_public_url when set, otherwise falls back to
         server_scheme://server_host:server_port.

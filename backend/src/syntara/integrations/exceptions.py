@@ -3,11 +3,11 @@
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.integrations.error_handlers.integration_error_handler")
-class IntegrationError(NexusError):
+class IntegrationError(SyntaraError):
     """Base exception for all integration errors."""
 
 

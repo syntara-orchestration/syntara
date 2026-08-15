@@ -1,7 +1,7 @@
 """Installation model for unique deployment identification.
 
 This module provides the Installation model — a system-internal singleton
-that persists a unique UUID identifying this Nexus deployment.  The record
+that persists a unique UUID identifying this Syntara deployment.  The record
 is created once by an Alembic migration and read at runtime by the
 telemetry subsystem.
 
@@ -17,7 +17,7 @@ from sqlmodel import Boolean, CheckConstraint, Column, DateTime, Field, SQLModel
 
 
 class Installation(SQLModel, table=True):
-    """Singleton record representing a Nexus deployment.
+    """Singleton record representing a Syntara deployment.
 
     Created during database migration.  Read-only from application code.
 

@@ -34,7 +34,7 @@ from fastapi import APIRouter, FastAPI
 from filelock import FileLock
 
 from syntara.core.config.base import get_settings
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.core.router import validate_routes
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ def _get_lock_file_path() -> Path:
     return Path(tempfile.gettempdir()) / lock_filename
 
 
-class RouterDiscoveryError(NexusError):
+class RouterDiscoveryError(SyntaraError):
     """Error during router discovery or registration."""
 
 
@@ -299,6 +299,13 @@ def register_routers(
 
     """
     logger.info("Registering router(s) with prefix", count=len(routers), prefix=prefix or "(none)")
+
+    # Static-prefix routers must be registered before parameterized ones so
+    # that e.g. /groups/directory is matched before /groups/{group_id}.
+    def _has_path_param(r: RouterInfo) -> bool:
+        return any("{" in route.path for route in r.router.routes if hasattr(route, "path"))
+
+    routers = sorted(routers, key=_has_path_param)
 
     for router_info in routers:
         try:

@@ -64,15 +64,6 @@ export function buildRegistryActionInitialData(
 export function buildRegistryActivityUpdate(taskData: TaskActivity, data: RegistryActionFormData): Activity {
   const apiHeaders = data.executor === ExecutorTypeEnum.HTTP_REQUEST ? headersEntriesToRecord(data.headers) : undefined
 
-  let mergedApiHeaders: Record<string, string> | undefined
-  if (data.executor !== ExecutorTypeEnum.HTTP_REQUEST || !data.authentication) {
-    mergedApiHeaders = apiHeaders
-  } else if (apiHeaders) {
-    mergedApiHeaders = { ...apiHeaders, Authorization: data.authentication }
-  } else {
-    mergedApiHeaders = { Authorization: data.authentication }
-  }
-
   const scriptEnv = data.executor === ExecutorTypeEnum.SCRIPT ? parseJsonEnvironment(data.parameters) : undefined
 
   return {
@@ -90,7 +81,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
         : {
             method: data.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
             url: data.url!,
-            ...(mergedApiHeaders && { headers: mergedApiHeaders }),
+            ...(apiHeaders && { headers: apiHeaders }),
             ...(data.body && {
               body: parseHttpBodyField(data.body),
             }),

@@ -4,15 +4,40 @@ This module contains SQLModel classes corresponding to the OpenAPI specification
 components for type-safe API operations.
 """
 
+import html
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, Field
+import nh3
+from pydantic import ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
+
+_SANITIZE_MAX_ROUNDS = 10
+_SANITIZE_ERROR = "Decision notes contain deeply nested HTML encoding that cannot be safely sanitized"
+
+
+def _sanitize_notes(v: str | None) -> str | None:
+    if not isinstance(v, str):
+        return v
+    # Fixed-point loop: keep unescaping entity-encoded HTML and stripping
+    # tags until the output stabilises.  Handles arbitrary encoding depth
+    # (e.g. &amp;lt;script&amp;gt;).  Bounded to prevent infinite loops.
+    result = v
+    for _ in range(_SANITIZE_MAX_ROUNDS):
+        cleaned = html.unescape(nh3.clean(result, tags=set()))
+        if cleaned == result:
+            return result
+        result = cleaned
+    # One extra convergence check: the last peel may have produced a safe
+    # result that simply had no iteration left to verify stability.
+    final = html.unescape(nh3.clean(result, tags=set()))
+    if final == result:
+        return result
+    raise ValueError(_SANITIZE_ERROR)
 
 
 class ApproverUserSummary(SQLModel):
@@ -170,6 +195,12 @@ class ApprovalDecisionRequest(SQLModel):
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
     )
 
+    @field_validator("notes", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v: str | None) -> str | None:
+        """Strip HTML tags to prevent stored XSS."""
+        return _sanitize_notes(v)
+
 
 class BatchApprovalDecision(SQLModel):
     """Single decision within a batch approval request."""
@@ -181,6 +212,12 @@ class BatchApprovalDecision(SQLModel):
     notes: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
     )
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v: str | None) -> str | None:
+        """Strip HTML tags to prevent stored XSS."""
+        return _sanitize_notes(v)
 
 
 class BatchApprovalRequest(SQLModel):

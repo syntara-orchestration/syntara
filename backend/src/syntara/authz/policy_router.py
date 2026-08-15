@@ -14,9 +14,9 @@ from syntara.authz.schemas import PolicyCreate, PolicyListParams, PolicyListResp
 from syntara.authz.services.policy_service import PolicyService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 
-router = NexusRouter(prefix="/policies", tags=["Policies"])
+router = SyntaraRouter(prefix="/policies", tags=["Policies"])
 
 
 def get_policy_service(

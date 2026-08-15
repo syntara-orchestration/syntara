@@ -1,6 +1,6 @@
 # Authorization
 
-Nexus uses an in-process `regopy` evaluator for policy-based authorization. The system supports both Role-Based Access Control (RBAC) and Attribute-Based Access Control (ABAC) with project-scoped multi-tenancy.
+Syntara uses an in-process `regopy` evaluator for policy-based authorization. The system supports both Role-Based Access Control (RBAC) and Attribute-Based Access Control (ABAC) with project-scoped multi-tenancy.
 
 ## Architecture
 

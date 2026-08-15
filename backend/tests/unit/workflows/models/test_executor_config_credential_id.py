@@ -4,8 +4,6 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AgenticExecutorParameters,
     APIExecutorParameters,
-    Authentication,
-    AuthenticationType,
     HTTPMethod,
 )
 
@@ -45,20 +43,6 @@ class TestAPIExecutorParametersCredentialId:
         )
         assert config.credential_id is None
 
-    def test_credential_id_and_authentication_coexist(self) -> None:
-        """Both credential_id and authentication can be set simultaneously."""
-        config = APIExecutorParameters(
-            method=HTTPMethod.GET,
-            url="https://example.com",
-            credential_id="550e8400-e29b-41d4-a716-446655440000",
-            authentication=Authentication(
-                type=AuthenticationType.BEARER,
-                credentials="${secrets.my_token}",
-            ),
-        )
-        assert config.credential_id is not None
-        assert config.authentication is not None
-
 
 class TestAgenticExecutorParametersCredentialId:
     """Verify credential_id on AgenticExecutorParameters."""
@@ -88,7 +72,7 @@ class TestAAPJobTemplateExecutorParametersCredentialId:
         assert dumped["credential_id"] == "550e8400-e29b-41d4-a716-446655440000"
 
     def test_credential_id_coexists_with_job_credentials(self) -> None:
-        """credential_id (Nexus) and job_credentials (AAP IDs) can coexist."""
+        """credential_id (Syntara) and job_credentials (AAP IDs) can coexist."""
         config = AAPJobTemplateExecutorParameters(
             job_template_id=1,
             credential_id="550e8400-e29b-41d4-a716-446655440000",

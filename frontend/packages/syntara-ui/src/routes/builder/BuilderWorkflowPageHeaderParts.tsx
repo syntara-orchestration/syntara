@@ -1,8 +1,8 @@
 import { FlexItem } from '@patternfly/react-core'
 
 import { NxLabel } from '../../components/labels/NxLabel'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
-import { formatHistoryDateTime } from './historyDateUtils'
 import { isVersionStatus } from './hooks/useVersionHistory'
 import { VersionStatusBadge } from './VersionStatusBadge'
 
@@ -17,7 +17,9 @@ export function BuilderVersionViewTitleRowAddons({
     <>
       {viewedVersionDate ? (
         <FlexItem>
-          <NxLabel color="grey">Viewing {formatHistoryDateTime(viewedVersionDate)}</NxLabel>
+          <NxLabel color="grey">
+            Viewing <ExecutionTimestamp dateString={viewedVersionDate} />
+          </NxLabel>
         </FlexItem>
       ) : null}
       {viewedVersionStatus && isVersionStatus(viewedVersionStatus) ? (

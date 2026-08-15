@@ -669,6 +669,52 @@ class TestRecorderPrometheus:
         )._value.get()
         assert sample_value == pytest.approx(3600.5)
 
+    def test_cache_pool_retry_dispatches_to_counter(self, recorder: MetricsRecorder) -> None:
+        """CACHE_POOL_RETRY increments the labeled retry counter."""
+        recorder.record(
+            MetricType.CACHE_POOL_RETRY,
+            1.0,
+            labels={"component": "redis", "operation": "cache_setex", "outcome": "retry"},
+        )
+        counter_val = recorder.prometheus.cache_pool_retry_total.labels(
+            component="redis", operation="cache_setex", outcome="retry"
+        )._value.get()
+        assert counter_val == pytest.approx(1.0)
+
+    def test_cache_pool_retry_distinguishes_outcome_label(self, recorder: MetricsRecorder) -> None:
+        """Retry and failed outcomes increment distinct counter series."""
+        recorder.record(
+            MetricType.CACHE_POOL_RETRY,
+            1.0,
+            labels={"component": "redis", "operation": "cache_setex", "outcome": "retry"},
+        )
+        recorder.record(
+            MetricType.CACHE_POOL_RETRY,
+            1.0,
+            labels={"component": "redis", "operation": "cache_setex", "outcome": "failed"},
+        )
+        retry_val = recorder.prometheus.cache_pool_retry_total.labels(
+            component="redis", operation="cache_setex", outcome="retry"
+        )._value.get()
+        failed_val = recorder.prometheus.cache_pool_retry_total.labels(
+            component="redis", operation="cache_setex", outcome="failed"
+        )._value.get()
+        assert retry_val == pytest.approx(1.0)
+        assert failed_val == pytest.approx(1.0)
+
+    def test_cache_pool_retry_backoff_duration_updates_histogram(self, recorder: MetricsRecorder) -> None:
+        """CACHE_POOL_RETRY_BACKOFF_DURATION observes the backoff histogram, converting ms to seconds."""
+        recorder.record(
+            MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION,
+            20.0,
+            unit="ms",
+            labels={"component": "redis", "operation": "stream_publish"},
+        )
+        sample = recorder.prometheus.cache_pool_retry_backoff_duration_seconds.labels(
+            component="redis", operation="stream_publish"
+        )
+        assert sample._sum.get() == pytest.approx(0.02)
+
     def test_enabled_property(self, recorder: MetricsRecorder) -> None:
         """Enabled property reflects constructor argument."""
         assert recorder.enabled is True

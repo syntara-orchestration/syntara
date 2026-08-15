@@ -1224,10 +1224,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/NodeSettingsFull
     RetryPolicyParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/RetryPolicyParameters
-    Authentication:
-      $ref: ./shared-schemas.yaml#/components/schemas/Authentication
-    AuthenticationType:
-      $ref: ./shared-schemas.yaml#/components/schemas/AuthenticationType
     HTTPMethod:
       $ref: ./shared-schemas.yaml#/components/schemas/HTTPMethod
     ScriptLanguage:

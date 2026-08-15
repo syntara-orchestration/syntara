@@ -511,7 +511,7 @@ class RoleService(BaseService):
             info = get_builtin_policy(name)
             if info is None:
                 continue
-            is_project_policy = info.scope == "project"
+            is_project_policy = info.scope in ("project", "own")
             if is_project_role != is_project_policy:
                 mismatched.append(name)
         if mismatched:

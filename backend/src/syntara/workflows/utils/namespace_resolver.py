@@ -208,21 +208,25 @@ class NamespaceResolver:
                 parts = path.split(".")
 
         if namespace_name not in self.namespaces:
-            msg = f"Namespace '{namespace_name}' not found"
+            msg = (
+                f'Step "{namespace_name}" was not found or has not produced output yet.'
+                " Check that the referenced step name is correct and that it runs"
+                " before this step in the workflow."
+            )
             raise KeyError(msg)
 
         result: Any = self.namespaces[namespace_name]
         for part in parts[1:]:
             if isinstance(result, dict):
                 if part not in result:
-                    msg = f"Key '{part}' not found in namespace path '{path}'"
+                    msg = f'Property "{part}" not found in step "{namespace_name}" output at path "{path}"'
                     raise KeyError(msg)
                 result = result[part]
             elif isinstance(result, list):
                 try:
                     result = result[int(part)]
                 except (ValueError, IndexError) as exc:
-                    msg = f"Invalid list index '{part}' in namespace path '{path}'"
+                    msg = f'Invalid list index "{part}" in step "{namespace_name}" output at path "{path}"'
                     raise KeyError(msg) from exc
             else:
                 msg = f"Cannot traverse into {type(result).__name__} with key '{part}' in path '{path}'"

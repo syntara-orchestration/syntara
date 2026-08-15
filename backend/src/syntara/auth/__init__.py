@@ -1,7 +1,7 @@
 """Authentication utilities.
 
 This module provides JWT token services, session management, authentication
-dependencies, and infrastructure for the Nexus platform.
+dependencies, and infrastructure for the Syntara platform.
 
 Submodules:
     - services: Token creation, validation, and key management

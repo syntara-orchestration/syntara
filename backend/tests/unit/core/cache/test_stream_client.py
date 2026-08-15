@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import ResponseError
+from redis.exceptions import MaxConnectionsError, ResponseError
 
 from syntara.core.cache.stream import StreamClient
 from syntara.core.exceptions import SafeValueError
@@ -208,6 +208,113 @@ async def test_publish_error_propagation(exception_type: type[Exception], error_
         async with StreamClient() as client:
             with pytest.raises(exception_type, match=error_message):
                 await client.publish("test_stream", {"key": "value"})
+
+
+async def test_publish_retries_on_pool_exhaustion_then_succeeds() -> None:
+    """XADD failing with MaxConnectionsError retries and eventually succeeds.
+
+    MaxConnectionsError is raised while acquiring a connection, before the
+    command reaches the server, so retrying cannot produce a duplicate entry.
+    """
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(
+        side_effect=[
+            MaxConnectionsError("Too many connections"),
+            MaxConnectionsError("Too many connections"),
+            "1234567890-0",
+        ]
+    )
+    mock_client.expire = AsyncMock(return_value=True)
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            event_id = await client.publish("test_stream", {"key": "value"})
+
+    assert event_id == "1234567890-0"
+    assert mock_client.xadd.await_count == 3
+
+
+async def test_publish_raises_after_exhausting_retries_on_pool_exhaustion() -> None:
+    """XADD that always raises MaxConnectionsError raises after retries are exhausted."""
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(side_effect=MaxConnectionsError("Too many connections"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+    ):
+        async with StreamClient() as client:
+            with pytest.raises(RedisConnectionError, match="Too many connections"):
+                await client.publish("test_stream", {"key": "value"})
+
+    # Initial attempt + 3 retries (default max_retries) = 4 calls
+    assert mock_client.xadd.await_count == 4
+    assert mock_sleep.await_count == 3
+
+
+async def test_publish_does_not_retry_response_error() -> None:
+    """A ResponseError (e.g. malformed command) is not a transient pool error and must not retry."""
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(side_effect=ResponseError("Invalid stream"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+    ):
+        async with StreamClient() as client:
+            with pytest.raises(ResponseError, match="Invalid stream"):
+                await client.publish("test_stream", {"key": "value"})
+
+    mock_client.xadd.assert_awaited_once()
+    mock_sleep.assert_not_awaited()
+
+
+async def test_publish_expire_failure_does_not_rerun_xadd() -> None:
+    """If XADD succeeds but EXPIRE keeps failing, publish must not re-run XADD.
+
+    Retrying the pair as one unit would duplicate the stream entry (XADD is
+    not idempotent). EXPIRE failure is best-effort: the event is already
+    durably written, so publish() must still return its event_id.
+    """
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(return_value="1234567890-0")
+    mock_client.expire = AsyncMock(side_effect=RedisConnectionError("Too many connections"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            event_id = await client.publish("test_stream", {"key": "value"})
+
+    assert event_id == "1234567890-0"
+    mock_client.xadd.assert_awaited_once()  # never re-run despite expire failure
+    mock_client.expire.assert_awaited_once()  # single best-effort attempt, no retries
+
+
+async def test_publish_xadd_does_not_retry_non_pool_connection_error() -> None:
+    """A mid-flight RedisConnectionError (not MaxConnectionsError) on XADD must not retry.
+
+    A generic connection drop after the command may have reached Redis; retrying
+    XADD would risk a duplicate stream entry. Only MaxConnectionsError (pool-full
+    before any command is sent) is safe to retry.
+    """
+    mock_client = AsyncMock()
+    mock_client.xadd = AsyncMock(side_effect=RedisConnectionError("Connection dropped"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+    ):
+        async with StreamClient() as client:
+            with pytest.raises(RedisConnectionError, match="Connection dropped"):
+                await client.publish("test_stream", {"key": "value"})
+
+    mock_client.xadd.assert_awaited_once()  # no retry
+    mock_sleep.assert_not_awaited()  # no backoff sleep
 
 
 async def test_events_connection_error_propagates() -> None:

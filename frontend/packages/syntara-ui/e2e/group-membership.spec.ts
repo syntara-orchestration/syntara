@@ -9,7 +9,7 @@
  * - Navigate back to groups list
  * - Manage group membership from user detail page
  */
-import { test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { createUserViaApi, deleteUserViaApi, ensureGroupExists, type SeededUser } from './seeds/iam'
 import { getAuthToken } from './utils/api'
@@ -37,16 +37,18 @@ test.afterAll(async ({ browser }) => {
 })
 
 test.describe('Group Detail — Navigation & Tabs', () => {
+  const guard = createUnavailableGuard('No "admins" group found; seed data required')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
     await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
-    // Skip if "admins" group doesn't exist (real backend may not have seeded groups)
     const table = app.getByRole('grid', { name: 'Groups table' })
     const hasAdmins = await table
       .getByRole('button', { name: 'admins', exact: true })
       .waitFor({ state: 'visible', timeout: 3000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasAdmins) guard.markUnavailable()
     test.skip(!hasAdmins, 'No "admins" group found; seed data required')
   })
 
@@ -101,72 +103,55 @@ test.describe('Group Detail — Navigation & Tabs', () => {
     await expect(table.getByRole('button', { name: 'admins', exact: true })).toBeVisible()
   })
 
-  test('add and remove a member from the group detail', async ({ app }) => {
+  test.describe('Member add/remove (typeahead)', () => {
     test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
-    // Navigate to admins group detail
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
 
-    // Switch to members tab
-    await app.getByRole('tab', { name: /members/i }).click()
+    test('add and remove a member from the group detail', async ({ app }) => {
+      const table = app.getByRole('grid', { name: 'Groups table' })
+      await table.getByRole('button', { name: 'admins', exact: true }).click()
+      await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
 
-    // Click add member button
-    await app.getByRole('button', { name: 'Add member' }).click()
+      await app.getByRole('tab', { name: /members/i }).click()
+      await app.getByRole('button', { name: 'Add member' }).click()
 
-    // Modal should appear
-    const dialog = app.getByRole('dialog')
-    await expect(dialog).toBeVisible()
+      const dialog = app.getByRole('dialog')
+      await expect(dialog).toBeVisible()
 
-    // Open the typeahead to pick an available user
-    const selectInput = dialog.getByPlaceholder('Search for a user...')
-    await selectInput.click()
+      const selectInput = dialog.getByPlaceholder('Search for a user...')
+      await selectInput.click()
 
-    // Wait for either options or "No results match" to appear.
-    // PF6 Select renders the listbox in a portal outside the dialog DOM,
-    // so we must query at page level, not scoped to the dialog.
-    const noResults = app.getByRole('option', { name: /No results match/ })
-    const availableOptions = app.getByRole('option').filter({ hasNotText: /No results match/ })
-    const selectedOption = availableOptions.nth(0)
-    await expect(noResults.or(selectedOption)).toBeVisible({ timeout: 15_000 })
+      const noResults = app.getByRole('option', { name: /No results match/ })
+      const availableOptions = app.getByRole('option').filter({ hasNotText: /No results match/ })
+      const selectedOption = availableOptions.nth(0)
+      await expect(noResults.or(selectedOption)).toBeVisible({ timeout: 15_000 })
 
-    if (await noResults.isVisible()) {
-      // Only one user exists and is already a member — skip add/remove
-      test.skip(true, 'No available users to add (all users are already members)')
-      return
-    }
+      if (await noResults.isVisible()) {
+        test.skip(true, 'No available users to add (all users are already members)')
+        return
+      }
 
-    // The option contains two child spans: username + display name.
-    // Extract just the username (first child text) for later verification.
-    const userName = await selectedOption.locator('> *').nth(0).textContent()
-    await selectedOption.click()
+      const userName = await selectedOption.locator('> *').nth(0).textContent()
+      await selectedOption.click()
 
-    // Submit
-    await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Add', exact: true }).click()
 
-    // Verify success — wait for the dialog to close and alert to appear
-    await expect(dialog).not.toBeVisible()
-    await expect(app.getByText(/member added/i)).toBeVisible()
+      await expect(dialog).not.toBeVisible()
+      await expect(app.getByText(/member added/i)).toBeVisible()
 
-    // The new member should appear in the Username column.
-    // The table refetches after a successful add, so allow extra time.
-    // PF6 uses role="grid" / role="gridcell", so match with 'gridcell'.
-    if (userName) {
-      const memberName = userName.trim()
-      await expect(app.getByRole('gridcell', { name: memberName, exact: true })).toBeVisible({ timeout: 10_000 })
+      if (userName) {
+        const memberName = userName.trim()
+        await expect(app.getByRole('gridcell', { name: memberName, exact: true })).toBeVisible({ timeout: 10_000 })
 
-      // Now remove the member via kebab menu
-      const memberRow = app.getByRole('row').filter({ hasText: memberName })
-      await memberRow.getByRole('button', { name: /kebab toggle/i }).click()
-      await app.getByRole('menuitem', { name: 'Remove' }).click()
+        const memberRow = app.getByRole('row').filter({ hasText: memberName })
+        await memberRow.getByRole('button', { name: /kebab toggle/i }).click()
+        await app.getByRole('menuitem', { name: 'Remove' }).click()
 
-      // Confirm removal dialog
-      await expect(app.getByRole('dialog')).toBeVisible()
-      await app.getByRole('button', { name: 'Remove', exact: true }).click()
+        await expect(app.getByRole('dialog')).toBeVisible()
+        await app.getByRole('button', { name: 'Remove', exact: true }).click()
 
-      // Verify success
-      await expect(app.getByText(/member removed/i)).toBeVisible()
-    }
+        await expect(app.getByText(/member removed/i)).toBeVisible()
+      }
+    })
   })
 
   test('navigating to a different group shows its details', async ({ app }) => {

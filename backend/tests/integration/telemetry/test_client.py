@@ -117,7 +117,7 @@ class TestInitializeTelemetry:
                 segment_write_key=SecretStr("test-write-key"),
                 entitlement_id="test-ent-id",
                 db_host="db.example.com",
-                db_name="nexus_prod",
+                db_name="syntara_prod",
             ),
         ):
             result = await initialize_telemetry(session_factory=session_factory)

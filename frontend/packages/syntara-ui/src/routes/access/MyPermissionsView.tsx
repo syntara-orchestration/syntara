@@ -1,5 +1,5 @@
 import { Button, Flex, Label, Tooltip } from '@patternfly/react-core'
-import { CheckCircleIcon, SyncAltIcon, TimesCircleIcon } from '@patternfly/react-icons'
+import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
@@ -105,7 +105,7 @@ function PermissionsTableContent({
             <Td dataLabel="Effect">
               <Label
                 color={perm.effect === 'allow' ? 'green' : 'red'}
-                icon={perm.effect === 'allow' ? <CheckCircleIcon /> : <TimesCircleIcon />}
+                icon={perm.effect === 'allow' ? <RhUiCheckCircleIcon /> : <RhUiCloseCircleIcon />}
                 isCompact
               >
                 {perm.effect}
@@ -232,7 +232,7 @@ export function MyPermissionsView() {
                   variant="plain"
                   aria-label="Refresh permissions"
                   onClick={() => detachPromise(refetch())}
-                  icon={<SyncAltIcon />}
+                  icon={<RhUiSyncIcon />}
                 />
               </Tooltip>
             }

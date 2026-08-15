@@ -38,14 +38,13 @@ describe('VersionInfoCard', () => {
 
     expect(screen.getByText('v2.0 Release')).toBeInTheDocument()
     expect(screen.getByText('Created')).toBeInTheDocument()
-    expect(screen.getByText('formatted:2026-05-19T21:59:00.000Z')).toBeInTheDocument()
+    expect(screen.getByText(/May.*19.*2026/i)).toBeInTheDocument()
   })
 
   it('does not show date as subtitle when no title prop is provided', () => {
     render(<VersionInfoCard date="2026-05-19T21:59:00.000Z" />)
 
-    const formatted = screen.getAllByText('formatted:2026-05-19T21:59:00.000Z')
-    expect(formatted).toHaveLength(1)
+    expect(screen.queryByText('Created')).not.toBeInTheDocument()
   })
 
   it('shows description when provided', () => {
@@ -59,7 +58,7 @@ describe('VersionInfoCard', () => {
 
     expect(screen.getByText('v2.0 Release')).toBeInTheDocument()
     expect(screen.getByText('Created')).toBeInTheDocument()
-    expect(screen.getByText('formatted:2026-05-19T21:59:00.000Z')).toBeInTheDocument()
+    expect(screen.getByText(/May.*19.*2026/i)).toBeInTheDocument()
     expect(screen.getByText('Major update')).toBeInTheDocument()
   })
 
@@ -67,7 +66,22 @@ describe('VersionInfoCard', () => {
     render(<VersionInfoCard title="v2.0 Release" />)
 
     expect(screen.getByText('v2.0 Release')).toBeInTheDocument()
-    expect(screen.queryByText(/formatted:/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Created')).not.toBeInTheDocument()
+  })
+
+  it('renders Published/Unpublished rows via PF Timestamp', () => {
+    render(
+      <VersionInfoCard
+        title="v2.0 Release"
+        publishedAt="2026-06-01T10:00:00.000Z"
+        unpublishedAt="2026-06-10T10:00:00.000Z"
+      />
+    )
+
+    expect(screen.getByText('Published')).toBeInTheDocument()
+    expect(screen.getByText(/Jun 1,\s*2026/i)).toBeInTheDocument()
+    expect(screen.getByText('Unpublished')).toBeInTheDocument()
+    expect(screen.getByText(/Jun 10,\s*2026/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

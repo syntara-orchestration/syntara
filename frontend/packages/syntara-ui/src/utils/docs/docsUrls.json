@@ -15,5 +15,25 @@
   "accessControl": "__PLACEHOLDER__/access-control",
   "authentication": "__PLACEHOLDER__/authentication",
   "identityProviders": "__PLACEHOLDER__/identity-providers",
-  "serviceAccounts": "__PLACEHOLDER__/service-accounts"
+  "serviceAccounts": "__PLACEHOLDER__/service-accounts",
+  "configureIntegration": "__PLACEHOLDER__/configure-integration",
+  "createUser": "__PLACEHOLDER__/create-user",
+  "transferIdentity": "__PLACEHOLDER__/transfer-identity",
+  "addIdentityProvider": "__PLACEHOLDER__/add-identity-provider",
+  "identityProviderMapping": "__PLACEHOLDER__/identity-provider-mapping",
+
+  "manualTrigger": "__PLACEHOLDER__/manual-trigger",
+  "scheduleTrigger": "__PLACEHOLDER__/schedule-trigger",
+  "webhookTrigger": "__PLACEHOLDER__/webhook-trigger",
+  "eventDrivenAnsibleTrigger": "__PLACEHOLDER__/event-driven-ansible-trigger",
+  "taskAgent": "__PLACEHOLDER__/task-agent",
+  "restApi": "__PLACEHOLDER__/rest-api",
+  "launchAapJobTemplate": "__PLACEHOLDER__/launch-aap-job-template",
+  "launchAapWorkflowTemplate": "__PLACEHOLDER__/launch-aap-workflow-template",
+  "approval": "__PLACEHOLDER__/approval",
+  "conditional": "__PLACEHOLDER__/conditional",
+  "converge": "__PLACEHOLDER__/converge",
+  "loop": "__PLACEHOLDER__/loop",
+  "switch": "__PLACEHOLDER__/switch",
+  "wait": "__PLACEHOLDER__/wait"
 }

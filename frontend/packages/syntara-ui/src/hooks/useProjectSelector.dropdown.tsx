@@ -15,7 +15,7 @@ import {
   TextInputGroupUtilities,
   Tooltip,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, TimesIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import { useRef } from 'react'
 import type { CSSProperties, Dispatch, MouseEvent, ReactNode, SetStateAction } from 'react'
 
@@ -139,9 +139,8 @@ function renderInputUtilities(isOpen: boolean, filterValue: string, isFilterFetc
         onClick={onClear}
         style={{ visibility: filterValue ? 'visible' : 'hidden' }}
         tabIndex={filterValue && isOpen ? 0 : -1}
-      >
-        <TimesIcon aria-hidden />
-      </Button>
+        icon={<RhUiCloseIcon aria-hidden />}
+      />
     </TextInputGroupUtilities>
   )
 }

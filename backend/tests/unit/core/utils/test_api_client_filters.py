@@ -225,8 +225,8 @@ class TestEdgeCasesLabels:
 
     def test_label_key_with_dots(self) -> None:
         """Label keys with dots work correctly."""
-        result = build_filters(**{"labels__app.kubernetes.io/name": "nexus"})
-        assert result == {"labels[app.kubernetes.io/name]": "nexus"}
+        result = build_filters(**{"labels__app.kubernetes.io/name": "syntara"})
+        assert result == {"labels[app.kubernetes.io/name]": "syntara"}
 
     def test_label_key_with_underscores(self) -> None:
         """Label keys with underscores work correctly."""

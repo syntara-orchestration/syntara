@@ -2,7 +2,7 @@
 
 ## Overview
 
-Retry policies control automatic retry behavior for workflow activities that fail due to transient errors. The Nexus workflow engine uses a **whitelist approach** — only specific HTTP status codes trigger retries; all other errors fail immediately.
+Retry policies control automatic retry behavior for workflow activities that fail due to transient errors. The Syntara workflow engine uses a **whitelist approach** — only specific HTTP status codes trigger retries; all other errors fail immediately.
 
 Retry behavior varies by node type. Some nodes expose a configurable `retry_policy` in the workflow definition; others handle retry internally or have no retry at all.
 

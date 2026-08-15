@@ -1,6 +1,6 @@
 # Configuration Standards
 
-This document defines the configuration patterns for the Nexus project. All application settings use Pydantic Settings v2 with environment variable injection.
+This document defines the configuration patterns for the Syntara project. All application settings use Pydantic Settings v2 with environment variable injection.
 
 ## Architecture
 

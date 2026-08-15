@@ -40,7 +40,7 @@ describe('ScheduleBuilderFields', () => {
     render(<ScheduleBuilderFields value="R/2024-01-15T10:00:00Z/P1D" />)
 
     expect(screen.getByLabelText('Start date')).toHaveValue('2024-01-15')
-    expect(screen.getByLabelText('Start time')).toHaveValue('10:00')
+    expect(screen.getByLabelText('Start time')).toHaveValue('10:00 AM')
     expect(screen.getByLabelText('Frequency')).toHaveTextContent('Daily')
   })
 
@@ -179,15 +179,40 @@ describe('ScheduleBuilderFields', () => {
 
   it('updates start time', async () => {
     const onChange = vi.fn()
+    const user = userEvent.setup()
     render(<ScheduleBuilderFields value="R/2024-01-15T10:00:00Z/P1D" onChange={onChange} />)
 
-    await userEvent.setup().clear(screen.getByLabelText('Start time'))
-    await userEvent.setup().type(screen.getByLabelText('Start time'), '14:30')
+    const input = screen.getByLabelText('Start time')
+    await user.clear(input)
+    await user.paste('2:30 PM')
 
     await waitFor(() => {
       const lastCall = onChange.mock.calls.at(-1)?.[0] as string
       expect(lastCall).toContain('14:30')
     })
+  })
+
+  it('selects a start time from the TimePicker dropdown menu', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<ScheduleBuilderFields value="R/2024-01-15T10:00:00Z/P1D" onChange={onChange} />)
+
+    await user.click(screen.getByLabelText('Start time'))
+    await user.click(await screen.findByRole('menuitem', { name: '2:00 PM' }))
+
+    await waitFor(() => {
+      const lastCall = onChange.mock.calls.at(-1)?.[0] as string
+      expect(lastCall).toContain('14:00')
+    })
+  })
+
+  it('ignores an incomplete/invalid start time entry', async () => {
+    const onChange = vi.fn()
+    render(<ScheduleBuilderFields value="R/2024-01-15T10:00:00Z/P1D" onChange={onChange} />)
+
+    await userEvent.setup().type(screen.getByLabelText('Start time'), '9')
+
+    expect(onChange.mock.calls.every((call) => !(call[0] as string).includes('T9:'))).toBe(true)
   })
 
   it('updates end date', async () => {

@@ -251,6 +251,20 @@ describe('RoleAssignmentsPanel', () => {
       const results = await axe(container)
       expect(results).toHaveNoViolations()
     })
+
+    it('has no accessibility violations with expanded rows', async () => {
+      const user = userEvent.setup()
+
+      const { container } = render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+      await waitFor(() => {
+        expect(screen.getByText('policy-a')).toBeVisible()
+      })
+
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
+    })
   })
 
   describe('Loading and error states', () => {
@@ -347,7 +361,7 @@ describe('RoleAssignmentsPanel', () => {
       expect(screen.getByRole('columnheader', { name: 'Description' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Scope' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Project' })).toBeInTheDocument()
-      expect(screen.getByRole('columnheader', { name: 'Policies' })).toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: 'Policies' })).not.toBeInTheDocument()
     })
 
     it('renders all assignment rows', () => {
@@ -376,17 +390,40 @@ describe('RoleAssignmentsPanel', () => {
       expect(systemLabels.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('shows policies as labels', () => {
+    it('shows policies as labels when row is expanded', async () => {
+      const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      expect(screen.getByText('policy-a')).toBeInTheDocument()
-      expect(screen.getByText('policy-b')).toBeInTheDocument()
-      expect(screen.getByText('policy-c')).toBeInTheDocument()
+      expect(screen.queryByText('policy-a')).not.toBeVisible()
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+
+      expect(screen.getByText('policy-a')).toBeVisible()
+      expect(screen.getByText('policy-b')).toBeVisible()
+
+      await user.click(expandButtons[1])
+
+      expect(screen.getByText('policy-c')).toBeVisible()
     })
 
     it('shows "Assign role" button', () => {
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
       expect(screen.getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
+    })
+  })
+
+  describe('Expandable rows', () => {
+    it('expand-all button expands all rows on the current page', async () => {
+      const user = userEvent.setup()
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      expect(screen.queryByText('policy-a')).not.toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: /expand all/i }))
+
+      expect(screen.getByText('policy-a')).toBeVisible()
+      expect(screen.getByText('policy-c')).toBeVisible()
     })
   })
 
@@ -892,7 +929,7 @@ describe('RoleAssignmentsPanel', () => {
       expect(within(table).getByRole('columnheader', { name: 'Role name' })).toBeInTheDocument()
       expect(within(table).getByRole('columnheader', { name: 'Description' })).toBeInTheDocument()
       expect(within(table).getByRole('columnheader', { name: 'Project' })).toBeInTheDocument()
-      expect(within(table).getByRole('columnheader', { name: 'Policies' })).toBeInTheDocument()
+      expect(within(table).queryByRole('columnheader', { name: 'Policies' })).not.toBeInTheDocument()
     })
 
     it('does not offer Scope as a filter category when scope column is hidden', () => {
@@ -946,7 +983,7 @@ describe('RoleAssignmentsPanel', () => {
       const dataRows = rows.slice(1)
 
       const firstRowCells = within(dataRows[0]).getAllByRole('cell')
-      expect(firstRowCells[0]).toHaveTextContent('alpha-role')
+      expect(firstRowCells[1]).toHaveTextContent('alpha-role')
     })
 
     it('has no accessibility violations with hidden columns', async () => {

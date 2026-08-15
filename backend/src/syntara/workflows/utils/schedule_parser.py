@@ -149,13 +149,13 @@ def build_schedule_policy(missed_policy: MissedSchedulePolicy) -> SchedulePolicy
     return SchedulePolicy(catchup_window=catchup, overlap=overlap)
 
 
-SCHEDULE_ID_PREFIX = "nexus-sched-"
+SCHEDULE_ID_PREFIX = "orchestrator-sched-"
 
 
 def build_schedule_id(workflow_id: str, trigger_node_id: str) -> str:
     """Build a deterministic Temporal Schedule ID.
 
-    Convention: ``nexus-sched-{workflow_id}-{trigger_node_id}``
+    Convention: ``orchestrator-sched-{workflow_id}-{trigger_node_id}``
 
     Args:
         workflow_id: The workflow UUID (as string).
@@ -166,6 +166,17 @@ def build_schedule_id(workflow_id: str, trigger_node_id: str) -> str:
 
     """
     return f"{SCHEDULE_ID_PREFIX}{workflow_id}-{trigger_node_id}"
+
+
+def build_schedule_execution_workflow_id(workflow_id: str, trigger_node_id: str) -> str:
+    """Build the Temporal workflow ID used when a schedule fires its launcher.
+
+    Convention: ``sched-exec-{workflow_id}-{trigger_node_id}``
+
+    Temporal appends an RFC3339 UTC timestamp suffix on each fire; verification
+    normalizes that suffix in ``workflow_auth._auth_workflow_id``.
+    """
+    return f"sched-exec-{workflow_id}-{trigger_node_id}"
 
 
 def config_to_temporal_schedule(
@@ -219,6 +230,7 @@ def config_to_temporal_schedule(
 
 # Re-export for convenience
 __all__ = [
+    "build_schedule_execution_workflow_id",
     "build_schedule_id",
     "build_schedule_policy",
     "config_to_temporal_schedule",

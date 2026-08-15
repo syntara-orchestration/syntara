@@ -92,8 +92,8 @@ from syntara.core.models.group import user_groups
 from syntara.core.models.principal import PrincipalType
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import SUBJECT_MAX_LENGTH
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
 from syntara.core.services.secret_service import create_secret_service
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.identity_provider_configuration import (
     IdentityProviderConfigurationTypes,
@@ -124,7 +124,7 @@ async def _get_user_group_names(db: AsyncSession, user_id: UUID) -> list[str]:
     return list(result.all())
 
 
-router = NexusRouter(prefix="/auth", tags=["Authentication"])
+router = SyntaraRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post(

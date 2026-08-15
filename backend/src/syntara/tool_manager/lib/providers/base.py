@@ -18,7 +18,7 @@ class ToolProviderAdapter(Protocol):
     """Protocol for tool provider adapters.
 
     This protocol defines the interface that all tool providers must implement
-    to integrate with the nexus tool management system. Providers can be local
+    to integrate with the syntara tool management system. Providers can be local
     or remote services that expose tools via various protocols.
     """
 

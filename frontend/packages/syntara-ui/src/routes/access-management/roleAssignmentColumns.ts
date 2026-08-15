@@ -3,7 +3,7 @@ import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 
 import type { RoleAssignmentRow } from './useRoleAssignmentData'
 
-export type RoleAssignmentColumnKey = 'roleName' | 'description' | 'scope' | 'project' | 'policies'
+export type RoleAssignmentColumnKey = 'roleName' | 'description' | 'scope' | 'project'
 
 export type ColumnDefinition = {
   key: RoleAssignmentColumnKey
@@ -16,7 +16,6 @@ const allColumns: ColumnDefinition[] = [
   { key: 'description', sortField: 'description', sortRowKey: 'roleDescription' },
   { key: 'scope', sortField: 'scope_type', sortRowKey: 'scopeType' },
   { key: 'project', sortField: 'project', sortRowKey: 'scope' },
-  { key: 'policies', sortField: 'policies', sortRowKey: 'roleName' },
 ]
 
 export const filterKeyToColumn: Record<string, RoleAssignmentColumnKey> = {

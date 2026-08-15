@@ -12,7 +12,7 @@ T = TypeVar("T", bound="OIDCClaimMapping")
 
 @_attrs_define
 class OIDCClaimMapping:
-    """Maps Nexus user fields to IdP-specific OIDC claim names.
+    """Maps Syntara user fields to IdP-specific OIDC claim names.
 
     Attributes:
         subject (str | Unset):  Default: 'sub'.

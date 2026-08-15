@@ -29,7 +29,7 @@ nodes:
       url: https://api.github.com/repos/${trigger.owner}/${trigger.repo}
       headers:
         Accept: application/vnd.github.v3+json
-        User-Agent: Nexus-Workflow-Engine
+        User-Agent: Syntara-Workflow-Engine
     outputs:
       repo_data: "${result.body}"
       name: "${result.body.name}"
@@ -51,7 +51,7 @@ nodes:
       url: https://api.github.com/repos/${trigger.owner}/${trigger.repo}/languages
       headers:
         Accept: application/vnd.github.v3+json
-        User-Agent: Nexus-Workflow-Engine
+        User-Agent: Syntara-Workflow-Engine
     outputs:
       languages: "${result.body}"
     settings:

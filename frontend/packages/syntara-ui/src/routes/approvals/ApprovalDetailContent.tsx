@@ -21,11 +21,11 @@ import { useState } from 'react'
 import { approvalsClient } from '../../client'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
+import { DateCell } from '../../components/table/DateCell'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useAlerts } from '../../providers/alerts'
-import { formatDateTime } from '../../utils/dateUtils'
 
 import styles from './ApprovalDetailContent.module.css'
 import { getNotesLabel } from './approvalNotes'
@@ -185,14 +185,14 @@ function PendingDecisionForm({
 
 function ApprovalSummary({
   approvalDisplayName,
-  approvalInitiated,
+  approvalInitiatedAt,
   approvalMessage,
   workflowName,
   workflowLink,
   onWorkflowClick,
 }: Readonly<{
   approvalDisplayName: string
-  approvalInitiated: string
+  approvalInitiatedAt: string | null | undefined
   approvalMessage: string | undefined
   workflowName: string
   workflowLink: string | undefined
@@ -223,7 +223,9 @@ function ApprovalSummary({
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Approval initiated</DescriptionListTerm>
-        <DescriptionListDescription>{approvalInitiated}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={approvalInitiatedAt} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
       {approvalMessage && (
         <DescriptionListGroup>
@@ -280,7 +282,6 @@ export function ApprovalDetailContent({
   const workflowId = approval.workflow_context?.workflow_id
   const workflowVersion = approval.workflow_context?.workflow_version
   const workflowLink = workflowId ? buildWorkflowBuilderLink(workflowId, workflowVersion) : undefined
-  const approvalInitiated = formatDateTime(approval.created_at ?? null)
   const approvalMessage = message || getApprovalMessage(approval)
   const approvalDisplayName = resolveApprovalName(approval, activityNameMap)
   const decisionNotes = approval.decision_notes ?? undefined
@@ -390,7 +391,7 @@ export function ApprovalDetailContent({
           <StackItem>
             <ApprovalSummary
               approvalDisplayName={approvalDisplayName}
-              approvalInitiated={approvalInitiated}
+              approvalInitiatedAt={approval.created_at}
               approvalMessage={approvalMessage}
               workflowName={workflowName}
               workflowLink={workflowLink}

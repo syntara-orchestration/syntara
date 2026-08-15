@@ -215,7 +215,7 @@ class TestDiscoverHandlers:
 class TestDiscoverySecurityValidation:
     """Tests for security validations that prevent malicious module loading."""
 
-    def test_rejects_non_nexus_package(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_rejects_non_syntara_package(self, caplog: pytest.LogCaptureFixture) -> None:
         """discover_handlers rejects packages outside the syntara.* hierarchy."""
         malicious_pkg = ModuleType("malicious.package")
         malicious_pkg.__path__ = []
@@ -265,7 +265,7 @@ class TestDiscoverySecurityValidation:
 
         fake_pkg = ModuleType("syntara.test_pkg")
         # Set the package path to a different directory
-        safe_dir = mkdtemp(prefix="safe_nexus_")
+        safe_dir = mkdtemp(prefix="safe_syntara_")
         fake_pkg.__path__ = [safe_dir]
         fake_pkg.__name__ = "syntara.test_pkg"
 

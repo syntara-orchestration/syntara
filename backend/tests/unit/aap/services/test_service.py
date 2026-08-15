@@ -1151,6 +1151,46 @@ class TestResolveConnectionFromIntegration:
             )
 
 
+@pytest.mark.ssrf_enforced
+class TestRequestTimeSsrfRevalidation:
+    """Request-time SSRF re-check before AAP connection resolution (guards DNS rebinding).
+
+    A stored ``base_url`` that passed write-time validation can later re-point to a
+    private/metadata target. ``_resolve_connection_from_integration`` re-runs the
+    integration SSRF policy before resolving credentials or dispatching any request,
+    so a base_url pointing at the cloud-metadata IP must be rejected before any
+    outbound httpx call. This guards the ``validate_integration_configuration_no_ssrf``
+    call at the resolve boundary; delete it and this test fails.
+    """
+
+    @pytest.mark.asyncio
+    async def test_metadata_base_url_rejected_before_outbound_dispatch(self) -> None:
+        integration = _mock_integration(base_url="https://169.254.169.254")
+        mock_session = _mock_session_with_integration(integration)
+        service = AAPProxyService(settings=get_settings(), session=mock_session)
+
+        credential_id = uuid4()
+        user_id = uuid4()
+
+        with (
+            patch(
+                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+                new_callable=AsyncMock,
+            ) as mock_cred_resolver,
+            patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls,
+        ):
+            with pytest.raises(AAPNotConfiguredError, match="not permitted by SSRF policy"):
+                await service._resolve_connection(
+                    integration_id=integration.id,
+                    credential_id=credential_id,
+                    user_id=user_id,
+                )
+
+            # Short-circuit must happen before credential resolution and any outbound dispatch.
+            mock_cred_resolver.assert_not_called()
+            mock_client_cls.assert_not_called()
+
+
 class TestEnforceIntegrationVisibility:
     """Tests for _enforce_integration_visibility."""
 

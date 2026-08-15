@@ -16,6 +16,32 @@ from syntara.workflows.workflow_engine.activities.common import (
     extract_error_code,
 )
 
+_USER_FRIENDLY_MESSAGES: dict[str, str] = {
+    "AuthenticationError": ("Authentication failed. Check that your credentials are valid and have not expired."),
+    "AuthError": ("Authentication failed. Check that your credentials are valid and have not expired."),
+    "RateLimitError": "The request was rate-limited. The workflow will retry automatically.",
+    "NetworkError": ("A network error occurred. Check your connection and verify the service endpoint is reachable."),
+    "TimeoutError": "The request timed out. The service may be under heavy load or unreachable.",
+    "ServerError": "The service encountered an internal error. This is usually temporary.",
+    "ValidationError": "The request was invalid. Check the step configuration and input values.",
+    "LLMConfigurationError": ("The AI model configuration is invalid. Check the model name and parameters."),
+    "ToolDiscoveryError": "Failed to discover available tools. Check tool configuration and connectivity.",
+    "ToolSelectionUnavailableError": (
+        "A selected tool is not available. Verify the tool is enabled and properly configured."
+    ),
+    "CredentialResolutionError": (
+        "Failed to resolve credentials for this step. Check that the credential exists and is accessible."
+    ),
+    "EmptyLLMResponseError": "The AI model returned an empty response. Try simplifying the prompt or retrying.",
+}
+
+
+def _format_user_message(error_type: str, error_message: str) -> str:
+    if error_type in _USER_FRIENDLY_MESSAGES:
+        friendly_message = _USER_FRIENDLY_MESSAGES[error_type]
+        return f"{friendly_message} Details: {error_message}"
+    return f"An unexpected error occurred: {error_message}"
+
 
 class WorkflowSignalProcessor:
     """Processor for workflow activity signals.
@@ -76,7 +102,7 @@ class WorkflowSignalProcessor:
                     },
                 )
 
-            msg = f"{error_type}: {error_message}"
+            msg = _format_user_message(error_type, error_message)
 
             # Extract error code from message (works for HTTP status codes AND exit codes)
             error_code = extract_error_code(error_message)

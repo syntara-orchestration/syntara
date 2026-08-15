@@ -1,0 +1,7 @@
+.icon {
+  color: var(--pf-t--global--color--icon--default);
+}
+
+.trigger {
+  padding: 0;
+}

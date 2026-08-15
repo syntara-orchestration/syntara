@@ -115,7 +115,7 @@ def audit_worker_perf_session_factory(
 ) -> async_sessionmaker[AsyncSession]:
     """Separate session factory simulating the audit worker's dedicated pool.
 
-    After AAP-79901 (#212), the audit outbox worker uses its own connection
+    The audit outbox worker uses its own connection
     pool (``audit_worker_pool_size=5``, ``audit_worker_max_overflow=2``)
     isolated from the main application pool.  This fixture provides a
     second NullPool-backed session factory so mixed-workload tests can

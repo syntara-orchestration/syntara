@@ -18,10 +18,10 @@ import groupedTableStyles from '../../../components/groupedTable.module.css'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import type { ProjectRead } from '../../access/types'
 
 import type { Credential, CredentialType } from './credentialConstants'
-import { UserTimestamp } from './UserTimestamp'
 
 /** Total visible columns including expand toggle and actions. */
 const COLUMN_COUNT = 9

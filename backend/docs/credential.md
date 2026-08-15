@@ -1,6 +1,6 @@
 # Credentials
 
-**Developer Guide — Understanding the Nexus credential system**
+**Developer Guide — Understanding the Syntara credential system**
 
 ## Table of Contents
 
@@ -199,7 +199,7 @@ The key rotation CLI re-encrypts all stored credentials from an old encryption k
 
 1. **Back up the database** before rotation:
    ```bash
-   pg_dump -U <user> syntara_api > nexus_backup_$(date +%Y%m%d_%H%M%S).sql
+   pg_dump -U <user> syntara_api > syntara_backup_$(date +%Y%m%d_%H%M%S).sql
    ```
 
 2. **Stop the API server** to prevent concurrent access.

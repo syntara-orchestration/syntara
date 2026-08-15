@@ -1,122 +1,91 @@
-import { renderHook } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import type { UsersAPI } from '@syntara/contracts'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
+import { createElement } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../../client', () => ({
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
+  usersFetchClient: {
+    GET: vi.fn(),
+  },
+}))
+
+import { usersFetchClient } from '../../../client'
 
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
 
-const mockUseAllGroups = vi.fn()
+type GroupDirectoryEntry = UsersAPI.components['schemas']['GroupDirectoryEntry']
 
-vi.mock('../../access/useAllGroups', () => ({
-  useAllGroups: () => mockUseAllGroups() as unknown,
-}))
+const mockGET = vi.mocked(usersFetchClient.GET)
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, retryDelay: 0 },
+    },
+  })
+  return ({ children }: { children: React.ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children)
+}
 
 describe('useApprovalDecideGroups', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('returns groups from useAllGroups', () => {
-    const mockGroups = [
-      {
-        id: '1',
-        name: 'admins',
-        description: 'Admins',
-        created_at: '2024-01-01',
-        updated_at: '2024-01-01',
-        is_builtin: false,
-      },
-      {
-        id: '2',
-        name: 'approvers',
-        description: 'Approvers',
-        created_at: '2024-01-01',
-        updated_at: '2024-01-01',
-        is_builtin: false,
-      },
+  it('fetches and returns groups from groups/directory endpoint', async () => {
+    const mockGroups: GroupDirectoryEntry[] = [
+      { id: 'group-1', name: 'approvers' },
+      { id: 'group-2', name: 'admins' },
     ]
-
-    mockUseAllGroups.mockReturnValue({
-      groups: mockGroups,
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
+    mockGET.mockResolvedValueOnce({
+      data: { resources: mockGroups, next: null },
+      error: undefined,
+      response: new Response(),
     })
 
-    const { result } = renderHook(() => useApprovalDecideGroups())
+    const { result } = renderHook(() => useApprovalDecideGroups(), { wrapper: createWrapper() })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
 
     expect(result.current.groups).toEqual(mockGroups)
-    expect(result.current.isLoading).toBe(false)
-    expect(result.current.error).toBe(null)
-  })
-
-  it('returns loading state', () => {
-    mockUseAllGroups.mockReturnValue({
-      groups: [],
-      isLoading: true,
-      error: null,
-      refetch: vi.fn(),
-    })
-
-    const { result } = renderHook(() => useApprovalDecideGroups())
-
-    expect(result.current.isLoading).toBe(true)
-    expect(result.current.groups).toEqual([])
-  })
-
-  it('returns error state', () => {
-    const mockError = new Error('Failed to fetch')
-
-    mockUseAllGroups.mockReturnValue({
-      groups: [],
-      isLoading: false,
-      error: mockError,
-      refetch: vi.fn(),
-    })
-
-    const { result } = renderHook(() => useApprovalDecideGroups())
-
-    expect(result.current.error).toBe(mockError)
-    expect(result.current.groups).toEqual([])
-  })
-
-  it('returns empty groups array when no groups exist', () => {
-    mockUseAllGroups.mockReturnValue({
-      groups: [],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-    })
-
-    const { result } = renderHook(() => useApprovalDecideGroups())
-
-    expect(result.current.groups).toEqual([])
-    expect(result.current.isLoading).toBe(false)
-    expect(result.current.error).toBe(null)
-  })
-
-  it('passes through all properties from useAllGroups', () => {
-    const mockGroups = [
-      {
-        id: '1',
-        name: 'test',
-        description: 'Test',
-        created_at: '2024-01-01',
-        updated_at: '2024-01-01',
-        is_builtin: true,
+    expect(result.current.error).toBeNull()
+    expect(mockGET).toHaveBeenCalledWith('/groups/directory', {
+      params: {
+        query: expect.objectContaining({
+          sort: 'name',
+        }) as Record<string, unknown>,
       },
-    ]
-    const mockError = new Error('Test error')
+    })
+  })
 
-    mockUseAllGroups.mockReturnValue({
-      groups: mockGroups,
-      isLoading: true,
-      error: mockError,
-      refetch: vi.fn(),
+  it('returns empty groups when no groups exist', async () => {
+    mockGET.mockResolvedValueOnce({
+      data: { resources: [], next: null },
+      error: undefined,
+      response: new Response(),
     })
 
-    const { result } = renderHook(() => useApprovalDecideGroups())
+    const { result } = renderHook(() => useApprovalDecideGroups(), { wrapper: createWrapper() })
 
-    expect(result.current.groups).toBe(mockGroups)
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.groups).toEqual([])
+    expect(result.current.error).toBeNull()
+  })
+
+  it('returns loading state initially', () => {
+    mockGET.mockReturnValue(new Promise(() => {}) as never)
+
+    const { result } = renderHook(() => useApprovalDecideGroups(), { wrapper: createWrapper() })
+
     expect(result.current.isLoading).toBe(true)
-    expect(result.current.error).toBe(mockError)
+    expect(result.current.groups).toEqual([])
   })
 })
