@@ -54,7 +54,8 @@ describe('useAlreadyAssignedRoles', () => {
       wrapper: createWrapper(),
     })
 
-    expect(result.current.size).toBe(0)
+    expect(result.current.assigned.size).toBe(0)
+    expect(result.current.isLoading).toBe(false)
   })
 
   it('returns system-scoped roles for USER principal', async () => {
@@ -64,11 +65,14 @@ describe('useAlreadyAssignedRoles', () => {
       wrapper: createWrapper(),
     })
 
+    expect(result.current.isLoading).toBe(true)
+
     await waitFor(() => {
-      expect(result.current.has('admin')).toBe(true)
+      expect(result.current.assigned.has('admin')).toBe(true)
     })
-    expect(result.current.has('editor')).toBe(false)
-    expect(result.current.has('viewer')).toBe(false)
+    expect(result.current.assigned.has('editor')).toBe(false)
+    expect(result.current.assigned.has('viewer')).toBe(false)
+    expect(result.current.isLoading).toBe(false)
 
     const userCall = vi
       .mocked(accessFetchClient.GET)
@@ -85,10 +89,10 @@ describe('useAlreadyAssignedRoles', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.has('editor')).toBe(true)
+      expect(result.current.assigned.has('editor')).toBe(true)
     })
-    expect(result.current.has('admin')).toBe(false)
-    expect(result.current.has('viewer')).toBe(false)
+    expect(result.current.assigned.has('admin')).toBe(false)
+    expect(result.current.assigned.has('viewer')).toBe(false)
   })
 
   it('does not include roles from other projects', async () => {
@@ -99,8 +103,9 @@ describe('useAlreadyAssignedRoles', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.size).toBe(0)
+      expect(result.current.isLoading).toBe(false)
     })
+    expect(result.current.assigned.size).toBe(0)
   })
 
   it('returns roles for GROUP principal type', async () => {
@@ -111,7 +116,7 @@ describe('useAlreadyAssignedRoles', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.has('admin')).toBe(true)
+      expect(result.current.assigned.has('admin')).toBe(true)
     })
 
     const groupCall = vi
@@ -129,7 +134,7 @@ describe('useAlreadyAssignedRoles', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.has('admin')).toBe(true)
+      expect(result.current.assigned.has('admin')).toBe(true)
     })
 
     const saCall = vi.mocked(accessFetchClient.GET).mock.calls.find((c) => c[0] === '/role_assignments')

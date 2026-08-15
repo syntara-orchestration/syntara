@@ -11,6 +11,7 @@ import {
   SelectList,
   SelectOption,
 } from '@patternfly/react-core'
+import { useQueryClient } from '@tanstack/react-query'
 import { type Ref, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
@@ -21,9 +22,10 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAlerts } from '../../providers/alerts'
 import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
 import { batchedAllSettled } from '../../utils/batchedSettled'
+import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
-import { useAlreadyAssignedRoles } from '../access/useAlreadyAssignedRoles'
+import { roleAssignmentsQueryKey, useAlreadyAssignedRoles } from '../access/useAlreadyAssignedRoles'
 
 import styles from './AssignRoleModal.module.css'
 import { MultiRoleSelect, type RoleOption } from './MultiRoleSelect'
@@ -149,6 +151,7 @@ export function AssignRoleModal({
   onClose,
   onSuccess,
 }: Readonly<AssignRoleModalProps>) {
+  const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
   const defaultScope = principalType === RolePrincipalType.SERVICE_ACCOUNT ? 'project' : 'system'
 
@@ -178,17 +181,23 @@ export function AssignRoleModal({
     },
   })
 
-  const alreadyAssigned = useAlreadyAssignedRoles(principalType, principalId, scope === 'project', projectId ?? '')
+  const { assigned: alreadyAssigned, isLoading: isAssignmentsLoading } = useAlreadyAssignedRoles(
+    principalType,
+    principalId,
+    scope === 'project',
+    projectId ?? ''
+  )
 
   const roleOptions = useMemo((): RoleOption[] => {
+    if (isAssignmentsLoading) return []
     const roles = rolesQuery.data?.resources ?? []
     return roles
       .filter((r) => !alreadyAssigned.has(r.name))
       .map((r) => ({ id: r.name, name: r.name, description: r.description ?? null }))
-  }, [rolesQuery.data?.resources, alreadyAssigned])
+  }, [rolesQuery.data?.resources, alreadyAssigned, isAssignmentsLoading])
 
   const hasMoreRoles = !!rolesQuery.data?.next
-  const isRolesLoading = rolesQuery.isFetching
+  const isRolesLoading = rolesQuery.isFetching || isAssignmentsLoading
 
   const projectOptions = useMemo(() => {
     return allProjects
@@ -226,6 +235,7 @@ export function AssignRoleModal({
     })
     const successCount = showAssignmentResult(results, showAlert)
     if (successCount > 0) {
+      detachPromise(queryClient.invalidateQueries({ queryKey: roleAssignmentsQueryKey(principalType, principalId) }))
       onSuccess()
     }
     handleClose()

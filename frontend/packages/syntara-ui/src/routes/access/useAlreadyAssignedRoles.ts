@@ -40,29 +40,41 @@ function fetchAssignments(principalType: RolePrincipalType, principalId: string)
   }
 }
 
+export function roleAssignmentsQueryKey(principalType: RolePrincipalType, principalId: string) {
+  return ['role-assignments', principalType, principalId] as const
+}
+
 export function useAlreadyAssignedRoles(
   principalType: RolePrincipalType,
   principalId: string,
   isProjectScoped: boolean,
   projectId: string
 ) {
-  const { data: assignments } = useQuery({
-    queryKey: ['role-assignments', principalType, principalId],
+  const {
+    data: assignments,
+    isPending,
+    isError,
+  } = useQuery({
+    queryKey: roleAssignmentsQueryKey(principalType, principalId),
     queryFn: () => fetchAssignments(principalType, principalId),
     enabled: !!principalId,
   })
 
-  return useMemo(() => {
+  const isLoading = !!principalId && isPending
+
+  const assigned = useMemo(() => {
     const items = assignments ?? []
-    const assigned = new Set<string>()
+    const result = new Set<string>()
     for (const a of items) {
       const aIsProject = !!a.project_id
       if (isProjectScoped && aIsProject && a.project_id === projectId) {
-        assigned.add(a.role_name)
+        result.add(a.role_name)
       } else if (!isProjectScoped && !aIsProject) {
-        assigned.add(a.role_name)
+        result.add(a.role_name)
       }
     }
-    return assigned
+    return result
   }, [assignments, isProjectScoped, projectId])
+
+  return { assigned, isLoading, isError }
 }

@@ -16,6 +16,7 @@ import {
   SelectOption,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
+import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
@@ -23,6 +24,7 @@ import { NxSelect } from '../../components/NxSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
+import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody, RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
 import { accessClient } from './accessClient'
@@ -33,7 +35,7 @@ import { PrincipalField } from './PrincipalField'
 import { PrincipalTypeSelect } from './PrincipalTypeSelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
-import { PRINCIPAL_ID_FIELD, useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
+import { PRINCIPAL_ID_FIELD, roleAssignmentsQueryKey, useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 const PAGE_SIZE = 20
 
@@ -281,6 +283,7 @@ type AssignRoleDialogProps = {
 }
 
 export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDialogProps>) {
+  const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
 
   const { handleSubmit, control, setValue, setError } = useForm<AssignRoleFormData>({
@@ -358,7 +361,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     [serviceAccountsQuery.data]
   )
 
-  const alreadyAssignedRoles = useAlreadyAssignedRoles(
+  const { assigned: alreadyAssignedRoles, isLoading: isAssignmentsLoading } = useAlreadyAssignedRoles(
     principalType,
     selectedPrincipalId ?? '',
     isProjectScoped,
@@ -394,10 +397,12 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const activeRolesQuery = isProjectScoped ? projectRolesQuery : systemRolesQuery
   const roleOptions = useMemo(
     () =>
-      (activeRolesQuery.data?.resources ?? [])
-        .filter((r) => !alreadyAssignedRoles.has(r.name))
-        .map((r) => ({ value: r.name, label: r.name })),
-    [activeRolesQuery.data, alreadyAssignedRoles]
+      isAssignmentsLoading
+        ? []
+        : (activeRolesQuery.data?.resources ?? [])
+            .filter((r) => !alreadyAssignedRoles.has(r.name))
+            .map((r) => ({ value: r.name, label: r.name })),
+    [activeRolesQuery.data, alreadyAssignedRoles, isAssignmentsLoading]
   )
 
   const { mutate: createRoleAssignment, isPending: isPendingSystem } = accessClient.useMutation(
@@ -413,12 +418,6 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const handleError = useFormMutationErrorHandler<AssignRoleFormData>(setError)
 
   const onSubmit = (data: AssignRoleFormData) => {
-    const onMutationSuccess = () => {
-      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
-      onSuccess()
-      onClose()
-    }
-    const onMutationError = handleError({ title: 'Failed to add assignment' })
     const principalIdByType: Record<RolePrincipalType, string> = {
       [RolePrincipalType.USER]: data.userId,
       [RolePrincipalType.GROUP]: data.groupId,
@@ -426,6 +425,17 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     }
     const principalId = principalIdByType[data.principalType]
     const body = buildAssignmentBody(data.principalType, principalId, data.roleName)
+    const onMutationSuccess = () => {
+      detachPromise(
+        queryClient.invalidateQueries({
+          queryKey: roleAssignmentsQueryKey(data.principalType, principalId),
+        })
+      )
+      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
+      onSuccess()
+      onClose()
+    }
+    const onMutationError = handleError({ title: 'Failed to add assignment' })
 
     if (data.scope === 'project') {
       createProjectRoleAssignment(
@@ -465,7 +475,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
             isServiceAccountsLoading={serviceAccountsQuery.isFetching}
             onRoleSearchChange={setRoleSearchTerm}
             hasMoreRoles={!!activeRolesQuery.data?.next}
-            isRolesLoading={activeRolesQuery.isFetching}
+            isRolesLoading={activeRolesQuery.isFetching || isAssignmentsLoading}
           />
         </Form>
       </ModalBody>
