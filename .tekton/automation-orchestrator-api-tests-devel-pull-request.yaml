@@ -37,16 +37,14 @@ spec:
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
   pipelineRef:
+    resolver: git
     params:
-      - name: name
-        value: ao-api-tests
-      - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:ebcbf4b420fdb581cbbac322fc2b5ad403dde2f8ff4656b3ec1dadac0fa5197c
-      - name: kind
-        value: pipeline
-      - name: secret
-        value: quay-aap-ci-viewer
-    resolver: bundles
+      - name: url
+        value: https://github.com/ansible-automation-platform/aap-konflux-pipelines.git
+      - name: revision
+        value: fix/ao-e2e-script-nodes-ssrf-config
+      - name: pathInRepo
+        value: pipelines/test/ao-api-tests/0.1/pipeline.yaml
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
