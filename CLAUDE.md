@@ -9,7 +9,7 @@ syntara/
 ├── backend/           # Python 3.12+ / FastAPI API, Temporal workflows, PostgreSQL
 │   ├── src/syntara/   # Main Python package (domain-driven, auto-discovered routers)
 │   ├── src/api_client/# Auto-generated Python API client (syntara-api-client)
-│   ├── test-sdk/      # Shared pytest plugin (nexus-test-sdk) — installable via pip from git
+│   ├── test-sdk/      # Shared pytest plugin (orchestrator-test-sdk) — installable via pip from git
 │   ├── tests/         # pytest: unit, integration, contract, E2E, performance
 │   ├── containers/    # Containerfiles for API and MCP server
 │   └── Makefile       # Backend-specific targets (run make -C backend help)
