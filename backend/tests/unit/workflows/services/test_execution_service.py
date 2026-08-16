@@ -1787,6 +1787,40 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         assert "AgentError: LLM error" in str(error)
 
     @pytest.mark.asyncio
+    async def test_failed_callback_uses_empty_signal_fallback_when_message_missing(self) -> None:
+        """Empty/missing callback error.message uses the SIGNAL-02 fallback on the production path."""
+        from syntara.workflows.workflow_engine.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
+
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "failed", "error": {}},
+        )
+
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert error.message == EMPTY_SIGNAL_ERROR_MESSAGE
+        assert "Activity execution failed" not in error.message
+
+    @pytest.mark.asyncio
+    async def test_failed_callback_uses_empty_signal_fallback_for_whitespace_message(self) -> None:
+        """Whitespace-only callback error.message uses the SIGNAL-02 fallback."""
+        from syntara.workflows.workflow_engine.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
+
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "failed", "error": {"message": "   ", "error_type": "AgentError"}},
+        )
+
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert error.message == EMPTY_SIGNAL_ERROR_MESSAGE
+        assert "AgentError:" not in error.message
+
+    @pytest.mark.asyncio
     async def test_truncates_long_error_messages(self) -> None:
         """Test that error messages are truncated to 500 characters."""
         service, mock_temporal = self._make_service()
