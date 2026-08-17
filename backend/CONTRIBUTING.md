@@ -177,13 +177,12 @@ CI posts an informational warning if the spec changed but contracts were not reg
 
 The pre-commit hook (enforced in CI) compares your spec against `devel` to detect breaking changes (removed fields, type changes, deleted endpoints).
 
-**If breaking changes are detected**, you must acknowledge them in the PR description:
+**If breaking changes are detected**, they are blocked on the current major API version. Two resolution paths exist:
 
-- Add to PR description: `breaking-change-ack: <detailed justification>`
-- Minimum 20 characters explaining why necessary, migration path, and how the frontend is updated
-- Example: `breaking-change-ack: Removing deprecated created_by_id field in favor of created_by object. Regenerated contracts and updated UI references in this PR. Migration guide added to API docs.`
+1. **Route to a new major version** — bump `info.version` to the next major (e.g., 1.0.0 → 2.0.0) and add `breaking-change-ack: <detailed justification>` (≥ 20 characters) to the PR description. The new version must be served from a separate URL path.
+2. **CVE escape hatch** — for CVE fixes that cannot avoid a breaking change, request the `cve-breaking-change-approved` label from engineering leadership (Senior Director or above). This label is restricted in GitHub; a PR-body annotation is not enough.
 
-**This check blocks merge** until breaking changes are acknowledged. See [OpenAPI Breaking Changes](docs/openapi-breaking-changes.md) for details.
+A `breaking-change-ack` alone (without a major version bump) is **not sufficient**. Additive non-breaking changes that bump `info.version` must use a minor bump (not patch). See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for the full policy.
 
 ### Submitting a Pull Request
 

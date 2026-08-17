@@ -15,9 +15,10 @@ Environment variables:
 import argparse
 import json
 import subprocess
-import sys
 from pathlib import Path
-from typing import Dict
+
+
+COMMENT_MARKER = "<!-- syntara-openapi-breaking-changes -->"
 
 
 def escape_markdown(text: str) -> str:
@@ -32,7 +33,52 @@ def escape_markdown(text: str) -> str:
     )
 
 
-def format_breaking_changes_comment(results: Dict, repo_owner: str, repo_name: str) -> str:
+def _incorrect_bump_lines(
+    *,
+    spec_path: str,
+    base_version: str,
+    head_version: str,
+    version_bump_type: str | None,
+    change_kind: str,
+) -> list[str]:
+    """Format the blocked incorrect-bump PR comment section."""
+    lines = [
+        "### Incorrect Version Bump (Blocked)\n",
+        (
+            "This PR does **not** introduce breaking changes, but `info.version` "
+            "was bumped in a way that does not match the change type.\n"
+        ),
+    ]
+    if spec_path:
+        lines.append(f"**Spec:** `{escape_markdown(spec_path)}`")
+    if base_version or head_version:
+        lines.append(
+            f"**Version:** {escape_markdown(base_version or 'unknown')} → "
+            f"{escape_markdown(head_version or 'unknown')}"
+        )
+        if version_bump_type:
+            lines.append(f" ({escape_markdown(version_bump_type)} bump)")
+        lines.append("")
+    if change_kind:
+        lines.append(f"**Change kind:** {escape_markdown(change_kind)}\n")
+    if version_bump_type == "major":
+        lines.append(
+            "Major bumps are reserved for breaking changes. "
+            "Use a **minor** bump for additive features/new endpoints, "
+            "or a **patch** bump for fixes — or omit the bump.\n"
+        )
+    elif change_kind == "additive":
+        lines.append(
+            "Additive API changes require a **minor** version bump "
+            "(for example `1.0.0` → `1.1.0`). A patch bump is not sufficient. "
+            "You may also omit the bump.\n"
+        )
+    else:
+        lines.append("See the OpenAPI versioning policy for the required bump type.\n")
+    return lines
+
+
+def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: str) -> str:
     """Format breaking changes results as a GitHub comment.
 
     Args:
@@ -49,36 +95,84 @@ def format_breaking_changes_comment(results: Dict, repo_owner: str, repo_name: s
     acknowledged = results["acknowledged"]
     ack_insufficient = results["ack_insufficient"]
     justification = results["justification"]
+    base_version = results.get("base_version", "")
+    head_version = results.get("head_version", "")
+    version_bump_type = results.get("version_bump_type")
+    cve_approved = results.get("cve_approved", False)
+    spec_path = results.get("spec_path", "")
+    gate_code = results.get("gate_code", "")
+    change_kind = results.get("change_kind", "")
 
     escaped_breaking = escape_markdown(breaking_changes)
     escaped_all = escape_markdown(all_changes)
     escaped_justification = escape_markdown(justification)
 
-    lines = []
+    lines = [COMMENT_MARKER, ""]
 
     if has_breaking:
-        if acknowledged:
-            lines.append("### Breaking Changes Detected (Acknowledged)\n")
-            lines.append("The developer has acknowledged these breaking changes with justification:\n")
+        # Determine which override path (if any) was used
+        major_bump_ack = version_bump_type == "major" and acknowledged
+
+        if cve_approved:
+            lines.append("### Breaking Changes Detected (CVE Override)\n")
+            lines.append(
+                "The `cve-breaking-change-approved` label is present. "
+                "This breaking change is permitted under the CVE escape hatch.\n"
+            )
+            lines.append("**Reviewer:** Please verify:")
+            lines.append("1. This override was authorized by engineering leadership (Senior Director or above)")
+            lines.append("2. The breaking change is necessary to address a CVE")
+            lines.append("3. Frontend contracts are regenerated in this PR (`make gen-contracts`)")
+            lines.append("4. Migration path is documented for API consumers\n")
+        elif major_bump_ack:
+            lines.append("### Breaking Changes Detected (New Major Version)\n")
+            lines.append(
+                f"The API version has been bumped from **{escape_markdown(base_version)}** to "
+                f"**{escape_markdown(head_version)}** (major) with acknowledgment:\n"
+            )
             lines.append(f"```\n{escaped_justification}\n```\n")
             lines.append("**Reviewer:** Please verify:")
             lines.append("1. The justification is valid and necessary")
-            lines.append("2. Frontend contracts are regenerated in this PR (`make gen-contracts`)")
-            lines.append("3. Migration path is clear for API consumers\n")
-        elif ack_insufficient:
-            lines.append("### Breaking Changes Detected (Insufficient Acknowledgment)\n")
-            lines.append("Breaking changes require explicit acknowledgment with detailed justification.\n")
-            lines.append(f"**Your acknowledgment is too brief:**\n```\n{escaped_justification}\n```\n")
-            lines.append("Please update your PR description with a detailed explanation (minimum 20 characters).\n")
+            lines.append("2. The new major version is served from a separate URL path (e.g., `/api/v2/`)")
+            lines.append("3. Frontend contracts are regenerated in this PR (`make gen-contracts`)")
+            lines.append("4. Migration path is clear for API consumers\n")
         else:
-            lines.append("### Breaking Changes Detected (Not Acknowledged)\n")
-            lines.append("This PR introduces **breaking changes** that will affect existing API consumers.\n")
-            lines.append("**Action Required:** Add to your PR description:")
-            lines.append("```")
+            lines.append("### Breaking Changes Detected (Blocked)\n")
             lines.append(
-                "breaking-change-ack: <detailed justification explaining why this breaking change is necessary and how consumers should migrate>"
+                "This PR introduces **breaking changes** that are **not allowed** "
+                "on the current major API version.\n"
             )
-            lines.append("```\n")
+
+            if spec_path:
+                lines.append(f"**Spec:** `{escape_markdown(spec_path)}`")
+            if base_version or head_version:
+                lines.append(f"**Current version:** {escape_markdown(base_version or 'unknown')}")
+                lines.append(f"**PR version:** {escape_markdown(head_version or 'unknown')}\n")
+
+            if acknowledged and version_bump_type != "major":
+                lines.append(
+                    "A `breaking-change-ack` is present, but breaking changes require "
+                    "a **major version bump** (not just an acknowledgment).\n"
+                )
+            elif ack_insufficient:
+                lines.append(
+                    f"**Insufficient acknowledgment:**\n```\n{escaped_justification}\n```\n"
+                    "Acknowledgments must be at least 20 characters.\n"
+                )
+
+            lines.append("**To resolve, choose one of:**\n")
+            lines.append(
+                "1. **Route to a new major version** — bump `info.version` to the next major "
+                "(e.g., 2.0.0) and add to your PR description:\n"
+                "   ```\n"
+                "   breaking-change-ack: <detailed justification>\n"
+                "   ```"
+            )
+            lines.append(
+                "2. **CVE escape hatch** — if this is a CVE fix that cannot avoid a breaking change, "
+                "request the `cve-breaking-change-approved` label from engineering leadership "
+                "(Senior Director or above)\n"
+            )
 
         lines.append("---\n")
         lines.append("### Breaking Changes Detected\n")
@@ -90,29 +184,37 @@ def format_breaking_changes_comment(results: Dict, repo_owner: str, repo_name: s
             lines.append(f"```\n{escaped_all}\n```")
             lines.append("</details>\n")
 
-        lines.append("---\n")
-        lines.append("### What This Means\n")
-        lines.append(
-            "**Breaking changes** remove or modify existing API contracts in ways that break existing consumers:"
-        )
-        lines.append("- Removed endpoints or fields")
-        lines.append("- Changed field types (e.g., string → number)")
-        lines.append("- Changed required/optional status")
-        lines.append("- Removed enum values\n")
-
-        lines.append("**Before merging, you must:**\n")
-        lines.append("1. **Acknowledge the breaking change** in your PR description")
-        lines.append(
-            "2. **Regenerate frontend contracts** — run `make gen-contracts` and include the updated types in this PR"
-        )
-        lines.append("3. **Document the migration path** for API consumers\n")
-
-        lines.append(
-            f"See [docs/openapi-breaking-changes.md](https://github.com/{repo_owner}/{repo_name}/blob/devel/docs/openapi-breaking-changes.md) for details.\n"
+        if not (cve_approved or major_bump_ack):
+            lines.append("---\n")
+            lines.append("### What This Means\n")
+            lines.append(
+                "Per the **AO REST API Versioning and Deprecation Policy**, breaking changes "
+                "never apply in place — v1 and v2 are separate specs served from different URL paths."
+            )
+            lines.append("- Removed endpoints or fields")
+            lines.append("- Changed field types (e.g., string → number)")
+            lines.append("- Changed required/optional status")
+            lines.append("- Removed enum values\n")
+    elif gate_code == "incorrect_bump":
+        lines.extend(
+            _incorrect_bump_lines(
+                spec_path=spec_path,
+                base_version=base_version,
+                head_version=head_version,
+                version_bump_type=version_bump_type,
+                change_kind=change_kind,
+            )
         )
     else:
         lines.append("### No Breaking Changes Detected\n")
         lines.append("This PR modifies the OpenAPI spec but does **not** introduce breaking changes.\n")
+
+        if base_version and head_version:
+            lines.append(f"**Version:** {escape_markdown(base_version)} → {escape_markdown(head_version)}")
+            if version_bump_type:
+                lines.append(f" ({version_bump_type} bump)\n")
+            else:
+                lines.append("\n")
 
         if all_changes and all_changes.strip():
             lines.append("**Changes detected:**")
@@ -123,7 +225,8 @@ def format_breaking_changes_comment(results: Dict, repo_owner: str, repo_name: s
 
     lines.append("---")
     lines.append(
-        f"*Automated check from [`ci-backend.yml`](https://github.com/{repo_owner}/{repo_name}/blob/devel/.github/workflows/ci-backend.yml)*"
+        f"*Automated check from [`openapi-breaking-changes.yml`]"
+        f"(https://github.com/{repo_owner}/{repo_name}/blob/devel/.github/workflows/openapi-breaking-changes.yml)*"
     )
 
     return "\n".join(lines)
@@ -144,7 +247,7 @@ def post_or_update_comment(pr_number: str, comment_body: str, repo: str) -> None
         f"repos/{repo}/issues/{pr_number}/comments",
         "--paginate",
         "--jq",
-        '.[] | select(.body | contains("Breaking Changes Detected")) | .id',
+        '.[] | select(.body | contains("syntara-openapi-breaking-changes")) | .id',
     ]
 
     result = subprocess.run(list_cmd, capture_output=True, text=True)
