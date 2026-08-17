@@ -170,7 +170,7 @@ test.describe('Integration Wizard @pr-check', () => {
   })
 
   test('connection test with unreachable endpoint returns connection error', async ({ app }) => {
-    test.skip(!isRealBackend, 'Requires real backend — mock API discover always returns success')
+    test.skip(!isRealBackend || !mcpServerUrl, 'Requires real backend with SYNTARA_E2E_MCP_SERVER_URL set')
     const name = buildUniqueName('e2e-wizard-t9a')
     const credName = buildUniqueName('e2e-wizard-t9a-cred')
     let credentialId: string | undefined
@@ -186,7 +186,7 @@ test.describe('Integration Wizard @pr-check', () => {
       await app.getByRole('option', { name: 'LLM Provider' }).click()
 
       await app.getByRole('textbox', { name: 'Name' }).fill(name)
-      await app.getByRole('textbox', { name: 'API URL' }).fill('https://example.com:9999')
+      await app.getByRole('textbox', { name: 'API URL' }).fill('https://mcp-server:9999')
 
       await app.getByRole('button', { name: 'Next' }).click()
 
