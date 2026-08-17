@@ -41,6 +41,7 @@ import pageMainSlotStyles from '../../components/layout/NxPage.module.css'
 import { NxPanel } from '../../components/layout/NxPanel'
 import { NxLink } from '../../components/NxLink'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../types/filters'
@@ -262,13 +263,15 @@ function VersionRow({
           <FlexItem style={{ minWidth: 0 }}>
             <Tooltip content={version.name || (version.created_at ? formatHistoryDateTime(version.created_at) : '')}>
               <Content component={ContentVariants.p} className={styles.versionTimestamp}>
-                {version.name || (version.created_at ? formatHistoryDateTime(version.created_at) : '')}
+                {version.name || <ExecutionTimestamp dateString={version.created_at} />}
               </Content>
             </Tooltip>
           </FlexItem>
           {(showSecondaryDatetime && version.created_at) || version.created_by_username ? (
             <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
-              {showSecondaryDatetime && version.created_at ? formatHistoryDateTime(version.created_at) : null}
+              {showSecondaryDatetime && version.created_at ? (
+                <ExecutionTimestamp dateString={version.created_at} />
+              ) : null}
               {version.created_by_username ? (
                 <>
                   {showSecondaryDatetime && version.created_at ? ' by ' : null}

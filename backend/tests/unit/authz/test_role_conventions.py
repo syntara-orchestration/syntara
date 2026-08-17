@@ -240,12 +240,15 @@ class TestRegistryIntegrity:  # noqa: D101
     def test_all_builtin_policies_have_test_coverage(self) -> None:
         from tests.e2e.authz.policies.conftest import (
             E2E_COVERAGE_EXEMPT,
+            OWN_SCOPED_CASES,
             PROJECT_SCOPED_CASES,
             SELF_SCOPED_CASES,
             SYSTEM_SCOPED_REPRESENTATIVE,
         )
 
-        e2e_covered = {c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES}
+        e2e_covered = {
+            c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
+        }
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
         all_builtin = {p.name for p in BUILTIN_POLICIES}
 
@@ -267,3 +270,41 @@ class TestRegistryIntegrity:  # noqa: D101
             f"E2E_COVERAGE_EXEMPT but no longer exist in BUILTIN_POLICIES. "
             f"Remove them from tests/e2e/authorization/policies/conftest.py:\n  " + "\n  ".join(stale)
         )
+
+    def test_own_scope_policies_have_project_constraint(self) -> None:
+        """Verify all 'own'-scoped policies have a project constraint.
+
+        This test verifies that the removed project-less 'own' Rego branch
+        (commit 8ac5970e1) is not needed by any builtin policies. All 'own'-scoped
+        policies must have scope="own" AND be assigned only to project-scoped roles,
+        ensuring they always have a project constraint.
+
+        If this test fails, it means a builtin policy uses 'own' scope in a
+        system-scoped context, which would require the removed Rego branch.
+        """
+        from syntara.authz.role_conventions import BUILTIN_ROLES
+
+        # Collect all roles by scope
+        system_roles = {r.name for r in BUILTIN_ROLES if r.scope != "project"}
+        project_roles = {r.name for r in BUILTIN_ROLES if r.scope == "project"}
+
+        # Check all own-scoped policies
+        own_policies = [p for p in BUILTIN_POLICIES if p.scope == "own"]
+
+        for policy in own_policies:
+            # Verify the policy is only assigned to project-scoped roles
+            assigned_roles = set(policy.roles)
+            system_role_assignments = assigned_roles & system_roles
+
+            assert not system_role_assignments, (
+                f"Policy '{policy.name}' has scope='own' but is assigned to "
+                f"system-scoped roles: {sorted(system_role_assignments)}. "
+                f"Own-scoped policies require a project constraint (removed in commit 8ac5970e1). "
+                f"Either change the scope to 'any' or assign only to project-scoped roles."
+            )
+
+            # All assignments should be to project roles
+            assert assigned_roles & project_roles, (
+                f"Policy '{policy.name}' has scope='own' but is not assigned to any "
+                f"project-scoped roles. Assigned to: {sorted(assigned_roles)}"
+            )

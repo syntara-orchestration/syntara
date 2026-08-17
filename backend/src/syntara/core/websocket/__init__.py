@@ -1,4 +1,4 @@
-"""WebSocket core functionality for Nexus.
+"""WebSocket core functionality for Syntara.
 
 This package provides dynamic WebSocket message handling using AsyncAPI specifications.
 Uses a hook-based system for message validation and processing with plain Python dicts.

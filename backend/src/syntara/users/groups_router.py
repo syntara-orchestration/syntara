@@ -36,10 +36,10 @@ from syntara.core.models.group import (
     GroupUpdate,
 )
 from syntara.core.models.user_schemas import GroupMemberListResponse
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.users.services.group_service import GroupsService
 
-router = NexusRouter(prefix="/groups", tags=["Groups"])
+router = SyntaraRouter(prefix="/groups", tags=["Groups"])
 
 _group_create = PermissionChecker("group", "create")
 _group_read = PermissionChecker("group", "read")

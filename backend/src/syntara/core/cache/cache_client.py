@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from syntara.core.cache.base import redis_error_handler
+from syntara.core.cache.base import redis_error_handler, redis_operation_with_backoff
 
 if TYPE_CHECKING:
     import redis.asyncio as redis
@@ -42,22 +42,36 @@ class CacheMixin:
     async def cache_setex(self, key: str, ttl_seconds: int, value: str) -> None:
         """Store *value* at *key* with a TTL.
 
+        Automatically retries with exponential backoff on transient pool exhaustion
+        errors (up to 3 retries, 10ms-500ms backoff).
+
         Raises:
-            RedisConnectionError: If the connection fails.
+            RedisConnectionError: If the connection fails after retries exhausted.
 
         """
         client = self._ensure_connected()
-        async with redis_error_handler("cache_setex", key=key):
-            await client.setex(key, ttl_seconds, value)
+
+        async def _setex() -> None:
+            async with redis_error_handler("cache_setex", key=key):
+                await client.setex(key, ttl_seconds, value)
+
+        await redis_operation_with_backoff(_setex, "cache_setex", key=key)
 
     async def cache_delete(self, key: str) -> bool:
         """Delete *key*.  Returns ``True`` if the key existed.
 
+        Automatically retries with exponential backoff on transient pool exhaustion
+        errors (up to 3 retries, 10ms-500ms backoff).
+
         Raises:
-            RedisConnectionError: If the connection fails.
+            RedisConnectionError: If the connection fails after retries exhausted.
 
         """
         client = self._ensure_connected()
-        async with redis_error_handler("cache_delete", key=key):
-            count: int = await client.delete(key)
-            return count > 0
+
+        async def _delete() -> bool:
+            async with redis_error_handler("cache_delete", key=key):
+                count: int = await client.delete(key)
+                return count > 0
+
+        return await redis_operation_with_backoff(_delete, "cache_delete", key=key)

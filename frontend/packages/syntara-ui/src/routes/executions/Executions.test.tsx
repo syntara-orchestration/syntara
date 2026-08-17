@@ -265,6 +265,8 @@ describe('Executions Component', () => {
     expect(screen.getByText('prod release')).toBeInTheDocument()
   })
 
+  // Longer timeout: this exercises PatternFly's Timestamp component, which has been observed
+  // to occasionally exceed the 5s default under CI's coverage-instrumented, sharded test runs.
   it('displays version creation date when no publish name', () => {
     mockExecutionsQuery([
       {
@@ -279,7 +281,7 @@ describe('Executions Component', () => {
 
     const versionCells = screen.getAllByRole('cell', { name: /Jun/ })
     expect(versionCells.length).toBeGreaterThanOrEqual(1)
-  })
+  }, 15000)
 
   it('shows loading state', () => {
     mockExecutionsQuery([], true)

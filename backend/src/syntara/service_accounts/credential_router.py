@@ -12,7 +12,7 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialCreate,
     ServiceAccountCredentialCreateResponse,
@@ -25,7 +25,7 @@ from syntara.service_accounts.credential_schemas import (
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.service_accounts.services.credential_service import ServiceAccountCredentialService
 
-router = NexusRouter(
+router = SyntaraRouter(
     prefix="/service_accounts/{service_account_id}/credentials",
     tags=["Service Account Credentials"],
 )

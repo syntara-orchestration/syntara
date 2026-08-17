@@ -1,1 +1,1 @@
-"""Nexus Identity Providers - External identity provider management."""
+"""Syntara Identity Providers - External identity provider management."""

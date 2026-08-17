@@ -386,6 +386,15 @@ SELF_SCOPED_CASES: list[PolicyTestCase] = [
 ]
 
 # ---------------------------------------------------------------------------
+# Own-scoped policy test cases
+# Tested via test_credential_ownership.py; included here for coverage tracking.
+# ---------------------------------------------------------------------------
+
+OWN_SCOPED_CASES: list[PolicyTestCase] = [
+    PolicyTestCase("credential:update:own", description="Tested in test_credential_ownership.py"),
+]
+
+# ---------------------------------------------------------------------------
 # Policies covered by unit tests only (tests/unit/authz/).
 #
 # System-scoped e2e tests use a representative subset — not every policy

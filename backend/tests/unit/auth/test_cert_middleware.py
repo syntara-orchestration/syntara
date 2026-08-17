@@ -52,7 +52,7 @@ class TestExtractCn:
         assert _extract_cn({"subject": ()}) is None
 
     def test_returns_none_for_no_cn(self) -> None:
-        assert _extract_cn({"subject": ((("organizationName", "Nexus"),),)}) is None
+        assert _extract_cn({"subject": ((("organizationName", "Syntara"),),)}) is None
 
 
 class TestValidateClientCert:
@@ -92,7 +92,7 @@ class TestValidateClientCert:
         assert exc_info.value.reason == "certificate_revoked"
 
     def test_no_cn_in_peercert_raises(self) -> None:
-        peercert = {"subject": ((("organizationName", "Nexus"),),), "serialNumber": "01"}
+        peercert = {"subject": ((("organizationName", "Syntara"),),), "serialNumber": "01"}
         with pytest.raises(CertificateValidationError) as exc_info:
             _validate_client_cert(
                 peercert,

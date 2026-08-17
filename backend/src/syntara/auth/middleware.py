@@ -238,7 +238,7 @@ class StaleTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Reject disabled/deleted principals, and stale tokens."""
         auth_header = request.headers.get("authorization", "")
-        if not auth_header.startswith("Bearer "):
+        if auth_header[:7].lower() != "bearer ":
             return await call_next(request)
 
         token = auth_header[7:]

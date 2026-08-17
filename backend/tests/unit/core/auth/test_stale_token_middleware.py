@@ -408,6 +408,25 @@ class TestStaleTokenMiddleware:
         if response.status_code == 401:
             assert response.json()["code"] == "TOKEN_STALE"
 
+    @pytest.mark.parametrize("scheme", ["bearer", "BEARER", "BeArEr"])
+    def test_case_insensitive_bearer_scheme(self, scheme) -> None:
+        """RFC 7235: the auth scheme is case-insensitive; revocation must still apply."""
+        app = _build_app()
+        payload = _make_payload(sub="user-123", token_version=1)
+
+        mock_ts = _mock_token_service(payload=payload)
+        mock_ctx = _mock_async_session(token_version=5)
+
+        with (
+            patch("syntara.auth.middleware.AsyncSessionLocal", return_value=mock_ctx),
+            patch("syntara.auth.middleware.TokenService", return_value=mock_ts),
+        ):
+            client = TestClient(app)
+            response = client.get("/", headers={"Authorization": f"{scheme} some-jwt"})
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "TOKEN_STALE"
+
     def test_impostor_logout_path_not_exempted(self) -> None:
         """A path that ends with /auth/logout but under a different prefix must NOT be exempted."""
         app = _build_app_with_impostor_routes()

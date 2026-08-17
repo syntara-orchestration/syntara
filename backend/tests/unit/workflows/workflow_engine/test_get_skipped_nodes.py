@@ -1,6 +1,6 @@
-"""Unit tests for NexusWorkflow.get_skipped_nodes query method.
+"""Unit tests for OrchestratorWorkflow.get_skipped_nodes query method.
 
-Verifies that only one get_skipped_nodes method exists on NexusWorkflow,
+Verifies that only one get_skipped_nodes method exists on OrchestratorWorkflow,
 that it directly accesses self.skipped_nodes (no hasattr guard),
 and that it returns the correct data.
 """
@@ -9,7 +9,7 @@ import inspect
 
 import pytest
 
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 
 
 class TestGetSkippedNodesUniqueness:
@@ -17,14 +17,14 @@ class TestGetSkippedNodesUniqueness:
 
     def test_only_one_get_skipped_nodes_method_defined_in_source(self) -> None:
         """The source file should contain exactly one definition of get_skipped_nodes."""
-        source = inspect.getsource(NexusWorkflow)
+        source = inspect.getsource(OrchestratorWorkflow)
         count = source.count("def get_skipped_nodes")
         assert count == 1, f"Expected exactly 1 definition of get_skipped_nodes, found {count}"
 
     def test_get_skipped_nodes_is_callable(self) -> None:
         """get_skipped_nodes should be a callable method on the class."""
-        assert hasattr(NexusWorkflow, "get_skipped_nodes")
-        assert callable(NexusWorkflow.get_skipped_nodes)
+        assert hasattr(OrchestratorWorkflow, "get_skipped_nodes")
+        assert callable(OrchestratorWorkflow.get_skipped_nodes)
 
 
 class TestGetSkippedNodesNoHasattrGuard:
@@ -32,7 +32,7 @@ class TestGetSkippedNodesNoHasattrGuard:
 
     def test_no_hasattr_guard_in_get_skipped_nodes_source(self) -> None:
         """The method body should not contain a hasattr check."""
-        source = inspect.getsource(NexusWorkflow.get_skipped_nodes)
+        source = inspect.getsource(OrchestratorWorkflow.get_skipped_nodes)
         assert "hasattr" not in source, (
             "get_skipped_nodes should directly access self.skipped_nodes without a hasattr guard"
         )
@@ -43,7 +43,7 @@ class TestGetSkippedNodesNoHasattrGuard:
         This confirms the hasattr guard was removed — the method directly
         accesses self.skipped_nodes which is only set during run().
         """
-        wf = NexusWorkflow.__new__(NexusWorkflow)
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
         # Do NOT call __init__ or run() — skipped_nodes won't exist
         with pytest.raises(AttributeError):
             wf.get_skipped_nodes()
@@ -52,9 +52,9 @@ class TestGetSkippedNodesNoHasattrGuard:
 class TestGetSkippedNodesReturnValue:
     """Verify correct return values for various skipped_nodes states."""
 
-    def _make_workflow_with_skipped_nodes(self, skipped: set[str]) -> NexusWorkflow:
-        """Create a NexusWorkflow instance with skipped_nodes set directly."""
-        wf = NexusWorkflow.__new__(NexusWorkflow)
+    def _make_workflow_with_skipped_nodes(self, skipped: set[str]) -> OrchestratorWorkflow:
+        """Create an OrchestratorWorkflow instance with skipped_nodes set directly."""
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
         wf.skipped_nodes = skipped
         return wf
 

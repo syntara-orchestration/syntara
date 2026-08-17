@@ -15,7 +15,7 @@ class AAPBaseQuery(BaseModel):
     page_size: int = Field(default=50, ge=1, le=200, description="Max results to return")
     credential_id: UUID | None = Field(
         default=None,
-        description="Optional Nexus credential ID for Ansible Automation Platform Controller authentication. "
+        description="Optional Syntara credential ID for Ansible Automation Platform Controller authentication. "
         "If provided, the credential is decrypted and used instead of environment variables. "
         'Credential must be of type "Ansible Automation Platform". '
         "Must be a valid UUID format.",

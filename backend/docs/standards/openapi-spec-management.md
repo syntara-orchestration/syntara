@@ -1,10 +1,10 @@
 # OpenAPI Spec Management Standards
 
-This document defines the conventions for maintaining, bundling, and validating OpenAPI specifications in the Nexus project.
+This document defines the conventions for maintaining, bundling, and validating OpenAPI specifications in the Syntara project.
 
 ## Overview
 
-Nexus follows a **domain sub-spec → bundled spec** model:
+Syntara follows a **domain sub-spec → bundled spec** model:
 
 - Each API domain owns a sub-spec under `src/syntara/schemas/{domain}/openapi.yaml`
 - A single bundled spec at `src/syntara/schemas/openapi.yaml` is the committed source of truth
@@ -167,7 +167,7 @@ This is what `make api-spec-drift` does internally.
 
 ## API Client Filter Utilities
 
-The Nexus Python API client (generated from the OpenAPI spec) provides type-safe filter utilities for endpoints that accept `additional_params` with bracket-notation query parameters.
+The Syntara Python API client (generated from the OpenAPI spec) provides type-safe filter utilities for endpoints that accept `additional_params` with bracket-notation query parameters.
 
 ### Quick Start
 

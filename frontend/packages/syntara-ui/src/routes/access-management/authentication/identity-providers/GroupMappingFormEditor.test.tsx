@@ -7,12 +7,19 @@ import { axe } from 'vitest-axe'
 
 import { identityProvidersClient, usersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
+import type { DocKey } from '../../../../utils/docs/types'
 import { useAllGroups } from '../../../access/useAllGroups'
 
 import { GroupMappingFormEditor } from './GroupMappingFormEditor'
 import type { UseGroupMappingFormMetadataResult } from './useGroupMappingForm'
 
 const VALID_PROVIDER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../../client', () => ({
   identityProvidersClient: {
@@ -88,6 +95,7 @@ function buildMetadata(overrides: Partial<UseGroupMappingFormMetadataResult> = {
 
 describe('GroupMappingFormEditor', () => {
   beforeEach(() => {
+    useDocLinkMock.mockClear()
     vi.mocked(useAllGroups).mockReturnValue({
       groups: [],
       isLoading: false,
@@ -106,6 +114,19 @@ describe('GroupMappingFormEditor', () => {
       mutate: vi.fn(),
       isPending: false,
     } as never)
+  })
+
+  it('uses identityProviderMapping documentation key', async () => {
+    render(<GroupMappingFormEditor metadata={buildMetadata()} openTestSignInRef={createRef()} />, { wrapper })
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Add group mapping' })).toBeInTheDocument()
+    })
+    expect(useDocLinkMock).toHaveBeenCalledWith('identityProviderMapping')
+    expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+      'href',
+      'https://docs.example/identityProviderMapping'
+    )
   })
 
   it('disables Save mapping while the patch mutation is pending', async () => {

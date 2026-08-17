@@ -41,7 +41,7 @@ def _make_oidc_config(**overrides: object) -> OIDCConfiguration:
     """Build an OIDCConfiguration with sensible defaults."""
     defaults = {
         "issuer_url": "https://idp.example.com",
-        "client_id": "nexus-client",
+        "client_id": "syntara-client",
         "client_secret": "super-secret",
         "redirect_uri": "http://localhost:3000/auth/callback",
     }
@@ -87,7 +87,7 @@ def _make_provider(**overrides: object) -> IdentityProvider:
         "enabled": True,
         "configuration": OIDCConfigurationResponse(
             issuer_url="https://idp.example.com",
-            client_id="nexus-client",
+            client_id="syntara-client",
             redirect_uri="http://localhost:3000/auth/callback",
         ),
         "secret_id": uuid4(),
@@ -263,7 +263,7 @@ async def test_update_provider_configuration_preserves_claim_mapping() -> None:
     custom_mapping = OIDCClaimMapping(subject="sub", email="mail", username="upn", first_name="displayName")
     config = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
         claim_mapping=custom_mapping,
     )
@@ -300,7 +300,7 @@ async def test_update_provider_configuration_preserves_jmespath() -> None:
     """Patching config without group_jmespath_expression preserves the existing one."""
     config = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
         group_jmespath_expression="token.groups",
     )
@@ -562,7 +562,7 @@ async def test_get_decrypted_config() -> None:
 
     config_data = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
     )
     provider = _make_provider(name="DecryptTest", configuration=config_data, secret_id=secret_id)

@@ -1,6 +1,6 @@
 # Testing Standards
 
-This document defines the testing conventions for the Nexus project. These standards ensure consistency, maintainability, and reliability across the test suite.
+This document defines the testing conventions for the Syntara project. These standards ensure consistency, maintainability, and reliability across the test suite.
 
 ## Directory Structure
 
@@ -197,7 +197,7 @@ async def test_file_upload_invalid_file_type(base_client: AsyncClient) -> None:
 **Scope:** Test complete user workflows across the entire system.
 
 **Characteristics:**
-- Requires full stack running (Nexus API, Temporal, MCP server, OpenRouter)
+- Requires full stack running (Syntara API, Temporal, MCP server, OpenRouter)
 - Uses production-like configuration
 - Tests real user scenarios end-to-end
 - Slowest execution (minutes)

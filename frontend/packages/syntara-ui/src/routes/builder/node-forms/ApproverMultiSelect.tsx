@@ -40,6 +40,7 @@ type ApproverMultiSelectProps<T extends SelectableItem> = Readonly<{
   emptyText: string
   loadingText: string
   helperText: string
+  allowCustomValue?: boolean
 }>
 
 export function ApproverMultiSelect<T extends SelectableItem>({
@@ -55,6 +56,7 @@ export function ApproverMultiSelect<T extends SelectableItem>({
   emptyText,
   loadingText,
   helperText,
+  allowCustomValue,
 }: ApproverMultiSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -71,8 +73,24 @@ export function ApproverMultiSelect<T extends SelectableItem>({
         : [...selectedValues, itemValue]
 
       onChange(newValues)
+      setFilterValue('')
     },
     [selectedValues, onChange]
+  )
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!allowCustomValue) return
+      if (e.key === 'Enter' && filterValue.trim()) {
+        e.preventDefault()
+        const customValue = filterValue.trim()
+        if (!selectedValues.includes(customValue)) {
+          onChange([...selectedValues, customValue])
+          setFilterValue('')
+        }
+      }
+    },
+    [allowCustomValue, filterValue, selectedValues, onChange]
   )
 
   const clearAll = useCallback(() => {
@@ -96,13 +114,16 @@ export function ApproverMultiSelect<T extends SelectableItem>({
     }
   }, [])
 
-  // Get selected item labels for display
-  const selectedLabels = useMemo(
+  const selectedChips = useMemo(
     () =>
-      selectedValues
-        .map((val) => items.find((item) => getItemValue(item) === val))
-        .filter((item): item is T => item !== undefined),
-    [selectedValues, items, getItemValue]
+      selectedValues.map((val) => {
+        const item = items.find((i) => getItemValue(i) === val)
+        if (item) {
+          return { key: val, label: getItemLabel(item), value: getItemValue(item) }
+        }
+        return { key: val, label: val, value: val }
+      }),
+    [selectedValues, items, getItemValue, getItemLabel]
   )
 
   const handleRemoveSelection = useCallback(
@@ -133,22 +154,23 @@ export function ApproverMultiSelect<T extends SelectableItem>({
             onClick={() => {
               if (!isOpen) setIsOpen(true)
             }}
+            onKeyDown={handleKeyDown}
             placeholder={selectedValues.length === 0 ? placeholderText : ''}
             autoComplete="off"
             innerRef={inputRef}
           >
-            {selectedLabels.length > 0 && (
+            {selectedChips.length > 0 && (
               <LabelGroup numLabels={3}>
-                {selectedLabels.map((item) => (
+                {selectedChips.map((chip) => (
                   <Label
-                    key={getItemId(item)}
+                    key={chip.key}
                     color="blue"
                     onClose={(e) => {
                       e.stopPropagation()
-                      handleRemoveSelection(getItemValue(item))
+                      handleRemoveSelection(chip.value)
                     }}
                   >
-                    {getItemLabel(item)}
+                    {chip.label}
                   </Label>
                 ))}
               </LabelGroup>
@@ -179,10 +201,8 @@ export function ApproverMultiSelect<T extends SelectableItem>({
       filterValue,
       validationError,
       clearAll,
-      selectedLabels,
-      getItemId,
-      getItemLabel,
-      getItemValue,
+      handleKeyDown,
+      selectedChips,
       handleRemoveSelection,
     ]
   )

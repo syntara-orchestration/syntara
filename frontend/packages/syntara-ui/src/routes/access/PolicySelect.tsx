@@ -1,21 +1,10 @@
-import {
-  Button,
-  Label,
-  LabelGroup,
-  MenuToggle,
-  SelectList,
-  SelectOption,
-  Spinner,
-  TextInputGroup,
-  TextInputGroupMain,
-  TextInputGroupUtilities,
-} from '@patternfly/react-core'
-import { RhUiCloseIcon } from '@patternfly/react-icons'
-import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-import { NxSelect } from '../../components/NxSelect'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { accessClient } from './accessClient'
+import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
+import { filterPoliciesForRoleSelect } from './policySelectConstants'
+import { PolicySelectField } from './PolicySelectDropdown'
+import { buildPolicyOptionList, filterPolicyOptionsByTerm, usePolicySelectField } from './policySelectShared'
 
 type PolicySelectProps = {
   selected: string[]
@@ -40,19 +29,41 @@ export function PolicySelect({
   projectEligible,
   isDisabled,
 }: Readonly<PolicySelectProps>) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [filterValue, setFilterValue] = useState('')
   const [debouncedFilter, setDebouncedFilter] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const filterValueRef = useRef('')
+  const debouncedFilterRef = useRef('')
 
-  // Debounce filter value for API calls
+  const fetchAllMatchingPolicies = useCallback(
+    () =>
+      fetchAllPoliciesForSelect({
+        scopeProjectId,
+        projectEligible,
+        nameContains: filterValueRef.current || debouncedFilterRef.current || undefined,
+      }),
+    [scopeProjectId, projectEligible]
+  )
+
+  const field = usePolicySelectField({
+    selected,
+    onChange,
+    fetchPolicies: fetchAllMatchingPolicies,
+  })
+
+  useEffect(() => {
+    filterValueRef.current = field.filterValue
+  }, [field.filterValue])
+
+  useEffect(() => {
+    debouncedFilterRef.current = debouncedFilter
+  }, [debouncedFilter])
+
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
-      setDebouncedFilter(filterValue)
+      setDebouncedFilter(field.filterValue)
     }, DEBOUNCE_MS)
     return () => clearTimeout(debounceRef.current)
-  }, [filterValue])
+  }, [field.filterValue])
 
   const policiesQuery = accessClient.useQuery(
     'get',
@@ -68,157 +79,47 @@ export function PolicySelect({
         },
       },
     },
-    { enabled: isOpen }
+    { enabled: field.isOpen }
   )
 
-  const policies = policiesQuery.data?.resources
+  const scopedPolicies = useMemo(
+    () => filterPoliciesForRoleSelect(policiesQuery.data?.resources ?? [], { scopeProjectId, projectEligible }),
+    [policiesQuery.data?.resources, scopeProjectId, projectEligible]
+  )
 
-  // Merge fetched policies with selected names so selected items always appear
-  const policyOptions = useMemo(() => {
-    const fetched = policies ?? []
-    const fetchedNames = new Set(fetched.map((p) => p.name))
-    const selectedOnly = selected.filter((name) => !fetchedNames.has(name))
-    return [
-      ...fetched.map((p) => ({ name: p.name, description: p.description })),
-      ...selectedOnly.map((name) => ({ name, description: null })),
-    ]
-  }, [policies, selected])
+  const policyOptions = useMemo(() => buildPolicyOptionList(scopedPolicies, selected), [scopedPolicies, selected])
 
   const filteredOptions = useMemo(() => {
-    // Client-side filter for instant feedback while debounce hasn't fired yet
-    if (filterValue && filterValue !== debouncedFilter) {
-      const term = filterValue.toLowerCase()
-      return policyOptions.filter((p) => p.name.toLowerCase().includes(term))
+    if (field.filterValue && field.filterValue !== debouncedFilter) {
+      return filterPolicyOptionsByTerm(policyOptions, field.filterValue)
     }
     return policyOptions
-  }, [policyOptions, filterValue, debouncedFilter])
-
-  const onSelect = useCallback(
-    (_event: React.MouseEvent<Element, MouseEvent> | undefined, value: string | number | undefined) => {
-      const policyName = value as string
-      if (selected.includes(policyName)) {
-        onChange(selected.filter((p) => p !== policyName))
-      } else {
-        onChange([...selected, policyName])
-      }
-      setFilterValue('')
-      inputRef.current?.focus()
-    },
-    [selected, onChange]
-  )
-
-  const removePolicy = useCallback(
-    (policyName: string) => {
-      onChange(selected.filter((p) => p !== policyName))
-    },
-    [selected, onChange]
-  )
-
-  const clearAll = useCallback(() => {
-    onChange([])
-    setFilterValue('')
-  }, [onChange])
+  }, [policyOptions, field.filterValue, debouncedFilter])
 
   const isLoading = policiesQuery.isLoading || policiesQuery.isFetching
 
-  const toggle = (toggleRef: Ref<HTMLButtonElement>) => (
-    <MenuToggle
-      ref={toggleRef}
-      variant="typeahead"
-      onClick={() => setIsOpen(!isOpen)}
-      isExpanded={isOpen}
-      isFullWidth
-      isDisabled={isDisabled}
-      status={hasError ? 'danger' : undefined}
-    >
-      <TextInputGroup isPlain isDisabled={isDisabled}>
-        <TextInputGroupMain
-          value={filterValue}
-          onChange={(_e, val) => {
-            setFilterValue(val)
-            if (!isOpen) setIsOpen(true)
-          }}
-          onClick={() => {
-            if (!isOpen) setIsOpen(true)
-          }}
-          placeholder={selected.length === 0 ? 'Select policies...' : ''}
-          autoComplete="off"
-          innerRef={inputRef}
-        >
-          {selected.length > 0 && (
-            <LabelGroup>
-              {selected.map((name) => (
-                <Label
-                  key={name}
-                  color="blue"
-                  onClose={(e) => {
-                    e.stopPropagation()
-                    removePolicy(name)
-                  }}
-                >
-                  {name}
-                </Label>
-              ))}
-            </LabelGroup>
-          )}
-        </TextInputGroupMain>
-        {selected.length > 0 && (
-          <TextInputGroupUtilities>
-            <Button
-              variant="plain"
-              onClick={(e) => {
-                e.stopPropagation()
-                clearAll()
-              }}
-              aria-label="Clear all selected policies"
-            >
-              <RhUiCloseIcon />
-            </Button>
-          </TextInputGroupUtilities>
-        )}
-      </TextInputGroup>
-    </MenuToggle>
-  )
-
-  const handleOpenChange = useCallback((open: boolean) => {
-    setIsOpen(open)
-    if (!open) setFilterValue('')
-  }, [])
-
   return (
-    <NxSelect
+    <PolicySelectField
       id="role-policies"
-      aria-label="Policies"
-      isOpen={isOpen}
-      onOpenChange={handleOpenChange}
-      onSelect={onSelect}
       selected={selected}
-      toggle={toggle}
-    >
-      <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {isLoading && (
-          <SelectOption isDisabled>
-            <Spinner size="sm" /> Loading policies...
-          </SelectOption>
-        )}
-        {!isLoading && filteredOptions.length === 0 && (
-          <SelectOption isDisabled>
-            {filterValue ? `No policies match "${filterValue}"` : 'No policies available'}
-          </SelectOption>
-        )}
-        {!isLoading &&
-          filteredOptions.map((policy) => (
-            <SelectOption
-              key={policy.name}
-              value={policy.name}
-              hasCheckbox
-              isSelected={selected.includes(policy.name)}
-              description={policy.description ?? undefined}
-            >
-              {policy.name}
-            </SelectOption>
-          ))}
-      </SelectList>
-    </NxSelect>
+      filteredOptions={filteredOptions}
+      filterValue={field.filterValue}
+      isOpen={field.isOpen}
+      isLoading={isLoading}
+      isSelectingAll={field.isSelectingAll}
+      hasError={hasError}
+      isDisabled={isDisabled}
+      inputRef={field.inputRef}
+      onOpenChange={field.handleOpenChange}
+      onSelect={field.onSelect}
+      onFilterChange={(value: string) => {
+        field.setFilterValue(value)
+        field.openDropdown()
+      }}
+      onFilterFocus={field.openDropdown}
+      onRemovePolicy={field.removePolicy}
+      onClearAll={field.clearAll}
+      onToggle={() => field.handleOpenChange(!field.isOpen)}
+    />
   )
 }

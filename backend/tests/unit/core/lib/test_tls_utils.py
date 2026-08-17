@@ -32,7 +32,7 @@ def sample_ca_cert() -> str:
                 "1",
                 "-nodes",
                 "-subj",
-                "/CN=test-nexus-ca",
+                "/CN=test-orchestrator-ca",
             ],
             capture_output=True,
             check=True,

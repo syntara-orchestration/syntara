@@ -21,7 +21,7 @@ _VALIDITY_DAYS = 365
 def generate_local_certs(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ca_key, ca_cert = generate_ca(output_dir, common_name="Nexus Local Dev CA", validity_days=_VALIDITY_DAYS)
+    ca_key, ca_cert = generate_ca(output_dir, common_name="Orchestrator Local Dev CA", validity_days=_VALIDITY_DAYS)
 
     not_valid_before = ca_cert.not_valid_before_utc
     not_valid_after = ca_cert.not_valid_after_utc
@@ -30,7 +30,7 @@ def generate_local_certs(output_dir: Path) -> None:
         output_dir,
         ca_key,
         ca_cert,
-        common_name="backend.nexus.svc",
+        common_name="backend.orchestrator.svc",
         filename="backend",
         not_valid_before=not_valid_before,
         not_valid_after=not_valid_after,
@@ -39,7 +39,7 @@ def generate_local_certs(output_dir: Path) -> None:
         output_dir,
         ca_key,
         ca_cert,
-        common_name="worker.nexus.svc",
+        common_name="worker.orchestrator.svc",
         filename="worker",
         not_valid_before=not_valid_before,
         not_valid_after=not_valid_after,

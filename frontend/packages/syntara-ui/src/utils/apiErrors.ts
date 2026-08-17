@@ -230,7 +230,7 @@ export function isForbiddenError(error: unknown): boolean {
   }
 
   const code = getErrorCode(error)
-  if (code === 'FORBIDDEN' || code === 'AUTHORIZATION_ERROR') {
+  if (code === 'FORBIDDEN' || code === 'AUTHORIZATION_ERROR' || code === 'AUTHORIZATION_DENIED') {
     return true
   }
 

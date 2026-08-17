@@ -21,7 +21,7 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.base import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -248,7 +248,7 @@ async def delete_sub_resource_assignment(
 # Global role-assignment router
 # ---------------------------------------------------------------------------
 
-router = NexusRouter(prefix="/role_assignments", tags=["Role Assignments"])
+router = SyntaraRouter(prefix="/role_assignments", tags=["Role Assignments"])
 
 
 def _get_service(

@@ -26,7 +26,7 @@ async def test_file_metadata_create_with_defaults(test_db_session: AsyncSession,
         filename="document.pdf",
         mime_type="application/pdf",
         size_bytes=1024,
-        file_path="/storage/nexus-abc123-document.pdf",
+        file_path="/storage/orchestrator-abc123-document.pdf",
         project_id=test_project_id,
     )
 
@@ -39,7 +39,7 @@ async def test_file_metadata_create_with_defaults(test_db_session: AsyncSession,
     assert file_metadata.filename == "document.pdf"
     assert file_metadata.mime_type == "application/pdf"
     assert file_metadata.size_bytes == 1024
-    assert file_metadata.file_path == "/storage/nexus-abc123-document.pdf"
+    assert file_metadata.file_path == "/storage/orchestrator-abc123-document.pdf"
 
     # Verify default values
     assert file_metadata.status == FileStatus.PENDING_CONVERSION
@@ -68,7 +68,7 @@ async def test_file_metadata_status_enum_values(test_db_session: AsyncSession, t
             filename=f"file_{status.value}.txt",
             mime_type="text/plain",
             size_bytes=100,
-            file_path=f"/storage/nexus-{status.value}-file.txt",
+            file_path=f"/storage/orchestrator-{status.value}-file.txt",
             status=status,
             project_id=test_project_id,
         )
@@ -105,7 +105,7 @@ async def test_file_metadata_inherits_base_resource_fields(test_db_session: Asyn
         filename="test.txt",
         mime_type="text/plain",
         size_bytes=256,
-        file_path="/storage/nexus-test-test.txt",
+        file_path="/storage/orchestrator-test-test.txt",
         project_id=test_project_id,
     )
 
@@ -132,8 +132,8 @@ async def test_file_metadata_with_converted_content(test_db_session: AsyncSessio
         filename="document.pdf",
         mime_type="application/pdf",
         size_bytes=2048,
-        file_path="/storage/nexus-abc123-document.pdf",
-        converted_content_path="/storage/nexus-abc123-content.md",
+        file_path="/storage/orchestrator-abc123-document.pdf",
+        converted_content_path="/storage/orchestrator-abc123-content.md",
         status=FileStatus.CONVERTED,
         project_id=test_project_id,
     )
@@ -142,7 +142,7 @@ async def test_file_metadata_with_converted_content(test_db_session: AsyncSessio
     await test_db_session.commit()
 
     assert file_metadata.status == FileStatus.CONVERTED
-    assert file_metadata.converted_content_path == "/storage/nexus-abc123-content.md"
+    assert file_metadata.converted_content_path == "/storage/orchestrator-abc123-content.md"
     assert file_metadata.conversion_error is None
 
 
@@ -155,7 +155,7 @@ async def test_file_metadata_with_conversion_error(test_db_session: AsyncSession
         filename="corrupted.pdf",
         mime_type="application/pdf",
         size_bytes=512,
-        file_path="/storage/nexus-xyz789-corrupted.pdf",
+        file_path="/storage/orchestrator-xyz789-corrupted.pdf",
         status=FileStatus.CONVERSION_FAILED,
         conversion_error=error_message,
         project_id=test_project_id,
@@ -191,7 +191,7 @@ async def test_file_metadata_update_status(test_db_session: AsyncSession, test_p
         filename="processing.docx",
         mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         size_bytes=4096,
-        file_path="/storage/nexus-proc123-processing.docx",
+        file_path="/storage/orchestrator-proc123-processing.docx",
         status=FileStatus.PENDING_CONVERSION,
         project_id=test_project_id,
     )
@@ -207,11 +207,11 @@ async def test_file_metadata_update_status(test_db_session: AsyncSession, test_p
 
     # Update to converted with content path
     file_metadata.status = FileStatus.CONVERTED
-    file_metadata.converted_content_path = "/storage/nexus-proc123-content.md"
+    file_metadata.converted_content_path = "/storage/orchestrator-proc123-content.md"
     await test_db_session.commit()
 
     assert file_metadata.status == FileStatus.CONVERTED
-    assert file_metadata.converted_content_path == "/storage/nexus-proc123-content.md"
+    assert file_metadata.converted_content_path == "/storage/orchestrator-proc123-content.md"
 
 
 @pytest.mark.asyncio
@@ -221,7 +221,7 @@ async def test_file_metadata_content_hash_nullable(test_db_session: AsyncSession
         filename="test.pdf",
         mime_type="application/pdf",
         size_bytes=1024,
-        file_path="/storage/nexus-abc-test.pdf",
+        file_path="/storage/orchestrator-abc-test.pdf",
         project_id=test_project_id,
     )
     test_db_session.add(file_metadata)
@@ -244,7 +244,7 @@ async def test_file_metadata_create_with_content_hash(test_db_session: AsyncSess
         filename="report.docx",
         mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         size_bytes=4096,
-        file_path="nexus-xyz-report.docx",
+        file_path="orchestrator-xyz-report.docx",
         content_hash=sha256,
         project_id=test_project_id,
     )

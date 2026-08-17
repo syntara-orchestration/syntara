@@ -182,7 +182,7 @@ class TestMTLS2WorkerToBackend:
             tmp_path,
             ca_key,
             ca_cert,
-            common_name="expired.nexus.svc",
+            common_name="expired.orchestrator.svc",
             filename="expired",
             not_valid_before=datetime.now(UTC) - timedelta(hours=1),
             not_valid_after=datetime.now(UTC) - timedelta(seconds=1),

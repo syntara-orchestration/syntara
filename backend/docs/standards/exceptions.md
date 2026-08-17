@@ -4,10 +4,10 @@ This document defines the naming conventions and structural patterns for excepti
 
 ## Exception Hierarchy
 
-All domain exceptions inherit from `NexusError`:
+All domain exceptions inherit from `SyntaraError`:
 
 ```
-NexusError(Exception)
+SyntaraError(Exception)
 ├── ApprovalError
 │   ├── ApprovalNotFoundError
 │   ├── ApprovalAlreadyDecidedError
@@ -34,7 +34,7 @@ NexusError(Exception)
 ├── AgentOrchestratorError
 │   ├── LLMConfigurationError
 │   └── TemporalUnavailableError
-└── SafeValueError(ValueError, NexusError)
+└── SafeValueError(ValueError, SyntaraError)
 ```
 
 ## Naming Conventions
@@ -57,12 +57,12 @@ NexusError(Exception)
 
 ### Domain Base Exceptions
 
-**Pattern:** `{Domain}Error(NexusError)`
+**Pattern:** `{Domain}Error(SyntaraError)`
 
 Each domain module defines a base exception that all domain-specific exceptions inherit from:
 
 ```python
-class ToolManagerError(NexusError):
+class ToolManagerError(SyntaraError):
     """Base exception for tool manager operations."""
 ```
 
@@ -86,7 +86,7 @@ Examples: `APPROVAL_NOT_FOUND`, `WORKFLOW_NAME_CONFLICT`, `VALIDATION_ERROR`, `T
 
 ### Simple (Most Common)
 
-Inherit from `NexusError` — the base class stores `self.message`:
+Inherit from `SyntaraError` — the base class stores `self.message`:
 
 ```python
 class WorkflowNotFoundError(WorkflowError):
@@ -122,7 +122,7 @@ class ApprovalAlreadyDecidedError(ApprovalError):
         )
 ```
 
-The `message` attribute (set by `NexusError.__init__`) is used by error handlers to extract user-safe detail text.
+The `message` attribute (set by `SyntaraError.__init__`) is used by error handlers to extract user-safe detail text.
 
 ## @fastapi_exception Decorator
 
@@ -235,7 +235,7 @@ Core infrastructure:
 
 | File | Purpose |
 |---|---|
-| `src/syntara/core/exceptions.py` | `NexusError` base class, `SafeValueError` |
+| `src/syntara/core/exceptions.py` | `SyntaraError` base class, `SafeValueError` |
 | `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator, `register_exceptions()` |
 | `src/syntara/core/error_handlers.py` | `PROBLEM_TYPES` dict, `create_problem_details_response()`, framework-level handlers |
 
@@ -246,11 +246,11 @@ Core infrastructure:
 ```python
 # src/syntara/must_gather/exceptions.py
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.must_gather.error_handlers import must_gather_not_found_handler
 
 
-class MustGatherError(NexusError):
+class MustGatherError(SyntaraError):
     """Base exception for must-gather operations."""
 
 
@@ -378,7 +378,7 @@ Backoff formula: `initial * (growth_factor ** attempt)`, capped at `max_backoff`
 
 | File | Purpose |
 |---|---|
-| `src/syntara/core/exceptions.py` | `NexusError` base, `SafeValueError` |
+| `src/syntara/core/exceptions.py` | `SyntaraError` base, `SafeValueError` |
 | `src/syntara/core/exception_registry.py` | Decorator and registration |
 | `src/syntara/core/error_handlers.py` | `PROBLEM_TYPES`, `create_problem_details_response()` |
 | `docs/error-handling-strategy.md` | Architectural strategy and principles |

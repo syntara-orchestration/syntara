@@ -9,8 +9,15 @@ import { axe } from 'vitest-axe'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
+import type { DocKey } from '../../../../utils/docs/types'
 
 import { IntegrationForm } from './IntegrationForm'
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../useProjectAssignmentSync', () => ({
   useProjectAssignmentSync: () => ({
@@ -102,6 +109,16 @@ function mockMutations(discoverMutate?: Mock, createMutate?: Mock) {
 describe('IntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('uses configureIntegration documentation key', () => {
+    render(<IntegrationForm />, { wrapper })
+
+    expect(useDocLinkMock).toHaveBeenCalledWith('configureIntegration')
+    expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+      'href',
+      'https://docs.example/configureIntegration'
+    )
   })
 
   it('renders the wizard with three steps in navigation', () => {

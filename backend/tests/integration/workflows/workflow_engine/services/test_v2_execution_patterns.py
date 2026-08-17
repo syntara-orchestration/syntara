@@ -26,7 +26,7 @@ from syntara.workflows.workflow_engine.activities.manual_trigger import manual_t
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.switch import switch
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
@@ -61,7 +61,7 @@ async def _run_workflow(
     async with Worker(
         temporal_env.client,
         task_queue=task_queue,
-        workflows=[NexusWorkflow],
+        workflows=[OrchestratorWorkflow],
         activities=_V2_ACTIVITIES,
     ):
         svc = TemporalExecutionService(

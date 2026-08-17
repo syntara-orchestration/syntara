@@ -9,7 +9,7 @@ import {
   ToolbarItem,
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
-import { ArrowRightIcon, FilterIcon } from '@patternfly/react-icons'
+import { RhUiArrowRightIcon, RhUiFilterIcon } from '@patternfly/react-icons'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
@@ -43,7 +43,7 @@ type FieldSelectorMenuToggleProps = {
 
 function FieldSelectorMenuToggle({ toggleRef, isOpen, onOpenChange, label }: Readonly<FieldSelectorMenuToggleProps>) {
   return (
-    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} icon={<FilterIcon />}>
+    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} icon={<RhUiFilterIcon />}>
       {label}
     </MenuToggle>
   )
@@ -140,9 +140,7 @@ export function TextFilterInput({
           />
         </InputGroupItem>
         <InputGroupItem>
-          <Button variant="control" aria-label="Apply filter" onClick={onApply}>
-            <ArrowRightIcon />
-          </Button>
+          <Button variant="control" aria-label="Apply filter" onClick={onApply} icon={<RhUiArrowRightIcon />} />
         </InputGroupItem>
       </InputGroup>
     </ToolbarItem>

@@ -1,12 +1,12 @@
 """Domain exceptions for tool management."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 # Domain Exceptions
 @fastapi_exception(handler="syntara.tool_manager.error_handlers.tool_manager_error_handler")
-class ToolManagerError(NexusError):
+class ToolManagerError(SyntaraError):
     """Base exception for all tool management errors."""
 
 

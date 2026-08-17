@@ -13,6 +13,12 @@ const ruleTester = new RuleTester({
   },
 })
 
+const allowedFilesOption = [
+  {
+    allowedFiles: ['**/utils/dateUtils.ts', '**/components/table/DateCell.tsx'],
+  },
+]
+
 ruleTester.run('no-locale-date-format', rule, {
   valid: [
     {
@@ -39,6 +45,21 @@ ruleTester.run('no-locale-date-format', rule, {
     {
       code: `const s = someVar.toLocaleString();`,
     },
+    // Canonical wrapper components (allowlisted) may import Timestamp directly.
+    {
+      code: `
+        import { Timestamp } from '@patternfly/react-core';
+        const App = () => <Timestamp date={d} />;
+      `,
+      filename: '/repo/src/components/table/DateCell.tsx',
+      options: allowedFilesOption,
+    },
+    // dateUtils.ts (allowlisted) may use raw locale Date methods.
+    {
+      code: `const t = date.toLocaleTimeString('en-US', {});`,
+      filename: '/repo/src/utils/dateUtils.ts',
+      options: allowedFilesOption,
+    },
   ],
   invalid: [
     {
@@ -62,14 +83,24 @@ ruleTester.run('no-locale-date-format', rule, {
         import { Timestamp } from '@patternfly/react-core';
         const App = () => <Timestamp date={d} />;
       `,
-      errors: [{ messageId: 'noTimestamp' }],
+      errors: [{ messageId: 'restrictedTimestampImport' }],
     },
     {
       code: `
         import { Content, Timestamp } from '@patternfly/react-core';
         const App = () => <Timestamp date={d} />;
       `,
-      errors: [{ messageId: 'noTimestamp' }],
+      errors: [{ messageId: 'restrictedTimestampImport' }],
+    },
+    // Non-allowlisted file still flagged even when other files are allowlisted.
+    {
+      code: `
+        import { Timestamp } from '@patternfly/react-core';
+        const App = () => <Timestamp date={d} />;
+      `,
+      filename: '/repo/src/routes/workflows/WorkflowsTableBody.tsx',
+      options: allowedFilesOption,
+      errors: [{ messageId: 'restrictedTimestampImport' }],
     },
   ],
 })

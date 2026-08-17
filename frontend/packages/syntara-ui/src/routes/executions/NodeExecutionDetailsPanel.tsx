@@ -27,9 +27,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxLabel } from '../../components/labels/NxLabel'
 import { NxErrorState } from '../../components/states/NxErrorState'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
-import { formatExecutionDateTime, formatElapsedTime } from '../../utils/dateUtils'
+import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
@@ -187,7 +188,9 @@ function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
       <FlexItem>
         <Stack>
           <StackItem className={styles.auditLabel}>Decided at</StackItem>
-          <StackItem className={styles.auditValue}>{formatExecutionDateTime(audit.decidedAt)}</StackItem>
+          <StackItem className={styles.auditValue}>
+            <ExecutionTimestamp dateString={audit.decidedAt} />
+          </StackItem>
         </Stack>
       </FlexItem>
       {audit.decisionNotes && (
@@ -268,8 +271,13 @@ function NodeDetailsHeader({
                 component={ContentVariants.small}
                 style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
               >
-                {formatExecutionDateTime(nodeStarted)}
-                {nodeCompleted && ` - ${formatExecutionDateTime(nodeCompleted)}`}
+                <ExecutionTimestamp dateString={nodeStarted} />
+                {nodeCompleted && (
+                  <>
+                    {' - '}
+                    <ExecutionTimestamp dateString={nodeCompleted} />
+                  </>
+                )}
               </Content>
             )}
             {nodeElapsedLabel && (

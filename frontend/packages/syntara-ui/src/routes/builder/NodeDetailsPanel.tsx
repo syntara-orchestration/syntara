@@ -217,6 +217,7 @@ function renderEditModeContent(
         nodeId={node.id}
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
       />
     )
   }

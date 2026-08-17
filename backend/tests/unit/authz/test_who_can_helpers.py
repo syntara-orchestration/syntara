@@ -7,14 +7,19 @@ import pytest
 from sqlalchemy import Select
 from sqlmodel import select
 
+from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.router import (
+    _WHO_CAN_GATE_RULES,
     WhoCanRequest,
     WhoCanUser,
     _apply_who_can_cursor_filter,
     _build_page_cursors,
+    _can_edit_workflow_in_project,
     _check_batch_authorization,
     _check_user_authorized,
     _count_batch_authorized,
+    _enforce_who_can_permission,
+    _user_has_authz_query_permission,
 )
 from syntara.core.models.user import User
 from syntara.core.utils.cursor import PaginationDirection, SortDirection
@@ -282,6 +287,42 @@ class TestCheckUserAuthorized:
             result = await _check_user_authorized(db, evaluator, user, body, "")
             assert result is False
 
+    @pytest.mark.asyncio
+    async def test_passes_stripped_labels_to_authorize(self) -> None:
+        """Tier 1 callers have labels/metadata stripped at the endpoint level.
+
+        Simulate the who_can endpoint flow: _enforce_who_can_permission returns
+        is_trusted=False for Tier 1, so the endpoint creates a sanitized copy
+        of the body (via model_copy) before passing it to _check_user_authorized.
+        """
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = MagicMock(spec=User)
+        user.id = uuid4()
+        user.labels = {}
+        user.authz_metadata = {}
+        original_body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_labels={"forged": "true"},
+            resource_metadata={"admin": True},
+        )
+
+        # Simulate the endpoint's model_copy stripping for non-trusted callers
+        sanitized_body = original_body.model_copy(update={"resource_labels": {}, "resource_metadata": {}})
+
+        # Original is untouched
+        assert original_body.resource_labels == {"forged": "true"}
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth:
+            await _check_user_authorized(db, evaluator, user, sanitized_body, "my-project")
+            authz_req = mock_auth.call_args[0][2]
+            assert authz_req.resource_labels == {}
+            assert authz_req.resource_metadata == {}
+
 
 # ---------------------------------------------------------------------------
 # _check_batch_authorization
@@ -428,3 +469,399 @@ class TestCountBatchAuthorized:
         assert count == 2
         assert scanned == 5
         assert cap_exceeded is False
+
+
+# ---------------------------------------------------------------------------
+# _user_has_authz_query_permission
+# ---------------------------------------------------------------------------
+
+
+class TestUserHasAuthzQueryPermission:
+    """Tests for _user_has_authz_query_permission."""
+
+    def _make_user(self) -> MagicMock:
+        user = MagicMock(spec=User)
+        user.id = uuid4()
+        user.labels = {}
+        user.authz_metadata = {}
+        return user
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_authorized(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth:
+            result = await _user_has_authz_query_permission(user, evaluator, db)
+            assert result is True
+            mock_auth.assert_awaited_once()
+            call_args = mock_auth.call_args
+            authz_request = call_args[0][2]
+            assert authz_request.action == "query"
+            assert authz_request.resource_type == "authz"
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_denied(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+
+        mock_result = MagicMock()
+        mock_result.allowed = False
+
+        with patch("syntara.authz.router.authorize", return_value=mock_result):
+            result = await _user_has_authz_query_permission(user, evaluator, db)
+            assert result is False
+
+
+# ---------------------------------------------------------------------------
+# who_can two-tier permission gate
+# ---------------------------------------------------------------------------
+
+
+class TestCanEditWorkflowInProject:
+    """Tests for _can_edit_workflow_in_project."""
+
+    def _make_user(self) -> MagicMock:
+        user = MagicMock(spec=User)
+        user.id = uuid4()
+        user.labels = {}
+        user.authz_metadata = {}
+        return user
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_user_can_update(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth:
+            result = await _can_edit_workflow_in_project(user, evaluator, db, "proj-1")
+            assert result is True
+            call_args = mock_auth.call_args[0][2]
+            assert call_args.action == "update"
+            assert call_args.resource_type == "workflow"
+            assert call_args.resource_project == "proj-1"
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_user_can_create(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+
+        denied = MagicMock()
+        denied.allowed = False
+        allowed = MagicMock()
+        allowed.allowed = True
+
+        with patch("syntara.authz.router.authorize", side_effect=[denied, allowed]) as mock_auth:
+            result = await _can_edit_workflow_in_project(user, evaluator, db, "proj-1")
+            assert result is True
+            assert mock_auth.await_count == 2
+            assert mock_auth.call_args_list[1][0][2].action == "create"
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_neither_update_nor_create(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+
+        denied = MagicMock()
+        denied.allowed = False
+
+        with patch("syntara.authz.router.authorize", return_value=denied):
+            result = await _can_edit_workflow_in_project(user, evaluator, db, "proj-1")
+            assert result is False
+
+
+class TestWhoCanPermissionGate:
+    """Tests for the two-tier authorization gate in _enforce_who_can_permission."""
+
+    def _make_user(self) -> MagicMock:
+        user = MagicMock(spec=User)
+        user.id = uuid4()
+        user.labels = {}
+        user.authz_metadata = {}
+        return user
+
+    def _make_request(self, *, cert_authenticated: bool = False) -> MagicMock:
+        request = MagicMock()
+        request.state.is_cert_authenticated = cert_authenticated
+        return request
+
+    @pytest.mark.asyncio
+    async def test_rejects_disallowed_action_type_pair(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="delete",
+            resource_type="project",
+            resource_project="my-project",
+        )
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router._dispatch_who_can_denied"),
+            pytest.raises(
+                AuthorizationDeniedError,
+                match="who_can query for project:delete is not permitted for non-admin users",
+            ),
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+
+    def test_gate_rules_contain_approval_decide(self) -> None:
+        pairs = {(r.resource_type, r.action) for r in _WHO_CAN_GATE_RULES}
+        assert ("approval", "decide") in pairs
+
+    @pytest.mark.asyncio
+    async def test_tier1_allows_workflow_editor_with_project(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_project="my-project",
+        )
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router.authorize", return_value=mock_result),
+        ):
+            is_trusted = await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+            assert is_trusted is False
+
+    @pytest.mark.asyncio
+    async def test_tier1_denies_non_editor_with_project(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_project="my-project",
+        )
+
+        mock_result = MagicMock()
+        mock_result.allowed = False
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router.authorize", return_value=mock_result),
+            patch("syntara.authz.router._dispatch_who_can_denied"),
+            pytest.raises(AuthorizationDeniedError, match="Not authorized to query approval in project my-project"),
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+
+    @pytest.mark.asyncio
+    async def test_tier1_resource_project_drives_check_not_resource_id(self) -> None:
+        """resource_project is what drives Tier 1; resource_id is informational only."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_id="res-123",
+        )
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth,
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+            mock_auth.assert_awaited()
+            authz_req = mock_auth.call_args[0][2]
+            assert authz_req.resource_type == "workflow"
+            assert authz_req.action in ("update", "create")
+
+    @pytest.mark.asyncio
+    async def test_resource_id_alone_without_project_is_denied(self) -> None:
+        """resource_id without resource_project falls to Tier 2, not Tier 1."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_id="res-123",
+        )
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router._dispatch_who_can_denied"),
+            pytest.raises(AuthorizationDeniedError, match="System-wide who_can queries require authz:query permission"),
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="", request=self._make_request()
+            )
+
+    @pytest.mark.asyncio
+    async def test_tier1_does_not_use_client_labels(self) -> None:
+        """Client-supplied labels/metadata must not influence the gate."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_project="my-project",
+            resource_labels={"forged": "true"},
+            resource_metadata={"admin": True},
+        )
+
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router.authorize", return_value=mock_result) as mock_auth,
+        ):
+            is_trusted = await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+            assert is_trusted is False
+            authz_req = mock_auth.call_args[0][2]
+            assert authz_req.resource_labels == {}
+            assert authz_req.resource_metadata == {}
+
+    @pytest.mark.asyncio
+    async def test_authz_query_allows_scoped_unlisted_pair(self) -> None:
+        """Admin with authz:query can query any scoped (resource_type, action) pair."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="assign",
+            resource_type="role-assignment",
+            resource_project="my-project",
+        )
+
+        with patch("syntara.authz.router._user_has_authz_query_permission", return_value=True):
+            is_trusted = await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+            assert is_trusted is True
+
+    @pytest.mark.asyncio
+    async def test_tier2_allows_admin_without_project(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+        )
+
+        with patch("syntara.authz.router._user_has_authz_query_permission", return_value=True):
+            is_trusted = await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="", request=self._make_request()
+            )
+            assert is_trusted is True
+
+    @pytest.mark.asyncio
+    async def test_tier2_denies_non_admin_without_project(self) -> None:
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+        )
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router._dispatch_who_can_denied"),
+            pytest.raises(AuthorizationDeniedError, match="System-wide who_can queries require authz:query permission"),
+        ):
+            await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="", request=self._make_request()
+            )
+
+    @pytest.mark.asyncio
+    async def test_cert_authenticated_bypasses_gate(self) -> None:
+        """Certificate-authenticated requests bypass the permission gate entirely."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="delete",
+            resource_type="project",
+            resource_project="my-project",
+        )
+
+        is_trusted = await _enforce_who_can_permission(
+            body,
+            user,
+            db,
+            evaluator,
+            resource_project="my-project",
+            request=self._make_request(cert_authenticated=True),
+        )
+        assert is_trusted is True
+
+    @pytest.mark.asyncio
+    async def test_tier1_forged_labels_stripped_before_batch_auth(self) -> None:
+        """End-to-end: Tier 1 gate + model_copy + batch auth receives empty labels."""
+        db = AsyncMock()
+        evaluator = AsyncMock()
+        user = self._make_user()
+        body = WhoCanRequest(
+            action="decide",
+            resource_type="approval",
+            resource_project="my-project",
+            resource_labels={"forged": "true"},
+            resource_metadata={"admin": True},
+        )
+
+        gate_result = MagicMock()
+        gate_result.allowed = True
+
+        with (
+            patch("syntara.authz.router._user_has_authz_query_permission", return_value=False),
+            patch("syntara.authz.router.authorize", return_value=gate_result),
+        ):
+            is_trusted = await _enforce_who_can_permission(
+                body, user, db, evaluator, resource_project="my-project", request=self._make_request()
+            )
+        assert is_trusted is False
+
+        # Replicate the endpoint's model_copy stripping
+        sanitized = body.model_copy(update={"resource_labels": {}, "resource_metadata": {}})
+        assert body.resource_labels == {"forged": "true"}  # original untouched
+
+        # Verify batch authorization receives the stripped body
+        alice = self._make_user()
+        alice.username = "alice"
+        authorized: list[WhoCanUser] = []
+        checked: set[UUID] = set()
+
+        scan_result = MagicMock()
+        scan_result.allowed = True
+        with patch("syntara.authz.router.authorize", return_value=scan_result) as mock_auth:
+            await _check_batch_authorization(db, evaluator, [alice], sanitized, "my-project", authorized, checked, 10)
+            authz_req = mock_auth.call_args[0][2]
+            assert authz_req.resource_labels == {}
+            assert authz_req.resource_metadata == {}

@@ -127,7 +127,7 @@ class TestExtractIdpGroupValues:
 
     def test_rejects_string_claim_with_wildcard_expression(self) -> None:
         user_id = uuid4()
-        claims = {"groups": "nexus-users"}
+        claims = {"groups": "syntara-users"}
         result = extract_idp_group_values("groups[*]", claims, user_id)
         assert result is None
 
@@ -328,9 +328,9 @@ class TestSyncIdpGroups:
         identity = _make_identity(user, provider_id)
         mapped_group_id = uuid4()
         config = _make_config(group_jmespath_expression="groups[*]")
-        db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "nexus-users", mapped_group_id)])
+        db = _make_mock_db(mapping_entries=[_make_db_entry(provider_id, "syntara-users", mapped_group_id)])
 
-        result = await sync_idp_groups(db, user, identity, {"groups": "nexus-users"}, config)
+        result = await sync_idp_groups(db, user, identity, {"groups": "syntara-users"}, config)
         assert result is False
 
 
@@ -410,11 +410,11 @@ class TestAllowAllAuthenticated:
         users_group = _make_builtin_group("users")
         config = _make_config(group_jmespath_expression="groups[*]", allow_all_authenticated=True)
         db = _make_mock_db(
-            mapping_entries=[_make_db_entry(provider_id, "nexus-users", mapped_group_id)],
+            mapping_entries=[_make_db_entry(provider_id, "syntara-users", mapped_group_id)],
             users_group=users_group,
         )
 
-        result = await sync_idp_groups(db, user, identity, {"groups": "nexus-users"}, config)
+        result = await sync_idp_groups(db, user, identity, {"groups": "syntara-users"}, config)
         assert result is True
 
 
@@ -429,7 +429,7 @@ class TestGroupMappingModels:
         assert entry.idp_group_value == "admin-guid-123"
 
     def test_oidc_config_with_group_jmespath(self):
-        nexus_id = uuid4()
+        mapped_id = uuid4()
         config = OIDCConfiguration(
             provider_type="oidc",
             issuer_url="https://idp.example.com",
@@ -437,7 +437,7 @@ class TestGroupMappingModels:
             client_secret="client-secret",
             redirect_uri="http://localhost:8000/callback",
             group_jmespath_expression="realm_access.roles[*]",
-            group_mapping_entries=[OIDCGroupMappingEntry(idp_group_value="admin", mapped_group_id=nexus_id)],
+            group_mapping_entries=[OIDCGroupMappingEntry(idp_group_value="admin", mapped_group_id=mapped_id)],
         )
         assert config.group_jmespath_expression == "realm_access.roles[*]"
         assert len(config.group_mapping_entries) == 1

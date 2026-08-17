@@ -16,7 +16,7 @@ import httpx
 
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 PROVIDER_NAME = "mcp"
-MCP_BASE_URL = "http://nexus_mcp-server_1:8765/mcp"
+MCP_BASE_URL = "http://syntara_mcp-server_1:8765/mcp"
 
 
 def _get_access_token() -> str:

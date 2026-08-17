@@ -182,8 +182,8 @@ services:
       - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
       - APP_S2S_TLS_CN_ALLOWLIST=["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc"]
       - APP_BACKGROUND_TASK_QUEUE=orchestrator-background-queue
-      # Docs off by default; enable for DAST / local container debugging.
-      - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-false}
+      # Docs on by default; set to false to disable in locked-down environments.
+      - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-true}
     volumes:
       - ./backend/src:/opt/app-root/src/src:z
       - syntara_audit_exports:/data/audit-exports:z
@@ -238,6 +238,7 @@ services:
       - APP_TEMPORAL_ADDRESS=temporal:7233
       - APP_TEMPORAL_NAMESPACE=default
       - APP_TASK_QUEUE=orchestrator-workflow-queue
+      - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis
@@ -385,6 +386,38 @@ services:
       - MCP_PORT=8765
     healthcheck:
       test: [CMD, curl, -f, 'http://localhost:8765/health']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Auxiliary MCP servers used only by the auth-failure E2E tests
+  # (test_mcp_provider_connection_failure_unauthorized/_forbidden). These are
+  # reached by the "syntara" container via this service's compose-network name,
+  # not via host.containers.internal: that address is unreachable from
+  # Kubernetes pods and, under Podman's pasta network backend, resolves to a
+  # 169.254.0.0/16 address that SSRF cloud-metadata protection always blocks.
+  mcp-server-scenarios:
+    profiles:
+      - mcp-scenarios
+    build:
+      context: ./backend
+      dockerfile: containers/mcp/Containerfile
+    image: ${MCP_IMAGE:-localhost/syntara-mcp:latest}
+    restart: unless-stopped
+    command: [sh, -c, 'uv run python run_mcp_scenario_servers.py']
+    ports:
+      - "127.0.0.1:${MCP_AUTH_PORT:-8766}:8766"
+      - "127.0.0.1:${MCP_FORBIDDEN_PORT:-8767}:8767"
+    environment:
+      - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
+      - MCP_HOST=0.0.0.0
+      - MCP_AUTH_PORT=8766
+      - MCP_FORBIDDEN_PORT=8767
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'a=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8766/health); f=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8767/health); [ "$$a" = "200" ] && [ "$$f" = "403" ]'
       interval: 10s
       timeout: 5s
       retries: 3

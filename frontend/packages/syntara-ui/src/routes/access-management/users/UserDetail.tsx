@@ -22,10 +22,10 @@ import { NxPageHeader } from '../../../components/layout/NxPageHeader'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUrlTab } from '../../../hooks/useUrlTab'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { isValidUUID } from '../../../utils/generateUUID'
@@ -178,12 +178,16 @@ function UserDetailsTab({
         </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
-        <DescriptionListTerm>Last login</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(user.last_login)}</DescriptionListDescription>
+        <DescriptionListTerm>Last Login</DescriptionListTerm>
+        <DescriptionListDescription>
+          <DateCell dateString={user.last_login} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Created</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(user.created_at)}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={user.created_at} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>
   )

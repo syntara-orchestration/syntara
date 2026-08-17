@@ -24,6 +24,7 @@ import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useUrlTab } from '../../../hooks/useUrlTab'
@@ -44,7 +45,6 @@ import { useCredentialDetailPermissions } from './useCredentialDetailPermissions
 import { useCredentialPermissions } from './useCredentialPermissions'
 import { useDeleteCredentialState } from './useDeleteCredentialState'
 import { useDisableCredentialState } from './useDisableCredentialState'
-import { UserTimestamp } from './UserTimestamp'
 
 type CredentialTab = 'details' | 'workflows' | 'integrations'
 const ALL_CREDENTIAL_TABS: CredentialTab[] = ['details', 'workflows', 'integrations']

@@ -9,7 +9,7 @@ we confirm:
 - A workflow with an interval-based scheduled trigger publishes without error.
 
 The underlying ``ScheduledTriggerService`` creates a Temporal Schedule on
-publish (format ``nexus-sched-{workflow_id}-{trigger_node_id}``) and deletes
+publish (format ``orchestrator-sched-{workflow_id}-{trigger_node_id}``) and deletes
 it on unpublish/delete.  The ``workflow_factory`` fixture handles cleanup.
 
 Run with:

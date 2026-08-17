@@ -1,5 +1,5 @@
 import { Button, Flex, FlexItem, TextInput, Title } from '@patternfly/react-core'
-import { TrashIcon } from '@patternfly/react-icons'
+import { RhUiTrashIcon } from '@patternfly/react-icons'
 import { useCallback } from 'react'
 
 import { generateUUID } from '../../../../utils/generateUUID'
@@ -80,9 +80,8 @@ function InputMappingFields({ mappings, onChange }: Readonly<InputMappingFieldsP
               variant="plain"
               aria-label={`Remove input ${String(index + 1)}`}
               onClick={() => handleRemove(index)}
-            >
-              <TrashIcon />
-            </Button>
+              icon={<RhUiTrashIcon />}
+            />
           </FlexItem>
         </Flex>
       ))}

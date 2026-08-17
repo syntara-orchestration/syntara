@@ -92,7 +92,7 @@ def _make_file_payload(descriptor: dict[str, Any], index: int) -> tuple[str, io.
 
 
 def upload_single_file(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     descriptor: dict[str, Any],
     index: int,
 ) -> tuple[float, bool, int]:
@@ -107,7 +107,7 @@ def upload_single_file(
     )
     start = time.monotonic()
     try:
-        r = nexus_api.files.upload(body=body)
+        r = syntara_api.files.upload(body=body)
         elapsed_ms = (time.monotonic() - start) * 1000
         return elapsed_ms, r.is_success, r.status_code
     except Exception:
@@ -116,7 +116,7 @@ def upload_single_file(
 
 
 def upload_large_file(
-    nexus_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
     filename: str,
     data: bytes,
     mime_type: str,
@@ -131,7 +131,7 @@ def upload_large_file(
     )
     start = time.monotonic()
     try:
-        r = nexus_api.files.upload(body=body)
+        r = syntara_api.files.upload(body=body)
         elapsed_ms = (time.monotonic() - start) * 1000
         return elapsed_ms, r.is_success, r.status_code
     except Exception:

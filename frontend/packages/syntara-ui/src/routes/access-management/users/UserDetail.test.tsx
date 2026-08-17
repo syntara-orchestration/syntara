@@ -315,7 +315,7 @@ describe('UserDetail', () => {
       expect(screen.getByText('Last name')).toBeInTheDocument()
       expect(screen.getByText('Email')).toBeInTheDocument()
       expect(screen.getByText('Identity provider')).toBeInTheDocument()
-      expect(screen.getByText('Last login')).toBeInTheDocument()
+      expect(screen.getByText('Last Login')).toBeInTheDocument()
       expect(screen.getByText('Created')).toBeInTheDocument()
     })
 
@@ -1593,7 +1593,7 @@ describe('UserDetail', () => {
 
   describe('Permission-based tab gating', () => {
     function mockCanI(permissions: Record<string, boolean>) {
-      vi.mocked(accessFetchClient.POST).mockImplementation((_path, opts) => {
+      vi.mocked(accessFetchClient.POST).mockImplementation((_path: string, opts: never) => {
         const body = (opts as { body?: { resource_type?: string } })?.body
         const resourceType = body?.resource_type ?? ''
         const allowed = permissions[resourceType] ?? true

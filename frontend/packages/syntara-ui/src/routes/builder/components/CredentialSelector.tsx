@@ -12,7 +12,7 @@ import {
   SelectOption,
   Spinner,
 } from '@patternfly/react-core'
-import { PlusIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
 import type { CredentialsAPI } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
@@ -343,7 +343,7 @@ export function CredentialSelector({
           <NoCredentialOption isRequired={isRequired} value={value} />
           {allowCreate && (
             <>
-              <SelectOption value={CREATE_NEW_VALUE} icon={<PlusIcon />}>
+              <SelectOption value={CREATE_NEW_VALUE} icon={<RhUiAddIcon />}>
                 Create new credential
               </SelectOption>
               <Divider />
