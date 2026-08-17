@@ -3566,6 +3566,23 @@ class TestProcessHistoryEvent:
         assert len(self.probe_tasks) == 1
 
 
+def _make_mock_producer(
+    *events: Any,  # noqa: ANN401 — queue items are heterogeneous mock objects
+) -> Any:  # noqa: ANN401 — mock side_effect callable
+    """Return an async function matching _history_event_producer's signature.
+
+    Enqueues each event in order, then pushes the ``None`` sentinel so the
+    consumer loop terminates cleanly.
+    """
+
+    async def _producer(_handle: Mock, queue: asyncio.Queue[Any], _exec_id: UUID) -> None:
+        for ev in events:
+            await queue.put(ev)
+        await queue.put(None)
+
+    return _producer
+
+
 class TestMonitorExecutionIntegration:
     """Integration tests for _monitor_execution queue-based consumer."""
 
@@ -3597,12 +3614,9 @@ class TestMonitorExecutionIntegration:
             patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata),
             patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock) as mock_sync,
         ):
+            producer = _make_mock_producer(SyntheticActivityStarted(activity_id="my-activity", scheduled_event_id=5))
 
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(SyntheticActivityStarted(activity_id="my-activity", scheduled_event_id=5))
-                await queue.put(None)
-
-            with patch.object(self.service, "_history_event_producer", side_effect=mock_producer):
+            with patch.object(self.service, "_history_event_producer", side_effect=producer):
                 await self.service._monitor_execution(
                     self.execution_id,
                     "temporal-wf-id",
@@ -3623,13 +3637,8 @@ class TestMonitorExecutionIntegration:
         event.event_id = 5
 
         with patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata):
-
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(event)
-                await queue.put(None)
-
             with (
-                patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+                patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
                 patch.object(self.service, "_process_history_event", new_callable=AsyncMock) as mock_process,
             ):
                 await self.service._monitor_execution(
@@ -3645,11 +3654,7 @@ class TestMonitorExecutionIntegration:
         metadata = create_test_metadata(execution_id=self.execution_id)
 
         with patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata):
-
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(None)
-
-            with patch.object(self.service, "_history_event_producer", side_effect=mock_producer):
+            with patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()):
                 await self.service._monitor_execution(
                     self.execution_id,
                     "temporal-wf-id",
@@ -3669,12 +3674,8 @@ class TestRunMonitorLoop:
     @pytest.mark.asyncio
     async def test_returns_true_on_normal_completion(self) -> None:
         """Test that _run_monitor_loop returns True when the event stream ends normally."""
-
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
@@ -3686,11 +3687,8 @@ class TestRunMonitorLoop:
         """Test that _run_monitor_loop returns False when a SQLAlchemy error occurs."""
         from sqlalchemy.exc import OperationalError
 
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(
                 self.service,
                 "_sync_activities_to_db",
@@ -3705,12 +3703,8 @@ class TestRunMonitorLoop:
     @pytest.mark.asyncio
     async def test_returns_false_on_os_error(self) -> None:
         """Test that _run_monitor_loop returns False when a network-level OSError occurs."""
-
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(
                 self.service,
                 "_sync_activities_to_db",
@@ -3725,12 +3719,8 @@ class TestRunMonitorLoop:
     @pytest.mark.asyncio
     async def test_non_transient_error_propagates(self) -> None:
         """Test that non-transient errors (e.g. programming bugs) propagate instead of being retried."""
-
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(
                 self.service,
                 "_sync_activities_to_db",
@@ -3746,11 +3736,8 @@ class TestRunMonitorLoop:
         """Test that TemporalError propagates out of _run_monitor_loop without being caught."""
         from temporalio.exceptions import TemporalError
 
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(
                 self.service,
                 "_sync_activities_to_db",
@@ -3768,12 +3755,8 @@ class TestRunMonitorLoop:
         event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
         event.event_id = 5
 
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(event)
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
             patch.object(
                 self.service,
                 "_dispatch_queue_item",
@@ -3789,11 +3772,8 @@ class TestRunMonitorLoop:
         """Test that background tasks are cancelled even when a transient error occurs."""
         from sqlalchemy.exc import OperationalError
 
-        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-            await queue.put(None)
-
         with (
-            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
             patch.object(
                 self.service,
                 "_sync_activities_to_db",
