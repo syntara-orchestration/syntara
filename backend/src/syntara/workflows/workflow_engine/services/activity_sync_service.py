@@ -18,6 +18,7 @@ import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 from sqlalchemy import or_
 from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
@@ -1156,7 +1157,7 @@ class ActivitySyncService:
             raise
         except TemporalError:
             raise
-        except (OperationalError, InterfaceError, OSError):
+        except (OperationalError, InterfaceError, SATimeoutError, OSError):
             logger.exception(
                 "Transient error in monitor loop",
                 execution_id=execution_id,

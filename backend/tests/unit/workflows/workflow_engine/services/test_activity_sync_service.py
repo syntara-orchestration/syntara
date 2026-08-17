@@ -3702,6 +3702,24 @@ class TestRunMonitorLoop:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_returns_false_on_pool_timeout(self) -> None:
+        """Test that _run_monitor_loop returns False on connection pool timeout."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=SATimeoutError("QueuePool limit reached"),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
     async def test_returns_false_on_os_error(self) -> None:
         """Test that _run_monitor_loop returns False when a network-level OSError occurs."""
         with (
