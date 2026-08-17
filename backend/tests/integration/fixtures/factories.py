@@ -18,8 +18,8 @@ from tests.integration.helpers.workflow import ActivitiesFactory, WorkflowFactor
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from nexus.core.models import User
-    from nexus.workflows.models import Workflow
+    from syntara.core.models import User
+    from syntara.workflows.models import Workflow
 
 
 @pytest_asyncio.fixture
@@ -31,7 +31,7 @@ async def activities_factory(test_db_session: AsyncSession) -> ActivitiesFactory
 @pytest_asyncio.fixture
 async def workflow_factory(test_db_session: AsyncSession, test_user: User) -> WorkflowFactory:
     """Factory for creating workflows with versions."""
-    from nexus.authz.models.project import Project
+    from syntara.authz.models.project import Project
 
     project = Project(name=f"wf-factory-project-{uuid4().hex[:8]}", description="Workflow factory project")
     test_db_session.add(project)

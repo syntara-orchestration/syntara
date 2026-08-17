@@ -1,0 +1,589 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Authorization Query API
+  version: 1.0.0
+  description: |
+    Authorization debug and query endpoints for the Syntara platform.
+
+    Provides three query patterns for inspecting authorization decisions:
+    - **Can I?** - Check if the current user can perform a specific action
+    - **Who can?** - List users who can perform a specific action
+    - **What can I?** - List all permissions for the current user
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: Authorization
+    description: Authorization debug and query endpoints
+
+paths:
+  /authz/can_i:
+    post:
+      summary: Check if the current user can perform an action
+      description: Evaluates the current user's effective policies to determine if a specific action is allowed on a resource.
+      operationId: can_i
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanIRequest"
+      responses:
+        "200":
+          description: Authorization decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanIResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /authz/who_can:
+    post:
+      summary: List users who can perform an action
+      description: Iterates all active users, resolves their policies, and checks each against the configured authz evaluator.
+      operationId: who_can
+      x-app-permission:
+        resource: authz
+        action: query
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhoCanRequest"
+      responses:
+        "200":
+          description: List of authorized users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhoCanResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+  /authz/what_can_i:
+    post:
+      summary: List all permissions for the current user
+      description: Resolves the current user's effective policies and returns them as a flat list of permission entries. No runtime policy evaluation call is needed.
+      operationId: what_can_i
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatCanIRequest"
+      responses:
+        "200":
+          description: Paginated list of permission entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatCanIResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+      security:
+        - bearerAuth: []
+
+  /authz/resource_actions:
+    get:
+      summary: List available resource types and actions
+      description: Returns the catalog of all resource types and the actions that can be performed on each.
+      operationId: get_resource_actions
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authorization
+      responses:
+        "200":
+          description: Map of resource types to their valid actions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceActionsResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /authz/validate_name:
+    get:
+      summary: Validate name
+      description: |
+        Validate a resource name against naming rules.
+        Returns whether the name is valid and, if not, why.
+        Intended for real-time UI validation.
+      operationId: validate_name
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authorization
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Name to validate
+            title: Name
+          description: Name to validate
+        - name: resource_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - project
+              - policy
+              - role
+            default: project
+            description: Resource type
+            title: Resource Type
+          description: Resource type
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateNameResponse"
+        "400":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        "401":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        "404":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        "409":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        "422":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        "500":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "429":
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+components:
+  schemas:
+    CanIRequest:
+      type: object
+      title: Can I Request
+      description: Request body for the Can I? authorization check.
+      required:
+        - action
+        - resource_type
+      properties:
+        action:
+          type: string
+          title: Action
+          description: The action to check (e.g., "read", "create", "delete")
+        resource_type:
+          type: string
+          title: Resource Type
+          description: The type of resource (e.g., "workflow", "project")
+        resource_id:
+          type: string
+          title: Resource Id
+          default: ""
+          description: Optional specific resource ID
+        resource_labels:
+          type: object
+          title: Resource Labels
+          default: {}
+          additionalProperties:
+            type: string
+          description: Labels on the target resource
+        resource_metadata:
+          type: object
+          title: Resource Metadata
+          default: {}
+          additionalProperties: true
+          description: Additional metadata about the target resource
+        resource_project:
+          type: string
+          title: Resource Project
+          default: ""
+          description: Project scope of the resource (project name or UUID)
+        check_any_project:
+          type: boolean
+          title: Check Any Project
+          default: false
+          description: >
+            When true, allow if the user has the permission in any project
+            (project-scoped policies match without a concrete resource_project).
+            Mutually exclusive with a non-empty resource_project.
+            Default false preserves strict project matching — empty
+            resource_project alone is never a wildcard.
+
+    CanIResponse:
+      type: object
+      title: Can I Response
+      description: Authorization decision result.
+      required:
+        - allowed
+        - denied
+        - matched_policy
+        - denial_reason
+        - denied_by
+      properties:
+        allowed:
+          type: boolean
+          title: Allowed
+          description: Whether the action is allowed
+        denied:
+          type: boolean
+          title: Denied
+          description: Whether the action is explicitly denied
+        matched_policy:
+          type: string
+          title: Matched Policy
+          description: Name of the policy that matched
+        denial_reason:
+          type: string
+          title: Denial Reason
+          description: Reason for denial (empty if allowed)
+        denied_by:
+          type: string
+          title: Denied By
+          description: Name of the deny policy (empty if allowed)
+
+    WhoCanRequest:
+      type: object
+      title: WhoCanRequest
+      description: Request body for the Who can? endpoint.
+      required:
+        - action
+        - resource_type
+      properties:
+        limit:
+          type: integer
+          maximum: 100
+          exclusiveMinimum: 0
+          title: Limit
+          description: Maximum number of results per page
+          default: 20
+        cursor:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Cursor
+          description: Pagination cursor from previous response
+        sort:
+          anyOf:
+            - type: string
+              pattern: "^-?[a-z][a-z0-9_]*$"
+            - type: 'null'
+          title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        include_total:
+          type: boolean
+          title: Include Total
+          description: Include total count in response (expensive)
+          default: false
+        action:
+          type: string
+          title: Action
+          x-query-param: true
+        resource_type:
+          type: string
+          title: Resource Type
+          x-query-param: true
+        resource_id:
+          type: string
+          title: Resource Id
+          default: ''
+          x-query-param: true
+        resource_labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Resource Labels
+          x-query-param: true
+        resource_metadata:
+          additionalProperties: true
+          type: object
+          title: Resource Metadata
+          x-query-param: true
+        resource_project:
+          type: string
+          title: Resource Project
+          description: Project scope of the resource (project name or UUID)
+          default: ''
+          x-query-param: true
+
+    WhoCanUser:
+      type: object
+      title: WhoCanUser
+      description: A user who can perform the requested action.
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        username:
+          type: string
+          title: Username
+
+    WhoCanResponse:
+      type: object
+      title: WhoCanResponse
+      description: Paginated response body for the Who can? endpoint.
+      required:
+        - resources
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          items:
+            $ref: "#/components/schemas/WhoCanUser"
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+
+    PermissionEntry:
+      type: object
+      title: PermissionEntry
+      description: A single permission from a policy statement.
+      required:
+        - policy_name
+        - effect
+        - actions
+        - scope
+      properties:
+        policy_name:
+          type: string
+          title: Policy Name
+        effect:
+          type: string
+          title: Effect
+        actions:
+          type: array
+          items:
+            type: string
+          title: Actions
+        scope:
+          type: string
+          title: Scope
+        project:
+          type: string
+          default: ""
+          title: Project
+          description: Project scope (empty for system-level)
+
+    WhatCanIRequest:
+      type: object
+      title: WhatCanIRequest
+      description: Request body for the What can I? endpoint.
+      properties:
+        limit:
+          type: integer
+          maximum: 100.0
+          exclusiveMinimum: 0.0
+          title: Limit
+          description: Maximum number of results per page
+          default: 20
+        cursor:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Cursor
+          description: Pagination cursor from previous response
+        sort:
+          anyOf:
+            - type: string
+              pattern: "^-?[a-z][a-z0-9_]*$"
+            - type: 'null'
+          title: Sort
+          description: "Sort parameter (e.g., 'name', '-created_at')"
+        include_total:
+          type: boolean
+          title: Include Total
+          description: Include total count in response (expensive)
+          default: false
+
+    WhatCanIResponse:
+      type: object
+      title: WhatCanIResponse
+      description: Paginated response body for the What can I? endpoint.
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+      required:
+        - resources
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          items:
+            $ref: "#/components/schemas/PermissionEntry"
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+
+    ResourceActionsResponse:
+      type: object
+      title: Resource Actions Response
+      description: Available resource types and their valid actions.
+      required:
+        - resource_actions
+      properties:
+        resource_actions:
+          type: object
+          title: Resource Actions
+          description: Map of resource types to their valid actions
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    ValidateNameResponse:
+      type: object
+      title: ValidateNameResponse
+      description: Response body for the validate_name endpoint.
+      required:
+        - valid
+        - name
+      properties:
+        valid:
+          type: boolean
+          title: Valid
+        name:
+          type: string
+          title: Name
+        reason:
+          type: string
+          default: ""
+          title: Reason
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

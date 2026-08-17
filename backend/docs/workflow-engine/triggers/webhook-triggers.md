@@ -25,7 +25,7 @@ sequenceDiagram
     Svc-->>Router: workflow_id, trigger_node_id, input_schema
     Router->>Router: wrap payload as {"payload": <body>}
     Router->>ES: create_execution()<br/>(use_published=True)
-    ES->>Temporal: start NexusWorkflow
+    ES->>Temporal: start OrchestratorWorkflow
     Router-->>Ext: 202 Accepted<br/>{execution_id}
     Temporal->>Temporal: _execute_trigger()<br/>→ webhook_trigger activity
     Temporal->>Temporal: apply output mapping,<br/>register in namespaces
@@ -68,7 +68,7 @@ Webhook payloads are wrapped as `{"payload": <body>}` before being passed to the
 
 ## Configuration
 
-Webhook trigger parameters are defined by the config model `WebhookTriggerConfig` in `workflow_definition.py` and the JSON Schemas at `src/nexus/schemas/workflows/v2/triggers/webhook.schema.json` (and `eda.schema.json`). Key fields are `webhook_path` (unique URL slug) and `input_schema` (optional JSON Schema for payload validation, with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
+Webhook trigger parameters are defined by the config model `WebhookTriggerConfig` in `workflow_definition.py` and the JSON Schemas at `src/syntara/schemas/workflows/v2/triggers/webhook.schema.json` (and `eda.schema.json`). Key fields are `webhook_path` (unique URL slug) and `input_schema` (optional JSON Schema for payload validation, with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
 
 ## EDA Variant
 
@@ -108,12 +108,12 @@ flowchart LR
 
 | File | Purpose |
 |------|---------|
-| `src/nexus/workflows/webhook_router.py` | FastAPI router for both `/webhooks/{webhook_path}` and `/webhooks/eda/{webhook_path}` |
-| `src/nexus/workflows/services/webhook_trigger_service.py` | Trigger lookup and sync for both types |
-| `src/nexus/workflows/workflow_engine/activities/webhook_trigger.py` | Webhook activity (pass-through + output mapping) |
-| `src/nexus/workflows/workflow_engine/activities/eda_trigger.py` | EDA activity (delegates to webhook) |
-| `src/nexus/workflows/models/webhook_trigger.py` | `WebhookTrigger` SQLModel (shared DB table) |
-| `src/nexus/workflows/workflow_engine/models/workflow_definition.py` | `WebhookTriggerConfig` model |
+| `src/syntara/workflows/webhook_router.py` | FastAPI router for both `/webhooks/{webhook_path}` and `/webhooks/eda/{webhook_path}` |
+| `src/syntara/workflows/services/webhook_trigger_service.py` | Trigger lookup and sync for both types |
+| `src/syntara/workflows/workflow_engine/activities/webhook_trigger.py` | Webhook activity (pass-through + output mapping) |
+| `src/syntara/workflows/workflow_engine/activities/eda_trigger.py` | EDA activity (delegates to webhook) |
+| `src/syntara/workflows/models/webhook_trigger.py` | `WebhookTrigger` SQLModel (shared DB table) |
+| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `WebhookTriggerConfig` model |
 
 ## Related Documentation
 

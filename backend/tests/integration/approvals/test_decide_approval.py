@@ -15,7 +15,7 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from nexus.approvals.models import ApprovalRequestStatus
+from syntara.approvals.models import ApprovalRequestStatus
 from tests.integration.helpers.approval import ApprovalsFactory
 from tests.integration.helpers.error_data import assert_error_data
 from tests.integration.helpers.workflow import ExecutionsFactory
@@ -46,7 +46,7 @@ class TestDecideApprovalContract:
         approval_id = str(approvals[0].id)
 
         # Act - Submit approval decision (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -109,7 +109,7 @@ class TestDecideApprovalContract:
         approval_id = str(approvals[0].id)
 
         # Act - Submit rejection decision (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -156,7 +156,7 @@ class TestDecideApprovalContract:
         approvals = await approvals_factory.create_pending_approvals(count=2, execution_id=executions[0].id)
 
         # Test 1: Omit notes field entirely (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -182,7 +182,7 @@ class TestDecideApprovalContract:
         assert data["decision_notes"] is None
 
         # Test 2: Explicitly set notes to null (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client_2 = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client_2
             mock_client_2.send_approval_signal = AsyncMock()
@@ -419,7 +419,7 @@ class TestDecideApprovalContract:
         approval_id = str(approvals[0].id)
 
         # Test reasonable length notes (should succeed) (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -448,7 +448,7 @@ class TestDecideApprovalContract:
         long_approval_id = str(long_approvals[0].id)
 
         # 2000 characters should be acceptable (with mocked workflow client)
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()
@@ -507,7 +507,7 @@ class TestDecideApprovalContract:
         approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=executions[0].id)
         approval_id = str(approvals[0].id)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock(side_effect=Exception("Connection refused"))
@@ -534,7 +534,7 @@ class TestDecideApprovalContract:
         approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=executions[0].id)
         approval_id = str(approvals[0].id)
 
-        with patch("nexus.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.send_approval_signal = AsyncMock()

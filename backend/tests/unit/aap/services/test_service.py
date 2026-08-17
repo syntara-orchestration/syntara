@@ -10,11 +10,11 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from nexus.aap.auth import AAPConnection
-from nexus.aap.exceptions import AAPAuthenticationError, AAPConnectionError, AAPNotConfiguredError, AAPUpstreamError
-from nexus.aap.models.queries import AAPBaseQuery, AAPResourceQuery
-from nexus.aap.services.aap_proxy_service import AAPProxyService
-from nexus.core.config.base import get_settings
+from syntara.aap.auth import AAPConnection
+from syntara.aap.exceptions import AAPAuthenticationError, AAPConnectionError, AAPNotConfiguredError, AAPUpstreamError
+from syntara.aap.models.queries import AAPBaseQuery, AAPResourceQuery
+from syntara.aap.services.aap_proxy_service import AAPProxyService
+from syntara.core.config.base import get_settings
 
 
 @pytest.fixture(autouse=True)
@@ -602,7 +602,7 @@ class TestClose:
         mock_response.status_code = 200
         mock_response.json.return_value = {"results": []}
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -639,7 +639,7 @@ class TestProxyGet:
         mock_response = MagicMock()
         mock_response.status_code = 401
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -655,7 +655,7 @@ class TestProxyGet:
         mock_response = MagicMock()
         mock_response.status_code = 403
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -671,7 +671,7 @@ class TestProxyGet:
         mock_response = MagicMock()
         mock_response.status_code = 500
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -689,7 +689,7 @@ class TestProxyGet:
         mock_response.json.side_effect = ValueError("invalid JSON")
         mock_response.text = "<html>not json</html>"
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -702,7 +702,7 @@ class TestProxyGet:
         service = _service()
         conn = _connection()
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.side_effect = httpx.TimeoutException("timed out")
             mock_client_cls.return_value = mock_client
@@ -716,7 +716,7 @@ class TestProxyGet:
         service = _service()
         conn = _connection()
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.side_effect = httpx.ConnectError("connection refused")
             mock_client_cls.return_value = mock_client
@@ -743,7 +743,7 @@ class TestProxyGet:
         service = _service()
         conn = _connection()
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.side_effect = httpx.ConnectError("connection refused")
             mock_client_cls.return_value = mock_client
@@ -761,7 +761,7 @@ class TestProxyGet:
         mock_response.status_code = 200
         mock_response.json.return_value = expected
 
-        with patch("nexus.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
+        with patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
             mock_client_cls.return_value = mock_client
@@ -918,7 +918,7 @@ class TestCredentialAuthorization:
         """Invalid credential_id format (non-UUID) must raise AAPAuthenticationError."""
         from uuid import uuid4
 
-        from nexus.aap.credential_resolver import resolve_aap_connection_from_credential
+        from syntara.aap.credential_resolver import resolve_aap_connection_from_credential
 
         mock_session = AsyncMock()
         user_id = uuid4()
@@ -940,7 +940,7 @@ def _mock_integration(
     config_valid: bool = True,
 ) -> MagicMock:
     """Build a mock Integration with AAPConfiguration."""
-    from nexus.integrations.models.integration import IntegrationType
+    from syntara.integrations.models.integration import IntegrationType
 
     integration = MagicMock()
     integration.id = integration_id or uuid4()
@@ -953,7 +953,7 @@ def _mock_integration(
         config.base_url = base_url
         config.insecure_skip_tls_verify = insecure_skip_tls_verify
         # Make isinstance check pass for AAPConfiguration
-        from nexus.integrations.models.integration_configuration import AAPConfiguration
+        from syntara.integrations.models.integration_configuration import AAPConfiguration
 
         config.__class__ = AAPConfiguration  # type: ignore[assignment]
         integration.configuration = config
@@ -997,7 +997,7 @@ class TestResolveConnectionFromIntegration:
         user_id = uuid4()
 
         with patch(
-            "nexus.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
             new_callable=AsyncMock,
             return_value=cred_connection,
         ) as mock_cred_resolver:
@@ -1079,7 +1079,7 @@ class TestResolveConnectionFromIntegration:
         user_id = uuid4()
 
         with patch(
-            "nexus.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
             new_callable=AsyncMock,
             return_value=cred_connection,
         ):
@@ -1124,7 +1124,7 @@ class TestResolveConnectionFromIntegration:
         user_id = uuid4()
 
         with patch(
-            "nexus.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
             new_callable=AsyncMock,
             return_value=cred_connection,
         ):
@@ -1151,14 +1151,54 @@ class TestResolveConnectionFromIntegration:
             )
 
 
+@pytest.mark.ssrf_enforced
+class TestRequestTimeSsrfRevalidation:
+    """Request-time SSRF re-check before AAP connection resolution (guards DNS rebinding).
+
+    A stored ``base_url`` that passed write-time validation can later re-point to a
+    private/metadata target. ``_resolve_connection_from_integration`` re-runs the
+    integration SSRF policy before resolving credentials or dispatching any request,
+    so a base_url pointing at the cloud-metadata IP must be rejected before any
+    outbound httpx call. This guards the ``validate_integration_configuration_no_ssrf``
+    call at the resolve boundary; delete it and this test fails.
+    """
+
+    @pytest.mark.asyncio
+    async def test_metadata_base_url_rejected_before_outbound_dispatch(self) -> None:
+        integration = _mock_integration(base_url="https://169.254.169.254")
+        mock_session = _mock_session_with_integration(integration)
+        service = AAPProxyService(settings=get_settings(), session=mock_session)
+
+        credential_id = uuid4()
+        user_id = uuid4()
+
+        with (
+            patch(
+                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+                new_callable=AsyncMock,
+            ) as mock_cred_resolver,
+            patch("syntara.aap.services.aap_proxy_service.httpx.AsyncClient") as mock_client_cls,
+        ):
+            with pytest.raises(AAPNotConfiguredError, match="not permitted by SSRF policy"):
+                await service._resolve_connection(
+                    integration_id=integration.id,
+                    credential_id=credential_id,
+                    user_id=user_id,
+                )
+
+            # Short-circuit must happen before credential resolution and any outbound dispatch.
+            mock_cred_resolver.assert_not_called()
+            mock_client_cls.assert_not_called()
+
+
 class TestEnforceIntegrationVisibility:
     """Tests for _enforce_integration_visibility."""
 
     @pytest.mark.asyncio
     async def test_global_scope_integration_accessible_with_restricted_projects(self) -> None:
         """GLOBAL-scoped integrations must be accessible regardless of allowed_projects."""
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.integrations.models.integration import IntegrationScope
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.integrations.models.integration import IntegrationScope
 
         integration = _mock_integration(base_url="https://aap-global.example.com")
         integration.scope = IntegrationScope.GLOBAL
@@ -1175,7 +1215,7 @@ class TestEnforceIntegrationVisibility:
         )
 
         with patch(
-            "nexus.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
             new_callable=AsyncMock,
             return_value=cred_connection,
         ):
@@ -1190,8 +1230,8 @@ class TestEnforceIntegrationVisibility:
     @pytest.mark.asyncio
     async def test_project_scope_integration_blocked_without_matching_project(self) -> None:
         """PROJECT-scoped integrations must raise when user has no matching project."""
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.integrations.models.integration import IntegrationScope
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.integrations.models.integration import IntegrationScope
 
         integration = _mock_integration(base_url="https://aap-project.example.com")
         integration.scope = IntegrationScope.PROJECT

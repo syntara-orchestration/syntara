@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from nexus.core.lib.encryption import (
+from syntara.core.lib.encryption import (
     ENCRYPTED_SENTINEL,
     KEY_SIZE,
     EncryptionError,

@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.authz.engine import AuthzRequest, AuthzResult
-from nexus.authz.router import CanIRequest, can_i
+from syntara.authz.engine import AuthzRequest, AuthzResult
+from syntara.authz.router import CanIRequest, can_i
 
 
 class TestCanIRequestModel:
@@ -62,8 +62,8 @@ class TestCanIEndpointWiring:
         )
 
         with (
-            patch("nexus.authz.router._resolve_project_input", new=AsyncMock(return_value="")),
-            patch("nexus.authz.router.authorize", new=AsyncMock(return_value=authz_result)) as mock_authorize,
+            patch("syntara.authz.router._resolve_project_input", new=AsyncMock(return_value="")),
+            patch("syntara.authz.router.authorize", new=AsyncMock(return_value=authz_result)) as mock_authorize,
         ):
             response = await can_i(body, user, db, evaluator)
 
@@ -94,8 +94,8 @@ class TestCanIEndpointWiring:
         )
 
         with (
-            patch("nexus.authz.router._resolve_project_input", new=AsyncMock(return_value="")),
-            patch("nexus.authz.router.authorize", new=AsyncMock(return_value=authz_result)) as mock_authorize,
+            patch("syntara.authz.router._resolve_project_input", new=AsyncMock(return_value="")),
+            patch("syntara.authz.router.authorize", new=AsyncMock(return_value=authz_result)) as mock_authorize,
         ):
             await can_i(body, user, db, evaluator)
 
@@ -109,7 +109,7 @@ class TestPermissionCheckerNeverSetsAnyProject:
 
     @pytest.mark.asyncio
     async def test_permission_checker_authz_request_keeps_flag_false(self) -> None:
-        from nexus.authz.dependencies import PermissionChecker
+        from syntara.authz.dependencies import PermissionChecker
 
         checker = PermissionChecker("credential", "read")
         request = MagicMock()
@@ -129,7 +129,7 @@ class TestPermissionCheckerNeverSetsAnyProject:
                 new=AsyncMock(return_value=("", "", "", {})),
             ),
             patch(
-                "nexus.authz.dependencies.authorize",
+                "syntara.authz.dependencies.authorize",
                 new=AsyncMock(
                     return_value=AuthzResult(
                         allowed=True,
@@ -141,7 +141,7 @@ class TestPermissionCheckerNeverSetsAnyProject:
                     )
                 ),
             ) as mock_authorize,
-            patch("nexus.authz.dependencies.get_authz_evaluator", return_value=AsyncMock()),
+            patch("syntara.authz.dependencies.get_authz_evaluator", return_value=AsyncMock()),
         ):
             await checker(request, user, AsyncMock())
 
@@ -156,7 +156,7 @@ class TestAuthorizeAnyProjectInput:
 
     @pytest.mark.asyncio
     async def test_rego_input_includes_any_project_true(self) -> None:
-        from nexus.authz.engine import authorize
+        from syntara.authz.engine import authorize
 
         db = AsyncMock()
         evaluator = AsyncMock()
@@ -171,9 +171,9 @@ class TestAuthorizeAnyProjectInput:
         )
 
         with (
-            patch("nexus.authz.engine.resolve_effective_policies", new=AsyncMock(return_value=[])),
+            patch("syntara.authz.engine.resolve_effective_policies", new=AsyncMock(return_value=[])),
             patch(
-                "nexus.authz.engine._evaluate_authz_policy",
+                "syntara.authz.engine._evaluate_authz_policy",
                 new=AsyncMock(
                     return_value={
                         "allow": True,
@@ -195,7 +195,7 @@ class TestAuthorizeAnyProjectInput:
 
     @pytest.mark.asyncio
     async def test_rego_input_includes_any_project_false(self) -> None:
-        from nexus.authz.engine import authorize
+        from syntara.authz.engine import authorize
 
         db = AsyncMock()
         evaluator = AsyncMock()
@@ -209,9 +209,9 @@ class TestAuthorizeAnyProjectInput:
         )
 
         with (
-            patch("nexus.authz.engine.resolve_effective_policies", new=AsyncMock(return_value=[])),
+            patch("syntara.authz.engine.resolve_effective_policies", new=AsyncMock(return_value=[])),
             patch(
-                "nexus.authz.engine._evaluate_authz_policy",
+                "syntara.authz.engine._evaluate_authz_policy",
                 new=AsyncMock(
                     return_value={
                         "allow": False,

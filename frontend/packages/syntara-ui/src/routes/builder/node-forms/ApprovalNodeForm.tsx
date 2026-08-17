@@ -1,4 +1,5 @@
 import {
+  Alert,
   FormGroup,
   HelperText,
   HelperTextItem,
@@ -98,28 +99,60 @@ function ApproverUsersSelect({
   users,
   isLoading,
   validationError,
+  isPermissionDenied,
+  hasProjectContext,
 }: Readonly<{
   value: readonly string[]
   onChange: (value: string[]) => void
   users: ReadonlyArray<ApproverUser>
   isLoading: boolean
   validationError?: Readonly<{ message?: string }>
+  isPermissionDenied?: boolean
+  hasProjectContext?: boolean
 }>) {
+  const showFallback = !hasProjectContext || isPermissionDenied
+
+  let placeholderText = APPROVER_USERS_PLACEHOLDER
+  if (!hasProjectContext) {
+    placeholderText = 'Select a project to load approval users'
+  } else if (isPermissionDenied) {
+    placeholderText = 'Type a username and press Enter'
+  }
+
   return (
-    <ApproverMultiSelect<ApproverUser>
-      value={value}
-      onChange={onChange}
-      items={users}
-      isLoading={isLoading}
-      validationError={validationError}
-      getItemId={(item) => item.id}
-      getItemValue={(item) => item.username}
-      getItemLabel={(item) => item.username}
-      placeholderText={APPROVER_USERS_PLACEHOLDER}
-      emptyText={APPROVER_USERS_EMPTY}
-      loadingText={APPROVER_USERS_LOADING}
-      helperText={APPROVER_USERS_HELPER_TEXT}
-    />
+    <Stack hasGutter>
+      <StackItem>
+        <ApproverMultiSelect<ApproverUser>
+          value={value}
+          onChange={onChange}
+          items={users}
+          isLoading={isLoading}
+          validationError={validationError}
+          getItemId={(item) => item.id}
+          getItemValue={(item) => item.username}
+          getItemLabel={(item) => item.username}
+          placeholderText={placeholderText}
+          emptyText={showFallback ? 'Enter usernames manually' : APPROVER_USERS_EMPTY}
+          loadingText={APPROVER_USERS_LOADING}
+          helperText={APPROVER_USERS_HELPER_TEXT}
+          allowCustomValue={showFallback}
+        />
+      </StackItem>
+      {!hasProjectContext && (
+        <StackItem>
+          <Alert variant="info" title="Project required" isInline isPlain>
+            Select a project to load approval users, or enter usernames manually.
+          </Alert>
+        </StackItem>
+      )}
+      {hasProjectContext && isPermissionDenied && (
+        <StackItem>
+          <Alert variant="warning" title="Dropdown unavailable" isInline isPlain>
+            You don&apos;t have permission to list approval users. You can still enter usernames manually.
+          </Alert>
+        </StackItem>
+      )}
+    </Stack>
   )
 }
 
@@ -185,14 +218,17 @@ type ApprovalNodeFormProps = {
   onSubmit: (data: ApprovalFormSubmitData) => void
   initialData?: Partial<ApprovalFormSubmitData>
   onHeaderContentChange?: (content: ReactNode | null) => void
+  projectId?: string
 }
 
 function ApprovalFormFields({
   onHeaderContentChange,
   validationErrors,
+  projectId,
 }: {
   onHeaderContentChange?: (content: ReactNode | null) => void
   validationErrors?: { approver_users?: { message?: string }; approver_groups?: { message?: string } }
+  projectId?: string
 }) {
   const isVersionView = useIsVersionView()
   const { register, control, setValue } = useFormContext<ApprovalFormData>()
@@ -200,11 +236,15 @@ function ApprovalFormFields({
   const { defaults } = useWorkflowEngineDefaults()
   const approvalTimeoutDefault = defaults?.timeoutSeconds.approval ?? null
 
-  // Get the workflow's project ID (not the UI-selected project, which can diverge on deep links / navigation)
-  const workflowProjectId = useWorkflowStore((state) => state.projectId)
+  const storeProjectId = useWorkflowStore((state) => state.projectId)
+  const effectiveProjectId = projectId ?? storeProjectId
 
   // Fetch users with approval:decide permission and all groups
-  const { users, isLoading: isLoadingUsers } = useApprovalDecideUsers(workflowProjectId)
+  const {
+    users,
+    isLoading: isLoadingUsers,
+    isPermissionDenied: usersPermissionDenied,
+  } = useApprovalDecideUsers(effectiveProjectId)
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
@@ -234,6 +274,8 @@ function ApprovalFormFields({
                   users={users}
                   isLoading={isLoadingUsers}
                   validationError={validationErrors?.approver_users}
+                  isPermissionDenied={usersPermissionDenied}
+                  hasProjectContext={!!effectiveProjectId}
                 />
               )}
             />
@@ -370,7 +412,11 @@ export function ApprovalNodeForm(props: ApprovalNodeFormProps) {
   return (
     <FormProvider {...methods}>
       <NodeFormContainer formId="approval-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
-        <ApprovalFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
+        <ApprovalFormFields
+          onHeaderContentChange={props.onHeaderContentChange}
+          validationErrors={errors}
+          projectId={props.projectId}
+        />
       </NodeFormContainer>
     </FormProvider>
   )

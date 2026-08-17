@@ -8,10 +8,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.audit.actor_extractor import extract_actor
-from nexus.audit.emitter import AuditActorContext, actor_context_var
-from nexus.core.models.principal import PrincipalType, service_principal_id
-from nexus.core.models.user import User
+from syntara.audit.actor_extractor import extract_actor
+from syntara.audit.emitter import AuditActorContext, actor_context_var
+from syntara.core.models.principal import PrincipalType, service_principal_id
+from syntara.core.models.user import User
 
 
 @pytest.fixture

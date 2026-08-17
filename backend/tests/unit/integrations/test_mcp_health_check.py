@@ -18,12 +18,12 @@ from httpx_sse import SSEError
 from mcp.shared.exceptions import McpError
 from mcp.types import ErrorData
 
-from nexus.integrations.adapters.mcp_server import MCPServerAdapter
-from nexus.integrations.adapters.protocol import (
+from syntara.integrations.adapters.mcp_server import MCPServerAdapter
+from syntara.integrations.adapters.protocol import (
     HealthCheckErrorType,
     IntegrationAdapter,
 )
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
 
 
 @pytest.fixture
@@ -94,8 +94,8 @@ class MockMCPSDK:
         mock_streams = (AsyncMock(), AsyncMock(), MagicMock())
 
         # Start patches
-        self.mock_streamable_client_patch = patch("nexus.integrations.adapters.mcp_server.streamable_http_client")
-        self.mock_client_session_patch = patch("nexus.integrations.adapters.mcp_server.ClientSession")
+        self.mock_streamable_client_patch = patch("syntara.integrations.adapters.mcp_server.streamable_http_client")
+        self.mock_client_session_patch = patch("syntara.integrations.adapters.mcp_server.ClientSession")
 
         self.mock_streamable_client = self.mock_streamable_client_patch.__enter__()
         mock_client_session_cls = self.mock_client_session_patch.__enter__()
@@ -369,7 +369,7 @@ class TestMCPServerDiscoverSuccess:
     @pytest.mark.asyncio
     async def test_returns_discovered_tools(self, mcp_config: MCPServerConfiguration) -> None:
         """Successful discover returns tool names and descriptions."""
-        from nexus.tool_manager.models.tool import Tool
+        from syntara.tool_manager.models.tool import Tool
 
         mock_tool = MagicMock(spec=Tool)
         mock_tool.name = "search"
@@ -379,7 +379,7 @@ class TestMCPServerDiscoverSuccess:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(tools=[mock_tool])
 
@@ -401,7 +401,7 @@ class TestMCPServerDiscoverSuccess:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(tools=[])
 
@@ -423,7 +423,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider = _mock_mcp_provider(side_effect=TimeoutError("internal details"))
             mock_provider_cls.return_value = mock_provider
@@ -444,7 +444,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider = _mock_mcp_provider(side_effect=ConnectionError("Connection refused"))
             mock_provider_cls.return_value = mock_provider
@@ -465,7 +465,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(side_effect=_mock_http_error(401))
 
@@ -484,7 +484,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(side_effect=_mock_http_error(403))
 
@@ -502,7 +502,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(side_effect=_mock_http_error(500))
 
@@ -520,7 +520,7 @@ class TestMCPServerDiscoverErrors:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider = _mock_mcp_provider(
                 side_effect=ssl.SSLCertVerificationError("certificate verify failed"),
@@ -547,7 +547,7 @@ class TestMCPServerDiscoverErrors:
 
         with (
             patch(
-                "nexus.integrations.adapters.mcp_server.MCPProvider",
+                "syntara.integrations.adapters.mcp_server.MCPProvider",
             ) as mock_provider_cls,
             structlog.testing.capture_logs() as captured,
         ):
@@ -574,7 +574,7 @@ class TestErrorMessageSanitization:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(
                 side_effect=ConnectionError("connect to 10.0.0.5:8765 failed: Connection refused"),
@@ -594,7 +594,7 @@ class TestErrorMessageSanitization:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(
                 side_effect=ssl.SSLCertVerificationError("certificate verify failed: CN=internal.corp.example.com"),
@@ -614,7 +614,7 @@ class TestErrorMessageSanitization:
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
-            "nexus.integrations.adapters.mcp_server.MCPProvider",
+            "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
             mock_provider_cls.return_value = _mock_mcp_provider(
                 side_effect=RuntimeError("KeyError at /home/user/.secrets/key.pem"),
@@ -639,7 +639,7 @@ class TestErrorMessageSanitization:
 
         with (
             patch(
-                "nexus.integrations.adapters.mcp_server.MCPProvider",
+                "syntara.integrations.adapters.mcp_server.MCPProvider",
             ) as mock_provider_cls,
             structlog.testing.capture_logs() as captured,
         ):

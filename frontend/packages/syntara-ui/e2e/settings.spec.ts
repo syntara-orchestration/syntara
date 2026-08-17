@@ -12,7 +12,9 @@
  * - UI-8:  Modify float setting (0.1-step), save, reload, restore
  * - UI-9:  Modify string setting with allowed values dropdown
  * - UI-10: Modify JSON list setting (add/remove items)
- * - UI-11: Modify freeform string setting
+ * - UI-11: (removed) Modify freeform string setting — no plain-text-input
+ *   setting currently exists in the catalog; all remaining STRING settings
+ *   use allowed_values and render as dropdowns (see UI-9).
  * - UI-12: Validation — out of range value shows inline error
  * - UI-13: Reset single setting via kebab menu
  * - UI-14: Reset all settings via confirmation modal
@@ -26,7 +28,7 @@
  * - Version conflict auto-refetches latest values
  */
 
-import { expect, test, toAppUrl } from './fixtures'
+import { createUnavailableGuard, expect, test, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { apiRequest } from './utils/api'
 
@@ -77,30 +79,25 @@ async function resetAllToDefaults(app: import('@playwright/test').Page) {
 }
 
 test.describe('Settings', () => {
-  // Settings tests share backend state — run serially to avoid conflicts
-  test.describe.configure({ mode: 'serial' })
-
-  // Cache tab unavailability after the first probe to avoid repeating the 10s
-  // timeout wait in every subsequent test when Settings has no tabs.
-  let settingsTabsUnavailable = false
+  // Settings tests share backend state — run serially to avoid conflicts.
+  // mode: 'serial' is set by createUnavailableGuard below.
+  const guard = createUnavailableGuard('Settings page has no tabs; backend may not have settings configured')
 
   test.beforeEach(async ({ app }) => {
-    test.skip(settingsTabsUnavailable, 'Settings page has no tabs; backend may not have settings configured')
-
     await app.goto(toAppUrl('/system-administration/settings'))
     const heading = app.getByRole('heading', { level: 1, name: 'Settings' })
     const hasPage = await heading
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasPage) guard.markUnavailable()
     test.skip(!hasPage, 'Settings page not available; backend may not be running')
-    // Wait for content to fully load (tabs + save button)
     const hasTabs = await app
       .getByRole('tab', { name: /Context Manager|System|Authentication/i })
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTabs) settingsTabsUnavailable = true
+    if (!hasTabs) guard.markUnavailable()
     test.skip(!hasTabs, 'Settings page has no tabs; backend may not have settings configured')
   })
 
@@ -444,34 +441,6 @@ test.describe('Settings', () => {
       const kebab = app.getByLabel('Actions for Priority order')
       await kebab.scrollIntoViewIfNeeded()
       await resetSingleSetting(app, 'Priority order')
-    }
-  })
-
-  test('modify freeform string setting', async ({ app }) => {
-    await goToSystem(app)
-
-    const formGroup = app.locator('[id="telemetry.segment_endpoint"]').locator('..')
-    await formGroup.scrollIntoViewIfNeeded()
-    await expect(formGroup).toBeVisible({ timeout: 5000 })
-    const input = formGroup.locator('input')
-
-    try {
-      // Change value
-      await input.fill('https://test.segment.io')
-
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
-
-      // Reload and verify persisted
-      await goToSystem(app)
-      const reloadedInput = app.locator('[id="telemetry.segment_endpoint"]').locator('..').locator('input')
-      await expect(reloadedInput).toHaveValue('https://test.segment.io')
-    } finally {
-      await goToSystem(app)
-      await resetSingleSetting(app, 'Segment endpoint URL')
     }
   })
 

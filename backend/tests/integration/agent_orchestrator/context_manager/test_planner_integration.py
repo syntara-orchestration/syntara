@@ -13,15 +13,15 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.models import ContextPackage
-from nexus.agent_orchestrator.context_manager.planner import ContextManagerPlanner
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
+from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import (
     RelevantDocument,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.services import RetrieverService
-from nexus.agent_orchestrator.models import Invocation
-from nexus.core.models import User
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.context_manager.retriever_service.services import RetrieverService
+from syntara.agent_orchestrator.models import Invocation
+from syntara.core.models import User
+from syntara.files.models import FileMetadata
 from tests.fixtures.settings import FakeSettingsCache
 
 

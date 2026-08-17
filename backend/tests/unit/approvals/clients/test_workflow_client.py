@@ -10,7 +10,7 @@ import httpx
 import pytest
 import respx
 
-from nexus.approvals.clients.workflow_client import WorkflowApiClient
+from syntara.approvals.clients.workflow_client import WorkflowApiClient
 
 
 class TestWorkflowApiClient:
@@ -27,7 +27,7 @@ class TestWorkflowApiClient:
         decided_at = "2026-05-20T10:00:00+00:00"
         notes = "Approved by test"
 
-        with patch("nexus.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -75,7 +75,7 @@ class TestWorkflowApiClient:
         decision = "rejected"
         approval_id = uuid4()
 
-        with patch("nexus.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -112,7 +112,7 @@ class TestWorkflowApiClient:
         decision = "approved"
         approval_id = uuid4()
 
-        with patch("nexus.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -149,7 +149,7 @@ class TestWorkflowApiClient:
 
         with (
             override_settings(workflow_client_max_retries=0),
-            patch("nexus.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url,
+            patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url,
         ):
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
@@ -184,7 +184,7 @@ class TestWorkflowApiClient:
         decision = "rejected"
         approval_id = uuid4()
 
-        with patch("nexus.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:

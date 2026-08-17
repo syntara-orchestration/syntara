@@ -18,10 +18,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.workflows.utils.namespace_resolver import NamespaceResolver
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.graph import WorkflowGraph
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -29,7 +29,7 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
-    with patch("nexus.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.execute_activity = AsyncMock()
@@ -40,9 +40,9 @@ def _make_workflow(
     pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
     stop_after_nodes: set[str] | None = None,
     resolver: NamespaceResolver | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()

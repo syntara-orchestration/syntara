@@ -456,8 +456,6 @@ export function ActionNodeForm(props: Readonly<ActionNodeFormProps>) {
       code: data.executor === ExecutorTypeEnum.SCRIPT ? data.code : undefined,
       method: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.method : undefined,
       url: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.url : undefined,
-      authentication:
-        data.executor === ExecutorTypeEnum.HTTP_REQUEST && data.authentication ? data.authentication : undefined,
       headers: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.headers : undefined,
       body: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.body : undefined,
       parameters: data.parameters ?? undefined,

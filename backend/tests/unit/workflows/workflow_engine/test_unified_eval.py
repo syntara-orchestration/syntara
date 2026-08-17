@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from nexus.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH, safe_eval_with_namespace
+from syntara.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH, safe_eval_with_namespace
 
 
 class TestBasicEvaluation:
@@ -39,7 +39,10 @@ class TestBasicEvaluation:
 
     def test_variable_not_found_raises_key_error(self) -> None:
         namespace = {"status": "ok"}
-        with pytest.raises(KeyError, match="unknown"):
+        with pytest.raises(
+            KeyError,
+            match=r'The condition references "unknown" but no step with that name has produced output',
+        ):
             safe_eval_with_namespace("${unknown} == 'value'", namespace)
 
     def test_empty_expression_raises_error(self) -> None:
@@ -365,8 +368,15 @@ class TestErrorMessages:
             safe_eval_with_namespace("${status} ==", {"status": "ok"})
 
     def test_variable_not_found_error_message(self) -> None:
-        with pytest.raises(KeyError, match="'unknown' not found"):
+        with pytest.raises(KeyError) as exc_info:
             safe_eval_with_namespace("${unknown} == 'value'", {})
+
+        error_msg = str(exc_info.value)
+        assert 'The condition references "unknown"' in error_msg
+        assert "no step with that name has produced output" in error_msg
+        assert "runs before this condition" in error_msg
+        assert "Variable" not in error_msg
+        assert "namespace" not in error_msg.lower()
 
     def test_unsupported_operation_error_message(self) -> None:
         """Function calls are not supported."""
@@ -431,7 +441,7 @@ class TestSecurityLimits:
 
     def test_expression_length_limit(self) -> None:
         """Expressions longer than MAX_EXPRESSION_LENGTH are rejected."""
-        from nexus.workflows.workflow_engine.unified_eval import MAX_EXPRESSION_LENGTH
+        from syntara.workflows.workflow_engine.unified_eval import MAX_EXPRESSION_LENGTH
 
         long_expr = "${x} == 'a'" + " and ${x} == 'a'" * 1000
         if len(long_expr) > MAX_EXPRESSION_LENGTH:
@@ -440,7 +450,7 @@ class TestSecurityLimits:
 
     def test_variable_name_length_limit_old_behavior(self) -> None:
         """Variable names longer than MAX_VARIABLE_NAME_LENGTH are now explicitly validated."""
-        from nexus.workflows.workflow_engine.unified_eval import MAX_VARIABLE_NAME_LENGTH
+        from syntara.workflows.workflow_engine.unified_eval import MAX_VARIABLE_NAME_LENGTH
 
         long_var = "x" * (MAX_VARIABLE_NAME_LENGTH + 100)
         expr = f"${{{long_var}}} == 'test'"
@@ -617,7 +627,7 @@ class TestReDoSFix:
 
     def test_variable_name_length_limit(self) -> None:
         """Variable names exceeding MAX_VARIABLE_NAME_LENGTH are rejected."""
-        from nexus.workflows.workflow_engine.unified_eval import MAX_VARIABLE_NAME_LENGTH
+        from syntara.workflows.workflow_engine.unified_eval import MAX_VARIABLE_NAME_LENGTH
 
         long_var = "x" * (MAX_VARIABLE_NAME_LENGTH + 1)
         expression = f"${{{long_var}}} == 1"
@@ -640,7 +650,7 @@ class TestASTDepthValidation:
 
     def test_deeply_nested_attribute_access_rejected(self) -> None:
         """Deeply nested attribute access should be rejected before parsing."""
-        from nexus.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH
+        from syntara.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH
 
         # Create deeply nested expression
         deep_path = ".".join(["x"] * (MAX_AST_DEPTH + 1))

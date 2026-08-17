@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexus.workflows.models.validation_finding import (
+from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
     ValidationResult,

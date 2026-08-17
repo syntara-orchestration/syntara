@@ -1,6 +1,6 @@
 """Unit tests for exception utilities."""
 
-from nexus.core.utils.exceptions import extract_all_exceptions
+from syntara.core.utils.exceptions import extract_all_exceptions
 
 
 class TestExtractAllExceptions:

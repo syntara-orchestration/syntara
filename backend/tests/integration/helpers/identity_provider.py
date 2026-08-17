@@ -4,8 +4,8 @@ from uuid import uuid4
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.identity_providers.models.identity_provider import IdentityProvider
+from syntara.core.models import User
+from syntara.identity_providers.models.identity_provider import IdentityProvider
 
 
 class IdentityProviderCreate:

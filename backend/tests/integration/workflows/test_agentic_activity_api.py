@@ -15,7 +15,7 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
+from syntara.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
 from tests.fixtures.temporal import CompleteAsyncError
 
 
@@ -50,9 +50,9 @@ def mock_agent_client() -> Generator[AsyncMock, None, None]:
     """Auto-mock Agent Orchestrator client for all tests."""
     with (
         patch("temporalio.activity.heartbeat"),
-        patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+        patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
         patch(
-            "nexus.workflows.workflow_engine.activities.agentic_activity._inject_runtime_settings",
+            "syntara.workflows.workflow_engine.activities.agentic_activity._inject_runtime_settings",
             side_effect=_fake_inject_runtime_settings,
         ),
     ):
@@ -77,7 +77,7 @@ class TestAgenticActivityExecution:
         """Test that agentic activity invokes Agent Orchestrator asynchronously."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -92,7 +92,7 @@ class TestAgenticActivityExecution:
         """Test that parameters are correctly mapped from config to Agent Orchestrator."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -103,7 +103,7 @@ class TestAgenticActivityExecution:
         call_args = mock_agent_client.invoke_agent_async.call_args
 
         # Check agent
-        assert call_args.kwargs["agent"] == "nexus-agent://default"
+        assert call_args.kwargs["agent"] == "syntara-agent://default"
 
         # Check llm_model_id is forwarded in metadata
         assert call_args.kwargs["metadata"]["llm_model_id"] == "550e8400-e29b-41d4-a716-446655440000"
@@ -116,7 +116,7 @@ class TestAgenticActivityExecution:
         """Test that activity invokes agent async and returns metadata."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -133,7 +133,7 @@ class TestAgenticActivityErrorHandling:
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_unavailable(self, mock_agent_client) -> None:
         """Test error handling when Agent Orchestrator is unavailable."""
-        from nexus.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
+        from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
 
         mock_agent_client.invoke_agent_async.side_effect = AgentOrchestratorClientConnectionError(
             "Agent Orchestrator unavailable"
@@ -146,12 +146,16 @@ class TestAgenticActivityErrorHandling:
 
         with pytest.raises(ApplicationError) as exc_info:
             await execute_agentic_activity(input_config, None, project_id=str(uuid4()))
-        assert "agent orchestrator" in str(exc_info.value).lower()
+        error_message = str(exc_info.value)
+        assert "temporarily unavailable" in error_message.lower()
+        assert "try again" in error_message.lower()
+        assert "agent orchestrator" not in error_message.lower()
+        assert "Failed to connect to Agent Orchestrator" not in error_message
 
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_timeout(self, mock_agent_client) -> None:
         """Test timeout handling for Agent Orchestrator invocations."""
-        from nexus.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientError, ErrorCode
+        from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientError, ErrorCode
 
         mock_agent_client.invoke_agent_async.side_effect = AgentOrchestratorClientError(
             "Invocation timed out", code=ErrorCode.TIMEOUT

@@ -62,12 +62,12 @@ def _drain_revocation_window_after_module() -> Generator[None, None, None]:
 _API_HEALTH_TIMEOUT = 15.0
 
 
-def _wait_for_api_healthy(nexus_api: SyntaraApiRegistry) -> None:
+def _wait_for_api_healthy(syntara_api: SyntaraApiRegistry) -> None:
     """Poll the API until it responds with 200, absorbing any post-revocation instability."""
     deadline = time.monotonic() + _API_HEALTH_TIMEOUT
     while True:
         try:
-            resp = nexus_api.settings.list(limit=1)
+            resp = syntara_api.settings.list(limit=1)
             if resp.status_code == HTTPStatus.OK:
                 return
         except Exception:
@@ -77,7 +77,7 @@ def _wait_for_api_healthy(nexus_api: SyntaraApiRegistry) -> None:
         time.sleep(0.5)
 
 
-def _revoke_all(nexus_api: SyntaraApiRegistry) -> None:
+def _revoke_all(syntara_api: SyntaraApiRegistry) -> None:
     """Revoke all sessions via the generated API client, then wait for the API to stabilize.
 
     Global revocation invalidates every cached session on the server.  In the
@@ -88,11 +88,11 @@ def _revoke_all(nexus_api: SyntaraApiRegistry) -> None:
     After the revocation succeeds we poll the API until it responds with 200,
     ensuring callers always see a stable server.
     """
-    response = nexus_api.admin.revoke_all_sessions()
+    response = syntara_api.admin.revoke_all_sessions()
     assert response.status_code == HTTPStatus.OK, (
         f"Failed to set global revocation: {response.status_code} {response.content!r}"
     )
-    _wait_for_api_healthy(nexus_api)
+    _wait_for_api_healthy(syntara_api)
 
 
 def assert_refresh_unauthorized_consistently(
@@ -132,52 +132,52 @@ class TestGlobalRevocation:
 
     def test_global_revocation_invalidates_all_sessions(
         self,
-        nexus_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_api: SyntaraApiRegistry,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """All pre-revocation tokens (access and refresh) must be rejected after cache TTL."""
         user_a, pw_a = local_user_factory(first_name="GlobalRev", last_name="UserA")
         user_b, pw_b = local_user_factory(first_name="GlobalRev", last_name="UserB")
 
-        token_a, cookies_a = local_login_session(nexus_base_url, user_a.username, pw_a)
-        token_b, cookies_b = local_login_session(nexus_base_url, user_b.username, pw_b)
+        token_a, cookies_a = local_login_session(syntara_base_url, user_a.username, pw_a)
+        token_b, cookies_b = local_login_session(syntara_base_url, user_b.username, pw_b)
 
-        assert_refresh_succeeds(nexus_base_url, cookies_a)
-        assert_refresh_succeeds(nexus_base_url, cookies_b)
+        assert_refresh_succeeds(syntara_base_url, cookies_a)
+        assert_refresh_succeeds(syntara_base_url, cookies_b)
 
-        _revoke_all(nexus_api)
+        _revoke_all(syntara_api)
         _wait_for_cache_expiry()
 
-        assert_refresh_unauthorized_consistently(nexus_base_url, cookies_a, label="user_a")
-        assert_refresh_unauthorized_consistently(nexus_base_url, cookies_b, label="user_b")
+        assert_refresh_unauthorized_consistently(syntara_base_url, cookies_a, label="user_a")
+        assert_refresh_unauthorized_consistently(syntara_base_url, cookies_b, label="user_b")
 
-        assert_access_token_unauthorized(nexus_base_url, token_a, label="user_a access")
-        assert_access_token_unauthorized(nexus_base_url, token_b, label="user_b access")
+        assert_access_token_unauthorized(syntara_base_url, token_a, label="user_a access")
+        assert_access_token_unauthorized(syntara_base_url, token_b, label="user_b access")
 
     def test_sessions_created_after_revocation_are_valid(
         self,
-        nexus_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_api: SyntaraApiRegistry,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """Sessions created after the TTL window must work normally."""
         user, pw = local_user_factory(first_name="GlobalRev", last_name="PostRevoke")
 
-        _, cookies_before = local_login_session(nexus_base_url, user.username, pw)
+        _, cookies_before = local_login_session(syntara_base_url, user.username, pw)
 
-        _revoke_all(nexus_api)
+        _revoke_all(syntara_api)
         _wait_for_cache_expiry()
 
-        assert_refresh_unauthorized_consistently(nexus_base_url, cookies_before, label="pre-revoke")
+        assert_refresh_unauthorized_consistently(syntara_base_url, cookies_before, label="pre-revoke")
 
-        _, cookies_after = local_login_session(nexus_base_url, user.username, pw)
-        assert_refresh_succeeds(nexus_base_url, cookies_after)
+        _, cookies_after = local_login_session(syntara_base_url, user.username, pw)
+        assert_refresh_succeeds(syntara_base_url, cookies_after)
 
     def test_tokens_issued_during_ttl_window_are_rejected(
         self,
-        nexus_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_api: SyntaraApiRegistry,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """Tokens obtained within the TTL window after revocation must also be rejected.
@@ -188,22 +188,22 @@ class TestGlobalRevocation:
         """
         user, pw = local_user_factory(first_name="GlobalRev", last_name="TTLWindow")
 
-        _revoke_all(nexus_api)
+        _revoke_all(syntara_api)
 
-        tainted_token, tainted_cookies = local_login_session(nexus_base_url, user.username, pw)
+        tainted_token, tainted_cookies = local_login_session(syntara_base_url, user.username, pw)
 
         _wait_for_cache_expiry()
 
-        assert_access_token_unauthorized(nexus_base_url, tainted_token, label="tainted access")
-        assert_refresh_unauthorized_consistently(nexus_base_url, tainted_cookies, label="tainted refresh")
+        assert_access_token_unauthorized(syntara_base_url, tainted_token, label="tainted access")
+        assert_refresh_unauthorized_consistently(syntara_base_url, tainted_cookies, label="tainted refresh")
 
-        _, clean_cookies = local_login_session(nexus_base_url, user.username, pw)
-        assert_refresh_succeeds(nexus_base_url, clean_cookies)
+        _, clean_cookies = local_login_session(syntara_base_url, user.username, pw)
+        assert_refresh_succeeds(syntara_base_url, clean_cookies)
 
     def test_bruteforce_refresh_during_ttl_window_yields_unusable_token(
         self,
-        nexus_api: SyntaraApiRegistry,
-        nexus_base_url: str,
+        syntara_api: SyntaraApiRegistry,
+        syntara_base_url: str,
         local_user_factory: Callable[..., tuple[UserRead, str]],
     ) -> None:
         """Spam refresh with pre-revocation cookies during the TTL window.
@@ -222,15 +222,15 @@ class TestGlobalRevocation:
 
         user, pw = local_user_factory(first_name="GlobalRev", last_name="BruteForce")
 
-        _, cookies = local_login_session(nexus_base_url, user.username, pw)
-        assert_refresh_succeeds(nexus_base_url, cookies)
+        _, cookies = local_login_session(syntara_base_url, user.username, pw)
+        assert_refresh_succeeds(syntara_base_url, cookies)
 
-        _revoke_all(nexus_api)
+        _revoke_all(syntara_api)
 
         captured_tokens: list[str] = []
         deadline = time.monotonic() + _CACHE_TTL
         while time.monotonic() < deadline:
-            resp = refresh_with_cookies(nexus_base_url, cookies)
+            resp = refresh_with_cookies(syntara_base_url, cookies)
             if resp.status_code == HTTPStatus.OK and isinstance(resp.parsed, AccessTokenResponse):
                 captured_tokens.append(resp.parsed.access_token)
 
@@ -239,21 +239,21 @@ class TestGlobalRevocation:
         if captured_tokens:
             for i, token in enumerate(captured_tokens):
                 assert_access_token_unauthorized(
-                    nexus_base_url,
+                    syntara_base_url,
                     token,
                     label=f"captured token {i + 1}/{len(captured_tokens)}",
                 )
 
-        assert_refresh_unauthorized_consistently(nexus_base_url, cookies, label="post-ttl refresh")
+        assert_refresh_unauthorized_consistently(syntara_base_url, cookies, label="post-ttl refresh")
 
     def test_revocation_timestamp_readable_after_set(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
     ) -> None:
         """GET /admin/revocation must return a non-null timestamp after POST."""
-        _revoke_all(nexus_api)
+        _revoke_all(syntara_api)
 
-        response = nexus_api.admin.get_global_revocation_timestamp()
+        response = syntara_api.admin.get_global_revocation_timestamp()
         assert response.status_code == HTTPStatus.OK
         data = response.parsed
         assert data is not None

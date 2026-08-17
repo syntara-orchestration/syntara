@@ -5,8 +5,8 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from nexus.telemetry.events.tool_execution import ToolExecutionEvent
-from nexus.tool_manager.models.tool_execution import ToolExecutionStatus
+from syntara.telemetry.events.tool_execution import ToolExecutionEvent
+from syntara.tool_manager.models.tool_execution import ToolExecutionStatus
 
 VALID_WORKFLOW_EXECUTION_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 

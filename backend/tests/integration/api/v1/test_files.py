@@ -14,12 +14,12 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.files.document_conversion.tasks import get_document_conversion_task
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.files.document_conversion.tasks import get_document_conversion_task
+from syntara.files.models import FileMetadata, FileStatus
 
 
 class TestFilesAPIUpload:
@@ -352,7 +352,7 @@ async def _create_file_metadata(
         filename=filename,
         size_bytes=size_bytes,
         mime_type=mime_type,
-        file_path=f"/opt/app-root/uploads/nexus-{uuid4()}-{filename}",
+        file_path=f"/opt/app-root/uploads/orchestrator-{uuid4()}-{filename}",
         status=file_status,
         project_id=UUID(project_id),
     )
@@ -556,4 +556,4 @@ class TestFilesAPIMetadata:
         raw = response.text
         assert "file_path" not in raw
         assert "converted_content_path" not in raw
-        assert "/opt/app-root/uploads/nexus-" not in raw
+        assert "/opt/app-root/uploads/orchestrator-" not in raw

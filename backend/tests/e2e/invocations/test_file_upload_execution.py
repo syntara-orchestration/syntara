@@ -52,7 +52,7 @@ class TestFileUploadExecution:
     @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
     def test_file_upload_invocation_completes_with_converted_files(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         auth_headers: dict[str, str],
         first_project_id: UUID,
         llm_credential_id: str,
@@ -75,7 +75,7 @@ class TestFileUploadExecution:
         }
 
         response = httpx.post(
-            f"{nexus_base_url}/api/v1/invocations/chat",
+            f"{syntara_base_url}/api/v1/invocations/chat",
             data=data,
             files=files,
             headers=auth_headers,
@@ -89,13 +89,13 @@ class TestFileUploadExecution:
         assert len(file_ids) == 1
         UUID(file_ids[0])
 
-        final = _poll_invocation(nexus_base_url, auth_headers, invocation_id)
+        final = _poll_invocation(syntara_base_url, auth_headers, invocation_id)
         assert final["status"] == "completed", f"Invocation failed: {final.get('result')}"
         assert final["context_data"]["file_ids"] == file_ids
 
         file_ids_query = "&".join(f"file_ids={fid}" for fid in file_ids)
         meta_resp = httpx.get(
-            f"{nexus_base_url}/api/v1/files/metadata?{file_ids_query}",
+            f"{syntara_base_url}/api/v1/files/metadata?{file_ids_query}",
             headers=auth_headers,
             verify=e2e_ssl_context(),
         )

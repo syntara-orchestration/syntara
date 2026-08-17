@@ -1,10 +1,10 @@
 # Error Handling Strategy
 
-This document outlines the comprehensive error handling strategy implemented across the Nexus application to ensure all REST API responses comply with RFC 9457 Problem Details specification.
+This document outlines the comprehensive error handling strategy implemented across the Syntara application to ensure all REST API responses comply with RFC 9457 Problem Details specification.
 
 ## Overview
 
-The Nexus application implements a **centralized exception handling strategy** that provides consistent, secure, and standards-compliant error responses across all API endpoints. This approach ensures clean separation of concerns between business logic and HTTP presentation layers.
+The Syntara application implements a **centralized exception handling strategy** that provides consistent, secure, and standards-compliant error responses across all API endpoints. This approach ensures clean separation of concerns between business logic and HTTP presentation layers.
 
 ## Architecture Principles
 
@@ -124,8 +124,8 @@ async def workflow_name_conflict_handler(request: Request, exc: Exception) -> JS
 - `WorkflowVersionNotFoundError`
 
 ### Validation Errors (400/422)
-- `nexus.files.validators.ValidationError` → 400 (business logic validation)
-- `nexus.tool_manager.lib.exceptions.ValidationError` → 422 (schema validation)
+- `syntara.files.validators.ValidationError` → 400 (business logic validation)
+- `syntara.tool_manager.lib.exceptions.ValidationError` → 422 (schema validation)
 - `pydantic.ValidationError` → 422 (request validation)
 - `fastapi.exceptions.RequestValidationError` → 422 (request validation)
 
@@ -195,7 +195,7 @@ async def workflow_not_found_handler(request: Request, exc: Exception) -> JSONRe
 
 1. **Create domain exception with decorator** in appropriate domain module:
 ```python
-from nexus.core.exception_registry import fastapi_exception
+from syntara.core.exception_registry import fastapi_exception
 
 @fastapi_exception(handler=my_domain_error_handler)
 class MyDomainError(Exception):
@@ -316,6 +316,6 @@ result = await service.operation()
 
 ## Conclusion
 
-This centralized error handling strategy ensures that Nexus provides a professional, secure, and standards-compliant API experience. By maintaining the single exception boundary principle and letting domain exceptions bubble up to global handlers, we achieve consistent error responses while maintaining clean architectural boundaries.
+This centralized error handling strategy ensures that Syntara provides a professional, secure, and standards-compliant API experience. By maintaining the single exception boundary principle and letting domain exceptions bubble up to global handlers, we achieve consistent error responses while maintaining clean architectural boundaries.
 
 All new code should follow this pattern, and any legacy error handling code should be migrated to use this centralized approach.

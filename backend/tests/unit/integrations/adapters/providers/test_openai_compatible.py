@@ -1,6 +1,6 @@
 """Tests for OpenAICompatibleProvider."""
 
-from nexus.integrations.adapters.providers.openai_compatible import OpenAICompatibleProvider
+from syntara.integrations.adapters.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class TestOpenAICompatibleProvider:

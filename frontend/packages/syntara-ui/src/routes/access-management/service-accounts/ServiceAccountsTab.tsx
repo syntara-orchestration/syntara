@@ -12,6 +12,7 @@ import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxLink } from '../../../components/NxLink'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -19,7 +20,6 @@ import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import type { FilterFieldDefinition } from '../../../types/filters'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 import { getProjectDetailPath, getServiceAccountDetailPath } from '../accessManagementPaths'
@@ -121,9 +121,11 @@ function ServiceAccountRow({
           </>
         )}
       </Td>
-      <Td dataLabel="Created">{formatDateTime(sa.created_at)}</Td>
+      <Td dataLabel="Created">
+        <DateCell dateString={sa.created_at} />
+      </Td>
       <Td dataLabel="Last authenticated">
-        {sa.last_authenticated_at ? formatDateTime(sa.last_authenticated_at) : 'Never'}
+        {sa.last_authenticated_at ? <DateCell dateString={sa.last_authenticated_at} /> : 'Never'}
       </Td>
       <Td dataLabel="State">
         <Switch

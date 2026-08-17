@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexus.workflows.utils.namespace_resolver import NamespaceResolver
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.graph import WorkflowGraph
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -17,16 +17,16 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     mock_logger = MagicMock()
     with (
-        patch("nexus.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("nexus.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         yield mock_wf
 
 
-def _make_workflow(stop_after_nodes: set[str] | None = None) -> NexusWorkflow:
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+def _make_workflow(stop_after_nodes: set[str] | None = None) -> OrchestratorWorkflow:
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.resolver = NamespaceResolver()
@@ -51,7 +51,7 @@ def _node(node_id: str, node_type: str = "script") -> dict[str, Any]:
 
 
 class TestApplyExecutionScope:
-    """Tests for NexusWorkflow._apply_execution_scope."""
+    """Tests for OrchestratorWorkflow._apply_execution_scope."""
 
     def test_noop_when_no_stop_after_nodes(self) -> None:
         backend = InMemoryGraphBackend()

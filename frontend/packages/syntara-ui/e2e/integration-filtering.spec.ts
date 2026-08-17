@@ -1,4 +1,4 @@
-import { test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { createIntegrationViaApi, deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
 import { getAuthToken } from './utils/api'
@@ -28,6 +28,8 @@ test.afterAll(async ({ browser }) => {
 })
 
 test.describe('Integration Filtering', () => {
+  const guard = createUnavailableGuard('No integration data available; seed data required')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -36,6 +38,7 @@ test.describe('Integration Filtering', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasGrid) guard.markUnavailable()
     test.skip(!hasGrid, 'No integration data available; seed data required')
   })
 

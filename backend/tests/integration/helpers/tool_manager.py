@@ -8,10 +8,10 @@ from typing import Any
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration
-from nexus.tool_manager.models import Tool, ToolStatus
-from nexus.tool_manager.models.tool import ToolParameter, ToolParameterType
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration
+from syntara.tool_manager.models import Tool, ToolStatus
+from syntara.tool_manager.models.tool import ToolParameter, ToolParameterType
 
 
 @asynccontextmanager

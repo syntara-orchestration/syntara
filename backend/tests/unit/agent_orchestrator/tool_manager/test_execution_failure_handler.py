@@ -11,13 +11,15 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from nexus.agent_orchestrator.tool_manager.execution_failure_handler import (
+from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
+    _report_tool_failure,
     _resolve_execution_status,
     create_tool_awrapper,
     create_tool_wrapper,
 )
-from nexus.core.utils.retry import is_retryable_error
-from nexus.tool_manager.models.tool_execution import ToolExecutionStatus
+from syntara.core.utils.retry import is_retryable_error
+from syntara.tool_manager.models.tool import ToolStatus
+from syntara.tool_manager.models.tool_execution import ToolExecutionStatus
 
 
 async def _execute_async_wrapper(
@@ -190,10 +192,10 @@ class TestSyncToolWrapper:
         assert result.status == "error"
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    def test_sync_wrapper_tool_disable_scheduling(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
-        """Test sync tool wrapper disables tool for valid tool_id (no event loop provided)."""
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    def test_sync_wrapper_tool_failure_reporting(self, mock_logger: Mock, mock_report_tool_failure: AsyncMock) -> None:
+        """Test sync tool wrapper reports failure for valid tool_id (no event loop provided)."""
         # Create BaseTool with valid tool_id
         valid_tool_id = uuid4()
         tool = Mock(spec=BaseTool)
@@ -213,14 +215,14 @@ class TestSyncToolWrapper:
             tool_name="sync_tool",
         )
 
-        # Verify _disable_tool_by_id was actually called (fallback path using asyncio.run)
-        mock_disable_tool.assert_called_once()
-        args = mock_disable_tool.call_args[0]
+        # Verify _report_tool_failure was actually called (fallback path using asyncio.run)
+        mock_report_tool_failure.assert_called_once()
+        args = mock_report_tool_failure.call_args[0]
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, RuntimeError)
-        assert str(disabled_error) == "Sync failure"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, RuntimeError)
+        assert str(reported_error) == "Sync failure"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -230,10 +232,12 @@ class TestSyncToolWrapper:
         assert result.status == "error"
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    def test_sync_wrapper_tool_disable_with_event_loop(self, mock_logger: Mock, mock_disable_tool: AsyncMock) -> None:
-        """Test sync tool wrapper disables tool for valid tool_id (with event loop provided)."""
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    def test_sync_wrapper_tool_failure_reporting_with_event_loop(
+        self, mock_logger: Mock, mock_report_tool_failure: AsyncMock
+    ) -> None:
+        """Test sync tool wrapper reports failure for valid tool_id (with event loop provided)."""
         # Create a mock event loop
         import asyncio
 
@@ -259,14 +263,14 @@ class TestSyncToolWrapper:
             tool_name="loop_tool",
         )
 
-        # Verify _disable_tool_by_id was actually called (via run_coroutine_threadsafe path)
-        mock_disable_tool.assert_called_once()
-        args = mock_disable_tool.call_args[0]
+        # Verify _report_tool_failure was actually called (via run_coroutine_threadsafe path)
+        mock_report_tool_failure.assert_called_once()
+        args = mock_report_tool_failure.call_args[0]
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, ConnectionError)
-        assert str(disabled_error) == "Network failure"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, ConnectionError)
+        assert str(reported_error) == "Network failure"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -306,7 +310,7 @@ class TestRetryableErrorIntegration:
 class TestToolWrapperFailureScenarios:
     """Test comprehensive failure scenarios for tool wrapper."""
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_missing_base_tool(self, mock_logger: Mock) -> None:
         """Test tool wrapper when BaseTool is None."""
         result = await _execute_async_wrapper(
@@ -334,7 +338,7 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "test_tool"
         assert result.status == "error"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_missing_metadata_attribute(self, mock_logger: Mock) -> None:
         """Test tool wrapper when BaseTool has no metadata attribute."""
         # Create BaseTool without metadata attribute
@@ -367,7 +371,7 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "network_tool"
         assert result.status == "error"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_non_dict_metadata(self, mock_logger: Mock) -> None:
         """Test tool wrapper when BaseTool metadata is not a dictionary."""
         # Create BaseTool with non-dict metadata
@@ -401,7 +405,7 @@ class TestToolWrapperFailureScenarios:
         assert result.status == "error"
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_missing_tool_id_in_metadata(self, mock_logger: Mock) -> None:
         """Test tool wrapper when metadata exists but tool_id is missing."""
         # Create BaseTool with metadata but no tool_id
@@ -435,7 +439,7 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "timeout_tool"
         assert result.status == "error"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_invalid_tool_id_format(self, mock_logger: Mock) -> None:
         """Test tool wrapper when tool_id in metadata is not a valid UUID."""
         # Create BaseTool with invalid tool_id format
@@ -469,12 +473,12 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "key_tool"
         assert result.status == "error"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._disable_tool_by_id")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
-    async def test_tool_wrapper_successful_tool_id_extraction_and_disable_scheduling(
-        self, mock_logger: Mock, mock_disable_tool: AsyncMock
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._report_tool_failure")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    async def test_tool_wrapper_successful_tool_id_extraction_and_failure_reporting(
+        self, mock_logger: Mock, mock_report_tool_failure: AsyncMock
     ) -> None:
-        """Test tool wrapper with valid tool_id that gets disabled directly."""
+        """Test tool wrapper with valid tool_id reports failure directly."""
         # Create BaseTool with valid tool_id
         valid_tool_id = uuid4()
         tool = Mock(spec=BaseTool)
@@ -495,14 +499,14 @@ class TestToolWrapperFailureScenarios:
         )
         mock_logger.debug.assert_any_call("Extracted tool_id from metadata", tool_id=valid_tool_id)
 
-        # Verify tool disable was called directly
-        mock_disable_tool.assert_called_once()
-        args, _kwargs = mock_disable_tool.call_args
+        # Verify failure reporting was called directly
+        mock_report_tool_failure.assert_called_once()
+        args, _kwargs = mock_report_tool_failure.call_args
         assert len(args) == 2
-        disabled_tool_id, disabled_error = args
-        assert disabled_tool_id == valid_tool_id
-        assert isinstance(disabled_error, OSError)
-        assert str(disabled_error) == "Disk full"
+        reported_tool_id, reported_error = args
+        assert reported_tool_id == valid_tool_id
+        assert isinstance(reported_error, OSError)
+        assert str(reported_error) == "Disk full"
 
         # Verify response
         assert isinstance(result, ToolMessage)
@@ -511,7 +515,7 @@ class TestToolWrapperFailureScenarios:
         assert result.name == "disk_tool"
         assert result.status == "error"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler.logger")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler.logger")
     async def test_tool_wrapper_none_tool_id_in_metadata(self, mock_logger: Mock) -> None:
         """Test tool wrapper when tool_id is explicitly None in metadata."""
         # Create BaseTool with None tool_id
@@ -571,8 +575,8 @@ class TestResolveToolExecutionStatus:
 class TestMetricsEmissionAndDbPersistence:
     """Test that tool wrappers emit metrics with correct status and persist to DB."""
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     async def test_async_wrapper_success_emits_success_status(self, mock_emit: Mock, mock_persist: AsyncMock) -> None:
         """Test that successful async execution emits SUCCESS status and persists to DB."""
         tool = Mock(spec=BaseTool)
@@ -597,8 +601,8 @@ class TestMetricsEmissionAndDbPersistence:
         assert persist_args[0][2] == ToolExecutionStatus.SUCCESS
         assert persist_args[1]["error_message"] is None
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     async def test_async_wrapper_timeout_emits_timeout_status(self, mock_emit: Mock, mock_persist: AsyncMock) -> None:
         """Test that TimeoutError emits TIMEOUT status and persists with error message."""
         tool = Mock(spec=BaseTool)
@@ -622,8 +626,8 @@ class TestMetricsEmissionAndDbPersistence:
         assert persist_args[0][2] == ToolExecutionStatus.TIMEOUT
         assert persist_args[1]["error_message"] == "Request timed out"
 
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     async def test_async_wrapper_error_emits_error_status(self, mock_emit: Mock, mock_persist: AsyncMock) -> None:
         """Test that a generic exception emits ERROR status."""
         tool = Mock(spec=BaseTool)
@@ -645,8 +649,8 @@ class TestMetricsEmissionAndDbPersistence:
         assert mock_persist.call_args[0][2] == ToolExecutionStatus.ERROR
 
     @pytest.mark.usefixtures("fast_retry_settings")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._run_coroutine_from_sync")
-    @patch("nexus.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._run_coroutine_from_sync")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     def test_sync_wrapper_timeout_emits_timeout_status(self, mock_emit: Mock, mock_run_coro: Mock) -> None:
         """Test that sync wrapper maps TimeoutError to TIMEOUT status."""
         tool = Mock(spec=BaseTool)
@@ -664,7 +668,30 @@ class TestMetricsEmissionAndDbPersistence:
         _, _, emit_status = mock_emit.call_args[0]
         assert emit_status == ToolExecutionStatus.TIMEOUT
 
-        # _run_coroutine_from_sync is called twice: once for tool disable, once for DB persistence
+        # _run_coroutine_from_sync is called twice: once for failure reporting, once for DB persistence
         assert mock_run_coro.call_count == 2
         persist_call = mock_run_coro.call_args_list[-1]
         assert persist_call[0][2] == "tool execution DB persistence"
+
+
+class TestReportToolFailure:
+    """Tests for the execution failure reporting helper."""
+
+    @pytest.mark.asyncio
+    async def test_report_tool_failure_reports_error_status(self) -> None:
+        """Helper reports ERROR status and refresh_error via update_tool_status."""
+        tool_id = uuid4()
+        client = AsyncMock()
+        client.__aenter__.return_value = client
+
+        with patch(
+            "syntara.agent_orchestrator.tool_manager.execution_failure_handler._get_tool_manager_client",
+            return_value=client,
+        ):
+            await _report_tool_failure(tool_id, TimeoutError("boom"))
+
+        client.update_tool_status.assert_awaited_once()
+        kwargs = client.update_tool_status.await_args.kwargs
+        assert kwargs["tool_id"] == tool_id
+        assert kwargs["status"] == ToolStatus.ERROR
+        assert "TimeoutError" in kwargs["refresh_error"]

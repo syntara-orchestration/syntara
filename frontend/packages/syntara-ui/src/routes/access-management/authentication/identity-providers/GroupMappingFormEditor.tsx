@@ -6,6 +6,7 @@ import { FormProvider } from 'react-hook-form'
 import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
 import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../../components/layout/NxPanel'
+import { useDocLink } from '../../../../utils/docs/useDocLink'
 
 import { GroupMappingEditPanel } from './GroupMappingEditPanel'
 import { useGroupMappingEditForm, type UseGroupMappingFormMetadataResult } from './useGroupMappingForm'
@@ -24,6 +25,7 @@ function GroupMappingFormEditorContent({
   GroupMappingFormEditorProps & { providerId: string; config: NonNullable<UseGroupMappingFormMetadataResult['config']> }
 >) {
   const { defaultExpression, groupMappingConfig, idpType, pageTitle, breadcrumbs } = metadata
+  const mappingDocLink = useDocLink('identityProviderMapping')
 
   const editForm = useGroupMappingEditForm({
     providerId,
@@ -40,7 +42,7 @@ function GroupMappingFormEditorContent({
   return (
     <FormProvider {...editForm.form}>
       <NxPage>
-        <NxPageHeader title={pageTitle} breadcrumbs={breadcrumbs} />
+        <NxPageHeader title={pageTitle} breadcrumbs={breadcrumbs} docLink={mappingDocLink} />
         <NxPageBody>
           <NxPanel
             isFullHeight

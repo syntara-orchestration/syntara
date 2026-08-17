@@ -9,14 +9,14 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from nexus.telemetry.client import TelemetryClientRegistry
-from nexus.telemetry.events.workflow_execution import (
+from syntara.telemetry.client import TelemetryClientRegistry
+from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
 )
-from nexus.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from nexus.workflows.audit.node_execution import NodeExecutedEvent
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
     WorkflowTerminalStatus,
@@ -73,7 +73,7 @@ class TestEndToEndWorkflowTelemetry:
         assert complete_call.kwargs["properties"]["node_count"] == 3
         assert complete_call.kwargs["properties"]["error_count"] == 0
 
-    @patch("nexus.telemetry.handlers.node_execution.get_telemetry_registry")
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_node_event_sent_via_audit_handler(self, mock_get_registry: MagicMock) -> None:
         """Verify that NodeExecutedTelemetryHandler emits node_execution to Segment."""
         registry = TelemetryClientRegistry()

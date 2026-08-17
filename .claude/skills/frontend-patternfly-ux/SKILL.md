@@ -311,7 +311,7 @@ Filter bar is visible when data exists or when filters are active; hidden only w
 - **Table columns:**
   - Columns for "created" or "modified" should have username (linked) + date together
   - This pattern should be used for any column that includes a date/time and a who
-  - Date/time format: `MMM DD, YYYY, H:MM:SS AM/PM` — e.g., "Jan 15, 2026, 2:30:45 PM". Comma between date and time. Seconds included. Always use `DateCell` / `formatDateTime()` from `dateUtils.ts` — never `toLocaleString()` or PatternFly's `Timestamp` component.
+  - Date/time format: `MMM DD, YYYY, H:MM:SS AM/PM` — e.g., "Jan 15, 2026, 2:30:45 PM". Comma between date and time. Seconds included. Always render read-only date/time values through `DateCell` / `UserTimestamp` (`components/table/DateCell.tsx`), which wrap PatternFly's [`Timestamp`](https://www.patternfly.org/components/timestamp) component with `dateFormat="medium" timeFormat="medium"` — never call `toLocaleString()` or hand-roll date-fns formatting directly in a component. `Timestamp` renders smaller (`body-sm`) text than default body copy by design (PF's built-in `--pf-v6-c-timestamp--FontSize` token) — do not override this per-instance; it is the accepted look project-wide.
 - **Row Actions:**
   - Every table row has a kebab menu (⋮) in the rightmost column containing all available actions for that resource
   - The actions column has no column header label

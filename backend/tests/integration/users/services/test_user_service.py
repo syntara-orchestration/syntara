@@ -16,7 +16,7 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.auth.exceptions import (
+from syntara.auth.exceptions import (
     AdminDeleteError,
     AdminDisableNoOtherAdminsError,
     AdminModifyError,
@@ -25,15 +25,15 @@ from nexus.auth.exceptions import (
     UserNotFoundError,
     UserUsernameConflictError,
 )
-from nexus.auth.passwords import hash_password, verify_password
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
-from nexus.core.models.user import AuthType
-from nexus.core.models.user_identity import UserIdentity
-from nexus.core.models.user_schemas import UserRead
-from nexus.identity_providers.models.identity_provider import IdentityProvider
-from nexus.identity_providers.models.identity_provider_configuration import OIDCConfiguration
-from nexus.users.services.user_service import UsersService
+from syntara.auth.passwords import hash_password, verify_password
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
+from syntara.core.models.user import AuthType
+from syntara.core.models.user_identity import UserIdentity
+from syntara.core.models.user_schemas import UserRead
+from syntara.identity_providers.models.identity_provider import IdentityProvider
+from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.users.services.user_service import UsersService
 
 
 async def _get_or_create_admins_group(session: AsyncSession) -> Group:
@@ -58,6 +58,7 @@ async def _get_or_create_builtin_admin(session: AsyncSession) -> User:
         id=uuid4(),
         username="admin",
         first_name="Admin",
+        email="admin@example.com",
         password_hash=hash_password("adminpassword"),
         is_builtin=True,
     )
@@ -411,6 +412,27 @@ async def test_non_admin_cannot_modify_admin_fields(test_db_session: AsyncSessio
 
 
 @pytest.mark.asyncio
+async def test_admin_self_can_update_email(test_db_session: AsyncSession) -> None:
+    """Builtin admin may replace the bootstrap email placeholder on itself."""
+    admin = await _get_or_create_builtin_admin(test_db_session)
+    service = UsersService(test_db_session, admin)
+
+    updated = await service.update_user(admin.id, email="ops-admin@example.com")
+
+    assert updated.email == "ops-admin@example.com"
+
+
+@pytest.mark.asyncio
+async def test_admin_self_cannot_update_name(test_db_session: AsyncSession) -> None:
+    """Builtin admin still cannot change protected display-name fields."""
+    admin = await _get_or_create_builtin_admin(test_db_session)
+    service = UsersService(test_db_session, admin)
+
+    with pytest.raises(AdminModifyError):
+        await service.update_user(admin.id, first_name="Renamed")
+
+
+@pytest.mark.asyncio
 async def test_list_users_cursor(test_db_session: AsyncSession, test_user: User) -> None:
     """Test listing users with cursor-based pagination."""
     service = UsersService(test_db_session, test_user)
@@ -474,8 +496,8 @@ async def test_is_duplicate_username_error(test_db_session: AsyncSession, test_u
 @pytest.mark.asyncio
 async def test_update_user_rejects_password_on_federated_user(test_db_session: AsyncSession, test_user: User) -> None:
     """Test that setting a password on a federated user raises PasswordOnFederatedUserError."""
-    from nexus.auth.exceptions import PasswordOnFederatedUserError
-    from nexus.core.models.user import AuthType
+    from syntara.auth.exceptions import PasswordOnFederatedUserError
+    from syntara.core.models.user import AuthType
 
     service = UsersService(test_db_session, test_user)
 

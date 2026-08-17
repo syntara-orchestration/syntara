@@ -12,8 +12,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
-from nexus.core.router.loader import EndpointDefinition, OpenAPISchema
-from nexus.core.router.validator import (
+from syntara.core.router.loader import EndpointDefinition, OpenAPISchema
+from syntara.core.router.validator import (
     RouteInfo,
     RouteValidator,
     ValidationError,
@@ -534,7 +534,7 @@ class TestLogValidationErrors:
 
     def test_no_errors_logs_success(self) -> None:
         """Test logging when there are no errors."""
-        with patch("nexus.core.router.validator.logger") as mock_logger:
+        with patch("syntara.core.router.validator.logger") as mock_logger:
             log_validation_errors([])
 
             # Verify logger.info was called with success message
@@ -549,7 +549,7 @@ class TestLogValidationErrors:
             ValidationError("function_name_mismatch", "Name mismatch"),
         ]
 
-        with patch("nexus.core.router.validator.logger") as mock_logger:
+        with patch("syntara.core.router.validator.logger") as mock_logger:
             log_validation_errors(errors)
 
             # Verify logger.warning was called with error summary (uses format strings)
@@ -573,7 +573,7 @@ class TestLogValidationErrors:
             },
         )
 
-        with patch("nexus.core.router.validator.logger") as mock_logger:
+        with patch("syntara.core.router.validator.logger") as mock_logger:
             log_validation_errors([error])
 
             # Verify logger.error was called with error details (uses format strings)

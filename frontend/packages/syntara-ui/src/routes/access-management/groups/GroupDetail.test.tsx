@@ -59,10 +59,6 @@ vi.mock('../../../hooks/routing/useSearchParams', async () => {
   }
 })
 
-vi.mock('../../../utils/dateUtils', () => ({
-  formatDateTime: (v: string | null | undefined) => v ?? 'N/A',
-}))
-
 vi.mock('./GroupMembersPanel', () => ({
   GroupMembersPanel: ({ groupId, onMembershipChange }: { groupId: string; onMembershipChange: () => void }) => (
     <div data-testid="group-members-panel">
@@ -246,9 +242,9 @@ describe('GroupDetail', () => {
       expect(screen.getByText('Description')).toBeInTheDocument()
       expect(screen.getByText('Developer group')).toBeInTheDocument()
       expect(screen.getByText('Created')).toBeInTheDocument()
-      expect(screen.getByText('2024-01-15T00:00:00Z')).toBeInTheDocument()
+      expect(screen.getByText(/Jan.*2024/i)).toBeInTheDocument()
       expect(screen.getByText('Updated')).toBeInTheDocument()
-      expect(screen.getByText('2024-06-10T12:00:00Z')).toBeInTheDocument()
+      expect(screen.getByText(/Jun.*10.*2024/i)).toBeInTheDocument()
     })
 
     it('shows dash when description is null', () => {

@@ -26,7 +26,6 @@ import type { Approval } from '@syntara/contracts'
 
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxPanel } from '../../components/layout/NxPanel'
-import { formatDateTime } from '../../utils/dateUtils'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 
 import styles from './ApprovalReadOnlyView.module.css'
@@ -97,10 +96,7 @@ export function ApprovalReadOnlyView({
         </StackItem>
 
         <StackItem>
-          <ApprovalSummaryList
-            workflowName={workflowContext.workflow_name}
-            approvalInitiated={formatDateTime(approval.created_at)}
-          />
+          <ApprovalSummaryList workflowName={workflowContext.workflow_name} approvalInitiatedAt={approval.created_at} />
         </StackItem>
 
         <StackItem>

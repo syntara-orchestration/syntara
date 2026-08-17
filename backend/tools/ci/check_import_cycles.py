@@ -24,7 +24,7 @@ GREEN = "\033[92m"
 YELLOW = "\033[93m"
 RESET = "\033[0m"
 
-# Matches pyan3 cycle lines like: ('nexus.aap.error_handlers', 'nexus.aap.exceptions', ...)
+# Matches pyan3 cycle lines like: ('syntara.aap.error_handlers', 'syntara.aap.exceptions', ...)
 CYCLE_PATTERN = re.compile(r"\(\s*'([^']+)'(?:\s*,\s*'([^']+)')*\s*\)")
 
 

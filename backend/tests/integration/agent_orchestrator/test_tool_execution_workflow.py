@@ -14,9 +14,9 @@ import pytest
 from httpx import AsyncClient, HTTPStatusError
 from langchain_core.tools import tool
 
-from nexus.integrations.adapters.mcp_server import MCPServerAdapter
-from nexus.integrations.adapters.protocol import ValidateResult
-from nexus.tool_manager.lib.providers.mcp import MCPProvider
+from syntara.integrations.adapters.mcp_server import MCPServerAdapter
+from syntara.integrations.adapters.protocol import ValidateResult
+from syntara.tool_manager.lib.providers.mcp import MCPProvider
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 from tests.integration.helpers.tool_manager import wait_for_tool_status
 
@@ -24,7 +24,7 @@ from tests.integration.helpers.tool_manager import wait_for_tool_status
 @pytest.fixture(autouse=True)
 def mock_tool_manager_client(jwt_client: AsyncClient) -> Generator[None, None, None]:
     """Override ToolManagerClient creation to use test server transport with JWT auth."""
-    from nexus.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
+    from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
 
     # Store the original ToolManagerClient __init__ method
     original_init = ToolManagerClient.__init__
@@ -383,7 +383,7 @@ class TestToolExecutionWorkflow:
 
 
 class TestToolExecutionFailureRetryWorkflow:
-    """Integration tests for tool execution failure handling, retry mechanisms, and auto-disable functionality."""
+    """Integration tests for tool execution failure handling, retry mechanisms, and failure reporting."""
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("fast_retry_settings")
@@ -488,10 +488,10 @@ class TestToolExecutionFailureRetryWorkflow:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("fast_retry_settings")
     @pytest.mark.usefixtures("mock_mcp_provider_with_retry_tools")
-    async def test_tool_automatic_disable_on_persistent_failure(
+    async def test_tool_stays_enabled_on_persistent_failure(
         self, auth_client_with_tool_aware_mocked_llm: AsyncClient, test_project_id
     ) -> None:
-        """Test that consistently failing tools are automatically disabled."""
+        """Test that consistently failing tools are marked errored without changing the enabled flag."""
         # Set up MCP Integration and refresh tools
         integration_id = await _create_mcp_integration_and_refresh(auth_client_with_tool_aware_mocked_llm)
 
@@ -514,7 +514,7 @@ class TestToolExecutionFailureRetryWorkflow:
         # Create invocation that should trigger failing tool usage
         invocation_data = {
             "prompt": "Use the mock_failing_tool to process data 'test input'.",
-            "session_id": "test-auto-disable-session",
+            "session_id": "test-persistent-failure-session",
             "project_id": str(test_project_id),
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
@@ -532,16 +532,16 @@ class TestToolExecutionFailureRetryWorkflow:
             # Invocation may complete with failure or still succeed with error handling
             assert completed_invocation is not None
 
-        # Wait for the tool to be automatically disabled due to persistent failures
+        # Wait for the tool to be marked errored due to persistent failures
         async with wait_for_tool_status(
             auth_client_with_tool_aware_mocked_llm, failing_tool_id, "error", max_wait_time=10.0
         ) as tool_status:
             # Verify the tool was found and has the expected status
             assert tool_status is not None, "Failed to get tool status"
 
-            # Critical assertion: Tool should be automatically disabled due to persistent failures
-            assert tool_status["enabled"] is False, (
-                f"Tool should be automatically disabled after persistent failures, but enabled={tool_status['enabled']}"
+            # Critical assertion: enabled is administrator-owned and must survive execution failures
+            assert tool_status["enabled"] is True, (
+                f"Tool enabled flag must not change on execution failure, but enabled={tool_status['enabled']}"
             )
 
             # Tool status should be marked as having issues
@@ -573,7 +573,7 @@ class TestToolEventWebSocketStreaming:
         2. Wait for completion
         3. Verify tool_call and tool_result events were published to stream
         """
-        from nexus.core.cache.stream import StreamClient
+        from syntara.core.cache.stream import StreamClient
 
         # Set up MCP Integration and refresh tools with calculator tool
         await _create_mcp_integration_and_refresh(auth_client_with_tool_aware_mocked_llm)

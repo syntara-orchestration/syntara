@@ -173,7 +173,7 @@ describe('sortRoleAssignmentRows', () => {
 describe('getVisibleColumns', () => {
   it('returns all columns when no hidden columns specified', () => {
     const cols = getVisibleColumns()
-    expect(cols.map((c) => c.key)).toEqual(['roleName', 'description', 'scope', 'project', 'policies'])
+    expect(cols.map((c) => c.key)).toEqual(['roleName', 'description', 'scope', 'project'])
   })
 
   it('returns all columns for empty array', () => {
@@ -182,7 +182,7 @@ describe('getVisibleColumns', () => {
 
   it('hides specified columns', () => {
     const cols = getVisibleColumns(['scope', 'project'])
-    expect(cols.map((c) => c.key)).toEqual(['roleName', 'description', 'policies'])
+    expect(cols.map((c) => c.key)).toEqual(['roleName', 'description'])
   })
 })
 

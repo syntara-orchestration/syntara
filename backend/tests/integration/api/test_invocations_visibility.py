@@ -18,11 +18,11 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models.invocation import Invocation, InvocationStatus
-from nexus.agent_orchestrator.services import InvocationService
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.authz.models import Project
-from nexus.core.models import User
+from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.agent_orchestrator.services import InvocationService
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.models import Project
+from syntara.core.models import User
 from tests.integration.api.conftest import (
     make_admin,
     make_auditor,

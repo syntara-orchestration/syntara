@@ -9,7 +9,7 @@ from ..client import AuthenticatedClient
 
 if TYPE_CHECKING:
     from .admin import AdminApi
-    from .ansible_automation_platform import AnsibleAutomationPlatformApi
+    from .ansible_automation_platform_proxy import AnsibleAutomationPlatformProxyApi
     from .approvals import ApprovalsApi
     from .authentication import AuthenticationApi
     from .authorization import AuthorizationApi
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from .service_account_credentials import ServiceAccountCredentialsApi
     from .service_accounts import ServiceAccountsApi
     from .settings import SettingsApi
-    from .tool_metrics import ToolMetricsApi
     from .tools import ToolsApi
     from .users import UsersApi
     from .users_directory import UsersDirectoryApi
@@ -44,10 +43,10 @@ class SyntaraApiRegistry:
         self._client = client
 
     @cached_property
-    def ansible_automation_platform(self) -> AnsibleAutomationPlatformApi:
-        from .ansible_automation_platform import AnsibleAutomationPlatformApi
+    def ansible_automation_platform_proxy(self) -> AnsibleAutomationPlatformProxyApi:
+        from .ansible_automation_platform_proxy import AnsibleAutomationPlatformProxyApi
 
-        return AnsibleAutomationPlatformApi(client=self._client)
+        return AnsibleAutomationPlatformProxyApi(client=self._client)
 
     @cached_property
     def admin(self) -> AdminApi:
@@ -150,12 +149,6 @@ class SyntaraApiRegistry:
         from .settings import SettingsApi
 
         return SettingsApi(client=self._client)
-
-    @cached_property
-    def tool_metrics(self) -> ToolMetricsApi:
-        from .tool_metrics import ToolMetricsApi
-
-        return ToolMetricsApi(client=self._client)
 
     @cached_property
     def tools(self) -> ToolsApi:

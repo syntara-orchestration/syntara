@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, act, within } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -11,6 +11,43 @@ import { accessClient } from './accessClient'
 import { POLICIES_HELP, SCOPE_HELP } from './accessControlFieldHelpText'
 import { AddRoleDialog } from './AddRoleDialog'
 import { useSelectableProjects } from './useAllProjects'
+
+const { mockPolicySelect } = vi.hoisted(() => ({
+  mockPolicySelect: vi.fn(
+    ({
+      selected,
+      onChange,
+      scopeProjectId,
+      projectEligible,
+      isDisabled,
+    }: {
+      selected: string[]
+      onChange: (policies: string[]) => void
+      scopeProjectId?: string | null
+      projectEligible?: boolean
+      isDisabled?: boolean
+    }) => (
+      <div
+        data-testid="policy-select"
+        data-scope-project-id={scopeProjectId ?? ''}
+        data-project-eligible={String(projectEligible ?? false)}
+        data-disabled={String(isDisabled ?? false)}
+      >
+        <input
+          placeholder="Select policies..."
+          readOnly
+          disabled={isDisabled}
+          value={selected.join(', ')}
+          onClick={() => onChange(['workflow-admin'])}
+        />
+      </div>
+    )
+  ),
+}))
+
+vi.mock('./PolicySelect', () => ({
+  PolicySelect: mockPolicySelect,
+}))
 
 vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -130,6 +167,10 @@ describe('AddRoleDialog', () => {
     return render(<AddRoleDialog onClose={mockOnClose} onSuccess={mockOnSuccess} {...props} />, { wrapper })
   }
 
+  function selectPolicy(user: ReturnType<typeof userEvent.setup>) {
+    return user.click(screen.getByPlaceholderText('Select policies...'))
+  }
+
   describe('Accessibility', () => {
     it('has no accessibility violations', async () => {
       const { container } = renderDialog()
@@ -239,11 +280,8 @@ describe('AddRoleDialog', () => {
       // Fill in description
       await user.type(screen.getByRole('textbox', { name: /role description/i }), 'A test role')
 
-      // Select a policy by opening the dropdown and clicking
-      const policyInput = screen.getByPlaceholderText('Select policies...')
-      await user.click(policyInput)
-      const menuitem1 = screen.getByRole('menuitem', { name: /workflow-admin/i })
-      await user.click(within(menuitem1).getByText('workflow-admin'))
+      // Select a policy
+      await selectPolicy(user)
 
       // Submit the form
       await user.click(screen.getByRole('button', { name: 'Create role' }))
@@ -269,10 +307,7 @@ describe('AddRoleDialog', () => {
       await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
 
       // Select a policy
-      const policyInput = screen.getByPlaceholderText('Select policies...')
-      await user.click(policyInput)
-      const menuitem2 = screen.getByRole('menuitem', { name: /workflow-admin/i })
-      await user.click(within(menuitem2).getByText('workflow-admin'))
+      await selectPolicy(user)
 
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
@@ -296,10 +331,7 @@ describe('AddRoleDialog', () => {
 
       await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
 
-      const policyInput = screen.getByPlaceholderText('Select policies...')
-      await user.click(policyInput)
-      const menuitem3 = screen.getByRole('menuitem', { name: /workflow-admin/i })
-      await user.click(within(menuitem3).getByText('workflow-admin'))
+      await selectPolicy(user)
 
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
@@ -324,10 +356,7 @@ describe('AddRoleDialog', () => {
 
       await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
 
-      const policyInput = screen.getByPlaceholderText('Select policies...')
-      await user.click(policyInput)
-      const menuitem4 = screen.getByRole('menuitem', { name: /workflow-admin/i })
-      await user.click(within(menuitem4).getByText('workflow-admin'))
+      await selectPolicy(user)
 
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
@@ -345,10 +374,7 @@ describe('AddRoleDialog', () => {
 
       await user.type(screen.getByRole('textbox', { name: /role name/i }), 'proj-role')
 
-      const policyInput = screen.getByPlaceholderText('Select policies...')
-      await user.click(policyInput)
-      const menuitem = screen.getByRole('menuitem', { name: /workflow-admin/i })
-      await user.click(within(menuitem).getByText('workflow-admin'))
+      await selectPolicy(user)
 
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
@@ -369,6 +395,50 @@ describe('AddRoleDialog', () => {
         description: undefined,
         policies: ['workflow-admin'],
       })
+    })
+  })
+
+  describe('PolicySelect scope', () => {
+    it('passes null scopeProjectId for system scope by default', () => {
+      renderDialog()
+
+      expect(mockPolicySelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scopeProjectId: null,
+          projectEligible: false,
+        }),
+        undefined
+      )
+    })
+
+    it('passes project scopeProjectId when defaultScope is project', () => {
+      renderDialog({ defaultScope: 'project', defaultProjectId: 'proj-1' })
+
+      expect(mockPolicySelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scopeProjectId: 'proj-1',
+          projectEligible: true,
+          isDisabled: false,
+        }),
+        undefined
+      )
+    })
+
+    it('disables PolicySelect until a project is chosen in project scope', async () => {
+      const user = userEvent.setup()
+      renderDialog()
+
+      await user.click(screen.getByRole('button', { name: 'Role scope' }))
+      await user.click(screen.getByRole('option', { name: 'Project' }))
+
+      expect(mockPolicySelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          scopeProjectId: null,
+          projectEligible: true,
+          isDisabled: true,
+        }),
+        undefined
+      )
     })
   })
 

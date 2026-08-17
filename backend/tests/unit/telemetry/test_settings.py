@@ -1,6 +1,6 @@
 """Unit tests for TelemetrySettings."""
 
-from nexus.core.config.base import Settings, TelemetrySettings
+from syntara.core.config.base import Settings, TelemetrySettings
 
 
 class TestTelemetrySettings:

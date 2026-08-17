@@ -5,20 +5,20 @@ in the tool_services module.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
 from langchain_core.tools import BaseTool
 
-from nexus.agent_orchestrator.tool_manager import tool_services
-from nexus.integrations.models.integration import (
+from syntara.agent_orchestrator.tool_manager import tool_services
+from syntara.integrations.models.integration import (
     IntegrationRead,
     IntegrationStatus,
     IntegrationType,
 )
-from nexus.integrations.models.integration_configuration import MCPServerConfiguration
-from nexus.tool_manager.models.tool import ToolWithParameters
+from syntara.integrations.models.integration_configuration import MCPServerConfiguration
+from syntara.tool_manager.models.tool import ToolWithParameters
 
 
 def _make_integration(
@@ -65,7 +65,7 @@ class TestToolServices:
         tool_manager_client.get_all_tools.return_value = sample_tools
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -86,7 +86,7 @@ class TestToolServices:
         tool_manager_client.get_all_tools.return_value = sample_tools
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -101,7 +101,7 @@ class TestToolServices:
         tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
 
         # Mock the ToolManagerClient context manager
-        with patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
@@ -127,8 +127,8 @@ class TestToolServices:
         mock_tool.name = "code_search"
 
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             # Setup Tool Manager client
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
@@ -161,8 +161,8 @@ class TestToolServices:
 
         # Patch MockMCPProvider to raise exception
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.get_provider_factory"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.get_provider_factory"),
             patch(
                 "tests.unit.fixtures.mock_mcp_provider.MockMCPProvider.get_base_tools",
                 side_effect=RuntimeError("Connection failed to MCP server"),
@@ -181,7 +181,7 @@ class TestToolServices:
 
         # Patch MockMCPProvider to raise exception
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient"),
             patch(
                 "tests.unit.fixtures.mock_mcp_provider.MockMCPProvider.get_base_tools",
                 side_effect=ValueError("Invalid configuration parameter"),
@@ -209,8 +209,8 @@ class TestToolServices:
         mock_tool.name = "code_search"
 
         with (
-            patch("nexus.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
-            patch("nexus.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient") as mock_mcp_client_class,
         ):
             # Setup Tool Manager client
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
@@ -304,6 +304,37 @@ class TestToolServices:
 
         assert captured_params["api_key"] is None
         assert len(result) == 1
+
+    @pytest.mark.ssrf_enforced
+    @pytest.mark.asyncio
+    async def test_process_single_integration_blocks_rebound_base_url_before_dispatch(self) -> None:
+        """Request-time SSRF re-check blocks a rebound/metadata base_url before adapter dispatch.
+
+        The stored base_url may be re-pointed to a private/metadata address after write time
+        (DNS rebinding). _process_single_integration re-runs the SSRF policy BEFORE creating the
+        provider adapter; a block raises ValueError that is caught and the integration is skipped.
+        If the re-check is removed, create_provider_instance would run against 169.254.169.254 --
+        so the assert_not_called() below is what actually guards this call site.
+        """
+        integration = _make_integration("rebound-mcp")
+        integration = IntegrationRead(
+            **{
+                **integration.model_dump(),
+                "configuration": MCPServerConfiguration(
+                    integration_type="mcp_server",
+                    base_url="https://169.254.169.254",
+                ),
+            }
+        )
+
+        # MagicMock so create_provider_instance is a tracked mock and is_registered("mcp") is truthy.
+        provider_factory = MagicMock()
+
+        result = await tool_services._process_single_integration(integration, provider_factory)
+
+        # Integration is skipped (empty result) and, critically, the adapter is never created.
+        assert result == []
+        provider_factory.create_provider_instance.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_prepare_config_params_includes_api_key_when_provided(self) -> None:

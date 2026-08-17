@@ -1,6 +1,6 @@
 # Testing Standards
 
-This document defines the testing conventions for the Nexus project. These standards ensure consistency, maintainability, and reliability across the test suite.
+This document defines the testing conventions for the Syntara project. These standards ensure consistency, maintainability, and reliability across the test suite.
 
 ## Directory Structure
 
@@ -43,29 +43,6 @@ tests/
 │   ├── users/           # User management tests
 │   ├── websocket/       # WebSocket tests
 │   └── workflows/       # Includes examples/, fixtures/, services/, workflow_engine/
-├── performance/         # Performance tests (opt-in via --run-performance)
-│   ├── agent_orchestration/
-│   ├── agent_orchestrator/
-│   ├── api_service/
-│   ├── audit/
-│   ├── authentication/
-│   ├── chat_window/
-│   ├── cli/
-│   ├── cost_tracking/
-│   ├── database/
-│   ├── e2e_agentic/
-│   ├── execution_service/
-│   ├── files/
-│   ├── invocation_service/
-│   ├── llm_model/
-│   ├── model_management/
-│   ├── routing_service/
-│   ├── system_wide/
-│   ├── telemetry/
-│   ├── temporal_worker/
-│   ├── tool_manager/
-│   ├── websocket/
-│   └── workflow_engine/
 └── unit/                # Unit tests (isolated, no external deps)
     ├── aap/                 # Includes models/, services/
     ├── admin/
@@ -95,8 +72,8 @@ tests/
 
 **Organization Rules:**
 
-- Test directory structure mirrors `src/nexus/` hierarchy within each test category
-  - Example: `tests/unit/agent_orchestrator/` maps to `src/nexus/agent_orchestrator/`
+- Test directory structure mirrors `src/syntara/` hierarchy within each test category
+  - Example: `tests/unit/agent_orchestrator/` maps to `src/syntara/agent_orchestrator/`
 - Domain-specific conftest files provide domain-specific fixtures at appropriate hierarchy levels
 - Sample test files (PDFs, images, documents) live in `tests/fixtures/files/` and are accessed via `get_fixtures_dir()` from `tests.fixtures.files`
 - Shared unit/integration fixtures live in `tests/fixtures/` (settings, files, encryption, tls, temporal helpers)
@@ -220,7 +197,7 @@ async def test_file_upload_invalid_file_type(base_client: AsyncClient) -> None:
 **Scope:** Test complete user workflows across the entire system.
 
 **Characteristics:**
-- Requires full stack running (Nexus API, Temporal, MCP server, OpenRouter)
+- Requires full stack running (Syntara API, Temporal, MCP server, OpenRouter)
 - Uses production-like configuration
 - Tests real user scenarios end-to-end
 - Slowest execution (minutes)
@@ -235,46 +212,24 @@ async def test_file_upload_invalid_file_type(base_client: AsyncClient) -> None:
 **API Client Rules (REQUIRED):**
 
 - All API calls MUST use the auto-generated client under `src/api_client/syntara_api_client/` — do NOT call HTTP libraries (e.g., `requests`, `httpx`) directly in test files
-- All API calls MUST go through the `nexus_api` fixture (type: `NexusApiRegistry`)
-- Use the typed property for the relevant API group: `nexus_api.workflows`, `nexus_api.executions`, `nexus_api.approvals`, `nexus_api.invocation`, `nexus_api.tool_manager`, `nexus_api.files`, `nexus_api.default`
+- All API calls MUST go through the `syntara_api` fixture (type: `SyntaraApiRegistry`)
+- Use the typed property for the relevant API group: `syntara_api.workflows`, `syntara_api.executions`, `syntara_api.approvals`, `syntara_api.invocation`, `syntara_api.tool_manager`, `syntara_api.files`, `syntara_api.default`
 
 **Example:**
 ```python
 """E2E tests for GET endpoints: workflows and approvals."""
 
 import pytest
-from syntara_api_client.api import NexusApiRegistry
+from syntara_api_client.api import SyntaraApiRegistry
 
 pytestmark = pytest.mark.e2e
 
 class TestWorkflows:
     """E2E tests for workflow GET endpoints."""
 
-    def test_list_workflows(self, nexus_api: NexusApiRegistry) -> None:
-        workflows = nexus_api.workflows.list().assert_and_get()
+    def test_list_workflows(self, syntara_api: SyntaraApiRegistry) -> None:
+        workflows = syntara_api.workflows.list().assert_and_get()
         assert isinstance(workflows.resources, list)
-```
-
-### Performance Tests (`tests/performance/`)
-
-**Scope:** Measure and validate performance characteristics.
-
-**Characteristics:**
-- Excluded from default test runs
-- Opt-in via `--run-performance` flag or `make test-performance`
-- Tests response times, throughput, resource usage
-- May use specialized fixtures (performance_db_engine)
-
-**Marker:** `@pytest.mark.performance` (REQUIRED)
-
-**Example:**
-```python
-import pytest
-
-@pytest.mark.performance
-async def test_workflow_execution_performance(base_client: AsyncClient) -> None:
-    """Test workflow execution completes within acceptable time."""
-    # Performance test implementation
 ```
 
 ## conftest.py Hierarchy
@@ -287,7 +242,7 @@ The project uses a two-level conftest structure. Base fixtures come from the `or
 - FastAPI test clients (`base_client`, `auth_client`, `jwt_client`, `session_app`)
 - Model factories: users, workflows, groups, tools, credentials, executions
 - Mock fixtures: `mock_openrouter_llm`, `mock_websocket`
-- Pytest hooks: performance test filtering, lock file cleanup, `worker_id`
+- Pytest hooks: lock file cleanup, `worker_id`
 - E2E helpers: `ExecutionsFactory`, `create_minimal_workflow_definition`, `ExampleMCPServer`
 
 **Local shared fixtures (`tests/fixtures/`)** — import directly, no plugin needed:
@@ -328,7 +283,7 @@ The project uses a two-level conftest structure. Base fixtures come from the `or
 
 **Fixture Location Guidelines:**
 
-1. If used by e2e or performance tests (and possibly integration) → `orchestrator-test-sdk` plugin
+1. If used by e2e tests (and possibly integration) → `orchestrator-test-sdk` plugin
 2. If shared between unit and integration tests → `tests/fixtures/` module (import directly)
 3. If only needed by integration tests as a factory helper → `tests/integration/helpers/`
 4. If only needed by unit tests → `tests/unit/fixtures/`
@@ -345,14 +300,12 @@ Configure markers in `pyproject.toml` under `[tool.pytest.ini_options]`.
 - `integration` — Integration tests (inferred by location)
 - `unit` — Unit tests (inferred by location)
 - `mcp` — Tests requiring MCP server infrastructure (deselect with `-m "not mcp"`)
-- `performance` — Performance tests (excluded by default, run with `--run-performance`)
 - `e2e` — End-to-end tests (required for tests in `tests/e2e/`)
 - `pipeline(test_phase=str)` — E2E test phase classification for PR filtering (e.g., `test_phase="pr-check"`)
 
 **When to Apply Markers:**
 
 - `@pytest.mark.e2e` — REQUIRED for all tests in `tests/e2e/`
-- `@pytest.mark.performance` — REQUIRED for all tests in `tests/performance/`
 - `@pytest.mark.mcp` — REQUIRED for tests that start MCP test servers
 - `@pytest.mark.pipeline(test_phase="pr-check")` — Optional, for E2E tests that should run on PRs (see Shift-Left E2E Testing section)
 - `@pytest.mark.slow` — Optional, for any test taking >5 seconds
@@ -383,7 +336,7 @@ import pytest
 
 # Mark a single test for PR checks
 @pytest.mark.pipeline(test_phase="pr-check")
-async def test_workflow_create_minimal(nexus_api):
+async def test_workflow_create_minimal(syntara_api):
     """Test minimal workflow creation - runs on PRs."""
     pass
 
@@ -392,14 +345,14 @@ async def test_workflow_create_minimal(nexus_api):
 class TestWorkflowCRUD:
     """All tests in this class run on PRs."""
 
-    async def test_create(self, nexus_api):
+    async def test_create(self, syntara_api):
         pass
 
-    async def test_delete(self, nexus_api):
+    async def test_delete(self, syntara_api):
         pass
 
 # No marker - runs in full suite only
-async def test_workflow_complex_validation(nexus_api):
+async def test_workflow_complex_validation(syntara_api):
     """Complex test - full suite only."""
     pass
 ```
@@ -456,7 +409,7 @@ Mark tests with `test_phase="pr-check"` if they cover:
 
 ```python
 @pytest.mark.pipeline(test_phase="pr-check")
-async def test_create_workflow_minimal(nexus_api: NexusApiRegistry) -> None:
+async def test_create_workflow_minimal(syntara_api: SyntaraApiRegistry) -> None:
     """Test minimal workflow creation.
 
     Marked for PR checks because:
@@ -465,7 +418,7 @@ async def test_create_workflow_minimal(nexus_api: NexusApiRegistry) -> None:
     - Fast execution (~2s)
     - Catches deployment configuration issues early
     """
-    workflow = await nexus_api.workflows.create(
+    workflow = await syntara_api.workflows.create(
         name="Test Workflow",
         description="E2E test workflow"
     ).assert_and_get()
@@ -583,16 +536,16 @@ This project uses structlog with `cache_logger_on_first_use=True`. Under pytest-
 
 ```python
 import structlog
-from nexus.some_module import target_module
+from syntara.some_module import target_module
 
-@patch("nexus.some_module.emitter._do_emit")
+@patch("syntara.some_module.emitter._do_emit")
 async def test_logs_warning(self, mock_emit: Mock) -> None:
     old_logger = target_module.logger
     try:
         with structlog.testing.capture_logs() as captured:
             # Create fresh logger INSIDE capture_logs() context
             # so it binds to the capture processor chain
-            target_module.logger = structlog.get_logger("nexus.some_module")
+            target_module.logger = structlog.get_logger("syntara.some_module")
             do_something_that_logs()
     finally:
         target_module.logger = old_logger
@@ -621,7 +574,6 @@ async def test_logs_warning(self, mock_emit: Mock) -> None:
 - Strict markers (undefined markers fail)
 - Strict config (invalid config fails)
 - Coverage threshold (80% required, fails under)
-- Performance test filtering (auto-skipped without flag)
 - Async mode (auto-detected)
 - Parallel execution (xdist)
 - Linter rules (S101, ANN001, etc. ignored for tests)
@@ -657,16 +609,15 @@ make test              # Unit tests only (default)
 make test-unit         # Explicit unit tests
 make test-integration  # Integration tests (excludes MCP)
 make test-e2e-mcp      # MCP E2E tests (auto-starts services)
-make test-all          # All tests with coverage (excludes e2e, performance)
+make test-all          # All tests with coverage (excludes e2e)
 make test-e2e          # End-to-end tests (auto-starts services)
-make test-performance  # Performance tests only
 make test-coverage     # Coverage report (XML + terminal)
 make test-fast         # Fail-fast mode with short traceback
 ```
 
 **Test Execution Pattern:**
 
-All test commands (except e2e, performance) use the `run-tests` make function:
+All test commands (except e2e) use the `run-tests` make function:
 1. Detect container runtime (Podman preferred, Docker fallback)
 2. Set environment variables (DOCKER_HOST, TESTCONTAINERS_RYUK_DISABLED, etc.)
 3. Run `uv run pytest` with specified arguments
@@ -726,7 +677,7 @@ All HTML coverage reports are gitignored via the `htmlcov-*/` pattern:
 
 ## Adding Tests for a New Domain
 
-When adding a new domain (e.g., `src/nexus/new_domain/`):
+When adding a new domain (e.g., `src/syntara/new_domain/`):
 
 **Step 1: Create Test Directory Structure**
 
@@ -746,7 +697,7 @@ Only add if domain needs specific fixtures:
 """Domain-specific test fixtures."""
 
 import pytest
-from nexus.new_domain.models import DomainModel
+from syntara.new_domain.models import DomainModel
 
 @pytest.fixture
 def domain_model_data() -> dict[str, Any]:

@@ -50,10 +50,10 @@ export interface paths {
     options?: never
     head?: never
     /**
-     * Patch identity provider
-     * @description Patch an identity provider.
+     * Update identity provider
+     * @description Update an identity provider.
      */
-    patch: operations['patch_identity_provider']
+    patch: operations['update_identity_provider']
     trace?: never
   }
   '/identity_providers/setup_aap_oidc': {
@@ -102,7 +102,7 @@ export interface components {
   schemas: {
     /**
      * OIDCClaimMapping
-     * @description Maps Nexus user fields to IdP-specific OIDC claim names.
+     * @description Maps Syntara user fields to IdP-specific OIDC claim names.
      */
     OIDCClaimMapping: {
       /**
@@ -133,7 +133,7 @@ export interface components {
     }
     /**
      * OIDCGroupMappingEntry
-     * @description API-facing schema for a single IdP-to-Nexus group mapping entry.
+     * @description API-facing schema for a single IdP-to-Syntara group mapping entry.
      *
      *     Used in API requests/responses. Actual storage is in the
      *     ``idp_group_mapping_entries`` table.
@@ -145,11 +145,11 @@ export interface components {
        */
       idp_group_value: string
       /**
-       * Nexus Group Id
+       * Mapped Group Id
        * Format: uuid
-       * @description ID of the Nexus group to map to
+       * @description ID of the group to map to
        */
-      nexus_group_id: string
+      mapped_group_id: string
     }
     /**
      * OIDCConfiguration
@@ -239,7 +239,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries
+       * @description IdP-to-Syntara group mapping entries
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][]
       /**
@@ -345,7 +345,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries
+       * @description IdP-to-Syntara group mapping entries
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][]
       /**
@@ -368,10 +368,10 @@ export interface components {
       disable_tls_verify?: boolean
     }
     /**
-     * OIDCConfigurationPatch
-     * @description Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted).
+     * OIDCConfigurationUpdate
+     * @description Update schema for OIDC configuration (client_secret optional — preserves existing if omitted).
      */
-    OIDCConfigurationPatch: {
+    OIDCConfigurationUpdate: {
       /**
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
@@ -455,7 +455,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries (omit to keep existing)
+       * @description IdP-to-Syntara group mapping entries (omit to keep existing)
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][] | null
       /**
@@ -496,10 +496,10 @@ export interface components {
       configuration: components['schemas']['OIDCConfiguration']
     }
     /**
-     * IdentityProviderPatch
+     * IdentityProviderUpdate
      * @description Schema for partially updating an identity provider.
      */
-    IdentityProviderPatch: {
+    IdentityProviderUpdate: {
       /**
        * Name
        * @description Human-readable name for the provider
@@ -514,7 +514,7 @@ export interface components {
        * Configuration
        * @description Provider-specific configuration (client_secret optional — preserves existing if omitted)
        */
-      configuration?: components['schemas']['OIDCConfigurationPatch'] | null
+      configuration?: components['schemas']['OIDCConfigurationUpdate'] | null
       /**
        * Enabled
        * @description Enable/disable the provider
@@ -522,10 +522,10 @@ export interface components {
       enabled?: boolean | null
     }
     /**
-     * IdentityProviderResponse
+     * IdentityProviderRead
      * @description Schema for IdentityProvider response with configuration details (excludes secrets).
      */
-    IdentityProviderResponse: components['schemas']['UserOwnedResource'] &
+    IdentityProviderRead: components['schemas']['UserOwnedResource'] &
       components['schemas']['NamedResource'] & {
         /** @description Human-readable provider name */
         name?: unknown
@@ -543,7 +543,7 @@ export interface components {
      * @description Paginated list response for identity providers.
      */
     IdentityProviderListResponse: components['schemas']['ResourcesResponseBase'] & {
-      resources: components['schemas']['IdentityProviderResponse'][]
+      resources: components['schemas']['IdentityProviderRead'][]
     }
     /**
      * OIDCTestRequest
@@ -1021,7 +1021,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IdentityProviderResponse']
+          'application/json': components['schemas']['IdentityProviderRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1051,7 +1051,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IdentityProviderResponse']
+          'application/json': components['schemas']['IdentityProviderRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1092,7 +1092,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  patch_identity_provider: {
+  update_identity_provider: {
     parameters: {
       query?: never
       header?: never
@@ -1103,7 +1103,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['IdentityProviderPatch']
+        'application/json': components['schemas']['IdentityProviderUpdate']
       }
     }
     responses: {
@@ -1113,7 +1113,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IdentityProviderResponse']
+          'application/json': components['schemas']['IdentityProviderRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1145,7 +1145,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IdentityProviderResponse']
+          'application/json': components['schemas']['IdentityProviderRead']
         }
       }
       400: components['responses']['BadRequestError']

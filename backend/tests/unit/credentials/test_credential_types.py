@@ -2,8 +2,8 @@
 
 import pytest
 
-from nexus.credentials.lib.preseed import GA_CREDENTIAL_TYPES
-from nexus.credentials.models.credential_type import CredentialType, CredentialTypeRead
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
+from syntara.credentials.models.credential_type import CredentialType, CredentialTypeRead
 
 
 class TestCredentialTypeModel:

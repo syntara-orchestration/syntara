@@ -10,7 +10,7 @@ import {
   HelperTextItem,
   MenuToggle,
 } from '@patternfly/react-core'
-import { EllipsisVIcon } from '@patternfly/react-icons'
+import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
 import type { SettingsAPI } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -42,9 +42,14 @@ function KebabToggle({
   readonly label: string
 }) {
   return (
-    <MenuToggle ref={toggleRef} variant="plain" onClick={onClick} isExpanded={isExpanded} aria-label={label}>
-      <EllipsisVIcon />
-    </MenuToggle>
+    <MenuToggle
+      ref={toggleRef}
+      variant="plain"
+      onClick={onClick}
+      isExpanded={isExpanded}
+      aria-label={label}
+      icon={<RhUiEllipsisVerticalFillIcon />}
+    />
   )
 }
 

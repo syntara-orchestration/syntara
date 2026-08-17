@@ -35,7 +35,7 @@ jobs:
       - name: Detect OpenAPI spec changes
         id: detect
         run: |
-          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qx 'backend/src/nexus/schemas/openapi.yaml'; then
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qx 'backend/src/syntara/schemas/openapi.yaml'; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -74,6 +74,7 @@ jobs:
             --base origin/${{ github.base_ref }} \
             --head HEAD \
             --output breaking-results.json \
+            --fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
             --pr-body "$PR_BODY"
         working-directory: backend
 

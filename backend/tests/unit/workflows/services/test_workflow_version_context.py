@@ -14,9 +14,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.workflows.models.workflow import WorkflowRead
-from nexus.workflows.models.workflow_publish_event import PublishAction
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.workflows.models.workflow import WorkflowRead
+from syntara.workflows.models.workflow_publish_event import PublishAction
+from syntara.workflows.services.workflow_service import WorkflowService
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -243,7 +243,7 @@ class TestListWorkflowVersionsCursor:
     @pytest.mark.asyncio
     async def test_convert_version_calls_deserialize(self, mock_service: WorkflowService) -> None:
         """convert_version delegates to deserialize_workflow_version."""
-        from nexus.workflows.models import WorkflowVersionRead
+        from syntara.workflows.models import WorkflowVersionRead
 
         workflow_id = uuid4()
         pub_id = uuid4()

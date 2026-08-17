@@ -13,12 +13,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.files.document_conversion.services.types import ConversionState
-from nexus.files.document_conversion.tasks import (
+from syntara.files.document_conversion.services.types import ConversionState
+from syntara.files.document_conversion.tasks import (
     DocumentConversionTask,
     get_document_conversion_task,
 )
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.models import FileMetadata, FileStatus
 
 
 class TestDocumentConversionTaskInit:
@@ -56,7 +56,7 @@ class TestDocumentConversionTaskConvert:
         return FileMetadata(
             id=sample_file_id,
             filename="test.pdf",
-            file_path=f"/uploads/nexus-{sample_file_id}-test.pdf",
+            file_path=f"/uploads/orchestrator-{sample_file_id}-test.pdf",
             mime_type="application/pdf",
             size_bytes=1024,
             status=FileStatus.PENDING_CONVERSION,
@@ -71,7 +71,7 @@ class TestDocumentConversionTaskConvert:
         mock_file_manager.update_file_status = AsyncMock()
 
         with patch(
-            "nexus.files.document_conversion.tasks.document_conversion_task.get_file_manager",
+            "syntara.files.document_conversion.tasks.document_conversion_task.get_file_manager",
             return_value=mock_file_manager,
         ):
             task = DocumentConversionTask(

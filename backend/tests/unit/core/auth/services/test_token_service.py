@@ -16,8 +16,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from nexus.auth.exceptions import InvalidTokenError, TokenExpiredError
-from nexus.auth.services.token_service import (
+from syntara.auth.exceptions import InvalidTokenError, TokenExpiredError
+from syntara.auth.services.token_service import (
     KeyManager,
     TokenPayload,
     TokenService,
@@ -31,7 +31,7 @@ class TestKeyManager:
 
     def test_raises_when_no_key_configured(self) -> None:
         """Test that KeyManager raises RuntimeError when no key is configured."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -44,7 +44,7 @@ class TestKeyManager:
 
     def test_key_is_cached(self) -> None:
         """Test that the private key is cached after first access."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -59,7 +59,7 @@ class TestKeyManager:
 
     def test_public_key_pem_derivation(self) -> None:
         """Test that public key PEM is correctly derived from private key."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -74,7 +74,7 @@ class TestKeyManager:
 
     def test_jwks_format(self) -> None:
         """Test that JWKS is correctly formatted."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -100,7 +100,7 @@ class TestKeyManager:
 @pytest.fixture
 def token_service() -> TokenService:
     """Create a TokenService with a test signing key."""
-    with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+    with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
         mock_settings.return_value = MagicMock(
             jwt_private_key_path=None,
             jwt_private_key_base64=None,
@@ -602,7 +602,7 @@ class TestKeyRotation:
 
     def test_backup_keys_not_loaded_when_none_configured(self) -> None:
         """Test that backup keys loading succeeds when none are configured."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -617,7 +617,7 @@ class TestKeyRotation:
 
     def test_get_public_key_for_kid_returns_primary_key(self) -> None:
         """Test that get_public_key_for_kid returns the primary key for its ID."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -633,7 +633,7 @@ class TestKeyRotation:
 
     def test_get_public_key_for_kid_returns_none_for_unknown(self) -> None:
         """Test that get_public_key_for_kid returns None for unknown key ID."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -647,7 +647,7 @@ class TestKeyRotation:
 
     def test_get_all_key_ids_returns_primary_when_no_backups(self) -> None:
         """Test that get_all_key_ids returns only primary key when no backups."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -661,7 +661,7 @@ class TestKeyRotation:
 
     def test_backup_key_skipped_when_missing_key_id(self) -> None:
         """Test that backup key config without key_id is skipped."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -675,7 +675,7 @@ class TestKeyRotation:
 
     def test_backup_key_skipped_when_same_as_primary(self) -> None:
         """Test that backup key with same ID as primary is skipped."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -689,7 +689,7 @@ class TestKeyRotation:
 
     def test_backup_key_skipped_when_missing_key_data(self) -> None:
         """Test that backup key config without key_path or key_base64 is skipped."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -703,7 +703,7 @@ class TestKeyRotation:
 
     def test_jwks_includes_only_primary_when_no_backups(self) -> None:
         """Test that JWKS includes only primary key when no backups configured."""
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -757,7 +757,7 @@ class TestKeyRotation:
         )
 
         # Set up settings with new primary key and the backup key
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -802,7 +802,7 @@ class TestKeyRotation:
         )
         backup_key_base64 = base64.b64encode(backup_key_pem).decode("ascii")
 
-        with patch("nexus.auth.services.token_service.get_settings") as mock_settings:
+        with patch("syntara.auth.services.token_service.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 jwt_private_key_path=None,
                 jwt_private_key_base64=None,
@@ -900,7 +900,7 @@ class TestCacheInvalidation:
 
     def test_clear_token_service_cache_forces_new_instance(self) -> None:
         """Clearing the cache should produce a new TokenService on next call."""
-        from nexus.auth.dependencies import _get_token_service, clear_token_service_cache
+        from syntara.auth.dependencies import _get_token_service, clear_token_service_cache
 
         clear_token_service_cache()
         clear_key_manager_cache()

@@ -18,11 +18,11 @@ Constitution mandates: pull requests required for all changes, minimum two appro
 
 ### Structured logging output format
 
-No standard for expected JSON field names, required fields per event type, or correlation ID propagation. Should be based on observed patterns in `src/nexus/core/logging/logging.py`.
+No standard for expected JSON field names, required fields per event type, or correlation ID propagation. Should be based on observed patterns in `src/syntara/core/logging/logging.py`.
 
 ### Architecture principles (dependency injection, composition, SOLID)
 
-Constitution mandates dependency injection (constructor injection as primary pattern), composition over inheritance, separation of concerns between layers, and SOLID principles. No domain standard documents the Nexus-specific patterns, examples, or enforcement strategy for these.
+Constitution mandates dependency injection (constructor injection as primary pattern), composition over inheritance, separation of concerns between layers, and SOLID principles. No domain standard documents the Syntara-specific patterns, examples, or enforcement strategy for these.
 
 ### API security and schema management
 

@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexus.settings.catalog import SETTINGS_CATALOG
-from nexus.settings.store import check_catalog_completeness
+from syntara.settings.catalog import SETTINGS_CATALOG
+from syntara.settings.store import check_catalog_completeness
 
 
 @pytest.mark.asyncio

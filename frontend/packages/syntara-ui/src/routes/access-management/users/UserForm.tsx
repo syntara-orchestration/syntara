@@ -14,6 +14,7 @@ import { NxPageHeader } from '../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { userFormSchema, userCreateSchema, type UserFormData } from '../userFormSchema'
@@ -52,26 +53,6 @@ function PasswordWarningAlert({ isSelf }: Readonly<{ isSelf: boolean }>) {
   )
 }
 
-function UserFormWarningAlerts({
-  showDisableWarning,
-  showPasswordWarning,
-  isSelf,
-}: Readonly<{ showDisableWarning: boolean; showPasswordWarning: boolean; isSelf: boolean }>) {
-  return (
-    <>
-      {showDisableWarning ? (
-        <StackItem>
-          <Alert variant="warning" title="You will be signed out" isInline>
-            Disabling your own account will immediately end your current session. You will need another admin to
-            re-enable it.
-          </Alert>
-        </StackItem>
-      ) : null}
-      {showPasswordWarning ? <PasswordWarningAlert isSelf={isSelf} /> : null}
-    </>
-  )
-}
-
 function userFormBreadcrumbTrail(
   isEdit: boolean,
   pageTitle: string,
@@ -95,8 +76,6 @@ type UserFormMainPanelProps = {
   isBuiltinUser: boolean
   isFederatedUser: boolean
   isSelf: boolean
-  statusToggleDisabledReason?: string
-  showDisableWarning: boolean
   showPasswordWarning: boolean
   onFormSubmit: (event?: BaseSyntheticEvent) => Promise<void>
   footer: ReactNode
@@ -108,8 +87,6 @@ function UserFormMainPanel({
   isBuiltinUser,
   isFederatedUser,
   isSelf,
-  statusToggleDisabledReason,
-  showDisableWarning,
   showPasswordWarning,
   onFormSubmit,
   footer,
@@ -122,11 +99,7 @@ function UserFormMainPanel({
       panelMainBodyProps={{ style: { padding: 'var(--pf-t--global--spacer--xl)' } }}
     >
       <Stack hasGutter style={{ maxWidth: '600px' }}>
-        <UserFormWarningAlerts
-          showDisableWarning={showDisableWarning}
-          showPasswordWarning={showPasswordWarning}
-          isSelf={isSelf}
-        />
+        {showPasswordWarning ? <PasswordWarningAlert isSelf={isSelf} /> : null}
         <StackItem>
           <Form id="user-form" onSubmit={onFormSubmit}>
             <UserFormFields
@@ -135,7 +108,6 @@ function UserFormMainPanel({
               isBuiltinUser={isBuiltinUser}
               isBuiltinSelf={isBuiltinUser && isSelf}
               isFederatedUser={isFederatedUser}
-              statusToggleDisabledReason={statusToggleDisabledReason}
             />
           </Form>
         </StackItem>
@@ -170,30 +142,34 @@ function UserFormEditBusyPage({ pageTitle, children }: Readonly<{ pageTitle: str
 
 export function UserForm({ mode }: Readonly<UserFormProps>) {
   const navigate = useNavigate()
-  const usersDocLink = useDocLink('users')
   const isEdit = mode === 'edit'
+  const usersDocLink = useDocLink(isEdit ? 'users' : 'createUser')
   const pageTitle = isEdit ? 'Edit User' : 'Create User'
   const submitLabel = isEdit ? 'Save' : 'Create user'
 
-  const {
-    userId,
-    isValidId,
-    userQuery,
-    isBuiltinUser,
-    isFederatedUser,
-    isSelf,
-    statusToggleDisabledReason,
-    formValues,
-  } = useUserFormData(isEdit)
+  const { userId, isValidId, userQuery, isBuiltinUser, isFederatedUser, isSelf, formValues } = useUserFormData(isEdit)
 
   const schema = isEdit ? userFormSchema : userCreateSchema
-  const { control, handleSubmit, setError } = useForm<UserFormData>({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    formState: { isDirty },
+    reset,
+  } = useForm<UserFormData>({
     resolver: zodResolver(schema, undefined, { mode: 'sync' }),
     defaultValues: formValues ?? DEFAULT_VALUES,
     values: isEdit && formValues ? formValues : undefined,
   })
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Users }))
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this user. Your changes will be lost if you leave.',
+  })
 
   const { onSubmit, isSaving } = useUserFormSubmit({
     isEdit,
@@ -203,13 +179,14 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
     isFederatedUser,
     isSelf,
     setError,
-    navigateBack,
+    navigateBack: () => {
+      dismiss()
+      navigateBack()
+    },
   })
 
   const passwordValue = useWatch({ control, name: 'password' })
-  const isActiveValue = useWatch({ control, name: 'is_enabled' })
   const showPasswordWarning = isEdit && !isFederatedUser && !!passwordValue
-  const showDisableWarning = isEdit && isSelf && isActiveValue === false
 
   const refetchUser = userQuery.refetch
   const queryState = useQueryState(userQuery, {
@@ -245,8 +222,6 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
           isBuiltinUser={isBuiltinUser}
           isFederatedUser={isFederatedUser}
           isSelf={isSelf}
-          statusToggleDisabledReason={statusToggleDisabledReason}
-          showDisableWarning={showDisableWarning}
           showPasswordWarning={showPasswordWarning}
           onFormSubmit={handleSubmit(onSubmit)}
           footer={

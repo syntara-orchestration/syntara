@@ -2,9 +2,9 @@
 
 ## Overview
 
-Nexus uses [structlog](https://www.structlog.org/en/stable/) for structured logging across all Python components. Structured logging ensures logs are machine-parsable, consistent, and enriched with context for debugging and observability.
+Syntara uses [structlog](https://www.structlog.org/en/stable/) for structured logging across all Python components. Structured logging ensures logs are machine-parsable, consistent, and enriched with context for debugging and observability.
 
-This document defines the required patterns for logging in the Nexus codebase. All code MUST comply with these standards.
+This document defines the required patterns for logging in the Syntara codebase. All code MUST comply with these standards.
 
 ## Core Principles
 
@@ -30,19 +30,19 @@ logger = structlog.stdlib.get_logger(__name__)
 - Place the logger at module level, never inside functions.
 - Never use `logging.getLogger()` directly (use structlog's stdlib wrapper).
 
-**Exception:** `BaseAgent` (`src/nexus/agent_orchestrator/agents/base_agent.py`) uses `self.logger = structlog.stdlib.get_logger(self.__class__.__name__)` to bind the concrete agent class name rather than the module name. This is the only sanctioned class-level logger pattern. Do not replicate it in other domains without justification.
+**Exception:** `BaseAgent` (`src/syntara/agent_orchestrator/agents/base_agent.py`) uses `self.logger = structlog.stdlib.get_logger(self.__class__.__name__)` to bind the concrete agent class name rather than the module name. This is the only sanctioned class-level logger pattern. Do not replicate it in other domains without justification.
 
 **Example:**
 
 ```python
-# src/nexus/workflows/services/execution_service.py
+# src/syntara/workflows/services/execution_service.py
 """Execution service for managing workflow executions."""
 
 from uuid import UUID
 
 import structlog
 
-from nexus.workflows.models import Execution
+from syntara.workflows.models import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -55,10 +55,10 @@ class ExecutionService:
 
 ## Configuration
 
-Logging is configured centrally in `src/nexus/core/logging/logging.py` via `configure_structlog()`.
+Logging is configured centrally in `src/syntara/core/logging/logging.py` via `configure_structlog()`.
 
 This function is called:
-- At application startup in `src/nexus/__init__.py`
+- At application startup in `src/syntara/__init__.py`
 - In test setup in `tests/conftest.py`
 
 **Do not configure structlog in individual modules.** Use the global configuration.
@@ -318,7 +318,7 @@ logger.exception(
 
 ## Testing with Structlog
 
-Nexus uses standard pytest logging fixtures to capture logs in tests.
+Syntara uses standard pytest logging fixtures to capture logs in tests.
 
 ### Reading Logs in Tests
 
@@ -384,19 +384,19 @@ def test_exception_logging(caplog):
 
 ## Adding Logging to a New Domain
 
-When adding a new domain or module to Nexus, follow these steps:
+When adding a new domain or module to Syntara, follow these steps:
 
 ### 1. Create Module Logger
 
 In the main service or handler file:
 
 ```python
-# src/nexus/my_domain/services/my_service.py
+# src/syntara/my_domain/services/my_service.py
 """My service for doing domain operations."""
 
 import structlog
 
-from nexus.my_domain.models import MyEntity
+from syntara.my_domain.models import MyEntity
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -520,7 +520,7 @@ if response.status_code != 200:
 
 ## Compliance
 
-All code merged into Nexus MUST:
+All code merged into Syntara MUST:
 1. Use module-level structlog loggers
 2. Pass context as keyword arguments (never string formatting)
 3. Use appropriate log levels
@@ -532,7 +532,7 @@ Violations of these standards will be flagged in code review and must be correct
 
 ## Output Formats
 
-Nexus supports two log output formats, controlled by `APP_LOG_OUTPUT_FORMAT`:
+Syntara supports two log output formats, controlled by `APP_LOG_OUTPUT_FORMAT`:
 
 ### Text Mode (`text`)
 
@@ -540,12 +540,12 @@ Human-readable console output via structlog's `ConsoleRenderer`. Used in local d
 
 ### JSON Mode (`json`)
 
-Machine-parsable JSON via `NexusLogRecordRenderer` (extends `JSONRenderer`). Used in production.
+Machine-parsable JSON via `SyntaraLogRecordRenderer` (extends `JSONRenderer`). Used in production.
 
 The custom renderer recursively converts non-JSON-serializable objects to strings via `__repr__()`. This prevents serialization failures from crashing the logging pipeline:
 
 ```python
-class NexusLogRecordRenderer(JSONRenderer):
+class SyntaraLogRecordRenderer(JSONRenderer):
     def _make_serializable(self, obj: object) -> object:
         # Primitives pass through
         # Dicts and lists are recursed
@@ -559,7 +559,7 @@ class NexusLogRecordRenderer(JSONRenderer):
 
 ### Shared Processor Pipeline
 
-Both modes share the same processor chain (configured in `build_nexus_shared_formatters()`):
+Both modes share the same processor chain (configured in `build_syntara_shared_formatters()`):
 
 1. `merge_contextvars` — merge thread-local context
 2. `add_log_level` — inject log level
@@ -574,7 +574,7 @@ Both modes share the same processor chain (configured in `build_nexus_shared_for
 - structlog configuration via `configure_structlog()` (centralized, called at startup)
 - Log level filtering (Python logging infrastructure)
 - `make lint` catches f-string usage in log calls (Ruff G004 rule)
-- `NexusLogRecordRenderer` prevents JSON serialization failures via `__repr__` fallback
+- `SyntaraLogRecordRenderer` prevents JSON serialization failures via `__repr__` fallback
 
 **Convention only:**
 
@@ -589,8 +589,8 @@ Both modes share the same processor chain (configured in `build_nexus_shared_for
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `NexusLogRecordRenderer` |
-| `src/nexus/__init__.py` | Application startup logging init |
+| `src/syntara/core/logging/logging.py` | Central structlog configuration (`configure_structlog()`), `SyntaraLogRecordRenderer` |
+| `src/syntara/__init__.py` | Application startup logging init |
 | `tests/conftest.py` | Test logging setup |
 
 **External:**

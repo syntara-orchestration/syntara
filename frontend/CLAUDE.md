@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Claude, you have access to the following skills. **Do not load them all at once** -- read each skill file on-demand when its trigger condition is met. If a loaded skill (e.g., `frontend_specialist.md`) tells you to read another skill you have already loaded in this conversation, skip the re-read.
 
-<!-- NOTE: Hook enforcement (skill-gate.sh, skill-triggers.json) was removed during
-     monorepo migration. Skills are advisory — Claude should still read them on-demand
-     per the triggers below. Hook-based enforcement may be re-added at the root level
-     once the monorepo hook strategy is finalized. -->
+<!-- NOTE: Executable agent hooks (skill-gate.sh, skill-triggers.json, settings.json)
+     were removed for supply-chain safety and are not allowed upstream. Skills are
+     advisory — read them on-demand per the triggers below. See
+     ../.github/AI_AGENT_POLICY.md. -->
 
 | Trigger                                                                             | Skill file to read                                                                        |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -159,7 +159,7 @@ npm run tsc                # Type check only
 
 ## Connecting to Real Backend
 
-To use the real Nexus backend instead of the mock API:
+To use the real backend instead of the mock API:
 
 1. The backend is available at `../backend/` in this monorepo
 2. Follow the backend README (`../backend/README.md`) to start the API server
@@ -341,12 +341,16 @@ See: [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) �
 
 #### How do I format dates?
 
-Use date utilities in `packages/syntara-ui/src/utils/dateUtils.ts`:
+For any **rendered/read-only** date or timestamp (table columns, detail views, tooltips), use `DateCell` / `UserTimestamp` (`packages/syntara-ui/src/components/table/DateCell.tsx`), which wrap PatternFly's `Timestamp` component (`dateFormat="medium" timeFormat="medium"`). For execution start/end ranges that collapse to time-only on the same day, use the `ExecutionTimestamp` helper. Do not call `toLocaleString()` or render date-fns output directly in JSX.
 
-- `formatDate(isoString)` — "Jan 15, 2024"
-- `formatTime(isoString)` — "2:30 PM"
-- `formatDateTime(isoString?)` — medium date + time with seconds (e.g. "May 27, 2026, 9:55:01 AM")
-- `formatElapsedTime(elapsedMs)` — "1h 2m 3s"
+`packages/syntara-ui/src/utils/dateUtils.ts` is now scoped to non-display helpers and to the handful of **plain-string** contexts where JSX can't be used (dropdown option labels, `TextInput value=`, model fields):
+
+- `formatDateForApi(date)` / `formatDateChipValue(isoValue)` — API/filter serialization
+- `formatDateYMD(date)` / `parseDateYMD(val)` — round-trip helpers for PF `DatePicker`
+- `formatElapsedTime(elapsedMs)` — "1h 2m 3s" (duration, not a calendar timestamp)
+- `formatTimeAgo(isoString)` — relative "5m ago" labels (no PF `Timestamp` equivalent)
+- `formatExpirationDate(isoString)` — plain-string date only, for `TextInput value=` contexts
+- `formatDateTime(isoString?)` — kept only for plain-string contexts (e.g. dropdown option labels, version-name fallbacks) that cannot render JSX; do not call this from new component render paths — use `DateCell`/`Timestamp` instead
 
 Use for UI display only, not in logic (per i18n guidelines). Trigger-specific interval formatting stays in `utils/triggerFormatting.ts`.
 
@@ -404,7 +408,6 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
 - **Authentication**: Basic (demo/coffee)
 - **Separate containers**: UI and Mock API
-- **Build script**: `./build-multiarch.sh` for multi-arch Podman builds
 
 ### Container Commands
 
@@ -418,8 +421,4 @@ npm run podman:build:mock-api     # Build mock API container only
 npm run podman:run                # Run all containers
 npm run podman:run:ui             # Run UI on port 4000
 npm run podman:run:mock-api       # Run API on port 3000
-
-# Multi-arch builds
-./build-multiarch.sh              # Build for AMD64 + ARM64
-./build-multiarch.sh push         # Build and push to registry
 ```

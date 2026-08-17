@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from nexus.agent_orchestrator.utils.used_tools import aggregate_used_tools
+from syntara.agent_orchestrator.utils.used_tools import aggregate_used_tools
 
 
 class TestAggregateUsedTools:

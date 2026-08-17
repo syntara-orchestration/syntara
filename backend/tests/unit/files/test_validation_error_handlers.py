@@ -6,14 +6,14 @@ from unittest.mock import Mock
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES
-from nexus.files.error_handlers import (
+from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.files.error_handlers import (
     file_error_handler,
     file_integrity_error_handler,
     file_not_found_error_handler,
     file_validation_error_handler,
 )
-from nexus.files.exceptions import FileContentNotFoundError, FileError, FileIntegrityError, FileValidationError
+from syntara.files.exceptions import FileContentNotFoundError, FileError, FileIntegrityError, FileValidationError
 
 
 class TestFileValidationErrorHandler:
@@ -59,7 +59,7 @@ class TestFileNotFoundErrorHandler:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/files/abc/download"
 
-        exc = FileContentNotFoundError("File not found: nexus-abc-report.pdf")
+        exc = FileContentNotFoundError("File not found: orchestrator-abc-report.pdf")
         response = file_not_found_error_handler(request, exc)
 
         assert response.status_code == 404

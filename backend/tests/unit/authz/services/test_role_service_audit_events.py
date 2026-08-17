@@ -13,15 +13,15 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.authz.audit.role_lifecycle import RoleLifecycleEvent, RoleLifecycleHandler
-from nexus.authz.models.role import Role
-from nexus.authz.services.role_service import RoleService
-from nexus.core.models import User
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.authz.audit.role_lifecycle import RoleLifecycleEvent, RoleLifecycleHandler
+from syntara.authz.models.role import Role
+from syntara.authz.services.role_service import RoleService
+from syntara.core.models import User
 
 if TYPE_CHECKING:
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestRoleServiceCreateAuditEvents:
@@ -31,7 +31,7 @@ class TestRoleServiceCreateAuditEvents:
         AuditEventDispatcher.register({RoleLifecycleEvent: RoleLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_role_emits_role_created_event(
         self,
         mock_do_emit: AsyncMock,
@@ -72,7 +72,7 @@ class TestRoleServiceCreateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.event_message == "Role created: test-editor"
         assert event.resource_urn == f"urn:syntara:role:{role_id}"
         assert event.structured_data.data_type == "role-lifecycle"
@@ -80,7 +80,7 @@ class TestRoleServiceCreateAuditEvents:
         assert event.structured_data.role_name == "test-editor"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_create_role_with_project_emits_event(
         self,
         mock_do_emit: AsyncMock,
@@ -107,8 +107,8 @@ class TestRoleServiceCreateAuditEvents:
         with (
             patch.object(service, "_check_name_conflict", new_callable=AsyncMock),
             patch.object(service, "_validate_policy_names", new_callable=AsyncMock),
-            patch("nexus.authz.services.role_service.is_builtin_role", return_value=False),
-            patch("nexus.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
+            patch("syntara.authz.services.role_service.is_builtin_role", return_value=False),
+            patch("syntara.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
         ):
             await service.create_role(
                 name="project-role",
@@ -129,7 +129,7 @@ class TestRoleServiceUpdateAuditEvents:
         AuditEventDispatcher.register({RoleLifecycleEvent: RoleLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_update_role_emits_role_updated_event(
         self,
         mock_do_emit: AsyncMock,
@@ -166,7 +166,7 @@ class TestRoleServiceUpdateAuditEvents:
         assert event.event_category == EventCategory.SECURITY_EVENT
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.authz"
+        assert event.source_component == "syntara.authz"
         assert event.resource_urn == f"urn:syntara:role:{role_id}"
 
 
@@ -177,7 +177,7 @@ class TestRoleServiceDeleteAuditEvents:
         AuditEventDispatcher.register({RoleLifecycleEvent: RoleLifecycleHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_role_no_assignments_emits_info_event(
         self,
         mock_do_emit: AsyncMock,
@@ -220,7 +220,7 @@ class TestRoleServiceDeleteAuditEvents:
         assert not hasattr(event.structured_data, "affected_assignments_count")
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_delete_role_with_assignments_emits_warning_event(
         self,
         mock_do_emit: AsyncMock,

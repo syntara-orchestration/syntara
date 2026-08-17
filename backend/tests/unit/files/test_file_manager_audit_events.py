@@ -4,29 +4,29 @@ These tests verify that service methods correctly dispatch domain events
 which are then converted to AuditEvents by the registered handlers.
 """
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
 
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.models.audit_event import EventSeverity, EventStatus
-from nexus.files.audit.file_converted import ConversionStateAudit
-from nexus.files.document_conversion.models.conversion_result import ConversionResult
-from nexus.files.document_conversion.services import ConversionState
-from nexus.files.document_conversion.services.document_conversion_service import (
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.models.audit_event import EventSeverity, EventStatus
+from syntara.files.audit.file_converted import ConversionStateAudit
+from syntara.files.document_conversion.models.conversion_result import ConversionResult
+from syntara.files.document_conversion.services import ConversionState
+from syntara.files.document_conversion.services.document_conversion_service import (
     DocumentConversionService,
 )
-from nexus.files.exceptions import FileValidationError
-from nexus.files.file_manager import FileManager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.exceptions import FileValidationError
+from syntara.files.file_manager import FileManager
+from syntara.files.models import FileMetadata, FileStatus
 
 if TYPE_CHECKING:
     from fastapi import UploadFile
 
-    from nexus.audit.models.audit_event import AuditEvent
+    from syntara.audit.models.audit_event import AuditEvent
 
 
 class TestFileManagerAuditEvents:
@@ -34,7 +34,7 @@ class TestFileManagerAuditEvents:
 
     def setup_method(self) -> None:
         """Register files audit handlers before each test."""
-        from nexus.files.audit.files_uploaded import (
+        from syntara.files.audit.files_uploaded import (
             FilesUploadedEvent,
             FilesUploadedHandler,
         )
@@ -42,7 +42,7 @@ class TestFileManagerAuditEvents:
         AuditEventDispatcher.register({FilesUploadedEvent: FilesUploadedHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -50,20 +50,26 @@ class TestFileManagerAuditEvents:
         """Successful file upload should emit FilesUploadedEvent with file details."""
         # Arrange
         file_content = b"PDF content"
-        mock_file = Mock()
-        mock_file.filename = "test.pdf"
-        mock_file.size = len(file_content)
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=file_content)
-        mock_file.seek = AsyncMock()
+
+        async def _consume_stream(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+            total = 0
+            async for chunk in stream:
+                total += len(chunk)
+            return "orchestrator-uuid-test.pdf", total
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file_stream = AsyncMock(side_effect=_consume_stream)
         file_manager._retriever = mock_retriever
 
         # Act
-        with patch("magic.from_buffer", return_value="application/pdf"):
+        with patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            return_value=(b"", "application/pdf"),
+        ):
+            mock_file = Mock(filename="test.pdf")
+            mock_file.read = AsyncMock(side_effect=[file_content, b""])
             await file_manager.validate_and_save_files([mock_file], project_id=uuid4())
 
         # Assert - verify audit event was emitted
@@ -73,7 +79,7 @@ class TestFileManagerAuditEvents:
         assert event.event_action == "files_uploaded"
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
-        assert event.source_component == "nexus.files.file_manager"
+        assert event.source_component == "syntara.files.file_manager"
         assert "1 files uploaded and stored for conversion" in event.event_message
         assert event.resource_urn is None  # Bulk operation
         assert event.resource_name is None
@@ -89,31 +95,37 @@ class TestFileManagerAuditEvents:
         assert "file_id" in file_detail
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_multiple_files_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
     ) -> None:
         """Uploading multiple files should emit event with all file details."""
+
         # Arrange
+        async def _consume_stream(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+            total = 0
+            async for chunk in stream:
+                total += len(chunk)
+            return "orchestrator-uuid-test.pdf", total
+
         mock_files = []
         for i in range(3):
-            file_content = f"File {i} content".encode()
-            mock_file = Mock()
-            mock_file.filename = f"test{i}.txt"
-            mock_file.size = len(file_content)
-            mock_file.content_type = "text/plain"
-            mock_file.read = AsyncMock(return_value=file_content)
-            mock_file.seek = AsyncMock()
-            mock_files.append(mock_file)
+            mf = Mock(filename=f"test{i}.txt")
+            mf.read = AsyncMock(side_effect=[f"File {i} content".encode(), b""])
+            mock_files.append(mf)
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="nexus-uuid-test.pdf")
+        mock_retriever.save_file_stream = AsyncMock(side_effect=_consume_stream)
         file_manager._retriever = mock_retriever
 
         # Act
-        with patch("magic.from_buffer", return_value="text/plain"):
+        with patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            side_effect=[(b"", "text/plain")] * 3,
+        ):
             await file_manager.validate_and_save_files(cast("list[UploadFile]", mock_files), project_id=uuid4())
 
         # Assert
@@ -127,26 +139,27 @@ class TestFileManagerAuditEvents:
         assert len(event.structured_data.file_details) == 3  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_validate_and_save_files_validation_error_emits_error_event(
         self,
         mock_do_emit: AsyncMock,
     ) -> None:
         """File validation error should emit error audit event before raising."""
         # Arrange
-        file_content = b"Unsupported content"
         mock_file = Mock()
         mock_file.filename = "bad.exe"
-        mock_file.size = len(file_content)
-        mock_file.content_type = "application/x-msdownload"
-        mock_file.read = AsyncMock(return_value=file_content)
-        mock_file.seek = AsyncMock()
 
         file_manager = FileManager()
+        mock_retriever = AsyncMock()
+        file_manager._retriever = mock_retriever
 
         # Act & Assert
         with (
-            patch("magic.from_buffer", return_value="application/x-msdownload"),
+            patch(
+                "syntara.files.file_manager.validators.validate_single_file",
+                new_callable=AsyncMock,
+                side_effect=FileValidationError("Unsupported MIME type"),
+            ),
             pytest.raises(FileValidationError),
         ):
             await file_manager.validate_and_save_files([mock_file], project_id=uuid4())
@@ -177,14 +190,14 @@ class TestDocumentConversionServiceAuditEvents:
         mock_config.timeout_seconds = 30
         mock_config.temp_dir = "/tmp/nexus-test"  # noqa: S108
         with patch(
-            "nexus.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
+            "syntara.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
             return_value=mock_config,
         ):
             yield mock_config
 
     def setup_method(self) -> None:
         """Register files audit handlers before each test."""
-        from nexus.files.audit.file_converted import (
+        from syntara.files.audit.file_converted import (
             FileConvertedEvent,
             FileConvertedHandler,
         )
@@ -192,7 +205,7 @@ class TestDocumentConversionServiceAuditEvents:
         AuditEventDispatcher.register({FileConvertedEvent: FileConvertedHandler()})
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_success_emits_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -244,7 +257,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.INFO
         assert event.event_status == EventStatus.SUCCESS
         assert event.event_message == "File converted."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "document.pdf"
 
@@ -255,7 +268,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.structured_data.conversion_state == ConversionStateAudit.SUCCESS  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_failed_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -306,7 +319,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.ERROR
         assert event.event_status == EventStatus.ERROR
         assert event.event_message == "File conversion failed."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "broken.pdf"
 
@@ -314,7 +327,7 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.structured_data.error_type == "ConversionFailureError"
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_skipped_emits_warning_audit_event(
         self,
         mock_do_emit: AsyncMock,
@@ -346,14 +359,14 @@ class TestDocumentConversionServiceAuditEvents:
         assert event.event_severity == EventSeverity.WARNING
         assert event.event_status == EventStatus.SUCCESS
         assert event.event_message == "File conversion skipped."
-        assert event.source_component == "nexus.files.document_conversion"
+        assert event.source_component == "syntara.files.document_conversion"
         assert event.resource_urn == f"urn:syntara:file:{file_id}"
         assert event.resource_name == "already_converted.txt"
 
         assert event.structured_data.conversion_state == ConversionStateAudit.SKIPPED  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
-    @patch("nexus.audit.emitter._do_emit_audit_event")
+    @patch("syntara.audit.emitter._do_emit_audit_event")
     async def test_convert_file_missing_converter_emits_error_audit_event(
         self,
         mock_do_emit: AsyncMock,

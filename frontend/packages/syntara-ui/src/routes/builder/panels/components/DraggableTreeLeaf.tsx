@@ -1,5 +1,5 @@
 import { Button, Label, Tooltip } from '@patternfly/react-core'
-import { CopyIcon } from '@patternfly/react-icons'
+import { RhUiCopyIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
@@ -61,7 +61,7 @@ export function CopyExpressionAction({ expressionText }: Readonly<{ expressionTe
           variant="plain"
           aria-label={`Copy expression ${expressionText}`}
           onClick={handleCopy}
-          icon={<CopyIcon />}
+          icon={<RhUiCopyIcon />}
           size="sm"
         />
       </Tooltip>

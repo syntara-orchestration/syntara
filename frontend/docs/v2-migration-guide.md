@@ -30,7 +30,7 @@ backend repo               @syntara/contracts    factory is updated          v2 
 
 | Step | Action                                                              | Outcome                                                                                                                         | Tests affected                                       |
 | ---- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 1    | Backend v2 implementation complete                                  | v2 OpenAPI YAML specs in `nexus/src/nexus/schemas/`                                                                             | None yet                                             |
+| 1    | Backend v2 implementation complete                                  | v2 OpenAPI YAML specs in `syntara/backend/src/syntara/schemas/`                                                                 | None yet                                             |
 | 2    | `npm run gen`                                                       | Generated v2 TypeScript types in `packages/syntara-contracts/src/`                                                              | Types available to code against                      |
 | 3a   | Update factories (`workflowFactories.ts`) to produce v2 node shapes | Factories return `{ type: 'script', config: {...} }` instead of `{ type: 'task', task: { executor: 'script', config: {...} } }` | **Unit tests pass**                                  |
 | 3b   | Update save path (`getWorkflowDefinition()`) to build v2 payload    | Save sends `{ schema_version: '2.0.0', triggers: [], nodes: [], edges: [] }`                                                    | **E2E tests pass**                                   |
@@ -48,10 +48,10 @@ backend repo               @syntara/contracts    factory is updated          v2 
 ## How the UI Connects to the Backend
 
 ```
-Backend (nexus/)                      Contracts                              UI (syntara-ui/)
+Backend (syntara/)                    Contracts                              UI (syntara-ui/)
 ────────────────                      ─────────                              ──────────────
 
-src/nexus/schemas/                    packages/syntara-contracts/              packages/syntara-ui/
+src/syntara/schemas/                    packages/syntara-contracts/              packages/syntara-ui/
   workflows/openapi.yaml     ──┐
   executions_openapi.yaml    ──┤
   approvals/openapi.yaml     ──┼──  npm run gen  ──►  openapi-typescript

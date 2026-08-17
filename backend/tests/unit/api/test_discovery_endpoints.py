@@ -5,8 +5,9 @@ Covers the three-tier discovery hierarchy against the real production app:
 - GET /api/v1       — authenticated, lists v1 endpoints
 - GET /api/v1/version — authenticated, returns full version details
 
-Also verifies that authenticated doc endpoints reject unauthenticated
-requests and that old root-level doc paths no longer serve anything.
+Also verifies that unauthenticated doc endpoints at /api_docs/v1/ are
+accessible without auth when enabled, and that old root-level doc paths
+no longer serve anything.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from starlette.testclient import TestClient
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.constants import API_DOCS_V1_PATH_PREFIX, API_V1_PATH_PREFIX, API_V1_VERSION
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -28,9 +29,9 @@ from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
 
 @pytest.fixture
 def auth_client() -> Generator[TestClient, None, None]:
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
-    from nexus.core.models.user import User
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
+    from syntara.core.models.user import User
 
     async def mock_user() -> User:
         return User(username="testuser", email="test@test.com", first_name="Test")
@@ -43,8 +44,8 @@ def auth_client() -> Generator[TestClient, None, None]:
 
 @pytest.fixture
 def unauth_client() -> TestClient:
-    from nexus.api.main import app
-    from nexus.auth.dependencies import get_current_user
+    from syntara.api.main import app
+    from syntara.auth.dependencies import get_current_user
 
     app.dependency_overrides.pop(get_current_user, None)
     return TestClient(app, raise_server_exceptions=False)
@@ -131,20 +132,27 @@ class TestApiV1Version:
         assert data["status"] == "current"
 
     def test_links_null_when_docs_disabled(self, auth_client: TestClient) -> None:
-        data = auth_client.get(f"{API_V1_PATH_PREFIX}/version").json()
-        assert data["links"] is None
+        import syntara.api.main as main_module
+
+        original = main_module._settings.enable_api_docs
+        object.__setattr__(main_module._settings, "enable_api_docs", False)
+        try:
+            data = auth_client.get(f"{API_V1_PATH_PREFIX}/version").json()
+            assert data["links"] is None
+        finally:
+            object.__setattr__(main_module._settings, "enable_api_docs", original)
 
     def test_links_present_when_docs_enabled(self, auth_client: TestClient) -> None:
-        import nexus.api.main as main_module
+        import syntara.api.main as main_module
 
         original = main_module._settings.enable_api_docs
         object.__setattr__(main_module._settings, "enable_api_docs", True)
         try:
             data = auth_client.get(f"{API_V1_PATH_PREFIX}/version").json()
             assert data["links"] is not None
-            assert data["links"]["docs"] == f"{API_V1_PATH_PREFIX}/docs"
-            assert data["links"]["redoc"] == f"{API_V1_PATH_PREFIX}/redoc"
-            assert data["links"]["openapi"] == f"{API_V1_PATH_PREFIX}/openapi.json"
+            assert data["links"]["docs"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
+            assert data["links"]["redoc"] == f"{API_DOCS_V1_PATH_PREFIX}/redoc"
+            assert data["links"]["openapi"] == f"{API_DOCS_V1_PATH_PREFIX}/openapi.json"
         finally:
             object.__setattr__(main_module._settings, "enable_api_docs", original)
 
@@ -154,90 +162,50 @@ class TestApiV1Version:
 
 
 # ---------------------------------------------------------------------------
-# Docs endpoints — auth required (when docs enabled via reload)
+# Docs endpoints — unauthenticated at /api_docs/v1/ (when docs enabled)
 # ---------------------------------------------------------------------------
 
 
-class TestDocsAuth:
-    """Doc endpoints under /api/v1/ require authentication when enabled."""
+class TestDocsNoAuth:
+    """Doc endpoints at /api_docs/v1/ are accessible without authentication."""
 
     @pytest.fixture
-    def docs_enabled_unauth_client(self) -> Generator[TestClient, None, None]:
+    def docs_enabled_client(self) -> Generator[TestClient, None, None]:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.config.base import get_settings
+        import syntara.api.main as main_module
+        from syntara.core.config.base import get_settings
 
         monkeypatch = pytest.MonkeyPatch()
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
-            main_module.app.dependency_overrides.pop(get_current_user, None)
             yield TestClient(main_module.app, raise_server_exceptions=False)
         finally:
             monkeypatch.delenv("APP_ENABLE_API_DOCS", raising=False)
             get_settings.cache_clear()
             importlib.reload(main_module)
 
-    def test_docs_returns_401_without_auth(self, docs_enabled_unauth_client: TestClient) -> None:
-        assert docs_enabled_unauth_client.get(f"{API_V1_PATH_PREFIX}/docs").status_code == 401
-
-    def test_redoc_returns_401_without_auth(self, docs_enabled_unauth_client: TestClient) -> None:
-        assert docs_enabled_unauth_client.get(f"{API_V1_PATH_PREFIX}/redoc").status_code == 401
-
-    def test_openapi_json_returns_401_without_auth(self, docs_enabled_unauth_client: TestClient) -> None:
-        assert docs_enabled_unauth_client.get(f"{API_V1_PATH_PREFIX}/openapi.json").status_code == 401
-
-
-# ---------------------------------------------------------------------------
-# Docs endpoints — authenticated happy path (when docs enabled via reload)
-# ---------------------------------------------------------------------------
-
-
-class TestDocsAuthHappyPath:
-    """Doc endpoints return 200 for authenticated users when docs are enabled."""
-
-    @pytest.fixture
-    def docs_enabled_auth_client(self) -> Generator[TestClient, None, None]:
-        import importlib
-
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.config.base import get_settings
-        from nexus.core.models.user import User
-
-        async def mock_user() -> User:
-            return User(username="testuser", email="test@test.com", first_name="Test")
-
-        monkeypatch = pytest.MonkeyPatch()
-        monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
-        get_settings.cache_clear()
-        try:
-            importlib.reload(main_module)
-            main_module.app.dependency_overrides[get_current_user] = mock_user
-            yield TestClient(main_module.app, raise_server_exceptions=False)
-        finally:
-            main_module.app.dependency_overrides.pop(get_current_user, None)
-            monkeypatch.delenv("APP_ENABLE_API_DOCS", raising=False)
-            get_settings.cache_clear()
-            importlib.reload(main_module)
-
-    def test_docs_returns_200(self, docs_enabled_auth_client: TestClient) -> None:
-        response = docs_enabled_auth_client.get(f"{API_V1_PATH_PREFIX}/docs")
+    def test_docs_returns_200_without_auth(self, docs_enabled_client: TestClient) -> None:
+        response = docs_enabled_client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_redoc_returns_200(self, docs_enabled_auth_client: TestClient) -> None:
-        response = docs_enabled_auth_client.get(f"{API_V1_PATH_PREFIX}/redoc")
+    def test_redoc_returns_200_without_auth(self, docs_enabled_client: TestClient) -> None:
+        response = docs_enabled_client.get(f"{API_DOCS_V1_PATH_PREFIX}/redoc")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_openapi_json_returns_200(self, docs_enabled_auth_client: TestClient) -> None:
-        response = docs_enabled_auth_client.get(f"{API_V1_PATH_PREFIX}/openapi.json")
+    def test_openapi_json_returns_200_without_auth(self, docs_enabled_client: TestClient) -> None:
+        response = docs_enabled_client.get(f"{API_DOCS_V1_PATH_PREFIX}/openapi.json")
         assert response.status_code == 200
         assert "openapi" in response.json()
+
+    def test_docs_redirect_from_root(self, docs_enabled_client: TestClient) -> None:
+        response = docs_enabled_client.get("/docs", follow_redirects=False)
+        assert response.status_code == 307
+        assert response.headers["location"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
 
 
 # ---------------------------------------------------------------------------
@@ -252,9 +220,9 @@ class TestApiV1RootWithIncludedRouters:
     def client_with_router(self) -> Generator[TestClient, None, None]:
         from fastapi import APIRouter
 
-        from nexus.api.main import app
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        from syntara.api.main import app
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -280,27 +248,51 @@ class TestApiV1RootWithIncludedRouters:
 
 
 # ---------------------------------------------------------------------------
-# Old root-level doc paths are gone
+# Old root-level and /api/v1 doc paths are gone (except /docs which redirects)
 # ---------------------------------------------------------------------------
 
 
 class TestOldDocsEndpointsRemoved:
-    """Old root-level /docs, /redoc, /openapi.json must return 404."""
+    """Old doc paths under / and /api/v1 must return 404."""
 
     @pytest.fixture
     def client(self) -> TestClient:
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         return TestClient(app, raise_server_exceptions=False)
 
-    def test_old_docs_404(self, client: TestClient) -> None:
-        assert client.get("/docs").status_code == 404
+    def test_docs_redirect_404_when_disabled(self) -> None:
+        import importlib
+
+        import syntara.api.main as main_module
+        from syntara.core.config.base import get_settings
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        get_settings.cache_clear()
+        try:
+            importlib.reload(main_module)
+            client = TestClient(main_module.app, raise_server_exceptions=False)
+            assert client.get("/docs").status_code == 404
+        finally:
+            monkeypatch.delenv("APP_ENABLE_API_DOCS", raising=False)
+            get_settings.cache_clear()
+            importlib.reload(main_module)
 
     def test_old_redoc_404(self, client: TestClient) -> None:
         assert client.get("/redoc").status_code == 404
 
     def test_old_openapi_json_404(self, client: TestClient) -> None:
         assert client.get("/openapi.json").status_code == 404
+
+    def test_old_api_v1_docs_404(self, client: TestClient) -> None:
+        assert client.get(f"{API_V1_PATH_PREFIX}/docs").status_code == 404
+
+    def test_old_api_v1_redoc_404(self, client: TestClient) -> None:
+        assert client.get(f"{API_V1_PATH_PREFIX}/redoc").status_code == 404
+
+    def test_old_api_v1_openapi_json_404(self, client: TestClient) -> None:
+        assert client.get(f"{API_V1_PATH_PREFIX}/openapi.json").status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +305,7 @@ class TestOldRootEndpointRemoved:
 
     @pytest.fixture
     def client(self) -> TestClient:
-        from nexus.api.main import app
+        from syntara.api.main import app
 
         return TestClient(app, raise_server_exceptions=False)
 

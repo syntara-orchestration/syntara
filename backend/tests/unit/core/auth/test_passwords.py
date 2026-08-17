@@ -1,6 +1,6 @@
 """Unit tests for password hashing utilities."""
 
-from nexus.auth.passwords import hash_password, verify_password
+from syntara.auth.passwords import hash_password, verify_password
 
 
 class TestHashPassword:

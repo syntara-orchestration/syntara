@@ -1,20 +1,23 @@
 """Unit tests for SA rejection audit events and handlers."""
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.sa_rejection import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.sa_rejection import (
     DisabledSACredentialRejectionEvent,
     DisabledSACredentialRejectionHandler,
     DisabledSARejectionEvent,
     DisabledSARejectionHandler,
+    ExpiredSACredentialRejectionEvent,
+    ExpiredSACredentialRejectionHandler,
     MissingSACredentialClaimEvent,
     MissingSACredentialClaimHandler,
     StaleSATokenDetectionEvent,
     StaleSATokenDetectionHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestDisabledSARejectionHandler:
@@ -33,7 +36,7 @@ class TestDisabledSARejectionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "disabled_sa_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "disabled" in result.event_message
 
     def test_maps_deleted_sa_to_audit_event(self) -> None:
@@ -80,7 +83,7 @@ class TestDisabledSACredentialRejectionHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "disabled_sa_credential_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "disabled" in result.event_message
         assert cred_id in result.event_message
 
@@ -109,6 +112,57 @@ class TestDisabledSACredentialRejectionHandler:
         assert result.structured_data.credential_status == "deleted"  # type: ignore[attr-defined]
 
 
+class TestExpiredSACredentialRejectionHandler:
+    """Tests for ExpiredSACredentialRejectionHandler."""
+
+    def test_is_audit_event_handler_subclass(self) -> None:
+        assert issubclass(ExpiredSACredentialRejectionHandler, AuditEventHandler)
+
+    def test_maps_event_to_audit_event(self) -> None:
+        sa_id = str(uuid4())
+        cred_id = str(uuid4())
+        expires_at = datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC)
+        event = ExpiredSACredentialRejectionEvent(
+            service_account_id=sa_id, credential_id=cred_id, expires_at=expires_at
+        )
+        result = ExpiredSACredentialRejectionHandler().handle(event)
+
+        assert result.event_category == EventCategory.SECURITY_EVENT
+        assert result.event_severity == EventSeverity.WARNING
+        assert result.event_status == EventStatus.ERROR
+        assert result.event_action == "expired_sa_credential_rejected"
+        assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
+        assert result.source_component == "syntara.auth.middleware"
+        assert "expired" in result.event_message
+        assert cred_id in result.event_message
+
+    def test_resource_fields(self) -> None:
+        sa_id = str(uuid4())
+        cred_id = str(uuid4())
+        expires_at = datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC)
+        event = ExpiredSACredentialRejectionEvent(
+            service_account_id=sa_id, credential_id=cred_id, expires_at=expires_at
+        )
+        result = ExpiredSACredentialRejectionHandler().handle(event)
+
+        assert result.resource_urn == f"urn:syntara:service-account:{sa_id}"
+        assert result.resource_name == sa_id
+
+    def test_structured_data(self) -> None:
+        sa_id = str(uuid4())
+        cred_id = str(uuid4())
+        expires_at = datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC)
+        event = ExpiredSACredentialRejectionEvent(
+            service_account_id=sa_id, credential_id=cred_id, expires_at=expires_at
+        )
+        result = ExpiredSACredentialRejectionHandler().handle(event)
+
+        assert result.structured_data is not None
+        assert result.structured_data.data_type == "expired-sa-credential-rejection"
+        assert result.structured_data.credential_id == cred_id  # type: ignore[attr-defined]
+        assert result.structured_data.expires_at == expires_at.isoformat()  # type: ignore[attr-defined]
+
+
 class TestMissingSACredentialClaimHandler:
     """Tests for MissingSACredentialClaimHandler."""
 
@@ -125,7 +179,7 @@ class TestMissingSACredentialClaimHandler:
         assert result.event_status == EventStatus.ERROR
         assert result.event_action == "missing_sa_credential_claim_rejected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
         assert "cred_id" in result.event_message
 
     def test_resource_fields(self) -> None:
@@ -161,7 +215,7 @@ class TestStaleSATokenDetectionHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "stale_sa_token_detected"
         assert result.actor_type == PrincipalType.SERVICE_ACCOUNT
-        assert result.source_component == "nexus.auth.middleware"
+        assert result.source_component == "syntara.auth.middleware"
 
     def test_resource_fields(self) -> None:
         sa_id = str(uuid4())

@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from nexus.workflows.workflow_engine.activities.loop import loop
+from syntara.workflows.workflow_engine.activities.loop import loop
 
 # ---------------------------------------------------------------------------
 # for_each loop

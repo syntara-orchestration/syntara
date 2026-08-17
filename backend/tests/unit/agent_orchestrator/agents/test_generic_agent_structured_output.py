@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from nexus.audit.emitter import AuditActorContext
+from syntara.audit.emitter import AuditActorContext
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -15,8 +15,8 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
-from nexus.agent_orchestrator.agents.generic_agent import GenericAgent
-from nexus.agent_orchestrator.models.agent_state import AgentState
+from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
+from syntara.agent_orchestrator.models.agent_state import AgentState
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ class TestGenericAgentStructuredOutputNoTools:
 
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
@@ -119,7 +119,7 @@ class TestGenericAgentStructuredOutputNoTools:
 
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
@@ -153,7 +153,7 @@ class TestGenericAgentStructuredOutputNoTools:
 
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
@@ -207,13 +207,15 @@ class TestGenericAgentStructuredOutputWithTools:
         mock_tool.name = "test_tool"
 
         agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
         assert result_state["result"] is not None
         assert result_state["result"]["content"] == extracted_output
         assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "native"
+        # Case A: tools present → standard tool-loop path (bind_tools), then extraction.
+        mock_llm.bind_tools.assert_called()
         # Standard tool-loop call (100+50) + extraction call (40+15)
         assert result_state["llm_token_usage_log"] == [
             {
@@ -250,7 +252,7 @@ class TestGenericAgentStructuredOutputWithTools:
         mock_tool.name = "test_tool"
 
         agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
@@ -287,7 +289,7 @@ class TestGenericAgentStructuredOutputWithTools:
         mock_tool.name = "test_tool"
 
         agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 
@@ -331,7 +333,7 @@ class TestGenericAgentTokenTracking:
 
         agent = GenericAgent(llm=mock_llm, available_tools=[])
 
-        with patch("nexus.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
             mock_record.side_effect = _make_record_side_effect()
             result_state = await agent.execute_as_node(sample_state)
 

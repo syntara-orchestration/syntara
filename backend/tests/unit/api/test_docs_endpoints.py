@@ -11,10 +11,11 @@ The ``TestAPIDocsSettings`` class separately verifies that the
 Together the two layers confirm that the wiring in ``main.py`` will
 produce the right result when the real setting is read at startup.
 
-Note: The production app now serves custom authenticated doc endpoints
-at ``/api/v1/docs``, ``/api/v1/redoc``, and ``/api/v1/openapi.json``
-(see ``test_discovery_endpoints.py``).  The standalone ``_make_app``
-tests here verify the abstract toggling logic in isolation.
+Note: The production app now serves unauthenticated doc endpoints
+at ``/api_docs/v1/docs``, ``/api_docs/v1/redoc``, and
+``/api_docs/v1/openapi.json`` (gated by ``enable_api_docs``).
+The standalone ``_make_app`` tests here verify the abstract toggling
+logic in isolation.
 """
 
 from __future__ import annotations
@@ -26,10 +27,10 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from nexus.api.constants import API_V1_PATH_PREFIX, API_V1_VERSION
-from nexus.api.main import swagger_ui_parameters
-from nexus.core.config.base import get_settings
-from nexus.core.router_discovery import iter_api_routes
+from syntara.api.constants import API_DOCS_V1_PATH_PREFIX, API_V1_PATH_PREFIX, API_V1_VERSION
+from syntara.api.main import swagger_ui_parameters
+from syntara.core.config.base import get_settings
+from syntara.core.router_discovery import iter_api_routes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -124,21 +125,20 @@ class TestDocsEnabled:
 
 
 class TestAPIDocsSettings:
-    """The enable_api_docs setting defaults to False and is toggleable."""
+    """The enable_api_docs setting defaults to True and is toggleable."""
 
-    def test_default_is_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nexus.core.config.base import get_settings
+    def test_default_is_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from syntara.core.config.base import get_settings
 
-        # Override local .env so this asserts the production default.
-        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
         try:
-            assert get_settings().enable_api_docs is False
+            assert get_settings().enable_api_docs is True
         finally:
             get_settings.cache_clear()
 
     def test_env_var_enables(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
@@ -151,16 +151,16 @@ class TestAPIDocsSettings:
         self,
         override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         with override_settings(enable_api_docs=True):
             assert get_settings().enable_api_docs is True
 
     def test_field_default_on_class(self) -> None:
-        from nexus.core.config.base import APIDocsSettings
+        from syntara.core.config.base import APIDocsSettings
 
         settings = APIDocsSettings()
-        assert settings.enable_api_docs is False
+        assert settings.enable_api_docs is True
 
 
 class TestTryItOutSettings:
@@ -190,7 +190,7 @@ class TestTryItOutSettings:
             assert get_settings().enable_try_it_out is True
 
     def test_field_default_on_class(self) -> None:
-        from nexus.core.config.base import APIDocsSettings
+        from syntara.core.config.base import APIDocsSettings
 
         settings = APIDocsSettings()
         assert settings.enable_try_it_out is False
@@ -253,9 +253,9 @@ class TestDocsEnabledWiring:
     """Cover True branches of enable_api_docs conditionals in main.py."""
 
     def test_version_includes_docs_links_when_enabled(self) -> None:
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        import syntara.api.main as main_module
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
@@ -267,7 +267,7 @@ class TestDocsEnabledWiring:
             client = TestClient(main_module.app, raise_server_exceptions=False)
             response = client.get(f"{API_V1_PATH_PREFIX}/version")
             assert response.status_code == 200
-            assert response.json()["links"]["docs"] == f"{API_V1_PATH_PREFIX}/docs"
+            assert response.json()["links"]["docs"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
         finally:
             object.__setattr__(main_module._settings, "enable_api_docs", original)
             main_module.app.dependency_overrides.pop(get_current_user, None)
@@ -275,17 +275,18 @@ class TestDocsEnabledWiring:
     def test_docs_routes_registered_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.core.config.base import get_settings
+        import syntara.api.main as main_module
+        from syntara.core.config.base import get_settings
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
             route_paths = [r.path for r in iter_api_routes(main_module.app)]
-            assert f"{API_V1_PATH_PREFIX}/docs" in route_paths
-            assert f"{API_V1_PATH_PREFIX}/redoc" in route_paths
-            assert f"{API_V1_PATH_PREFIX}/openapi.json" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/docs" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/redoc" in route_paths
+            assert f"{API_DOCS_V1_PATH_PREFIX}/openapi.json" in route_paths
+            assert "/docs" in route_paths
         finally:
             # Force production defaults so later tests are not polluted by .env.
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
@@ -296,26 +297,19 @@ class TestDocsEnabledWiring:
     def test_custom_docs_try_it_out_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
-
-        async def mock_user() -> User:
-            return User(username="testuser", email="test@test.com", first_name="Test")
+        import syntara.api.main as main_module
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
-            main_module.app.dependency_overrides[get_current_user] = mock_user
             client = TestClient(main_module.app, raise_server_exceptions=False)
-            response = client.get(f"{API_V1_PATH_PREFIX}/docs")
+            response = client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
             assert response.status_code == 200
             assert '"tryItOutEnabled": false' in response.text
             assert '"supportedSubmitMethods": []' in response.text
         finally:
-            main_module.app.dependency_overrides.pop(get_current_user, None)
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
             get_settings.cache_clear()
@@ -324,28 +318,39 @@ class TestDocsEnabledWiring:
     def test_custom_docs_try_it_out_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import importlib
 
-        import nexus.api.main as main_module
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
-
-        async def mock_user() -> User:
-            return User(username="testuser", email="test@test.com", first_name="Test")
+        import syntara.api.main as main_module
 
         monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "true")
         get_settings.cache_clear()
         try:
             importlib.reload(main_module)
-            main_module.app.dependency_overrides[get_current_user] = mock_user
             client = TestClient(main_module.app, raise_server_exceptions=False)
-            response = client.get(f"{API_V1_PATH_PREFIX}/docs")
+            response = client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
             assert response.status_code == 200
             assert '"tryItOutEnabled": true' in response.text
             assert '"supportedSubmitMethods": []' not in response.text
         finally:
-            main_module.app.dependency_overrides.pop(get_current_user, None)
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             monkeypatch.setenv("APP_ENABLE_TRY_IT_OUT", "false")
+            get_settings.cache_clear()
+            importlib.reload(main_module)
+
+    def test_docs_redirect_to_api_docs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import importlib
+
+        import syntara.api.main as main_module
+
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
+        get_settings.cache_clear()
+        try:
+            importlib.reload(main_module)
+            client = TestClient(main_module.app, raise_server_exceptions=False)
+            response = client.get("/docs", follow_redirects=False)
+            assert response.status_code == 307
+            assert response.headers["location"] == f"{API_DOCS_V1_PATH_PREFIX}/docs"
+        finally:
+            monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             get_settings.cache_clear()
             importlib.reload(main_module)
 
@@ -354,29 +359,29 @@ class TestProductionAppWiring:
     """Verify the real app has correct doc endpoint wiring for coverage."""
 
     def test_builtin_docs_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.docs_url is None
 
     def test_builtin_redoc_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.redoc_url is None
 
     def test_builtin_openapi_url_disabled(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.openapi_url is None
 
     def test_builtin_swagger_ui_params_none(self) -> None:
-        from nexus.api.main import app as real_app
+        from syntara.api.main import app as real_app
 
         assert real_app.swagger_ui_parameters is None
 
     def test_version_omits_docs_links_when_disabled(self) -> None:
-        from nexus.api.main import app as real_app
-        from nexus.auth.dependencies import get_current_user
-        from nexus.core.models.user import User
+        from syntara.api.main import app as real_app
+        from syntara.auth.dependencies import get_current_user
+        from syntara.core.models.user import User
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from pydantic import SecretStr
 
-from nexus.core.logging.otel_handlers import (
+from syntara.core.logging.otel_handlers import (
     create_otel_handler,
     flush_otel_handler,
 )
@@ -33,7 +33,7 @@ class TestCreateOtelHandler:
 
             assert handler is None
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_returns_logging_handler_when_enabled(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that create_otel_handler returns a LoggingHandler when enabled."""
         mock_exporter.return_value = MagicMock()
@@ -41,14 +41,14 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 
             assert handler is not None
             assert handler.__class__.__name__ == "LoggingHandler"
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_handler_level_set_to_notset(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that created handler has level set to NOTSET."""
         mock_exporter.return_value = MagicMock()
@@ -56,14 +56,14 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 
             assert handler is not None
             assert handler.level == logging.NOTSET
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_creates_handler_with_api_key_authentication(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that handler is created with API key authentication."""
         mock_exporter.return_value = MagicMock()
@@ -73,7 +73,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_api_key=SecretStr(api_key),
             otel_auth_header_name="X-API-Key",
         ):
@@ -91,7 +91,7 @@ class TestCreateOtelHandler:
             assert call_kwargs["client_certificate_file"] is None
             assert call_kwargs["client_key_file"] is None
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_creates_handler_with_mtls_authentication(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that handler is created with mTLS certificate authentication."""
         mock_exporter.return_value = MagicMock()
@@ -99,7 +99,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
             otel_ca_cert_file="/etc/ssl/ca.crt",
             otel_client_cert_file="/etc/ssl/client.crt",
             otel_client_key_file="/etc/ssl/client.key",
@@ -118,8 +118,8 @@ class TestCreateOtelHandler:
             assert call_kwargs["client_certificate_file"] == "/etc/ssl/client.crt"
             assert call_kwargs["client_key_file"] == "/etc/ssl/client.key"
 
-    @patch("nexus.core.logging.otel_handlers.logger")
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.logger")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_warns_when_no_authentication_configured(
         self, mock_exporter: MagicMock, mock_logger: MagicMock, override_settings
     ) -> None:
@@ -129,7 +129,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="http://localhost:4318/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             create_otel_handler()
 
@@ -139,7 +139,7 @@ class TestCreateOtelHandler:
             assert warning_call[0][0] == "otel.handler.no_authentication"
             assert warning_call[1]["endpoint"] == "http://localhost:4318/v1/logs"
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_includes_service_name_in_resource(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that logger provider includes service name in resource."""
         mock_exporter.return_value = MagicMock()
@@ -147,16 +147,16 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test-service",
+            otel_service_name="syntara-test-service",
         ):
             handler = create_otel_handler()
 
             assert handler is not None
             # Verify service name is in the resource (access via _logger_provider)
             resource_attrs = handler._logger_provider._resource.attributes  # type: ignore[attr-defined]
-            assert resource_attrs.get("service.name") == "nexus-test-service"
+            assert resource_attrs.get("service.name") == "syntara-test-service"
 
-    @patch("nexus.core.logging.otel_handlers.OTLPLogExporter")
+    @patch("syntara.core.logging.otel_handlers.OTLPLogExporter")
     def test_includes_service_instance_id_in_resource(self, mock_exporter: MagicMock, override_settings) -> None:
         """Test that logger provider includes service instance ID (hostname) in resource."""
         import os
@@ -166,7 +166,7 @@ class TestCreateOtelHandler:
         with override_settings(
             otel_enabled=True,
             otel_endpoint="https://otlp.example.com/v1/logs",
-            otel_service_name="nexus-test",
+            otel_service_name="syntara-test",
         ):
             handler = create_otel_handler()
 
@@ -227,7 +227,7 @@ class TestFlushOtelHandler:
         test_logger.addHandler(mock_handler)
 
         try:
-            with patch("nexus.core.logging.otel_handlers.logger") as mock_logger:
+            with patch("syntara.core.logging.otel_handlers.logger") as mock_logger:
                 # Should not raise
                 flush_otel_handler(test_logger)
 
@@ -250,7 +250,7 @@ class TestFlushOtelHandler:
         test_logger.addHandler(mock_handler)
 
         try:
-            with patch("nexus.core.logging.otel_handlers.logger") as mock_logger:
+            with patch("syntara.core.logging.otel_handlers.logger") as mock_logger:
                 # Should not raise
                 flush_otel_handler(test_logger)
 
@@ -270,7 +270,7 @@ class TestFlushOtelHandler:
         test_logger.addHandler(mock_handler)
 
         try:
-            with patch("nexus.core.logging.otel_handlers.logger") as mock_logger:
+            with patch("syntara.core.logging.otel_handlers.logger") as mock_logger:
                 flush_otel_handler(test_logger)
 
                 # Verify info log was emitted
@@ -330,7 +330,7 @@ class TestFlushOtelHandler:
         test_logger.addHandler(mock_handler2)
 
         try:
-            with patch("nexus.core.logging.otel_handlers.logger"):
+            with patch("syntara.core.logging.otel_handlers.logger"):
                 flush_otel_handler(test_logger)
 
                 # Verify second handler was still flushed despite first failure

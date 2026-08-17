@@ -9,7 +9,7 @@ These tests verify:
 import pytest
 from pydantic import ValidationError
 
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     AgenticExecutorParameters,
 )
 
@@ -104,13 +104,13 @@ class TestDeadV1CodeRemoval:
 
     def test_validate_input_data_function_removed(self) -> None:
         """_validate_input_data should no longer exist in agentic_activity module."""
-        import nexus.workflows.workflow_engine.activities.agentic_activity as mod
+        import syntara.workflows.workflow_engine.activities.agentic_activity as mod
 
         assert not hasattr(mod, "_validate_input_data"), "_validate_input_data should have been removed as dead V1 code"
 
     def test_validate_resolved_prompt_function_removed(self) -> None:
         """_validate_resolved_prompt should no longer exist in agentic_activity module."""
-        import nexus.workflows.workflow_engine.activities.agentic_activity as mod
+        import syntara.workflows.workflow_engine.activities.agentic_activity as mod
 
         assert not hasattr(mod, "_validate_resolved_prompt"), (
             "_validate_resolved_prompt should have been removed as dead V1 code"
@@ -118,13 +118,13 @@ class TestDeadV1CodeRemoval:
 
     def test_extract_config_function_removed(self) -> None:
         """_extract_config should no longer exist in agentic_activity module."""
-        import nexus.workflows.workflow_engine.activities.agentic_activity as mod
+        import syntara.workflows.workflow_engine.activities.agentic_activity as mod
 
         assert not hasattr(mod, "_extract_config"), "_extract_config should have been removed as dead V1 code"
 
     def test_resolve_parameter_templates_import_removed(self) -> None:
         """resolve_parameter_templates should not be imported in agentic_activity module."""
-        import nexus.workflows.workflow_engine.activities.agentic_activity as mod
+        import syntara.workflows.workflow_engine.activities.agentic_activity as mod
 
         assert not hasattr(mod, "resolve_parameter_templates"), (
             "resolve_parameter_templates import should have been removed"

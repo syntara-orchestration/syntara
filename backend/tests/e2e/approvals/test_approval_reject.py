@@ -114,7 +114,7 @@ class TestRejectSignal:
 
     def test_reject_terminates_execution_and_approved_path_not_executed(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -140,17 +140,17 @@ class TestRejectSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
         assert approval.status == ApprovalRequestStatus.PENDING
         assert approval.approval_node_id == "approval_gate"
 
         rejection_notes = "Blocked by policy — rejecting for E2E test"
-        decide_response = nexus_api.approvals.decide(
+        decide_response = syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(
                 status=ApprovalDecisionStatus.REJECTED,
@@ -170,7 +170,7 @@ class TestRejectSignal:
         )
 
         # Execution reaches terminal — rejection with no successor ends the workflow
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status in TERMINAL_STATUSES, f"Execution did not reach terminal status, got: {final.status}"
 
         # Approved-path node must not have completed
@@ -182,7 +182,7 @@ class TestRejectSignal:
 
     def test_reject_executes_rejected_path_node(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -207,18 +207,18 @@ class TestRejectSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
-        nexus_api.approvals.decide(
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(status=ApprovalDecisionStatus.REJECTED),
         ).assert_and_get()
 
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status in TERMINAL_STATUSES, f"Execution did not reach terminal status, got: {final.status}"
 
         activities = {a.activity_id: a for a in (final.activities or [])}
@@ -237,7 +237,7 @@ class TestRejectSignal:
 
     def test_reject_output_contains_required_fields(
         self,
-        nexus_api: SyntaraApiRegistry,
+        syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
     ) -> None:
@@ -265,15 +265,15 @@ class TestRejectSignal:
             )
         )
 
-        execution = nexus_api.executions.create(
+        execution = syntara_api.executions.create(
             body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
         ).assert_and_get()
         exec_id = UUID(str(execution.id))
 
-        approval = poll_for_pending_approval(nexus_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        approval = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
         rejection_notes = "Rejected for E2E output test"
 
-        nexus_api.approvals.decide(
+        syntara_api.approvals.decide(
             approval_id=UUID(str(approval.id)),
             body=ApprovalDecisionRequest(
                 status=ApprovalDecisionStatus.REJECTED,
@@ -281,7 +281,7 @@ class TestRejectSignal:
             ),
         ).assert_and_get()
 
-        final = poll_execution(nexus_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
         assert final.status in TERMINAL_STATUSES
 
         activities = {a.activity_id: a for a in (final.activities or [])}

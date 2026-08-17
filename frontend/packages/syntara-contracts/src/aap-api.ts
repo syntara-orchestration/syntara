@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-  '/aap/organizations': {
+  '/proxies/aap/organizations': {
     parameters: {
       query?: never
       header?: never
@@ -24,7 +24,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/job_templates': {
+  '/proxies/aap/job_templates': {
     parameters: {
       query?: never
       header?: never
@@ -44,7 +44,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/job_templates/{job_template_id}': {
+  '/proxies/aap/job_templates/{job_template_id}': {
     parameters: {
       query?: never
       header?: never
@@ -64,7 +64,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/workflow_job_templates': {
+  '/proxies/aap/workflow_job_templates': {
     parameters: {
       query?: never
       header?: never
@@ -84,7 +84,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/workflow_job_templates/{workflow_job_template_id}': {
+  '/proxies/aap/workflow_job_templates/{workflow_job_template_id}': {
     parameters: {
       query?: never
       header?: never
@@ -104,7 +104,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/inventories': {
+  '/proxies/aap/inventories': {
     parameters: {
       query?: never
       header?: never
@@ -124,7 +124,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/execution_environments': {
+  '/proxies/aap/execution_environments': {
     parameters: {
       query?: never
       header?: never
@@ -144,7 +144,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/credentials': {
+  '/proxies/aap/credentials': {
     parameters: {
       query?: never
       header?: never
@@ -152,7 +152,7 @@ export interface paths {
       cookie?: never
     }
     /**
-     * List credentials
+     * List AAP credentials
      * @description List Ansible Automation Platform credentials (not organization-scoped).
      */
     get: operations['list_aap_credentials']
@@ -164,7 +164,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/instance_groups': {
+  '/proxies/aap/instance_groups': {
     parameters: {
       query?: never
       header?: never
@@ -184,7 +184,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/aap/labels': {
+  '/proxies/aap/labels': {
     parameters: {
       query?: never
       header?: never
@@ -856,7 +856,7 @@ export interface components {
   }
   parameters: {
     /**
-     * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+     * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
      *     If provided, the credential is decrypted and used instead of environment variables.
      *     Credential must be of type "Ansible Automation Platform".
      */
@@ -879,7 +879,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -921,7 +921,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -964,7 +964,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1008,7 +1008,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1051,7 +1051,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1095,7 +1095,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1138,7 +1138,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1181,7 +1181,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1223,7 +1223,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1265,7 +1265,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */

@@ -24,7 +24,7 @@ authenticated:
     justification: Returns own user info; scoped to caller
 
   - method: POST
-    path: /api/v1/auth/ws-ticket
+    path: /api/v1/auth/ws_ticket
     justification: Exchanges Bearer JWT for single-use WS ticket; scoped to caller
 
   # -- authz: introspection / reference data --
@@ -35,6 +35,10 @@ authenticated:
   - method: POST
     path: /api/v1/authz/what_can_i
     justification: Checks caller's own permissions
+
+  - method: POST
+    path: /api/v1/authz/who_can
+    justification: Authorization enforced inline via authorize(); two-tier permission gate with authz:query fallback
 
   - method: GET
     path: /api/v1/roles
@@ -95,53 +99,49 @@ authenticated:
 
   # -- aap: proxy to Controller which enforces its own RBAC --
   - method: GET
-    path: /api/v1/aap/credentials
+    path: /api/v1/proxies/aap/credentials
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/execution_environments
+    path: /api/v1/proxies/aap/execution_environments
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/instance_groups
+    path: /api/v1/proxies/aap/instance_groups
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/inventories
+    path: /api/v1/proxies/aap/inventories
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/job_templates
+    path: /api/v1/proxies/aap/job_templates
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/job_templates/{job_template_id}
+    path: /api/v1/proxies/aap/job_templates/{job_template_id}
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/labels
+    path: /api/v1/proxies/aap/labels
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/organizations
+    path: /api/v1/proxies/aap/organizations
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/workflow_job_templates
+    path: /api/v1/proxies/aap/workflow_job_templates
     justification: Proxy to Controller; Controller enforces RBAC
 
   - method: GET
-    path: /api/v1/aap/workflow_job_templates/{workflow_job_template_id}
+    path: /api/v1/proxies/aap/workflow_job_templates/{workflow_job_template_id}
     justification: Proxy to Controller; Controller enforces RBAC
 
-  # -- tool_manager/metrics: internal observability --
-  - method: GET
-    path: /api/v1/tool_manager/metrics/tools
-    justification: Internal observability; no user data
-
-  - method: GET
-    path: /api/v1/tool_manager/metrics/executions
-    justification: Internal observability; no user data
+  # -- workflows: stateless validation --
+  - method: POST
+    path: /api/v1/workflows/validate
+    justification: Stateless, side-effect-free validation of caller-supplied definition; no project_id/workflow_id to authorize against
 
 public:
   # -- auth: pre-authentication flow --

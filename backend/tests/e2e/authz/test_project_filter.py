@@ -31,7 +31,7 @@ class TestProjectListNoRoles:
 
     def test_sees_no_projects(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -39,7 +39,7 @@ class TestProjectListNoRoles:
         _, hidden_name = create_project(admin_api, "hidden")
         _, name, password = create_user(admin_api, "filter-none")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
 
         projects = user_api.projects.list().assert_and_get()
         names = {str(p.name) for p in projects.resources}
@@ -51,7 +51,7 @@ class TestProjectListWithRoles:
 
     def test_sees_assigned_projects(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -66,7 +66,7 @@ class TestProjectListWithRoles:
         assign_project_role_to_user(admin_api, proj_a_id, user_id, "project-user")
         assign_project_role_to_user(admin_api, proj_b_id, user_id, "project-user")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
         projects = user_api.projects.list().assert_and_get()
         names = {str(p.name) for p in projects.resources}
 
@@ -80,7 +80,7 @@ class TestSystemAuditorSeesAll:
 
     def test_auditor_sees_all_projects(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_user: UserFactory,
@@ -93,7 +93,7 @@ class TestSystemAuditorSeesAll:
 
         assign_system_role(admin_api, user_id, "auditor")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
         projects = user_api.projects.list().assert_and_get()
         names = {str(p.name) for p in projects.resources}
 
@@ -106,7 +106,7 @@ class TestNoDuplicateProjects:
 
     def test_no_duplicate_entries(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
         create_group: GroupFactory,
@@ -122,7 +122,7 @@ class TestNoDuplicateProjects:
         add_to_group(admin_api, group_id, user_id)
         assign_project_role_to_group(admin_api, proj_id, group_id, "project-auditor")
 
-        user_api = api_for(nexus_base_url, name, password)
+        user_api = api_for(syntara_base_url, name, password)
         projects = user_api.projects.list().assert_and_get()
         names = [str(p.name) for p in projects.resources]
 

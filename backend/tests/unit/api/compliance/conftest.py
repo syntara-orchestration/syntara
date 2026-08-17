@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from _pytest.outcomes import Failed, Skipped
 
-from nexus.core.router.loader import load_openapi_schema
+from syntara.core.router.loader import load_openapi_schema
 
 if TYPE_CHECKING:
     from collections.abc import Callable

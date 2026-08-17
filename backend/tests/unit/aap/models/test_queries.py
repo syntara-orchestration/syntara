@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from nexus.aap.models.queries import AAPBaseQuery, AAPResourceQuery
+from syntara.aap.models.queries import AAPBaseQuery, AAPResourceQuery
 
 
 class TestAAPBaseQueryIntegrationId:

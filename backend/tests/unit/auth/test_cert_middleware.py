@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 import pytest
 
-from nexus.auth.cert_middleware import (
+from syntara.auth.cert_middleware import (
     CertificateValidationError,
     ClientCertAuthMiddleware,
     _extract_cn,
@@ -52,7 +52,7 @@ class TestExtractCn:
         assert _extract_cn({"subject": ()}) is None
 
     def test_returns_none_for_no_cn(self) -> None:
-        assert _extract_cn({"subject": ((("organizationName", "Nexus"),),)}) is None
+        assert _extract_cn({"subject": ((("organizationName", "Syntara"),),)}) is None
 
 
 class TestValidateClientCert:
@@ -92,7 +92,7 @@ class TestValidateClientCert:
         assert exc_info.value.reason == "certificate_revoked"
 
     def test_no_cn_in_peercert_raises(self) -> None:
-        peercert = {"subject": ((("organizationName", "Nexus"),),), "serialNumber": "01"}
+        peercert = {"subject": ((("organizationName", "Syntara"),),), "serialNumber": "01"}
         with pytest.raises(CertificateValidationError) as exc_info:
             _validate_client_cert(
                 peercert,
@@ -133,7 +133,7 @@ class TestClientCertAuthMiddleware:
 
     @pytest.fixture
     def _tls_enabled(self) -> Generator[None]:
-        with patch("nexus.auth.cert_middleware.get_settings") as mock:
+        with patch("syntara.auth.cert_middleware.get_settings") as mock:
             mock.return_value.s2s_tls_enabled = True
             mock.return_value.s2s_tls_cn_allowlist = None
             mock.return_value.s2s_tls_crl_path = None
@@ -141,7 +141,7 @@ class TestClientCertAuthMiddleware:
 
     @pytest.fixture
     def _tls_disabled(self) -> Generator[None]:
-        with patch("nexus.auth.cert_middleware.get_settings") as mock:
+        with patch("syntara.auth.cert_middleware.get_settings") as mock:
             mock.return_value.s2s_tls_enabled = False
             mock.return_value.s2s_tls_cn_allowlist = None
             mock.return_value.s2s_tls_crl_path = None
@@ -149,7 +149,7 @@ class TestClientCertAuthMiddleware:
 
     @pytest.fixture
     def _tls_with_allowlist(self) -> Generator[None]:
-        with patch("nexus.auth.cert_middleware.get_settings") as mock:
+        with patch("syntara.auth.cert_middleware.get_settings") as mock:
             mock.return_value.s2s_tls_enabled = True
             mock.return_value.s2s_tls_cn_allowlist = ["worker.ao.svc", "backend.ao.svc"]
             mock.return_value.s2s_tls_crl_path = None
@@ -168,7 +168,7 @@ class TestClientCertAuthMiddleware:
         crl_path = generate_crl(tmp_path, ca_key, ca_cert, revoked_certs=[revoked_cert])
         self._revoked_serial = f"{revoked_cert.serial_number:X}"
 
-        with patch("nexus.auth.cert_middleware.get_settings") as mock:
+        with patch("syntara.auth.cert_middleware.get_settings") as mock:
             mock.return_value.s2s_tls_enabled = True
             mock.return_value.s2s_tls_cn_allowlist = None
             mock.return_value.s2s_tls_crl_path = str(crl_path)
@@ -391,8 +391,8 @@ class TestUserFromCert:
 
     def test_fallback_uses_service_principal_id(self) -> None:
         """Without X-On-Behalf-Of, uses service_principal_id derived from CN."""
-        from nexus.auth.dependencies import _user_from_cert
-        from nexus.core.models.principal import service_principal_id
+        from syntara.auth.dependencies import _user_from_cert
+        from syntara.core.models.principal import service_principal_id
 
         request = self._make_request()
         user = _user_from_cert(request, "backend.ao.svc")
@@ -402,7 +402,7 @@ class TestUserFromCert:
         """With valid X-On-Behalf-Of header, uses that UUID."""
         from uuid import UUID
 
-        from nexus.auth.dependencies import _user_from_cert
+        from syntara.auth.dependencies import _user_from_cert
 
         user_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         request = self._make_request(on_behalf_of=user_id)
@@ -411,8 +411,8 @@ class TestUserFromCert:
 
     def test_invalid_on_behalf_of_falls_back(self) -> None:
         """With invalid X-On-Behalf-Of, falls back to service_principal_id."""
-        from nexus.auth.dependencies import _user_from_cert
-        from nexus.core.models.principal import service_principal_id
+        from syntara.auth.dependencies import _user_from_cert
+        from syntara.core.models.principal import service_principal_id
 
         request = self._make_request(on_behalf_of="not-a-uuid")
         user = _user_from_cert(request, "backend.ao.svc")
@@ -420,7 +420,7 @@ class TestUserFromCert:
 
     def test_user_fields_populated(self) -> None:
         """Username, email, and first_name are populated from CN."""
-        from nexus.auth.dependencies import _user_from_cert
+        from syntara.auth.dependencies import _user_from_cert
 
         request = self._make_request()
         user = _user_from_cert(request, "backend.ao.svc")
@@ -435,8 +435,8 @@ class TestAllowlistDriftWarning:
 
     def test_warns_when_known_cns_missing_from_allowlist(self) -> None:
         with (
-            patch("nexus.auth.cert_middleware.get_settings") as mock,
-            patch("nexus.auth.cert_middleware.logger") as mock_logger,
+            patch("syntara.auth.cert_middleware.get_settings") as mock,
+            patch("syntara.auth.cert_middleware.logger") as mock_logger,
         ):
             mock.return_value.s2s_tls_enabled = True
             mock.return_value.s2s_tls_cn_allowlist = ["worker.ao.svc"]
@@ -446,11 +446,11 @@ class TestAllowlistDriftWarning:
         assert "KNOWN_SERVICE_CNS entries missing" in mock_logger.warning.call_args[0][0]
 
     def test_no_warning_when_all_known_cns_in_allowlist(self) -> None:
-        from nexus.core.models.principal import KNOWN_SERVICE_CNS
+        from syntara.core.models.principal import KNOWN_SERVICE_CNS
 
         with (
-            patch("nexus.auth.cert_middleware.get_settings") as mock,
-            patch("nexus.auth.cert_middleware.logger") as mock_logger,
+            patch("syntara.auth.cert_middleware.get_settings") as mock,
+            patch("syntara.auth.cert_middleware.logger") as mock_logger,
         ):
             mock.return_value.s2s_tls_enabled = True
             mock.return_value.s2s_tls_cn_allowlist = list(KNOWN_SERVICE_CNS)

@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from nexus.core.tls.certs import generate_ca, generate_service_cert
+from syntara.core.tls.certs import generate_ca, generate_service_cert
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

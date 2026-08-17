@@ -4,17 +4,17 @@ from copy import deepcopy
 
 import pytest
 
-from nexus.agent_orchestrator.context_manager.retriever_service.checkers.keyword_relevancy_checker import (
+from syntara.agent_orchestrator.context_manager.retriever_service.checkers.keyword_relevancy_checker import (
     KeywordRelevancyChecker,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
+from syntara.agent_orchestrator.context_manager.retriever_service.config.configuration_manager import (
     ConfigurationManager,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevancy_configuration import (
     RelevancyConfiguration,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.files.models import FileMetadata
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.files.models import FileMetadata
 
 
 class TestKeywordRelevancyChecker:

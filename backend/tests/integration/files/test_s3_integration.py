@@ -17,10 +17,10 @@ from moto import mock_aws
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-from nexus.files.exceptions import FileContentNotFoundError
-from nexus.files.retrievers.s3 import S3FileRetriever
+from syntara.files.exceptions import FileContentNotFoundError
+from syntara.files.retrievers.s3 import S3FileRetriever
 
-BUCKET = "nexus-integration-test"
+BUCKET = "orchestrator-integration-test"
 REGION = "us-east-1"
 
 

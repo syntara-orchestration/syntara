@@ -11,11 +11,11 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.exceptions import LLMConfigurationError
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
-from nexus.integrations.models.integration import Integration
-from nexus.integrations.models.integration_configuration import LLMProviderConfiguration, LLMProviderHint
-from nexus.integrations.models.llm_model import LLMModel
+from syntara.agent_orchestrator.exceptions import LLMConfigurationError
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.integrations.models.integration import Integration
+from syntara.integrations.models.integration_configuration import LLMProviderConfiguration, LLMProviderHint
+from syntara.integrations.models.llm_model import LLMModel
 
 
 def _make_executor(mock_session: MagicMock | None = None) -> tuple[InvocationExecutor, MagicMock]:
@@ -160,6 +160,26 @@ class TestResolveLlmModelAndIntegration:
             await executor._resolve_llm_model_and_integration(model_id)
 
     @pytest.mark.asyncio
+    @pytest.mark.ssrf_enforced
+    async def test_rejects_metadata_base_url_before_dispatch(self) -> None:
+        """Request-time SSRF re-check blocks a rebound/metadata base_url before any LLM call.
+
+        A stored base_url pointing at the cloud-metadata IP (169.254.169.254) passes
+        the format-only model validators but must be rejected by the request-time
+        SSRF re-check. Marked ``ssrf_enforced`` so the real check runs (the autouse
+        bypass fixture is disabled). If the ``validate_integration_configuration_no_ssrf``
+        call is removed from the resolver, this test fails because the metadata base_url
+        would be returned for a live LLM request instead of raising.
+        """
+        executor, session = _make_executor()
+        mock_model, mock_integration = _mock_model_and_integration(base_url="https://169.254.169.254")
+        session.get = _session_get_dispatch(mock_model, mock_integration)
+
+        model_id = str(uuid4())
+        with pytest.raises(LLMConfigurationError, match="not permitted by SSRF policy"):
+            await executor._resolve_llm_model_and_integration(model_id)
+
+    @pytest.mark.asyncio
     async def test_not_llm_provider(self) -> None:
         executor, session = _make_executor()
         mock_model, mock_integration = _mock_model_and_integration(
@@ -189,8 +209,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -204,8 +224,8 @@ class TestResolveLlmApiKey:
         mock_resolved.extra_vars = {"llm_api_key": "sk-test-key-123"}
 
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved
@@ -265,7 +285,7 @@ class TestResolveLlmApiKey:
         session.get = AsyncMock(return_value=mock_credential)
 
         cred_id = str(uuid4())
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(side_effect=RuntimeError("decrypt failed"))
 
             with pytest.raises(LLMConfigurationError, match=r"Failed to decrypt.*key rotation"):
@@ -281,7 +301,7 @@ class TestResolveLlmApiKey:
         mock_credential.credential_type_id = uuid4()
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
+            from syntara.credentials.models.credential import Credential
 
             if model_class is Credential:
                 return mock_credential
@@ -290,7 +310,7 @@ class TestResolveLlmApiKey:
         session.get = AsyncMock(side_effect=mock_get)
 
         cred_id = str(uuid4())
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
 
             with pytest.raises(LLMConfigurationError, match="Credential type for"):
@@ -309,8 +329,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -322,8 +342,8 @@ class TestResolveLlmApiKey:
 
         cred_id = str(uuid4())
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.side_effect = RuntimeError("template error")
@@ -344,8 +364,8 @@ class TestResolveLlmApiKey:
         mock_cred_type.injectors = {}
 
         async def mock_get(model_class: type, pk: object) -> object:
-            from nexus.credentials.models.credential import Credential
-            from nexus.credentials.models.credential_type import CredentialType
+            from syntara.credentials.models.credential import Credential
+            from syntara.credentials.models.credential_type import CredentialType
 
             if model_class is Credential:
                 return mock_credential
@@ -360,8 +380,8 @@ class TestResolveLlmApiKey:
 
         cred_id = str(uuid4())
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"api_key": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved

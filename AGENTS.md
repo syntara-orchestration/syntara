@@ -1,6 +1,10 @@
 # AI Agent Instructions
 
-Nexus is a distributed multi-agent automation system. This monorepo contains a Python/FastAPI backend (`backend/`) and a React/TypeScript frontend (`frontend/`).
+Syntara is a distributed multi-agent automation system. This monorepo contains a Python/FastAPI backend (`backend/`) and a React/TypeScript frontend (`frontend/`).
+
+Upstream policy for AI agent configuration (no executable hooks; what may live
+under `.claude/`; review expectations) is in
+[`.github/AI_AGENT_POLICY.md`](.github/AI_AGENT_POLICY.md).
 
 ## Component-Specific Standards
 

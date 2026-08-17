@@ -212,7 +212,7 @@ The AAP integration stores the API URL and TLS configuration. It does not discov
 
 ## TLS and Security
 
-All adapters, the AAP proxy, and the agent orchestrator share `build_integration_httpx_verify()` (in `src/nexus/core/lib/tls_utils.py`) which maps `IntegrationSecurityMixin` fields to `httpx.AsyncClient` verification:
+All adapters, the AAP proxy, and the agent orchestrator share `build_integration_httpx_verify()` (in `src/syntara/core/lib/tls_utils.py`) which maps `IntegrationSecurityMixin` fields to `httpx.AsyncClient` verification:
 
 | `insecure_skip_tls_verify` | `ca_certificate` | Result |
 |---|---|---|
@@ -220,7 +220,7 @@ All adapters, the AAP proxy, and the agent orchestrator share `build_integration
 | `False` | PEM string | `ssl.SSLContext` with the custom CA loaded |
 | `False` | `None` | `True` (system default trust store) |
 
-MCP server URLs are additionally validated via `validate_safe_url()` (from LangChain) before connection, blocking SSRF against cloud metadata endpoints. Private IP ranges and localhost are permitted to support internal MCP servers.
+Integration `base_url` fields are additionally validated for SSRF before connection, at both write time (create/patch) and each runtime resolve/connect. Private, reserved, and loopback targets (RFC1918, 127.0.0.0/8, `::1`, `localhost`) are **rejected unless the hostname is explicitly allowlisted** via `APP_INTEGRATION_URL_ALLOWED_HOSTS`, so reaching an internal MCP server is an opt-in rather than an always-on bypass. The allowlist matches on hostname, so the entry must match the host in the URL (e.g. `localhost` for `http://localhost:8765`, `127.0.0.1` for `http://127.0.0.1:8765`). Cloud metadata endpoints (e.g. `169.254.169.254`) are always blocked regardless of the allowlist. HTTPS is required by default; HTTP needs `allow_http=true` on the configuration, except for loopback hosts, which are always reachable over HTTP.
 
 ## Health and Observability
 
@@ -266,7 +266,7 @@ Files to touch:
 ## File Layout
 
 ```
-src/nexus/integrations/
+src/syntara/integrations/
 ├── adapters/
 │   ├── protocol.py              # IntegrationAdapter protocol, result types, HealthCheckErrorType
 │   ├── factory.py               # Registry + create_health_check_adapter()
@@ -295,7 +295,7 @@ src/nexus/integrations/
 ├── exceptions.py                # Domain exceptions — see error_handlers.py for HTTP mapping
 └── error_handlers.py            # RFC 9457 error responses
 
-src/nexus/tool_manager/          # Tool records discovered from MCP integrations
+src/syntara/tool_manager/          # Tool records discovered from MCP integrations
 ├── models/tool.py               # Tool table (integration_id FK, namespaced_name, status)
 └── lib/providers/mcp/           # MCPProvider — MCP SDK client for tool discovery and execution
 ```

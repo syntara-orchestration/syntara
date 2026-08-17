@@ -13,8 +13,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models.installation import Installation
-from nexus.telemetry.client import derive_anonymous_id, get_installation
+from syntara.core.models.installation import Installation
+from syntara.telemetry.client import derive_anonymous_id, get_installation
 
 
 class TestInstallationTableSingleton:
@@ -65,13 +65,13 @@ class TestDeriveAnonymousId:
     def test_deterministic_same_inputs(self) -> None:
         """Same inputs should always produce the same anonymous ID."""
         installation_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
-        result1 = derive_anonymous_id(installation_id, "db.example.com", "nexus_prod")
-        result2 = derive_anonymous_id(installation_id, "db.example.com", "nexus_prod")
+        result1 = derive_anonymous_id(installation_id, "db.example.com", "syntara_prod")
+        result2 = derive_anonymous_id(installation_id, "db.example.com", "syntara_prod")
         assert result1 == result2
 
     def test_output_is_64_char_hex_string(self) -> None:
         """The anonymous ID should be a 64-character hex string (SHA-256)."""
         installation_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
-        result = derive_anonymous_id(installation_id, "localhost", "nexus")
+        result = derive_anonymous_id(installation_id, "localhost", "syntara")
         assert len(result) == 64
         assert all(c in "0123456789abcdef" for c in result)

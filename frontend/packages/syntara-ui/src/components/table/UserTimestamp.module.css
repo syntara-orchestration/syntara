@@ -1,0 +1,20 @@
+.userName {
+  color: var(--pf-t--global--color--brand--default);
+}
+
+.inlineWrapper {
+  display: block;
+}
+
+.inlineTimestampSubtle {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.stackedWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.stackedTimestampSubtle {
+  color: var(--pf-t--global--text--color--subtle);
+}

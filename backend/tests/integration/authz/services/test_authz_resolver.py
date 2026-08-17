@@ -14,20 +14,20 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models.assignments import RoleAssignment
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.project import Project
-from nexus.authz.models.role import Role
-from nexus.authz.resolver import (
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
+from syntara.authz.resolver import (
     _resolve_roles_to_policies,
     get_user_group_ids,
     resolve_effective_policies,
     resolve_user_groups,
 )
-from nexus.authz.seed import seed_authz_data
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
-from nexus.service_accounts.models.service_account import ServiceAccount
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
+from syntara.service_accounts.models.service_account import ServiceAccount
 
 
 @pytest.fixture

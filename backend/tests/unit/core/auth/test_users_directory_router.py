@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.models.user import User
-from nexus.users.users_directory_router import (
+from syntara.core.models.user import User
+from syntara.users.users_directory_router import (
     UserDirectoryEntry,
     UserDirectoryListResponse,
     _UserDirectoryService,
@@ -28,7 +28,7 @@ def _make_user(**kwargs: object) -> User:
 
 
 class TestListUsersDirectory:
-    """Tests for GET /users_directory."""
+    """Tests for GET /users/directory."""
 
     @pytest.mark.asyncio
     async def test_returns_lightweight_entries(self) -> None:

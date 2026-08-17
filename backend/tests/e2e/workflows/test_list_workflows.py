@@ -9,6 +9,6 @@ pytestmark = [pytest.mark.e2e]
 class TestWorkflows:
     """E2E tests for workflow GET endpoints."""
 
-    def test_list_workflows(self, nexus_api: SyntaraApiRegistry) -> None:
-        workflows = nexus_api.workflows.list().assert_and_get()
+    def test_list_workflows(self, syntara_api: SyntaraApiRegistry) -> None:
+        workflows = syntara_api.workflows.list().assert_and_get()
         assert isinstance(workflows.resources, list)

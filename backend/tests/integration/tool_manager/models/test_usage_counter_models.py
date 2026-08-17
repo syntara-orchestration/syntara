@@ -13,10 +13,10 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.integrations.models.integration import Integration
-from nexus.tool_manager.models import Tool
-from nexus.tool_manager.models.usage_counter import (
+from syntara.core.models import User
+from syntara.integrations.models.integration import Integration
+from syntara.tool_manager.models import Tool
+from syntara.tool_manager.models.usage_counter import (
     CounterType,
     UsageCounter,
     WindowDuration,

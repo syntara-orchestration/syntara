@@ -14,10 +14,10 @@ from uuid import uuid4
 import pytest
 from prometheus_client import CollectorRegistry
 
-from nexus.agent_orchestrator.models.invocation import InvocationStatus
-from nexus.metrics.completion_poller import _emit_agent_duration, _emit_llm_metrics, _emit_routing_duration
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.agent_orchestrator.models.invocation import InvocationStatus
+from syntara.metrics.completion_poller import _emit_agent_duration, _emit_llm_metrics, _emit_routing_duration
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 
 @pytest.fixture

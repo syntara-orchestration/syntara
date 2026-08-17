@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from nexus.core.lib.tls_utils import build_integration_httpx_verify
+from syntara.core.lib.tls_utils import build_integration_httpx_verify
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +32,7 @@ def sample_ca_cert() -> str:
                 "1",
                 "-nodes",
                 "-subj",
-                "/CN=test-nexus-ca",
+                "/CN=test-orchestrator-ca",
             ],
             capture_output=True,
             check=True,

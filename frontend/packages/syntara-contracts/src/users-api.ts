@@ -152,7 +152,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/users_directory': {
+  '/users/directory': {
     parameters: {
       query?: never
       header?: never
@@ -172,7 +172,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/groups_directory': {
+  '/groups/directory': {
     parameters: {
       query?: never
       header?: never

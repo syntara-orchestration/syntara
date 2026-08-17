@@ -1,6 +1,6 @@
 """Shared encryption test constants for unit and integration tests."""
 
-from nexus.core.lib.encryption import key_from_string
+from syntara.core.lib.encryption import key_from_string
 
 # Test encryption keys (64-char hex)
 OLD_KEY_HEX = "aa" * 32

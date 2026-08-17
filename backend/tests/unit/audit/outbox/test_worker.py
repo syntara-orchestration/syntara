@@ -13,17 +13,17 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.audit.models.audit_event import AuditEvent, EventCategory
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.audit.outbox.models import AuditEventSource, AuditOutboxRecord
-from nexus.audit.outbox.worker import (
+from syntara.audit.models.audit_event import AuditEvent, EventCategory
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.audit.outbox.models import AuditEventSource, AuditOutboxRecord
+from syntara.audit.outbox.worker import (
     _OTEL_DISPATCH_RETRY_MESSAGE,
     AuditOutboxWorker,
     _build_otel_log_record,
     _handle_crud_audit_records,
     publish_outbox_events,
 )
-from nexus.audit.sanitization import REDACTED
+from syntara.audit.sanitization import REDACTED
 
 # ------------------------------------------------------------------ #
 # Helpers
@@ -103,7 +103,7 @@ class TestAuditEventWriterEnqueue:
 
         with (
             patch("asyncio.create_task", side_effect=RuntimeError("no running event loop")),
-            patch("nexus.audit.outbox.worker.logger") as mock_logger,
+            patch("syntara.audit.outbox.worker.logger") as mock_logger,
         ):
             worker.write_to_outbox(event)
 
@@ -216,7 +216,7 @@ class TestAuditEventWriterWrite:
         )
         event = _make_event()
 
-        with patch("nexus.audit.outbox.worker.logger") as mock_logger:
+        with patch("syntara.audit.outbox.worker.logger") as mock_logger:
             await worker._write(event)
 
             mock_logger.exception.assert_called_once_with(
@@ -340,7 +340,7 @@ class TestAuditEventWriterDrain:
 
         with (
             patch.object(worker, "_get_pending_outbox_count", side_effect=[5, 5]),
-            patch("nexus.audit.outbox.worker.publish_outbox_events", new_callable=AsyncMock) as mock_publish,
+            patch("syntara.audit.outbox.worker.publish_outbox_events", new_callable=AsyncMock) as mock_publish,
         ):
             await worker.drain()
 
@@ -385,7 +385,7 @@ class TestAuditEventWriterRetry:
         )
         event = _make_event()
 
-        with patch("nexus.audit.outbox.worker.logger") as mock_logger:
+        with patch("syntara.audit.outbox.worker.logger") as mock_logger:
             await worker._write(event)
 
             # Should log retry warnings
@@ -426,7 +426,7 @@ class TestAuditEventWriterRetry:
         )
         event = _make_event()
 
-        with patch("nexus.audit.outbox.worker.logger") as mock_logger:
+        with patch("syntara.audit.outbox.worker.logger") as mock_logger:
             await worker._write(event)
 
             # Should log 3 retry warnings (attempts 1, 2, 3)
@@ -463,7 +463,7 @@ class TestAuditEventWriterRetry:
         )
         event = _make_event()
 
-        with patch("nexus.audit.outbox.worker.logger") as mock_logger:
+        with patch("syntara.audit.outbox.worker.logger") as mock_logger:
             await worker._write(event)
 
             # Should not log retry warnings (no retries)
@@ -589,8 +589,8 @@ class TestMalformedRecordHandling:
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
         with (
-            patch("nexus.audit.outbox.worker.logger") as mock_logger,
-            patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build,
+            patch("syntara.audit.outbox.worker.logger") as mock_logger,
+            patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build,
         ):
             mock_build.return_value = MagicMock()
 
@@ -642,8 +642,8 @@ class TestMalformedRecordHandling:
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
         with (
-            patch("nexus.audit.outbox.worker.logger") as mock_logger,
-            patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build,
+            patch("syntara.audit.outbox.worker.logger") as mock_logger,
+            patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build,
         ):
             mock_build.return_value = MagicMock()
 
@@ -697,8 +697,8 @@ class TestOtelExportFailureRetainsRecords:
         mock_exporter.export.return_value = LogRecordExportResult.FAILURE
 
         with (
-            patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build,
-            patch("nexus.audit.outbox.worker.logger") as mock_logger,
+            patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build,
+            patch("syntara.audit.outbox.worker.logger") as mock_logger,
         ):
             mock_build.return_value = MagicMock()
 
@@ -742,7 +742,7 @@ class TestOtelExportFailureRetainsRecords:
         mock_exporter = MagicMock()
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory, mock_exporter)
@@ -768,7 +768,7 @@ class TestOtelExportFailureRetainsRecords:
             session.add(outbox_record)
             await session.commit()
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory)
@@ -801,7 +801,7 @@ class TestOtelExportFailureRetainsRecords:
         mock_exporter = MagicMock()
         mock_exporter.export.return_value = LogRecordExportResult.FAILURE
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory, mock_exporter)
@@ -844,7 +844,7 @@ class TestOtelExportDispatchAttempts:
         mock_exporter = MagicMock()
         mock_exporter.export.return_value = LogRecordExportResult.FAILURE
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             # First failure: 0 -> 1
@@ -856,7 +856,7 @@ class TestOtelExportDispatchAttempts:
             assert len(remaining) == 1
             assert remaining[0].dispatch_attempts == 1
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             # Second failure: 1 -> 2
@@ -893,8 +893,8 @@ class TestOtelExportDispatchAttempts:
         mock_exporter.export.return_value = LogRecordExportResult.FAILURE
 
         with (
-            patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build,
-            patch("nexus.audit.outbox.worker.logger") as mock_logger,
+            patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build,
+            patch("syntara.audit.outbox.worker.logger") as mock_logger,
         ):
             mock_build.return_value = MagicMock()
 
@@ -947,7 +947,7 @@ class TestOtelEventSourceDiscriminator:
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
         # Mock _build_otel_log_record to capture calls and verify event_source
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory, mock_exporter)
@@ -985,7 +985,7 @@ class TestOtelEventSourceDiscriminator:
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
         # Mock _build_otel_log_record to capture calls and verify event_source
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory, mock_exporter)
@@ -1023,7 +1023,7 @@ class TestOtelEventSourceDiscriminator:
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
         # Mock _build_otel_log_record to capture calls and verify event_source
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
 
             await publish_outbox_events(test_session_factory, mock_exporter)
@@ -1071,7 +1071,7 @@ class TestCrudOutboxSanitization:
             event_payload=event.model_dump(mode="json"),
         )
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
             _handle_crud_audit_records([record])
 
@@ -1106,7 +1106,7 @@ class TestCrudOutboxSanitization:
             event_payload=event.model_dump(mode="json"),
         )
 
-        with patch("nexus.audit.outbox.worker._build_otel_log_record") as mock_build:
+        with patch("syntara.audit.outbox.worker._build_otel_log_record") as mock_build:
             mock_build.return_value = MagicMock()
             _handle_crud_audit_records([record])
 
@@ -1138,14 +1138,14 @@ class TestAuditEventStdoutLogging:
         mock_exporter = MagicMock()
         mock_exporter.export.return_value = LogRecordExportResult.SUCCESS
 
-        with patch("nexus.audit.outbox.worker.audit_logger") as mock_audit_logger:
+        with patch("syntara.audit.outbox.worker.audit_logger") as mock_audit_logger:
             await publish_outbox_events(test_session_factory, mock_exporter)
 
             mock_audit_logger.info.assert_called_once()
             call_args, call_kwargs = mock_audit_logger.info.call_args
 
-            # Body is the OTEL log record body
-            assert call_args[0] == "audit_event"
+            # Body includes event_id so Loki does not collapse co-timestamped siblings
+            assert call_args[0] == f"audit_event:{event.event_id}"
 
             # Attributes contain the serialised event fields
             assert call_kwargs["event_action"] == "credential_create"
@@ -1181,7 +1181,7 @@ class TestOtelExportExceptionRetainsRecords:
         mock_exporter = MagicMock()
         mock_exporter.export.side_effect = ConnectionError("network unreachable")
 
-        with patch("nexus.audit.outbox.worker.logger") as mock_logger:
+        with patch("syntara.audit.outbox.worker.logger") as mock_logger:
             await publish_outbox_events(test_session_factory, mock_exporter)
 
             mock_logger.exception.assert_any_call(
@@ -1227,16 +1227,31 @@ class TestBuildOtelLogRecordSerialization:
             ),
         )
 
-        with override_settings(otel_service_name="nexus-test"):
+        with override_settings(otel_service_name="syntara-test"):
             record = _build_otel_log_record(event, datetime.now(UTC), AuditEventSource.BUSINESS_EVENT)
 
         attrs = record.log_record.attributes
         assert attrs is not None
         assert attrs["audit.event_source"] == "business_event"
-        assert record.log_record.body == "audit_event"
+        assert record.log_record.body == f"audit_event:{event.event_id}"
 
         # Must not raise TypeError — no UUID objects, datetimes, etc.
         json.dumps(dict(attrs))
+
+    def test_sibling_events_get_distinct_bodies(self, override_settings) -> None:
+        """Same timestamp must not produce identical export bodies (log-store dedup)."""
+        shared_ts = datetime.now(UTC)
+        event_a = _make_event(event_action="project_create")
+        event_b = _make_event(event_action="roleassignment_create")
+
+        with override_settings(otel_service_name="syntara-test"):
+            record_a = _build_otel_log_record(event_a, shared_ts, AuditEventSource.CRUD_EVENT)
+            record_b = _build_otel_log_record(event_b, shared_ts, AuditEventSource.CRUD_EVENT)
+
+        assert record_a.log_record.timestamp == record_b.log_record.timestamp
+        assert record_a.log_record.body != record_b.log_record.body
+        assert record_a.log_record.body == f"audit_event:{event_a.event_id}"
+        assert record_b.log_record.body == f"audit_event:{event_b.event_id}"
 
     def test_uuid_subclass_in_extra_fields_coerced(self, override_settings) -> None:
         """UUID subclasses (e.g. asyncpg UUID) in extra fields become strings."""
@@ -1252,7 +1267,7 @@ class TestBuildOtelLogRecordSerialization:
             ),
         )
 
-        with override_settings(otel_service_name="nexus-test"):
+        with override_settings(otel_service_name="syntara-test"):
             record = _build_otel_log_record(event, datetime.now(UTC), AuditEventSource.CRUD_EVENT)
 
         attrs = record.log_record.attributes

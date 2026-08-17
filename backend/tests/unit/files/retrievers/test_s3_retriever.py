@@ -6,7 +6,7 @@ including happy paths, edge cases, and error handling.
 
 import hashlib
 import os
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import patch
@@ -16,10 +16,10 @@ import pytest
 from botocore.exceptions import ClientError
 from moto import mock_aws
 
-from nexus.files.exceptions import FileContentNotFoundError
-from nexus.files.retrievers.s3 import S3FileRetriever
+from syntara.files.exceptions import FileContentNotFoundError, FileError
+from syntara.files.retrievers.s3 import S3FileRetriever
 
-BUCKET_NAME = "nexus-test-files"
+BUCKET_NAME = "orchestrator-test-files"
 REGION = "us-east-1"
 
 
@@ -44,6 +44,108 @@ def s3_retriever() -> Generator[S3FileRetriever, None, None]:
         yield retriever
 
 
+# --- save_file_stream ---
+
+
+async def _chunks(data: bytes, chunk_size: int = 1024 * 1024) -> AsyncGenerator[bytes]:
+    """Helper: yield data in fixed-size chunks."""
+    for offset in range(0, len(data), chunk_size):
+        yield data[offset : offset + chunk_size]
+
+
+@pytest.mark.asyncio
+async def test_save_file_stream_roundtrip(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming upload produces the same bytes when loaded back."""
+    content = os.urandom(3 * 1024 * 1024)  # 3 MB — multiple chunks
+    key = "orchestrator-test-uuid-stream-upload.bin"
+
+    saved_key, total_bytes = await s3_retriever.save_file_stream(_chunks(content), key)
+    assert saved_key == key
+    assert total_bytes == len(content)
+
+    loaded = await s3_retriever.load_file(key)
+    assert loaded == content
+
+
+@pytest.mark.asyncio
+async def test_save_file_stream_hash_preserved(s3_retriever: S3FileRetriever) -> None:
+    """Test SHA-256 is preserved across streaming upload + download."""
+    content = os.urandom(6 * 1024 * 1024)  # 6 MB — exceeds multipart threshold
+    key = "orchestrator-test-uuid-stream-upload-hash.bin"
+    expected_hash = hashlib.sha256(content).hexdigest()
+
+    await s3_retriever.save_file_stream(_chunks(content), key)
+
+    loaded = await s3_retriever.load_file(key)
+    assert hashlib.sha256(loaded).hexdigest() == expected_hash
+
+
+@pytest.mark.asyncio
+async def test_save_file_stream_small_file(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming upload with a small file (single chunk, below multipart threshold)."""
+    content = b"small file content"
+    key = "orchestrator-test-uuid-stream-upload-small.txt"
+
+    saved_key, total_bytes = await s3_retriever.save_file_stream(_chunks(content), key)
+    assert saved_key == key
+    assert total_bytes == len(content)
+
+    loaded = await s3_retriever.load_file(key)
+    assert loaded == content
+
+
+@pytest.mark.asyncio
+async def test_save_file_stream_error_aborts_multipart(s3_retriever: S3FileRetriever) -> None:
+    """Test that S3 errors during streaming upload abort the multipart upload."""
+    error_response: dict[str, Any] = {"Error": {"Code": "InternalError", "Message": "Internal Error"}}
+
+    async def _failing_stream() -> AsyncGenerator[bytes]:
+        yield os.urandom(1024)
+        yield os.urandom(1024)
+
+    original_abort = s3_retriever._client.abort_multipart_upload
+    abort_called = False
+
+    def _tracking_abort(**kwargs: Any) -> Any:  # noqa: ANN401
+        nonlocal abort_called
+        abort_called = True
+        return original_abort(**kwargs)
+
+    with (
+        patch.object(
+            s3_retriever._client,
+            "upload_part",
+            side_effect=ClientError(error_response, "UploadPart"),  # type: ignore[arg-type]
+        ),
+        patch.object(
+            s3_retriever._client,
+            "abort_multipart_upload",
+            side_effect=_tracking_abort,
+        ),
+    ):
+        with pytest.raises(FileError, match="S3 storage unavailable"):
+            await s3_retriever.save_file_stream(_failing_stream(), "orchestrator-test-fail.bin")
+
+    assert abort_called, "abort_multipart_upload was not called after upload failure"
+
+
+@pytest.mark.asyncio
+async def test_save_file_stream_empty(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming upload with zero bytes falls back to put_object."""
+    key = "orchestrator-test-uuid-stream-upload-empty.txt"
+
+    async def _empty_stream() -> AsyncGenerator[bytes]:
+        return
+        yield b""  # type: ignore[unreachable]  # required so Python treats this as an async generator
+
+    saved_key, total_bytes = await s3_retriever.save_file_stream(_empty_stream(), key)
+    assert saved_key == key
+    assert total_bytes == 0
+
+    loaded = await s3_retriever.load_file(key)
+    assert loaded == b""
+
+
 # --- save_file + load_file ---
 
 
@@ -51,7 +153,7 @@ def s3_retriever() -> Generator[S3FileRetriever, None, None]:
 async def test_save_and_load_file(s3_retriever: S3FileRetriever) -> None:
     """Test round-trip save and load for small files."""
     content = b"Hello from S3FileRetriever!" * 30
-    key = "nexus-test-uuid-document.txt"
+    key = "orchestrator-test-uuid-document.txt"
 
     stored_key = await s3_retriever.save_file(content, key)
     assert stored_key == key
@@ -64,7 +166,7 @@ async def test_save_and_load_file(s3_retriever: S3FileRetriever) -> None:
 async def test_save_and_load_large_file_multipart(s3_retriever: S3FileRetriever) -> None:
     """Test multipart upload for files exceeding 5MB threshold."""
     content = os.urandom(6 * 1024 * 1024)
-    key = "nexus-test-uuid-large.bin"
+    key = "orchestrator-test-uuid-large.bin"
 
     stored_key = await s3_retriever.save_file(content, key)
     assert stored_key == key
@@ -79,8 +181,8 @@ async def test_save_and_load_large_file_multipart(s3_retriever: S3FileRetriever)
 @pytest.mark.asyncio
 async def test_file_exists_true(s3_retriever: S3FileRetriever) -> None:
     """Test file_exists returns True for existing file."""
-    await s3_retriever.save_file(b"exists test", "nexus-test-uuid-exists.txt")
-    assert await s3_retriever.file_exists("nexus-test-uuid-exists.txt") is True
+    await s3_retriever.save_file(b"exists test", "orchestrator-test-uuid-exists.txt")
+    assert await s3_retriever.file_exists("orchestrator-test-uuid-exists.txt") is True
 
 
 @pytest.mark.asyncio
@@ -96,7 +198,7 @@ async def test_file_exists_false(s3_retriever: S3FileRetriever) -> None:
 async def test_get_file_metadata(s3_retriever: S3FileRetriever) -> None:
     """Test metadata retrieval for existing file."""
     content = b"metadata test content"
-    key = "nexus-test-uuid-metadata.txt"
+    key = "orchestrator-test-uuid-metadata.txt"
 
     await s3_retriever.save_file(content, key)
     metadata: dict[str, Any] = await s3_retriever.get_file_metadata(key)
@@ -115,7 +217,7 @@ async def test_get_file_metadata(s3_retriever: S3FileRetriever) -> None:
 async def test_delete_file(s3_retriever: S3FileRetriever) -> None:
     """Test file deletion removes file from S3."""
     content = b"to be deleted"
-    key = "nexus-test-uuid-delete.txt"
+    key = "orchestrator-test-uuid-delete.txt"
 
     await s3_retriever.save_file(content, key)
     assert await s3_retriever.file_exists(key) is True
@@ -153,7 +255,7 @@ async def test_health_check_fails_for_nonexistent_bucket() -> None:
 async def test_content_hash_roundtrip(s3_retriever: S3FileRetriever) -> None:
     """Test SHA-256 hash is preserved across save/load cycle."""
     content = os.urandom(1024)
-    key = "nexus-test-uuid-hash.bin"
+    key = "orchestrator-test-uuid-hash.bin"
     expected_hash = hashlib.sha256(content).hexdigest()
 
     await s3_retriever.save_file(content, key)
@@ -169,7 +271,7 @@ async def test_content_hash_roundtrip(s3_retriever: S3FileRetriever) -> None:
 @pytest.mark.asyncio
 async def test_empty_file(s3_retriever: S3FileRetriever) -> None:
     """Test handling of empty files."""
-    key = "nexus-test-uuid-empty.txt"
+    key = "orchestrator-test-uuid-empty.txt"
 
     await s3_retriever.save_file(b"", key)
     loaded = await s3_retriever.load_file(key)
@@ -180,7 +282,7 @@ async def test_empty_file(s3_retriever: S3FileRetriever) -> None:
 async def test_special_characters_in_key(s3_retriever: S3FileRetriever) -> None:
     """Test keys with special characters."""
     content = b"special chars"
-    key = "nexus-550e8400-file (final).pdf"
+    key = "orchestrator-550e8400-file (final).pdf"
 
     await s3_retriever.save_file(content, key)
     loaded = await s3_retriever.load_file(key)
@@ -190,7 +292,7 @@ async def test_special_characters_in_key(s3_retriever: S3FileRetriever) -> None:
 @pytest.mark.asyncio
 async def test_overwrite_existing_file(s3_retriever: S3FileRetriever) -> None:
     """Test that saving to the same key overwrites the previous content."""
-    key = "nexus-test-uuid-overwrite.txt"
+    key = "orchestrator-test-uuid-overwrite.txt"
 
     await s3_retriever.save_file(b"version 1", key)
     await s3_retriever.save_file(b"version 2", key)
@@ -216,6 +318,153 @@ async def test_get_metadata_nonexistent_file(s3_retriever: S3FileRetriever) -> N
         await s3_retriever.get_file_metadata("does-not-exist")
 
 
+# --- stream_file ---
+
+
+@pytest.mark.asyncio
+async def test_stream_file_roundtrip(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming download produces the same bytes as load_file."""
+    content = os.urandom(3 * 1024 * 1024)  # 3 MB — spans multiple chunks
+    key = "orchestrator-test-uuid-stream.bin"
+
+    await s3_retriever.save_file(content, key)
+
+    streamed = b""
+    async for chunk in s3_retriever.stream_file(key):
+        streamed += chunk
+
+    assert streamed == content
+
+
+@pytest.mark.asyncio
+async def test_stream_file_hash_matches(s3_retriever: S3FileRetriever) -> None:
+    """Test SHA-256 computed from streamed chunks matches the original."""
+    content = os.urandom(2 * 1024 * 1024)
+    key = "orchestrator-test-uuid-stream-hash.bin"
+    expected_hash = hashlib.sha256(content).hexdigest()
+
+    await s3_retriever.save_file(content, key)
+
+    hasher = hashlib.sha256()
+    async for chunk in s3_retriever.stream_file(key):
+        hasher.update(chunk)
+
+    assert hasher.hexdigest() == expected_hash
+
+
+@pytest.mark.asyncio
+async def test_stream_file_empty(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming an empty file yields no chunks."""
+    key = "orchestrator-test-uuid-stream-empty.txt"
+    await s3_retriever.save_file(b"", key)
+
+    chunks: list[bytes] = []
+    async for chunk in s3_retriever.stream_file(key):
+        chunks.append(chunk)
+
+    assert chunks == []
+
+
+@pytest.mark.asyncio
+async def test_stream_nonexistent_file(s3_retriever: S3FileRetriever) -> None:
+    """Test streaming nonexistent file raises FileContentNotFoundError."""
+    with pytest.raises(FileContentNotFoundError, match="File not found"):
+        async for _ in s3_retriever.stream_file("does-not-exist"):
+            pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(5)
+async def test_stream_file_cancellation(s3_retriever: S3FileRetriever) -> None:
+    """Test that the S3 producer thread stops when the consumer abandons the stream.
+
+    Simulates a client disconnecting mid-download:
+      1. Upload a multi-chunk file to S3.
+      2. Start streaming and read only the first chunk.
+      3. Call aclose() on the async generator (what Starlette does on client disconnect).
+
+    The producer thread uses a threading.Event to detect cancellation.
+    If the cancellation logic is broken, the producer blocks forever on
+    queue.put() and aclose() never returns — the 5s timeout fails the test.
+    """
+    content = os.urandom(5 * 1024 * 1024)  # 5 MB — multiple chunks at 512 KB each
+    key = "orchestrator-test-uuid-stream-cancel.bin"
+
+    await s3_retriever.save_file(content, key)
+
+    stream = s3_retriever.stream_file(key, chunk_size=512 * 1024)
+    first_chunk = await stream.__anext__()
+    assert len(first_chunk) > 0
+
+    # Simulate client disconnect — must return promptly, not block on producer.
+    await stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_file_generic_s3_error(s3_retriever: S3FileRetriever) -> None:
+    """Test that non-NoSuchKey ClientError raises FileError."""
+    error_response: dict[str, Any] = {"Error": {"Code": "InternalError", "Message": "Internal Error"}}
+    with patch.object(
+        s3_retriever._client,
+        "get_object",
+        side_effect=ClientError(error_response, "GetObject"),  # type: ignore[arg-type]
+    ):
+        with pytest.raises(FileError, match="S3 storage unavailable"):
+            async for _ in s3_retriever.stream_file("some-key"):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_stream_file_connection_error(s3_retriever: S3FileRetriever) -> None:
+    """Test that EndpointConnectionError raises FileError."""
+    from botocore.exceptions import EndpointConnectionError
+
+    with patch.object(
+        s3_retriever._client,
+        "get_object",
+        side_effect=EndpointConnectionError(endpoint_url="https://s3.example.com"),
+    ):
+        with pytest.raises(FileError, match="S3 storage unavailable"):
+            async for _ in s3_retriever.stream_file("some-key"):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_stream_file_mid_read_error(s3_retriever: S3FileRetriever) -> None:
+    """Test that non-S3 exceptions during body.read() surface as FileError.
+
+    get_object succeeds but a subsequent body.read() raises (e.g. network
+    reset, IncompleteReadError).  Without this handling, the partial stream
+    would look like a successful truncated download.
+    """
+    content = os.urandom(1024 * 1024)
+    key = "orchestrator-test-uuid-stream-read-error.bin"
+    await s3_retriever.save_file(content, key)
+
+    original_get_object = s3_retriever._client.get_object
+
+    def _get_object_with_failing_body(**kwargs: Any) -> Any:  # noqa: ANN401
+        response = original_get_object(**kwargs)
+        original_read = response["Body"].read
+        call_count = 0
+
+        def _failing_read(amt: int | None = None) -> bytes:
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                msg = "connection reset"
+                raise OSError(msg)
+            return original_read(amt)
+
+        patch.object(response["Body"], "read", side_effect=_failing_read).start()
+        return response
+
+    with patch.object(s3_retriever._client, "get_object", side_effect=_get_object_with_failing_body):
+        with pytest.raises(FileError, match="Read error"):
+            async for _ in s3_retriever.stream_file(key):
+                pass
+
+
 # --- TLS / verify configuration ---
 
 
@@ -223,18 +472,18 @@ class TestS3VerifySSL:
     """Tests for S3 TLS verification configuration."""
 
     def test_default_verify_is_true(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(endpoint_url=None, bucket_name=BUCKET_NAME, region_name=REGION)
             mock_client.assert_called_once()
             assert mock_client.call_args.kwargs["verify"] is True
 
     def test_verify_false_passed_through(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(endpoint_url=None, bucket_name=BUCKET_NAME, region_name=REGION, verify_ssl=False)
             assert mock_client.call_args.kwargs["verify"] is False
 
     def test_ca_bundle_used_when_verify_ssl_true(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(
                 endpoint_url=None,
                 bucket_name=BUCKET_NAME,
@@ -244,7 +493,7 @@ class TestS3VerifySSL:
             assert mock_client.call_args.kwargs["verify"] == "/var/run/secrets/ca.crt"
 
     def test_verify_false_takes_precedence_over_ca_bundle(self) -> None:
-        with mock_aws(), patch("nexus.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
+        with mock_aws(), patch("syntara.files.retrievers.s3.boto3.client", wraps=boto3.client) as mock_client:
             S3FileRetriever(
                 endpoint_url=None,
                 bucket_name=BUCKET_NAME,

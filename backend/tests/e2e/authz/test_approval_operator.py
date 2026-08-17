@@ -44,7 +44,7 @@ def approval_operator_env(
     create_project: ProjectFactory,
     create_project_role: ProjectRoleFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ) -> tuple[SyntaraApiRegistry, UUID]:
     """Create project, user with approval policies."""
     user_id, name, password = create_user(admin_api, "approv")
@@ -53,7 +53,7 @@ def approval_operator_env(
     role_name = create_project_role(admin_api, project_id, "approv", _POLICIES)
     assign_project_role_to_user(admin_api, project_id, user_id, role_name)
 
-    user_api = api_for(nexus_base_url, name, password)
+    user_api = api_for(syntara_base_url, name, password)
     return user_api, project_id
 
 

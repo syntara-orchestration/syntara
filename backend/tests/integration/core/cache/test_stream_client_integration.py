@@ -25,8 +25,8 @@ import pytest
 import pytest_asyncio
 import redis.asyncio as redis
 
-from nexus.core.cache.stream import StreamClient
-from nexus.core.config.base import get_settings
+from syntara.core.cache.stream import StreamClient
+from syntara.core.config.base import get_settings
 
 # ============================================================================
 # Fixtures

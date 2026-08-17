@@ -333,22 +333,6 @@ describe('workflowFactories', () => {
         expect(activity.parameters.headers).toEqual({ Authorization: 'Bearer token' })
       })
 
-      it('merges authentication into headers when provided', () => {
-        const activity = createApiActivity({
-          id: 'api-1',
-          name: 'API Call',
-          method: 'GET',
-          url: 'https://api.example.com',
-          headers: [{ id: 'h1', key: 'Content-Type', value: 'application/json' }],
-          authentication: 'Bearer token',
-        })
-
-        expect(activity.parameters.headers).toEqual({
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer token',
-        })
-      })
-
       it('creates an API activity with body', () => {
         const activity = createApiActivity({
           id: 'api-1',
@@ -407,18 +391,6 @@ describe('workflowFactories', () => {
         })
 
         expect(activity.settings).toEqual({ timeout: 60 })
-      })
-
-      it('sets authentication header without existing headers', () => {
-        const activity = createApiActivity({
-          id: 'api-1',
-          name: 'API Call',
-          method: 'GET',
-          url: 'https://api.example.com',
-          authentication: 'Bearer token',
-        })
-
-        expect(activity.parameters.headers).toEqual({ Authorization: 'Bearer token' })
       })
 
       it('includes credential_id when provided', () => {

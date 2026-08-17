@@ -8,12 +8,12 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.exceptions import ScheduledTriggerSyncError
-from nexus.workflows.models.workflow import Workflow
-from nexus.workflows.models.workflow_publish_event import WorkflowPublishEvent
-from nexus.workflows.models.workflow_version import WorkflowVersion
-from nexus.workflows.seed_builtin import _BUILTIN_DEFINITIONS, seed_builtin_workflows
-from nexus.workflows.validators import workflow_validator as real_workflow_validator
+from syntara.workflows.exceptions import ScheduledTriggerSyncError
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_publish_event import WorkflowPublishEvent
+from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS, seed_builtin_workflows
+from syntara.workflows.validators import workflow_validator as real_workflow_validator
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -92,14 +92,14 @@ class TestSeedBuiltinWorkflows:
 
     @pytest.fixture(autouse=True)
     def _patch_validator(self) -> Generator[MagicMock, None, None]:
-        with patch("nexus.workflows.seed_builtin.workflow_validator") as mock_v:
+        with patch("syntara.workflows.seed_builtin.workflow_validator") as mock_v:
             self.mock_validator = mock_v
             yield mock_v
 
     @pytest.fixture(autouse=True)
     def _patch_scheduled_trigger_service(self) -> Generator[MagicMock, None, None]:
         """Prevent real Temporal connection attempts during unit tests."""
-        with patch("nexus.workflows.seed_builtin.ScheduledTriggerService") as mock_cls:
+        with patch("syntara.workflows.seed_builtin.ScheduledTriggerService") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.sync_scheduled_triggers = AsyncMock(return_value=0)
             mock_cls.return_value = mock_instance

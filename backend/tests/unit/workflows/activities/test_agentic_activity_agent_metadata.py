@@ -16,7 +16,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.workflows.workflow_engine.activities.agentic_activity import (
+from syntara.workflows.workflow_engine.activities.agentic_activity import (
     execute_agentic_activity,
 )
 from tests.fixtures.temporal import CompleteAsyncError
@@ -63,13 +63,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -102,13 +102,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value=callback_url,
             ) as mock_generate_url,
             pytest.raises(CompleteAsyncError),
@@ -137,9 +137,9 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -165,13 +165,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -198,13 +198,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -239,13 +239,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -285,13 +285,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -322,13 +322,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 side_effect=RuntimeError("Not in activity context"),
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://example.com/callback",
             ),
             pytest.raises(CompleteAsyncError),
@@ -364,13 +364,13 @@ class TestAgenticActivityWorkflowContextMetadata:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.generate_activity_signal_url",
                 return_value="https://callback.test",
             ),
             pytest.raises(CompleteAsyncError),
@@ -416,9 +416,9 @@ class TestAgenticActivityIntegrationConnections:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -451,9 +451,9 @@ class TestAgenticActivityIntegrationConnections:
         input_config = {"prompt": "Test", "integration_connections": connections}
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -472,9 +472,9 @@ class TestAgenticActivityIntegrationConnections:
         input_config = {"prompt": "Test prompt"}
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -502,9 +502,9 @@ class TestAgenticActivityToolSelection:
         }
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -522,9 +522,9 @@ class TestAgenticActivityToolSelection:
         input_config = {"prompt": "Test prompt", "tool_selection_strategy": "ALL"}
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),
@@ -544,9 +544,9 @@ class TestAgenticActivityToolSelection:
         input_config = {"prompt": "Test prompt"}
 
         with (
-            patch("nexus.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
             patch(
-                "nexus.workflows.workflow_engine.activities.agentic_activity.activity.info",
+                "syntara.workflows.workflow_engine.activities.agentic_activity.activity.info",
                 return_value=mock_activity_info,
             ),
             pytest.raises(CompleteAsyncError),

@@ -1,0 +1,57 @@
+---
+# Playbook: Trigger an EDA webhook
+#
+# Called as a rulebook action to fire an EDA trigger endpoint.
+# Obtains an OAuth token via client credentials, then POSTs the
+# entire event payload (as-is) to the webhook.
+#
+# Usage:
+#   ansible-playbook eda-trigger-webhook.yml \
+#     -e webhook_base_url=https://syntara.example.com \
+#     -e webhook_path=my-eda-trigger \
+#     -e client_id=nx_sa_abc123 \
+#     -e client_secret=<secret> \
+#     -e '{"event_payload": {"alert_name": "high_cpu", "instance": "web-server-01"}}'
+
+- name: Trigger EDA webhook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    base_url: "https://localhost:8000"
+    webhook_path: ""
+    client_id: ""
+    client_secret: ""
+    event_payload: {}
+
+  tasks:
+    - name: Obtain OAuth token
+      ansible.builtin.uri:
+        url: "{{ webhook_base_url }}/api/v1/auth/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ webhook_client_id }}"
+          client_secret: "{{ webhook_client_secret }}"
+        status_code: 200
+        validate_certs: "{{ webhook_validate_certs | default(true) }}" # set to false for local dev with self-signed certs
+      register: token_response
+
+    - name: Post event payload to EDA trigger endpoint
+      ansible.builtin.uri:
+        url: "{{ webhook_base_url }}/api/v1/webhooks/eda/{{ webhook_path }}"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+          Content-Type: application/json
+        body: "{{ event_payload }}"
+        status_code: 202
+        validate_certs: "{{ webhook_validate_certs | default(true) }}" # set to false for local dev with self-signed certs
+      register: webhook_response
+
+    - name: Display execution ID
+      ansible.builtin.debug:
+        msg: "Workflow execution started: {{ webhook_response.json.execution_id }}"

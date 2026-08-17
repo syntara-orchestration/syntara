@@ -1,0 +1,1 @@
+"""Syntara Core Resources."""

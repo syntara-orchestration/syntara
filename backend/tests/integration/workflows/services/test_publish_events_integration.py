@@ -13,11 +13,11 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
-from nexus.workflows.models import Workflow, WorkflowVersion
-from nexus.workflows.models.validation_finding import ValidationResult
-from nexus.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
-from nexus.workflows.services.workflow_service import WorkflowService
+from syntara.core.models import User
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.validation_finding import ValidationResult
+from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.services.workflow_service import WorkflowService
 
 
 def _mock_validator_valid() -> MagicMock:
@@ -34,8 +34,8 @@ def _mock_webhook_service() -> MagicMock:
     return svc
 
 
-_PATCH_VALIDATOR = "nexus.workflows.services.workflow_service.workflow_validator"
-_PATCH_WEBHOOK_SVC = "nexus.workflows.services.workflow_service.WebhookTriggerService"
+_PATCH_VALIDATOR = "syntara.workflows.services.workflow_service.workflow_validator"
+_PATCH_WEBHOOK_SVC = "syntara.workflows.services.workflow_service.WebhookTriggerService"
 
 
 class _PublishEventsTestBase:

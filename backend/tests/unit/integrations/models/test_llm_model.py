@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.integrations.models.llm_model import (
+from syntara.integrations.models.llm_model import (
     LLMModel,
     LLMModelBulkUpdate,
     LLMModelRead,

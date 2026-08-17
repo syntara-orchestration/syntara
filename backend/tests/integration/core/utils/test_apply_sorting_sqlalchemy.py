@@ -9,10 +9,10 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.utils.cursor import SortDirection
-from nexus.core.utils.sorting import apply_sorting
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.utils.cursor import SortDirection
+from syntara.core.utils.sorting import apply_sorting
 
 
 @pytest.mark.asyncio

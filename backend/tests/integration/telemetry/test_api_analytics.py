@@ -13,17 +13,17 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nexus.api.constants import API_V1_PATH_PREFIX
-from nexus.audit.dispatcher import AuditEventDispatcher
-from nexus.audit.events.http_request import HTTPRequestEvent
-from nexus.audit.middleware import AuditMiddleware
-from nexus.telemetry.handlers.api_call import APICallTelemetryHandler
+from syntara.api.constants import API_DOCS_V1_PATH_PREFIX
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.events.http_request import HTTPRequestEvent
+from syntara.audit.middleware import AuditMiddleware
+from syntara.telemetry.handlers.api_call import APICallTelemetryHandler
 
 if TYPE_CHECKING:
-    from nexus.telemetry.events.api_call import APICallEvent
+    from syntara.telemetry.events.api_call import APICallEvent
 
-_SETTINGS_PATH = "nexus.telemetry.handlers.api_call.get_settings"
-_REGISTRY_PATH = "nexus.telemetry.handlers.api_call.get_telemetry_registry"
+_SETTINGS_PATH = "syntara.telemetry.handlers.api_call.get_settings"
+_REGISTRY_PATH = "syntara.telemetry.handlers.api_call.get_telemetry_registry"
 
 
 def _make_registry_mock() -> MagicMock:
@@ -63,8 +63,8 @@ def _create_test_app() -> FastAPI:
     async def api_discovery() -> dict[str, str]:
         return {"current_version": "/api/v1"}
 
-    @app.get(f"{API_V1_PATH_PREFIX}/docs", include_in_schema=False)
-    async def api_v1_docs() -> dict[str, str]:
+    @app.get(f"{API_DOCS_V1_PATH_PREFIX}/docs", include_in_schema=False)
+    async def api_docs() -> dict[str, str]:
         return {"docs": "placeholder"}
 
     app.add_middleware(AuditMiddleware, fastapi_app=app)
@@ -194,7 +194,7 @@ class TestExcludedPathsIntegration:
             patch(_REGISTRY_PATH, return_value=mock_registry),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                await client.get(f"{API_V1_PATH_PREFIX}/docs")
+                await client.get(f"{API_DOCS_V1_PATH_PREFIX}/docs")
 
         mock_registry.send_event.assert_not_called()
 

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.users.groups_directory_router import (
+from syntara.users.groups_directory_router import (
     GroupDirectoryEntry,
     GroupDirectoryListResponse,
     _GroupDirectoryService,
@@ -14,7 +14,7 @@ from nexus.users.groups_directory_router import (
 
 
 class TestListGroupsDirectory:
-    """Tests for GET /groups_directory."""
+    """Tests for GET /groups/directory."""
 
     @pytest.mark.asyncio
     async def test_returns_lightweight_entries(self) -> None:

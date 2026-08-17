@@ -14,9 +14,9 @@ import pytest_asyncio
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.models import Invocation, InvocationStatus
-from nexus.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from nexus.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
+from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
 
 
 @pytest_asyncio.fixture

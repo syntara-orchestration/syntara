@@ -1985,205 +1985,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nexus"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "argon2-cffi" },
-    { name = "asyncpg" },
-    { name = "boto3" },
-    { name = "cachetools" },
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "filelock" },
-    { name = "httpx" },
-    { name = "httpx-sse" },
-    { name = "idna" },
-    { name = "jmespath" },
-    { name = "jsonschema" },
-    { name = "langchain" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-core" },
-    { name = "langchain-google-genai" },
-    { name = "langchain-mcp-adapters" },
-    { name = "langchain-openai" },
-    { name = "langgraph" },
-    { name = "langsmith" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "prometheus-client" },
-    { name = "pydantic", extra = ["email"] },
-    { name = "pydantic-settings" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "pypandoc" },
-    { name = "pypdf" },
-    { name = "python-magic" },
-    { name = "python-multipart" },
-    { name = "pyyaml" },
-    { name = "rapidfuzz" },
-    { name = "redis" },
-    { name = "regopy" },
-    { name = "scikit-learn" },
-    { name = "segment-analytics-python" },
-    { name = "spacy" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "sqlmodel" },
-    { name = "structlog" },
-    { name = "temporalio" },
-    { name = "tiktoken" },
-    { name = "typer" },
-    { name = "uuid-utils" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "wrapt" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "authlib" },
-    { name = "azure-identity" },
-    { name = "beautifulsoup4" },
-    { name = "boto3-stubs", extra = ["s3"] },
-    { name = "fastmcp" },
-    { name = "httpx" },
-    { name = "jsonschema" },
-    { name = "junitparser" },
-    { name = "moto", extra = ["s3"] },
-    { name = "msgraph-sdk" },
-    { name = "mypy" },
-    { name = "openapi-python-client" },
-    { name = "orchestrator-cli" },
-    { name = "orchestrator-test-sdk" },
-    { name = "podman-compose" },
-    { name = "pre-commit" },
-    { name = "psutil" },
-    { name = "pyan3" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-xdist" },
-    { name = "respx" },
-    { name = "ruamel-yaml" },
-    { name = "ruff" },
-    { name = "scikit-learn-stubs" },
-    { name = "syntara-api-client" },
-    { name = "testcontainers", extra = ["redis"] },
-    { name = "types-cachetools" },
-    { name = "types-jsonschema" },
-    { name = "types-python-dateutil" },
-    { name = "types-pyyaml" },
-    { name = "types-requests" },
-    { name = "vulture" },
-    { name = "websockets" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "psutil" },
-    { name = "pypandoc-binary" },
-    { name = "pytest-order" },
-    { name = "respx" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.12.0" },
-    { name = "argon2-cffi", specifier = ">=25.1.0" },
-    { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "authlib", marker = "extra == 'dev'", specifier = ">=1.7.1" },
-    { name = "azure-identity", marker = "extra == 'dev'", specifier = ">=1.19.0" },
-    { name = "beautifulsoup4", marker = "extra == 'dev'", specifier = ">=4.12.0" },
-    { name = "boto3", specifier = ">=1.35.0" },
-    { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
-    { name = "cachetools", specifier = ">=5.0" },
-    { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "fastapi", specifier = ">=0.135.0" },
-    { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
-    { name = "filelock", specifier = ">=3.20.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.25.0" },
-    { name = "httpx-sse", specifier = ">=0.4.0" },
-    { name = "idna", specifier = ">=3.15" },
-    { name = "jmespath", specifier = ">=1.0.0" },
-    { name = "jsonschema", specifier = ">=4.0.0" },
-    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "junitparser", marker = "extra == 'dev'", specifier = ">=3.2.0" },
-    { name = "langchain", specifier = ">=1.3.9" },
-    { name = "langchain-anthropic", specifier = ">=1.4.8,<1.5.0" },
-    { name = "langchain-core", specifier = ">=1.4.6" },
-    { name = "langchain-google-genai", specifier = ">=4.2.7" },
-    { name = "langchain-mcp-adapters", specifier = ">=0.1.0,<0.2.0" },
-    { name = "langchain-openai", specifier = ">=0.3.0" },
-    { name = "langgraph", specifier = ">=1.2.4" },
-    { name = "langsmith", specifier = ">=0.8.18" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "msgraph-sdk", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.6.0,<1.19" },
-    { name = "openapi-python-client", marker = "extra == 'dev'", specifier = ">=0.28.3,<0.29.0" },
-    { name = "opentelemetry-api", specifier = ">=1.39.1" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.39.1" },
-    { name = "opentelemetry-sdk", specifier = ">=1.39.1" },
-    { name = "orchestrator-cli", marker = "extra == 'dev'", editable = "src/cli" },
-    { name = "orchestrator-test-sdk", marker = "extra == 'dev'", editable = "test-sdk" },
-    { name = "podman-compose", marker = "extra == 'dev'", specifier = ">=1.5.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
-    { name = "prometheus-client", specifier = ">=0.19.0" },
-    { name = "psutil", marker = "extra == 'dev'", specifier = ">=5.9.0" },
-    { name = "pyan3", marker = "extra == 'dev'", specifier = ">=2.6.0" },
-    { name = "pydantic", extras = ["email"], specifier = ">=2.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.14.2" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
-    { name = "pypandoc", specifier = ">=1.14" },
-    { name = "pypdf", specifier = ">=5.1.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.8.0" },
-    { name = "python-magic", specifier = ">=0.4.27" },
-    { name = "python-multipart", specifier = ">=0.0.31" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "rapidfuzz", specifier = ">=3.14.3" },
-    { name = "redis", specifier = ">=7.1.0,<8.0.0" },
-    { name = "regopy", specifier = ">=1.5.1" },
-    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.20.0" },
-    { name = "ruamel-yaml", marker = "extra == 'dev'", specifier = ">=0.17.40" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0,<0.14.4" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
-    { name = "scikit-learn-stubs", marker = "extra == 'dev'", specifier = ">=0.0.3" },
-    { name = "segment-analytics-python", specifier = ">=2.3.5" },
-    { name = "spacy", specifier = ">=3.8.11" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<2.0.45" },
-    { name = "sqlmodel", specifier = ">=0.0.14,<0.0.28" },
-    { name = "structlog", specifier = ">=25.5.0,<26.0.0" },
-    { name = "syntara-api-client", marker = "extra == 'dev'", editable = "src/api_client" },
-    { name = "temporalio", specifier = ">=1.5.0" },
-    { name = "testcontainers", extras = ["postgres", "redis"], marker = "extra == 'dev'", specifier = ">=4.14.0" },
-    { name = "tiktoken", specifier = ">=0.5.0" },
-    { name = "typer", specifier = ">=0.9.0,<0.27.0" },
-    { name = "types-cachetools", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "types-jsonschema", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = ">=2.8.0" },
-    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12" },
-    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
-    { name = "uuid-utils", specifier = ">=0.9.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
-    { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.16" },
-    { name = "websockets", marker = "extra == 'dev'", specifier = ">=12.0" },
-    { name = "wrapt", specifier = ">=1.17.3" },
-]
-provides-extras = ["dev", "integration"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "psutil", specifier = ">=7.1.3" },
-    { name = "pypandoc-binary", specifier = ">=1.16.2" },
-    { name = "pytest-order", specifier = ">=1.5.0" },
-    { name = "respx", specifier = ">=0.22.0" },
-]
-
-[[package]]
 name = "nexus-rpc"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2193,6 +1994,30 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/35/d5/cd1ffb202b76ebc1b33c1332a3416e55a39929006982adc2b1eb069aaa9b/nexus_rpc-1.4.0.tar.gz", hash = "sha256:3b8b373d4865671789cc43623e3dc0bcbf192562e40e13727e17f1c149050fba", size = 82367, upload-time = "2026-02-25T22:01:34.053Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/11/52/6327a5f4fda01207205038a106a99848a41c83e933cd23ea2cab3d2ebc6c/nexus_rpc-1.4.0-py3-none-any.whl", hash = "sha256:14c953d3519113f8ccec533a9efdb6b10c28afef75d11cdd6d422640c40b3a49", size = 29645, upload-time = "2026-02-25T22:01:33.122Z" },
+]
+
+[[package]]
+name = "nh3"
+version = "0.3.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/1b/ef84624f14954d270f74060a19fc550dd4f06656399447569afb584d8c06/nh3-0.3.6.tar.gz", hash = "sha256:f3736c9dd3d1856f80cd031715b84ca75cda2bbb1ac802c3da26bfce590838d7", size = 24684, upload-time = "2026-06-22T00:47:02.008Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/ab/a7653bce9a3b204be6a6931767a9e23595807bb84790ce6685e4d7e5bd08/nh3-0.3.6-cp38-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:a43ebd7543555c3ac1bc353023d0794e75cb76f6f18f19c32e95441496c0cc25", size = 1443564, upload-time = "2026-06-22T00:46:36.66Z" },
+    { url = "https://files.pythonhosted.org/packages/41/21/e1084ab18eb589506335c7c7576f2d4643e9a0c0e33983ef0e549a256b96/nh3-0.3.6-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e1b160831c9cdb06a6c79c2f9cdb11386602938f9af260d1c457a85add4f6f69", size = 838002, upload-time = "2026-06-22T00:46:38.101Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/94/f48d08e6f72a406300fa11d8acd929fea1a80d4bf750fa292cb10785f126/nh3-0.3.6-cp38-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:d14bf7982e7a77c0c775634c29c07ce08b38a046df73e1c1f139b3e82f18a38e", size = 823045, upload-time = "2026-06-22T00:46:39.495Z" },
+    { url = "https://files.pythonhosted.org/packages/25/bb/431615ba1d1d3eb63cde0f974f2114edf863a8a3f6049a12fed23fc241d3/nh3-0.3.6-cp38-abi3-manylinux_2_17_ppc64.manylinux2014_ppc64.whl", hash = "sha256:44673b27010051ab5a5e438a86ec31bbda61d4a77d7e900af6b7be3037c1abae", size = 1093171, upload-time = "2026-06-22T00:46:41.21Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/24/a0d80182a18919665fefd19c1c06f1d1df1c9a6455d0252de40c034a0bc3/nh3-0.3.6-cp38-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:e6b7beece07525dc6e6b0fc2f104442de2ba328360ad00e50cbe2e1fd620447d", size = 1049217, upload-time = "2026-06-22T00:46:42.804Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/13/6f1e302ca674ac74362e150848ad56a1be5145391204f74facdb8e94df12/nh3-0.3.6-cp38-abi3-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:455469a29951edc92bc48b47ac2281c3f2609e6c4f6a047056449f8c2c23facf", size = 917372, upload-time = "2026-06-22T00:46:44.495Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/67/314f6151bad77a93d751978a344033e1fc890822f05f0416079338e34231/nh3-0.3.6-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:905f877dc66dd7aea4a76e54bcb26acb5ff8216f720c0017ccf63e0e6035698e", size = 806699, upload-time = "2026-06-22T00:46:45.99Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/a6/bfaa00046e58603507dcfc266c4778e3ab7adf68a5dedd73b6274b8d9314/nh3-0.3.6-cp38-abi3-manylinux_2_31_riscv64.whl", hash = "sha256:25c733bee928530556b1db0ea46c52cf5aa686146e38e60a6fc7cb801ef91cec", size = 835165, upload-time = "2026-06-22T00:46:47.617Z" },
+    { url = "https://files.pythonhosted.org/packages/30/a8/fb2c38845efb703a9173bffdfc745fc64d2b0e55cfc73a3647d2f028250c/nh3-0.3.6-cp38-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:2f90d9a0cfdbee218994fdaaeeb5a0fde62d08f35e4eef0378ec1e2200172fd0", size = 858282, upload-time = "2026-06-22T00:46:49.276Z" },
+    { url = "https://files.pythonhosted.org/packages/68/17/06e72a18ee9b572914447338237ca7eb164c0df901f141bc10d1282247a2/nh3-0.3.6-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:82ca5bf427ad1b216b65ede1a2e2d87dc49bec417ceba0f297213107d3cd9d78", size = 1014328, upload-time = "2026-06-22T00:46:51.026Z" },
+    { url = "https://files.pythonhosted.org/packages/11/f9/3966c61455668c08853bf5e33b4bed93c421f3194ce4de896dc248d6f6ce/nh3-0.3.6-cp38-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:f5ed5fe84aee7f39db95c214a7421bf0499fbf500fec6d86a4e29bfc37971438", size = 1098207, upload-time = "2026-06-22T00:46:52.674Z" },
+    { url = "https://files.pythonhosted.org/packages/19/d3/479cb4ae440424825735d60525b53e3c77fd60fd6e6afc0e984f00eb0178/nh3-0.3.6-cp38-abi3-musllinux_1_2_i686.whl", hash = "sha256:082675ff87b9385ec430ffe6d5847ba7456cc39b73720cd4add472f9f4cffd56", size = 1056961, upload-time = "2026-06-22T00:46:54.335Z" },
+    { url = "https://files.pythonhosted.org/packages/17/0c/6cdb5ee1e127be50dc8391e54bddc1f64e87bf4bfad0c55633320e2e02db/nh3-0.3.6-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:36d06341bd501240d320f5942481ed5e6846136b666e1ba4faf802b78ebc875f", size = 1033829, upload-time = "2026-06-22T00:46:56.258Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/55/9de666ad975d6ccd77d799ea0add55ee2347aa81286ce21b2a97c070746b/nh3-0.3.6-cp38-abi3-win32.whl", hash = "sha256:5276ef17bdba9ad8040575c74072008b13aae429436e9d0429e718bb5f90f4da", size = 609081, upload-time = "2026-06-22T00:46:57.665Z" },
+    { url = "https://files.pythonhosted.org/packages/82/fa/2b5d684e3edf1e81bfd02d298c78c3e3da77ca1d8a2be3183a79544a7548/nh3-0.3.6-cp38-abi3-win_amd64.whl", hash = "sha256:f338ac7d594c067679f1e99b4f5ec3906842979560f9d8f15d6bdfa39a353b10", size = 624461, upload-time = "2026-06-22T00:46:59.163Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/e5/7cafee2f0413ca4cb0ef3bd111e94d408a48810008b283ad8aee00dd1809/nh3-0.3.6-cp38-abi3-win_arm64.whl", hash = "sha256:69f365963f63a1e9bff53bdbb3c542c7c2efed3e163c9d5d83a772a2ac468c21", size = 603060, upload-time = "2026-06-22T00:47:00.596Z" },
 ]
 
 [[package]]
@@ -2948,6 +2773,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-timeout"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/82/4c9ecabab13363e72d880f2fb504c5f750433b2b6f16e99f4ec21ada284c/pytest_timeout-2.4.0.tar.gz", hash = "sha256:7e68e90b01f9eff71332b25001f85c75495fc4e3a836701876183c4bcfd0540a", size = 17973, upload-time = "2025-05-05T19:44:34.99Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/b6/3127540ecdf1464a00e5a01ee60a1b09175f6913f0644ac748494d9c4b21/pytest_timeout-2.4.0-py3-none-any.whl", hash = "sha256:c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2", size = 14382, upload-time = "2025-05-05T19:44:33.502Z" },
+]
+
+[[package]]
 name = "pytest-xdist"
 version = "3.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3700,8 +3537,213 @@ wheels = [
 ]
 
 [[package]]
-name = "syntara-api-client"
+name = "syntara"
 version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "argon2-cffi" },
+    { name = "asyncpg" },
+    { name = "boto3" },
+    { name = "cachetools" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "filelock" },
+    { name = "httpx" },
+    { name = "httpx-sse" },
+    { name = "idna" },
+    { name = "jmespath" },
+    { name = "jsonschema" },
+    { name = "langchain" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-core" },
+    { name = "langchain-google-genai" },
+    { name = "langchain-mcp-adapters" },
+    { name = "langchain-openai" },
+    { name = "langgraph" },
+    { name = "langsmith" },
+    { name = "nh3" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
+    { name = "pydantic", extra = ["email"] },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "pypandoc" },
+    { name = "pypdf" },
+    { name = "python-magic" },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "rapidfuzz" },
+    { name = "redis" },
+    { name = "regopy" },
+    { name = "scikit-learn" },
+    { name = "segment-analytics-python" },
+    { name = "spacy" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "sqlmodel" },
+    { name = "structlog" },
+    { name = "temporalio" },
+    { name = "tiktoken" },
+    { name = "typer" },
+    { name = "tzdata" },
+    { name = "uuid-utils" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "wrapt" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "authlib" },
+    { name = "azure-identity" },
+    { name = "beautifulsoup4" },
+    { name = "boto3-stubs", extra = ["s3"] },
+    { name = "fastmcp" },
+    { name = "httpx" },
+    { name = "jsonschema" },
+    { name = "junitparser" },
+    { name = "moto", extra = ["s3"] },
+    { name = "msgraph-sdk" },
+    { name = "mypy" },
+    { name = "openapi-python-client" },
+    { name = "orchestrator-cli" },
+    { name = "orchestrator-test-sdk" },
+    { name = "podman-compose" },
+    { name = "pre-commit" },
+    { name = "psutil" },
+    { name = "pyan3" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
+    { name = "respx" },
+    { name = "ruamel-yaml" },
+    { name = "ruff" },
+    { name = "scikit-learn-stubs" },
+    { name = "syntara-api-client" },
+    { name = "testcontainers", extra = ["redis"] },
+    { name = "types-cachetools" },
+    { name = "types-jsonschema" },
+    { name = "types-python-dateutil" },
+    { name = "types-pyyaml" },
+    { name = "types-requests" },
+    { name = "vulture" },
+    { name = "websockets" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "psutil" },
+    { name = "pypandoc-binary" },
+    { name = "pytest-order" },
+    { name = "pytest-timeout" },
+    { name = "respx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.12.0" },
+    { name = "argon2-cffi", specifier = ">=25.1.0" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "authlib", marker = "extra == 'dev'", specifier = ">=1.7.1" },
+    { name = "azure-identity", marker = "extra == 'dev'", specifier = ">=1.19.0" },
+    { name = "beautifulsoup4", marker = "extra == 'dev'", specifier = ">=4.12.0" },
+    { name = "boto3", specifier = ">=1.35.0" },
+    { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
+    { name = "cachetools", specifier = ">=5.0" },
+    { name = "cryptography", specifier = ">=48.0.1" },
+    { name = "fastapi", specifier = ">=0.135.0" },
+    { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
+    { name = "filelock", specifier = ">=3.20.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.25.0" },
+    { name = "httpx-sse", specifier = ">=0.4.0" },
+    { name = "idna", specifier = ">=3.15" },
+    { name = "jmespath", specifier = ">=1.0.0" },
+    { name = "jsonschema", specifier = ">=4.0.0" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "junitparser", marker = "extra == 'dev'", specifier = ">=3.2.0" },
+    { name = "langchain", specifier = ">=1.3.9" },
+    { name = "langchain-anthropic", specifier = ">=1.4.8,<1.5.0" },
+    { name = "langchain-core", specifier = ">=1.4.6" },
+    { name = "langchain-google-genai", specifier = ">=4.2.7" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.1.0,<0.2.0" },
+    { name = "langchain-openai", specifier = ">=0.3.0" },
+    { name = "langgraph", specifier = ">=1.2.4" },
+    { name = "langsmith", specifier = ">=0.8.18" },
+    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
+    { name = "msgraph-sdk", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.6.0,<1.19" },
+    { name = "nh3", specifier = ">=0.2.21" },
+    { name = "openapi-python-client", marker = "extra == 'dev'", specifier = ">=0.28.3,<0.29.0" },
+    { name = "opentelemetry-api", specifier = ">=1.39.1" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.39.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.39.1" },
+    { name = "orchestrator-cli", marker = "extra == 'dev'", editable = "src/cli" },
+    { name = "orchestrator-test-sdk", marker = "extra == 'dev'", editable = "test-sdk" },
+    { name = "podman-compose", marker = "extra == 'dev'", specifier = ">=1.5.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
+    { name = "prometheus-client", specifier = ">=0.19.0" },
+    { name = "psutil", marker = "extra == 'dev'", specifier = ">=5.9.0" },
+    { name = "pyan3", marker = "extra == 'dev'", specifier = ">=2.6.0" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
+    { name = "pypandoc", specifier = ">=1.14" },
+    { name = "pypdf", specifier = ">=5.1.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.8.0" },
+    { name = "python-magic", specifier = ">=0.4.27" },
+    { name = "python-multipart", specifier = ">=0.0.31" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
+    { name = "rapidfuzz", specifier = ">=3.14.3" },
+    { name = "redis", specifier = ">=7.1.0,<8.0.0" },
+    { name = "regopy", specifier = ">=1.5.1" },
+    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.20.0" },
+    { name = "ruamel-yaml", marker = "extra == 'dev'", specifier = ">=0.17.40" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0,<0.14.4" },
+    { name = "scikit-learn", specifier = ">=1.7.2" },
+    { name = "scikit-learn-stubs", marker = "extra == 'dev'", specifier = ">=0.0.3" },
+    { name = "segment-analytics-python", specifier = ">=2.3.5" },
+    { name = "spacy", specifier = ">=3.8.11" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<2.0.45" },
+    { name = "sqlmodel", specifier = ">=0.0.14,<0.0.28" },
+    { name = "structlog", specifier = ">=25.5.0,<26.0.0" },
+    { name = "syntara-api-client", marker = "extra == 'dev'", editable = "src/api_client" },
+    { name = "temporalio", specifier = ">=1.5.0" },
+    { name = "testcontainers", extras = ["postgres", "redis"], marker = "extra == 'dev'", specifier = ">=4.14.0" },
+    { name = "tiktoken", specifier = ">=0.5.0" },
+    { name = "typer", specifier = ">=0.9.0,<0.27.0" },
+    { name = "types-cachetools", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "types-jsonschema", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = ">=2.8.0" },
+    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12" },
+    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
+    { name = "tzdata", specifier = ">=2024.1" },
+    { name = "uuid-utils", specifier = ">=0.9.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
+    { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.16" },
+    { name = "websockets", marker = "extra == 'dev'", specifier = ">=12.0" },
+    { name = "wrapt", specifier = ">=1.17.3" },
+]
+provides-extras = ["dev", "integration"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "psutil", specifier = ">=7.1.3" },
+    { name = "pypandoc-binary", specifier = ">=1.16.2" },
+    { name = "pytest-order", specifier = ">=1.5.0" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "respx", specifier = ">=0.22.0" },
+]
+
+[[package]]
+name = "syntara-api-client"
+version = "1.0.0"
 source = { editable = "src/api_client" }
 dependencies = [
     { name = "attrs" },
@@ -3983,6 +4025,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7", size = 14611, upload-time = "2025-10-01T02:14:40.154Z" },
+]
+
+[[package]]
+name = "tzdata"
+version = "2026.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/ff/5a28bdfd8c3ebec42564ac7d0e54ca3db65044a9314a97f9564fa7a1e926/tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415", size = 198674, upload-time = "2026-07-10T08:50:37.887Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931", size = 348168, upload-time = "2026-07-10T08:50:36.46Z" },
 ]
 
 [[package]]

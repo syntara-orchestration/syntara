@@ -47,13 +47,13 @@ import { NxPageTitle } from '../../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs } from '../../../../components/panels/list/NxListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../../hooks/useMutationErrorHandler'
 import { useUrlTab } from '../../../../hooks/useUrlTab'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorStatus } from '../../../../utils/apiErrors'
-import { formatDateTime } from '../../../../utils/dateUtils'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
 import { isValidUUID } from '../../../../utils/generateUUID'
@@ -67,7 +67,7 @@ import { IdentityProviderDeleteDialog } from './IdentityProviderDeleteDialog'
 import { identityProviderGroupMappingEditPath } from './identityProviderPaths'
 import { IdpTypeKey, IDP_TYPE_PRESETS } from './idpTypePresets'
 
-type ProviderData = IdentityProvidersAPI.components['schemas']['IdentityProviderResponse']
+type ProviderData = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 type ProviderConfig = NonNullable<ProviderData['configuration']>
 
 function identityProviderTypeDisplayLabel(idpType: string | null | undefined): string {
@@ -148,8 +148,12 @@ function ProviderDetailsContent({ provider }: Readonly<{ provider: ProviderData 
           {config.userinfo_endpoint && <DetailField label="Userinfo endpoint">{config.userinfo_endpoint}</DetailField>}
         </>
       )}
-      <DetailField label="Created">{formatDateTime(provider.created_at)}</DetailField>
-      <DetailField label="Last updated">{formatDateTime(provider.updated_at)}</DetailField>
+      <DetailField label="Created">
+        <DateCell dateString={provider.created_at} />
+      </DetailField>
+      <DetailField label="Last updated">
+        <DateCell dateString={provider.updated_at} />
+      </DetailField>
     </DescriptionList>
   )
 }

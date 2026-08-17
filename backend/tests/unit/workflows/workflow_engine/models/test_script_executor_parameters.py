@@ -1,6 +1,6 @@
 """Tests for ScriptExecutorParameters environment coercion."""
 
-from nexus.workflows.workflow_engine.models.workflow_definition import ScriptExecutorParameters, ScriptLanguage
+from syntara.workflows.workflow_engine.models.workflow_definition import ScriptExecutorParameters, ScriptLanguage
 
 
 class TestScriptExecutorParametersEnvironmentCoercion:

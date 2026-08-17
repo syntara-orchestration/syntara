@@ -19,6 +19,7 @@ REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
+XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
 ifeq ($(shell uname -s),Darwin)
 # macOS: try podman machine inspect first (works for any machine name),
 # then the standard symlink, then Homebrew's common location
@@ -86,7 +87,7 @@ _check-uv:
 
 _check-dependency-binaries: _check-uv
 	@if ! uv run python -c "import src" 2>/dev/null; then \
-		echo "❌ nexus package not installed. Run 'make install' first"; \
+		echo "❌ syntara package not installed. Run 'make install' first"; \
 		exit 1; \
 	fi
 
@@ -100,7 +101,7 @@ define run-tests
 @PODMAN_SOCK="$(PODMAN_SOCK)" POSTGRES_IMAGE="$(POSTGRES_IMAGE)" REDIS_IMAGE="$(REDIS_IMAGE)" \
 	APP_JWT_PRIVATE_KEY_PATH=.secrets/jwt-primary.pem \
 	./tools/scripts/run-with-testcontainers.sh --label "🧪 Running tests" -- \
-	uv run --no-sync pytest $(1)
+	uv run --no-sync pytest $(XFAIL_ARGS) $(1)
 endef
 
 
@@ -130,7 +131,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/ -v -m "mcp")
 else
 	@echo "🧪 Running MCP tests..."
-	uv run --no-sync pytest tests/ -v -m "mcp"
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/ -v -m "mcp"
 endif
 
 .PHONY: test-performance
@@ -139,7 +140,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/performance/ -v --run-performance)
 else
 	@echo "🧪 Running performance tests..."
-	uv run --no-sync pytest tests/performance/ -v --run-performance
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/performance/ -v --run-performance
 endif
 
 
@@ -149,7 +150,7 @@ endif
 .PHONY: test-unit-coverage
 test-unit-coverage: check-deps ## Run unit tests with coverage report
 	@echo "📊 Running unit tests with coverage..."
-	$(call run-tests,tests/unit/ -v -n auto --cov=src --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-unit.xml)
+	$(call run-tests,tests/unit/ -v -n auto --cov=src --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=85 --junitxml=pytest-results-unit.xml)
 	@echo "✅ Unit test coverage report: htmlcov-unit/index.html"
 
 .PHONY: test-cli-coverage
@@ -189,7 +190,7 @@ test-all: check-deps ## Run all tests (unit + integration; E2E runs separately v
 # Usage: $(call _e2e-run,<pytest-args>)
 define _e2e-run
 @COMPOSE_CMD="$(COMPOSE_FINAL_CMD)" \
-	./tools/scripts/e2e-run.sh $(1)
+	./tools/scripts/e2e-run.sh $(XFAIL_ARGS) $(1)
 endef
 
 # Default to empty so it runs all tests if not provided
@@ -203,7 +204,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS))
 else
 	@echo "🧪 Running E2E tests $(if $(PHASE),for phase $(PHASE),$(if $(EXCLUDE),excluding phase $(EXCLUDE),))..."
-	uv run --no-sync pytest tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS)
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/$(E2E_TARGET) -v -m "not global_revocation" $(E2E_ARGS)
 endif
 
 .PHONY: test-e2e-global-revocation
@@ -212,7 +213,7 @@ ifndef APP_BASE_URL
 	$(call _e2e-run,tests/e2e/ -v -m global_revocation)
 else
 	@echo "🧪 Running global revocation E2E tests..."
-	uv run --no-sync pytest tests/e2e/ -v -m global_revocation; \
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/ -v -m global_revocation; \
 	exitcode=$$?; \
 	if [ $$exitcode -eq 5 ]; then echo "⚠️  No global revocation tests found — all migrated downstream"; exit 0; fi; \
 	exit $$exitcode
@@ -230,11 +231,11 @@ test-e2e-exclude-pr-check: ## Run E2E tests excluding PR checks (alias for: make
 .PHONY: test-e2e-telemetry
 test-e2e-telemetry: check-deps ## Run telemetry E2E tests only
 ifndef APP_BASE_URL
-	$(call _e2e-run,tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && APP_BASE_URL=$${APP_BASE_URL:-http://localhost:8000} uv run --no-sync pytest tests/e2e/telemetry/test_performance_and_resilience.py -v)
+	$(call _e2e-run,tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && APP_BASE_URL=$${APP_BASE_URL:-http://localhost:8000} uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/test_performance_and_resilience.py -v)
 else
 	@echo "🧪 Running telemetry E2E tests..."
-	uv run --no-sync pytest tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && \
-	uv run --no-sync pytest tests/e2e/telemetry/test_performance_and_resilience.py -v
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/ -v -n auto --dist loadscope --ignore=tests/e2e/telemetry/test_performance_and_resilience.py && \
+	uv run --no-sync pytest $(XFAIL_ARGS) tests/e2e/telemetry/test_performance_and_resilience.py -v
 endif
 
 # Development workflow
@@ -242,7 +243,7 @@ endif
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
-	@uv run python -m nexus.seed
+	@uv run python -m syntara.seed
 	@echo "✅ Seeding complete"
 
 .PHONY: admin-password
@@ -254,7 +255,7 @@ admin-password: check-deps _ensure-secrets ## Sync bootstrap admin password from
 .PHONY: db-seed-all
 db-seed-all: check-deps ## Run all database seeders including dev samples
 	@echo "🌱 Seeding database (including samples)..."
-	@uv run python -m nexus.seed --all
+	@uv run python -m syntara.seed --all
 	@echo "✅ Seeding complete"
 
 .PHONY: dev
@@ -293,7 +294,7 @@ dev: check-deps _ensure-secrets _ensure-certs ## Run development server with aut
 	APP_S3_SECRET_ACCESS_KEY=$${APP_S3_SECRET_ACCESS_KEY:-testing} \
 	APP_S3_VERIFY_SSL=$${APP_S3_VERIFY_SSL:-false} \
 	APP_S3_USE_PATH_STYLE=$${APP_S3_USE_PATH_STYLE:-true} \
-	uv run python -m nexus.api.main
+	uv run python -m syntara.api.main
 
 
 .PHONY: worker-run
@@ -309,7 +310,7 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m nexus.workflows.worker
+	uv run python -m syntara.workflows.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -324,7 +325,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m nexus.workflows.background_worker
+	uv run python -m syntara.workflows.background_worker
 
 
 # Database
@@ -332,7 +333,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 .PHONY: db-run
 db-run: ## Start PostgreSQL database container (foreground, Ctrl+C to stop)
 	@echo "🚀 Starting PostgreSQL database..."
-	@echo "📍 Connection: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Connection: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "Press Ctrl+C to stop"
 	@echo ""
 	$(COMPOSE_FINAL_CMD) up database
@@ -451,7 +452,7 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	@echo "🚀 Starting all services..."
 	@echo "📍 Syntara API: http://localhost:$${APP_API_PORT:-8000}"
 	@echo "📍 Syntara UI: http://localhost:$${APP_UI_PORT:-8080}"
-	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
@@ -463,12 +464,12 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 .PHONY: services-run
 services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
 	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
-	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/nexus_api"
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server moto
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
@@ -533,6 +534,27 @@ mcp-logs: ## View MCP server logs only
 	@echo "📋 Viewing MCP server logs (project: $(PODMAN_PROJECT))..."
 	$(COMPOSE_FINAL_CMD) logs -f mcp-server
 
+.PHONY: mcp-scenarios-start
+mcp-scenarios-start: ## Start auxiliary auth/forbidden MCP servers (used by test-e2e-mcp auth-failure tests)
+	@echo "🚀 Starting MCP scenario servers..."
+	@echo "📍 Auth-required MCP Server: http://localhost:$${MCP_AUTH_PORT:-8766}/mcp"
+	@echo "📍 Forbidden MCP Server: http://localhost:$${MCP_FORBIDDEN_PORT:-8767}/mcp"
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d mcp-server-scenarios
+	@echo "✅ MCP scenario servers started in background"
+	@echo "   Use 'make mcp-scenarios-logs' to view logs"
+	@echo "   Use 'make mcp-scenarios-stop' to stop servers"
+
+.PHONY: mcp-scenarios-stop
+mcp-scenarios-stop: ## Stop auxiliary auth/forbidden MCP servers
+	@echo "🛑 Stopping MCP scenario servers..."
+	$(COMPOSE_FINAL_CMD) stop mcp-server-scenarios
+	@echo "✅ MCP scenario servers stopped"
+
+.PHONY: mcp-scenarios-logs
+mcp-scenarios-logs: ## View auxiliary auth/forbidden MCP server logs only
+	@echo "📋 Viewing MCP scenario server logs (project: $(PODMAN_PROJECT))..."
+	$(COMPOSE_FINAL_CMD) logs -f mcp-server-scenarios
+
 .PHONY: run-clean
 run-clean: ## Stop all services and remove all data (destructive)
 	@echo "🧹 Stopping all services and removing data..."
@@ -550,7 +572,7 @@ services-clean: ## Stop all services and remove all data (destructive)
 
 # API spec governance
 # ========================================================
-OPENAPI_SPEC ?= src/nexus/schemas/openapi.yaml
+OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -726,7 +748,7 @@ check-api-paths: ## Check API endpoint paths use snake_case (no hyphens)
 .PHONY: check-dead-code
 check-dead-code: ## Check for dead code with vulture
 	@echo "🔍 Checking for dead code..."
-	uv run vulture src/nexus/
+	uv run vulture src/syntara/
 	@echo "✅ No dead code detected"
 
 .PHONY: check-cycles
@@ -734,7 +756,7 @@ check-cycles: ## Check for new import cycles with pyan3
 	@echo "🔍 Checking for import cycles..."
 	uv run pyan3 --module-level --cycles \
 		--exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
-		--root src src/nexus/**/*.py 2>/dev/null | \
+		--root src src/syntara/**/*.py 2>/dev/null | \
 		uv run python tools/ci/check_import_cycles.py
 	@echo "✅ No new import cycles detected"
 
@@ -758,12 +780,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
 			--pr-body "$$PR_BODY_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
-			--format text; \
+			--format text \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
 	fi
 	@echo "OpenAPI breaking changes check complete"
 

@@ -10,15 +10,15 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.files.document_conversion.models.conversion_result import (
+from syntara.core.exceptions import SafeValueError
+from syntara.files.document_conversion.models.conversion_result import (
     ConversionResult,
 )
-from nexus.files.document_conversion.services import ConversionState
-from nexus.files.document_conversion.services.document_conversion_service import (
+from syntara.files.document_conversion.services import ConversionState
+from syntara.files.document_conversion.services.document_conversion_service import (
     DocumentConversionService,
 )
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.fixture(autouse=True)
@@ -27,9 +27,9 @@ def mock_conversion_config() -> Generator[MagicMock]:
     mock_config = MagicMock()
     mock_config.overwrite_existing = True
     mock_config.timeout_seconds = 30
-    mock_config.temp_dir = "/tmp/nexus-test"  # noqa: S108
+    mock_config.temp_dir = "/tmp/syntara-test"  # noqa: S108
     with patch(
-        "nexus.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
+        "syntara.files.document_conversion.services.document_conversion_service.ConversionConfig.from_settings",
         return_value=mock_config,
     ):
         yield mock_config
@@ -450,7 +450,7 @@ class TestDocumentConversionServiceStorageIntegration:
     async def test_store_converted_file_uses_correct_retriever(self, conversion_helper: ConversionTestHelper) -> None:
         """Test that _store_converted_file uses FileManager.get_retriever."""
         file_metadata = create_file_metadata(filename="store_test.pdf", status=FileStatus.CONVERTING)
-        expected_key = f"nexus-{file_metadata.id}-content.md"
+        expected_key = f"orchestrator-{file_metadata.id}-content.md"
         conversion_result = create_success_result("# Converted Content\n\nThis is the markdown version.", 1000)
 
         mock_retriever = AsyncMock()

@@ -1,6 +1,5 @@
 /**
  * E2E Tests: Cancel Execution
- * Jira: AAP-82020
  *
  * Objective: Verify the cancel execution flow from the execution detail page.
  *
@@ -9,23 +8,22 @@
  * - Clicking cancel transitions execution to cancelled status
  * - Cancel button hidden for completed executions
  *
- * Requires a real backend with Temporal — the sleep node keeps the execution
+ * Requires a real backend with Temporal — the wait node keeps the execution
  * in "running" state long enough to interact with the cancel button.
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { buildUniqueName } from '../helpers/workflows'
-import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject, getAuthToken } from '../utils/api'
+import {
+  apiRequest,
+  createWorkflowViaApi,
+  deleteWorkflowViaApi,
+  ensureProject,
+  getAuthToken,
+  pollExecutionStatus,
+} from '../utils/api'
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
-
-async function pollExecutionUntilDone(page: Page, executionId: string, token: string): Promise<void> {
-  await expect(async () => {
-    const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
-    const exec = (await resp.json()) as { status: string }
-    expect(TERMINAL_STATUSES).toContain(exec.status)
-  }).toPass({ timeout: 30_000, intervals: [1_000] })
-}
 
 let sleepWorkflowId: string | null = null
 let runningExecutionId: string | null = null
@@ -47,13 +45,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'sleep_node',
-          type: 'script',
-          name: 'Long Sleep',
-          parameters: { language: 'bash', code: 'sleep 300' },
+          id: 'long_wait',
+          type: 'wait',
+          name: 'Long Wait',
+          parameters: { duration: 300 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'sleep_node' }]
+      [{ from: 'trigger_manual', to: 'long_wait' }]
     ))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
@@ -63,6 +61,7 @@ test.beforeAll(async ({ browser }) => {
     if (runResp.ok()) {
       const body = (await runResp.json()) as { id: string }
       runningExecutionId = body.id
+      await pollExecutionStatus(page, runningExecutionId, ['running'], { token, timeout: 60_000 })
     }
 
     const echoName = buildUniqueName('e2e-cancel-echo')
@@ -72,13 +71,13 @@ test.beforeAll(async ({ browser }) => {
       [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       [
         {
-          id: 'echo_node',
-          type: 'script',
-          name: 'Quick Echo',
-          parameters: { language: 'bash', code: 'echo done' },
+          id: 'quick_wait',
+          type: 'wait',
+          name: 'Quick Wait',
+          parameters: { duration: 1 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'echo_node' }]
+      [{ from: 'trigger_manual', to: 'quick_wait' }]
     ))
 
     const echoRunResp = await apiRequest(page, 'post', '/executions', {
@@ -88,7 +87,7 @@ test.beforeAll(async ({ browser }) => {
     if (echoRunResp.ok()) {
       const body = (await echoRunResp.json()) as { id: string }
       completedExecutionId = body.id
-      await pollExecutionUntilDone(page, completedExecutionId, token)
+      await pollExecutionStatus(page, completedExecutionId, TERMINAL_STATUSES, { token })
     }
   } finally {
     await page.close()

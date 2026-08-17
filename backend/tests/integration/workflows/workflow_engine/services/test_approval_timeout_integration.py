@@ -18,10 +18,10 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from nexus.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from nexus.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 _expire_calls: list[tuple[str, str]] = []
 
@@ -152,12 +152,12 @@ class TestApprovalTimeoutIntegration:
         task_queue = "approval-timeout-queue"
         _expire_calls.clear()
 
-        from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
         async with Worker(
             temporal_env.client,
             task_queue=task_queue,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[
                 manual_trigger,
                 _test_approval_activity,
@@ -198,12 +198,12 @@ class TestApprovalTimeoutIntegration:
         task_queue = f"approval-cof-{fallback_decision}-queue"
         _expire_calls.clear()
 
-        from nexus.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
         async with Worker(
             temporal_env.client,
             task_queue=task_queue,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[
                 manual_trigger,
                 _test_approval_activity,

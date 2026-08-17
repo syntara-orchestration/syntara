@@ -7,7 +7,7 @@ Based on Scenario 1 from quickstart.md.
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.models import User
+from syntara.core.models import User
 from tests.integration.helpers.invocations import wait_for_invocation_execution
 
 

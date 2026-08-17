@@ -1,13 +1,13 @@
-# Nexus Monorepo — Claude Agent Instructions
+# Syntara Monorepo — Claude Agent Instructions
 
-Nexus is a distributed multi-agent automation system. This monorepo contains the Python/FastAPI backend and the React/TypeScript frontend.
+Syntara is a distributed multi-agent automation system. This monorepo contains the Python/FastAPI backend and the React/TypeScript frontend.
 
 ## Repository Structure
 
 ```
 syntara/
 ├── backend/           # Python 3.12+ / FastAPI API, Temporal workflows, PostgreSQL
-│   ├── src/nexus/     # Main Python package (domain-driven, auto-discovered routers)
+│   ├── src/syntara/   # Main Python package (domain-driven, auto-discovered routers)
 │   ├── src/api_client/# Auto-generated Python API client (syntara-api-client)
 │   ├── test-sdk/      # Shared pytest plugin (nexus-test-sdk) — installable via pip from git
 │   ├── tests/         # pytest: unit, integration, contract, E2E, performance
@@ -35,6 +35,10 @@ Read the component docs when working in that area — they contain detailed stan
 | Both (E2E, contracts, infra) | This file |
 
 ### Skills
+
+Upstream AI agent policy (no executable hooks; private local settings; who may
+change `.claude/`) is documented in
+[`.github/AI_AGENT_POLICY.md`](.github/AI_AGENT_POLICY.md).
 
 Skills live in `.claude/skills/` at the repo root, prefixed by workspace:
 
@@ -90,7 +94,7 @@ make -C backend db-clean      # Reset database (destructive)
 
 ## Contract Generation
 
-Backend OpenAPI specs live at `backend/src/nexus/schemas/`. Frontend TypeScript types are generated into `frontend/packages/syntara-contracts/src/`.
+Backend OpenAPI specs live at `backend/src/syntara/schemas/`. Frontend TypeScript types are generated into `frontend/packages/syntara-contracts/src/`.
 
 ```bash
 make gen-contracts

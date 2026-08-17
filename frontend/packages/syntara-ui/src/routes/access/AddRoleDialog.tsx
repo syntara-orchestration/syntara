@@ -180,6 +180,7 @@ function AddRoleFormFields({
               selected={field.value}
               onChange={field.onChange}
               hasError={!!errors.policies}
+              scopeProjectId={scope === 'project' ? projectId || null : null}
               projectEligible={scope === 'project'}
               isDisabled={scope === 'project' && !projectId}
             />

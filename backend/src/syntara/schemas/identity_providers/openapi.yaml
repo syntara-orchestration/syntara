@@ -1,0 +1,1001 @@
+---
+openapi: 3.1.0
+info:
+  title: Identity Provider Management API
+  description: API for registering and managing external Identity Providers
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+tags:
+  - name: Identity Providers
+    description: Identity provider registration and management
+
+x-shared-contracts:
+  - path: ../base/shared-resources.openapi.yaml
+    namespace: shared
+
+paths:
+  /identity_providers:
+    get:
+      summary: List identity providers
+      description: List identity providers with filtering, sorting, and pagination.
+      operationId: list_identity_providers
+      x-app-permission:
+        resource: identity-provider
+        action: read
+      parameters:
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+      responses:
+        '200':
+          description: List of identity providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityProviderListResponse'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+    post:
+      summary: Create identity provider
+      description: Create a new identity provider.
+      operationId: create_identity_provider
+      x-app-permission:
+        resource: identity-provider
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderCreate'
+      responses:
+        '201':
+          description: Identity provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityProviderRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+  /identity_providers/{provider_id}:
+    get:
+      summary: Get identity provider
+      description: Get identity provider details by ID.
+      operationId: get_identity_provider
+      x-app-permission:
+        resource: identity-provider
+        action: read
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Provider Id
+      responses:
+        '200':
+          description: Identity provider details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityProviderRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update identity provider
+      description: Update an identity provider.
+      operationId: update_identity_provider
+      x-app-permission:
+        resource: identity-provider
+        action: update
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Provider Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityProviderRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete identity provider
+      description: Soft delete an identity provider.
+      operationId: delete_identity_provider
+      x-app-permission:
+        resource: identity-provider
+        action: delete
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Provider Id
+      responses:
+        '204':
+          description: Identity provider deleted
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+  /identity_providers/setup_aap_oidc:
+    post:
+      summary: Setup Ansible Automation Platform OIDC provider
+      description: >-
+        Push-button setup: connects to Ansible Automation Platform, creates an OAuth2
+        application, and configures the identity provider with Ansible Automation Platform defaults.
+      operationId: setup_aap_oidc_provider
+      x-app-permission:
+        resource: identity-provider
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AAPOIDCSetupRequest'
+      responses:
+        '201':
+          description: Ansible Automation Platform OIDC provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityProviderRead'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+  /identity_providers/test:
+    post:
+      summary: Test identity provider
+      description: Test identity provider connection without saving. Requires authentication.
+      operationId: test_identity_provider
+      x-app-permission:
+        resource: identity-provider
+        action: test
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OIDCTestRequest'
+      responses:
+        '200':
+          description: Test results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OIDCTestResult'
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+      tags:
+        - Identity Providers
+      security:
+        - bearerAuth: []
+components:
+  schemas:
+    OIDCClaimMapping:
+      type: object
+      title: OIDCClaimMapping
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
+      additionalProperties: false
+      properties:
+        subject:
+          type: string
+          default: sub
+          title: Subject
+        email:
+          type: string
+          default: email
+          title: Email
+        username:
+          type: string
+          default: preferred_username
+          title: Username
+        first_name:
+          type: string
+          default: given_name
+          title: First Name
+        last_name:
+          type: string
+          default: family_name
+          title: Last Name
+
+    OIDCGroupMappingEntry:
+      type: object
+      title: OIDCGroupMappingEntry
+      description: |-
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
+
+        Used in API requests/responses. Actual storage is in the
+        ``idp_group_mapping_entries`` table.
+      required:
+        - idp_group_value
+        - mapped_group_id
+      additionalProperties: false
+      properties:
+        idp_group_value:
+          type: string
+          minLength: 1
+          title: Idp Group Value
+          description: Group value from the IdP token (e.g. GUID or role name)
+        mapped_group_id:
+          type: string
+          format: uuid
+          title: Mapped Group Id
+          description: ID of the group to map to
+
+    OIDCConfiguration:
+      type: object
+      title: OIDCConfiguration
+      description: Configuration for OIDC (OpenID Connect) providers.
+      additionalProperties: false
+      required:
+        - issuer_url
+        - client_id
+        - redirect_uri
+      properties:
+        provider_type:
+          type: string
+          const: oidc
+          default: oidc
+          title: Provider Type
+        idp_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Idp Type
+          description: "Identity provider type hint. Known values: aap, custom"
+        auto_discovery:
+          type: boolean
+          default: true
+          title: Auto Discovery
+          description: Use OIDC auto-discovery via .well-known endpoint
+        issuer_url:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Issuer Url
+          description: OIDC issuer URL (e.g. https://accounts.google.com)
+        client_id:
+          type: string
+          title: Client Id
+          description: OAuth 2.0 client ID
+        client_secret:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Client Secret
+          description: OAuth 2.0 client secret
+        redirect_uri:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Redirect Uri
+          description: OAuth 2.0 redirect URI
+        scopes:
+          type: string
+          default: openid profile email
+          title: Scopes
+          description: Space-separated list of OAuth 2.0 scopes
+        authorization_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Authorization Endpoint
+          description: Authorization endpoint URL
+        token_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Token Endpoint
+          description: Token endpoint URL
+        jwks_uri:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Jwks Uri
+          description: JWKS URI for token verification
+        userinfo_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Userinfo Endpoint
+          description: Userinfo endpoint URL (optional)
+        end_session_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: End Session Endpoint
+          description: OIDC end session endpoint URL for RP-initiated logout
+        enable_rp_initiated_logout:
+          type: boolean
+          default: false
+          title: Enable Rp Initiated Logout
+          description: Enable RP-initiated logout redirect to IdP when user logs out
+        claim_mapping:
+          $ref: '#/components/schemas/OIDCClaimMapping'
+        group_jmespath_expression:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Group Jmespath Expression
+          description: JMESPath expression to extract group values from token claims
+        group_mapping_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/OIDCGroupMappingEntry'
+          title: Group Mapping Entries
+          description: IdP-to-Syntara group mapping entries
+        allow_all_authenticated:
+          type: boolean
+          default: false
+          title: Allow All Authenticated
+          description: Allow all users from this IdP to log in regardless of group mapping results
+        aap_role_mapping_enabled:
+          type: boolean
+          default: false
+          title: Aap Role Mapping Enabled
+          description: Map Ansible Automation Platform aap_system_role claim to built-in groups
+        disable_tls_verify:
+          type: boolean
+          default: false
+          title: Disable Tls Verify
+          description: Disable TLS certificate verification for requests to this identity provider (insecure)
+
+    OIDCConfigurationResponse:
+      type: object
+      title: OIDCConfigurationResponse
+      description: Response schema for OIDC configuration (excludes client_secret).
+      additionalProperties: false
+      required:
+        - issuer_url
+        - client_id
+        - redirect_uri
+      properties:
+        provider_type:
+          type: string
+          const: oidc
+          default: oidc
+          title: Provider Type
+        idp_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Idp Type
+          description: Identity provider type hint
+        auto_discovery:
+          type: boolean
+          default: true
+          title: Auto Discovery
+          description: Use OIDC auto-discovery via .well-known endpoint
+        issuer_url:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Issuer Url
+          description: OIDC issuer URL (e.g. https://accounts.google.com)
+        client_id:
+          type: string
+          title: Client Id
+          description: OAuth 2.0 client ID
+        redirect_uri:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Redirect Uri
+          description: OAuth 2.0 redirect URI
+        scopes:
+          type: string
+          default: "openid profile email"
+          title: Scopes
+          description: Space-separated list of OAuth 2.0 scopes
+        authorization_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: Authorization Endpoint
+          description: Authorization endpoint URL
+        token_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: Token Endpoint
+          description: Token endpoint URL
+        jwks_uri:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: Jwks Uri
+          description: JWKS URI for token verification
+        userinfo_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: Userinfo Endpoint
+          description: Userinfo endpoint URL (optional)
+        end_session_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: End Session Endpoint
+          description: OIDC end session endpoint URL for RP-initiated logout
+        enable_rp_initiated_logout:
+          type: boolean
+          default: false
+          title: Enable Rp Initiated Logout
+          description: Enable RP-initiated logout redirect to IdP when user logs out
+        claim_mapping:
+          $ref: '#/components/schemas/OIDCClaimMapping'
+        group_jmespath_expression:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Group Jmespath Expression
+          description: JMESPath expression for group extraction
+        group_mapping_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/OIDCGroupMappingEntry'
+          title: Group Mapping Entries
+          description: IdP-to-Syntara group mapping entries
+        allow_all_authenticated:
+          type: boolean
+          default: false
+          title: Allow All Authenticated
+          description: Allow all users from this IdP to log in regardless of group mapping results
+        aap_role_mapping_enabled:
+          type: boolean
+          default: false
+          title: Aap Role Mapping Enabled
+          description: Map Ansible Automation Platform aap_system_role claim to built-in groups
+        disable_tls_verify:
+          type: boolean
+          default: false
+          title: Disable Tls Verify
+          description: Disable TLS certificate verification for requests to this identity provider (insecure)
+
+    OIDCConfigurationUpdate:
+      type: object
+      title: OIDCConfigurationUpdate
+      description: "Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."
+      additionalProperties: false
+      required:
+        - issuer_url
+        - client_id
+        - redirect_uri
+      properties:
+        provider_type:
+          type: string
+          const: oidc
+          default: oidc
+          title: Provider Type
+        idp_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Idp Type
+          description: "Identity provider type hint. Known values: aap, custom"
+        auto_discovery:
+          type: boolean
+          default: true
+          title: Auto Discovery
+          description: Use OIDC auto-discovery via .well-known endpoint
+        issuer_url:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Issuer Url
+          description: OIDC issuer URL (e.g. https://accounts.google.com)
+        client_id:
+          type: string
+          title: Client Id
+          description: OAuth 2.0 client ID
+        client_secret:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Client Secret
+          description: OAuth 2.0 client secret (omit to keep existing)
+        redirect_uri:
+          type: string
+          maxLength: 2083
+          minLength: 1
+          format: uri
+          title: Redirect Uri
+          description: OAuth 2.0 redirect URI
+        scopes:
+          type: string
+          default: openid profile email
+          title: Scopes
+          description: Space-separated list of OAuth 2.0 scopes
+        authorization_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Authorization Endpoint
+          description: Authorization endpoint URL
+        token_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Token Endpoint
+          description: Token endpoint URL
+        jwks_uri:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Jwks Uri
+          description: JWKS URI for token verification
+        userinfo_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: "null"
+          title: Userinfo Endpoint
+          description: Userinfo endpoint URL (optional)
+        end_session_endpoint:
+          anyOf:
+            - type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            - type: 'null'
+          title: End Session Endpoint
+          description: OIDC end session endpoint URL for RP-initiated logout (omit to keep existing)
+        enable_rp_initiated_logout:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Enable Rp Initiated Logout
+          description: Enable RP-initiated logout redirect to IdP when user logs out (omit to keep existing)
+        claim_mapping:
+          anyOf:
+            - $ref: '#/components/schemas/OIDCClaimMapping'
+            - type: 'null'
+          description: OIDC claim mapping (omit to keep existing)
+        group_jmespath_expression:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Group Jmespath Expression
+          description: JMESPath expression for group extraction (omit to keep existing)
+        group_mapping_entries:
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/OIDCGroupMappingEntry'
+            - type: 'null'
+          title: Group Mapping Entries
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
+        allow_all_authenticated:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Allow All Authenticated
+          description: Allow all users from this IdP to log in regardless of group mapping results (omit to keep existing)
+        aap_role_mapping_enabled:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Aap Role Mapping Enabled
+          description: Map Ansible Automation Platform aap_system_role claim to built-in groups (omit to keep existing)
+        disable_tls_verify:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Disable Tls Verify
+          description: Disable TLS certificate verification for this identity provider (omit to keep existing)
+
+    IdentityProviderCreate:
+      type: object
+      title: IdentityProviderCreate
+      description: Schema for creating a new identity provider.
+      required:
+        - name
+        - configuration
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Human-readable name for the provider
+          minLength: 1
+          maxLength: 255
+        description:
+          title: Description
+          description: Detailed description of the provider
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+        configuration:
+          title: Configuration
+          description: Provider configuration
+          discriminator:
+            propertyName: provider_type
+            mapping:
+              oidc: '#/components/schemas/OIDCConfiguration'
+          oneOf:
+            - $ref: '#/components/schemas/OIDCConfiguration'
+
+    IdentityProviderUpdate:
+      type: object
+      title: IdentityProviderUpdate
+      description: Schema for partially updating an identity provider.
+      additionalProperties: false
+      properties:
+        name:
+          title: Name
+          description: Human-readable name for the provider
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 255
+            - type: 'null'
+        description:
+          title: Description
+          description: Detailed description of the provider
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+        configuration:
+          title: Configuration
+          description: "Provider-specific configuration (client_secret optional — preserves existing if omitted)"
+          anyOf:
+            - discriminator:
+                propertyName: provider_type
+                mapping:
+                  oidc: '#/components/schemas/OIDCConfigurationUpdate'
+              oneOf:
+                - $ref: '#/components/schemas/OIDCConfigurationUpdate'
+            - type: 'null'
+        enabled:
+          title: Enabled
+          description: Enable/disable the provider
+          anyOf:
+            - type: boolean
+            - type: 'null'
+
+    IdentityProviderRead:
+      title: IdentityProviderRead
+      description: Schema for IdentityProvider response with configuration details (excludes secrets).
+      additionalProperties: false
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
+        - type: object
+          title: IdentityProviderRead
+          required:
+            - configuration
+          properties:
+            name:
+              description: Human-readable provider name
+            enabled:
+              type: boolean
+              title: Enabled
+              description: Enable/disable the identity provider
+              default: true
+            configuration:
+              $ref: '#/components/schemas/OIDCConfigurationResponse'
+              description: Identity provider configuration
+
+    IdentityProviderListResponse:
+      allOf:
+        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
+        - type: object
+          required:
+            - resources
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/IdentityProviderRead'
+      title: IdentityProviderListResponse
+      description: Paginated list response for identity providers.
+
+    OIDCTestRequest:
+      type: object
+      title: OIDCTestRequest
+      description: Request body for testing an OIDC connection.
+      required:
+        - name
+        - configuration
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Name
+          description: Human-readable name for the provider
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          title: Description
+          description: Detailed description of the provider
+        configuration:
+          title: Configuration
+          description: Provider configuration
+          discriminator:
+            propertyName: provider_type
+            mapping:
+              oidc: '#/components/schemas/OIDCConfiguration'
+          oneOf:
+            - $ref: '#/components/schemas/OIDCConfiguration'
+
+    OIDCTestResult:
+      type: object
+      title: OIDCTestResult
+      description: Result of an OIDC connection test.
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          title: Success
+        message:
+          type: string
+          title: Message
+        metadata:
+          anyOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: "null"
+          title: Metadata
+        claims_supported:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: 'null'
+          title: Claims Supported
+        claim_aliases:
+          anyOf:
+            - type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+            - type: 'null'
+          title: Claim Aliases
+        end_session_endpoint_supported:
+          type: boolean
+          default: false
+          title: End Session Endpoint Supported
+
+    AAPOIDCSetupRequest:
+      type: object
+      title: AAPOIDCSetupRequest
+      description: Request body for push-button Ansible Automation Platform OIDC identity provider setup.
+      required:
+        - aap_url
+      additionalProperties: false
+      properties:
+        aap_url:
+          type: string
+          minLength: 1
+          title: Ansible Automation Platform URL
+          description: Ansible Automation Platform base URL (e.g., https://aap.example.com)
+        organization:
+          type: string
+          default: Default
+          minLength: 1
+          title: Organization
+          description: Ansible Automation Platform organization name to create the OAuth2 application in
+        admin_username:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Platform Admin Username
+          description: Ansible Automation Platform platform admin username (required when using basic auth)
+        admin_password:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          format: password
+          title: Platform Admin Password
+          description: Ansible Automation Platform platform admin password (used only for setup, never stored)
+        personal_access_token:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          format: password
+          title: Personal Access Token
+          description: Ansible Automation Platform personal access token (alternative to username/password, never stored)
+        insecure_skip_tls_verify:
+          type: boolean
+          default: false
+          title: Insecure Skip TLS Verify
+          description: Skip TLS certificate verification for the Ansible Automation Platform connection

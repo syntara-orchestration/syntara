@@ -1,6 +1,6 @@
 # Resilient Background Execution
 
-Nexus originally processed system operations — document conversion, agent execution — inside
+Syntara originally processed system operations — document conversion, agent execution — inside
 FastAPI `BackgroundTasks`. These are fire-and-forget callbacks that run in the same process as the
 HTTP request that triggered them: no retry, no durability, no visibility, and critically, they share
 a single-process execution slot with user workflows. A burst of file uploads could saturate the
@@ -30,7 +30,7 @@ own dedicated queue, served by their own dedicated worker deployment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Nexus API (FastAPI)                                                        │
+│  Syntara API (FastAPI)                                                        │
 │                                                                             │
 │  POST /executions  →  ExecutionService.start_workflow(is_builtin=False)    │
 │       ↓ task_queue = orchestrator-workflow-queue                                   │
@@ -57,7 +57,7 @@ touches `orchestrator-workflow-queue` and vice versa.
 
 ### The `is_builtin` Flag
 
-`Workflow.is_builtin` (`src/nexus/workflows/models/workflow.py`) is a boolean column on the
+`Workflow.is_builtin` (`src/syntara/workflows/models/workflow.py`) is a boolean column on the
 `Workflow` database table, defaulting `false` and indexed for fast queue-routing lookups:
 
 ```python
@@ -69,20 +69,20 @@ is_builtin: bool = Field(
 ```
 
 Built-in workflows (Document Conversion, Agent Execution) are seeded into the database by
-`seed_builtin_workflows()` (`src/nexus/workflows/seed_builtin.py`) with `is_builtin=True`. The
+`seed_builtin_workflows()` (`src/syntara/workflows/seed_builtin.py`) with `is_builtin=True`. The
 seeder is idempotent — re-running it updates the workflow definition if it changed, and is a
 no-op if nothing changed. It runs at startup, so the database always reflects the latest
 built-in workflow definition without manual intervention.
 
 ### Routing at Dispatch Time
 
-`TemporalExecutionService.start_workflow()` (`src/nexus/workflows/workflow_engine/services/temporal_execution_service.py`)
+`TemporalExecutionService.start_workflow()` (`src/syntara/workflows/workflow_engine/services/temporal_execution_service.py`)
 accepts an `is_builtin: bool = False` keyword argument. The queue selection is a single
 conditional at the Temporal client call:
 
 ```python
 handle = await self.temporal_client.start_workflow(
-    NexusWorkflow.run,
+    OrchestratorWorkflow.run,
     args=[...],
     id=temporal_workflow_id,
     task_queue=self.background_task_queue if is_builtin else self.task_queue,
@@ -90,7 +90,7 @@ handle = await self.temporal_client.start_workflow(
 ```
 
 `self.background_task_queue` defaults to `orchestrator-background-queue` (constant
-`TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE` in `src/nexus/core/config/base.py`) but is
+`TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE` in `src/syntara/core/config/base.py`) but is
 overridable via the `APP_BACKGROUND_TASK_QUEUE` environment variable. `create_temporal_execution_service()`
 reads both queue names from settings and wires them into the service at construction time, so
 nothing downstream of the service needs to know about queue names.
@@ -107,14 +107,14 @@ nothing downstream of the service needs to know about queue names.
 
 ### Entrypoint and Lifecycle
 
-`src/nexus/workflows/background_worker.py` is the background worker process entrypoint:
+`src/syntara/workflows/background_worker.py` is the background worker process entrypoint:
 
 ```
-python -m nexus.workflows.background_worker
+python -m syntara.workflows.background_worker
 ```
 
 It calls the same `run_worker()` lifecycle function as the main workflow worker
-(`src/nexus/workflows/worker_lifecycle.py`). `run_worker()` is not a background task or
+(`src/syntara/workflows/worker_lifecycle.py`). `run_worker()` is not a background task or
 a thread — it is the main event loop of the worker process, blocking on
 `asyncio.Event.wait()` until a `SIGTERM` or `SIGINT` arrives, then draining in-flight
 activities before exit.
@@ -133,7 +133,7 @@ The shared `run_worker()` function handles:
 ### Reduced Activity Surface
 
 The background worker runs a smaller activity registry than the main workflow worker
-(`src/nexus/workflows/workflow_engine/activities/registry.py`):
+(`src/syntara/workflows/workflow_engine/activities/registry.py`):
 
 | Registry | Used by | Activities |
 |---|---|---|
@@ -254,7 +254,7 @@ dedicated metrics Service is needed because Temporal's Service already exists.
 
 ### Queue Depth Metric
 
-`src/nexus/metrics/queue_depth_poller.py` runs as a `PeriodicWorker` inside the API server
+`src/syntara/metrics/queue_depth_poller.py` runs as a `PeriodicWorker` inside the API server
 process, polling Temporal's `DescribeTaskQueue` RPC every 5 seconds for both queues:
 
 ```python
@@ -334,7 +334,7 @@ files only.
 
 ### Step 1 — Register an internal operation handler
 
-`execute_internal_activity` (`src/nexus/workflows/workflow_engine/activities/internal_activity.py`)
+`execute_internal_activity` (`src/syntara/workflows/workflow_engine/activities/internal_activity.py`)
 is the single Temporal activity that all built-in workflows dispatch through. It looks up the
 `activity` parameter from the node config in `_DISPATCH`, a plain dict of
 `str → async callable`:
@@ -356,7 +356,7 @@ async def _run_my_operation(operation_input: dict[str, Any]) -> dict[str, Any]:
         raise ApplicationError("my_operation requires 'resource_id'", non_retryable=True)
 
     # Heavy imports go here (lazy, inside the function) to avoid Temporal sandbox warnings
-    from nexus.my_domain.tasks import MyTask  # noqa: PLC0415
+    from syntara.my_domain.tasks import MyTask  # noqa: PLC0415
 
     result = await MyTask().run(UUID(resource_id))
     return {"output": {"status": result.name}}
@@ -376,7 +376,7 @@ Two conventions to follow:
 
 ### Step 2 — Add the workflow definition to the seed
 
-`_BUILTIN_DEFINITIONS` (`src/nexus/workflows/seed_builtin.py`) is a list of V2 workflow
+`_BUILTIN_DEFINITIONS` (`src/syntara/workflows/seed_builtin.py`) is a list of V2 workflow
 definition dicts. Add an entry:
 
 ```python
@@ -452,17 +452,32 @@ await execution_service.start_workflow(
 The service looks up `background_task_queue` from settings and routes the Temporal workflow
 there. From this point, execution is identical to any other workflow — visible in the Temporal
 UI under `orchestrator-background-queue`, status synced to the DB via `ActivitySyncService`, and
-surfaced in the Nexus UI for administrators with the builtin toggle enabled.
+surfaced in the Syntara UI for administrators with the builtin toggle enabled.
 
 ## Constraints and Known Gaps
 
-**OOM under sustained load**: the background worker Temporal SDK caches workflow state in
-memory. Under high invocation rates (~10/sec), `max_cached_workflows` (default: 1000) fills
-the cache faster than entries expire, causing heap growth and eventual OOM restart. The fix is
-to cap `max_cached_workflows=50` in the worker constructor call in `background_worker.py`. This
-is not yet in place — the background worker's built-in workflow footprint is small enough that
-cache entries are short-lived, so OOM requires a specific combination of high rate and
-long-running internal activities.
+**OOM under sustained LLM load**: The background worker executes memory-heavy LLM/agent activities
+(Document Conversion, Agent Execution). Under sustained load, uncapped activity concurrency can cause
+out-of-memory pod restarts. The fix involves two coordinated changes:
+
+1. **Activity concurrency cap**: `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES` (default: 10)
+   controls the maximum concurrent Temporal activities per pod. This is the primary knob. LLM activities
+   consume ~200-500MB each; 10 concurrent activities fit within a 1Gi pod budget.
+
+   **Behavior when cap is reached**: Activities do not fail when the concurrency limit is reached. Instead,
+   incoming activity tasks queue in the Temporal task queue until a worker slot becomes available. The
+   worker polls the queue and processes tasks in FIFO order. This is standard Temporal behavior — the queue
+   acts as a backpressure mechanism. If demand consistently exceeds per-pod capacity (10 activities), the
+   Kubernetes HPA scales the background worker deployment horizontally by adding replicas, distributing
+   load across multiple pods. This allows the system to handle arbitrarily high sustained load.
+
+2. **Pod memory limit**: Kubernetes pod memory limit should be **1Gi minimum** for background workers
+   (configured in the operator via `spec.backgroundWorker.resources.limits.memory`). The previous
+   512Mi default was insufficient even with concurrency capping.
+
+Note: `max_cached_workflows` (default: 1000) caps workflow history caching in Temporal SDK, not activity
+concurrency. These are separate tuning knobs — do not confuse them when diagnosing OOM. For high activity
+concurrency load, tune `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES`, not `max_cached_workflows`.
 
 **No CPU-independent HPA metric**: the HPA scales on CPU utilization. This works for CPU-bound
 activities but is a weak proxy for queue backlog depth. A better HPA trigger would be the
@@ -472,7 +487,7 @@ correct; the CPU trigger just responds to load with some lag rather than immedia
 
 ## Related Documentation
 
-- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `NexusWorkflow` executes both user and built-in workflows identically
+- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `OrchestratorWorkflow` executes both user and built-in workflows identically
 - [Execution Runtime](execution-runtime.md) — `POST /executions` API, two-phase creation, live status
 - [Observability Standards](standards/observability.md) — `MetricsRecorder` usage, Prometheus gauge patterns
 - [Configuration Standards](standards/configuration.md) — adding new settings, Pydantic Settings patterns

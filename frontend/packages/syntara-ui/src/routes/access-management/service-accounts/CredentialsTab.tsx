@@ -10,6 +10,7 @@ import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
@@ -17,7 +18,7 @@ import { useTableSort } from '../../../hooks/useTableSort'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { formatDateTime, formatExpirationDate } from '../../../utils/dateUtils'
+import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 
@@ -26,7 +27,7 @@ import { RotateDialogBody } from './RotateDialogBody'
 import { DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { RotationGraceIndicator } from './RotationGraceIndicator'
 import { SecretRevealModal } from './SecretRevealModal'
-import type { SACredentialRead } from './serviceAccountTypes'
+import type { ServiceAccountCredentialRead } from './serviceAccountTypes'
 import { useServiceAccountPermissions } from './useServiceAccountPermissions'
 
 type SecretRevealState = {
@@ -56,7 +57,7 @@ const credentialFilterDefs: FilterFieldDefinition[] = [
 function useCredentialActions(
   serviceAccountId: string,
   refetch: () => Promise<unknown>,
-  onDisableRequest: (cred: SACredentialRead) => void
+  onDisableRequest: (cred: ServiceAccountCredentialRead) => void
 ) {
   const { showSuccess } = useAlerts()
   const handleMutationError = useMutationErrorHandler()
@@ -113,7 +114,7 @@ function useCredentialActions(
   )
 
   const handleEnable = useCallback(
-    (cred: SACredentialRead) => {
+    (cred: ServiceAccountCredentialRead) => {
       enableCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
         {
@@ -126,7 +127,7 @@ function useCredentialActions(
   )
 
   const handleToggleStatus = useCallback(
-    (cred: SACredentialRead) => {
+    (cred: ServiceAccountCredentialRead) => {
       if (cred.status === 'active') {
         onDisableRequest(cred)
         return
@@ -137,7 +138,7 @@ function useCredentialActions(
   )
 
   const handleDisableConfirm = useCallback(
-    (cred: SACredentialRead | null, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, onSettled: () => void) => {
       if (!cred) return
       disableCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
@@ -152,7 +153,7 @@ function useCredentialActions(
   )
 
   const handleRotateConfirm = useCallback(
-    (cred: SACredentialRead | null, gracePeriodSeconds: number, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, gracePeriodSeconds: number, onSettled: () => void) => {
       if (!cred) return
       const validValues = GRACE_PERIOD_OPTIONS.map((opt) => opt.value as number)
       const sanitizedGracePeriod = validValues.includes(gracePeriodSeconds) ? gracePeriodSeconds : DEFAULT_GRACE_PERIOD
@@ -180,7 +181,7 @@ function useCredentialActions(
   )
 
   const handleDeleteConfirm = useCallback(
-    (cred: SACredentialRead | null, onSettled: () => void) => {
+    (cred: ServiceAccountCredentialRead | null, onSettled: () => void) => {
       if (!cred) return
       deleteCredential(
         { params: { path: { service_account_id: serviceAccountId, credential_id: cred.id } } },
@@ -213,10 +214,10 @@ function useCredentialActions(
 }
 
 function getCredentialActions(
-  credential: SACredentialRead,
+  credential: ServiceAccountCredentialRead,
   permissions: ReturnType<typeof useServiceAccountPermissions>,
-  onRotate: (cred: SACredentialRead) => void,
-  onDelete: (cred: SACredentialRead) => void
+  onRotate: (cred: ServiceAccountCredentialRead) => void,
+  onDelete: (cred: ServiceAccountCredentialRead) => void
 ): KebabAction[] {
   return [
     {
@@ -246,12 +247,12 @@ function CredentialsTable({
   onToggleStatus,
   onDelete,
 }: Readonly<{
-  credentials: SACredentialRead[]
+  credentials: ServiceAccountCredentialRead[]
   getSortParams: ReturnType<typeof useTableSort>['getSortParams']
   permissions: ReturnType<typeof useServiceAccountPermissions>
-  onRotate: (cred: SACredentialRead) => void
-  onToggleStatus: (cred: SACredentialRead) => void
-  onDelete: (cred: SACredentialRead) => void
+  onRotate: (cred: ServiceAccountCredentialRead) => void
+  onToggleStatus: (cred: ServiceAccountCredentialRead) => void
+  onDelete: (cred: ServiceAccountCredentialRead) => void
 }>) {
   return (
     <>
@@ -274,8 +275,12 @@ function CredentialsTable({
                 {cred.identifier}
               </ClipboardCopy>
             </Td>
-            <Td dataLabel="Created">{formatDateTime(cred.created_at)}</Td>
-            <Td dataLabel="Last used">{cred.last_used_at ? formatDateTime(cred.last_used_at) : '-'}</Td>
+            <Td dataLabel="Created">
+              <DateCell dateString={cred.created_at} />
+            </Td>
+            <Td dataLabel="Last used">
+              <DateCell dateString={cred.last_used_at} />
+            </Td>
             <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
             <Td dataLabel="State">
               <Switch
@@ -318,9 +323,9 @@ export function CredentialsTab({
   resourceProject,
 }: Readonly<{ serviceAccountId: string; serviceAccountName?: string; resourceProject?: string }>) {
   const permissions = useServiceAccountPermissions({ resourceProject })
-  const deleteDialog = useDialogState<SACredentialRead>()
-  const disableDialog = useDialogState<SACredentialRead>()
-  const rotateDialog = useDialogState<SACredentialRead>()
+  const deleteDialog = useDialogState<ServiceAccountCredentialRead>()
+  const disableDialog = useDialogState<ServiceAccountCredentialRead>()
+  const rotateDialog = useDialogState<ServiceAccountCredentialRead>()
   const [rotateGracePeriod, setRotateGracePeriod] = useState(DEFAULT_GRACE_PERIOD)
 
   const {

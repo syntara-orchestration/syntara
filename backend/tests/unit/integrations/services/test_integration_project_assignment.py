@@ -9,25 +9,25 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.authz.exceptions import ProjectNotFoundError
-from nexus.authz.models import Project
-from nexus.core.models import User
-from nexus.integrations.exceptions import IntegrationNotFoundError, IntegrationScopeError
-from nexus.integrations.models.integration import (
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.exceptions import ProjectNotFoundError
+from syntara.authz.models import Project
+from syntara.core.models import User
+from syntara.integrations.exceptions import IntegrationNotFoundError, IntegrationScopeError
+from syntara.integrations.models.integration import (
     IntegrationCreate,
-    IntegrationPatch,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationType,
+    IntegrationUpdate,
 )
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 
 @pytest.fixture(autouse=True)
 def _skip_credential_validation() -> Generator[None, None, None]:
     with patch(
-        "nexus.integrations.services.integration_service.CREDENTIAL_REQUIRED_TYPES",
+        "syntara.integrations.services.integration_service.CREDENTIAL_REQUIRED_TYPES",
         frozenset(),
     ):
         yield
@@ -318,7 +318,7 @@ class TestPatchScopeClearing:
         created = await integration_service.create_integration(_mcp_create(scope=IntegrationScope.PROJECT))
         await integration_service.assign_project(created.id, project.id)
 
-        await integration_service.patch_integration(created.id, IntegrationPatch(scope=IntegrationScope.GLOBAL))
+        await integration_service.update_integration(created.id, IntegrationUpdate(scope=IntegrationScope.GLOBAL))
 
         rows = await test_db_session.exec(
             select(IntegrationProjectAssignment).where(IntegrationProjectAssignment.integration_id == created.id)
@@ -331,8 +331,8 @@ class TestPatchScopeClearing:
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
 
-        result = await integration_service.patch_integration(
-            created.id, IntegrationPatch(scope=IntegrationScope.PROJECT)
+        result = await integration_service.update_integration(
+            created.id, IntegrationUpdate(scope=IntegrationScope.PROJECT)
         )
 
         assert result.scope == IntegrationScope.PROJECT

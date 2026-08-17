@@ -1,4 +1,4 @@
-"""Unit tests for NexusWorkflow queries, loops, and helpers (task 6.3).
+"""Unit tests for OrchestratorWorkflow queries, loops, and helpers (task 6.3).
 
 Tests cover:
 - get_skipped_nodes query
@@ -18,15 +18,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexus.workflows.utils.namespace_resolver import NamespaceResolver
-from nexus.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
-from nexus.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from nexus.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from nexus.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.models.workflow_definition import (
     ForEachLoopState,
     NodeType,
 )
-from nexus.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -34,7 +34,7 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
-    with patch("nexus.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         yield mock_wf
@@ -44,9 +44,9 @@ def _make_workflow(
     skipped_nodes: set[str] | None = None,
     failed_nodes: dict[str, str] | None = None,
     resolver: NamespaceResolver | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = skipped_nodes if skipped_nodes is not None else set()
     wf.failed_nodes = failed_nodes if failed_nodes is not None else {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()
@@ -330,7 +330,7 @@ class TestScrubActivityCredentials:
             "url": "http://example.com",
             "_resolved_credentials": {"extra_vars": {"bearer_token": "secret"}},
         }
-        NexusWorkflow._scrub_activity_credentials(config)
+        OrchestratorWorkflow._scrub_activity_credentials(config)
         assert "_resolved_credentials" not in config
 
     def test_redacts_credential_fields_at_top_level(self) -> None:
@@ -339,28 +339,28 @@ class TestScrubActivityCredentials:
             "bearer_token": "sk-secret-123",
             "llm_api_key": "key-456",
         }
-        NexusWorkflow._scrub_activity_credentials(config)
+        OrchestratorWorkflow._scrub_activity_credentials(config)
         assert config["bearer_token"] == REDACTED
         assert config["llm_api_key"] == REDACTED
         assert config["url"] == "http://example.com"
 
     def test_preserves_non_credential_fields(self) -> None:
         config: dict[str, Any] = {"url": "http://example.com", "method": "POST", "timeout": 30}
-        NexusWorkflow._scrub_activity_credentials(config)
+        OrchestratorWorkflow._scrub_activity_credentials(config)
         assert config == {"url": "http://example.com", "method": "POST", "timeout": 30}
 
     def test_redacts_nested_credential_fields(self) -> None:
         config: dict[str, Any] = {
             "nested": {"bearer_token": "secret", "safe_key": "value"},
         }
-        NexusWorkflow._scrub_activity_credentials(config)
+        OrchestratorWorkflow._scrub_activity_credentials(config)
         assert config["nested"]["bearer_token"] == REDACTED
         assert config["nested"]["safe_key"] == "value"
 
     def test_preserves_dict_identity(self) -> None:
         config: dict[str, Any] = {"bearer_token": "secret", "url": "http://example.com"}
         original_id = id(config)
-        NexusWorkflow._scrub_activity_credentials(config)
+        OrchestratorWorkflow._scrub_activity_credentials(config)
         assert id(config) == original_id
 
 

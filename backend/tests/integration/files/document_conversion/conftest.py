@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from langchain_core.messages import AIMessage
 
-from nexus.agent_orchestrator.token_manager.models import UserTokenConfig
+from syntara.agent_orchestrator.token_manager.models import UserTokenConfig
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ async def test_user_token_config(test_db_session, test_user) -> UserTokenConfig:
 def mock_relevancy_checker() -> Generator[AsyncMock, None, None]:
     """Mock LLM relevancy so uploaded docs are not filtered out without an API key."""
     with patch(
-        "nexus.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
+        "syntara.agent_orchestrator.context_manager.retriever_service.checkers.llm_relevancy_checker.get_openrouter_llm"
     ) as mock_get_checker_llm:
         mock_llm = AsyncMock()
         mock_llm.ainvoke.return_value = AIMessage(content="Relevancy Score: 0.85\n\nHighly relevant document.")

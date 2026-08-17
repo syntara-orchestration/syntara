@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from nexus.audit.models.audit_event import AuditEvent, EventCategory
-from nexus.audit.models.structured_data import AuditContextData
+from syntara.audit.models.audit_event import AuditEvent, EventCategory
+from syntara.audit.models.structured_data import AuditContextData
 
 
 class TestAuditEventResourceUrnValidation:
@@ -79,7 +79,7 @@ class TestAuditEventResourceUrnValidation:
             pytest.param(None, None, None, id="none_value_accepted"),
             # Invalid URNs - should be dropped with warnings
             pytest.param(
-                "nexus:workflow:123",
+                "syntara:workflow:123",
                 None,
                 "does not conform to RFC 8141",
                 id="invalid_missing_urn_prefix",
@@ -111,7 +111,7 @@ class TestAuditEventResourceUrnValidation:
         expected_log_fragment: str | None,
     ) -> None:
         """Test resource_urn RFC 8141 validation with various inputs."""
-        with patch("nexus.audit.models.audit_event.logger") as mock_logger:
+        with patch("syntara.audit.models.audit_event.logger") as mock_logger:
             # Create event with the input URN (or omit if None and testing omission)
             event = AuditEvent(
                 event_category=EventCategory.USER_ACTION,

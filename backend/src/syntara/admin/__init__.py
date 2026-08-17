@@ -1,0 +1,1 @@
+"""Syntara admin CLI package."""

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from nexus.authz.role_conventions import BUILTIN_POLICIES
+from syntara.authz.role_conventions import BUILTIN_POLICIES
 from tests.unit.authz.conftest import allow_policy, build_opa_input, policies_for_role
 
 SA_ACTIONS = sorted({p.action for p in BUILTIN_POLICIES if p.resource == "service_account"})

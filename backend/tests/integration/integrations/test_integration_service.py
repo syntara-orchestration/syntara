@@ -6,29 +6,29 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.engine import AllowedProjectsResult
-from nexus.authz.models import Project
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.integrations.exceptions import (
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.models import Project
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
     IntegrationCredentialRequiredError,
     IntegrationCredentialTypeMismatchError,
     IntegrationNameConflictError,
     IntegrationNotFoundError,
 )
-from nexus.integrations.models.integration import (
+from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
-    IntegrationPatch,
     IntegrationProjectAssignment,
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
     IntegrationTestConnection,  # used by discover() service method
     IntegrationType,
+    IntegrationUpdate,
 )
-from nexus.integrations.services.integration_service import IntegrationService
+from syntara.integrations.services.integration_service import IntegrationService
 
 _UNRESTRICTED = AllowedProjectsResult(all_projects=True, project_ids=[])
 
@@ -181,7 +181,7 @@ class TestGetIntegration:
     async def test_get_global_visible_to_restricted_caller(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         created = await integration_service.create_integration(
             _mcp_create(name="Global Visible", scope=IntegrationScope.GLOBAL)
@@ -194,8 +194,8 @@ class TestGetIntegration:
     async def test_get_project_scoped_visible_when_assigned(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.authz.models import Project
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.authz.models import Project
 
         project = Project(name="visibility-project")
         test_db_session.add(project)
@@ -215,7 +215,7 @@ class TestGetIntegration:
     async def test_get_project_scoped_not_visible_when_unassigned(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         created = await integration_service.create_integration(
             _mcp_create(name="Unassigned", scope=IntegrationScope.PROJECT)
@@ -331,7 +331,7 @@ class TestListIntegrations:
     async def test_list_scope_filter_global_always_visible(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
+        from syntara.authz.engine import AllowedProjectsResult
 
         await integration_service.create_integration(_mcp_create(name="Global", scope=IntegrationScope.GLOBAL))
         await integration_service.create_integration(_mcp_create(name="Project Scoped", scope=IntegrationScope.PROJECT))
@@ -347,8 +347,8 @@ class TestListIntegrations:
     async def test_list_scope_filter_project_visible_with_assignment(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
-        from nexus.authz.engine import AllowedProjectsResult
-        from nexus.authz.models import Project
+        from syntara.authz.engine import AllowedProjectsResult
+        from syntara.authz.models import Project
 
         project = Project(name="my-project")
         test_db_session.add(project)
@@ -372,16 +372,16 @@ class TestListIntegrations:
 
 
 class TestPatchIntegration:
-    """Tests for IntegrationService.patch_integration."""
+    """Tests for IntegrationService.update_integration."""
 
     @pytest.mark.asyncio
     async def test_patch_partial_fields(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(name="Updated Name", enabled=False)
+        patch = IntegrationUpdate(name="Updated Name", enabled=False)
 
-        result = await integration_service.patch_integration(created.id, patch)
+        result = await integration_service.update_integration(created.id, patch)
 
         assert result.name == "Updated Name"
         assert result.enabled is False
@@ -395,14 +395,14 @@ class TestPatchIntegration:
         second = await integration_service.create_integration(_mcp_create(name="Second"))
 
         with pytest.raises(IntegrationNameConflictError):
-            await integration_service.patch_integration(second.id, IntegrationPatch(name="First"))
+            await integration_service.update_integration(second.id, IntegrationUpdate(name="First"))
 
     @pytest.mark.asyncio
     async def test_patch_configuration_type_mismatch_raises(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(
+        patch = IntegrationUpdate(
             configuration={
                 "integration_type": "llm_provider",
                 "base_url": "https://api.openai.com",
@@ -411,18 +411,18 @@ class TestPatchIntegration:
         )
 
         with pytest.raises(SafeValueError, match="does not match integration type"):
-            await integration_service.patch_integration(created.id, patch)
+            await integration_service.update_integration(created.id, patch)
 
     @pytest.mark.asyncio
     async def test_patch_configuration_matching_type_succeeds(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(
+        patch = IntegrationUpdate(
             configuration={"integration_type": "mcp_server", "base_url": "https://updated.example.com"},
         )
 
-        result = await integration_service.patch_integration(created.id, patch)
+        result = await integration_service.update_integration(created.id, patch)
         assert result.configuration.base_url == "https://updated.example.com"
 
     @pytest.mark.asyncio
@@ -430,7 +430,7 @@ class TestPatchIntegration:
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
         with pytest.raises(IntegrationNotFoundError):
-            await integration_service.patch_integration(uuid4(), IntegrationPatch(name="x"))
+            await integration_service.update_integration(uuid4(), IntegrationUpdate(name="x"))
 
 
 class TestUpdateValidationStatus:
@@ -608,8 +608,8 @@ class TestCredentialTypeValidation:
         project = await credential_factory.create_project()
         cred = await credential_factory.create(ct, project)
 
-        patch = IntegrationPatch(management_credential_id=cred.id)
-        result = await integration_service.patch_integration(created.id, patch)
+        patch = IntegrationUpdate(management_credential_id=cred.id)
+        result = await integration_service.update_integration(created.id, patch)
         assert result.management_credential_id == cred.id
 
     @pytest.mark.asyncio
@@ -625,9 +625,9 @@ class TestCredentialTypeValidation:
         project = await credential_factory.create_project()
         cred = await credential_factory.create(ct, project)
 
-        patch = IntegrationPatch(management_credential_id=cred.id)
+        patch = IntegrationUpdate(management_credential_id=cred.id)
         with pytest.raises(IntegrationCredentialTypeMismatchError, match="not valid for integration type 'mcp_server'"):
-            await integration_service.patch_integration(created.id, patch)
+            await integration_service.update_integration(created.id, patch)
 
     @pytest.mark.asyncio
     async def test_patch_without_credential_skips_validation(
@@ -636,8 +636,8 @@ class TestCredentialTypeValidation:
         integration_service: IntegrationService,
     ) -> None:
         created = await integration_service.create_integration(_mcp_create())
-        patch = IntegrationPatch(name="Renamed")
-        result = await integration_service.patch_integration(created.id, patch)
+        patch = IntegrationUpdate(name="Renamed")
+        result = await integration_service.update_integration(created.id, patch)
         assert result.name == "Renamed"
 
     @pytest.mark.asyncio
@@ -682,9 +682,9 @@ class TestCredentialTypeValidation:
             )
         )
 
-        patch = IntegrationPatch(management_credential_id=None)
+        patch = IntegrationUpdate(management_credential_id=None)
         with pytest.raises(IntegrationCredentialRequiredError):
-            await integration_service.patch_integration(created.id, patch)
+            await integration_service.update_integration(created.id, patch)
 
     @pytest.mark.asyncio
     async def test_patch_clearing_credential_on_non_required_type_succeeds(
@@ -698,8 +698,8 @@ class TestCredentialTypeValidation:
         cred = await credential_factory.create(ct, project)
 
         created = await integration_service.create_integration(_mcp_create(management_credential_id=cred.id))
-        result = await integration_service.patch_integration(
-            created.id, IntegrationPatch(management_credential_id=None)
+        result = await integration_service.update_integration(
+            created.id, IntegrationUpdate(management_credential_id=None)
         )
         assert result.management_credential_id is None
 

@@ -11,18 +11,18 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
-from nexus.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
-from nexus.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
+from syntara.agent_orchestrator.context_manager.retriever_service.exceptions import DocumentRetrievalError
+from syntara.agent_orchestrator.context_manager.retriever_service.models.relevant_document import RelevantDocument
+from syntara.agent_orchestrator.context_manager.retriever_service.retrievers.uploaded_file_retriever import (
     UploadedFileRetriever,
 )
-from nexus.agent_orchestrator.context_manager.retriever_service.services.retriever_service import (
+from syntara.agent_orchestrator.context_manager.retriever_service.services.retriever_service import (
     get_retriever_service,
 )
-from nexus.agent_orchestrator.models.invocation import Invocation
-from nexus.core.constants import CONTEXT_KEY_FILE_IDS
-from nexus.files.file_manager import get_file_manager
-from nexus.files.models import FileMetadata, FileStatus
+from syntara.agent_orchestrator.models.invocation import Invocation
+from syntara.core.constants import CONTEXT_KEY_FILE_IDS
+from syntara.files.file_manager import get_file_manager
+from syntara.files.models import FileMetadata, FileStatus
 
 
 @pytest.mark.integration
@@ -46,7 +46,7 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
 
         file_manager = get_file_manager()
         s3 = file_manager.get_retriever()
-        s3_path = f"nexus-{file_id}-test_document.txt"
+        s3_path = f"orchestrator-{file_id}-test_document.txt"
         await s3.save_file(test_content.encode("utf-8"), s3_path)
 
         file_metadata = FileMetadata(
@@ -139,9 +139,9 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
             filename="missing_file.txt",
             size_bytes=100,
             mime_type="text/plain",
-            file_path="nexus-nonexistent-original.txt",
+            file_path="orchestrator-nonexistent-original.txt",
             status=FileStatus.CONVERTED,
-            converted_content_path="nexus-nonexistent-does_not_exist.txt",
+            converted_content_path="orchestrator-nonexistent-does_not_exist.txt",
             created_by=test_user.id,
             project_id=test_project_id,
         )
@@ -218,7 +218,7 @@ class TestUploadedFileRetrieverRealDatabaseIntegration:
 
         file_manager = get_file_manager()
         s3 = file_manager.get_retriever()
-        s3_path = f"nexus-{file_id_1}-converted.txt"
+        s3_path = f"orchestrator-{file_id_1}-converted.txt"
         await s3.save_file(b"Valid content", s3_path)
 
         file_1 = FileMetadata(

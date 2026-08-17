@@ -24,8 +24,8 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from nexus.auth.cert_middleware import ClientCertAuthMiddleware, _validate_client_cert
-from nexus.core.tls.protocol import TLSH11Protocol
+from syntara.auth.cert_middleware import ClientCertAuthMiddleware, _validate_client_cert
+from syntara.core.tls.protocol import TLSH11Protocol
 from tests.fixtures.tls import generate_ca, generate_service_cert
 from tests.integration.core.tls.conftest import _health
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.integration]
 
-_ALLOWED_CNS = frozenset({"backend.nexus.svc", "worker.nexus.svc"})
+_ALLOWED_CNS = frozenset({"backend.orchestrator.svc", "worker.orchestrator.svc"})
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ def neg_certs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     ca_key, ca_cert = generate_ca(certs_dir)
 
     backend_cert, backend_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="backend.nexus.svc", filename="backend"
+        certs_dir, ca_key, ca_cert, common_name="backend.orchestrator.svc", filename="backend"
     )
     rogue_cert, rogue_key = generate_service_cert(
         certs_dir, ca_key, ca_cert, common_name="rogue-service", filename="rogue"
@@ -92,7 +92,7 @@ def neg_server(neg_certs: dict[str, Path]) -> Generator[str, None, None]:
     mock_settings.s2s_tls_cn_allowlist = list(_ALLOWED_CNS)
     mock_settings.s2s_tls_crl_path = None
 
-    with patch("nexus.auth.cert_middleware.get_settings", return_value=mock_settings):
+    with patch("syntara.auth.cert_middleware.get_settings", return_value=mock_settings):
         app = ClientCertAuthMiddleware(inner_app)
 
     config = uvicorn.Config(
@@ -156,7 +156,7 @@ class TestNEG1WrongCN:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["cn"] == "backend.nexus.svc"
+        assert body["cn"] == "backend.orchestrator.svc"
 
     def test_validate_client_cert_extracts_cn_without_allowlist_check(self) -> None:
         """Unit-level: _validate_client_cert returns CN (allowlist is checked by middleware)."""
@@ -214,7 +214,7 @@ class TestNEG3NoCertificate:
         mock_settings.s2s_tls_cn_allowlist = list(_ALLOWED_CNS)
         mock_settings.s2s_tls_crl_path = None
 
-        with patch("nexus.auth.cert_middleware.get_settings", return_value=mock_settings):
+        with patch("syntara.auth.cert_middleware.get_settings", return_value=mock_settings):
             middleware = ClientCertAuthMiddleware(capture_app)
 
         scope: dict[str, object] = {

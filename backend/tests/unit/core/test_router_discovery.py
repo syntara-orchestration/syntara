@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import APIRouter, FastAPI
 
-from nexus.core.router_discovery import (
+from syntara.core.router_discovery import (
     RouterInfo,
     _extract_router_from_module,
     _extract_router_prefix_from_file_path,
@@ -84,7 +84,7 @@ class TestDiscoverRouters:
         (excluded_dir / "router.py").write_text("from fastapi import APIRouter\nrouter = APIRouter()")
 
         # Mock the import to avoid actual module loading
-        with patch("nexus.core.router_discovery._load_router_from_file") as mock_load:
+        with patch("syntara.core.router_discovery._load_router_from_file") as mock_load:
             mock_load.return_value = None  # Prevent actual loading
 
             discover_routers(
@@ -108,7 +108,7 @@ class TestDiscoverRouters:
         (domain_dir / "sub_router.py").write_text("from fastapi import APIRouter\nrouter = APIRouter()")
         (domain_dir / "admin_router.py").write_text("from fastapi import APIRouter\nrouter = APIRouter()")
 
-        with patch("nexus.core.router_discovery._load_router_from_file") as mock_load:
+        with patch("syntara.core.router_discovery._load_router_from_file") as mock_load:
             mock_load.return_value = None
 
             discover_routers(
@@ -138,7 +138,7 @@ class TestRegisterRouters:
 
         router_info = RouterInfo(
             domain="test",
-            module_path="nexus.test.router",
+            module_path="syntara.test.router",
             router=router,
             router_prefix="",
             source_file=Path("/test/router.py"),
@@ -160,7 +160,7 @@ class TestRegisterRouters:
 
         router_info = RouterInfo(
             domain="bad",
-            module_path="nexus.bad.router",
+            module_path="syntara.bad.router",
             router=bad_router,
             router_prefix="",
             source_file=Path("/bad/router.py"),
@@ -168,7 +168,7 @@ class TestRegisterRouters:
 
         with (
             patch.object(app, "include_router", side_effect=Exception("Test error")),
-            patch("nexus.core.router_discovery.logger") as mock_logger,
+            patch("syntara.core.router_discovery.logger") as mock_logger,
         ):
             register_routers(app, [router_info], prefix="/api/v1")
 
@@ -177,6 +177,55 @@ class TestRegisterRouters:
         call_args = mock_logger.exception.call_args
         assert "Failed to register router" in call_args[0][0]
         assert call_args[1]["domain"] == router_info.domain
+
+    def test_static_routes_registered_before_parameterized(self) -> None:
+        """Static-prefix routes must be registered before parameterized siblings.
+
+        /groups/directory must be matched before /groups/{group_id},
+        otherwise FastAPI routes the request to the parameterized handler.
+        """
+        app = FastAPI()
+
+        parameterized_router = APIRouter(prefix="/groups")
+
+        @parameterized_router.get("/{group_id}")
+        def get_group(group_id: str) -> dict[str, str]:
+            return {"id": group_id}
+
+        static_router = APIRouter(prefix="/groups/directory")
+
+        @static_router.get("")
+        def list_directory() -> list[dict[str, str]]:
+            return [{"id": "1", "name": "admins"}]
+
+        # Pass parameterized first — register_routers should re-order
+        routers = [
+            RouterInfo(
+                domain="users",
+                module_path="syntara.users.groups_router",
+                router=parameterized_router,
+                router_prefix="groups_",
+                source_file=Path("/users/groups_router.py"),
+            ),
+            RouterInfo(
+                domain="users",
+                module_path="syntara.users.groups_directory_router",
+                router=static_router,
+                router_prefix="groups_directory_",
+                source_file=Path("/users/groups_directory_router.py"),
+            ),
+        ]
+
+        register_routers(app, routers, prefix="/api/v1")
+
+        from starlette.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.get("/api/v1/groups/directory")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert data[0]["name"] == "admins"
 
 
 class TestDiscoverAndRegisterRouters:
@@ -190,8 +239,8 @@ class TestDiscoverAndRegisterRouters:
         app = FastAPI()
 
         with (
-            patch("nexus.core.router_discovery.discover_routers") as mock_discover,
-            patch("nexus.core.router_discovery.register_routers"),
+            patch("syntara.core.router_discovery.discover_routers") as mock_discover,
+            patch("syntara.core.router_discovery.register_routers"),
             override_settings(
                 router_exclude_modules="core,utils",
                 openapi_validation_enabled=False,
@@ -216,16 +265,16 @@ class TestDiscoverAndRegisterRouters:
 
         router_info = RouterInfo(
             domain="test",
-            module_path="nexus.test.router",
+            module_path="syntara.test.router",
             router=APIRouter(),
             router_prefix="",
             source_file=Path("/test/router.py"),
         )
 
         with (
-            patch("nexus.core.router_discovery.discover_routers") as mock_discover,
-            patch("nexus.core.router_discovery.register_routers"),
-            patch("nexus.core.router_discovery._validate_discovered_routers") as mock_validate,
+            patch("syntara.core.router_discovery.discover_routers") as mock_discover,
+            patch("syntara.core.router_discovery.register_routers"),
+            patch("syntara.core.router_discovery._validate_discovered_routers") as mock_validate,
         ):
             # Return at least one router so validation is attempted
             mock_discover.return_value = [router_info]
@@ -247,13 +296,13 @@ class TestRealRouterDiscovery:
     def test_discover_real_routers(self) -> None:
         """Test discovery with real routers in the codebase."""
         # This test uses the actual codebase structure
-        nexus_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "nexus"
+        syntara_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "syntara"
 
-        if not nexus_root.exists():
-            pytest.skip("Nexus source directory not found")
+        if not syntara_root.exists():
+            pytest.skip("Syntara source directory not found")
 
         routers = discover_routers(
-            base_paths=[nexus_root],
+            base_paths=[syntara_root],
             exclude_modules={"websocket", "utils", "constants"},
         )
 

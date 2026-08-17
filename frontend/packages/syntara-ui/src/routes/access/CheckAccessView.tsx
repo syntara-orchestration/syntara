@@ -12,7 +12,7 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core'
-import { CheckCircleIcon, ExclamationTriangleIcon, TimesCircleIcon } from '@patternfly/react-icons'
+import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import { useMemo } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
@@ -64,7 +64,7 @@ function AccessResult({
     return (
       <Stack hasGutter>
         <StackItem>
-          <Alert variant="success" title="Access allowed" isInline customIcon={<CheckCircleIcon />}>
+          <Alert variant="success" title="Access allowed" isInline customIcon={<RhUiCheckCircleIcon />}>
             You can <strong>{action}</strong> on <strong>{resourceType}</strong>
             {projectSuffix}
           </Alert>
@@ -87,7 +87,7 @@ function AccessResult({
           variant={result.denied ? 'danger' : 'warning'}
           title={result.denied ? 'Access denied' : 'Access not granted'}
           isInline
-          customIcon={result.denied ? <TimesCircleIcon /> : <ExclamationTriangleIcon />}
+          customIcon={result.denied ? <RhUiCloseCircleIcon /> : <RhUiWarningIcon />}
         >
           You cannot <strong>{action}</strong> on <strong>{resourceType}</strong>
           {projectSuffix}

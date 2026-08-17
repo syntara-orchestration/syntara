@@ -13,14 +13,14 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.authz.models.project import Project
-from nexus.authz.models.role import Role
-from nexus.authz.seed import seed_authz_data
-from nexus.authz.services.role_assignment_service import RoleAssignmentService
-from nexus.core.exceptions import SafeValueError
-from nexus.core.models import User
-from nexus.core.models.group import Group
-from nexus.service_accounts.models.service_account import ServiceAccount
+from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
+from syntara.authz.seed import seed_authz_data
+from syntara.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.core.exceptions import SafeValueError
+from syntara.core.models import User
+from syntara.core.models.group import Group
+from syntara.service_accounts.models.service_account import ServiceAccount
 
 
 @pytest.fixture

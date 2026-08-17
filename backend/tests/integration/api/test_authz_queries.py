@@ -1,7 +1,7 @@
 """Integration tests for the authorization query endpoints.
 
 Covers the can-i, who-can, and what-can-i endpoints defined in
-``src/nexus/authz/router.py``.  These endpoints provide authorization
+``src/syntara/authz/router.py``.  These endpoints provide authorization
 evaluation with full explainability (matched policy, denial reason, etc.).
 """
 
@@ -16,16 +16,16 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.api.main import app
-from nexus.auth.dependencies import get_current_user
-from nexus.authz.dependencies import get_authz_evaluator
-from nexus.authz.evaluator import evaluate_policy_input
-from nexus.authz.models import RoleAssignment
-from nexus.authz.models.policy import Policy
-from nexus.authz.models.project import Project
-from nexus.authz.models.role import Role
-from nexus.core.models import User
-from nexus.core.models.group import Group, user_groups
+from syntara.api.main import app
+from syntara.auth.dependencies import get_current_user
+from syntara.authz.dependencies import get_authz_evaluator
+from syntara.authz.evaluator import evaluate_policy_input
+from syntara.authz.models import RoleAssignment
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
+from syntara.core.models import User
+from syntara.core.models.group import Group, user_groups
 from tests.integration.api.conftest import (
     make_admin,
     make_auditor,
@@ -437,6 +437,118 @@ async def test_who_can_requires_admin(
         json={"action": "read", "resource_type": "user"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_who_can_tier1_allows_workflow_editor(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+) -> None:
+    """WC-0b: project workflow editor can query approval:decide with resource_project."""
+    admin = await user_factory(username="admin-wc0b", email="admin-wc0b@test.com")
+    editor = await user_factory(username="editor-wc0b", email="editor-wc0b@test.com")
+    await make_admin(test_db_session, admin)
+
+    auth_as(admin)
+    response = await auth_client.post("/api/v1/projects", json={"name": "wc-tier1-proj"})
+    assert response.status_code == 201
+    project_name = response.json()["name"]
+    project = (await test_db_session.exec(select(Project).where(Project.name == project_name))).first()
+    assert project is not None
+    await make_project_user(test_db_session, editor, project)
+
+    auth_as(editor)
+    response = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "decide",
+            "resource_type": "approval",
+            "resource_project": project_name,
+        },
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_who_can_tier1_rejects_unlisted_pair(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+) -> None:
+    """WC-0c: non-admin with project context cannot query unlisted resource_type:action pairs."""
+    admin = await user_factory(username="admin-wc0c", email="admin-wc0c@test.com")
+    editor = await user_factory(username="editor-wc0c", email="editor-wc0c@test.com")
+    await make_admin(test_db_session, admin)
+
+    auth_as(admin)
+    response = await auth_client.post("/api/v1/projects", json={"name": "wc-tier1-deny-proj"})
+    assert response.status_code == 201
+    project_name = response.json()["name"]
+    project = (await test_db_session.exec(select(Project).where(Project.name == project_name))).first()
+    assert project is not None
+    await make_project_user(test_db_session, editor, project)
+
+    auth_as(editor)
+    response = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "read",
+            "resource_type": "user",
+            "resource_project": project_name,
+        },
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_who_can_tier1_strips_forged_labels(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+) -> None:
+    """WC-0d: Tier 1 callers have resource_labels/resource_metadata stripped."""
+    admin = await user_factory(username="admin-wc0d", email="admin-wc0d@test.com")
+    editor = await user_factory(username="editor-wc0d", email="editor-wc0d@test.com")
+    await make_admin(test_db_session, admin)
+
+    auth_as(admin)
+    response = await auth_client.post("/api/v1/projects", json={"name": "wc-tier1-labels-proj"})
+    assert response.status_code == 201
+    project_name = response.json()["name"]
+    project = (await test_db_session.exec(select(Project).where(Project.name == project_name))).first()
+    assert project is not None
+    await make_project_user(test_db_session, editor, project)
+
+    auth_as(editor)
+
+    clean = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "decide",
+            "resource_type": "approval",
+            "resource_project": project_name,
+        },
+    )
+    assert clean.status_code == 200
+
+    forged = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "decide",
+            "resource_type": "approval",
+            "resource_project": project_name,
+            "resource_labels": {"forged": "true"},
+            "resource_metadata": {"admin": True},
+        },
+    )
+    assert forged.status_code == 200
+
+    assert len(clean.json()["resources"]) > 0
+    assert clean.json()["resources"] == forged.json()["resources"]
 
 
 @pytest.mark.asyncio

@@ -31,11 +31,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uvicorn import Config, Server
 
-from nexus.authz.engine import clear_authz_cache, init_authz_cache
-from nexus.authz.models.project import Project
-from nexus.authz.resolver import AUTHENTICATED_GROUP_NAME
-from nexus.core.models.group import Group
-from nexus.core.websocket.router import build_websocket_router
+from syntara.authz.engine import clear_authz_cache, init_authz_cache
+from syntara.authz.models.project import Project
+from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
+from syntara.core.models.group import Group
+from syntara.core.websocket.router import build_websocket_router
 
 pytest_plugins = [
     "tests.integration.fixtures.database",
@@ -51,7 +51,7 @@ pytest_plugins = [
     "tests.integration.fixtures.users",
 ]
 
-_MOTO_BUCKET = "nexus-integration-test"
+_MOTO_BUCKET = "orchestrator-integration-test"
 _MOTO_REGION = "us-east-1"
 
 
@@ -72,7 +72,7 @@ async def test_db_template(
         (admin_url, db_name, template_name) used by _restore_from_template.
 
     """
-    from nexus.core.seed import run_seeders
+    from syntara.core.seed import run_seeders
 
     seeder_factory = async_sessionmaker(test_db_engine, class_=AsyncSession, expire_on_commit=False)
     await run_seeders(seeder_factory)
@@ -207,8 +207,8 @@ async def _seed_integration_data(test_db_session: AsyncSession) -> None:
     Not autouse — directories opt in via autouse wrapper fixtures in subdirectory conftest files.
     This avoids inflating workflow/resource counts in pagination and telemetry tests.
     """
-    from nexus.authz.seed import seed_authz_data
-    from nexus.workflows.seed_builtin import seed_builtin_workflows
+    from syntara.authz.seed import seed_authz_data
+    from syntara.workflows.seed_builtin import seed_builtin_workflows
 
     await seed_authz_data(test_db_session)
     await seed_builtin_workflows(test_db_session)
@@ -231,8 +231,8 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     The ``api`` conftest's ``_mock_evaluator`` fixture overrides this one for
     tests in that directory because pytest uses the most-specific conftest.
     """
-    from nexus.api.main import app
-    from nexus.authz.dependencies import get_authz_evaluator
+    from syntara.api.main import app
+    from syntara.authz.dependencies import get_authz_evaluator
 
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(
@@ -247,9 +247,9 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator
 
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("nexus.workflows.executions_router.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
+    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
 
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
 
@@ -266,19 +266,19 @@ def websocket_example_app(
     """
     # Create directory structure
     project_root = tmp_path / "project"
-    nexus_dir = project_root / "src" / "nexus"
-    core_dir = nexus_dir / "core" / "websocket"
+    syntara_dir = project_root / "src" / "syntara"
+    core_dir = syntara_dir / "core" / "websocket"
     core_dir.mkdir(parents=True)
 
-    component_dir = nexus_dir / "testcomp"
+    component_dir = syntara_dir / "testcomp"
     ws_dir = component_dir / "ws"
     ws_dir.mkdir(parents=True)
 
-    schemas_dir = nexus_dir / "schemas" / "testcomp"
+    schemas_dir = syntara_dir / "schemas" / "testcomp"
     schemas_dir.mkdir(parents=True)
 
     # Create __init__.py files
-    (nexus_dir / "__init__.py").touch()
+    (syntara_dir / "__init__.py").touch()
     (component_dir / "__init__.py").touch()
     (ws_dir / "__init__.py").touch()
     (core_dir / "__init__.py").touch()
@@ -782,24 +782,24 @@ components:
     (schemas_dir / "websocket-handlers2.yaml").write_text(handlers2_spec)
 
     # Add project to Python path
-    sys.path.insert(0, str(nexus_dir.parent))
+    sys.path.insert(0, str(syntara_dir.parent))
 
     # Mock __file__ to point to our temporary structure
     fake_endpoint_factory = core_dir / "endpoint_factory.py"
     fake_endpoint_factory.touch()
     monkeypatch.setattr(
-        "nexus.core.websocket.endpoint_factory.__file__",
+        "syntara.core.websocket.endpoint_factory.__file__",
         str(fake_endpoint_factory),
     )
 
     # Mock importlib.resources.files to return our temp schemas directory
     def mock_files(package: str) -> Path:
-        if package == "nexus":
-            return nexus_dir
+        if package == "syntara":
+            return syntara_dir
         msg = f"Package {package} not found"
         raise FileNotFoundError(msg)
 
-    monkeypatch.setattr("nexus.core.websocket.endpoint_factory.files", mock_files)
+    monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", mock_files)
 
     # Create FastAPI app
     app = FastAPI()
@@ -809,7 +809,7 @@ components:
     yield project_root, app
 
     # Cleanup
-    sys.path.remove(str(nexus_dir.parent))
+    sys.path.remove(str(syntara_dir.parent))
 
 
 async def _wait_for_server(host: str, port: int) -> None:
@@ -885,8 +885,8 @@ def _moto_s3() -> Generator[None, None, None]:
         conn = boto3.client("s3", region_name=_MOTO_REGION)
         conn.create_bucket(Bucket=_MOTO_BUCKET)
 
-        from nexus.files.file_manager import get_file_manager
-        from nexus.files.retrievers.s3 import S3FileRetriever
+        from syntara.files.file_manager import get_file_manager
+        from syntara.files.retrievers.s3 import S3FileRetriever
 
         retriever = S3FileRetriever(
             endpoint_url=None,
@@ -899,3 +899,24 @@ def _moto_s3() -> Generator[None, None, None]:
         fm._retriever = retriever
         yield
         fm._retriever = original_retriever
+
+
+@pytest.fixture(autouse=True)
+def _skip_ssrf_validation(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Bypass integration SSRF base_url validation for tests using placeholder hostnames.
+
+    Integration configs in tests use non-resolvable hosts (e.g. gateway.example.com), so the
+    DNS-resolving SSRF check would reject them. The shared bypass covers every boundary that
+    routes through the ``validate_integration_url_no_ssrf`` choke point — write time
+    (create/patch) and the runtime resolve/connect paths. Tests that exercise the SSRF check
+    itself opt out with ``@pytest.mark.ssrf_enforced``. The probe/patch logic is shared with the
+    unit conftest via :mod:`tests.helpers.ssrf_bypass` so the safety-net rules cannot drift.
+    """
+    from tests.helpers.ssrf_bypass import bypass_integration_ssrf_validation
+
+    if request.node.get_closest_marker("ssrf_enforced"):
+        yield
+        return
+
+    with bypass_integration_ssrf_validation():
+        yield

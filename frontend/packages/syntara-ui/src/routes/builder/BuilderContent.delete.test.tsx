@@ -209,7 +209,11 @@ describe('BuilderContent - Delete Workflow', () => {
     // Verify modal appears
     await waitFor(() => {
       expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
-      expect(screen.getByText(/will be deleted\. This cannot be undone\./)).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /will be deleted and any in-progress runs will stop immediately\. This action cannot be undone\./
+        )
+      ).toBeInTheDocument()
     })
   })
 
@@ -240,7 +244,9 @@ describe('BuilderContent - Delete Workflow', () => {
     // Acknowledge and confirm deletion
     await screen.findByText('Delete workflow?')
     await user.click(
-      screen.getByRole('checkbox', { name: /I understand this workflow and any dependent workflows will be affected/ })
+      screen.getByRole('checkbox', {
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+      })
     )
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
@@ -284,7 +290,9 @@ describe('BuilderContent - Delete Workflow', () => {
     // Acknowledge and confirm deletion
     await screen.findByText('Delete workflow?')
     await user.click(
-      screen.getByRole('checkbox', { name: /I understand this workflow and any dependent workflows will be affected/ })
+      screen.getByRole('checkbox', {
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+      })
     )
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 

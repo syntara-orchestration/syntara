@@ -1,6 +1,6 @@
-# Contributing to Nexus
+# Contributing to Syntara
 
-Thank you for your interest in contributing to the Nexus project!
+Thank you for your interest in contributing to the Syntara project!
 
 This document outlines the guidelines and best practices for contributing to this system.
 
@@ -145,7 +145,7 @@ The pre-commit configuration file is located at `.pre-commit-config.yaml` in the
 
 ### OpenAPI Spec Changes
 
-**If your PR modifies `src/nexus/schemas/openapi.yaml`**, two automated checks apply:
+**If your PR modifies `src/syntara/schemas/openapi.yaml`**, two automated checks apply:
 
 #### Local Validation (Before Pushing)
 
@@ -290,4 +290,4 @@ If you need help or have questions:
 
 Contributors who make significant improvements to the project will be recognized in our contributors list and release notes.
 
-Thank you for contributing to Nexus!
+Thank you for contributing to Syntara!

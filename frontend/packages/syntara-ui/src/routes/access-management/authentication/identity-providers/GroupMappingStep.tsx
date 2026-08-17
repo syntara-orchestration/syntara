@@ -15,7 +15,7 @@ import {
   SelectOption,
   TextInput,
 } from '@patternfly/react-core'
-import { PlusIcon, RhUiErrorIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiErrorIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import React, { useCallback, useEffect, useState } from 'react'
 import { Controller, useFieldArray, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
 
@@ -256,7 +256,7 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
             onRemove={() => remove(index)}
           />
         ))}
-        <Button variant="link" icon={<PlusIcon />} onClick={() => append({ idpGroupValue: '', nexusGroupId: '' })}>
+        <Button variant="link" icon={<RhUiAddIcon />} onClick={() => append({ idpGroupValue: '', nexusGroupId: '' })}>
           Add mapping
         </Button>
       </FormGroup>

@@ -25,14 +25,14 @@ import jwt as pyjwt
 import pytest
 from starlette import status
 
-from nexus.auth.services.oidc_service import (
+from syntara.auth.services.oidc_service import (
     OIDCError,
     OIDCService,
     _create_insecure_ssl_context,
     _get_jwks_client,
     _is_ssl_verification_error,
 )
-from nexus.identity_providers.models.identity_provider_configuration import OIDCClaimMapping
+from syntara.identity_providers.models.identity_provider_configuration import OIDCClaimMapping
 
 _real_getaddrinfo = socket.getaddrinfo
 
@@ -117,7 +117,7 @@ class TestGetJwksClient:
     def test_default_has_no_custom_ssl_context(self) -> None:
         """Test that the default client does not use a custom SSL context."""
         _get_jwks_client.cache_clear()
-        with patch("nexus.auth.services.oidc_service.PyJWKClient") as mock_cls:
+        with patch("syntara.auth.services.oidc_service.PyJWKClient") as mock_cls:
             _get_jwks_client("https://example.com/jwks")
             call_kwargs = mock_cls.call_args
             assert "ssl_context" not in call_kwargs.kwargs
@@ -127,7 +127,7 @@ class TestGetJwksClient:
         import ssl
 
         _get_jwks_client.cache_clear()
-        with patch("nexus.auth.services.oidc_service.PyJWKClient") as mock_cls:
+        with patch("syntara.auth.services.oidc_service.PyJWKClient") as mock_cls:
             _get_jwks_client("https://example.com/jwks", disable_tls_verify=True)
             call_kwargs = mock_cls.call_args
             ctx = call_kwargs.kwargs["ssl_context"]
@@ -157,7 +157,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             config = await oidc_service.fetch_discovery_config("https://example.com")
 
         assert config["issuer"] == "https://example.com"
@@ -175,7 +175,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Discovery request timed out"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -190,7 +190,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Discovery endpoint returned HTTP 404"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -210,7 +210,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Discovery response missing"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -222,7 +222,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Discovery request failed"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -243,7 +243,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
             mock_async_client.return_value = mock_client
             await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -267,7 +267,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
             mock_async_client.return_value = mock_client
             await oidc_service.fetch_discovery_config("https://example.com", disable_tls_verify=True)
 
@@ -286,7 +286,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="TLS certificate verification failed"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -298,7 +298,7 @@ class TestFetchDiscoveryConfig:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Discovery request failed"):
                 await oidc_service.fetch_discovery_config("https://example.com")
 
@@ -357,7 +357,7 @@ class TestStoreOidcState:
 
     def test_returns_encrypted_token(self, oidc_service: OIDCService) -> None:
         """Test that state is returned as an encrypted token string."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=uuid4(),
@@ -370,7 +370,7 @@ class TestStoreOidcState:
 
     def test_payload_is_not_readable(self, oidc_service: OIDCService) -> None:
         """Test that the code_verifier is not visible in the state token."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=uuid4(),
@@ -384,7 +384,7 @@ class TestStoreOidcState:
         """Test that all state fields survive encrypt/decrypt roundtrip."""
         provider_id = uuid4()
 
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=provider_id,
@@ -417,7 +417,7 @@ class TestRetrieveOidcState:
         """Test that a valid encrypted state is decrypted."""
         provider_id = uuid4()
 
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=provider_id,
@@ -433,7 +433,7 @@ class TestRetrieveOidcState:
 
     def test_returns_none_for_tampered_state(self, oidc_service: OIDCService) -> None:
         """Test that a tampered token returns None."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             result = oidc_service.retrieve_oidc_state("tampered-garbage-token")
 
@@ -441,7 +441,7 @@ class TestRetrieveOidcState:
 
     def test_returns_none_for_wrong_key(self, oidc_service: OIDCService) -> None:
         """Test that decryption with a different key fails."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=uuid4(),
@@ -449,7 +449,7 @@ class TestRetrieveOidcState:
                 code_verifier="test-verifier",
             )
 
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "b" * 64
             result = oidc_service.retrieve_oidc_state(state)
 
@@ -457,11 +457,11 @@ class TestRetrieveOidcState:
 
     def test_returns_none_for_expired_state(self, oidc_service: OIDCService) -> None:
         """Test that state with an expired timestamp returns None."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
 
             # Encrypt state with exp in the past
-            with patch("nexus.auth.services.oidc_service.time.time", return_value=time.time() - 700):
+            with patch("syntara.auth.services.oidc_service.time.time", return_value=time.time() - 700):
                 state = oidc_service.store_oidc_state(
                     provider_id=uuid4(),
                     nonce="test-nonce",
@@ -474,7 +474,7 @@ class TestRetrieveOidcState:
 
     def test_exp_is_stripped_from_result(self, oidc_service: OIDCService) -> None:
         """Test that the exp claim is not returned to the caller."""
-        with patch("nexus.auth.services.oidc_service.get_encryption_key") as mock_key:
+        with patch("syntara.auth.services.oidc_service.get_encryption_key") as mock_key:
             mock_key.return_value.get_secret_value.return_value = "a" * 64
             state = oidc_service.store_oidc_state(
                 provider_id=uuid4(),
@@ -507,7 +507,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             tokens = await oidc_service.exchange_code_for_tokens(
                 token_endpoint="https://example.com/token",
                 code="auth-code-123",
@@ -543,7 +543,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             tokens = await oidc_service.exchange_code_for_tokens(
                 token_endpoint="https://example.com/token",
                 code="auth-code-123",
@@ -568,7 +568,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Token exchange failed with HTTP 400"):
                 await oidc_service.exchange_code_for_tokens(
                     token_endpoint="https://example.com/token",
@@ -587,7 +587,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Token exchange request timed out"):
                 await oidc_service.exchange_code_for_tokens(
                     token_endpoint="https://example.com/token",
@@ -601,7 +601,7 @@ class TestExchangeCodeForTokens:
     @pytest.mark.asyncio
     async def test_rejects_http_token_endpoint(self, oidc_service: OIDCService) -> None:
         """Test that token exchange rejects HTTP endpoints (SSRF, AAP-71276)."""
-        with patch("nexus.auth.services.oidc_service.get_settings") as mock_gs:
+        with patch("syntara.auth.services.oidc_service.get_settings") as mock_gs:
             mock_gs.return_value.oidc_allow_private_networks = False
             with pytest.raises(OIDCError, match="OIDC issuer URL must use HTTPS"):
                 await oidc_service.exchange_code_for_tokens(
@@ -617,7 +617,7 @@ class TestExchangeCodeForTokens:
     async def test_rejects_private_ip_token_endpoint(self, oidc_service: OIDCService) -> None:
         """Test that token exchange rejects endpoints resolving to private IPs (SSRF, AAP-71276)."""
         with (
-            patch("nexus.auth.services.oidc_service.get_settings") as mock_gs,
+            patch("syntara.auth.services.oidc_service.get_settings") as mock_gs,
             patch("socket.getaddrinfo") as mock_getaddrinfo,
         ):
             mock_gs.return_value.oidc_allow_private_networks = False
@@ -634,7 +634,7 @@ class TestExchangeCodeForTokens:
 
     async def test_allow_private_still_blocks_cloud_metadata(self, oidc_service: OIDCService) -> None:
         """Cloud metadata endpoints are blocked even when oidc_allow_private_networks=True."""
-        with patch("nexus.auth.services.oidc_service.get_settings") as mock_gs:
+        with patch("syntara.auth.services.oidc_service.get_settings") as mock_gs:
             mock_gs.return_value.oidc_allow_private_networks = True
             with pytest.raises(OIDCError, match="SSRF blocked"):
                 oidc_service._validate_url("http://169.254.169.254/latest/meta-data/")
@@ -654,7 +654,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
             mock_async_client.return_value = mock_client
             await oidc_service.exchange_code_for_tokens(
                 token_endpoint="https://example.com/token",
@@ -671,7 +671,7 @@ class TestExchangeCodeForTokens:
     @pytest.mark.asyncio
     async def test_rejects_non_http_scheme_token_endpoint(self, oidc_service: OIDCService) -> None:
         """Test that token exchange rejects non-HTTP(S) schemes (SSRF, AAP-71276)."""
-        with patch("nexus.auth.services.oidc_service.get_settings") as mock_gs:
+        with patch("syntara.auth.services.oidc_service.get_settings") as mock_gs:
             mock_gs.return_value.oidc_allow_private_networks = False
             with pytest.raises(OIDCError, match="OIDC issuer URL must use HTTPS"):
                 await oidc_service.exchange_code_for_tokens(
@@ -696,7 +696,7 @@ class TestExchangeCodeForTokens:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="TLS certificate verification failed"):
                 await oidc_service.exchange_code_for_tokens(
                     token_endpoint="https://example.com/token",
@@ -728,7 +728,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             claims = await oidc_service.fetch_userinfo(
                 userinfo_endpoint="https://example.com/userinfo",
                 access_token="access-token-123",
@@ -752,7 +752,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Userinfo endpoint returned HTTP 401"):
                 await oidc_service.fetch_userinfo(
                     userinfo_endpoint="https://example.com/userinfo",
@@ -767,7 +767,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Userinfo request timed out"):
                 await oidc_service.fetch_userinfo(
                     userinfo_endpoint="https://example.com/userinfo",
@@ -786,7 +786,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="Userinfo response is not valid JSON"):
                 await oidc_service.fetch_userinfo(
                     userinfo_endpoint="https://example.com/userinfo",
@@ -808,7 +808,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient") as mock_async_client:
             mock_async_client.return_value = mock_client
             await oidc_service.fetch_userinfo(
                 userinfo_endpoint="https://example.com/userinfo",
@@ -821,7 +821,7 @@ class TestFetchUserinfo:
     @pytest.mark.asyncio
     async def test_userinfo_ssrf_validation(self, oidc_service: OIDCService) -> None:
         """Test that userinfo endpoint is validated against SSRF."""
-        with patch("nexus.auth.services.oidc_service.get_settings") as mock_gs:
+        with patch("syntara.auth.services.oidc_service.get_settings") as mock_gs:
             mock_gs.return_value.oidc_allow_private_networks = False
             with pytest.raises(OIDCError, match="OIDC issuer URL must use HTTPS"):
                 await oidc_service.fetch_userinfo(
@@ -842,7 +842,7 @@ class TestFetchUserinfo:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("nexus.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
+        with patch("syntara.auth.services.oidc_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(OIDCError, match="TLS certificate verification failed"):
                 await oidc_service.fetch_userinfo(
                     userinfo_endpoint="https://example.com/userinfo",
@@ -872,8 +872,8 @@ class TestValidateIdToken:
         mock_jwks_client = MagicMock()
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
-        with patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client):
-            with patch("nexus.auth.services.oidc_service.pyjwt.decode", return_value=claims):
+        with patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client):
+            with patch("syntara.auth.services.oidc_service.pyjwt.decode", return_value=claims):
                 result = oidc_service.validate_id_token(
                     id_token="mock-id-token",
                     jwks_uri="https://example.com/jwks",
@@ -895,9 +895,9 @@ class TestValidateIdToken:
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
         with (
-            patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
+            patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
             patch(
-                "nexus.auth.services.oidc_service.pyjwt.decode",
+                "syntara.auth.services.oidc_service.pyjwt.decode",
                 side_effect=pyjwt.ExpiredSignatureError("Token expired"),
             ),
             pytest.raises(OIDCError, match="ID token has expired"),
@@ -919,9 +919,9 @@ class TestValidateIdToken:
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
         with (
-            patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
+            patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
             patch(
-                "nexus.auth.services.oidc_service.pyjwt.decode",
+                "syntara.auth.services.oidc_service.pyjwt.decode",
                 side_effect=pyjwt.InvalidIssuerError("Issuer mismatch"),
             ),
             pytest.raises(OIDCError, match="ID token issuer mismatch"),
@@ -943,9 +943,9 @@ class TestValidateIdToken:
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
         with (
-            patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
+            patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
             patch(
-                "nexus.auth.services.oidc_service.pyjwt.decode",
+                "syntara.auth.services.oidc_service.pyjwt.decode",
                 side_effect=pyjwt.InvalidAudienceError("Audience mismatch"),
             ),
             pytest.raises(OIDCError, match="ID token audience mismatch"),
@@ -974,8 +974,8 @@ class TestValidateIdToken:
         mock_jwks_client = MagicMock()
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
-        with patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client):
-            with patch("nexus.auth.services.oidc_service.pyjwt.decode", return_value=claims):
+        with patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client):
+            with patch("syntara.auth.services.oidc_service.pyjwt.decode", return_value=claims):
                 with pytest.raises(OIDCError, match="ID token nonce mismatch"):
                     oidc_service.validate_id_token(
                         id_token="token-with-wrong-nonce",
@@ -1002,8 +1002,10 @@ class TestValidateIdToken:
         mock_jwks_client = MagicMock()
         mock_jwks_client.get_signing_key_from_jwt = MagicMock(return_value=mock_signing_key)
 
-        with patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client) as mock_get_jwks:
-            with patch("nexus.auth.services.oidc_service.pyjwt.decode", return_value=claims):
+        with patch(
+            "syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client
+        ) as mock_get_jwks:
+            with patch("syntara.auth.services.oidc_service.pyjwt.decode", return_value=claims):
                 oidc_service.validate_id_token(
                     id_token="mock-id-token",
                     jwks_uri="https://example.com/jwks",
@@ -1017,7 +1019,7 @@ class TestValidateIdToken:
 
     def test_rejects_http_jwks_uri(self, oidc_service: OIDCService) -> None:
         """Test that ID token validation rejects HTTP jwks_uri (SSRF, AAP-71276)."""
-        with patch("nexus.auth.services.oidc_service.get_settings") as mock_gs:
+        with patch("syntara.auth.services.oidc_service.get_settings") as mock_gs:
             mock_gs.return_value.oidc_allow_private_networks = False
             with pytest.raises(OIDCError, match="OIDC issuer URL must use HTTPS"):
                 oidc_service.validate_id_token(
@@ -1031,7 +1033,7 @@ class TestValidateIdToken:
     def test_rejects_private_ip_jwks_uri(self, oidc_service: OIDCService) -> None:
         """Test that ID token validation rejects jwks_uri resolving to private IPs (SSRF, AAP-71276)."""
         with (
-            patch("nexus.auth.services.oidc_service.get_settings") as mock_gs,
+            patch("syntara.auth.services.oidc_service.get_settings") as mock_gs,
             patch("socket.getaddrinfo") as mock_getaddrinfo,
         ):
             mock_gs.return_value.oidc_allow_private_networks = False
@@ -1059,7 +1061,7 @@ class TestValidateIdToken:
         )
 
         with (
-            patch("nexus.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
+            patch("syntara.auth.services.oidc_service._get_jwks_client", return_value=mock_jwks_client),
             pytest.raises(OIDCError, match="TLS certificate verification failed"),
         ):
             oidc_service.validate_id_token(

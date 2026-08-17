@@ -7,7 +7,7 @@ and edge cases in request handling.
 import pytest
 from httpx import AsyncClient
 
-from nexus.core.models import User
+from syntara.core.models import User
 
 # ============================================================================
 # CHAOS-002: Missing Required Fields → 422

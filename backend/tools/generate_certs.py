@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate self-signed TLS certificates for local development.
 
-Creates a CA and per-service certificates for mTLS between Nexus services
+Creates a CA and per-service certificates for mTLS between Syntara services
 running in podman-compose. Each service gets a distinct CN matching the
 production naming convention (e.g., backend.ao.svc, worker.ao.svc) so the
 auth middleware can extract per-service identity from the client cert.
@@ -44,7 +44,7 @@ SERVICE_CERTS = [
 ]
 
 # Validate against the canonical list in principal.py
-from nexus.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
+from syntara.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
 
 _cert_cns = {cn for _, cn, _ in SERVICE_CERTS}
 _expected = set(KNOWN_SERVICE_CNS)

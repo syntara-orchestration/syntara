@@ -2,7 +2,7 @@
 
 from uuid import UUID, uuid4
 
-from nexus.workflows.validators.workflow_integrations import (
+from syntara.workflows.validators.workflow_integrations import (
     _collect_expected_integration_types,
     _extract_integration_ids,
     _extract_llm_model_ids,

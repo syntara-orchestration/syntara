@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 
 from starlette.responses import JSONResponse
 
-from nexus.aap.error_handlers import (
+from syntara.aap.error_handlers import (
     aap_authentication_error_handler,
     aap_connection_error_handler,
     aap_not_configured_handler,
     aap_upstream_error_handler,
 )
-from nexus.aap.exceptions import (
+from syntara.aap.exceptions import (
     AAPAuthenticationError,
     AAPConnectionError,
     AAPNotConfiguredError,
@@ -20,7 +20,7 @@ from nexus.aap.exceptions import (
 )
 
 
-def _mock_request(url: str = "https://example.com/api/v1/aap/organizations") -> MagicMock:
+def _mock_request(url: str = "https://example.com/api/v1/proxies/aap/organizations") -> MagicMock:
     request = MagicMock()
     request.url = url
     return request

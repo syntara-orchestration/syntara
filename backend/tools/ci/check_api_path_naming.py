@@ -1,6 +1,6 @@
 """Check that API endpoint paths use snake_case (no hyphens).
 
-Scans all Python files under src/nexus/ for FastAPI router definitions and
+Scans all Python files under src/syntara/ for FastAPI router definitions and
 verifies that URL path segments do not contain hyphens. Path parameters
 (e.g., {project_id}) are ignored.
 
@@ -15,14 +15,16 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT / "src" / "nexus"
+SRC_DIR = ROOT / "src" / "syntara"
 
 RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
 
-PREFIX_RE = re.compile(r"""(?:APIRouter|NexusRouter)\(\s*prefix\s*=\s*["']([^"']+)["']""")
+PREFIX_RE = re.compile(r"""(?:APIRouter|SyntaraRouter)\(\s*prefix\s*=\s*["']([^"']+)["']""")
 ROUTE_RE = re.compile(r"""@\w+\.(?:get|post|put|patch|delete|head|options)\(\s*["']([^"']+)["']""")
+ROUTE_OPEN_RE = re.compile(r"""@\w+\.(?:get|post|put|patch|delete|head|options)\(\s*$""")
+PATH_ARG_RE = re.compile(r"""^\s*["']([^"']+)["']""")
 
 
 def _has_hyphen_segment(path: str) -> list[str]:
@@ -48,6 +50,14 @@ def check_file(filepath: Path) -> list[tuple[int, str, list[str]]]:
                 bad = _has_hyphen_segment(path)
                 if bad:
                     violations.append((i, path, bad))
+
+        if ROUTE_OPEN_RE.search(line) and i < len(lines):
+            next_match = PATH_ARG_RE.match(lines[i])
+            if next_match:
+                path = next_match.group(1)
+                bad = _has_hyphen_segment(path)
+                if bad:
+                    violations.append((i + 1, path, bad))
     return violations
 
 

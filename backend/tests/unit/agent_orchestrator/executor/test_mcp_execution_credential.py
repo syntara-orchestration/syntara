@@ -11,8 +11,8 @@ from uuid import uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.exceptions import CredentialResolutionError
-from nexus.agent_orchestrator.executor.invocation_executor import InvocationExecutor
+from syntara.agent_orchestrator.exceptions import CredentialResolutionError
+from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
 
 
 def _make_executor(mock_session: MagicMock | None = None) -> tuple[InvocationExecutor, MagicMock]:
@@ -52,8 +52,8 @@ def _session_get_dispatch(mock_credential: MagicMock, mock_cred_type: MagicMock 
     """Build a session.get side_effect that dispatches by model class."""
 
     async def _get(model_class: type, pk: object) -> object | None:
-        from nexus.credentials.models.credential import Credential
-        from nexus.credentials.models.credential_type import CredentialType
+        from syntara.credentials.models.credential import Credential
+        from syntara.credentials.models.credential_type import CredentialType
 
         if model_class is Credential:
             return mock_credential
@@ -77,8 +77,8 @@ class TestResolveMcpExecutionCredential:
         mock_resolved.extra_vars = {"bearer_token": "tok-abc-123"}
 
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"token": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved
@@ -97,8 +97,8 @@ class TestResolveMcpExecutionCredential:
         mock_resolved.extra_vars = {}
 
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"token": "encrypted"})
             mock_injector.resolve.return_value = mock_resolved
@@ -150,7 +150,7 @@ class TestResolveMcpExecutionCredential:
         session.get = AsyncMock(return_value=mock_credential)
         cred_id = str(uuid4())
 
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(side_effect=RuntimeError("decrypt failed"))
 
             with pytest.raises(CredentialResolutionError, match="Failed to decrypt"):
@@ -162,7 +162,7 @@ class TestResolveMcpExecutionCredential:
         mock_credential, _ = _mock_credential_and_type(has_cred_type=False)
 
         async def mock_get(model_class: type, pk: object) -> object | None:
-            from nexus.credentials.models.credential import Credential
+            from syntara.credentials.models.credential import Credential
 
             if model_class is Credential:
                 return mock_credential
@@ -171,7 +171,7 @@ class TestResolveMcpExecutionCredential:
         session.get = AsyncMock(side_effect=mock_get)
         cred_id = str(uuid4())
 
-        with patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
+        with patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc:
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"token": "encrypted"})
 
             with pytest.raises(CredentialResolutionError, match="Credential type for"):
@@ -185,8 +185,8 @@ class TestResolveMcpExecutionCredential:
         cred_id = str(uuid4())
 
         with (
-            patch("nexus.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
-            patch("nexus.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.create_secret_service") as mock_secret_svc,
+            patch("syntara.agent_orchestrator.executor.invocation_executor.InjectorResolver") as mock_injector,
         ):
             mock_secret_svc.return_value.retrieve_secret = AsyncMock(return_value={"token": "encrypted"})
             mock_injector.resolve.side_effect = RuntimeError("template error")

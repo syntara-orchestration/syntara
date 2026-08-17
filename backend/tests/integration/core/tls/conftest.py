@@ -17,8 +17,8 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from nexus.core.tls.http_client import build_internal_ssl_context
-from nexus.core.tls.temporal import build_temporal_tls_config
+from syntara.core.tls.http_client import build_internal_ssl_context
+from syntara.core.tls.temporal import build_temporal_tls_config
 from tests.fixtures.tls import generate_ca, generate_service_cert
 
 if TYPE_CHECKING:
@@ -42,10 +42,10 @@ def mtls_certs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     ca_key, ca_cert = generate_ca(certs_dir)
 
     backend_cert, backend_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="backend.nexus.svc", filename="backend"
+        certs_dir, ca_key, ca_cert, common_name="backend.orchestrator.svc", filename="backend"
     )
     worker_cert, worker_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="worker.nexus.svc", filename="worker"
+        certs_dir, ca_key, ca_cert, common_name="worker.orchestrator.svc", filename="worker"
     )
 
     return {

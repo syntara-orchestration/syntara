@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
-from nexus.authz.services.role_assignment_service import RoleAssignmentService
-from nexus.core.utils.cursor import CursorData, encode_cursor
+from syntara.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.core.utils.cursor import CursorData, encode_cursor
 
 metadata = sa.MetaData()
 _test_table = sa.Table(

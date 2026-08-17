@@ -2,16 +2,16 @@
 
 from uuid import uuid4
 
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.auth.audit.user_account_change import (
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.auth.audit.user_account_change import (
     AccountStatus,
     UserAccountStatusChangedEvent,
     UserAccountStatusChangedHandler,
     UserPasswordChangedEvent,
     UserPasswordChangedHandler,
 )
-from nexus.core.models.principal import PrincipalType
+from syntara.core.models.principal import PrincipalType
 
 
 class TestUserPasswordChangedHandler:
@@ -39,7 +39,7 @@ class TestUserPasswordChangedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == actor_id
         assert result.actor_username == "admin"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "alice" in result.event_message
         assert result.resource_urn == "urn:syntara:user:alice"
         assert result.resource_name == "alice"
@@ -88,7 +88,7 @@ class TestUserAccountStatusChangedHandler:
         assert result.actor_type == PrincipalType.USER
         assert result.actor_id == actor_id
         assert result.actor_username == "admin"
-        assert result.source_component == "nexus.auth.account_management"
+        assert result.source_component == "syntara.auth.account_management"
         assert "alice" in result.event_message
         assert "disabled" in result.event_message
         assert result.resource_urn == "urn:syntara:user:alice"

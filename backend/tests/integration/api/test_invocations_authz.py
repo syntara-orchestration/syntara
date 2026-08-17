@@ -11,7 +11,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import User
+from syntara.core.models import User
 from tests.integration.api.conftest import make_admin, make_user_role
 
 

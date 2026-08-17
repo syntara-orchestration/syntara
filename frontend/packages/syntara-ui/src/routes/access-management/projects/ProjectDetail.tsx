@@ -31,10 +31,10 @@ import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUrlTab } from '../../../hooks/useUrlTab'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -123,11 +123,15 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Created</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(project.created_at)}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={project.created_at} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Updated</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(project.updated_at)}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={project.updated_at} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>
   )

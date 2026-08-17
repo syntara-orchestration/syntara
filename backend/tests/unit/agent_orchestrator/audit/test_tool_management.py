@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from nexus.agent_orchestrator.audit.tool_management import (
+from syntara.agent_orchestrator.audit.tool_management import (
     ToolDiscoveryEvent,
     ToolDiscoveryHandler,
     ToolDiscoveryStatus,
@@ -15,12 +15,12 @@ from nexus.agent_orchestrator.audit.tool_management import (
     ToolInvocationHandler,
     ToolInvocationStatus,
 )
-from nexus.audit.emitter import AuditActorContext
-from nexus.audit.handler import AuditEventHandler
-from nexus.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
-from nexus.audit.models.structured_data import AuditContextData
-from nexus.core.models.principal import PrincipalType
-from nexus.core.models.user import User
+from syntara.audit.emitter import AuditActorContext
+from syntara.audit.handler import AuditEventHandler
+from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
+from syntara.core.models.user import User
 
 
 @dataclass
@@ -70,7 +70,7 @@ class TestToolDiscoveryHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "tool_discovery"
         assert result.event_message == "Tool discovery and synchronization started"
-        assert result.source_component == "nexus.agent_orchestrator.tool_manager"
+        assert result.source_component == "syntara.agent_orchestrator.tool_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username
@@ -283,7 +283,7 @@ class TestToolInvocationHandler:
         assert result.event_status == EventStatus.SUCCESS
         assert result.event_action == "tool_invocation"
         assert result.event_message == "Tool invocation started: read_file"
-        assert result.source_component == "nexus.agent_orchestrator.tool_manager"
+        assert result.source_component == "syntara.agent_orchestrator.tool_manager"
         assert result.actor_id == test_user.id
         assert result.actor_type == PrincipalType.USER
         assert result.actor_username == test_user.username

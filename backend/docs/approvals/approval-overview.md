@@ -449,7 +449,7 @@ nodes:
 
 | Parameter | Type | Default | Purpose |
 |-----------|------|---------|---------|
-| `credential_id` | str or None | None | Nexus credential UUID |
+| `credential_id` | str or None | None | Syntara credential UUID |
 | `approver_users` | list[str] or None | None | Usernames who can approve (max 100) |
 | `approver_groups` | list[str] or None | None | Group names whose members can approve (max 50) |
 | `prompt` | str or None | None | Message to display to approvers |
@@ -558,7 +558,7 @@ Both approver lists (`approver_user_ids` and `approver_group_ids`) support up to
 
 **Related Documentation:**
 
-- [Approval API Specification](../../src/nexus/schemas/approvals/openapi.yaml)
+- [Approval API Specification](../../src/syntara/schemas/approvals/openapi.yaml)
 - [Workflow Definition Guide](../workflow-engine/workflow-definition-guide.md)
 - [Authorization Overview](../authorization.md)
 - [Approval Authorization Model](./approval-authorization-model.md)

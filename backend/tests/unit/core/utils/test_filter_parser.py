@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nexus.core.exceptions import SafeValueError
-from nexus.core.utils.filters import (
+from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.filters import (
     Filter,
     FilterOperator,
     _convert_filter_value,
@@ -965,13 +965,13 @@ class TestSensitiveFieldProtection:
 
     def test_password_hash_not_in_filterable_fields(self) -> None:
         """Verify password_hash is excluded from User.__filterable_fields__."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         assert "password_hash" not in User.__filterable_fields__
 
     def test_sensitive_fields_not_in_filterable_fields(self) -> None:
         """Verify all sensitive User fields are excluded from __filterable_fields__."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         sensitive_fields = ["password_hash", "preferences", "authz_metadata", "token_version"]
         for field in sensitive_fields:
@@ -979,28 +979,28 @@ class TestSensitiveFieldProtection:
 
     def test_filter_password_hash_eq_rejected(self) -> None:
         """Filtering by password_hash with shorthand equality is rejected."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         with pytest.raises(SafeValueError, match="Invalid field: password_hash"):
             parse_filters({"password_hash": "$argon2id$v=19$m=65536"}, User.__filterable_fields__)
 
     def test_filter_password_hash_starts_with_rejected(self) -> None:
         """Filtering by password_hash[starts_with] is rejected — the primary attack vector."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         with pytest.raises(SafeValueError, match="Invalid field: password_hash"):
             parse_filters({"password_hash[starts_with]": "$argon2"}, User.__filterable_fields__)
 
     def test_filter_password_hash_contains_rejected(self) -> None:
         """Filtering by password_hash[contains] is rejected."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         with pytest.raises(SafeValueError, match="Invalid field: password_hash"):
             parse_filters({"password_hash[contains]": "argon"}, User.__filterable_fields__)
 
     def test_filter_password_hash_all_operators_rejected(self) -> None:
         """Every filter operator is rejected for password_hash."""
-        from nexus.core.models.user import User
+        from syntara.core.models.user import User
 
         operators = ["eq", "in", "contains", "starts_with", "gt", "gte", "lt", "lte"]
         for op in operators:

@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import SecretStr
 
-from nexus.core.config.base import get_settings
-from nexus.workflows.workflow_engine.activities.aap_common import (
+from syntara.core.config.base import get_settings
+from syntara.workflows.workflow_engine.activities.aap_common import (
     get_aap_auth_from_credentials,
     get_aap_auth_headers,
     get_aap_basic_auth,
@@ -49,8 +49,8 @@ class TestAAPCredentialInjection:
         resolved_creds = {
             "extra_vars": {
                 "auth_type": "aap",
-                "aap_username": "nexus-user",
-                "aap_password": "nexus-pass",
+                "aap_username": "syntara-user",
+                "aap_password": "syntara-pass",
                 "aap_oauth_token": "oauth-token-123",
             },
         }
@@ -99,7 +99,7 @@ class TestResolveAAPAuthWithIntegrationConfig:
 
     def test_uses_integration_config_for_url_and_tls(self) -> None:
         """URL and TLS should come from integration config, not credentials."""
-        from nexus.workflows.workflow_engine.activities.aap_common import resolve_aap_auth
+        from syntara.workflows.workflow_engine.activities.aap_common import resolve_aap_auth
 
         settings = MagicMock()
 

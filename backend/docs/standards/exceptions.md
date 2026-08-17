@@ -4,10 +4,10 @@ This document defines the naming conventions and structural patterns for excepti
 
 ## Exception Hierarchy
 
-All domain exceptions inherit from `NexusError`:
+All domain exceptions inherit from `SyntaraError`:
 
 ```
-NexusError(Exception)
+SyntaraError(Exception)
 ├── ApprovalError
 │   ├── ApprovalNotFoundError
 │   ├── ApprovalAlreadyDecidedError
@@ -34,7 +34,7 @@ NexusError(Exception)
 ├── AgentOrchestratorError
 │   ├── LLMConfigurationError
 │   └── TemporalUnavailableError
-└── SafeValueError(ValueError, NexusError)
+└── SafeValueError(ValueError, SyntaraError)
 ```
 
 ## Naming Conventions
@@ -57,12 +57,12 @@ NexusError(Exception)
 
 ### Domain Base Exceptions
 
-**Pattern:** `{Domain}Error(NexusError)`
+**Pattern:** `{Domain}Error(SyntaraError)`
 
 Each domain module defines a base exception that all domain-specific exceptions inherit from:
 
 ```python
-class ToolManagerError(NexusError):
+class ToolManagerError(SyntaraError):
     """Base exception for tool manager operations."""
 ```
 
@@ -86,7 +86,7 @@ Examples: `APPROVAL_NOT_FOUND`, `WORKFLOW_NAME_CONFLICT`, `VALIDATION_ERROR`, `T
 
 ### Simple (Most Common)
 
-Inherit from `NexusError` — the base class stores `self.message`:
+Inherit from `SyntaraError` — the base class stores `self.message`:
 
 ```python
 class WorkflowNotFoundError(WorkflowError):
@@ -122,16 +122,16 @@ class ApprovalAlreadyDecidedError(ApprovalError):
         )
 ```
 
-The `message` attribute (set by `NexusError.__init__`) is used by error handlers to extract user-safe detail text.
+The `message` attribute (set by `SyntaraError.__init__`) is used by error handlers to extract user-safe detail text.
 
 ## @fastapi_exception Decorator
 
 Register exceptions with their handlers using the `@fastapi_exception` decorator with a **string-based handler reference**:
 
 ```python
-from nexus.core.exception_registry import fastapi_exception
+from syntara.core.exception_registry import fastapi_exception
 
-@fastapi_exception(handler="nexus.approvals.error_handlers.approval_not_found_handler")
+@fastapi_exception(handler="syntara.approvals.error_handlers.approval_not_found_handler")
 class ApprovalNotFoundError(ApprovalError):
     """Exception raised when an approval request is not found."""
 ```
@@ -190,7 +190,7 @@ def create_problem_details_response(
 
 ## PROBLEM_TYPES Registry
 
-Defined in `nexus.core.error_handlers`:
+Defined in `syntara.core.error_handlers`:
 
 ```python
 PROBLEM_TYPES = {
@@ -226,7 +226,7 @@ Keys use `snake_case`. URI values use `kebab-case`. Add new entries when existin
 Each domain module contains:
 
 ```
-src/nexus/{domain}/
+src/syntara/{domain}/
 ├── exceptions.py       # Domain base + specific exceptions
 └── error_handlers.py   # Handler functions + logger
 ```
@@ -235,22 +235,22 @@ Core infrastructure:
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/exceptions.py` | `NexusError` base class, `SafeValueError` |
-| `src/nexus/core/exception_registry.py` | `@fastapi_exception` decorator, `register_exceptions()` |
-| `src/nexus/core/error_handlers.py` | `PROBLEM_TYPES` dict, `create_problem_details_response()`, framework-level handlers |
+| `src/syntara/core/exceptions.py` | `SyntaraError` base class, `SafeValueError` |
+| `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator, `register_exceptions()` |
+| `src/syntara/core/error_handlers.py` | `PROBLEM_TYPES` dict, `create_problem_details_response()`, framework-level handlers |
 
 ## Adding Exceptions for a New Domain
 
 ### Step 1: Create Domain Base Exception
 
 ```python
-# src/nexus/must_gather/exceptions.py
-from nexus.core.exception_registry import fastapi_exception
-from nexus.core.exceptions import NexusError
-from nexus.must_gather.error_handlers import must_gather_not_found_handler
+# src/syntara/must_gather/exceptions.py
+from syntara.core.exception_registry import fastapi_exception
+from syntara.core.exceptions import SyntaraError
+from syntara.must_gather.error_handlers import must_gather_not_found_handler
 
 
-class MustGatherError(NexusError):
+class MustGatherError(SyntaraError):
     """Base exception for must-gather operations."""
 
 
@@ -266,7 +266,7 @@ class MustGatherNotFoundError(MustGatherError):
 ### Step 2: Create Error Handlers
 
 ```python
-# src/nexus/must_gather/error_handlers.py
+# src/syntara/must_gather/error_handlers.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -275,7 +275,7 @@ import structlog
 from fastapi import status
 from fastapi.responses import JSONResponse
 
-from nexus.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -305,7 +305,7 @@ The `@fastapi_exception` decorator registers exceptions when the module is impor
 
 ```python
 # In main.py or a module that is always loaded
-import nexus.must_gather.exceptions  # noqa: F401
+import syntara.must_gather.exceptions  # noqa: F401
 ```
 
 ## Router URL Prefix Conventions
@@ -324,7 +324,7 @@ router = APIRouter(prefix="/tool_manager", tags=["tool_manager"])
 
 ## Retry Error Classification
 
-Transient errors (network failures, timeouts, rate limits) use retry logic with error classification. The retry system lives in `src/nexus/core/utils/retry.py`.
+Transient errors (network failures, timeouts, rate limits) use retry logic with error classification. The retry system lives in `src/syntara/core/utils/retry.py`.
 
 ### `is_retryable_error(error)`
 
@@ -347,7 +347,7 @@ Classifies exceptions as retryable or non-retryable:
 Wraps async functions with exponential backoff:
 
 ```python
-from nexus.core.utils.retry import retry_with_backoff
+from syntara.core.utils.retry import retry_with_backoff
 
 @retry_with_backoff
 async def call_llm(invocation_id: str, turn_id: str) -> str:
@@ -378,9 +378,9 @@ Backoff formula: `initial * (growth_factor ** attempt)`, capped at `max_backoff`
 
 | File | Purpose |
 |---|---|
-| `src/nexus/core/exceptions.py` | `NexusError` base, `SafeValueError` |
-| `src/nexus/core/exception_registry.py` | Decorator and registration |
-| `src/nexus/core/error_handlers.py` | `PROBLEM_TYPES`, `create_problem_details_response()` |
+| `src/syntara/core/exceptions.py` | `SyntaraError` base, `SafeValueError` |
+| `src/syntara/core/exception_registry.py` | Decorator and registration |
+| `src/syntara/core/error_handlers.py` | `PROBLEM_TYPES`, `create_problem_details_response()` |
 | `docs/error-handling-strategy.md` | Architectural strategy and principles |
 
 Generated By: Claude Code (Claude Opus 4.6)

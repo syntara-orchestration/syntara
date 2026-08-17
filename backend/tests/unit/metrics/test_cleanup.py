@@ -10,9 +10,9 @@ import pytest
 from orchestrator_test_sdk.e2e import async_poll_for
 from prometheus_client import CollectorRegistry
 
-from nexus.metrics.cleanup import cleanup_stale_metrics, get_metrics_cleanup_worker
-from nexus.metrics.recorder import MetricsRecorder
-from nexus.metrics.types import MetricType
+from syntara.metrics.cleanup import cleanup_stale_metrics, get_metrics_cleanup_worker
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import MetricType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,7 +48,7 @@ class TestCleanupStaleMetrics:
         record = next(iter(recorder.query()))
         record.created_at = datetime.now(UTC) - timedelta(hours=1)
 
-        with patch("nexus.metrics.cleanup.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.cleanup.get_metrics_recorder", return_value=recorder):
             await cleanup_stale_metrics(_mock_session_factory())
 
         assert recorder.store.count() == 0
@@ -63,7 +63,7 @@ class TestCleanupStaleMetrics:
         recorder.record(MetricType.LLM_DURATION, 100.0, unit="ms")
         recorder.record(MetricType.CACHE_HIT, 1.0)
 
-        with patch("nexus.metrics.cleanup.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.cleanup.get_metrics_recorder", return_value=recorder):
             await cleanup_stale_metrics(_mock_session_factory())
 
         assert recorder.store.count() == 2
@@ -81,7 +81,7 @@ class TestCleanupStaleMetrics:
         records = list(recorder.query())
         records[0].created_at = datetime.now(UTC) - timedelta(hours=1)
 
-        with patch("nexus.metrics.cleanup.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.cleanup.get_metrics_recorder", return_value=recorder):
             await cleanup_stale_metrics(_mock_session_factory())
 
         assert recorder.store.count() == 1
@@ -96,7 +96,7 @@ class TestCleanupStaleMetrics:
             prometheus_registry=CollectorRegistry(),
         )
 
-        with patch("nexus.metrics.cleanup.get_metrics_recorder", return_value=recorder):
+        with patch("syntara.metrics.cleanup.get_metrics_recorder", return_value=recorder):
             await cleanup_stale_metrics(_mock_session_factory())
 
         assert recorder.store.count() == 0
@@ -112,11 +112,11 @@ class TestGetMetricsCleanupWorker:
 
     def test_returns_periodic_worker(self, override_settings: Callable[..., AbstractContextManager[object]]) -> None:
         """Factory returns a PeriodicWorker with correct configuration."""
-        from nexus.core.workers.periodic import PeriodicWorker
+        from syntara.core.workers.periodic import PeriodicWorker
 
         with (
             override_settings(metrics_cleanup_interval_seconds=1800.0),
-            patch("nexus.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
+            patch("syntara.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
         ):
             worker = get_metrics_cleanup_worker()
 
@@ -126,7 +126,7 @@ class TestGetMetricsCleanupWorker:
         """Worker interval comes from settings."""
         with (
             override_settings(metrics_cleanup_interval_seconds=900.0),
-            patch("nexus.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
+            patch("syntara.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
         ):
             worker = get_metrics_cleanup_worker()
 
@@ -136,7 +136,7 @@ class TestGetMetricsCleanupWorker:
         """Cleanup runs per-process (no advisory lock coordination)."""
         with (
             override_settings(metrics_cleanup_interval_seconds=3600.0),
-            patch("nexus.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
+            patch("syntara.metrics.cleanup.AsyncSessionLocal", new_callable=MagicMock),
         ):
             worker = get_metrics_cleanup_worker()
 
@@ -162,8 +162,8 @@ class TestCleanupWorkerIntegration:
         record = next(iter(recorder.query()))
         record.created_at = datetime.now(UTC) - timedelta(seconds=10)
 
-        with patch("nexus.metrics.cleanup.get_metrics_recorder", return_value=recorder):
-            from nexus.core.workers.periodic import PeriodicWorker
+        with patch("syntara.metrics.cleanup.get_metrics_recorder", return_value=recorder):
+            from syntara.core.workers.periodic import PeriodicWorker
 
             worker = PeriodicWorker(
                 name="test-metrics-cleanup",

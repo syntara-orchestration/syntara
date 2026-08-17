@@ -5,6 +5,8 @@ import {
   Button,
   Content,
   ContentVariants,
+  Flex,
+  FlexItem,
   Stack,
   StackItem,
   Title,
@@ -21,7 +23,7 @@ import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { usersClient } from '../../../client'
 import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
+import { DocLinkButton, NxPageHeader } from '../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../components/layout/NxPanel'
 import { NxLink } from '../../../components/NxLink'
 import { NxPageTitle } from '../../../components/NxPageTitle'
@@ -30,6 +32,7 @@ import { useQueryState } from '../../../components/states/useQueryState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
 import { detachPromise } from '../../../utils/detachPromise'
+import { useDocLink } from '../../../utils/docs/useDocLink'
 import { isValidUUID } from '../../../utils/generateUUID'
 import { accessClient } from '../../access/accessClient'
 import { DetailPageShell } from '../DetailPageShell'
@@ -112,6 +115,7 @@ export function TransferIdentityWizard() {
   const { userId }: { userId: string } = useParams({ strict: false })
   const safeUserId = userId ?? ''
   const isValidId = !!userId && isValidUUID(userId)
+  const transferIdentityDocLink = useDocLink('transferIdentity')
 
   const { showSuccess } = useAlerts()
   const handleMutationError = useMutationErrorHandler()
@@ -228,7 +232,14 @@ export function TransferIdentityWizard() {
         titleSlot={
           <Stack>
             <StackItem>
-              <Title headingLevel="h1">Transfer identity to {targetUsername}</Title>
+              <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
+                <FlexItem>
+                  <Title headingLevel="h1">Transfer identity to {targetUsername}</Title>
+                </FlexItem>
+                <FlexItem>
+                  <DocLinkButton href={transferIdentityDocLink} />
+                </FlexItem>
+              </Flex>
             </StackItem>
             <StackItem>
               <Content component={ContentVariants.p} className={styles.descriptionText}>

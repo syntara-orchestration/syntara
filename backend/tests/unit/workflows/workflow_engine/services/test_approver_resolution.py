@@ -10,8 +10,8 @@ import pytest
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-from nexus.core.models import Group, User
-from nexus.workflows.workflow_engine.services.approver_resolution import ApproverResolutionService
+from syntara.core.models import Group, User
+from syntara.workflows.workflow_engine.services.approver_resolution import ApproverResolutionService
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ async def service(test_db_session: AsyncSession) -> ApproverResolutionService:
 @pytest.fixture
 async def test_users(test_db_session: AsyncSession) -> dict[str, User]:
     """Create test users."""
-    from nexus.auth.passwords import hash_password
+    from syntara.auth.passwords import hash_password
 
     users = {
         "alice": User(

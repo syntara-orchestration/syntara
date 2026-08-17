@@ -27,10 +27,10 @@ import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUrlTab } from '../../../hooks/useUrlTab'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -63,11 +63,15 @@ function GroupDetailsTab({ group }: Readonly<{ group: Group }>) {
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Created</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(group.created_at)}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={group.created_at} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
       <DescriptionListGroup>
         <DescriptionListTerm>Updated</DescriptionListTerm>
-        <DescriptionListDescription>{formatDateTime(group.updated_at)}</DescriptionListDescription>
+        <DescriptionListDescription>
+          <DateCell dateString={group.updated_at} />
+        </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>
   )

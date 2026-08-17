@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexus.auth.session.cleanup import cleanup_expired_sessions
+from syntara.auth.session.cleanup import cleanup_expired_sessions
 
 
 @pytest.fixture
@@ -81,8 +81,8 @@ class TestGetSessionCleanupWorker:
     """Tests for get_session_cleanup_worker factory."""
 
     def test_creates_worker(self):
-        with patch("nexus.auth.session.cleanup.AsyncSessionLocal"):
-            from nexus.auth.session.cleanup import get_session_cleanup_worker
+        with patch("syntara.auth.session.cleanup.AsyncSessionLocal"):
+            from syntara.auth.session.cleanup import get_session_cleanup_worker
 
             worker = get_session_cleanup_worker()
             assert worker._name == "session-cleanup"

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from nexus.core.config.base import Settings
+from syntara.core.config.base import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_settings_requires_nexus_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_requires_app_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that settings only reads environment variables with APP_ prefix."""
     monkeypatch.setenv("APP_OPENROUTER_MODEL", "prefixed-model")
 
@@ -40,7 +40,7 @@ class TestDatabaseSettings:
         assert settings.db_password.get_secret_value() == "admin"
         assert settings.db_host == "localhost"
         assert settings.db_port == 5432
-        assert settings.db_name == "nexus_api"
+        assert settings.db_name == "syntara_api"
         assert settings.db_pool_size == 10
         assert settings.db_max_overflow == 20
         assert settings.db_pool_timeout_seconds == 30.0
@@ -53,7 +53,7 @@ class TestDatabaseSettings:
         assert url.username == "admin"
         assert url.host == "localhost"
         assert url.port == 5432
-        assert url.database == "nexus_api"
+        assert url.database == "syntara_api"
 
     def test_database_url_with_custom_values(
         self,
@@ -62,7 +62,7 @@ class TestDatabaseSettings:
         """Test database_url with custom configuration values."""
         from pydantic import SecretStr
 
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         with override_settings(
             db_user="testuser",
@@ -256,6 +256,40 @@ class TestDatabaseSSLSettings:
 
 
 # =============================================================================
+# CacheSettings Tests
+# =============================================================================
+
+
+class TestCacheSettings:
+    """Tests for CacheSettings (Redis) configuration."""
+
+    def test_cache_defaults(self) -> None:
+        """Default pool size is 50 — large enough for concurrent workflow workers."""
+        settings = Settings()
+        assert settings.cache_host == "localhost"
+        assert settings.cache_port == 6379
+        assert settings.cache_connection_pool_size == 50
+
+    def test_cache_connection_pool_size_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", "100")
+        settings = Settings()
+        assert settings.cache_connection_pool_size == 100
+
+    @pytest.mark.parametrize("pool_size", ["0", "-1", "-50"])
+    def test_cache_connection_pool_size_rejects_non_positive(
+        self, monkeypatch: pytest.MonkeyPatch, pool_size: str
+    ) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", pool_size)
+        with pytest.raises(ValidationError, match="must be at least 1"):
+            Settings()
+
+    def test_cache_connection_pool_size_accepts_one(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_CACHE_CONNECTION_POOL_SIZE", "1")
+        settings = Settings()
+        assert settings.cache_connection_pool_size == 1
+
+
+# =============================================================================
 # AuditDatabaseSettings SSL Tests
 # =============================================================================
 
@@ -274,6 +308,24 @@ class TestServerSettings:
         assert settings.server_host == "0.0.0.0"  # noqa: S104
         assert settings.server_port == 8000
         assert settings.server_reload is False
+
+    def test_product_name_defaults_to_community(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Upstream/community build: product_name is 'Syntara' when APP_PRODUCT_NAME is unset."""
+        monkeypatch.delenv("APP_PRODUCT_NAME", raising=False)
+        settings = Settings(_env_file=None)
+        assert settings.product_name == "Syntara"
+
+    def test_product_name_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Product build: product_name uses APP_PRODUCT_NAME when set."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Custom Product")
+        settings = Settings(_env_file=None)
+        assert settings.product_name == "Custom Product"
+
+    def test_product_name_rejects_invalid_characters(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Product name must match the alphanumeric+space pattern."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Bad<Name>!")
+        with pytest.raises(ValidationError, match="pattern"):
+            Settings(_env_file=None)
 
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
@@ -318,7 +370,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com:8000"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "https://example.com:8000"
 
@@ -330,7 +382,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com/"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "https://example.com"
 
@@ -345,7 +397,7 @@ class TestServerSettings:
             server_host="localhost",
             server_port=9000,
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().jwt_issuer == "http://localhost:9000"
 
@@ -358,7 +410,7 @@ class TestServerSettings:
             server_public_url=HttpUrl("https://example.com"),
             oidc_post_logout_redirect_uri="https://custom.example.com",
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().post_logout_redirect_uri == "https://custom.example.com"
 
@@ -370,7 +422,7 @@ class TestServerSettings:
         with override_settings(
             server_public_url=HttpUrl("https://example.com"),
         ):
-            from nexus.core.config.base import get_settings
+            from syntara.core.config.base import get_settings
 
             assert get_settings().post_logout_redirect_uri == "https://example.com"
 
@@ -391,7 +443,7 @@ class TestLoggingSettings:
 
     def test_logging_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test default logging configuration values."""
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         # Clear env vars to test pure defaults
         monkeypatch.delenv("APP_FALLBACK_LOG_LEVEL", raising=False)
@@ -429,7 +481,7 @@ class TestTemporalSettings:
 
     def test_temporal_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test default Temporal configuration values."""
-        from nexus.core.config.base import get_settings
+        from syntara.core.config.base import get_settings
 
         # Clear env vars to test pure defaults
         monkeypatch.delenv("APP_TASK_QUEUE", raising=False)
@@ -448,6 +500,7 @@ class TestTemporalSettings:
             assert settings.max_cached_workflows == 20
             assert settings.max_concurrent_workflow_tasks == 50
             assert settings.max_concurrent_activities == 50
+            assert settings.background_worker_max_concurrent_activities == 10
         finally:
             get_settings.cache_clear()
 
@@ -459,6 +512,7 @@ class TestTemporalSettings:
         monkeypatch.setenv("APP_MAX_CACHED_WORKFLOWS", "100")
         monkeypatch.setenv("APP_MAX_CONCURRENT_WORKFLOW_TASKS", "75")
         monkeypatch.setenv("APP_MAX_CONCURRENT_ACTIVITIES", "25")
+        monkeypatch.setenv("APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES", "8")
         settings = Settings()
         assert settings.temporal_address == "temporal.example.com:7233"
         assert settings.temporal_namespace == "production"
@@ -466,6 +520,7 @@ class TestTemporalSettings:
         assert settings.max_cached_workflows == 100
         assert settings.max_concurrent_workflow_tasks == 75
         assert settings.max_concurrent_activities == 25
+        assert settings.background_worker_max_concurrent_activities == 8
 
     def test_temporal_concurrency_rejects_zero(self) -> None:
         """Test that concurrency controls reject values less than 1."""
@@ -475,6 +530,8 @@ class TestTemporalSettings:
             Settings(_env_file=None, max_concurrent_workflow_tasks=0)
         with pytest.raises(ValidationError):
             Settings(_env_file=None, max_concurrent_activities=0)
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, background_worker_max_concurrent_activities=0)
 
 
 # =============================================================================
