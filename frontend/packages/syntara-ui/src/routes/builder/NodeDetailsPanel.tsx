@@ -408,6 +408,14 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
 
       const handleCreate = (data: Record<string, unknown>): Promise<boolean> =>
         new Promise((resolve) => {
+          let settled = false
+          const settle = (ok: boolean) => {
+            if (settled) {
+              return
+            }
+            settled = true
+            resolve(ok)
+          }
           try {
             selectedNode.onSubmit(
               data,
@@ -415,7 +423,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
                 if (replacementNodeId) {
                   if (!handleReplacement(newNodeId)) {
                     showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
-                    resolve(true)
+                    settle(true)
                     return
                   }
                 } else if (sourceNodeId && newNodeId) {
@@ -427,20 +435,25 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
 
                 onClose()
                 onNodeAdded?.()
-                resolve(true)
+                settle(true)
               },
               (error: string) => {
                 showError({ title: 'Add step failed', description: error })
-                resolve(false)
+                settle(false)
               },
               nodeSubtypeId ?? undefined
             )
+            // Registry onSubmit is callback-based and sync. If neither callback
+            // ran, fail closed so AIAgentNodeForm does not hang waiting to markPersisted.
+            if (!settled) {
+              settle(false)
+            }
           } catch (error) {
             showError({
               title: 'Add step failed',
               description: error instanceof Error ? error.message : 'Failed to add step',
             })
-            resolve(false)
+            settle(false)
           }
         })
 

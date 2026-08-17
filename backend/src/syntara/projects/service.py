@@ -232,8 +232,9 @@ class ProjectService(BaseService):
 
         Files and service accounts are intentionally retained after project
         deletion (not cascaded here). Callers observe the orphaned state via
-        ``is_project_deleted`` on their read models; files remain deletable
-        via ``DELETE /files/{id}``.
+        ``is_project_deleted`` on their read models. After soft-delete,
+        project-scoped ``files:delete`` cannot authorize orphan cleanup;
+        only system-scope ``files:delete`` with a known UUID can.
         """
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
         from syntara.authz.models.policy import Policy  # noqa: PLC0415

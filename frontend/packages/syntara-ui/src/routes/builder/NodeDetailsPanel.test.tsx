@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Node } from '@xyflow/react'
 import { useEffect } from 'react'
@@ -273,6 +273,40 @@ describe('NodeDetailsPanel', () => {
     await user.click(screen.getByRole('button', { name: /Submit/i }))
 
     expect(mockShowError).toHaveBeenCalledWith({ title: 'Add step failed', description: 'boom' })
+    expect(mockOnClose).not.toHaveBeenCalled()
+  })
+
+  it('resolves add-mode submit as failed when registry onSubmit never callbacks', async () => {
+    const user = userEvent.setup()
+    const mockOnSubmit = vi.fn()
+    const onFormSettled = vi.fn()
+
+    mockNodeRegistryGet.mockReturnValue({
+      id: 'action',
+      label: 'Action',
+      icon: () => <div>ActionIcon</div>,
+      category: 'task',
+      formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => Promise<boolean> }) => (
+        <button
+          onClick={() => {
+            void onSubmit({}).then(onFormSettled)
+          }}
+          type="button"
+        >
+          Submit
+        </button>
+      ),
+      onSubmit: mockOnSubmit,
+    } as never)
+
+    render(<NodeDetailsPanel mode="add" nodeTypeId="action" nodeSubtypeId={null} onClose={mockOnClose} />)
+
+    await user.click(screen.getByRole('button', { name: /Submit/i }))
+
+    await waitFor(() => {
+      expect(onFormSettled).toHaveBeenCalledWith(false)
+    })
+    expect(mockOnClose).not.toHaveBeenCalled()
   })
 
   it('moves and connects new node when adding from an edge', async () => {
