@@ -11,6 +11,7 @@ from uuid import UUID
 import jmespath
 import structlog
 from sqlalchemy import delete as sa_delete
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -230,8 +231,9 @@ async def _clear_and_deny(
     the next successful login or manual cleanup.
     """
     try:
-        await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
-    except Exception:
+        async with db.begin_nested():
+            await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
+    except SQLAlchemyError:
         logger.critical(
             "Failed to clear stale IdP groups on denied login — denying anyway",
             user_id=str(user.id),

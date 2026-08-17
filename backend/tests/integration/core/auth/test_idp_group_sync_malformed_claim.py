@@ -1036,21 +1036,17 @@ class TestSyncRouterInteraction:
         self,
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
-        test_user: User,
-        test_identity: UserIdentity,
-        test_group: Group,
         users_group: Group,
-        provider_id: UUID,
         identity_provider: IdentityProvider,
         group_mapping: IdpGroupMappingEntry,
     ) -> None:
         """First-login deny must rollback JIT user — no user/identity persisted.
 
-        When a user is created during OIDC login (JIT) but group sync
-        denies (no mappings matched), the router should rollback to avoid
-        persisting an orphaned user with no session and no groups.
+        Exercises the real _resolve_oidc_user path (unmocked auto-create)
+        with a brand-new email/sub. After NO_GROUP_MATCH, a fresh session
+        must find no User or UserIdentity for that identity.
         """
-        from unittest.mock import AsyncMock, MagicMock, patch
+        from unittest.mock import MagicMock, patch
 
         from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode
         from syntara.auth.router import _resolve_and_login_user
@@ -1064,24 +1060,18 @@ class TestSyncRouterInteraction:
             group_jmespath_expression="groups[*]",
         )
 
-        # Do NOT set last_login — user is JIT-created (first login)
-        assert test_user.last_login is None
-
-        # Cache IDs/attrs before the call — rollback expires ORM objects
         await test_db_session.commit()
-        user_id = test_user.id
-        user_email = test_user.email
-        test_group_id = test_group.id
-        provider_name = identity_provider.name
+
+        jit_email = f"jit-{uuid4().hex[:8]}@example.com"
+        jit_sub = f"jit-sub-{uuid4().hex[:8]}"
+        issuer = str(config.issuer_url)
 
         provider_mock = MagicMock(spec=IdentityProvider)
-        provider_mock.name = provider_name
+        provider_mock.name = identity_provider.name
+        provider_mock.id = identity_provider.id
         provider_mock.configuration = config
 
-        mock_resolve = AsyncMock(return_value=(test_user, test_identity))
-
         with (
-            patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
             patch(
                 "syntara.auth.services.idp_group_sync.jmespath.search",
                 side_effect=TypeError("unexpected type"),
@@ -1090,7 +1080,7 @@ class TestSyncRouterInteraction:
         ):
             await _resolve_and_login_user(
                 test_db_session,
-                {"email": user_email, "sub": "sub-1"},
+                {"email": jit_email, "sub": jit_sub, "preferred_username": "jituser"},
                 {"groups": "admin"},
                 provider_mock,
                 None,
@@ -1098,23 +1088,17 @@ class TestSyncRouterInteraction:
 
         assert exc_info.value.error_code == OIDCErrorCode.NO_GROUP_MATCH
 
-        # Verify on a NEW session that rollback undid the group sync changes
-        # Note: the user row itself was committed before _resolve_and_login_user
-        # (fixture setup), so it still exists. In production, the user would be
-        # created inside the same transaction and rolled back. Here we verify
-        # that the deny-path rollback prevents any IdP group changes from
-        # persisting (the key behavioral difference from the commit path).
+        # Verify on a NEW session that the JIT user was NOT persisted
         async with test_db_session_factory() as verify_session:
-            idp_tracking = await verify_session.exec(
-                select(user_idp_groups.c.group_id).where(
-                    user_idp_groups.c.user_id == user_id,
-                    user_idp_groups.c.identity_provider_id == provider_id,
+            from syntara.core.models.user_identity import UserIdentity as UIModel
+
+            user_result = await verify_session.exec(select(User).where(User.email == jit_email))
+            assert user_result.first() is None, "JIT user must not be persisted after rollback"
+
+            identity_result = await verify_session.exec(
+                select(UIModel).where(
+                    UIModel.issuer == issuer,
+                    UIModel.subject == jit_sub,
                 )
             )
-            assert set(idp_tracking.all()) == set(), "Rollback must prevent IdP tracking rows from persisting"
-
-            memberships = await verify_session.exec(
-                select(user_groups.c.group_id).where(user_groups.c.user_id == user_id)
-            )
-            group_ids = set(memberships.all())
-            assert test_group_id not in group_ids, "Rollback must prevent group membership changes"
+            assert identity_result.first() is None, "JIT identity must not be persisted after rollback"
