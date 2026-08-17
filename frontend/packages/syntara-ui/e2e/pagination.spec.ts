@@ -7,6 +7,7 @@
  * - Changing per-page resets to first page
  */
 import { createUnavailableGuard, type Page, test, expect, toAppUrl } from './fixtures'
+import { paginationFooter } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -147,16 +148,12 @@ test.describe('Pagination Footer — Users Tab', () => {
   })
 
   test('pagination footer is visible with per-page toggle', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -179,9 +176,7 @@ test.describe('Pagination Footer — Groups Tab', () => {
       .catch(() => false)
     test.skip(!hasTable, 'No groups data available')
 
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -311,9 +306,7 @@ test.describe('Project Selector — Workflows', () => {
   })
 
   test('pagination footer has per-page toggle', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -335,9 +328,7 @@ test.describe('Pagination Navigation — Workflows', () => {
     }
 
     // Set per-page to 10 so pagination activates even with fewer items
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.waitFor({ state: 'visible', timeout: 10_000 })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /10 per page/i }).click()
@@ -374,9 +365,7 @@ test.describe('Pagination Navigation — Workflows', () => {
     await expect(prevButton).toBeEnabled()
 
     // Change per-page
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /50 per page/i }).click()
 
@@ -420,16 +409,12 @@ test.describe('Pagination Footer — Integrations', () => {
   })
 
   test('pagination footer is visible', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -453,9 +438,7 @@ test.describe('Pagination Footer — Identity Providers', () => {
   })
 
   test('pagination footer is visible on identity providers tab', async ({ app }) => {
-    const perPageToggle = app
-      .getByRole('navigation', { name: /pagination/i })
-      .getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })

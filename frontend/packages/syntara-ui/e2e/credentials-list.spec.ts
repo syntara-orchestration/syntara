@@ -20,6 +20,7 @@ import {
   filterCredentialByName,
   goToCredentialsList,
 } from './helpers/credentials'
+import { paginationFooter } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import { createCredentialSeed, deleteCredentialViaApi, type SeededCredential } from './seeds/resources'
 import { getAuthToken } from './utils/api'
@@ -157,12 +158,12 @@ test.describe('Cursor-Based Pagination', () => {
   })
 
   test('pagination footer displays credential count', async ({ app }) => {
-    const credentialCountText = app.getByRole('navigation', { name: /pagination/i }).getByText(/of \d+/)
+    const credentialCountText = paginationFooter(app).getByText(/of \d+/)
     await expect(credentialCountText).toBeVisible()
   })
 
   test('next/previous controls navigate between pages when available', async ({ app }) => {
-    const pagination = app.getByRole('navigation', { name: /pagination/i })
+    const pagination = paginationFooter(app)
     const nextButton = pagination.getByRole('button', { name: /next/i })
     const hasNext = await nextButton
       .waitFor({ state: 'visible', timeout: 3000 })

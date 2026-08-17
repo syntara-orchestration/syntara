@@ -16,6 +16,7 @@
  */
 import { test, expect, toAppUrl, createUnavailableGuard } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
+import { filterChipGroup } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createPolicyViaApi,
@@ -132,7 +133,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Filter chip appears
-    const nameChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // URL contains filter
@@ -143,7 +144,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Capture filtered URL, navigate away, then back
@@ -153,7 +154,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
 
     // Filter restored from URL
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
-    const restoredChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const restoredChipGroup = filterChipGroup(app, 'Name')
     await expect(restoredChipGroup.getByText('admin')).toBeVisible()
   })
 
@@ -162,7 +163,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Clear all filters
@@ -227,7 +228,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Apply sort — click the table header's sort button.
@@ -266,7 +267,7 @@ test.describe('Access Management — Shareable URLs', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.getByRole('list').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Click sort — force: true bypasses PF6 tooltip overlay on truncated header
@@ -283,7 +284,7 @@ test.describe('Access Management — Shareable URLs', () => {
 
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
 
-    const restoredChip = app.getByRole('list').filter({ hasText: 'Name' })
+    const restoredChip = filterChipGroup(app, 'Name')
     await expect(restoredChip.getByText('admin')).toBeVisible()
 
     const restoredHeader = app.getByRole('columnheader', { name: 'Name' })
