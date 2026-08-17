@@ -46,7 +46,7 @@ RUN --mount=from=override,source=/,target=/tmp/override \
 RUN npm run build
 
 # Production stage - use ubi9 nginx image
-FROM registry.redhat.io/ubi9/nginx-124:latest@sha256:d0dea12c26ab29734d15590f2a931180f68d6c276dffdf9e3f1e8eeb9ab3be59
+FROM registry.redhat.io/ubi9/nginx-124:latest@sha256:3292e9a046b72b18e51229a448f97568a9af26b26bf54488bfd78094800f2e61
 
 USER 0
 
