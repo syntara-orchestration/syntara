@@ -89,6 +89,7 @@ _PENDING_ACTIVITY_STATE_STARTED = PendingActivityState.PENDING_ACTIVITY_STATE_ST
 _MONITOR_RETRY_BASE_DELAY_S = 1.0
 _MONITOR_RETRY_MAX_DELAY_S = 30.0
 _MONITOR_RETRY_BACKOFF_FACTOR = 2.0
+_MONITOR_RETRY_MAX_ATTEMPTS = 50
 
 
 @dataclass
@@ -1082,6 +1083,14 @@ class ActivitySyncService:
                     break
 
                 attempt += 1
+                if attempt >= _MONITOR_RETRY_MAX_ATTEMPTS:
+                    logger.error(
+                        "Activity monitor exceeded max retry attempts, giving up",
+                        execution_id=execution_id,
+                        attempts=attempt,
+                    )
+                    break
+
                 logger.warning(
                     "Retrying activity monitor after transient error",
                     execution_id=execution_id,

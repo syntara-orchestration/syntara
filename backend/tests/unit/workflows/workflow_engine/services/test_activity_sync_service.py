@@ -17,13 +17,14 @@ from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_service import (
-    _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
-)
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
+    _MONITOR_RETRY_MAX_ATTEMPTS,
     ActivitySyncService,
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
+)
+from syntara.workflows.workflow_engine.services.activity_sync_service import (
+    _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
 )
 from syntara.workflows.workflow_engine.utils.timeout_messages import (
     build_timeout_error_message,
@@ -3973,6 +3974,24 @@ class TestMonitorExecutionRetry:
         assert len(metadata_instances) == 3
         assert all(m is self.metadata for m in metadata_instances)
         assert self.metadata.last_processed_event_id == 20
+
+    @pytest.mark.asyncio
+    async def test_stops_after_max_attempts(self) -> None:
+        """Test that the retry loop exits after _MONITOR_RETRY_MAX_ATTEMPTS."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(
+                self.service,
+                "_run_monitor_loop",
+                new_callable=AsyncMock,
+                return_value=False,
+            ) as mock_loop,
+            patch(self._SLEEP_PATH, new_callable=AsyncMock),
+            patch(self._RANDOM_PATH, return_value=1.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        assert mock_loop.call_count == _MONITOR_RETRY_MAX_ATTEMPTS
 
 
 class TestPendingSyncEventIds:
