@@ -242,7 +242,9 @@ async def sync_idp_groups(
     group memberships from every provider and replaces them with groups
     from the current login's token (last-login-wins).
 
-    On **deny paths** (extraction failure, AAP validation failure),
+    On **deny paths** (extraction failure, AAP validation failure,
+    soft no-match where extraction succeeds but maps to zero groups,
+    no mapping entries without ``allow_all_authenticated``),
     provider-scoped: clears only *this* provider's IdP-managed groups,
     leaving other providers' memberships intact.
 

@@ -1336,16 +1336,16 @@ class TestResolveAndLoginUserDenyPath:
     @pytest.mark.asyncio
     @patch("syntara.auth.router.sync_idp_groups", new_callable=AsyncMock)
     @patch("syntara.auth.router._resolve_oidc_user", new_callable=AsyncMock)
-    async def test_idp_tracked_group_does_not_satisfy_manual_fallback(
+    async def test_deny_path_commits_and_raises_no_group_match(
         self,
         mock_resolve: AsyncMock,
         mock_sync: AsyncMock,
     ) -> None:
-        """An IdP-tracked group must NOT satisfy the 'other groups' fallback.
+        """When sync returns False and no manual groups exist, deny with commit.
 
-        If the only non-authenticated group the user has is tracked in
-        user_idp_groups, the NOT IN subquery must exclude it so login is
-        still denied with NO_GROUP_MATCH.
+        This unit test verifies the deny-path control flow (commit + raise).
+        The NOT IN subquery that excludes IdP-tracked rows is covered by the
+        integration test ``test_idp_tracked_group_does_not_satisfy_fallback_via_router``.
         """
         from syntara.auth.router import _resolve_and_login_user
         from syntara.identity_providers.models.identity_provider import IdentityProvider

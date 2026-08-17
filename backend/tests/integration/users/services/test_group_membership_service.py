@@ -1083,10 +1083,10 @@ async def test_sync_idp_groups_overlapping_group_between_providers(
 
 
 @pytest.mark.asyncio
-async def test_sync_idp_groups_empty_desired_removes_all_idp_groups(
+async def test_sync_idp_groups_deny_clears_only_authenticating_provider(
     test_db_session: AsyncSession, test_user: User
 ) -> None:
-    """When the token resolves no groups, only that provider's IdP-managed memberships are removed."""
+    """When the token resolves no groups, only the authenticating provider's IdP-managed memberships are removed."""
     provider_a = await _create_identity_provider(test_db_session, "empty-idp-a", test_user)
     provider_b = await _create_identity_provider(test_db_session, "empty-idp-b", test_user)
     member = await _create_test_user(test_db_session, "empty-user", "empty@example.com")
