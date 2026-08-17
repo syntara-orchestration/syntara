@@ -224,8 +224,20 @@ async def _clear_and_deny(
     Provider-scoped: only removes groups tracked by *provider_id*, leaving
     other providers' memberships intact.  Returns ``False`` so callers can
     ``return await _clear_and_deny(...)``.
+
+    A DB failure during clearing is logged but does not propagate — the
+    deny (``False``) still takes effect; stale groups simply remain until
+    the next successful login or manual cleanup.
     """
-    await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
+    try:
+        await _clear_provider_idp_groups(db, user.id, provider_id, username=user.username)
+    except Exception:
+        logger.critical(
+            "Failed to clear stale IdP groups on denied login — denying anyway",
+            user_id=str(user.id),
+            provider_id=str(provider_id),
+            exc_info=True,
+        )
     return False
 
 
@@ -257,6 +269,10 @@ async def sync_idp_groups(
         unless the user has groups from other sources.
 
     """
+    # Serialize concurrent group syncs for the same user to prevent
+    # TOCTOU races between interleaved clear/write operations.
+    await db.exec(select(User).where(col(User.id) == user.id).with_for_update())
+
     aap_role_mapping = config.aap_role_mapping_enabled and config.idp_type == OIDCIdpType.AAP
     provider_id = identity.identity_provider_id
 
