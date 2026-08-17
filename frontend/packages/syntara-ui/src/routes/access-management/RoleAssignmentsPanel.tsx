@@ -26,6 +26,7 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
+import { roleAssignmentsQueryKey } from '../access/useAlreadyAssignedRoles'
 import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
 import { getProjectDetailPath } from './accessManagementPaths'
@@ -338,8 +339,9 @@ export function RoleAssignmentsPanel({
 
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
+    detachPromise(queryClient.invalidateQueries({ queryKey: roleAssignmentsQueryKey(principalType, principalId) }))
     refetch()
-  }, [queryClient, refetch])
+  }, [queryClient, principalType, principalId, refetch])
 
   const handleFilterChange = (newFilters: FilterConfig[]) => {
     setAllFilters(newFilters)
