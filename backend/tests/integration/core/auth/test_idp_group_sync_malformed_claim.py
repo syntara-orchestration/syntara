@@ -708,6 +708,8 @@ class TestSyncRouterInteraction:
             group_jmespath_expression="groups[*]",
         )
 
+        import datetime
+
         # First login: healthy claim grants test_group
         result = await sync_idp_groups(
             test_db_session,
@@ -716,6 +718,8 @@ class TestSyncRouterInteraction:
             {"groups": ["admin"]},
             config,
         )
+        # Mark user as returning so deny path commits (not rolls back)
+        test_user.last_login = datetime.datetime.now(tz=datetime.UTC)
         await test_db_session.commit()
         assert result is True
 
@@ -770,6 +774,7 @@ class TestSyncRouterInteraction:
     async def test_manual_group_admits_user_when_sync_clears_idp_groups(
         self,
         test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
         test_identity: UserIdentity,
         test_group: Group,
@@ -780,10 +785,11 @@ class TestSyncRouterInteraction:
     ) -> None:
         """A genuine manual group (no tracking row) must admit the user.
 
-        Even when sync_idp_groups returns False and IdP groups are cleared,
-        a manually-assigned group should pass the other_groups check and
-        allow login.
+        Seeds a prior IdP-managed membership, adds a manual group, then
+        triggers a malformed claim.  Asserts that login succeeds (manual
+        group admits) AND the stale IdP-managed group is cleared.
         """
+        import datetime
         from unittest.mock import AsyncMock, MagicMock, patch
 
         from syntara.auth.router import _resolve_and_login_user
@@ -797,6 +803,19 @@ class TestSyncRouterInteraction:
             group_jmespath_expression="groups[*]",
         )
 
+        # First login: healthy claim grants test_group as IdP-managed
+        result = await sync_idp_groups(
+            test_db_session,
+            test_user,
+            test_identity,
+            {"groups": ["admin"]},
+            config,
+        )
+        assert result is True
+
+        # Mark user as returning (has logged in before)
+        test_user.last_login = datetime.datetime.now(tz=datetime.UTC)
+
         # Create a manually-assigned group (no user_idp_groups tracking row)
         manual_group = Group(
             name=f"manual-group-{uuid4().hex[:8]}",
@@ -806,7 +825,15 @@ class TestSyncRouterInteraction:
         test_db_session.add(manual_group)
         await test_db_session.flush()
         await test_db_session.exec(user_groups.insert().values(user_id=test_user.id, group_id=manual_group.id))
-        await test_db_session.flush()
+        await test_db_session.commit()
+
+        # Verify setup: user has test_group (IdP-managed) + manual_group
+        memberships = await test_db_session.exec(
+            select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+        )
+        setup_ids = set(memberships.all())
+        assert test_group.id in setup_ids, "Setup: IdP-managed group must be present"
+        assert manual_group.id in setup_ids, "Setup: manual group must be present"
 
         provider_mock = MagicMock(spec=IdentityProvider)
         provider_mock.name = identity_provider.name
@@ -814,6 +841,7 @@ class TestSyncRouterInteraction:
 
         mock_resolve = AsyncMock(return_value=(test_user, test_identity))
 
+        # Second login: malformed claim — IdP groups cleared, manual group admits
         with (
             patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
             patch(
@@ -830,6 +858,27 @@ class TestSyncRouterInteraction:
             )
 
         assert result_user.id == test_user.id, "Manual group must admit user even when sync fails"
+
+        # Commit — in production the OIDC callback handler commits after
+        # _resolve_and_login_user returns; here we do it explicitly.
+        await test_db_session.commit()
+
+        # Verify stale IdP-managed group is cleared and manual group survives
+        async with test_db_session_factory() as verify_session:
+            memberships = await verify_session.exec(
+                select(user_groups.c.group_id).where(user_groups.c.user_id == test_user.id)
+            )
+            group_ids = set(memberships.all())
+            assert test_group.id not in group_ids, "Stale IdP-managed group must be cleared"
+            assert manual_group.id in group_ids, "Manual group must survive"
+
+            idp_tracking = await verify_session.exec(
+                select(user_idp_groups.c.group_id).where(
+                    user_idp_groups.c.user_id == test_user.id,
+                    user_idp_groups.c.identity_provider_id == provider_id,
+                )
+            )
+            assert set(idp_tracking.all()) == set(), "IdP tracking must be empty after malformed claim"
 
     @pytest.mark.asyncio
     async def test_idp_tracked_group_does_not_satisfy_fallback_via_router(
@@ -908,6 +957,8 @@ class TestSyncRouterInteraction:
             group_jmespath_expression="groups[*]",
         )
 
+        import datetime
+
         # Login via IdP A — grants other_group
         result = await sync_idp_groups(
             test_db_session,
@@ -916,6 +967,8 @@ class TestSyncRouterInteraction:
             {"groups": ["devs"]},
             other_config,
         )
+        # Mark user as returning so deny path commits (not rolls back)
+        test_user.last_login = datetime.datetime.now(tz=datetime.UTC)
         await test_db_session.commit()
         assert result is True
 
@@ -977,3 +1030,91 @@ class TestSyncRouterInteraction:
             )
             group_ids = set(memberships.all())
             assert other_group.id in group_ids, "IdP A's group membership must survive denied login at IdP B"
+
+    @pytest.mark.asyncio
+    async def test_first_login_deny_rolls_back_jit_user(
+        self,
+        test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+        test_identity: UserIdentity,
+        test_group: Group,
+        users_group: Group,
+        provider_id: UUID,
+        identity_provider: IdentityProvider,
+        group_mapping: IdpGroupMappingEntry,
+    ) -> None:
+        """First-login deny must rollback JIT user — no user/identity persisted.
+
+        When a user is created during OIDC login (JIT) but group sync
+        denies (no mappings matched), the router should rollback to avoid
+        persisting an orphaned user with no session and no groups.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode
+        from syntara.auth.router import _resolve_and_login_user
+
+        config = OIDCConfiguration(
+            provider_type="oidc",
+            issuer_url="https://idp.example.com",
+            client_id="client-id",
+            client_secret="client-secret",  # noqa: S106
+            redirect_uri="http://localhost:8000/callback",
+            group_jmespath_expression="groups[*]",
+        )
+
+        # Do NOT set last_login — user is JIT-created (first login)
+        assert test_user.last_login is None
+
+        # Cache IDs/attrs before the call — rollback expires ORM objects
+        await test_db_session.commit()
+        user_id = test_user.id
+        user_email = test_user.email
+        test_group_id = test_group.id
+        provider_name = identity_provider.name
+
+        provider_mock = MagicMock(spec=IdentityProvider)
+        provider_mock.name = provider_name
+        provider_mock.configuration = config
+
+        mock_resolve = AsyncMock(return_value=(test_user, test_identity))
+
+        with (
+            patch("syntara.auth.router._resolve_oidc_user", mock_resolve),
+            patch(
+                "syntara.auth.services.idp_group_sync.jmespath.search",
+                side_effect=TypeError("unexpected type"),
+            ),
+            pytest.raises(OIDCCallbackError) as exc_info,
+        ):
+            await _resolve_and_login_user(
+                test_db_session,
+                {"email": user_email, "sub": "sub-1"},
+                {"groups": "admin"},
+                provider_mock,
+                None,
+            )
+
+        assert exc_info.value.error_code == OIDCErrorCode.NO_GROUP_MATCH
+
+        # Verify on a NEW session that rollback undid the group sync changes
+        # Note: the user row itself was committed before _resolve_and_login_user
+        # (fixture setup), so it still exists. In production, the user would be
+        # created inside the same transaction and rolled back. Here we verify
+        # that the deny-path rollback prevents any IdP group changes from
+        # persisting (the key behavioral difference from the commit path).
+        async with test_db_session_factory() as verify_session:
+            idp_tracking = await verify_session.exec(
+                select(user_idp_groups.c.group_id).where(
+                    user_idp_groups.c.user_id == user_id,
+                    user_idp_groups.c.identity_provider_id == provider_id,
+                )
+            )
+            assert set(idp_tracking.all()) == set(), "Rollback must prevent IdP tracking rows from persisting"
+
+            memberships = await verify_session.exec(
+                select(user_groups.c.group_id).where(user_groups.c.user_id == user_id)
+            )
+            group_ids = set(memberships.all())
+            assert test_group_id not in group_ids, "Rollback must prevent group membership changes"

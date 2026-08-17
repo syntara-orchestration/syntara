@@ -82,7 +82,10 @@ def _make_db(
     async def _exec_side_effect(*_args: object, **_kwargs: object) -> MagicMock:
         nonlocal call_count, idp_consumed
         call_count += 1
+        # Call 1: SELECT ... FOR UPDATE on User row (locking query)
         if call_count == 1:
+            return _make_empty_result()
+        if call_count == 2:
             return mapping_result
         if not idp_consumed:
             idp_consumed = True

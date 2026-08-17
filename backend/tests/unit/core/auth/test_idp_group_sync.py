@@ -74,8 +74,9 @@ def _make_mock_db(
 ) -> AsyncMock:
     """Create a mock db session.
 
-    The first call to db.exec returns the mapping entries (for the
-    IdpGroupMappingEntry query). If ``users_group`` is provided, the second
+    The first call to db.exec returns empty (FOR UPDATE locking query).
+    The second call returns the mapping entries (for the
+    IdpGroupMappingEntry query). If ``users_group`` is provided, the third
     call returns it (for ``_resolve_users_group``). Remaining calls return
     empty results.
     """
@@ -100,9 +101,12 @@ def _make_mock_db(
     async def _exec_side_effect(*args: object, **kwargs: object) -> MagicMock:
         nonlocal call_count
         call_count += 1
+        # Call 1: SELECT ... FOR UPDATE on User row (locking query)
         if call_count == 1:
+            return _make_empty_result()
+        if call_count == 2:
             return mapping_result
-        if call_count == 2 and users_group is not None:
+        if call_count == 3 and users_group is not None:
             return users_group_result
         return _make_empty_result()
 
@@ -573,9 +577,10 @@ def _make_mock_db_for_aap(
     """Create a mock db session for AAP role mapping tests.
 
     Call sequence:
-    1. IdpGroupMappingEntry query (mapping entries)
-    2. Built-in group lookup (_resolve_aap_role_groups)
-    3+ Empty results for remaining queries (current_idp_groups, etc.)
+    1. FOR UPDATE locking query (empty result)
+    2. IdpGroupMappingEntry query (mapping entries)
+    3. Built-in group lookup (_resolve_aap_role_groups)
+    4+ Empty results for remaining queries (current_idp_groups, etc.)
     """
     db = AsyncMock()
     entries = mapping_entries or []
@@ -598,9 +603,12 @@ def _make_mock_db_for_aap(
     async def _exec_side_effect(*args: object, **kwargs: object) -> MagicMock:
         nonlocal call_count
         call_count += 1
+        # Call 1: SELECT ... FOR UPDATE on User row (locking query)
         if call_count == 1:
-            return mapping_result
+            return _make_empty_result()
         if call_count == 2:
+            return mapping_result
+        if call_count == 3:
             return builtin_result
         return _make_empty_result()
 

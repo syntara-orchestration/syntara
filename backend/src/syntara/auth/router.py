@@ -2133,21 +2133,22 @@ async def _resolve_and_login_user(
                 .limit(1)
             )
             if other_groups.first() is None:
+                is_new_user = user.last_login is None
                 logger.error(
                     "Login denied: no group mappings matched and user has no other groups",
                     user_id=str(user.id),
                     provider=provider_name,
+                    is_new_user=is_new_user,
                 )
-                # Commit (not rollback) so the membership revocation from
-                # sync_idp_groups persists — rollback would restore stale
-                # IdP-managed groups that the current token no longer grants.
-                # Note: this also persists the JIT user/identity created by
-                # _resolve_oidc_user.  For returning users that is required
-                # (we need the user row to persist the revocation).  For
-                # first-login denials the user row stays but has no session
-                # and no elevated groups — the user would be created on the
-                # next attempt anyway.
-                await db.commit()
+                if is_new_user:
+                    # First-login deny: rollback to avoid persisting a JIT
+                    # user/identity that has no session and no groups.
+                    await db.rollback()
+                else:
+                    # Returning user: commit so the membership revocation
+                    # from sync_idp_groups persists — rollback would restore
+                    # stale IdP-managed groups the token no longer grants.
+                    await db.commit()
                 raise OIDCCallbackError(
                     _OIDC_ERR_NO_GROUP_MATCH, error_code=OIDCErrorCode.NO_GROUP_MATCH, origin=origin
                 )
