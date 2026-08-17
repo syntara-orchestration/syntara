@@ -64,7 +64,7 @@ def _make_empty_result() -> MagicMock:
 def _make_db(
     mapping_entries: list[IdpGroupMappingEntry],
     *,
-    idp_rows: list[tuple[UUID, UUID]] | None = None,
+    idp_rows: list[UUID] | None = None,
 ) -> AsyncMock:
     """Mock DB: first exec returns mapping entries; idp-rows query returns *idp_rows* once."""
     db = AsyncMock()
@@ -142,7 +142,7 @@ class TestIdpGroupSyncMembershipAudit:
             idp_group_value="admin",
             mapped_group_id=uuid4(),
         )
-        db = _make_db([mapping_entry], idp_rows=[(stale_group_id, provider_id)])
+        db = _make_db([mapping_entry], idp_rows=[stale_group_id])
 
         result = await sync_idp_groups(db, user, identity, {"groups": ["unmapped"]}, config)
 
