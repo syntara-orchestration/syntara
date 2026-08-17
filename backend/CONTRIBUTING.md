@@ -212,6 +212,10 @@ Maintainers (organization owners and members) can trigger CI actions via PR comm
 |---------|-------------|
 | `/build-pr-image` | Builds the container image for the PR and pushes it to the container registry. |
 
+For which CI checks are upstream-open vs downstream-only (including Konflux / AO
+Operator E2E on fork PRs), see the root
+[CONTRIBUTING.md CI Checks](../CONTRIBUTING.md#ci-checks) section.
+
 ## Code Guidelines
 
 ### General Principles
