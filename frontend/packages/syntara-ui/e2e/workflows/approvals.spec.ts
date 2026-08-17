@@ -458,8 +458,7 @@ test.describe('Approval Workflow Operations', () => {
       })
 
       // Step 1: Click header row checkbox to select all
-      const headerRow = table.getByRole('row').nth(0)
-      const selectAllCheckbox = headerRow.getByRole('checkbox')
+      const selectAllCheckbox = table.locator('thead').getByRole('checkbox')
       await selectAllCheckbox.check()
 
       // Step 2: Verify all approvals are selected (2 in this case)
