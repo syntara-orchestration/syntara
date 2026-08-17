@@ -24,7 +24,7 @@ triggers:
           app_name:
             type: string
             description: "Application name"
-            default: "nexus-test-app"
+            default: "syntara-test-app"
           app_version:
             type: string
             description: "Application version to deploy/manage"

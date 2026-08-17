@@ -1,7 +1,7 @@
-"""Base exceptions for the Nexus application.
+"""Base exceptions for the Syntara application.
 
 This module contains the root exception hierarchy for all internal exceptions
-within the Nexus system. Exception boundaries stop at the FastAPI routers.
+within the Syntara system. Exception boundaries stop at the FastAPI routers.
 """
 
 from __future__ import annotations
@@ -14,16 +14,16 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 
-class NexusError(Exception):
-    """Base exception for all Nexus internal errors.
+class SyntaraError(Exception):
+    """Base exception for all Syntara internal errors.
 
     This is the root of the exception hierarchy for all domain-specific
-    exceptions within the Nexus system. It provides a common interface
+    exceptions within the Syntara system. It provides a common interface
     and ensures all internal exceptions accept a message parameter.
     """
 
     def __init__(self, message: str) -> None:
-        """Initialize NexusError.
+        """Initialize SyntaraError.
 
         Args:
             message: Error message describing the failure
@@ -33,7 +33,7 @@ class NexusError(Exception):
         super().__init__(message)
 
 
-class RetryableError(NexusError):
+class RetryableError(SyntaraError):
     """Marker base class for exceptions that should trigger retry logic.
 
     Mix into domain exceptions via multiple inheritance so retry_with_backoff
@@ -43,13 +43,13 @@ class RetryableError(NexusError):
 
 
 @fastapi_exception(handler="syntara.core.error_handlers.safe_value_error_handler")
-class SafeValueError(ValueError, NexusError):
+class SafeValueError(ValueError, SyntaraError):
     """ValueError subclass for user-safe validation error messages.
 
     Use this instead of ValueError when the error message is safe to expose
     to end users and doesn't contain internal implementation details.
 
-    This extends both ValueError (for isinstance checks) and NexusError
+    This extends both ValueError (for isinstance checks) and SyntaraError
     (for consistent exception handling).
 
     Examples:

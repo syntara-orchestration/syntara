@@ -29,7 +29,7 @@ logger = structlog.stdlib.get_logger(__name__)
 
 
 def _add_credential_auth_headers(headers: dict[str, Any], extra_vars: dict[str, Any]) -> None:
-    """Apply authentication from Nexus credential system.
+    """Apply authentication from Syntara credential system.
 
     Raises ActivityExecutionError if credential values are empty.
     """

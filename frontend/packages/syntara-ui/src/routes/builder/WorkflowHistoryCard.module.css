@@ -19,6 +19,13 @@
   color: var(--pf-t--global--text--color--subtle);
 }
 
+/* PF Timestamp uses inline-block (which blocks text-decoration propagation) and its own
+   color token. Override both so it inherits the link's blue color and dotted underline. */
+.historyRowMeta :global(.pf-v6-c-timestamp) {
+  --pf-v6-c-timestamp--Color: inherit;
+  display: inline;
+}
+
 .historyRowTitle {
   min-width: 0;
 }

@@ -1,1 +1,1 @@
-"""Tests for orchestrator-cli package (separate from Nexus core)."""
+"""Tests for orchestrator-cli package (separate from Syntara core)."""

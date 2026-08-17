@@ -353,6 +353,21 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
+        self.cache_pool_retry_total = Counter(
+            "orchestrator_cache_pool_retry_total",
+            "Total Redis cache operation retries, by operation and outcome (retry/failed)",
+            ["component", "operation", "outcome"],
+            registry=self.registry,
+        )
+
+        self.cache_pool_retry_backoff_duration_seconds = Histogram(
+            "orchestrator_cache_pool_retry_backoff_duration_seconds",
+            "Time spent backing off between Redis cache operation retries, in seconds",
+            ["component", "operation"],
+            buckets=LATENCY_BUCKETS_FAST,
+            registry=self.registry,
+        )
+
         self.database_transaction_rate_tps = Gauge(
             "orchestrator_database_transaction_rate_tps",
             "Database transaction rate in transactions per second",

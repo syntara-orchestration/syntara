@@ -9,7 +9,7 @@ import { adminClient, identityProvidersClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 
-import { IdentityProvidersTab } from './IdentityProvidersTab'
+import { IdentityProvidersTab, type IdentityProvidersHeaderToolbarState } from './IdentityProvidersTab'
 
 type MutationCallbacks = {
   onSuccess?: () => void
@@ -245,24 +245,46 @@ describe('IdentityProvidersTab', () => {
       expect(screen.getByRole('columnheader', { name: /Client ID/ })).toBeInTheDocument()
     })
 
-    it('renders add button in toolbar', () => {
+    it('does not put create actions in the list panel toolbar', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
     })
 
-    it('opens AAP setup modal from toolbar button', async () => {
+    it('reports header toolbar state for page header actions', () => {
+      const onHeaderToolbarStateChange = vi.fn()
       setupProviders()
-      const user = userEvent.setup()
-      render(<IdentityProvidersTab />, { wrapper })
+      render(<IdentityProvidersTab onHeaderToolbarStateChange={onHeaderToolbarStateChange} />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: /Add Ansible Automation Platform/ }))
+      expect(onHeaderToolbarStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          showToolbar: true,
+          showAapButton: true,
+          openAapSetup: expect.any(Function) as unknown,
+        })
+      )
+    })
+
+    it('opens AAP setup modal from header toolbar callback', () => {
+      let openAapSetup: (() => void) | undefined
+      const onHeaderToolbarStateChange = vi.fn((state: IdentityProvidersHeaderToolbarState | null) => {
+        openAapSetup = state?.openAapSetup
+      })
+      setupProviders()
+      render(<IdentityProvidersTab onHeaderToolbarStateChange={onHeaderToolbarStateChange} />, { wrapper })
+
+      expect(openAapSetup).toBeTypeOf('function')
+      act(() => {
+        openAapSetup?.()
+      })
 
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('hides Add Ansible Automation Platform button when AAP provider exists', () => {
+    it('hides AAP action in header toolbar state when AAP provider exists', () => {
+      const onHeaderToolbarStateChange = vi.fn()
       const aapProvider = {
         ...mockProvider,
         id: 'aap-1',
@@ -270,9 +292,14 @@ describe('IdentityProvidersTab', () => {
         configuration: { ...mockProvider.configuration, idp_type: 'aap' },
       }
       setupProviders([aapProvider])
-      render(<IdentityProvidersTab />, { wrapper })
+      render(<IdentityProvidersTab onHeaderToolbarStateChange={onHeaderToolbarStateChange} />, { wrapper })
 
-      expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
+      expect(onHeaderToolbarStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          showToolbar: true,
+          showAapButton: false,
+        })
+      )
     })
 
     it('shows provider count in footer', () => {

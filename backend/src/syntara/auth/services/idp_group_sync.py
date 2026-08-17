@@ -1,6 +1,6 @@
 """IdP group sync service for OIDC login.
 
-Handles syncing Nexus group memberships based on identity provider
+Handles syncing Syntara group memberships based on identity provider
 group mapping configuration during OIDC authentication flows.
 """
 
@@ -236,7 +236,7 @@ async def sync_idp_groups(
     raw_merged_claims: dict[str, Any],
     config: OIDCConfiguration,
 ) -> bool:
-    """Sync Nexus group memberships based on IdP group mapping.
+    """Sync Syntara group memberships based on IdP group mapping.
 
     On **successful resolution**, session-scoped: clears all IdP-managed
     group memberships from every provider and replaces them with groups

@@ -1,6 +1,6 @@
 # Workflow Versioning, Publishing, and Portability
 
-> **Developer Guide** — Understanding the Nexus workflow version lifecycle
+> **Developer Guide** — Understanding the Syntara workflow version lifecycle
 
 ## Table of Contents
 

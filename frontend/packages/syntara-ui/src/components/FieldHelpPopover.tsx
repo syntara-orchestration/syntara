@@ -1,5 +1,8 @@
-import { FormGroupLabelHelp, Popover } from '@patternfly/react-core'
+import { Button, Popover } from '@patternfly/react-core'
 import { type ReactNode, useRef } from 'react'
+
+import { FieldHelpIcon } from './FieldHelpIcon'
+import styles from './FieldHelpIcon.module.css'
 
 export type FieldHelpPopoverProps = Readonly<{
   /** Body content for the popover (plain text or rich React nodes). */
@@ -11,7 +14,7 @@ export type FieldHelpPopoverProps = Readonly<{
 }>
 
 /**
- * Label help for FormGroup: PatternFly FormGroupLabelHelp + Popover with shared ref (PF-recommended).
+ * Label help for FormGroup: RhUi question-mark icon + Popover with shared ref.
  *
  * Pass as `labelHelp` on FormGroup:
  * ```tsx
@@ -23,12 +26,18 @@ export function FieldHelpPopover({
   headerContent,
   'aria-label': ariaLabel = 'Field help',
 }: FieldHelpPopoverProps) {
-  const triggerRef = useRef<HTMLSpanElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const triggerAriaLabel = typeof headerContent === 'string' ? `More info for ${headerContent}` : 'More info'
 
   return (
     <Popover triggerRef={triggerRef} bodyContent={helpText} headerContent={headerContent} aria-label={ariaLabel}>
-      <FormGroupLabelHelp ref={triggerRef} aria-label={triggerAriaLabel} />
+      <Button
+        ref={triggerRef}
+        variant="plain"
+        aria-label={triggerAriaLabel}
+        className={styles.trigger}
+        icon={<FieldHelpIcon />}
+      />
     </Popover>
   )
 }

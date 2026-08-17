@@ -724,7 +724,7 @@ create_credential "Firebase Service Account" "$BEARER_TYPE" \
 
 # -- Internal tools credentials --
 create_credential "AAP Production Controller" "$AAP_TYPE" \
-    '{"host": "https://aap.internal.example.com", "username": "nexus-svc", "password": "demo-aap-password", "verify_ssl": true}' "$TOOLS_ID"
+    '{"host": "https://aap.internal.example.com", "username": "syntara-svc", "password": "demo-aap-password", "verify_ssl": true}' "$TOOLS_ID"
 create_credential "Internal Vault Token" "$BEARER_TYPE" \
     '{"token": "hvs.demo-vault-root-token-2026"}' "$TOOLS_ID"
 

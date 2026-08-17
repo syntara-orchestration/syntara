@@ -1,5 +1,5 @@
 import { CodeEditorControl } from '@patternfly/react-code-editor'
-import { CopyIcon, RhUiDownloadIcon, RhUiFileCodeIcon, RhUiUndoIcon, RhUiUploadIcon } from '@patternfly/react-icons'
+import { RhUiCopyIcon, RhUiDownloadIcon, RhUiFileCodeIcon, RhUiUndoIcon, RhUiUploadIcon } from '@patternfly/react-icons'
 import { memo, useCallback } from 'react'
 
 import { detachPromise } from '../../../utils/detachPromise'
@@ -81,7 +81,7 @@ export const JsonEditorControls = memo(function JsonEditorControls({
         onClick={handleUpload}
       />
       <CodeEditorControl
-        icon={<CopyIcon />}
+        icon={<RhUiCopyIcon />}
         aria-label="Copy to clipboard"
         tooltipProps={{ content: 'Copy to clipboard' }}
         onClick={handleCopy}

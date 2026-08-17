@@ -1,4 +1,4 @@
-"""Supplementary tests for NexusWorkflow execution engine (task 6.3 — TEST).
+"""Supplementary tests for OrchestratorWorkflow execution engine (task 6.3 — TEST).
 
 Covers gaps not addressed by the DEV tests:
 - _is_unreachable: transitive unreachability detection
@@ -25,7 +25,7 @@ from syntara.core.exceptions import SafeValueError
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import (
     ALLOWED_TRIGGER_TYPES,
-    NexusWorkflow,
+    OrchestratorWorkflow,
 )
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
@@ -55,9 +55,9 @@ def _make_workflow(
     skipped_nodes: set[str] | None = None,
     failed_nodes: dict[str, str] | None = None,
     resolver: NamespaceResolver | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = skipped_nodes if skipped_nodes is not None else set()
     wf.failed_nodes = failed_nodes if failed_nodes is not None else {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()
@@ -638,7 +638,7 @@ class TestGetActivityOutputEdgeCases:
         assert result["version"] == 2
 
 
-_TEMPORAL_MARGIN = NexusWorkflow._TEMPORAL_MARGIN
+_TEMPORAL_MARGIN = OrchestratorWorkflow._TEMPORAL_MARGIN
 
 
 class TestPerNodeTimeout:

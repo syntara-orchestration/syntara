@@ -1,6 +1,6 @@
 """Temporal activity for resolving workflow credentials at execution time.
 
-Resolves Nexus credentials from the database, decrypts field values,
+Resolves Syntara credentials from the database, decrypts field values,
 and produces structured configuration (extra_vars, env, file) via
 InjectorResolver for consumption by activity executors.
 """

@@ -923,7 +923,7 @@ class TestLogoutEndpoint:
         )
         mock_store.revoke.return_value = True
 
-        rp_info = {"auth_error": "Logged out of Nexus, but could not log out of Test IdP."}
+        rp_info = {"auth_error": "Logged out of Syntara, but could not log out of Test IdP."}
 
         with (
             patch("syntara.auth.router.create_session_store", _patch_session_store(mock_store)),

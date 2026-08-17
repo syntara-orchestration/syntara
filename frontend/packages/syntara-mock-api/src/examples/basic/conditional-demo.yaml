@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: conditional-demo
 description: Demonstrates conditional branching based on temperature input
 
@@ -76,7 +76,7 @@ nodes:
       temp: ${inputs.temperature}
 
   - id: summary
-    name: 'Generate Weather Summary Report (${inputs.temperature})'
+    name: "Generate Weather Summary Report (${inputs.temperature})"
     type: script
     parameters:
       language: bash

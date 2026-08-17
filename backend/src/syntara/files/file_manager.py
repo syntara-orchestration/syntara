@@ -10,6 +10,7 @@ database queries (encapsulation principle).
 """
 
 import hashlib
+from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import structlog
@@ -90,65 +91,159 @@ class FileManager:
             raise FileStorageUnavailableError(msg)
         return self._retriever
 
-    async def load_file_with_integrity_check(self, file_metadata: FileMetadata) -> bytes:
-        """Load file content and verify SHA-256 hash integrity.
+    async def stream_file_with_integrity_check(self, file_metadata: FileMetadata) -> AsyncGenerator[bytes]:
+        """Stream file content while computing SHA-256 incrementally.
 
-        Skips verification for legacy files without a stored content_hash.
+        Buffers one chunk behind so the hash can be verified before the
+        last chunk is yielded.  On mismatch the final chunk is withheld,
+        making the response shorter than Content-Length — every HTTP client
+        treats that as a failed download.  Legacy files without a stored
+        content_hash skip verification and stream without buffering.
 
         Args:
             file_metadata: FileMetadata with file_path and content_hash
 
-        Returns:
-            File content as bytes
+        Yields:
+            File content in chunks
 
         Raises:
             FileIntegrityError: If computed hash doesn't match stored hash
 
         """
         retriever = self.get_retriever()
-        content = await retriever.load_file(file_metadata.file_path)
 
-        if file_metadata.content_hash is not None:
-            actual_hash = hashlib.sha256(content).hexdigest()
-            if actual_hash != file_metadata.content_hash:
-                logger.critical(
-                    "File integrity check failed",
-                    file_id=str(file_metadata.id),
+        if file_metadata.content_hash is None:
+            async for chunk in retriever.stream_file(file_metadata.file_path):
+                yield chunk
+            return
+
+        hasher = hashlib.sha256()
+        pending: bytes | None = None
+
+        async for chunk in retriever.stream_file(file_metadata.file_path):
+            hasher.update(chunk)
+            if pending is not None:
+                yield pending
+            pending = chunk
+
+        actual_hash = hasher.hexdigest()
+        if actual_hash != file_metadata.content_hash:
+            logger.critical(
+                "File integrity check failed",
+                file_id=str(file_metadata.id),
+                filename=file_metadata.filename,
+                storage_backend="s3",
+                expected_hash=file_metadata.content_hash,
+                actual_hash=actual_hash,
+            )
+            AuditEventDispatcher.dispatch(
+                FileIntegrityFailedEvent(
+                    file_id=file_metadata.id,
                     filename=file_metadata.filename,
                     storage_backend="s3",
                     expected_hash=file_metadata.content_hash,
                     actual_hash=actual_hash,
-                )
-                AuditEventDispatcher.dispatch(
-                    FileIntegrityFailedEvent(
-                        file_id=file_metadata.id,
-                        filename=file_metadata.filename,
-                        storage_backend="s3",
-                        expected_hash=file_metadata.content_hash,
-                        actual_hash=actual_hash,
-                    ),
-                )
-                msg = (
-                    f"File integrity check failed for {file_metadata.id}: "
-                    f"expected {file_metadata.content_hash}, got {actual_hash}"
-                )
-                raise FileIntegrityError(msg)
+                ),
+            )
+            msg = (
+                f"File integrity check failed for {file_metadata.id}: "
+                f"expected {file_metadata.content_hash}, got {actual_hash}"
+            )
+            raise FileIntegrityError(msg)
 
-        return content
+        if pending is not None:
+            yield pending
+
+    @staticmethod
+    async def _stream_upload_file(
+        header: bytes, file: UploadFile, chunk_size: int = 1024 * 1024
+    ) -> AsyncGenerator[bytes]:
+        """Yield header bytes then stream remaining content from the UploadFile.
+
+        Args:
+            header: Already-read header bytes (from MIME detection)
+            file: UploadFile positioned after the header
+            chunk_size: Size of subsequent read chunks (default 1 MB)
+
+        Yields:
+            File content chunks — header first, then remaining data.
+
+        """
+        if header:
+            yield header
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+    async def _validate_and_stream_file(
+        self,
+        file: UploadFile,
+        retriever: BaseRetriever,
+        project_id: UUID,
+    ) -> tuple[FileMetadata, str]:
+        """Validate, stream, and hash a single file to S3.
+
+        Returns:
+            Tuple of (FileMetadata, saved S3 path).
+
+        """
+        safe_filename = sanitize_filename(file.filename) if file.filename else UNKNOWN_FILENAME
+        header, mime_type = await validators.validate_single_file(file, self.settings)
+
+        file_id = uuid4()
+        hasher = hashlib.sha256()
+
+        async def _hashing_stream() -> AsyncGenerator[bytes]:
+            async for chunk in self._stream_upload_file(header, file):
+                hasher.update(chunk)
+                yield chunk
+
+        file_path, file_size_bytes = await storage.save_file_stream(
+            _hashing_stream(),
+            safe_filename,
+            str(file_id),
+            retriever,
+        )
+
+        metadata = FileMetadata(
+            id=file_id,
+            filename=safe_filename,
+            size_bytes=file_size_bytes,
+            mime_type=mime_type,
+            file_path=file_path,
+            content_hash=hasher.hexdigest(),
+            status=FileStatus.PENDING_CONVERSION,
+            project_id=project_id,
+        )
+
+        logger.info("File processed successfully", filename=safe_filename, file_id=file_id)
+        return metadata, file_path
+
+    @staticmethod
+    async def _cleanup_saved_files(retriever: BaseRetriever, saved_file_paths: list[str]) -> None:
+        """Delete already-saved S3 objects on failure."""
+        for path in saved_file_paths:
+            try:
+                await retriever.delete_file(path)
+            except (OSError, FileError):
+                logger.warning("Cleanup failed for saved file", path=path, exc_info=True)
 
     async def validate_and_save_files(
         self,
         files: list[UploadFile],
         project_id: UUID,
     ) -> list[FileMetadata]:
-        """Validate and save uploaded files with transactional cleanup.
+        """Validate and save uploaded files with streaming and transactional cleanup.
 
-        This method performs the following operations:
-        1. Validate file count, size, and MIME types (reads each file once)
-        2. Generate unique file_id (UUID) for each file
-        3. Save files to storage using the S3 retriever
-        4. Generate FileMetadata for each file
-        5. Cleanup saved files if any step fails
+        Processes one file at a time to keep memory usage constant:
+        1. Validate file count
+        2. For each file: validate size → read header for MIME detection →
+           stream content through incremental SHA-256 hash → S3 multipart upload
+        3. Cleanup saved files if any step fails
+
+        Memory usage is O(chunk_size) per file regardless of file size.
 
         Note: Database persistence is handled by the caller. This method
         returns in-memory FileMetadata objects that should be added to
@@ -172,9 +267,8 @@ class FileManager:
             file_count=len(files),
         )
 
-        # Step 1: Validate all files (single read per file)
         try:
-            validated_files = await validators.validate_files(files, self.settings)
+            await validators.validate_file_count(files, self.settings.file_upload_max_files)
         except FileValidationError:
             logger.warning("File validation failed")
             AuditEventDispatcher.dispatch(
@@ -187,72 +281,66 @@ class FileManager:
             )
             raise
 
-        # Step 2: Ensure S3 is configured before saving
         retriever = self.get_retriever()
 
-        # Step 3: Save files and collect metadata
         file_metadata_list: list[FileMetadata] = []
         saved_file_paths: list[str] = []
 
+        # Each file is validated and streamed to S3 one at a time to keep
+        # memory usage constant (O(chunk_size) instead of O(total_file_size)).
+        # If file N+1 fails validation or storage, all files saved during
+        # *this request* (saved_file_paths) are deleted from S3 before the
+        # error propagates.  Previously uploaded files are never touched —
+        # each call creates new S3 objects with fresh UUIDs.
+        file_details_for_audit = [{"filename": sanitize_filename(f.filename or UNKNOWN_FILENAME)} for f in files]
+
+        cleaned_up = False
         try:
-            for (file_content, mime_type), file in zip(validated_files, files, strict=True):
-                safe_filename = sanitize_filename(file.filename) if file.filename else UNKNOWN_FILENAME
-                file_size_bytes = len(file_content)
-
-                file_id = uuid4()
-
-                file_path = await storage.save_file(
-                    file_content,
-                    safe_filename,
-                    str(file_id),
-                    retriever,
-                )
+            for file in files:
+                try:
+                    metadata, file_path = await self._validate_and_stream_file(file, retriever, project_id)
+                except FileValidationError:
+                    logger.warning("File validation failed")
+                    await self._cleanup_saved_files(retriever, saved_file_paths)
+                    cleaned_up = True
+                    AuditEventDispatcher.dispatch(
+                        FilesUploadedEvent(
+                            file_count=len(files),
+                            total_size_bytes=0,
+                            file_details=file_details_for_audit,
+                            error_type="FileValidationError",
+                        )
+                    )
+                    raise
 
                 saved_file_paths.append(file_path)
-
-                content_hash = hashlib.sha256(file_content).hexdigest()
-
-                metadata = FileMetadata(
-                    id=file_id,
-                    filename=safe_filename,
-                    size_bytes=file_size_bytes,
-                    mime_type=mime_type,
-                    file_path=file_path,
-                    content_hash=content_hash,
-                    status=FileStatus.PENDING_CONVERSION,
-                    project_id=project_id,
-                )
                 file_metadata_list.append(metadata)
 
-                logger.info(
-                    "File processed successfully",
-                    filename=safe_filename,
-                    file_id=file_id,
-                )
-
+        except FileValidationError:
+            raise
         except (OSError, FileError) as e:
             logger.exception(
                 "Storage failure during file processing, cleaning up saved files",
                 saved_file_count=len(saved_file_paths),
             )
+            await self._cleanup_saved_files(retriever, saved_file_paths)
+            cleaned_up = True
 
-            for path in saved_file_paths:
-                try:
-                    await retriever.delete_file(path)
-                except (OSError, FileError):
-                    logger.warning("Cleanup failed for saved file", path=path, exc_info=True)
-
-            error_type = type(e).__name__
             AuditEventDispatcher.dispatch(
                 FilesUploadedEvent(
                     file_count=len(files),
                     total_size_bytes=0,
-                    file_details=[{"filename": sanitize_filename(f.filename or UNKNOWN_FILENAME)} for f in files],
-                    error_type=error_type,
+                    file_details=file_details_for_audit,
+                    error_type=type(e).__name__,
                 )
             )
 
             raise
+        finally:
+            # CancelledError and other BaseExceptions bypass the except blocks.
+            # Clean up any already-saved S3 objects if the batch did not complete.
+            if not cleaned_up and saved_file_paths and len(file_metadata_list) != len(files):
+                await self._cleanup_saved_files(retriever, saved_file_paths)
 
         logger.info(
             "All files processed successfully",

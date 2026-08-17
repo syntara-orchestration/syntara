@@ -26,6 +26,7 @@ RUN VIRTUAL_ENV=/opt/app-root/.venv uv pip install --no-cache-dir --no-deps ./te
 
 # Copy specific files needed for MCP server
 COPY tools/run_mcp_server.py .
+COPY tools/run_mcp_scenario_servers.py .
 
 # Fix permissions for OpenShift/UBI (runs as arbitrary UID)
 RUN chown -R 1001:0 /opt/app-root && \

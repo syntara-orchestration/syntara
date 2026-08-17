@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: github-repo-info
 description: Fetch GitHub repository information and analyze it
 metadata:
@@ -32,7 +32,7 @@ nodes:
       url: https://api.github.com/repos/${input.owner}/${input.repo}
       headers:
         Accept: application/vnd.github.v3+json
-        User-Agent: Nexus-Workflow-Engine
+        User-Agent: Syntara-Workflow-Engine
     outputs:
       repoData: $.body
       name: $.body.name
@@ -53,7 +53,7 @@ nodes:
       url: https://api.github.com/repos/${input.owner}/${input.repo}/languages
       headers:
         Accept: application/vnd.github.v3+json
-        User-Agent: Nexus-Workflow-Engine
+        User-Agent: Syntara-Workflow-Engine
     outputs:
       languages: $.body
     timeout: 30

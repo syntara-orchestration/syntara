@@ -3,11 +3,11 @@ r"""CLI tool for managing authorization data (users, groups, roles, policies, pr
 
 ## Purpose
 
-Development utility for populating and querying authorization data via the Nexus API.
+Development utility for populating and querying authorization data via the Syntara API.
 Supports seeding built-in policies/roles, creating entities, and testing access checks.
 
 The ``--username`` flag authenticates as a specific user. Requires ``--password`` (or the
-``NEXUS_CLI_PASSWORD`` env var). When ``--username`` is omitted, the tool authenticates as
+``SYNTARA_CLI_PASSWORD`` env var). When ``--username`` is omitted, the tool authenticates as
 ``admin`` using the password file at ``APP_ADMIN_PASSWORD_PATH``.
 
 ## Usage
@@ -146,7 +146,7 @@ async def api_request(
     *,
     body: dict | None = None,
 ) -> tuple[dict | list | None, int]:
-    """Make an authenticated HTTP request to the Nexus API. Returns (data, status_code)."""
+    """Make an authenticated HTTP request to the Syntara API. Returns (data, status_code)."""
     import httpx
 
     if not _config["json_mode"]:
@@ -1002,8 +1002,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--password",
-        default=os.environ.get("NEXUS_CLI_PASSWORD"),
-        help="Password for --username (default: $NEXUS_CLI_PASSWORD or admin password file)",
+        default=os.environ.get("SYNTARA_CLI_PASSWORD"),
+        help="Password for --username (default: $SYNTARA_CLI_PASSWORD or admin password file)",
     )
     sub = parser.add_subparsers(dest="command", help="Available commands")
     _register_entity_commands(sub)

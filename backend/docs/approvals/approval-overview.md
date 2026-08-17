@@ -449,7 +449,7 @@ nodes:
 
 | Parameter | Type | Default | Purpose |
 |-----------|------|---------|---------|
-| `credential_id` | str or None | None | Nexus credential UUID |
+| `credential_id` | str or None | None | Syntara credential UUID |
 | `approver_users` | list[str] or None | None | Usernames who can approve (max 100) |
 | `approver_groups` | list[str] or None | None | Group names whose members can approve (max 50) |
 | `prompt` | str or None | None | Message to display to approvers |

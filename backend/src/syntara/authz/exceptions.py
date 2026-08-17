@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 def authorization_denied_handler(
@@ -24,11 +24,11 @@ def authorization_denied_handler(
 
 
 @fastapi_exception(handler=authorization_denied_handler)
-class AuthorizationDeniedError(NexusError):
+class AuthorizationDeniedError(SyntaraError):
     """Raised when a user is not authorized to perform an action."""
 
 
-def _not_found_handler(request: Request, exc: NexusError) -> JSONResponse:
+def _not_found_handler(request: Request, exc: SyntaraError) -> JSONResponse:
     return create_problem_details_response(
         status_code=status.HTTP_404_NOT_FOUND,
         problem_type=PROBLEM_TYPES["resource_not_found"],
@@ -39,7 +39,7 @@ def _not_found_handler(request: Request, exc: NexusError) -> JSONResponse:
     )
 
 
-def _conflict_handler(request: Request, exc: NexusError) -> JSONResponse:
+def _conflict_handler(request: Request, exc: SyntaraError) -> JSONResponse:
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
         problem_type=PROBLEM_TYPES["name_conflict"],
@@ -50,7 +50,7 @@ def _conflict_handler(request: Request, exc: NexusError) -> JSONResponse:
     )
 
 
-def _builtin_protection_handler(request: Request, exc: NexusError) -> JSONResponse:
+def _builtin_protection_handler(request: Request, exc: SyntaraError) -> JSONResponse:
     return create_problem_details_response(
         status_code=status.HTTP_403_FORBIDDEN,
         problem_type=PROBLEM_TYPES["forbidden"],
@@ -62,26 +62,26 @@ def _builtin_protection_handler(request: Request, exc: NexusError) -> JSONRespon
 
 
 @fastapi_exception(handler=_not_found_handler)
-class PolicyNotFoundError(NexusError):
+class PolicyNotFoundError(SyntaraError):
     """Raised when a policy is not found."""
 
 
 @fastapi_exception(handler=_not_found_handler)
-class RoleNotFoundError(NexusError):
+class RoleNotFoundError(SyntaraError):
     """Raised when a role is not found."""
 
 
 @fastapi_exception(handler=_not_found_handler)
-class ProjectNotFoundError(NexusError):
+class ProjectNotFoundError(SyntaraError):
     """Raised when a project is not found."""
 
 
 @fastapi_exception(handler=_builtin_protection_handler)
-class BuiltinProtectionError(NexusError):
+class BuiltinProtectionError(SyntaraError):
     """Raised when attempting to modify or delete a builtin resource."""
 
 
-def _default_project_protection_handler(request: Request, exc: NexusError) -> JSONResponse:
+def _default_project_protection_handler(request: Request, exc: SyntaraError) -> JSONResponse:
     return create_problem_details_response(
         status_code=status.HTTP_403_FORBIDDEN,
         problem_type=PROBLEM_TYPES["forbidden"],
@@ -93,21 +93,21 @@ def _default_project_protection_handler(request: Request, exc: NexusError) -> JS
 
 
 @fastapi_exception(handler=_default_project_protection_handler)
-class DefaultProjectProtectionError(NexusError):
+class DefaultProjectProtectionError(SyntaraError):
     """Raised when attempting to delete the default project."""
 
 
 @fastapi_exception(handler=_conflict_handler)
-class PolicyNameConflictError(NexusError):
+class PolicyNameConflictError(SyntaraError):
     """Raised when a policy name already exists in the same scope."""
 
 
 @fastapi_exception(handler=_conflict_handler)
-class RoleNameConflictError(NexusError):
+class RoleNameConflictError(SyntaraError):
     """Raised when a role name already exists in the same scope."""
 
 
-def _invalid_action_handler(request: Request, exc: NexusError) -> JSONResponse:
+def _invalid_action_handler(request: Request, exc: SyntaraError) -> JSONResponse:
     return create_problem_details_response(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         problem_type=PROBLEM_TYPES["validation_error"],
@@ -119,10 +119,10 @@ def _invalid_action_handler(request: Request, exc: NexusError) -> JSONResponse:
 
 
 @fastapi_exception(handler=_invalid_action_handler)
-class InvalidResourceActionError(NexusError):
+class InvalidResourceActionError(SyntaraError):
     """Raised when a policy statement references an unregistered resource:action pair."""
 
 
 @fastapi_exception(handler=_invalid_action_handler)
-class DenyEffectNotSupportedError(NexusError):
+class DenyEffectNotSupportedError(SyntaraError):
     """Raised when a policy statement uses effect='deny', which is not yet supported."""

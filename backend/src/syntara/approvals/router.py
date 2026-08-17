@@ -24,9 +24,9 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 
-router = NexusRouter(prefix="/approvals", tags=["Approvals"])
+router = SyntaraRouter(prefix="/approvals", tags=["Approvals"])
 
 _ALL_ROLES = ["admin", "auditor", "user", "project-admin", "project-user", "project-auditor"]
 

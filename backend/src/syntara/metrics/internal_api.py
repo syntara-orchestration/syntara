@@ -4,8 +4,8 @@ These endpoints expose raw in-memory metrics from the MetricsStore for use
 by external performance-test harnesses.
 
 Security model:
-    * ``include_in_schema=False`` keeps them out of ``/docs`` and
-      ``/openapi.json``.
+    * ``include_in_schema=False`` keeps them out of ``/api_docs/v1/docs`` and
+      ``/api_docs/v1/openapi.json``.
     * Each handler checks the ``metrics.perf_test_mode`` runtime setting
       and returns 404 when disabled.  Toggling the setting enables the
       endpoints (and the backing in-memory store) without a restart.
@@ -87,7 +87,7 @@ class PercentileStats(SQLModel):
 
 
 class ComponentKPISummary(SQLModel):
-    """KPI summary for a single Nexus component."""
+    """KPI summary for a single Syntara component."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -136,7 +136,7 @@ class MetricsRecordPage(SQLModel):
 
 
 class KPIDashboard(SQLModel):
-    """Full KPI dashboard covering all Nexus components."""
+    """Full KPI dashboard covering all Syntara components."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -480,11 +480,11 @@ async def metrics_store_records(
 async def metrics_store_kpis(
     recorder: Annotated[MetricsRecorder, Depends(get_metrics_recorder)],
 ) -> KPIDashboard:
-    """Return a computed KPI dashboard covering all Nexus components.
+    """Return a computed KPI dashboard covering all Syntara components.
 
-    Maps metrics to the KPIs defined in the Nexus KPI documents:
-    - Nexus Key Performance Indicators (KPIs)
-    - Nexus LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Syntara KPI documents:
+    - Syntara Key Performance Indicators (KPIs)
+    - Syntara LLM/Agent Performance KPIs
     """
     await _guard(recorder)
     return _build_kpi_dashboard(recorder)

@@ -6,7 +6,7 @@ connection pools.  Measures cross-impact between audit operations and
 main application database performance.
 
 Background:
-    After AAP-79901 (#212), the audit outbox worker uses a **dedicated
+    The audit outbox worker uses a **dedicated
     connection pool** (``audit_worker_pool_size=5``, ``max_overflow=2``,
     max 7 connections) isolated from the main application pool
     (``pool_size=10``, ``max_overflow=20``, max 30 connections).
@@ -118,7 +118,7 @@ class TestMixedWorkloadSimulation:
 
     Uses separate session factories for business operations (main pool)
     and audit worker operations (worker pool) to match the production
-    architecture after AAP-79901 (#212).
+    architecture.
     """
 
     async def test_mixed_workload_three_roles(

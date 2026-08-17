@@ -55,20 +55,20 @@ def _create_mock_traversable(path: Path) -> Mock:
     return mock
 
 
-def _create_mock_files_function(nexus_dir: Path) -> object:
+def _create_mock_files_function(syntara_dir: Path) -> object:
     """Create a mock files() function for tests.
 
     Args:
-        nexus_dir: Path to the test nexus directory
+        syntara_dir: Path to the test syntara directory
 
     Returns:
-        Mock function that returns traversable for nexus package
+        Mock function that returns traversable for syntara package
 
     """
 
     def mock_files(package: str) -> Mock:
         if package == "syntara":
-            return _create_mock_traversable(nexus_dir)
+            return _create_mock_traversable(syntara_dir)
         msg = f"Package {package} not found"
         raise FileNotFoundError(msg)
 
@@ -84,8 +84,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "test_component"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "test_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -104,7 +104,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files to return our temp directory
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         result = scan_handler_specs()
 
@@ -117,8 +117,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "test_component"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "test_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -134,7 +134,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         with pytest.raises(SafeValueError, match="Missing Spec File"):
             scan_handler_specs()
@@ -144,8 +144,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "test_component"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "test_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -159,7 +159,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         with pytest.raises(SafeValueError, match="Orphan Spec File"):
             scan_handler_specs()
@@ -169,10 +169,10 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
+        syntara_dir = tmp_path / "src" / "syntara"
 
         # Create a component WITHOUT ws/ directory
-        component_dir = nexus_dir / "no_ws_component"
+        component_dir = syntara_dir / "no_ws_component"
         component_dir.mkdir(parents=True)
 
         # Create spec file for component without ws/ (should be ignored)
@@ -193,8 +193,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "multi_handler"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "multi_handler"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -214,7 +214,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         result = scan_handler_specs()
 
@@ -227,10 +227,10 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
+        syntara_dir = tmp_path / "src" / "syntara"
 
         # Test .yml extension
-        component_dir = nexus_dir / "yml_component"
+        component_dir = syntara_dir / "yml_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -246,7 +246,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         result = scan_handler_specs()
 
@@ -258,10 +258,10 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
+        syntara_dir = tmp_path / "src" / "syntara"
 
         # Test .json extension with a complete AsyncAPI spec
-        component_dir = nexus_dir / "json_component"
+        component_dir = syntara_dir / "json_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -331,7 +331,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         result = scan_handler_specs()
 
@@ -370,8 +370,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "test_component"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "test_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -392,7 +392,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         # Should not fail even though __init__.py has no matching spec
         result = scan_handler_specs()
@@ -403,11 +403,11 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
+        syntara_dir = tmp_path / "src" / "syntara"
 
         # Create special directories that should be skipped
         for dir_name in ["__pycache__", "core", "api"]:
-            special_dir = nexus_dir / dir_name
+            special_dir = syntara_dir / dir_name
             ws_dir = special_dir / "ws"
             ws_dir.mkdir(parents=True)
             handler_file = ws_dir / "test.py"
@@ -427,8 +427,8 @@ class TestAutomaticPathMapping:
         core_websocket_dir = tmp_path / "src" / "syntara" / "core" / "websocket"
         core_websocket_dir.mkdir(parents=True)
 
-        nexus_dir = tmp_path / "src" / "syntara"
-        component_dir = nexus_dir / "test_component"
+        syntara_dir = tmp_path / "src" / "syntara"
+        component_dir = syntara_dir / "test_component"
         ws_dir = component_dir / "ws"
         ws_dir.mkdir(parents=True)
 
@@ -446,7 +446,7 @@ class TestAutomaticPathMapping:
         monkeypatch.setattr("syntara.core.websocket.endpoint_factory._get_module_file", lambda: str(fake_file))
 
         # Mock importlib.resources.files
-        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(nexus_dir))
+        monkeypatch.setattr("syntara.core.websocket.endpoint_factory.files", _create_mock_files_function(syntara_dir))
 
         # Handler with import error is skipped (doesn't fail startup)
         result = scan_handler_specs()

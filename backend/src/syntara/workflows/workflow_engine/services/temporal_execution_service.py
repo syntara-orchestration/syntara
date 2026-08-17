@@ -17,7 +17,8 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models.responses import (
     WorkflowStartResponse,
 )
@@ -152,7 +153,7 @@ class TemporalExecutionService:
                 labels={"component": ComponentLabel.EXECUTION_SERVICE.value, "workflow_name": workflow_name},
             ):
                 handle = await self.temporal_client.start_workflow(
-                    NexusWorkflow.run,
+                    OrchestratorWorkflow.run,
                     args=[
                         workflow_def,
                         execution_id,
@@ -339,6 +340,7 @@ async def create_temporal_execution_service(
         temporal_address,
         namespace=namespace,
         tls=build_temporal_tls_config(),
+        interceptors=[WorkflowAuthClientInterceptor()],
     )
     # TODO: Handle how TemporalExecutionService is dispatched/deployed  # noqa: TD002, TD003
     # via containerization. This will be addressed in a future Containerization & Deployment ticket.

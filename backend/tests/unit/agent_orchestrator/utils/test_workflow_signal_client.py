@@ -9,7 +9,7 @@ import respx
 
 from syntara.agent_orchestrator.utils.workflow_signal_client import WorkflowSignalClient, validate_signal_url
 
-_BASE_URL = "https://nexus:8000/api/v1"
+_BASE_URL = "https://syntara:8000/api/v1"
 _EXEC_UUID = "12345678-1234-5678-1234-567812345678"
 _SIGNAL_URL = f"{_BASE_URL}/executions/{_EXEC_UUID}/activities/step_1/signal"
 
@@ -29,16 +29,16 @@ class TestValidateSignalUrl:
         validate_signal_url(url)
 
     def test_valid_url_with_http_scheme(self) -> None:
-        url = f"http://nexus:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
+        url = f"http://syntara:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
         validate_signal_url(url)
 
     def test_rejects_invalid_scheme(self) -> None:
-        url = f"ftp://nexus:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
+        url = f"ftp://syntara:8000/api/v1/executions/{_EXEC_UUID}/activities/step_1/signal"
         with pytest.raises(ValueError, match="http or https"):
             validate_signal_url(url)
 
     def test_rejects_arbitrary_path(self) -> None:
-        url = "https://nexus:8000/api/v1/workflows/some-id/versions/1/publish"
+        url = "https://syntara:8000/api/v1/workflows/some-id/versions/1/publish"
         with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 
@@ -59,7 +59,7 @@ class TestValidateSignalUrl:
 
     def test_rejects_publish_endpoint_ssrf(self) -> None:
         """The exact exploit from the bug report: redirect to publish endpoint."""
-        url = "https://nexus:8000/api/v1/workflows/victim-wf-id/versions/1/publish"
+        url = "https://syntara:8000/api/v1/workflows/victim-wf-id/versions/1/publish"
         with pytest.raises(ValueError, match="not a valid signal endpoint"):
             validate_signal_url(url)
 

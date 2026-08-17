@@ -8,7 +8,7 @@
  */
 import type { Page } from '@playwright/test'
 
-import { test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -134,6 +134,8 @@ function isGlobalWorkflowsListUrl(url: string): boolean {
 }
 
 test.describe('Pagination Footer — Users Tab', () => {
+  const guard = createUnavailableGuard('No users data available')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/users'))
     await expect(app.getByRole('tab', { name: /Users/i })).toHaveAttribute('aria-selected', 'true')
@@ -142,6 +144,7 @@ test.describe('Pagination Footer — Users Tab', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No users data available')
   })
 
@@ -180,6 +183,8 @@ test.describe('Pagination Footer — Groups Tab', () => {
 })
 
 test.describe('Project Selector — Workflows', () => {
+  const guard = createUnavailableGuard('No workflows or project selector not available')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -189,7 +194,11 @@ test.describe('Project Selector — Workflows', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No workflows available — create workflows first')
+    if (!hasTable) {
+      guard.markUnavailable()
+      test.skip(true, 'No workflows available — create workflows first')
+      return
+    }
 
     const projectInput = app.getByPlaceholder('All projects')
     const selectorVisible = await projectInput
@@ -197,11 +206,11 @@ test.describe('Project Selector — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     if (!selectorVisible) {
+      guard.markUnavailable()
       test.skip(true, 'Project selector not available in this environment')
       return
     }
 
-    // Also verify the dropdown is interactive (opens options on click)
     await projectInput.click()
     const optionsInteractive = await app
       .getByRole('option', { name: 'All projects' })
@@ -209,6 +218,7 @@ test.describe('Project Selector — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     await app.keyboard.press('Escape')
+    if (!optionsInteractive) guard.markUnavailable()
     test.skip(!optionsInteractive, 'Project selector is not interactive in this environment')
   })
 
@@ -305,6 +315,8 @@ test.describe('Project Selector — Workflows', () => {
 })
 
 test.describe('Pagination Navigation — Workflows', () => {
+  const guard = createUnavailableGuard('Not enough data to paginate')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/workflows'))
     const table = app.getByRole('grid', { name: 'Workflows table' })
@@ -312,9 +324,12 @@ test.describe('Pagination Navigation — Workflows', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No workflows available')
+    if (!hasTable) {
+      guard.markUnavailable()
+      test.skip(true, 'No workflows available')
+      return
+    }
 
-    // Set per-page to 10 so pagination activates even with fewer items
     const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.waitFor({ state: 'visible', timeout: 10_000 })
     await perPageToggle.click()
@@ -327,6 +342,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       .then(() => true)
       .catch(() => false)
     const hasNextPage = buttonVisible && (await nextButton.isEnabled().catch(() => false))
+    if (!hasNextPage) guard.markUnavailable()
     test.skip(!hasNextPage, 'Not enough data to paginate — need more than 10 workflows')
   })
 
@@ -360,6 +376,8 @@ test.describe('Pagination Navigation — Workflows', () => {
 })
 
 test.describe('Pagination Footer — Credentials', () => {
+  const guard = createUnavailableGuard('No credentials data available')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/credentials'))
     const table = app.getByRole('grid', { name: 'Credentials table' })
@@ -367,6 +385,7 @@ test.describe('Pagination Footer — Credentials', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No credentials data available')
   })
 
@@ -377,6 +396,8 @@ test.describe('Pagination Footer — Credentials', () => {
 })
 
 test.describe('Pagination Footer — Integrations', () => {
+  const guard = createUnavailableGuard('No integrations data available')
+
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -385,6 +406,7 @@ test.describe('Pagination Footer — Integrations', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No integrations data available')
   })
 

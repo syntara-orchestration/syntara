@@ -8,7 +8,8 @@ Provides three query patterns:
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar, Literal, Self
 from uuid import UUID
 
@@ -21,9 +22,10 @@ from sqlmodel import Field, SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.dependencies import get_current_user
-from syntara.authz.dependencies import PermissionChecker, get_authz_evaluator
+from syntara.authz.dependencies import get_authz_evaluator
 from syntara.authz.engine import AuthzRequest, authorize, resolve_readable_project_ids
 from syntara.authz.evaluator import AuthzEvaluator
+from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.authz.resolver import resolve_effective_policies, resolve_user_groups
 from syntara.core.constants import NAME_PATTERN, FieldLimits
@@ -32,8 +34,8 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models.base.query_params import BasePaginatedRequest
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
 from syntara.core.services.base import BaseService
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.utils.cursor import (
     CursorData,
     PaginationDirection,
@@ -49,7 +51,7 @@ from syntara.core.utils.sorting import apply_sorting, parse_sort
 
 logger = structlog.stdlib.get_logger(__name__)
 
-router = NexusRouter(prefix="/authz", tags=["Authorization"])
+router = SyntaraRouter(prefix="/authz", tags=["Authorization"])
 
 
 # ============================================================================
@@ -627,11 +629,165 @@ def _build_page_cursors(
 
 
 # ============================================================================
-# Endpoints
+# Authorization Helpers
 # ============================================================================
 
 
-_authz_query_perm = PermissionChecker("authz", "query")
+async def _user_has_authz_query_permission(
+    user: User,
+    evaluator: AuthzEvaluator,
+    db: AsyncSession,
+) -> bool:
+    """Check if user has system-level authz:query permission.
+
+    Used as fallback for ad-hoc who_can queries without a resource_id.
+    Only admins (those with system-level authz:query) can make these queries.
+    """
+    result = await authorize(
+        db,
+        evaluator,
+        AuthzRequest(
+            user_id=user.id,
+            action="query",
+            resource_type="authz",
+            resource_id="",
+            user_labels=user.labels,
+            user_metadata=user.authz_metadata,
+        ),
+    )
+    return result.allowed
+
+
+async def _can_edit_workflow_in_project(
+    user: User,
+    evaluator: AuthzEvaluator,
+    db: AsyncSession,
+    resource_project: str,
+) -> bool:
+    """Check if user can create or update workflows in the given project."""
+    for action in ("update", "create"):
+        result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=user.id,
+                action=action,
+                resource_type="workflow",
+                resource_id="",
+                resource_project=resource_project,
+                user_labels=user.labels,
+                user_metadata=user.authz_metadata,
+            ),
+        )
+        if result.allowed:
+            return True
+    return False
+
+
+@dataclass(frozen=True)
+class _WhoCanGateRule:
+    """Maps a (resource_type, action) query pair to its required permission check."""
+
+    resource_type: str
+    action: str
+    check: Callable[[User, AuthzEvaluator, AsyncSession, str], Awaitable[bool]]
+
+
+_WHO_CAN_GATE_RULES: tuple[_WhoCanGateRule, ...] = (
+    _WhoCanGateRule("approval", "decide", _can_edit_workflow_in_project),
+)
+
+_WHO_CAN_GATE_LOOKUP: dict[tuple[str, str], _WhoCanGateRule] = {
+    (r.resource_type, r.action): r for r in _WHO_CAN_GATE_RULES
+}
+
+
+def _dispatch_who_can_denied(current_user: User, body: WhoCanRequest) -> None:
+    """Dispatch an audit event for a denied who_can query."""
+    from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+    from syntara.authz.audit.authorization_denied import AuthorizationDeniedEvent  # noqa: PLC0415
+
+    AuditEventDispatcher.dispatch(
+        AuthorizationDeniedEvent(
+            user_id=current_user.id,
+            username=current_user.username,
+            resource_id=body.resource_id,
+            resource_type=body.resource_type,
+            resource_name="",
+            action=body.action,
+            denied_by="who_can_gate",
+            principal_type=current_user.__dict__.get("__principal_type__"),
+        )
+    )
+    logger.info(
+        "Authorization denied for who_can query",
+        user_id=str(current_user.id),
+        resource_type=body.resource_type,
+        action=body.action,
+    )
+
+
+async def _enforce_who_can_permission(
+    body: WhoCanRequest,
+    current_user: User,
+    db: AsyncSession,
+    evaluator: AuthzEvaluator,
+    resource_project: str,
+    request: Request,
+) -> bool:
+    """Enforce two-tier authorization gate for who_can queries.
+
+    Tier 0 (always): authz:query holders (admins, CLI) pass unconditionally,
+            preserving backwards compatibility with the old PermissionChecker gate.
+    Tier 1: resource_project provided — the query's (resource_type, action)
+            pair must match a gate rule in _WHO_CAN_GATE_RULES, and the user
+            must pass that rule's permission check. Each rule binds the
+            allowed query pair to its required permission, so adding a new
+            pair forces the developer to specify how it is authorized.
+    Tier 2: No project context and no authz:query — denied.
+
+    Certificate-authenticated requests (service-to-service) bypass the gate,
+    matching the behavior of PermissionChecker.
+
+    Client-supplied resource_labels/resource_metadata are NOT used in the gate
+    to prevent forged attributes from influencing authorization.
+
+    Returns:
+        True if the caller is fully trusted (admin or cert-auth) and may
+        supply arbitrary query parameters including resource_labels/metadata.
+        False if the caller passed via a scoped gate rule (Tier 1) and
+        client-supplied labels/metadata should be stripped.
+
+    """
+    if getattr(request.state, "is_cert_authenticated", False):
+        return True
+
+    if await _user_has_authz_query_permission(current_user, evaluator, db):
+        return True
+
+    if resource_project:
+        query_pair = (body.resource_type, body.action)
+        rule = _WHO_CAN_GATE_LOOKUP.get(query_pair)
+        if rule is None:
+            msg = f"who_can query for {body.resource_type}:{body.action} is not permitted for non-admin users"
+            _dispatch_who_can_denied(current_user, body)
+            raise AuthorizationDeniedError(msg)
+
+        if not await rule.check(current_user, evaluator, db, resource_project):
+            msg = f"Not authorized to query {body.resource_type} in project {resource_project}"
+            _dispatch_who_can_denied(current_user, body)
+            raise AuthorizationDeniedError(msg)
+
+        return False
+
+    msg = "System-wide who_can queries require authz:query permission"
+    _dispatch_who_can_denied(current_user, body)
+    raise AuthorizationDeniedError(msg)
+
+
+# ============================================================================
+# Endpoints
+# ============================================================================
 
 
 @router.post(
@@ -694,7 +850,7 @@ async def can_i(
 
 @router.post(
     "/who_can",
-    dependencies=[Depends(_authz_query_perm)],
+    dependencies=[NO_PERMISSION],
     operation_id="who_can",
     summary="List users who can perform an action",
     description=(
@@ -703,13 +859,42 @@ async def can_i(
     response_description="List of authorized users",
 )
 async def who_can(
+    request: Request,
     body: WhoCanRequest,
-    _current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
 ) -> WhoCanResponse:
-    """List users who can perform a specific action."""
+    """List users who can perform a specific action.
+
+    Two-tier authorization model:
+    1. resource_project provided — the (resource_type, action) pair must match
+       a gate rule, and the user must pass that rule's permission check
+       (e.g. workflow:update for approval:decide queries).
+    2. No resource_project — system-wide query, requires authz:query (admin).
+
+    Args:
+        request: The HTTP request (used for cert-auth bypass check).
+        body: Query parameters including action, resource_type, optional resource_id.
+        current_user: Authenticated user (permission check happens inside).
+        db: Database session.
+        evaluator: Authorization evaluator.
+
+    Returns:
+        Paginated list of users who can perform the action.
+
+    Raises:
+        AuthorizationDeniedError: If user lacks permission for this query type.
+
+    """
     resource_project = await _resolve_project_input(db, body.resource_project)
+    is_trusted = await _enforce_who_can_permission(body, current_user, db, evaluator, resource_project, request)
+
+    if not is_trusted:
+        # Tier 1 callers must not influence per-user OPA evaluation with
+        # forged labels/metadata — only admins and cert-auth may supply them.
+        # Use model_copy to avoid mutating the original request body.
+        body = body.model_copy(update={"resource_labels": {}, "resource_metadata": {}})
 
     if body.cursor:
         cursor_data = decode_cursor(body.cursor)

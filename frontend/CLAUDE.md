@@ -341,12 +341,16 @@ See: [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) �
 
 #### How do I format dates?
 
-Use date utilities in `packages/syntara-ui/src/utils/dateUtils.ts`:
+For any **rendered/read-only** date or timestamp (table columns, detail views, tooltips), use `DateCell` / `UserTimestamp` (`packages/syntara-ui/src/components/table/DateCell.tsx`), which wrap PatternFly's `Timestamp` component (`dateFormat="medium" timeFormat="medium"`). For execution start/end ranges that collapse to time-only on the same day, use the `ExecutionTimestamp` helper. Do not call `toLocaleString()` or render date-fns output directly in JSX.
 
-- `formatDate(isoString)` — "Jan 15, 2024"
-- `formatTime(isoString)` — "2:30 PM"
-- `formatDateTime(isoString?)` — medium date + time with seconds (e.g. "May 27, 2026, 9:55:01 AM")
-- `formatElapsedTime(elapsedMs)` — "1h 2m 3s"
+`packages/syntara-ui/src/utils/dateUtils.ts` is now scoped to non-display helpers and to the handful of **plain-string** contexts where JSX can't be used (dropdown option labels, `TextInput value=`, model fields):
+
+- `formatDateForApi(date)` / `formatDateChipValue(isoValue)` — API/filter serialization
+- `formatDateYMD(date)` / `parseDateYMD(val)` — round-trip helpers for PF `DatePicker`
+- `formatElapsedTime(elapsedMs)` — "1h 2m 3s" (duration, not a calendar timestamp)
+- `formatTimeAgo(isoString)` — relative "5m ago" labels (no PF `Timestamp` equivalent)
+- `formatExpirationDate(isoString)` — plain-string date only, for `TextInput value=` contexts
+- `formatDateTime(isoString?)` — kept only for plain-string contexts (e.g. dropdown option labels, version-name fallbacks) that cannot render JSX; do not call this from new component render paths — use `DateCell`/`Timestamp` instead
 
 Use for UI display only, not in logic (per i18n guidelines). Trigger-specific interval formatting stays in `utils/triggerFormatting.ts`.
 

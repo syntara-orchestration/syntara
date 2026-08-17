@@ -33,7 +33,7 @@ class WorkflowConvergeMixin:
     timeout handling, and incomplete-predecessor skipping.
 
     State attributes are declared as type annotations for mypy;
-    initialization remains in ``NexusWorkflow._initialize_state``.
+    initialization remains in ``OrchestratorWorkflow._initialize_state``.
     """
 
     failed_nodes: dict[str, str]
@@ -47,7 +47,7 @@ class WorkflowConvergeMixin:
     _timed_out_converge_nodes: set[str]
     _detached_nodes: set[str]
 
-    # Methods provided by NexusWorkflow (resolved via MRO)
+    # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
 
     def _mark_downstream_as_skipped(self, start_node_id: str, graph: WorkflowGraph) -> None: ...

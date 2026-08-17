@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate secrets for Nexus development environment
+# Generate secrets for Syntara development environment
 #
 # This script generates:
 # - ES256 (ECDSA P-256) key pairs for JWT signing (primary + backup)
@@ -79,7 +79,7 @@ main() {
             --help|-h)
                 echo "Usage: $0 [--force]"
                 echo ""
-                echo "Generate JWT signing keys for Nexus development environment."
+                echo "Generate JWT signing keys for Syntara development environment."
                 echo ""
                 echo "Options:"
                 echo "  --force, -f  Regenerate all keys even if they exist"
@@ -142,7 +142,7 @@ main() {
         info "  Encryption key: $SECRETS_DIR/encryption-key"
     fi
 
-    # Prevent permissions issues once secrets are mounted to nexus containers
+    # Prevent permissions issues once secrets are mounted to syntara containers
     chmod -R +r "${SECRETS_DIR}"
 
     echo ""

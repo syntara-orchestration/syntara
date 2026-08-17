@@ -13,13 +13,13 @@ from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook
 
 async def test_webhook_trigger_basic() -> None:
     """Webhook trigger should return input as output."""
-    input_config = {"event": "push", "repo": "nexus"}
+    input_config = {"event": "push", "repo": "syntara"}
     result = await webhook_trigger(input_config, None)
 
     assert result == {
         "output": {
             "event": "push",
-            "repo": "nexus",
+            "repo": "syntara",
         }
     }
 
@@ -32,7 +32,7 @@ async def test_webhook_trigger_empty_payload() -> None:
 
 async def test_webhook_trigger_with_output_mapping_suppresses_fields() -> None:
     """Output mapping with explicit keys should suppress unmapped fields."""
-    input_config = {"event": "push", "repo": "nexus"}
+    input_config = {"event": "push", "repo": "syntara"}
     output_config = {"event_type": "event"}
 
     result = await webhook_trigger(input_config, output_config)

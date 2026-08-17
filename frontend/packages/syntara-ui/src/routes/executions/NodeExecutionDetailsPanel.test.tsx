@@ -293,9 +293,10 @@ describe('NodeExecutionDetailsPanel', () => {
   it('renders timestamp range when node has both start and end times', () => {
     render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    // Check that both timestamps are present with the dash separator
-    // Timestamps render in local timezone, so just verify the format and date
-    expect(screen.getByText(/\d{2}:\d{2}:\d{2} [AP]M, 1 Jan 2024/)).toBeInTheDocument()
+    // Start and end render as two separate <time> elements (via PatternFly Timestamp)
+    // joined by " - ". Timestamps render in local timezone, so just verify the date
+    // appears twice rather than asserting an exact combined string.
+    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
   })
 
   it('renders only start timestamp when completion time is missing', () => {
@@ -308,7 +309,7 @@ describe('NodeExecutionDetailsPanel', () => {
     }
     render(<NodeExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
-    expect(screen.getByText(/\d{2}:\d{2}:\d{2} [AP]M, 1 Jan 2024/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
     expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
   })
 

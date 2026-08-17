@@ -27,7 +27,7 @@ flowchart TD
     C --> L["ScheduledWorkflowLauncher"]
     L -->|"load published workflow"| T
 
-    D -->|"resolve trigger, validate input, start workflow"| T["Temporal: NexusWorkflow.run()"]
+    D -->|"resolve trigger, validate input, start workflow"| T["Temporal: OrchestratorWorkflow.run()"]
     T --> E["_execute_trigger()"]
     E -->|"dynamic dispatch: execute_activity(trigger_node.type)"| ACT["Trigger Activity"]
     ACT --> O["apply_output_mapping()"]

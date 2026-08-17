@@ -79,7 +79,7 @@ Token counting uses `tiktoken` with model-specific encoding for supported OpenAI
 Files flow through an asynchronous pipeline from upload to agent context:
 
 1. **Upload.** `POST /files` validates files (size ≤ 10 MB, count ≤ 10, allowed MIME types: PDF, Word, plain text, markdown) using content-based detection via `python-magic`. Originals are stored on S3 and `FileMetadata` records created in the database
-2. **Convert.** A Temporal workflow converts each file to markdown via `DocumentConversionService`. Registered converters: `PDFConverter`, `MSWordConverter`, `MarkdownConverter`, `TextConverter`. Converted content is stored as `nexus-{file_id}-content.md` on S3. Status transitions: `PENDING_CONVERSION` → `CONVERTING` → `CONVERTED` (or `CONVERSION_FAILED`)
+2. **Convert.** A Temporal workflow converts each file to markdown via `DocumentConversionService`. Registered converters: `PDFConverter`, `MSWordConverter`, `MarkdownConverter`, `TextConverter`. Converted content is stored as `orchestrator-{file_id}-content.md` on S3. Status transitions: `PENDING_CONVERSION` → `CONVERTING` → `CONVERTED` (or `CONVERSION_FAILED`)
 3. **Reference.** The workflow author adds `file_ids` (up to 10 UUIDs) to the agentic node config. These are stored in `AgenticExecutorParameters.file_ids` and forwarded to the orchestrator as invocation context
 4. **Load at execution.** `UploadedFileRetriever` validates all files are `CONVERTED`, loads converted markdown from S3 in parallel, and wraps each as a `RelevantDocument(relevancy_score=1.0)`
 5. **Fail-fast on unconverted files.** If any files have a status other than `CONVERTED` (including `CONVERSION_FAILED`), the `UploadedFileRetriever` raises a `DocumentRetrievalError` immediately — the retrieval does not proceed with partial context
@@ -107,7 +107,7 @@ The agentic activity sends `HEARTBEAT_STOP_MONITOR: True` immediately at dispatc
 
 ## Design Decisions
 
-**Credentials are passed by reference, not by value.** `credential_id` is forwarded to the Agent Orchestrator as metadata; the decrypted API key is never placed in the invocation context. The orchestrator resolves the credential itself, at execution time, via the Nexus Credentials API.
+**Credentials are passed by reference, not by value.** `credential_id` is forwarded to the Agent Orchestrator as metadata; the decrypted API key is never placed in the invocation context. The orchestrator resolves the credential itself, at execution time, via the Syntara Credentials API.
 
 **Prompts land in Temporal history — don't put secrets in them.** Because activity arguments are recorded in Temporal's durable event history, credentials, API keys, or PII should never be interpolated directly into a prompt string. Use `credential_id` (or `integration_connections`) instead, and reference already-resolved upstream data via expressions.
 

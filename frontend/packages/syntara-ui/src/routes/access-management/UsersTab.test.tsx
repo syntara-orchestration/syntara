@@ -984,4 +984,32 @@ describe('UsersTab Component', () => {
       })
     })
   })
+
+  describe('State column', () => {
+    it('renders State column header and per-user switches', () => {
+      render(<UsersTab />, { wrapper })
+
+      expect(screen.getByRole('columnheader', { name: 'State' })).toBeInTheDocument()
+      expect(screen.getByRole('switch', { name: 'Toggle jdoe status' })).toBeChecked()
+      expect(screen.getByRole('switch', { name: 'Toggle viewer1 status' })).not.toBeChecked()
+      expect(screen.getByRole('switch', { name: 'Toggle admin status' })).toBeChecked()
+    })
+
+    it('opens disable confirmation when toggling an enabled user off', async () => {
+      const user = userEvent.setup()
+      render(<UsersTab />, { wrapper })
+
+      await user.click(screen.getByRole('switch', { name: 'Toggle jdoe status' }))
+
+      expect(screen.getByRole('heading', { name: 'Disable user?' })).toBeInTheDocument()
+      expect(screen.getByText(/will be disabled and will no longer be able to sign in/i)).toBeInTheDocument()
+    })
+
+    it('does not show DisabledBadge next to usernames', () => {
+      render(<UsersTab />, { wrapper })
+
+      const table = screen.getByRole('grid', { name: 'Users' })
+      expect(within(table).queryByText('Disabled')).not.toBeInTheDocument()
+    })
+  })
 })

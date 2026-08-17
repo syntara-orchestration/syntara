@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 from syntara.files.exceptions import FileValidationError
 from syntara.files.file_manager import FileManager
 
+from .conftest import make_upload_mock
+
 
 @pytest.mark.asyncio
 async def test_rejects_file_exceeding_size_limit() -> None:
@@ -88,14 +90,8 @@ async def test_accepts_file_at_exact_size_limit() -> None:
     - Boundary condition handled correctly
     """
     # Arrange - Exactly 10MB
-    size_bytes = 10 * 1024 * 1024  # Exactly 10MB
-    content = b"0" * size_bytes
-    mock_file = Mock()
-    mock_file.filename = "exact_limit.pdf"
-    mock_file.size = size_bytes
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=content)
-    mock_file.seek = AsyncMock()
+    content = b"0" * (10 * 1024 * 1024)
+    mock_file = make_upload_mock("exact_limit.pdf", content)
 
     with patch("magic.from_buffer") as mock_magic:
         mock_magic.return_value = "application/pdf"
@@ -119,14 +115,8 @@ async def test_accepts_file_below_size_limit() -> None:
     - No error for valid sizes
     """
     # Arrange - 5MB file (below limit)
-    size_bytes = 5 * 1024 * 1024  # 5MB
-    content = b"0" * size_bytes
-    mock_file = Mock()
-    mock_file.filename = "small.pdf"
-    mock_file.size = size_bytes
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=content)
-    mock_file.seek = AsyncMock()
+    content = b"0" * (5 * 1024 * 1024)
+    mock_file = make_upload_mock("small.pdf", content)
 
     with patch("magic.from_buffer") as mock_magic:
         mock_magic.return_value = "application/pdf"
@@ -150,27 +140,12 @@ async def test_validates_each_file_size_independently() -> None:
     - One oversized file fails entire batch
     """
     # Arrange - 2 small files + 1 large file
-    mock_files = []
-
-    # Small file 1
-    mock_file1 = Mock()
-    mock_file1.filename = "small1.pdf"
-    mock_file1.size = 1 * 1024 * 1024  # 1MB
-    mock_file1.content_type = "application/pdf"
-    mock_file1.read = AsyncMock(return_value=b"0" * mock_file1.size)
-    mock_file1.seek = AsyncMock()
-    mock_files.append(mock_file1)
-
-    # Small file 2
-    mock_file2 = Mock()
-    mock_file2.filename = "small2.pdf"
-    mock_file2.size = 2 * 1024 * 1024  # 2MB
-    mock_file2.content_type = "application/pdf"
-    mock_file2.read = AsyncMock(return_value=b"0" * mock_file2.size)
-    mock_file2.seek = AsyncMock()
-    mock_files.append(mock_file2)
-
-    # Large file (exceeds limit)
+    # Files 1-2 pass validation and reach streaming — need finite reads
+    # File 3 fails size validation before streaming — plain Mock is fine
+    mock_files: list[Mock] = [
+        make_upload_mock("small1.pdf", b"0" * (1 * 1024 * 1024)),
+        make_upload_mock("small2.pdf", b"0" * (2 * 1024 * 1024)),
+    ]
     mock_file3 = Mock()
     mock_file3.filename = "large.pdf"
     mock_file3.size = 11 * 1024 * 1024  # 11MB
@@ -232,14 +207,8 @@ async def test_very_small_file_accepted() -> None:
     - Minimum file sizes work (1KB)
     """
     # Arrange - 1KB file
-    size_bytes = 1024  # 1KB
-    content = b"0" * size_bytes
-    mock_file = Mock()
-    mock_file.filename = "tiny.txt"
-    mock_file.size = size_bytes
-    mock_file.content_type = "text/plain"
-    mock_file.read = AsyncMock(return_value=content)
-    mock_file.seek = AsyncMock()
+    content = b"0" * 1024
+    mock_file = make_upload_mock("tiny.txt", content, content_type="text/plain")
 
     file_manager = FileManager()
 

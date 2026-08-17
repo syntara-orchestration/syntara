@@ -42,10 +42,10 @@ def mtls_certs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     ca_key, ca_cert = generate_ca(certs_dir)
 
     backend_cert, backend_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="backend.nexus.svc", filename="backend"
+        certs_dir, ca_key, ca_cert, common_name="backend.orchestrator.svc", filename="backend"
     )
     worker_cert, worker_key = generate_service_cert(
-        certs_dir, ca_key, ca_cert, common_name="worker.nexus.svc", filename="worker"
+        certs_dir, ca_key, ca_cert, common_name="worker.orchestrator.svc", filename="worker"
     )
 
     return {

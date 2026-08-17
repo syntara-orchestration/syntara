@@ -13,10 +13,10 @@ from syntara.core.database.session import get_db
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
-from syntara.core.nexus_router import NexusRouter
 from syntara.core.services.base import BaseService
+from syntara.core.syntara_router import SyntaraRouter
 
-router = NexusRouter(prefix="/users/directory", tags=["Users Directory"])
+router = SyntaraRouter(prefix="/users/directory", tags=["Users Directory"])
 
 _user_directory_read = PermissionChecker("user-directory", "read")
 

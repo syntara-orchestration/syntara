@@ -1,6 +1,6 @@
 # API Response Format Standards
 
-This document defines the standard response formats, endpoint conventions, and compliance testing for Nexus REST API endpoints. It covers shared conventions (model naming, URL paths, base models), list endpoint patterns (pagination, filtering, sorting), and CRUD endpoint patterns (status codes, error responses, service layer patterns).
+This document defines the standard response formats, endpoint conventions, and compliance testing for Syntara REST API endpoints. It covers shared conventions (model naming, URL paths, base models), list endpoint patterns (pagination, filtering, sorting), and CRUD endpoint patterns (status codes, error responses, service layer patterns).
 
 ## List Response Shape
 
@@ -36,7 +36,7 @@ class ResourcesResponse[T](ResourcesResponseBase):
 
 ### Strategy: Cursor-Based Keyset Pagination
 
-Nexus uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
+Syntara uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
 
 ### Query Parameters
 
@@ -376,7 +376,7 @@ class ResourcesResponse[T](ResourcesResponseBase):
 
 #### Strategy: Cursor-Based Keyset Pagination
 
-Nexus uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
+Syntara uses cursor-based pagination, not offset-based. This avoids the consistency problems of offset pagination (duplicates/skips when data changes between requests).
 
 #### Query Parameters
 
@@ -916,7 +916,7 @@ A catch-all `IntegrityError` handler in `core/error_handlers.py` provides a safe
 
 #### AAP Proxy Endpoints
 
-Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Nexus CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
+Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller API v2. They do not follow Syntara CRUD conventions — status codes, error formats, and response shapes are dictated by the upstream API. AAP proxy endpoints are excluded from CRUD compliance testing by the `"Ansible Automation Platform Proxy"` tag in the OpenAPI spec, not via `crud_compliance_exclusions.yaml`. See [Known List Exceptions — AAP Proxy Endpoints](#aap-proxy-endpoints) for the full comparison.
 
 #### Action Endpoints
 
