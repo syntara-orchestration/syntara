@@ -59,7 +59,11 @@ export type AIAgentFormSubmitData = {
 export type AIAgentFormInitialData = Partial<AIAgentFormData>
 
 export type AIAgentNodeFormProps = {
-  onSubmit: (data: AIAgentFormSubmitData) => void
+  /**
+   * Persist the form. Return `false` (or throw) when persist fails so session
+   * uploads stay DELETEable. `void` / `true` means success.
+   */
+  onSubmit: (data: AIAgentFormSubmitData) => boolean | void | Promise<boolean | void>
   initialData?: AIAgentFormInitialData
   existingFileIds?: string[]
   onHeaderContentChange?: (content: ReactNode | null) => void
@@ -429,7 +433,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
 
   const { onSubmit: onSubmitProp } = props
   const handleSubmit = useCallback(
-    (data: AIAgentFormData) => {
+    async (data: AIAgentFormData) => {
       const trimmed = data.responseSchema?.trim()
       const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
@@ -438,8 +442,17 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
         .filter((f) => f.status === 'success' && !currentDeletingIds.has(f.id))
         .map((f) => f.id)
 
-      onSubmitProp({ ...data, fileIds, parsedResponseSchema })
-      markPersisted?.(fileIds)
+      try {
+        const result = onSubmitProp({ ...data, fileIds, parsedResponseSchema })
+        const outcome = result instanceof Promise ? await result : result
+        if (outcome === false) {
+          return false
+        }
+        markPersisted?.(fileIds)
+        return true
+      } catch {
+        return false
+      }
     },
     [completedFiles, onSubmitProp, markPersisted]
   )

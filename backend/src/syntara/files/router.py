@@ -271,7 +271,9 @@ class FileDetailResponse(BaseModel):
     is_project_deleted: bool = Field(
         description=(
             "True when the owning project has been soft-deleted; the file is "
-            "retained as an orphan and remains deletable via DELETE /files/{id}."
+            "retained as an orphan. Project-scoped files:delete cannot remove "
+            "orphans after soft-delete; only system-scope files:delete with a "
+            "known file UUID can."
         ),
     )
 
@@ -496,7 +498,10 @@ async def get_file_details(
     "/{file_id}",
     summary="Delete file",
     description="Permanently delete a file and its stored content. "
-    "Files that outlive a deleted project can still be removed via this endpoint.",
+    "After a project is soft-deleted, project-scoped files:delete cannot "
+    "authorize orphan cleanup (the project no longer resolves). Only "
+    "system-scope files:delete can remove an orphan, and only when the "
+    "caller already knows the file UUID.",
     status_code=status.HTTP_204_NO_CONTENT,
     responses={status.HTTP_204_NO_CONTENT: {"description": "File deleted successfully"}},
     dependencies=[Depends(_files_perm_delete)],
@@ -509,7 +514,10 @@ async def delete_file(
 ) -> None:
     """Delete a file by ID from storage and the database.
 
-    Authorization is handled by PermissionChecker (files:delete).
+    Authorization is handled by PermissionChecker (files:delete). After
+    project soft-delete, project-scoped files:delete does not match (the
+    project is filtered out), so only system-scope files:delete with a
+    known UUID can remove an orphan.
 
     Raises:
         HTTPException: 404 if file not found

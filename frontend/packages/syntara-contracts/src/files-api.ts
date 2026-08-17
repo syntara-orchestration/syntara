@@ -80,7 +80,7 @@ export interface paths {
     post?: never
     /**
      * Delete file
-     * @description Permanently delete a file and its stored content. Files that outlive a deleted project can still be removed via this endpoint.
+     * @description Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope files:delete can remove an orphan, and only when the caller already knows the file UUID.
      */
     delete: operations['delete_file']
     options?: never
@@ -247,7 +247,7 @@ export interface components {
       conversion_error?: string | null
       /**
        * Is Project Deleted
-       * @description True when the owning project has been soft-deleted; the file is retained as an orphan and remains deletable via DELETE /files/{id}.
+       * @description True when the owning project has been soft-deleted; the file is retained as an orphan. Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with a known file UUID can.
        */
       is_project_deleted: boolean
     }

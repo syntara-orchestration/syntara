@@ -406,31 +406,43 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
         return true
       }
 
-      const handleCreate = (data: Record<string, unknown>) => {
-        selectedNode.onSubmit(
-          data,
-          (newNodeId?: string) => {
-            if (replacementNodeId) {
-              if (!handleReplacement(newNodeId)) {
-                showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
-                return
-              }
-            } else if (sourceNodeId && newNodeId) {
-              moveActivityAfter(newNodeId, sourceNodeId)
-              if (onConnect) {
-                onConnect(sourceNodeId, newNodeId)
-              }
-            }
+      const handleCreate = (data: Record<string, unknown>): Promise<boolean> =>
+        new Promise((resolve) => {
+          try {
+            selectedNode.onSubmit(
+              data,
+              (newNodeId?: string) => {
+                if (replacementNodeId) {
+                  if (!handleReplacement(newNodeId)) {
+                    showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
+                    resolve(true)
+                    return
+                  }
+                } else if (sourceNodeId && newNodeId) {
+                  moveActivityAfter(newNodeId, sourceNodeId)
+                  if (onConnect) {
+                    onConnect(sourceNodeId, newNodeId)
+                  }
+                }
 
-            onClose()
-            onNodeAdded?.()
-          },
-          (error: string) => {
-            showError({ title: 'Add step failed', description: error })
-          },
-          nodeSubtypeId ?? undefined
-        )
-      }
+                onClose()
+                onNodeAdded?.()
+                resolve(true)
+              },
+              (error: string) => {
+                showError({ title: 'Add step failed', description: error })
+                resolve(false)
+              },
+              nodeSubtypeId ?? undefined
+            )
+          } catch (error) {
+            showError({
+              title: 'Add step failed',
+              description: error instanceof Error ? error.message : 'Failed to add step',
+            })
+            resolve(false)
+          }
+        })
 
       return (
         <FormComponent

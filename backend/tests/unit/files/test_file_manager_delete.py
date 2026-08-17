@@ -205,3 +205,58 @@ class TestFileManagerIsProjectDeleted:
         session.exec = AsyncMock(return_value=result)
 
         assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is True
+
+
+class TestFileManagerBatchIsProjectDeleted:
+    """Tests for FileManager.batch_is_project_deleted orphan detection."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param("empty", id="empty-set-short-circuit"),
+            pytest.param("mapped", id="in-query-mapping"),
+            pytest.param("missing", id="missing-id-deleted-default"),
+        ],
+    )
+    async def test_batch_is_project_deleted(
+        self,
+        file_manager_with_retriever: FileManager,
+        scenario: str,
+    ) -> None:
+        from datetime import UTC, datetime
+
+        active_id = uuid4()
+        soft_id = uuid4()
+        missing_id = uuid4()
+
+        active = Mock()
+        active.id = active_id
+        active.deleted_at = None
+
+        soft = Mock()
+        soft.id = soft_id
+        soft.deleted_at = datetime.now(UTC)
+
+        session = AsyncMock()
+        query_result = Mock()
+
+        if scenario == "empty":
+            result = await file_manager_with_retriever.batch_is_project_deleted(set(), session)
+            assert result == {}
+            session.exec.assert_not_called()
+            return
+
+        if scenario == "mapped":
+            query_result.all = Mock(return_value=[active, soft])
+            session.exec = AsyncMock(return_value=query_result)
+            result = await file_manager_with_retriever.batch_is_project_deleted({active_id, soft_id}, session)
+            assert result == {active_id: False, soft_id: True}
+            session.exec.assert_awaited_once()
+            return
+
+        query_result.all = Mock(return_value=[active])
+        session.exec = AsyncMock(return_value=query_result)
+        result = await file_manager_with_retriever.batch_is_project_deleted({active_id, missing_id}, session)
+        assert result == {active_id: False, missing_id: True}
+        session.exec.assert_awaited_once()

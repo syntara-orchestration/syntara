@@ -90,8 +90,9 @@ def sync_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete file
 
-     Permanently delete a file and its stored content. Files that outlive a deleted project can still be
-    removed via this endpoint.
+     Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped
+    files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope
+    files:delete can remove an orphan, and only when the caller already knows the file UUID.
 
     Args:
         file_id (UUID):
@@ -122,8 +123,9 @@ def sync(
 ) -> Any | ErrorData | None:
     """Delete file
 
-     Permanently delete a file and its stored content. Files that outlive a deleted project can still be
-    removed via this endpoint.
+     Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped
+    files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope
+    files:delete can remove an orphan, and only when the caller already knows the file UUID.
 
     Args:
         file_id (UUID):
@@ -149,8 +151,9 @@ async def asyncio_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete file
 
-     Permanently delete a file and its stored content. Files that outlive a deleted project can still be
-    removed via this endpoint.
+     Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped
+    files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope
+    files:delete can remove an orphan, and only when the caller already knows the file UUID.
 
     Args:
         file_id (UUID):
@@ -179,8 +182,9 @@ async def asyncio(
 ) -> Any | ErrorData | None:
     """Delete file
 
-     Permanently delete a file and its stored content. Files that outlive a deleted project can still be
-    removed via this endpoint.
+     Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped
+    files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope
+    files:delete can remove an orphan, and only when the caller already knows the file UUID.
 
     Args:
         file_id (UUID):

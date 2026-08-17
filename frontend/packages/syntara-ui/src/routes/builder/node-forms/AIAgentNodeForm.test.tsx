@@ -145,6 +145,7 @@ describe('AIAgentNodeForm', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockOnSubmit.mockReset()
     vi.mocked(credentialsClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isPending: false,
@@ -347,6 +348,104 @@ describe('AIAgentNodeForm', () => {
       expect(screen.queryByText('test.txt')).not.toBeInTheDocument()
     })
     expect(deleteFileById).not.toHaveBeenCalled()
+  })
+
+  it('when onSubmit returns false, remove still DELETEs the session upload', async () => {
+    const user = userEvent.setup()
+    const { deleteFileById } = await import('../../../utils/deleteFile')
+    vi.mocked(deleteFileById).mockClear()
+    mockOnSubmit.mockReturnValue(false)
+
+    renderWithHeader(
+      <AIAgentNodeForm
+        onSubmit={mockOnSubmit}
+        projectId="project-789"
+        initialData={{ name: 'Agent', llm_model_id: 'model-1', prompt: 'Do stuff' }}
+      />
+    )
+
+    await user.click(screen.getByTestId('upload-files'))
+    await waitFor(() => {
+      expect(screen.getByText('test.txt')).toBeInTheDocument()
+    })
+
+    fireEvent.submit(screen.getByTestId('ai-agent-node-form'))
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalled()
+    })
+
+    vi.mocked(deleteFileById).mockClear()
+    await user.click(screen.getByTestId('remove-server-file-123'))
+
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('server-file-123')
+    })
+  })
+
+  it('when onSubmit throws, remove still DELETEs the session upload', async () => {
+    const user = userEvent.setup()
+    const { deleteFileById } = await import('../../../utils/deleteFile')
+    vi.mocked(deleteFileById).mockClear()
+    mockOnSubmit.mockImplementation(() => {
+      throw new Error('Add step failed')
+    })
+
+    renderWithHeader(
+      <AIAgentNodeForm
+        onSubmit={mockOnSubmit}
+        projectId="project-789"
+        initialData={{ name: 'Agent', llm_model_id: 'model-1', prompt: 'Do stuff' }}
+      />
+    )
+
+    await user.click(screen.getByTestId('upload-files'))
+    await waitFor(() => {
+      expect(screen.getByText('test.txt')).toBeInTheDocument()
+    })
+
+    fireEvent.submit(screen.getByTestId('ai-agent-node-form'))
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalled()
+    })
+
+    vi.mocked(deleteFileById).mockClear()
+    await user.click(screen.getByTestId('remove-server-file-123'))
+
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('server-file-123')
+    })
+  })
+
+  it('when onSubmit resolves false, remove still DELETEs the session upload', async () => {
+    const user = userEvent.setup()
+    const { deleteFileById } = await import('../../../utils/deleteFile')
+    vi.mocked(deleteFileById).mockClear()
+    mockOnSubmit.mockResolvedValue(false)
+
+    renderWithHeader(
+      <AIAgentNodeForm
+        onSubmit={mockOnSubmit}
+        projectId="project-789"
+        initialData={{ name: 'Agent', llm_model_id: 'model-1', prompt: 'Do stuff' }}
+      />
+    )
+
+    await user.click(screen.getByTestId('upload-files'))
+    await waitFor(() => {
+      expect(screen.getByText('test.txt')).toBeInTheDocument()
+    })
+
+    fireEvent.submit(screen.getByTestId('ai-agent-node-form'))
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalled()
+    })
+
+    vi.mocked(deleteFileById).mockClear()
+    await user.click(screen.getByTestId('remove-server-file-123'))
+
+    await waitFor(() => {
+      expect(deleteFileById).toHaveBeenCalledWith('server-file-123')
+    })
   })
 
   describe('Response Schema', () => {

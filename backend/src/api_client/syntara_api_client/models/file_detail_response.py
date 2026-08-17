@@ -29,8 +29,9 @@ class FileDetailResponse:
                 CONVERTING: Conversion in progress
                 CONVERTED: Successfully converted to text/markdown
                 CONVERSION_FAILED: Conversion failed with error
-        is_project_deleted (bool): True when the owning project has been soft-deleted; the file is retained as an orphan
-            and remains deletable via DELETE /files/{id}.
+        is_project_deleted (bool): True when the owning project has been soft-deleted; the file is retained as an orphan.
+            Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with a
+            known file UUID can.
         conversion_error (None | str | Unset): Error message if conversion failed
     """
 
