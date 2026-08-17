@@ -93,7 +93,7 @@ class AgentOrchestratorClient:
     Provides methods to invoke agents and receive completed results.
 
     Attributes:
-        base_url: Base URL for Agent Orchestrator API (e.g., http://localhost:8000/api/v1)
+        base_url: Base URL for Agent Orchestrator API (e.g., http://localhost:8000)
         timeout: Default timeout for HTTP requests in seconds
         max_retries: Maximum number of retry attempts for transient failures
         retry_backoff_base: Base delay for exponential backoff (seconds)

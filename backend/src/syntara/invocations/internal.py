@@ -1,7 +1,9 @@
 """Internal invocation endpoints for service-to-service calls.
 
 These endpoints are excluded from the public OpenAPI spec and intended
-for mTLS-authenticated internal callers (e.g. the Temporal worker).
+for network-isolated internal callers (e.g. the Temporal worker).
+Security relies on network-level isolation (k8s NetworkPolicy / service mesh),
+not application-level mTLS.
 """
 
 from typing import Annotated
@@ -50,6 +52,7 @@ async def create_internal_invocation(
 async def get_internal_invocation(
     invocation_id: Annotated[UUID, Path(description="UUID of the invocation")],
     db: Annotated[AsyncSession, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
 ) -> Invocation:
     """Retrieve an invocation by ID via internal route."""
     invocation = await db.get(Invocation, invocation_id)
