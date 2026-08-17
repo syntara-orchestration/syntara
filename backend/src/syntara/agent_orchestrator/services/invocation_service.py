@@ -299,3 +299,35 @@ class InvocationService(BaseService):
         await self._start_builtin_workflows(invocation_id, file_ids=new_file_ids or None)
 
         return invocation
+
+    async def _cleanup_files_from_paths(
+        self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""
+    ) -> None:
+        """Clean up files from storage via the retriever (best-effort)."""
+        if not files_to_cleanup:
+            return
+
+        logger.info(
+            "Cleaning up files for invocation",
+            file_count=len(files_to_cleanup),
+            invocation_id=invocation_id,
+            context=context,
+        )
+        try:
+            retriever = self.file_manager.get_retriever()
+            for file_path in files_to_cleanup:
+                try:
+                    await retriever.delete_file(file_path)
+                    logger.info("Cleaned up file", file_path=file_path, context=context)
+                except Exception:
+                    logger.exception(
+                        "Failed to cleanup file",
+                        file_path=file_path,
+                        invocation_id=invocation_id,
+                        context=context,
+                    )
+        except Exception:
+            logger.exception(
+                "File cleanup failed for invocation",
+                invocation_id=invocation_id,
+            )

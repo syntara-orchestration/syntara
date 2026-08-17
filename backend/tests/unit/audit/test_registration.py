@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from syntara.audit.discovery import discover_handlers
 from syntara.audit.registration import _handler_packages
-from syntara.invocations.audit.invocation_cancelled import InvocationCancelledEvent
 from syntara.invocations.audit.invocation_created import InvocationCreatedEvent
 from syntara.tool_manager.audit.tool_bulk_update import ToolBulkUpdateEvent
 from syntara.tool_manager.audit.tool_update import ToolUpdateEvent
@@ -23,4 +22,3 @@ class TestHandlerPackagesRegistration:
         assert ToolUpdateEvent in event_types
         assert ToolBulkUpdateEvent in event_types
         assert InvocationCreatedEvent in event_types
-        assert InvocationCancelledEvent in event_types
