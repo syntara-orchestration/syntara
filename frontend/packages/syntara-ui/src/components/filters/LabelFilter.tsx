@@ -1,5 +1,5 @@
 import { Button, Flex, FlexItem, FormGroup, TextInput } from '@patternfly/react-core'
-import { PlusIcon, TrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo } from 'react'
 
 /**
@@ -78,9 +78,8 @@ function LabelPairRow({ pair, index, onKeyChange, onValueChange, onRemove, isRem
           aria-label={`Remove label ${index + 1}`}
           onClick={onRemove}
           isDisabled={isRemoveDisabled}
-        >
-          <TrashIcon />
-        </Button>
+          icon={<RhUiTrashIcon />}
+        />
       </FlexItem>
     </Flex>
   )
@@ -217,7 +216,7 @@ export function LabelFilter({ label, labels = {}, onChange }: LabelFilterProps) 
           </FlexItem>
         ))}
         <FlexItem>
-          <Button variant="link" icon={<PlusIcon />} onClick={handleAdd}>
+          <Button variant="link" icon={<RhUiAddIcon />} onClick={handleAdd}>
             Add label
           </Button>
         </FlexItem>

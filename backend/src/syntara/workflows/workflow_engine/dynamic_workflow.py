@@ -13,6 +13,7 @@ from typing import Any, ClassVar, cast
 
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
@@ -36,6 +37,7 @@ with workflow.unsafe.imports_passed_through():
         resolve_timeout,
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
+    from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
@@ -76,7 +78,7 @@ def _parse_items(items: Any) -> Any:  # noqa: ANN401
 
 
 @workflow.defn(name="orchestrator_workflow")
-class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
+class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     """Temporal workflow for executing v2 graph-based workflows."""
 
     @workflow.run
@@ -344,15 +346,8 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         continue_on_failure: bool = False,
     ) -> None:
         """Record a node failure; skip downstream unless continue_on_failure is set."""
-        # Unwrap Temporal's ActivityError to surface the inner ApplicationError message.
-        # Also handle bare ApplicationError raised directly from workflow code.
-        app_error: ApplicationError | None = None
-        if isinstance(error, ActivityError) and isinstance(error.cause, ApplicationError):
-            app_error = error.cause
-        elif isinstance(error, ApplicationError):
-            app_error = error
-
-        error_message = (app_error.message or str(app_error)) if app_error is not None else str(error)
+        app_error = self._extract_application_error(error)
+        error_message = self._resolve_failure_message(node_id, error, app_error, graph)
 
         self.failed_nodes[node_id] = error_message
 
@@ -383,6 +378,37 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._cof_failed_nodes.add(node_id)
 
         self._check_converge_successors(node_id, graph, pending_tasks)
+
+    @staticmethod
+    def _extract_application_error(error: Exception) -> ApplicationError | None:
+        """Extract ApplicationError from direct or wrapped Temporal activity errors."""
+        if isinstance(error, ActivityError) and isinstance(error.cause, ApplicationError):
+            return error.cause
+        if isinstance(error, ApplicationError):
+            return error
+        return None
+
+    def _resolve_failure_message(
+        self,
+        node_id: str,
+        error: Exception,
+        app_error: ApplicationError | None,
+        graph: WorkflowGraph,
+    ) -> str:
+        """Build a user-facing failure message for node execution errors."""
+        is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
+        if is_timeout:
+            node = graph.get_node(node_id)
+            timeout_seconds = resolve_timeout(node, self._runtime_settings)
+            node_name = node.name or node.id
+            return build_timeout_error_message(
+                step_name=node_name,
+                is_agentic=node.type == NodeType.AGENTIC,
+                timeout_seconds=timeout_seconds,
+            )
+        if app_error is not None:
+            return app_error.message or str(app_error)
+        return str(error)
 
     @staticmethod
     def _build_empty_node_output(node: ActivityNode) -> dict[str, Any]:
@@ -1275,7 +1301,7 @@ class NexusWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
     ) -> None:
-        """Resolve and inject Nexus credentials for a task node.
+        """Resolve and inject Syntara credentials for a task node.
 
         If the node's parameters has a credential_id, calls the credential resolution
         activity to decrypt and inject resolved credentials into the parameters.

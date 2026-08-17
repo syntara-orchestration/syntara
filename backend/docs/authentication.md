@@ -49,7 +49,7 @@ An optional `post_logout_redirect_uri` query parameter specifies where the IdP s
 
 #### RP-Initiated Logout (OIDC)
 
-When `enable_rp_initiated_logout` is set to `true` on an OIDC provider's configuration, logging out of Nexus also terminates the user's session at the identity provider (per [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)).
+When `enable_rp_initiated_logout` is set to `true` on an OIDC provider's configuration, logging out of Syntara also terminates the user's session at the identity provider (per [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)).
 
 **How it works:**
 
@@ -58,7 +58,7 @@ When `enable_rp_initiated_logout` is set to `true` on an OIDC provider's configu
 3. The backend builds a logout URL with `id_token_hint` (decrypted) and `post_logout_redirect_uri` parameters.
 4. The logout JSON response includes `redirect_url` — the frontend navigates to this URL to complete the IdP logout.
 
-**Failure handling:** If the `end_session_endpoint` cannot be resolved (static config missing and discovery fails), the response includes `auth_error` instead of `redirect_url`. The user is logged out of Nexus but remains logged in at the IdP. The frontend should display the warning.
+**Failure handling:** If the `end_session_endpoint` cannot be resolved (static config missing and discovery fails), the response includes `auth_error` instead of `redirect_url`. The user is logged out of Syntara but remains logged in at the IdP. The frontend should display the warning.
 
 **Configuration:** Set `enable_rp_initiated_logout: true` and optionally `end_session_endpoint` in the provider's OIDC configuration. If `end_session_endpoint` is not set, it is discovered automatically via the OIDC well-known endpoint.
 
@@ -413,7 +413,7 @@ Authentication uses **PostgreSQL only** for session storage. Redis is not requir
 
 ### Token Version (Stale Token Detection) & Disabled User Enforcement
 
-When an admin changes a user's account (group memberships, profile, role, etc.), the user's access token becomes stale — its claims no longer reflect reality. Rather than forcing a logout, Nexus uses a lightweight version counter to trigger a seamless background token refresh.
+When an admin changes a user's account (group memberships, profile, role, etc.), the user's access token becomes stale — its claims no longer reflect reality. Rather than forcing a logout, Syntara uses a lightweight version counter to trigger a seamless background token refresh.
 
 #### Mechanism
 
@@ -478,7 +478,7 @@ The `KeyManager` and `TokenService` are cached as singletons per process for per
 1. **Deploy the new key alongside the old one** — set `APP_JWT_PRIVATE_KEY_PATH` to the new key and add the old key to `APP_JWT_BACKUP_KEYS`. Backup keys are used for **verification only** (they never sign new tokens), so existing tokens remain valid during the transition.
 
     ```
-    APP_JWT_BACKUP_KEYS='[{"key_id":"nexus-old-key","key_path":"/run/secrets/jwt-old.pem"}]'
+    APP_JWT_BACKUP_KEYS='[{"key_id":"orchestrator-old-key","key_path":"/run/secrets/jwt-old.pem"}]'
     ```
 
 2. **Restart all app processes** — the singleton caches are cleared on restart, causing the new key to be loaded. In Kubernetes this is a rolling restart (`kubectl rollout restart`); with systemd it's a service restart.
@@ -610,7 +610,7 @@ cat .secrets/admin-password
 
 ## Identity Providers (OIDC)
 
-Nexus supports external identity providers for federated authentication via OpenID Connect.
+Syntara supports external identity providers for federated authentication via OpenID Connect.
 
 ### Federated Identity Model
 
@@ -704,13 +704,13 @@ The `configuration` object includes:
 | `redirect_uri` | Yes | OAuth 2.0 redirect URI (must match provider registration) |
 | `auto_discovery` | No | Use `.well-known` auto-discovery (default: `true`) |
 | `scopes` | No | Space-separated scopes (default: `"openid profile email"`) |
-| `claim_mapping` | No | Maps IdP-specific claim names to Nexus fields (see [Claim Mapping](#claim-mapping)) |
+| `claim_mapping` | No | Maps IdP-specific claim names to Syntara fields (see [Claim Mapping](#claim-mapping)) |
 | `group_jmespath_expression` | No | JMESPath expression to extract group values from token claims (see [Group Mapping and Login Enforcement](#group-mapping-and-login-enforcement)) |
-| `group_mapping_entries` | No | Maps IdP group values to Nexus groups (see [Group Mapping and Login Enforcement](#group-mapping-and-login-enforcement)) |
+| `group_mapping_entries` | No | Maps IdP group values to Syntara groups (see [Group Mapping and Login Enforcement](#group-mapping-and-login-enforcement)) |
 | `allow_all_authenticated` | No | Allow all users from this IdP to log in regardless of group mapping results (default: `false`). Users receive the implicit "authenticated" group; group mappings still apply if configured |
 | `aap_role_mapping_enabled` | No | Map AAP `aap_system_role` claim (`system_administrator`, `system_auditor`, `normal_user`) to built-in groups (default: `false`). Only effective when `idp_type` is `"aap"`. See [AAP Role Mapping](#aap-role-mapping) |
 | `disable_tls_verify` | No | Skip TLS certificate verification when connecting to the provider (default: `false`). See [TLS Certificate Verification](#tls-certificate-verification) |
-| `enable_rp_initiated_logout` | No | Enable RP-initiated logout to terminate IdP sessions on Nexus logout (default: `false`) |
+| `enable_rp_initiated_logout` | No | Enable RP-initiated logout to terminate IdP sessions on Syntara logout (default: `false`) |
 | `end_session_endpoint` | No | IdP's end-session endpoint URL. Auto-discovered from `.well-known` if not set |
 
 #### Manual Endpoints (when auto_discovery is disabled)
@@ -724,7 +724,7 @@ The `configuration` object includes:
 
 ### TLS Certificate Verification
 
-By default, Nexus validates the TLS certificate chain when connecting to an OIDC identity provider. This ensures that the provider's certificate was issued by a trusted certificate authority (CA) and prevents man-in-the-middle attacks.
+By default, Syntara validates the TLS certificate chain when connecting to an OIDC identity provider. This ensures that the provider's certificate was issued by a trusted certificate authority (CA) and prevents man-in-the-middle attacks.
 
 When the provider uses a self-signed or internally-signed certificate that is not trusted by the system's CA bundle, all OIDC operations will fail with a TLS certificate verification error. The login page will display: *"TLS certificate verification failed. If the provider uses a self-signed certificate, enable 'Skip TLS certificate verification' in the identity provider settings."*
 
@@ -767,11 +767,11 @@ When a user authenticates via OIDC and no `UserIdentity` exists for their `(issu
 
 ### Claim Mapping
 
-Different identity providers use different claim names for the same user information. For example, Azure AD uses `mail` for the email address, while the OIDC standard uses `email`. The `claim_mapping` configuration allows admins to map IdP-specific claim names to Nexus canonical fields.
+Different identity providers use different claim names for the same user information. For example, Azure AD uses `mail` for the email address, while the OIDC standard uses `email`. The `claim_mapping` configuration allows admins to map IdP-specific claim names to Syntara canonical fields.
 
 #### Default mapping
 
-| Nexus Field | Default Claim | Description |
+| Syntara Field | Default Claim | Description |
 |---|---|---|
 | `subject` | `sub` | OIDC subject identifier |
 | `email` | `email` | User's email address |
@@ -798,7 +798,7 @@ When `groups` is set in the claim mapping, the groups claim is included in the e
 
 ### OIDC Claim Sanitization
 
-OIDC tokens from external identity providers may contain ASCII control characters (0x00–0x1F, 0x7F) in claim values — either through misconfiguration, encoding bugs, or malicious injection. Nexus applies a **tiered sanitization strategy** based on the sensitivity of each claim:
+OIDC tokens from external identity providers may contain ASCII control characters (0x00–0x1F, 0x7F) in claim values — either through misconfiguration, encoding bugs, or malicious injection. Syntara applies a **tiered sanitization strategy** based on the sensitivity of each claim:
 
 #### Strategy by claim type
 
@@ -856,22 +856,22 @@ The test sign-in flow requires authentication — only logged-in admins can init
 
 ### Group Mapping and Login Enforcement
 
-When a user authenticates via OIDC, Nexus determines which groups they belong to based on the identity provider's group mapping configuration. **If no groups can be resolved, login is denied** — the user sees an "Access denied" error on the login page.
+When a user authenticates via OIDC, Syntara determines which groups they belong to based on the identity provider's group mapping configuration. **If no groups can be resolved, login is denied** — the user sees an "Access denied" error on the login page.
 
 #### How group resolution works
 
 1. The backend extracts group values from the ID token using the configured JMESPath expression (e.g., `groups[*]`, `realm_access.roles[*]`)
 2. Group values are matched against the mapping entries configured for that provider
-3. Matched entries determine which Nexus groups the user is placed in
+3. Matched entries determine which Syntara groups the user is placed in
 4. Groups are synced (session-scoped): all previous IdP-assigned group memberships are cleared, and only groups from the current login's token are assigned
 5. Manually-assigned groups are never affected
 
 #### Modes: manual mapping and allow all authenticated
 
-- **Manual mapping** — Admins configure explicit mapping entries that map IdP group values to Nexus groups. Only matched entries grant group membership.
+- **Manual mapping** — Admins configure explicit mapping entries that map IdP group values to Syntara groups. Only matched entries grant group membership.
 - **Allow all authenticated** — When `allow_all_authenticated` is enabled, all users from the IdP can log in regardless of group mapping results. They are added to the built-in `users` group and receive the implicit "authenticated" group (added automatically by the authz resolver). Group mappings can still be configured alongside this for more granular access.
 
-Both modes respect the **JMESPath expression** configured on the provider. The expression is evaluated first to extract group values from the token claims, and only the extracted values are used for mapping. This means admins can use JMESPath to filter which groups are considered — for example, `groups[?starts_with(@, 'nexus-')]` would only extract groups prefixed with `nexus-`, ignoring all others in the token.
+Both modes respect the **JMESPath expression** configured on the provider. The expression is evaluated first to extract group values from the token claims, and only the extracted values are used for mapping. This means admins can use JMESPath to filter which groups are considered — for example, `groups[?starts_with(@, 'syntara-')]` would only extract groups prefixed with `syntara-`, ignoring all others in the token.
 
 **JMESPath validation**: Expressions are validated at configuration time — saving an invalid expression (e.g., `[[[bad`) returns a 422 error. If a valid expression fails at runtime (e.g., unexpected token claim structure), the group sync is aborted and login is denied rather than silently removing the user's groups.
 
@@ -879,7 +879,7 @@ Both modes respect the **JMESPath expression** configured on the provider. The e
 
 #### Push-Button AAP Setup
 
-The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OIDC identity provider setup in a single API call. It connects to an AAP Gateway instance, creates an OAuth2 application, and configures the corresponding identity provider in Nexus with AAP-specific defaults.
+The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OIDC identity provider setup in a single API call. It connects to an AAP Gateway instance, creates an OAuth2 application, and configures the corresponding identity provider in Syntara with AAP-specific defaults.
 
 **Request body:**
 
@@ -895,7 +895,7 @@ The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OI
 
 1. The backend resolves the AAP organization by name via `GET /api/gateway/v1/organizations/?name=<name>`.
 2. An OAuth2 application named after `APP_PRODUCT_NAME` (defaults to "Syntara") is created on AAP via `POST /api/gateway/v1/applications/` using the admin credentials. The redirect URI is derived from `APP_SERVER_PUBLIC_URL`.
-3. An identity provider is created in Nexus with the following AAP preset defaults:
+3. An identity provider is created in Syntara with the following AAP preset defaults:
    - `idp_type` = `"aap"`, `auto_discovery` = `true`
    - `issuer_url` = `{aap_url}/o/`
    - `scopes` = `"read write openid roles"`
@@ -928,7 +928,7 @@ The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OI
 
 #### AAP Role Mapping
 
-When an AAP provider template is used (`idp_type: "aap"`), administrators can enable `aap_role_mapping_enabled` to automatically map the AAP `aap_system_role` claim to built-in Nexus groups. This is enabled by default in the UI when the AAP template is selected.
+When an AAP provider template is used (`idp_type: "aap"`), administrators can enable `aap_role_mapping_enabled` to automatically map the AAP `aap_system_role` claim to built-in Syntara groups. This is enabled by default in the UI when the AAP template is selected.
 
 The mapping uses the `aap_system_role` string claim from the AAP OIDC token:
 
@@ -1130,7 +1130,7 @@ The `POST /test` endpoint accepts a full provider creation payload and fetches `
 On success, the response also includes:
 
 - `claims_supported` — list of claim names the provider advertises (from the discovery document's `claims_supported` field). Useful for configuring `claim_mapping`.
-- `claim_aliases` — a mapping of Nexus field names to common IdP claim aliases (e.g., `email` → `["mail", "upn", "preferred_username"]`). Helps the UI suggest claim mappings for the selected provider type.
+- `claim_aliases` — a mapping of Syntara field names to common IdP claim aliases (e.g., `email` → `["mail", "upn", "preferred_username"]`). Helps the UI suggest claim mappings for the selected provider type.
 
 ## Configuration Reference
 
@@ -1138,14 +1138,14 @@ On success, the response also includes:
 |---|---|---|
 | `APP_JWT_PRIVATE_KEY_PATH` | — | Path to ES256 private key PEM file |
 | `APP_JWT_PRIVATE_KEY_BASE64` | — | Base64-encoded ES256 private key PEM |
-| `APP_JWT_KEY_ID` | `nexus-primary` | Key ID (`kid`) in JWT header |
+| `APP_JWT_KEY_ID` | `orchestrator-primary` | Key ID (`kid`) in JWT header |
 | `APP_JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `15` | Access token lifetime |
 | `APP_JWT_REFRESH_TOKEN_LIFETIME_HOURS` | `8` | Refresh token lifetime |
 | `APP_JWT_BACKUP_KEYS` | — | JSON list of backup keys for rotation |
 | `APP_ADMIN_PASSWORD_PATH` | — | Path to file containing bootstrap admin password (migration skips seeding if unset; can also use `uv run python tools/set_admin_password.py`) |
 | `APP_ADMIN_PASSWORD` | — | Admin password value (used by `generate_secrets.sh` only) |
 | `APP_SERVER_SCHEME` | `https` | URL scheme for the constructed server URL (`https` for production, `http` for local dev). Used in the JWT issuer and post-logout redirect when `APP_SERVER_PUBLIC_URL` is not set. Also controls the `Secure` flag on the refresh cookie (HTTPS → `Secure=true`, HTTP → `Secure=false`) |
-| `APP_SERVER_PUBLIC_URL` | — | Public base URL for this Nexus instance (e.g., `https://example.com:8000`). Must be a valid URL. Used as the JWT issuer (`iss` claim), post-logout redirect, and frontend origin fallback. If not set, falls back to `{APP_SERVER_SCHEME}://{APP_SERVER_HOST}:{APP_SERVER_PORT}`. Required when the server binds to `0.0.0.0` or runs behind a reverse proxy |
+| `APP_SERVER_PUBLIC_URL` | — | Public base URL for this Syntara instance (e.g., `https://example.com:8000`). Must be a valid URL. Used as the JWT issuer (`iss` claim), post-logout redirect, and frontend origin fallback. If not set, falls back to `{APP_SERVER_SCHEME}://{APP_SERVER_HOST}:{APP_SERVER_PORT}`. Required when the server binds to `0.0.0.0` or runs behind a reverse proxy |
 | `APP_COOKIE_DOMAIN` | — | `Domain` attribute for refresh cookie |
 | `APP_CORS_ALLOW_ORIGINS` | `[]` | Allowed origins for CORS and OIDC redirect validation. Wildcard `*` is rejected when credentials are enabled |
 | `APP_CORS_ALLOW_CREDENTIALS` | `true` | Allow credentials (cookies) in CORS requests |

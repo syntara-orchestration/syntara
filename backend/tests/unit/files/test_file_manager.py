@@ -7,7 +7,7 @@ S3 is not configured.
 
 import asyncio
 import hashlib
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, Mock, patch
@@ -60,23 +60,62 @@ def test_get_retriever_raises_when_unconfigured() -> None:
 # =============================================================================
 
 
+async def _consuming_save(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+    """Mock save_file_stream that consumes the stream to drive the hasher."""
+    total = 0
+    async for chunk in stream:
+        total += len(chunk)
+    return f"orchestrator-uuid-{path}", total
+
+
+def _make_mock_file(filename: str, content: bytes) -> Mock:
+    """Create a mock UploadFile that supports streaming reads.
+
+    The mock returns content on the first read() call (header), then
+    remaining content on the second call, then b"" on subsequent calls
+    — matching how the streaming upload reads files.
+    """
+    mock_file = Mock()
+    mock_file.filename = filename
+    mock_file.size = len(content)
+    mock_file.content_type = "application/pdf"
+
+    read_position = 0
+
+    async def _read(size: int = -1) -> bytes:
+        nonlocal read_position
+        if size == -1:
+            chunk = content[read_position:]
+            read_position = len(content)
+        else:
+            chunk = content[read_position : read_position + size]
+            read_position += len(chunk)
+        return chunk
+
+    mock_file.read = _read
+    mock_file.seek = AsyncMock()
+    mock_file.file = Mock()
+    mock_file.file.fileno = Mock(side_effect=OSError)
+    return mock_file
+
+
 @pytest.mark.asyncio
 async def test_validate_and_save_files_success() -> None:
-    """Test successful file save via mocked S3 retriever."""
-    file_content = b"PDF content"
-    mock_file = Mock()
-    mock_file.filename = "test.pdf"
-    mock_file.size = len(file_content)
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=file_content)
-    mock_file.seek = AsyncMock()
+    """Test successful file save via streaming to mocked S3 retriever."""
+    file_content = b"PDF content here"
+    mock_file = _make_mock_file("test.pdf", file_content)
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
+    mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
     fm._retriever = mock_retriever
 
-    result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
+    with patch(
+        "syntara.files.file_manager.validators.validate_single_file",
+        new_callable=AsyncMock,
+        return_value=(b"", "application/pdf"),
+    ):
+        result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
 
     assert len(result) == 1
     metadata = result[0]
@@ -90,12 +129,7 @@ async def test_validate_and_save_files_success() -> None:
 @pytest.mark.asyncio
 async def test_validate_and_save_raises_when_unconfigured() -> None:
     """File upload raises FileStorageUnavailableError (503) when S3 is not configured."""
-    mock_file = Mock()
-    mock_file.filename = "test.pdf"
-    mock_file.size = 100
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"content")
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("test.pdf", b"content")
 
     fm = FileManager()
     project_id = uuid4()
@@ -105,23 +139,23 @@ async def test_validate_and_save_raises_when_unconfigured() -> None:
 
 @pytest.mark.asyncio
 async def test_upload_sets_content_hash() -> None:
-    """Upload populates content_hash with SHA-256."""
+    """Upload populates content_hash with SHA-256 computed incrementally."""
     file_content = b"hash me"
-    mock_file = Mock()
-    mock_file.filename = "hash_test.txt"
-    mock_file.size = len(file_content)
-    mock_file.content_type = "text/plain"
-    mock_file.read = AsyncMock(return_value=file_content)
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("hash_test.txt", file_content)
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-hash_test.txt")
+    mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
     fm._retriever = mock_retriever
 
-    result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
-    metadata = result[0]
+    with patch(
+        "syntara.files.file_manager.validators.validate_single_file",
+        new_callable=AsyncMock,
+        return_value=(b"", "text/plain"),
+    ):
+        result = await fm.validate_and_save_files([mock_file], project_id=uuid4())
 
+    metadata = result[0]
     expected_hash = hashlib.sha256(file_content).hexdigest()
     assert metadata.content_hash == expected_hash
 
@@ -131,27 +165,29 @@ async def test_multiple_files_saved_successfully() -> None:
     """Multiple files processed correctly with unique paths."""
     mock_files = []
     for i in range(3):
-        mock_file = Mock()
-        mock_file.filename = f"file{i}.pdf"
-        mock_file.size = 1024 * (i + 1)
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=f"content{i}".encode())
-        mock_file.seek = AsyncMock()
-        mock_files.append(mock_file)
+        mock_files.append(_make_mock_file(f"file{i}.pdf", f"content{i}".encode()))
 
     fm = FileManager()
     call_count = 0
 
-    async def unique_save(content: bytes, path: str) -> str:
+    async def unique_save(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
         nonlocal call_count
         call_count += 1
-        return f"orchestrator-{call_count}-file.pdf"
+        total = 0
+        async for _chunk in stream:
+            total += len(_chunk)
+        return f"orchestrator-{call_count}-file.pdf", total
 
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(side_effect=unique_save)
+    mock_retriever.save_file_stream = AsyncMock(side_effect=unique_save)
     fm._retriever = mock_retriever
 
-    result = await fm.validate_and_save_files(cast("list[UploadFile]", mock_files), project_id=uuid4())
+    with patch(
+        "syntara.files.file_manager.validators.validate_single_file",
+        new_callable=AsyncMock,
+        side_effect=[(b"", "application/pdf")] * 3,
+    ):
+        result = await fm.validate_and_save_files(cast("list[UploadFile]", mock_files), project_id=uuid4())
 
     assert len(result) == 3
     assert all(m.status == FileStatus.PENDING_CONVERSION for m in result)
@@ -160,34 +196,115 @@ async def test_multiple_files_saved_successfully() -> None:
 @pytest.mark.asyncio
 async def test_storage_failure_cleans_up_saved_files() -> None:
     """Storage failure on second file cleans up first file."""
-    files = []
-    for i in range(2):
-        mock_file = Mock()
-        mock_file.filename = f"file{i}.pdf"
-        mock_file.size = 100
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=f"content{i}".encode())
-        mock_file.seek = AsyncMock()
-        files.append(mock_file)
+    files = [_make_mock_file(f"file{i}.pdf", f"content{i}".encode()) for i in range(2)]
 
     fm = FileManager()
     call_count = 0
 
-    async def fail_on_second(content: bytes, path: str) -> str:
+    async def fail_on_second(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
         nonlocal call_count
         call_count += 1
+        async for _chunk in stream:
+            pass
         if call_count == 2:
             msg = "Disk full"
             raise OSError(msg)
-        return "orchestrator-1-file0.pdf"
+        return "orchestrator-1-file0.pdf", 8
 
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(side_effect=fail_on_second)
+    mock_retriever.save_file_stream = AsyncMock(side_effect=fail_on_second)
     mock_retriever.delete_file = AsyncMock()
     fm._retriever = mock_retriever
 
     project_id = uuid4()
-    with pytest.raises(OSError, match="Disk full"):
+    with (
+        patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            side_effect=[(b"", "application/pdf")] * 2,
+        ),
+        pytest.raises(OSError, match="Disk full"),
+    ):
+        await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
+
+    mock_retriever.delete_file.assert_called_once_with("orchestrator-1-file0.pdf")
+
+
+@pytest.mark.asyncio
+async def test_validation_failure_cleans_up_saved_files() -> None:
+    """Validation failure on second file cleans up first file from S3."""
+    from syntara.files.exceptions import FileValidationError
+
+    files = [_make_mock_file(f"file{i}.pdf", f"content{i}".encode()) for i in range(2)]
+
+    fm = FileManager()
+    mock_retriever = AsyncMock()
+    mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
+    mock_retriever.delete_file = AsyncMock()
+    fm._retriever = mock_retriever
+
+    call_count = 0
+
+    async def _pass_then_fail(file: object, settings: object) -> tuple[bytes, str]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            msg = "Bad MIME type"
+            raise FileValidationError(msg)
+        return b"", "application/pdf"
+
+    project_id = uuid4()
+    with (
+        patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            side_effect=_pass_then_fail,
+        ),
+        pytest.raises(FileValidationError),
+    ):
+        await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
+
+    mock_retriever.delete_file.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_error_cleans_up_saved_files() -> None:
+    """CancelledError during file 2 cleans up file 1 from S3.
+
+    asyncio.CancelledError is a BaseException, not Exception, so it
+    bypasses the except (OSError, FileError) handler.  The finally
+    block must still delete already-saved objects.
+    """
+    import asyncio
+
+    files = [_make_mock_file(f"file{i}.pdf", f"content{i}".encode()) for i in range(2)]
+
+    fm = FileManager()
+    call_count = 0
+
+    async def cancel_on_second(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+        nonlocal call_count
+        call_count += 1
+        async for _chunk in stream:
+            pass
+        if call_count == 2:
+            raise asyncio.CancelledError
+        return "orchestrator-1-file0.pdf", 8
+
+    mock_retriever = AsyncMock()
+    mock_retriever.save_file_stream = AsyncMock(side_effect=cancel_on_second)
+    mock_retriever.delete_file = AsyncMock()
+    fm._retriever = mock_retriever
+
+    project_id = uuid4()
+    with (
+        patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            side_effect=[(b"", "application/pdf")] * 2,
+        ),
+        pytest.raises(asyncio.CancelledError),
+    ):
         await fm.validate_and_save_files(cast("list[UploadFile]", files), project_id=project_id)
 
     mock_retriever.delete_file.assert_called_once_with("orchestrator-1-file0.pdf")
@@ -196,20 +313,20 @@ async def test_storage_failure_cleans_up_saved_files() -> None:
 @pytest.mark.asyncio
 async def test_file_upload_events_logged() -> None:
     """File upload events are logged with metadata."""
-    mock_file = Mock()
-    mock_file.filename = "logged.pdf"
-    mock_file.size = 1024
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"content")
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("logged.pdf", b"content")
 
     with patch("syntara.files.file_manager.logger") as mock_logger:
         fm = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-logged.pdf")
+        mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
         fm._retriever = mock_retriever
 
-        await fm.validate_and_save_files([mock_file], project_id=uuid4())
+        with patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            return_value=(b"", "application/pdf"),
+        ):
+            await fm.validate_and_save_files([mock_file], project_id=uuid4())
 
         assert mock_logger.info.called
 
@@ -217,86 +334,20 @@ async def test_file_upload_events_logged() -> None:
 @pytest.mark.asyncio
 async def test_async_io_used_for_file_operations() -> None:
     """File operations complete without blocking."""
-    mock_file = Mock()
-    mock_file.filename = "async_test.pdf"
-    mock_file.size = 512
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"async content")
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("async_test.pdf", b"async content")
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-async_test.pdf")
+    mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
     fm._retriever = mock_retriever
 
-    result = await asyncio.wait_for(fm.validate_and_save_files([mock_file], project_id=uuid4()), timeout=5.0)
+    with patch(
+        "syntara.files.file_manager.validators.validate_single_file",
+        new_callable=AsyncMock,
+        return_value=(b"", "application/pdf"),
+    ):
+        result = await asyncio.wait_for(fm.validate_and_save_files([mock_file], project_id=uuid4()), timeout=5.0)
     assert len(result) == 1
-
-
-# =============================================================================
-# load_file_with_integrity_check
-# =============================================================================
-
-
-@pytest.mark.asyncio
-async def test_load_file_with_integrity_check_success() -> None:
-    """Successful load with matching content hash."""
-    file_content = b"integrity check content"
-    content_hash = hashlib.sha256(file_content).hexdigest()
-
-    fm = FileManager()
-    mock_retriever = AsyncMock()
-    mock_retriever.load_file = AsyncMock(return_value=file_content)
-    fm._retriever = mock_retriever
-
-    mock_metadata = Mock()
-    mock_metadata.file_path = "orchestrator-uuid-integrity-check.txt"
-    mock_metadata.content_hash = content_hash
-    mock_metadata.id = "test-id"
-    mock_metadata.filename = "integrity-check.txt"
-
-    result = await fm.load_file_with_integrity_check(mock_metadata)
-    assert result == file_content
-
-
-@pytest.mark.asyncio
-async def test_load_file_with_integrity_check_no_hash() -> None:
-    """Load skips integrity check when content_hash is None (legacy files)."""
-    file_content = b"legacy file"
-
-    fm = FileManager()
-    mock_retriever = AsyncMock()
-    mock_retriever.load_file = AsyncMock(return_value=file_content)
-    fm._retriever = mock_retriever
-
-    mock_metadata = Mock()
-    mock_metadata.file_path = "orchestrator-uuid-legacy.txt"
-    mock_metadata.content_hash = None
-
-    result = await fm.load_file_with_integrity_check(mock_metadata)
-    assert result == file_content
-
-
-@pytest.mark.asyncio
-async def test_load_file_with_integrity_check_hash_mismatch() -> None:
-    """Load raises FileIntegrityError when hash doesn't match."""
-    from syntara.files.exceptions import FileIntegrityError
-
-    file_content = b"tampered content"
-
-    fm = FileManager()
-    mock_retriever = AsyncMock()
-    mock_retriever.load_file = AsyncMock(return_value=file_content)
-    fm._retriever = mock_retriever
-
-    mock_metadata = Mock()
-    mock_metadata.file_path = "orchestrator-uuid-tampered.txt"
-    mock_metadata.content_hash = "0" * 64
-    mock_metadata.id = "test-id"
-    mock_metadata.filename = "tampered.txt"
-
-    with pytest.raises(FileIntegrityError, match="File integrity check failed"):
-        await fm.load_file_with_integrity_check(mock_metadata)
 
 
 # =============================================================================
@@ -489,17 +540,13 @@ async def test_validate_and_save_files_validation_error_dispatches_audit() -> No
     mock_retriever = AsyncMock()
     fm._retriever = mock_retriever
 
-    mock_file = Mock()
-    mock_file.filename = "empty.pdf"
-    mock_file.size = 0
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"")
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("empty.pdf", b"")
 
     with (
         patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch,
         patch(
-            "syntara.files.file_manager.validators.validate_files",
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
             side_effect=FileValidationError("File too small"),
         ),
     ):
@@ -513,22 +560,23 @@ async def test_validate_and_save_files_validation_error_dispatches_audit() -> No
 async def test_audit_event_storage_backend_is_s3() -> None:
     """Audit event file_details includes storage_backend='s3'."""
     file_content = b"audit test"
-    mock_file = Mock()
-    mock_file.filename = "audit.txt"
-    mock_file.size = len(file_content)
-    mock_file.content_type = "text/plain"
-    mock_file.read = AsyncMock(return_value=file_content)
-    mock_file.seek = AsyncMock()
+    mock_file = _make_mock_file("audit.txt", file_content)
 
     fm = FileManager()
     mock_retriever = AsyncMock()
-    mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-audit.txt")
+    mock_retriever.save_file_stream = AsyncMock(side_effect=_consuming_save)
     fm._retriever = mock_retriever
 
-    with patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch:
+    with (
+        patch("syntara.files.file_manager.AuditEventDispatcher.dispatch") as mock_dispatch,
+        patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            return_value=(b"", "text/plain"),
+        ),
+    ):
         await fm.validate_and_save_files([mock_file], project_id=uuid4())
 
-        # The success audit event has file_details with storage_backend
         calls = mock_dispatch.call_args_list
-        success_event = calls[-1][0][0]  # last call, first positional arg
+        success_event = calls[-1][0][0]
         assert success_event.file_details[0]["storage_backend"] == "s3"

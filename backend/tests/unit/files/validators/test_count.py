@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 from syntara.files.exceptions import FileValidationError
 from syntara.files.file_manager import FileManager
 
+from .conftest import make_upload_mock
+
 
 @pytest.mark.asyncio
 async def test_rejects_files_exceeding_count_limit() -> None:
@@ -88,15 +90,7 @@ async def test_accepts_files_at_exact_limit() -> None:
     - Boundary condition handled correctly
     """
     # Arrange - Exactly 10 files
-    mock_files = []
-    for i in range(10):
-        mock_file = Mock()
-        mock_file.filename = f"file{i}.pdf"
-        mock_file.size = 1024
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=b"content")
-        mock_file.seek = AsyncMock()
-        mock_files.append(mock_file)
+    mock_files = [make_upload_mock(f"file{i}.pdf", b"content") for i in range(10)]
 
     file_manager = FileManager()
 
@@ -116,15 +110,7 @@ async def test_accepts_files_below_limit() -> None:
     - No validation error for valid count
     """
     # Arrange - 5 files (below limit)
-    mock_files = []
-    for i in range(5):
-        mock_file = Mock()
-        mock_file.filename = f"file{i}.pdf"
-        mock_file.size = 1024
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=b"content")
-        mock_file.seek = AsyncMock()
-        mock_files.append(mock_file)
+    mock_files = [make_upload_mock(f"file{i}.pdf", b"content") for i in range(5)]
 
     file_manager = FileManager()
 
@@ -176,12 +162,7 @@ async def test_single_file_accepted() -> None:
     - Minimum case (1 file) works
     """
     # Arrange - 1 file
-    mock_file = Mock()
-    mock_file.filename = "single.pdf"
-    mock_file.size = 1024
-    mock_file.content_type = "application/pdf"
-    mock_file.read = AsyncMock(return_value=b"content")
-    mock_file.seek = AsyncMock()
+    mock_file = make_upload_mock("single.pdf", b"content")
 
     file_manager = FileManager()
 

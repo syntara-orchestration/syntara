@@ -16,7 +16,7 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
 from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
@@ -34,7 +34,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 
 logger = structlog.stdlib.get_logger(__name__)
 
-router = NexusRouter(prefix="/executions", tags=["Executions"])
+router = SyntaraRouter(prefix="/executions", tags=["Executions"])
 
 _exec_perm_read = PermissionChecker(
     "execution",

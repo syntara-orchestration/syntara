@@ -10,7 +10,7 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.settings.models.api_models import (
     CategoriesListResponse,
     RuntimeSettingRead,
@@ -21,7 +21,7 @@ from syntara.settings.models.api_models import (
 from syntara.settings.models.query_params import SettingsListParams
 from syntara.settings.services.settings_service import SettingsService
 
-router = NexusRouter(prefix="/settings", tags=["Settings"])
+router = SyntaraRouter(prefix="/settings", tags=["Settings"])
 
 
 # ============================================================================

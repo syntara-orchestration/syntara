@@ -51,7 +51,7 @@ spec:
       - name: name
         value: container
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:401c54b0f4afcdb48e423de491a96a5d2155f4a781f8d7922097542b4ee7d6a7
+        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:4b3a85960859057464f43090f7387dfb3d7fa10a84581f0d6ab1c289ef279b82
       - name: kind
         value: pipeline
       - name: secret

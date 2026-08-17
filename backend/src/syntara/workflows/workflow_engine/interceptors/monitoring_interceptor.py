@@ -27,7 +27,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Only NexusWorkflow's run() signature carries execution_id at args[1] (see
+# Only OrchestratorWorkflow's run() signature carries execution_id at args[1] (see
 # module docstring). Other workflow types registered on the same worker (e.g.
 # ScheduledWorkflowLauncher) must be skipped.
 _MONITORED_WORKFLOW_TYPES = frozenset({"orchestrator_workflow"})

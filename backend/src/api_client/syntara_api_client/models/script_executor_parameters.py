@@ -24,7 +24,7 @@ class ScriptExecutorParameters:
         language (ScriptLanguage): Supported script languages for script executor.
         code (str): Script code to execute
         environment (ScriptExecutorParametersEnvironment | Unset): Environment variables
-        credential_id (None | str | Unset): Nexus credential UUID for credential scrubbing
+        credential_id (None | str | Unset): Syntara credential UUID for credential scrubbing
     """
 
     language: ScriptLanguage

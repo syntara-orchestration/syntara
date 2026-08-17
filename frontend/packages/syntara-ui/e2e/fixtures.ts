@@ -173,4 +173,33 @@ export const test = xfailBase.extend<
   },
 })
 
+/**
+ * Creates a describe-scoped guard that skips all remaining tests without
+ * setting up fixtures once a data-availability check fails.
+ *
+ * Configures the enclosing describe as `mode: 'serial'` so the unavailable
+ * flag reliably propagates across tests (with `fullyParallel: true`, parallel
+ * tests land on separate workers that each have their own flag).
+ *
+ * Usage inside a test.describe:
+ *   const guard = createUnavailableGuard('No data available')
+ *   test.beforeEach(async ({ app }) => {
+ *     const hasData = await checkData(app)
+ *     if (!hasData) guard.markUnavailable()
+ *     test.skip(!hasData, 'No data available')
+ *   })
+ */
+export function createUnavailableGuard(reason: string) {
+  let unavailable = false
+  test.describe.configure({ mode: 'serial' })
+  test.beforeEach(() => {
+    test.skip(unavailable, reason)
+  })
+  return {
+    markUnavailable: () => {
+      unavailable = true
+    },
+  }
+}
+
 export { expect, type Page, type Request }

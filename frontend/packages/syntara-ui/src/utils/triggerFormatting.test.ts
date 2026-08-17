@@ -7,6 +7,9 @@ import {
   formatScheduleSummary,
   frequencyAndIntervalToDuration,
   durationToFrequencyAndInterval,
+  buildRepeatingInterval,
+  getDefaultRepeatingInterval,
+  getTimezoneOffset,
 } from './triggerFormatting'
 
 describe('parseRepeatingInterval', () => {
@@ -263,5 +266,74 @@ describe('durationToFrequencyAndInterval', () => {
       const result = durationToFrequencyAndInterval(duration)
       expect(result).toEqual({ frequency: freq, count })
     }
+  })
+})
+
+describe('buildRepeatingInterval', () => {
+  it('builds a daily interval from explicit start fields', () => {
+    const result = buildRepeatingInterval({
+      startDate: '2024-01-15',
+      startTime: '10:00',
+      frequency: 'daily',
+      intervalCount: 1,
+      timezone: 'UTC',
+    })
+
+    expect(result).toContain('2024-01-15T10:00:00')
+    expect(result).toContain('/P1D')
+    expect(result.startsWith('R/')).toBe(true)
+  })
+
+  it('appends end date when provided', () => {
+    const result = buildRepeatingInterval({
+      startDate: '2024-01-15',
+      startTime: '10:00',
+      endDate: '2024-12-31',
+      frequency: 'daily',
+      intervalCount: 1,
+      timezone: 'UTC',
+    })
+
+    expect(result).toContain('2024-12-31T23:59:59')
+  })
+
+  it('builds a run-once interval when frequency is none', () => {
+    const result = buildRepeatingInterval({
+      startDate: '2024-01-15',
+      startTime: '10:00',
+      frequency: 'none',
+      intervalCount: 1,
+      timezone: 'UTC',
+    })
+
+    expect(result.startsWith('R1/')).toBe(true)
+    expect(result.endsWith('/PT0S')).toBe(true)
+  })
+})
+
+describe('getDefaultRepeatingInterval', () => {
+  it('returns a run-once interval starting from now', () => {
+    const now = new Date('2026-08-14T18:05:00')
+    const result = getDefaultRepeatingInterval('UTC', now)
+
+    expect(result.startsWith('R1/')).toBe(true)
+    expect(result.endsWith('/PT0S')).toBe(true)
+    expect(result).toContain('2026-08-14')
+  })
+})
+
+describe('getTimezoneOffset', () => {
+  it('returns a zero offset for UTC', () => {
+    const offset = getTimezoneOffset('UTC', '2026-01-15')
+
+    expect(offset === 'Z' || offset === '+00:00').toBe(true)
+  })
+
+  it('returns the winter offset for America/New_York', () => {
+    expect(getTimezoneOffset('America/New_York', '2026-01-15')).toBe('-05:00')
+  })
+
+  it('returns Z for an invalid timezone', () => {
+    expect(getTimezoneOffset('Not/AZone', '2026-01-15')).toBe('Z')
   })
 })

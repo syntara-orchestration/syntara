@@ -22,14 +22,17 @@ from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.telemetry.client import flush_telemetry, initialize_telemetry
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
 from syntara.workflows.workflow_engine.activities.registry import ACTIVITY_REGISTRY
+from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
 from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.interceptors.auth_interceptor import WorkflowAuthInterceptor
 from syntara.workflows.workflow_engine.interceptors.credential_output_interceptor import CredentialOutputInterceptor
 from syntara.workflows.workflow_engine.interceptors.monitoring_interceptor import MonitoringWorkflowInterceptor
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledExecutionLauncher, ScheduledWorkflowLauncher
 from syntara.workflows.workflow_engine.services.activity_sync_registry import set_activity_sync_service
 from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
+from syntara.workflows.workflow_engine.workflow_auth import init_signing_key
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -61,7 +64,9 @@ class TemporalWorkerService:
                 Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
             max_cached_workflows: Maximum workflow states cached in memory for replay.
             max_concurrent_workflow_tasks: Maximum concurrent workflow task executions.
-            max_concurrent_activities: Maximum concurrent activity executions.
+            max_concurrent_activities: Maximum concurrent activity executions. When the limit is
+                reached, new activity tasks queue in Temporal and wait for a slot. Standard
+                Temporal queuing behavior — no failures, just backpressure.
 
         """
         self.temporal_address = temporal_address
@@ -107,6 +112,9 @@ class TemporalWorkerService:
                 namespace=self.namespace,
             )
 
+            # Derive the workflow auth HMAC key before the sandbox starts.
+            init_signing_key()
+
             # Encrypt credential payloads in Temporal event history using AES-256-GCM.
             # Uses symmetric encrypt/decrypt (not one-way scrubbing) so workers can
             # still read credential data while it stays encrypted at rest in Temporal.
@@ -118,6 +126,7 @@ class TemporalWorkerService:
                 namespace=self.namespace,
                 data_converter=data_converter,
                 tls=build_temporal_tls_config(),
+                interceptors=[WorkflowAuthClientInterceptor()],
             )
 
             logger.info("Connected to Temporal. Starting worker on queue", task_queue=self.task_queue)
@@ -159,9 +168,13 @@ class TemporalWorkerService:
             self.worker = Worker(
                 self.client,
                 task_queue=self.task_queue,
-                workflows=[NexusWorkflow, ScheduledWorkflowLauncher],
+                workflows=[OrchestratorWorkflow, ScheduledWorkflowLauncher],
                 activities=activities,
-                interceptors=[MonitoringWorkflowInterceptor(), CredentialOutputInterceptor()],
+                interceptors=[
+                    WorkflowAuthInterceptor(),
+                    MonitoringWorkflowInterceptor(),
+                    CredentialOutputInterceptor(),
+                ],
                 max_cached_workflows=self.max_cached_workflows,
                 max_concurrent_workflow_tasks=self.max_concurrent_workflow_tasks,
                 max_concurrent_activities=self.max_concurrent_activities,
@@ -272,6 +285,7 @@ async def start_worker(
     namespace: str | None = None,
     task_queue: str | None = None,
     activity_registry: dict[ActivityName, Callable[..., Any]] = ACTIVITY_REGISTRY,
+    max_concurrent_activities: int | None = None,
 ) -> TemporalWorkerService:
     """Start the global Temporal worker service.
 
@@ -283,6 +297,9 @@ async def start_worker(
         task_queue: Task queue name (default from settings)
         activity_registry: Activity registry to use (defaults to full ACTIVITY_REGISTRY).
             Pass BACKGROUND_ACTIVITY_REGISTRY for the background queue worker.
+        max_concurrent_activities: Override max concurrent activities. Defaults to
+            ``settings.max_concurrent_activities``. Background workers should pass
+            ``settings.background_worker_max_concurrent_activities``.
 
     Returns:
         TemporalWorkerService instance
@@ -306,7 +323,9 @@ async def start_worker(
         activity_registry=activity_registry,
         max_cached_workflows=settings.max_cached_workflows,
         max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
-        max_concurrent_activities=settings.max_concurrent_activities,
+        max_concurrent_activities=(
+            max_concurrent_activities if max_concurrent_activities is not None else settings.max_concurrent_activities
+        ),
     )
 
     logger.info("temporal_worker_service_created")

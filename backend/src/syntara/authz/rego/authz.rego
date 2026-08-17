@@ -60,6 +60,11 @@ _scope_matches(policy) if {
     policy.scope == "project"
     policy.project == input.resource.project
 }
+_scope_matches(policy) if {
+    policy.scope == "own"
+    input.resource.metadata.created_by == input.user.id
+    policy.project == input.resource.project
+}
 # Explicit any-project check (can_i check_any_project=true). Does NOT treat
 # empty resource.project as a wildcard — that flag must be set.
 _scope_matches(policy) if {
@@ -174,6 +179,15 @@ allowed_projects contains policy.project if {
     policy.effect == "allow"
     _action_matches(policy)
     policy.scope == "project"
+    _conditions_match(policy)
+}
+allowed_projects contains policy.project if {
+    not deny
+    some policy in input.effective_policies
+    policy.effect == "allow"
+    _action_matches(policy)
+    policy.scope == "own"
+    policy.project
     _conditions_match(policy)
 }
 

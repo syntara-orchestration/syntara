@@ -1,6 +1,6 @@
 # File Storage
 
-**Developer Guide — Understanding the Nexus file storage system**
+**Developer Guide — Understanding the Syntara file storage system**
 
 ## Table of Contents
 

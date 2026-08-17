@@ -3,6 +3,8 @@ import { addScriptNode } from './helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
 
 test.describe('Execution URL unification', () => {
+  test.skip(!process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'], 'Execution engine unavailable (globalSetup probe)')
+
   test('running a workflow shows inline run panel in builder', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-exec-url-run')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Run action')

@@ -17,167 +17,173 @@ const WIZARD_URL = '/configuration/integrations/configure'
 const INTEGRATIONS_LIST_URL = '/configuration/integrations'
 
 test.describe('Create Integration Wizard', () => {
-  test('user creates an MCP Server integration through the wizard', async ({ app }) => {
+  test.describe('MCP Server integration', () => {
     test.skip(
       isRealBackend && !mcpServerUrl,
       'SYNTARA_E2E_MCP_SERVER_URL not set; cannot test MCP Server on real backend'
     )
 
-    const integrationName = buildUniqueName('e2e-wizard-mcp')
-    const credName = buildUniqueName('e2e-wizard-mcp-cred')
-    let credential: SeededCredential | null = null
-    let integrationId: string | null = null
+    test('user creates an MCP Server integration through the wizard', async ({ app }) => {
+      const integrationName = buildUniqueName('e2e-wizard-mcp')
+      const credName = buildUniqueName('e2e-wizard-mcp-cred')
+      let credential: SeededCredential | null = null
+      let integrationId: string | null = null
 
-    const mcpUrl = isRealBackend ? mcpServerUrl! : 'https://mcp-test.example.com/mcp'
+      const mcpUrl = isRealBackend ? mcpServerUrl! : 'https://mcp-test.example.com/mcp'
 
-    try {
-      credential = await createCredentialForIntegrationType(app, {
-        name: credName,
-        integrationType: 'mcp_server',
-      })
-      expect(credential).not.toBeNull()
+      try {
+        credential = await createCredentialForIntegrationType(app, {
+          name: credName,
+          integrationType: 'mcp_server',
+        })
+        expect(credential).not.toBeNull()
 
-      await app.goto(toAppUrl(WIZARD_URL))
-      await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
-      await expect(app.getByRole('heading', { level: 2, name: 'Integration details' })).toBeVisible()
-      await app.getByRole('textbox', { name: 'Server name / ID' }).fill(integrationName)
-      await app.getByRole('textbox', { name: 'API URL' }).fill(mcpUrl)
+        await app.goto(toAppUrl(WIZARD_URL))
+        await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
+        await expect(app.getByRole('heading', { level: 2, name: 'Integration details' })).toBeVisible()
+        await app.getByRole('textbox', { name: 'Server name / ID' }).fill(integrationName)
+        await app.getByRole('textbox', { name: 'API URL' }).fill(mcpUrl)
 
-      if (mcpUrl.startsWith('http://')) {
-        await app.getByRole('button', { name: 'Security' }).click()
-        await app.getByRole('checkbox', { name: 'Allow HTTP connections' }).check()
+        if (mcpUrl.startsWith('http://')) {
+          await app.getByRole('button', { name: 'Security' }).click()
+          await app.getByRole('checkbox', { name: 'Allow HTTP connections' }).check()
+        }
+
+        await app.getByRole('button', { name: 'Next' }).click()
+        await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
+
+        await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
+        await app.getByRole('option', { name: credName }).click()
+
+        await app.getByRole('button', { name: 'Test connection' }).click()
+        await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
+        await app.getByRole('button', { name: 'Next' }).click()
+
+        await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
+        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        await app.getByRole('button', { name: 'Save' }).click()
+        const response = await responsePromise
+        integrationId = ((await response.json()) as { id?: string }).id ?? null
+
+        await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
+        await app.getByPlaceholder('Filter by name').fill(integrationName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
+        await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
+      } finally {
+        if (integrationId) await deleteIntegrationViaApi(app, integrationId)
+        if (credential) await deleteCredentialViaApi(app, credential.id)
       }
-
-      await app.getByRole('button', { name: 'Next' }).click()
-      await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
-
-      await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
-      await app.getByRole('option', { name: credName }).click()
-
-      await app.getByRole('button', { name: 'Test connection' }).click()
-      await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
-      await app.getByRole('button', { name: 'Next' }).click()
-
-      await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
-      const responsePromise = app.waitForResponse('**/api/v1/integrations')
-      await app.getByRole('button', { name: 'Save' }).click()
-      const response = await responsePromise
-      integrationId = ((await response.json()) as { id?: string }).id ?? null
-
-      await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
-      await app.getByPlaceholder('Filter by name').fill(integrationName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
-    } finally {
-      if (integrationId) await deleteIntegrationViaApi(app, integrationId)
-      if (credential) await deleteCredentialViaApi(app, credential.id)
-    }
+    })
   })
 
-  test('user creates an LLM Provider integration through the wizard', async ({ app }) => {
+  test.describe('LLM Provider integration', () => {
     test.skip(
       isRealBackend && !openrouterApiKey,
       'APP_OPENROUTER_API_KEY not set; cannot test LLM Provider on real backend'
     )
 
-    const integrationName = buildUniqueName('e2e-wizard-llm')
-    const credName = buildUniqueName('e2e-wizard-llm-cred')
-    let credential: SeededCredential | null = null
-    let integrationId: string | null = null
+    test('user creates an LLM Provider integration through the wizard', async ({ app }) => {
+      const integrationName = buildUniqueName('e2e-wizard-llm')
+      const credName = buildUniqueName('e2e-wizard-llm-cred')
+      let credential: SeededCredential | null = null
+      let integrationId: string | null = null
 
-    const apiUrl = isRealBackend ? openrouterBaseUrl : 'https://llm-test.example.com/v1'
+      const apiUrl = isRealBackend ? openrouterBaseUrl : 'https://llm-test.example.com/v1'
 
-    try {
-      credential = await createCredentialForIntegrationType(app, {
-        name: credName,
-        integrationType: 'llm_provider',
-        apiKey: isRealBackend ? openrouterApiKey : undefined,
-      })
-      expect(credential).not.toBeNull()
+      try {
+        credential = await createCredentialForIntegrationType(app, {
+          name: credName,
+          integrationType: 'llm_provider',
+          apiKey: isRealBackend ? openrouterApiKey : undefined,
+        })
+        expect(credential).not.toBeNull()
 
-      await app.goto(toAppUrl(WIZARD_URL))
-      await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
+        await app.goto(toAppUrl(WIZARD_URL))
+        await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
 
-      await app.getByRole('button', { name: 'MCP Server' }).click()
-      await app.getByRole('option', { name: 'LLM Provider' }).click()
+        await app.getByRole('button', { name: 'MCP Server' }).click()
+        await app.getByRole('option', { name: 'LLM Provider' }).click()
 
-      await app.getByRole('button', { name: 'Red Hat AI' }).click()
-      await app.getByRole('option', { name: 'Custom' }).click()
+        await app.getByRole('button', { name: 'Red Hat AI' }).click()
+        await app.getByRole('option', { name: 'Custom' }).click()
 
-      await app.getByRole('textbox', { name: 'Name' }).fill(integrationName)
-      await app.getByRole('textbox', { name: 'API URL' }).fill(apiUrl)
-      await app.getByRole('button', { name: 'Next' }).click()
+        await app.getByRole('textbox', { name: 'Name' }).fill(integrationName)
+        await app.getByRole('textbox', { name: 'API URL' }).fill(apiUrl)
+        await app.getByRole('button', { name: 'Next' }).click()
 
-      await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
-      await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
-      await app.getByRole('option', { name: credName }).click()
+        await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
+        await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
+        await app.getByRole('option', { name: credName }).click()
 
-      await app.getByRole('button', { name: 'Test connection' }).click()
-      await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
-      await app.getByRole('button', { name: 'Next' }).click()
+        await app.getByRole('button', { name: 'Test connection' }).click()
+        await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
+        await app.getByRole('button', { name: 'Next' }).click()
 
-      await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
-      const responsePromise = app.waitForResponse('**/api/v1/integrations')
-      await app.getByRole('button', { name: 'Save' }).click()
-      const response = await responsePromise
-      integrationId = ((await response.json()) as { id?: string }).id ?? null
+        await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
+        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        await app.getByRole('button', { name: 'Save' }).click()
+        const response = await responsePromise
+        integrationId = ((await response.json()) as { id?: string }).id ?? null
 
-      await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
-      await app.getByPlaceholder('Filter by name').fill(integrationName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
-    } finally {
-      if (integrationId) await deleteIntegrationViaApi(app, integrationId)
-      if (credential) await deleteCredentialViaApi(app, credential.id)
-    }
+        await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
+        await app.getByPlaceholder('Filter by name').fill(integrationName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
+        await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
+      } finally {
+        if (integrationId) await deleteIntegrationViaApi(app, integrationId)
+        if (credential) await deleteCredentialViaApi(app, credential.id)
+      }
+    })
   })
 
-  test('user creates an AAP Gateway integration through the wizard', async ({ app }) => {
+  test.describe('AAP Gateway integration', () => {
     test.skip(isRealBackend, 'AAP Gateway not available in upstream test environment')
 
-    const integrationName = buildUniqueName('e2e-wizard-aap')
-    const credName = buildUniqueName('e2e-wizard-aap-cred')
-    let credential: SeededCredential | null = null
-    let integrationId: string | null = null
+    test('user creates an AAP Gateway integration through the wizard', async ({ app }) => {
+      const integrationName = buildUniqueName('e2e-wizard-aap')
+      const credName = buildUniqueName('e2e-wizard-aap-cred')
+      let credential: SeededCredential | null = null
+      let integrationId: string | null = null
 
-    try {
-      credential = await createCredentialForIntegrationType(app, {
-        name: credName,
-        integrationType: 'aap_gateway',
-      })
-      expect(credential).not.toBeNull()
+      try {
+        credential = await createCredentialForIntegrationType(app, {
+          name: credName,
+          integrationType: 'aap_gateway',
+        })
+        expect(credential).not.toBeNull()
 
-      await app.goto(toAppUrl(WIZARD_URL))
-      await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
+        await app.goto(toAppUrl(WIZARD_URL))
+        await expect(app.getByRole('heading', { level: 1, name: 'Configure integration' })).toBeVisible()
 
-      await app.getByRole('button', { name: 'MCP Server' }).click()
-      await app.getByRole('option', { name: 'Ansible Automation Platform' }).click()
+        await app.getByRole('button', { name: 'MCP Server' }).click()
+        await app.getByRole('option', { name: 'Ansible Automation Platform' }).click()
 
-      await app.getByRole('textbox', { name: 'Server name / ID' }).fill(integrationName)
-      await app.getByRole('textbox', { name: 'API URL' }).fill('https://aap.example.com')
-      await app.getByRole('button', { name: 'Next' }).click()
+        await app.getByRole('textbox', { name: 'Server name / ID' }).fill(integrationName)
+        await app.getByRole('textbox', { name: 'API URL' }).fill('https://aap.example.com')
+        await app.getByRole('button', { name: 'Next' }).click()
 
-      await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
-      await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
-      await app.getByRole('option', { name: credName }).click()
+        await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()
+        await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
+        await app.getByRole('option', { name: credName }).click()
 
-      await app.getByRole('button', { name: 'Test connection' }).click()
+        await app.getByRole('button', { name: 'Test connection' }).click()
 
-      const saveButton = app.getByRole('button', { name: 'Save' })
-      await expect(saveButton).toBeEnabled({ timeout: 30_000 })
-      const responsePromise = app.waitForResponse('**/api/v1/integrations')
-      await saveButton.click()
-      const response = await responsePromise
-      integrationId = ((await response.json()) as { id?: string }).id ?? null
+        const saveButton = app.getByRole('button', { name: 'Save' })
+        await expect(saveButton).toBeEnabled({ timeout: 30_000 })
+        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        await saveButton.click()
+        const response = await responsePromise
+        integrationId = ((await response.json()) as { id?: string }).id ?? null
 
-      await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
-      await app.getByPlaceholder('Filter by name').fill(integrationName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
-    } finally {
-      if (integrationId) await deleteIntegrationViaApi(app, integrationId)
-      if (credential) await deleteCredentialViaApi(app, credential.id)
-    }
+        await expect(app).toHaveURL(new RegExp(INTEGRATIONS_LIST_URL))
+        await app.getByPlaceholder('Filter by name').fill(integrationName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
+        await expect(app.getByRole('row', { name: new RegExp(integrationName) })).toBeVisible()
+      } finally {
+        if (integrationId) await deleteIntegrationViaApi(app, integrationId)
+        if (credential) await deleteCredentialViaApi(app, credential.id)
+      }
+    })
   })
 })
 

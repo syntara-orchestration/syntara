@@ -200,16 +200,16 @@ class TestStartWorkflow:
 class TestTriggerSelection:
     """Test trigger node selection logic for multi-trigger workflows."""
 
-    # NexusWorkflow.run signature: (workflow_def, execution_id, trigger_node_id, ...)
+    # OrchestratorWorkflow.run signature: (workflow_def, execution_id, trigger_node_id, ...)
     TRIGGER_NODE_ID_ARG_INDEX = 2
 
     def _get_trigger_node_id_from_call(self, mock_client: Mock) -> str:
-        """Extract trigger_node_id passed to NexusWorkflow.run from the mock call."""
+        """Extract trigger_node_id passed to OrchestratorWorkflow.run from the mock call."""
         call_kwargs = mock_client.start_workflow.call_args
         temporal_args = call_kwargs.kwargs.get("args") or call_kwargs[1].get("args")
         expected_min = self.TRIGGER_NODE_ID_ARG_INDEX + 1
         assert len(temporal_args) >= expected_min, (
-            f"Expected at least {expected_min} args to NexusWorkflow.run, got {len(temporal_args)}"
+            f"Expected at least {expected_min} args to OrchestratorWorkflow.run, got {len(temporal_args)}"
         )
         return str(temporal_args[self.TRIGGER_NODE_ID_ARG_INDEX])
 
@@ -281,11 +281,12 @@ class TestCreateTemporalExecutionService:
             assert service.temporal_client is mock_client
             assert service.task_queue == get_settings().task_queue
 
-            mock_client_class.connect.assert_awaited_once_with(
-                get_settings().temporal_address,
-                namespace=get_settings().temporal_namespace,
-                tls=None,
-            )
+            mock_client_class.connect.assert_awaited_once()
+            call_args = mock_client_class.connect.await_args
+            assert call_args[0][0] == get_settings().temporal_address
+            assert call_args[1]["namespace"] == get_settings().temporal_namespace
+            assert call_args[1]["tls"] is None
+            assert len(call_args[1]["interceptors"]) == 1
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_custom_params(self) -> None:
@@ -303,11 +304,12 @@ class TestCreateTemporalExecutionService:
 
             assert service.task_queue == "prod-queue"
 
-            mock_client_class.connect.assert_awaited_once_with(
-                "temporal.example.com:7233",
-                namespace="production",
-                tls=None,
-            )
+            mock_client_class.connect.assert_awaited_once()
+            call_args = mock_client_class.connect.await_args
+            assert call_args[0][0] == "temporal.example.com:7233"
+            assert call_args[1]["namespace"] == "production"
+            assert call_args[1]["tls"] is None
+            assert len(call_args[1]["interceptors"]) == 1
 
 
 class TestBuiltinWorkflowRouting:

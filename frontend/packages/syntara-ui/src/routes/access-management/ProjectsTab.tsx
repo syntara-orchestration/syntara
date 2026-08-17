@@ -11,6 +11,7 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useTableSort } from '../../hooks/useTableSort'
@@ -18,7 +19,6 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { getErrorMessage } from '../../utils/apiErrors'
-import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
@@ -100,8 +100,12 @@ function ProjectRow({
       <Td dataLabel="Description">
         <Truncate content={project.description ?? ''} />
       </Td>
-      <Td dataLabel="Created">{formatDateTime(project.created_at)}</Td>
-      <Td dataLabel="Updated">{formatDateTime(project.updated_at)}</Td>
+      <Td dataLabel="Created">
+        <DateCell dateString={project.created_at} />
+      </Td>
+      <Td dataLabel="Updated">
+        <DateCell dateString={project.updated_at} />
+      </Td>
       <Td isActionCell>
         <ActionsColumn items={getRowActions(project, onEdit, onDelete, permissions)} />
       </Td>

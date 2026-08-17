@@ -120,6 +120,18 @@ describe('MyPermissionsView', () => {
     expect(screen.getByText('workflow:delete')).toBeInTheDocument()
   })
 
+  it('renders allow and deny effect labels for mixed permissions', async () => {
+    await renderAndWaitForData([
+      { policy_name: 'allow-read', effect: 'allow', actions: ['read'], scope: '*', project: 'default' },
+      { policy_name: 'deny-delete', effect: 'deny', actions: ['delete'], scope: '*', project: 'default' },
+    ])
+
+    expect(screen.getByText('allow-read')).toBeInTheDocument()
+    expect(screen.getByText('deny-delete')).toBeInTheDocument()
+    expect(screen.getAllByText('allow')).toHaveLength(1)
+    expect(screen.getAllByText('deny')).toHaveLength(1)
+  })
+
   it('shows empty state when no permissions exist', async () => {
     mockPostSuccess([])
     render(<MyPermissionsView />, { wrapper })

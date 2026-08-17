@@ -1,6 +1,6 @@
 # Development with Git Worktrees
 
-This guide explains how to use Git worktrees for parallel development in the Nexus project.
+This guide explains how to use Git worktrees for parallel development in the Syntara project.
 
 ## Prerequisites
 
@@ -76,7 +76,7 @@ You're working on a feature but need to work on another feature or review a PR:
 
 ```bash
 # You're currently in main worktree working on feature-auth
-cd ~/repos/nexus
+cd ~/repos/syntara
 
 # Create a new worktree (for another feature or PR review)
 make init-worktree feature-payments
@@ -97,7 +97,7 @@ make services-run
 make dev
 
 # When done, go back to your original work
-cd ~/repos/nexus
+cd ~/repos/syntara
 source .venv/bin/activate
 ```
 
@@ -107,7 +107,7 @@ Your original `feature-auth` work remains untouched, and you can switch back any
 
 #### Example Configuration for Multiple Worktrees
 
-**Main Repository** (`~/repos/nexus/.env`):
+**Main Repository** (`~/repos/syntara/.env`):
 ```bash
 PODMAN_PROJECT=syntara
 APP_API_PORT=8000
@@ -116,7 +116,7 @@ APP_TEMPORAL_UI_PORT=8081
 APP_CACHE_PORT=6379
 ```
 
-**Feature Worktree** (`~/repos/nexus/worktrees/feature-auth/.env`):
+**Feature Worktree** (`~/repos/syntara/worktrees/feature-auth/.env`):
 ```bash
 PODMAN_PROJECT=syntara-feature-auth
 APP_API_PORT=8001
@@ -135,9 +135,9 @@ git worktree list
 
 Output example:
 ```
-/home/user/repos/nexus              abc1234 [main]
-/home/user/repos/nexus/worktrees/feature-auth   def5678 [feature-auth]
-/home/user/repos/nexus/worktrees/bugfix-api     ghi9012 [bugfix-api]
+/home/user/repos/syntara              abc1234 [main]
+/home/user/repos/syntara/worktrees/feature-auth   def5678 [feature-auth]
+/home/user/repos/syntara/worktrees/bugfix-api     ghi9012 [bugfix-api]
 ```
 
 ### Switch Between Worktrees
@@ -146,11 +146,11 @@ Simply navigate to the directory:
 
 ```bash
 # Switch to feature-auth worktree
-cd ~/repos/nexus/worktrees/feature-auth
+cd ~/repos/syntara/worktrees/feature-auth
 source .venv/bin/activate
 
 # Switch back to main worktree
-cd ~/repos/nexus
+cd ~/repos/syntara
 source .venv/bin/activate
 ```
 
@@ -290,5 +290,5 @@ When using Claude Code inside a worktree, you may see this warning:
 ## Additional Resources
 
 - [Git Worktree Documentation](https://git-scm.com/docs/git-worktree)
-- [Nexus Development Guide](../README.md)
+- [Syntara Development Guide](../README.md)
 - [Podman Compose Documentation](https://github.com/containers/podman-compose)

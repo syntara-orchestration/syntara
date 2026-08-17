@@ -1,10 +1,10 @@
 """Domain exceptions for runtime settings."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
-class SettingError(NexusError):
+class SettingError(SyntaraError):
     """Base exception for all settings errors."""
 
 

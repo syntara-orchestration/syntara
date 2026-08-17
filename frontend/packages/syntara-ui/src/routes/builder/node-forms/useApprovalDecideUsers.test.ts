@@ -27,7 +27,7 @@ const mockPOST = vi.mocked(accessFetchClient.POST)
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { retry: false, retryDelay: 0 },
     },
   })
   return ({ children }: { children: React.ReactNode }) =>
@@ -50,7 +50,7 @@ describe('useApprovalDecideUsers', () => {
       error: undefined,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -70,7 +70,7 @@ describe('useApprovalDecideUsers', () => {
         })
     )
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -86,7 +86,7 @@ describe('useApprovalDecideUsers', () => {
       error: mockError,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -122,23 +122,24 @@ describe('useApprovalDecideUsers', () => {
     })
   })
 
-  it('omits resource_project when projectId is null', async () => {
-    mockPOST.mockResolvedValue({
-      data: { resources: [], next: null },
-      error: undefined,
-    })
-
-    renderHook(() => useApprovalDecideUsers(null), {
+  it('does not fetch when projectId is null', () => {
+    const { result } = renderHook(() => useApprovalDecideUsers(null), {
       wrapper: createWrapper(),
     })
 
-    await waitFor(() => {
-      expect(mockPOST).toHaveBeenCalled()
+    expect(mockPOST).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.users).toEqual([])
+  })
+
+  it('does not fetch when projectId is undefined', () => {
+    const { result } = renderHook(() => useApprovalDecideUsers(), {
+      wrapper: createWrapper(),
     })
 
-    const firstCall = mockPOST.mock.calls[0] as [string, { body: Record<string, unknown> }]
-    const callBody = firstCall[1].body
-    expect(callBody).not.toHaveProperty('resource_project')
+    expect(mockPOST).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.users).toEqual([])
   })
 
   it('fetches all pages when pagination is present', async () => {
@@ -158,7 +159,7 @@ describe('useApprovalDecideUsers', () => {
         error: undefined,
       })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 
@@ -170,13 +171,56 @@ describe('useApprovalDecideUsers', () => {
     expect(mockPOST).toHaveBeenCalledTimes(2)
   })
 
+  it('sets isPermissionDenied when API returns AUTHORIZATION_DENIED', async () => {
+    mockPOST.mockResolvedValue({
+      data: undefined,
+      error: { code: 'AUTHORIZATION_DENIED', title: 'Authorization Denied', detail: 'Not authorized' },
+    })
+
+    const { result } = renderHook(() => useApprovalDecideUsers('project-123'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.isPermissionDenied).toBe(true)
+    expect(result.current.users).toEqual([])
+    expect(result.current.error).toBeNull()
+  })
+
+  it('does not retry on PermissionDeniedError', async () => {
+    mockPOST.mockResolvedValue({
+      data: undefined,
+      error: { code: 'AUTHORIZATION_DENIED', title: 'Authorization Denied', detail: 'Not authorized' },
+    })
+
+    const retryEnabledClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: 3 },
+      },
+    })
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      createElement(QueryClientProvider, { client: retryEnabledClient }, children)
+
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(mockPOST).toHaveBeenCalledTimes(1)
+    expect(result.current.isPermissionDenied).toBe(true)
+  })
+
   it('returns empty array when no users have permission', async () => {
     mockPOST.mockResolvedValue({
       data: { resources: [], next: null },
       error: undefined,
     })
 
-    const { result } = renderHook(() => useApprovalDecideUsers(), {
+    const { result } = renderHook(() => useApprovalDecideUsers('project-1'), {
       wrapper: createWrapper(),
     })
 

@@ -107,7 +107,7 @@ The agentic activity sends `HEARTBEAT_STOP_MONITOR: True` immediately at dispatc
 
 ## Design Decisions
 
-**Credentials are passed by reference, not by value.** `credential_id` is forwarded to the Agent Orchestrator as metadata; the decrypted API key is never placed in the invocation context. The orchestrator resolves the credential itself, at execution time, via the Nexus Credentials API.
+**Credentials are passed by reference, not by value.** `credential_id` is forwarded to the Agent Orchestrator as metadata; the decrypted API key is never placed in the invocation context. The orchestrator resolves the credential itself, at execution time, via the Syntara Credentials API.
 
 **Prompts land in Temporal history — don't put secrets in them.** Because activity arguments are recorded in Temporal's durable event history, credentials, API keys, or PII should never be interpolated directly into a prompt string. Use `credential_id` (or `integration_connections`) instead, and reference already-resolved upstream data via expressions.
 

@@ -1,1 +1,1 @@
-"""End-to-end tests for the Nexus API."""
+"""End-to-end tests for the Syntara API."""

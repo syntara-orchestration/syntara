@@ -1,6 +1,6 @@
 import { Content, ContentVariants } from '@patternfly/react-core'
 import { TreeView, type TreeViewDataItem } from '@patternfly/react-core'
-import { InfoCircleIcon } from '@patternfly/react-icons'
+import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { OutputFieldDef } from '@syntara/contracts'
 import { useCallback, useMemo } from 'react'
 
@@ -67,8 +67,7 @@ export function InputSchemaPreview({ fields, nodeId }: Readonly<InputSchemaPrevi
   return (
     <div className={styles.previewContainer}>
       <Content component={ContentVariants.small} className={styles.previewHeader}>
-        <InfoCircleIcon />
-        Expected output fields (run step to see actual values)
+        <RhUiInformationIcon /> Expected output fields (run step to see actual values)
       </Content>
       <TreeView data={treeData} aria-label="Schema preview" />
     </div>

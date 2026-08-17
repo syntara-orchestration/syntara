@@ -1,6 +1,6 @@
 # Audit Framework
 
-> **Developer Guide** — Understanding and using the Nexus audit system
+> **Developer Guide** — Understanding and using the Syntara audit system
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@
 
 ### Overview
 
-The audit framework provides **comprehensive, type-safe event tracking** for capturing system activities, user actions, and operational events across the Nexus platform. It follows an event-driven architecture with:
+The audit framework provides **comprehensive, type-safe event tracking** for capturing system activities, user actions, and operational events across the Syntara platform. It follows an event-driven architecture with:
 
 - **Guaranteed delivery** via transactional outbox pattern
 - **Automatic CRUD capture** via PostgreSQL database triggers
@@ -1239,7 +1239,7 @@ For a failed login (bad password):
 
 ## Summary
 
-The Nexus audit framework provides:
+The Syntara audit framework provides:
 
 ✅ **Guaranteed delivery** - Transactional outbox pattern ensures audit events survive process crashes  
 ✅ **Automatic CRUD capture** - PostgreSQL triggers track all database mutations without manual instrumentation  

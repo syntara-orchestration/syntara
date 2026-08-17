@@ -125,16 +125,15 @@ class TestDocsEnabled:
 
 
 class TestAPIDocsSettings:
-    """The enable_api_docs setting defaults to False and is toggleable."""
+    """The enable_api_docs setting defaults to True and is toggleable."""
 
-    def test_default_is_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_is_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from syntara.core.config.base import get_settings
 
-        # Override local .env so this asserts the production default.
-        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "true")
         get_settings.cache_clear()
         try:
-            assert get_settings().enable_api_docs is False
+            assert get_settings().enable_api_docs is True
         finally:
             get_settings.cache_clear()
 
@@ -161,7 +160,7 @@ class TestAPIDocsSettings:
         from syntara.core.config.base import APIDocsSettings
 
         settings = APIDocsSettings()
-        assert settings.enable_api_docs is False
+        assert settings.enable_api_docs is True
 
 
 class TestTryItOutSettings:

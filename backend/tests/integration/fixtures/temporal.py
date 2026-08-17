@@ -16,7 +16,7 @@ from syntara.workflows.workflow_engine.activities.internal_activity import execu
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
@@ -40,20 +40,26 @@ async def _create_temporal_worker(
 ) -> AsyncGenerator[Worker, None]:
     """Start a Temporal worker with all registered activities."""
     import syntara.settings.cache.settings_cache as _settings_mod
+    from syntara.core.config.base import get_settings
     from tests.fixtures.settings import FakeSettingsCache
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
 
+    settings = get_settings()
+    original_script_nodes = settings.script_nodes_enabled
+    object.__setattr__(settings, "script_nodes_enabled", True)
+
     try:
         async with Worker(
             temporal_env.client,
             task_queue="test-workflow-queue",
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=_TEST_WORKER_ACTIVITIES,
         ) as worker:
             yield worker
     finally:
+        object.__setattr__(settings, "script_nodes_enabled", original_script_nodes)
         _settings_mod._runtime_settings = original
 
 

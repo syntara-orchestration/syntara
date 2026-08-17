@@ -18,7 +18,7 @@ import type React from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { NxPanel } from '../../components/layout/NxPanel'
-import { formatExecutionDateTime } from '../../utils/dateUtils'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
 import { StatusLabel } from './ExecutionStatus'
 
@@ -79,8 +79,13 @@ export function HeaderMetadata({
               component={ContentVariants.small}
               style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
             >
-              {formatExecutionDateTime(startDisplay)}
-              {execution.completed_at && ` - ${formatExecutionDateTime(execution.completed_at)}`}
+              <ExecutionTimestamp dateString={startDisplay} />
+              {execution.completed_at && (
+                <>
+                  {' - '}
+                  <ExecutionTimestamp dateString={execution.completed_at} />
+                </>
+              )}
             </Content>
           )}
           {elapsedLabel && (

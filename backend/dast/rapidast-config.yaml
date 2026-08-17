@@ -8,14 +8,14 @@
 #   Automatically invoked by .github/workflows/dast.yml
 #
 # Usage (local, with Nexus running via podman-compose on localhost:8000):
-#   APP_ENABLE_API_DOCS=true uv run podman-compose -f ../podman-compose.yml up -d syntara
+#   uv run podman-compose -f ../podman-compose.yml up -d syntara
 #   podman run --rm --network=host \
 #     -v ./dast/rapidast-config.yaml:/opt/rapidast/config/config.yaml:z \
 #     -v ./dast/results:/opt/rapidast/results:z \
 #     quay.io/redhatproductsecurity/rapidast:latest \
 #     --config /opt/rapidast/config/config.yaml
 #
-# Docs must be enabled: RapidAST fetches /api_docs/v1/openapi.json (gated by APP_ENABLE_API_DOCS).
+# RapidAST fetches /api_docs/v1/openapi.json (enabled by default via APP_ENABLE_API_DOCS).
 
 config:
   configVersion: 6

@@ -41,7 +41,7 @@ jobs:
       - name: Start services with podman-compose
         timeout-minutes: 5
         env:
-          # RapidAST loads the live OpenAPI spec; docs must be enabled for that endpoint.
+          # Docs are enabled by default; kept explicit for clarity.
           APP_ENABLE_API_DOCS: "true"
         run: |
           uvx podman-compose -f ../podman-compose.yml -p syntara-ci up --build -d database redis temporal syntara

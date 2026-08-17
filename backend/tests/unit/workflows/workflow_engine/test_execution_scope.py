@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
@@ -25,8 +25,8 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
         yield mock_wf
 
 
-def _make_workflow(stop_after_nodes: set[str] | None = None) -> NexusWorkflow:
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+def _make_workflow(stop_after_nodes: set[str] | None = None) -> OrchestratorWorkflow:
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.resolver = NamespaceResolver()
@@ -51,7 +51,7 @@ def _node(node_id: str, node_type: str = "script") -> dict[str, Any]:
 
 
 class TestApplyExecutionScope:
-    """Tests for NexusWorkflow._apply_execution_scope."""
+    """Tests for OrchestratorWorkflow._apply_execution_scope."""
 
     def test_noop_when_no_stop_after_nodes(self) -> None:
         backend = InMemoryGraphBackend()

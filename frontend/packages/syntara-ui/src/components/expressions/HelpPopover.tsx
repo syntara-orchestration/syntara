@@ -4,8 +4,9 @@
  */
 
 import { Button, Popover } from '@patternfly/react-core'
-import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
+
+import { FieldHelpIcon } from '../FieldHelpIcon'
 
 type HelpPopoverProps = {
   /** Accessible label for the help button */
@@ -23,12 +24,7 @@ type HelpPopoverProps = {
 export function HelpPopover({ ariaLabel, headerContent, bodyContent }: HelpPopoverProps) {
   return (
     <Popover aria-label={ariaLabel} headerContent={headerContent} bodyContent={bodyContent} triggerAction="click">
-      <Button
-        variant="plain"
-        aria-label={ariaLabel}
-        onClick={(e) => e.preventDefault()}
-        icon={<OutlinedQuestionCircleIcon />}
-      />
+      <Button variant="plain" aria-label={ariaLabel} onClick={(e) => e.preventDefault()} icon={<FieldHelpIcon />} />
     </Popover>
   )
 }

@@ -17,7 +17,7 @@ flowchart TD
     LAUNCH --> ACT["ScheduledExecutionLauncher activity"]
 
     ACT --> P1["Phase 1: Load published workflow<br/>(read DB session, then release)"]
-    P1 --> P2["Phase 2: Start NexusWorkflow via Temporal<br/>(no DB session held during RPC)"]
+    P1 --> P2["Phase 2: Start OrchestratorWorkflow via Temporal<br/>(no DB session held during RPC)"]
     P2 --> P3["Phase 3: Create Execution record<br/>(write DB session)"]
 
     P3 --> ENGINE["_execute_trigger()<br/>→ scheduled_trigger activity"]
@@ -47,7 +47,7 @@ Temporal Schedules are synced *after* the database commit on publish. This preve
 The launcher activity deliberately splits DB and Temporal operations into separate phases:
 
 1. **Read phase** — loads the published workflow (read session, then released)
-2. **Temporal phase** — starts `NexusWorkflow` (no DB session held during the RPC call)
+2. **Temporal phase** — starts `OrchestratorWorkflow` (no DB session held during the RPC call)
 3. **Write phase** — creates the `Execution` record
 
 This avoids holding database connections during potentially slow Temporal RPCs.

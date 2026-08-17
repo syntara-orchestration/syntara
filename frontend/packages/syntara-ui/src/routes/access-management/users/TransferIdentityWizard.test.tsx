@@ -9,8 +9,15 @@ import { axe } from 'vitest-axe'
 import { usersClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
+import type { DocKey } from '../../../utils/docs/types'
 
 import { TransferIdentityWizard } from './TransferIdentityWizard'
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -172,6 +179,7 @@ function setupMocks({
 
 describe('TransferIdentityWizard', () => {
   beforeEach(() => {
+    useDocLinkMock.mockClear()
     queryClient.clear()
     vi.mocked(useParams).mockReturnValue({ userId: 'target-user' })
     setupAccessClientMock()
@@ -182,6 +190,16 @@ describe('TransferIdentityWizard', () => {
     render(<TransferIdentityWizard />, { wrapper })
 
     expect(screen.getByRole('heading', { name: /Transfer identity to targetuser/i })).toBeInTheDocument()
+  })
+
+  it('renders documentation link in the page header', () => {
+    render(<TransferIdentityWizard />, { wrapper })
+
+    expect(useDocLinkMock).toHaveBeenCalledWith('transferIdentity')
+    expect(screen.getByRole('link', { name: /View documentation/i })).toHaveAttribute(
+      'href',
+      'https://docs.example/transferIdentity'
+    )
   })
 
   it('renders the description text with username', () => {

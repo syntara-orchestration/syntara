@@ -352,7 +352,7 @@ class AAPProxyService:
         provides the AAP Gateway URL while the credential supplies authentication.
 
         Args:
-            credential_id: Nexus credential ID for AAP authentication.
+            credential_id: Syntara credential ID for AAP authentication.
             user_id: User ID for authorization check.
             integration_id: AAP Gateway integration ID for connection URL resolution.
 

@@ -60,7 +60,7 @@ def _mock_getaddrinfo(ip: str) -> list[tuple[None, None, None, None, tuple[str, 
 
 
 class TestAddCredentialAuthHeaders:
-    """Tests for _add_credential_auth_headers (Nexus credential system)."""
+    """Tests for _add_credential_auth_headers (Syntara credential system)."""
 
     def test_bearer_token_sets_authorization(self) -> None:
         headers: dict[str, Any] = {}

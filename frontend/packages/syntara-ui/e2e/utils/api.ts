@@ -5,7 +5,7 @@
  * and clean up resources via the API — faster and more reliable than
  * UI-based setup, especially for fixtures.
  */
-import { type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 import { appBaseUrl } from '../fixtures'
 
@@ -596,4 +596,23 @@ export async function deleteServiceAccountViaApi(app: Page, serviceAccountId: st
   } catch {
     // Best-effort cleanup
   }
+}
+
+/**
+ * Poll an execution's status via the API until it matches one of the expected values.
+ * Retries every 1s until timeout (default 90s). Used to wait for Temporal state
+ * transitions (e.g. "running", "paused", terminal statuses) without relying on UI updates.
+ */
+export async function pollExecutionStatus(
+  app: Page,
+  executionId: string,
+  expectedStatuses: string[],
+  options?: { token?: string; timeout?: number }
+): Promise<void> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  await expect(async () => {
+    const resp = await apiRequest(app, 'get', `/executions/${executionId}`, { token })
+    const exec = (await resp.json()) as { status: string }
+    expect(expectedStatuses).toContain(exec.status)
+  }).toPass({ timeout: options?.timeout ?? 90_000, intervals: [1_000] })
 }

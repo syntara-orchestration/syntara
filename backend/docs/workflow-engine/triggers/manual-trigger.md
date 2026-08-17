@@ -18,7 +18,7 @@ sequenceDiagram
     ES->>ES: resolve_trigger_node()
     ES->>ES: _apply_trigger_schema_defaults()
     ES->>ES: validate input against schema
-    ES->>Temporal: start NexusWorkflow<br/>(trigger_node_id, input_data)
+    ES->>Temporal: start OrchestratorWorkflow<br/>(trigger_node_id, input_data)
     Temporal->>Temporal: _execute_trigger()<br/>→ manual_trigger activity
     Temporal->>Temporal: register output in<br/>${trigger.*} and ${node_id.*}
     ES->>ES: create Execution DB record

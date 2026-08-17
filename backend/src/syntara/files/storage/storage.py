@@ -4,6 +4,7 @@ This module provides file storage operations using the retriever pattern
 for pluggable storage backends.
 """
 
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import structlog
@@ -105,4 +106,49 @@ async def save_file(
             size_bytes=len(file_content),
         )
         # Re-raise for caller to handle
+        raise
+
+
+async def save_file_stream(
+    stream: AsyncIterator[bytes],
+    safe_filename: str,
+    file_id: str,
+    retriever: BaseRetriever,
+) -> tuple[str, int]:
+    """Save uploaded file to storage by streaming chunks.
+
+    Files are saved with the naming pattern: orchestrator-{file_id}-{sanitized_filename}
+
+    Args:
+        stream: Async generator yielding file content chunks
+        safe_filename: Sanitized filename from original upload
+        file_id: Unique file identifier (UUID) for file naming
+        retriever: Storage retriever to use for saving file
+
+    Returns:
+        Tuple of (saved path, total bytes written)
+
+    """
+    safe_filename = sanitize_filename(safe_filename)
+    file_path = f"orchestrator-{file_id}-{safe_filename}"
+
+    try:
+        saved_path, total_bytes = await retriever.save_file_stream(stream, file_path)
+
+        logger.info(
+            "File saved to storage via streaming",
+            filename=safe_filename,
+            file_id=file_id,
+            size_bytes=total_bytes,
+        )
+
+        return saved_path, total_bytes
+
+    except (OSError, PermissionError):
+        logger.exception(
+            "Storage failure during streaming save",
+            filename=safe_filename,
+            file_id=file_id,
+            path=file_path,
+        )
         raise

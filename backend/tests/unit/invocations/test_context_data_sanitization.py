@@ -35,7 +35,7 @@ class TestSanitizeContextData:
 
     def test_preserves_callback_url_for_cert_authenticated_request(self) -> None:
         context_data: dict[str, object] = {
-            "callback_url": "https://nexus:8000/api/v1/executions/abc/activities/step/signal",
+            "callback_url": "https://syntara:8000/api/v1/executions/abc/activities/step/signal",
             "agent": "my-agent",
         }
         request = _make_request(is_cert_authenticated=True)
@@ -112,7 +112,7 @@ class TestCreateInvocationSanitization:
         mock_body.session_id = "sess"
         mock_body.project_id = "00000000-0000-0000-0000-000000000000"
         mock_body.context_data = {
-            "callback_url": "https://nexus:8000/api/v1/executions/abc/activities/step/signal",
+            "callback_url": "https://syntara:8000/api/v1/executions/abc/activities/step/signal",
             "agent": "my-agent",
         }
 

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { executionsClient } from '../../client'
+
 import { ExecutionDetailsPanel, type WorkflowDefShape } from './ExecutionDetailsPanel'
 
 /** v1 workflow definition: names live under workflow.activities */
@@ -104,6 +106,19 @@ describe('ExecutionDetailsPanel', () => {
 
       expect(screen.getByText('Current run details')).toBeInTheDocument()
       expect(screen.getByTestId('status-label')).toHaveTextContent('running')
+    })
+
+    it('shows a start/completed timestamp range when the execution has finished', () => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({
+        ...EXECUTION,
+        data: { ...EXECUTION.data, status: 'completed', completed_at: '2024-01-01T00:05:00Z' },
+      } as never)
+
+      const { container } = renderPanel(WORKFLOW_DEF)
+
+      expect(container.textContent).toContain(' - ')
+
+      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION as never)
     })
 
     it('shows elapsed time that ticks while running', () => {

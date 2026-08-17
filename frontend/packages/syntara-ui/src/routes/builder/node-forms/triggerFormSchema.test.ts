@@ -230,9 +230,13 @@ describe('triggerFormSchema — webhook trigger inputSchema (permissive)', () =>
 // Scheduled trigger validation
 // ---------------------------------------------------------------------------
 
-describe('triggerFormSchema — scheduled trigger (permissive)', () => {
-  it('accepts empty interval', () => {
-    expect(parseScheduled('interval', '').success).toBe(true)
+describe('triggerFormSchema — scheduled trigger', () => {
+  it('rejects empty interval', () => {
+    const result = parseScheduled('interval', '')
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.find((i) => i.path.includes('interval'))?.message).toBe('A schedule is required')
+    }
   })
 
   it('accepts present interval', () => {
@@ -243,8 +247,12 @@ describe('triggerFormSchema — scheduled trigger (permissive)', () => {
     expect(parseScheduled('cron', undefined, '0 9 * * *').success).toBe(true)
   })
 
-  it('accepts empty cron', () => {
-    expect(parseScheduled('cron', undefined, '').success).toBe(true)
+  it('rejects empty cron', () => {
+    const result = parseScheduled('cron', undefined, '')
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.find((i) => i.path.includes('cron'))?.message).toBe('Cron expression is required')
+    }
   })
 
   it('rejects cron exceeding 256 characters (max length kept)', () => {

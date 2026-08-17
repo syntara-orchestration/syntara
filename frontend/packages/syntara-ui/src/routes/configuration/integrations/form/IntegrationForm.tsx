@@ -246,7 +246,7 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
 }
 
 export function IntegrationForm() {
-  const docLink = useDocLink('integrations')
+  const docLink = useDocLink('configureIntegration')
   // zodResolver with discriminated unions produces a resolver type that react-hook-form
   // cannot reconcile — the TFieldValues generic diverges. This is a known @hookform/resolvers
   // limitation. The cast is safe because the schema defines the actual validation.

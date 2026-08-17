@@ -20,13 +20,13 @@ import { ProviderIcon } from '../../../components/ProviderIcon'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { NxLoadingState } from '../../../components/states/NxLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
 import { useAlerts, type AlertConfig } from '../../../providers/alerts'
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { IdentityActionsKebab, IdentityDialogs, type ConvertProviderInfo } from './IdentityDialogs'
@@ -152,8 +152,12 @@ function ConnectedIdentityRow({
       <Td dataLabel="Issuer URL">
         <Truncate content={identity.issuer} />
       </Td>
-      <Td dataLabel="Linked">{formatDateTime(identity.created_at)}</Td>
-      <Td dataLabel="Last authenticated">{identity.last_used_at ? formatDateTime(identity.last_used_at) : '-'}</Td>
+      <Td dataLabel="Linked">
+        <DateCell dateString={identity.created_at} />
+      </Td>
+      <Td dataLabel="Last authenticated">
+        <DateCell dateString={identity.last_used_at} />
+      </Td>
       <Td isActionCell>
         <IdentityActionsKebab
           kind="connected"

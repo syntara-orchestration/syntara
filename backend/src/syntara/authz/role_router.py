@@ -14,9 +14,9 @@ from syntara.authz.schemas import RoleCreate, RoleListParams, RoleListResponse, 
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 
-router = NexusRouter(prefix="/roles", tags=["Roles"])
+router = SyntaraRouter(prefix="/roles", tags=["Roles"])
 
 
 def get_role_service(

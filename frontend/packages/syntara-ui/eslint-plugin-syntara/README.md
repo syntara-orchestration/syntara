@@ -111,7 +111,26 @@ Disallows hardcoded color/spacing values. Use PatternFly design tokens instead.
 
 ### `no-locale-date-format`
 
-Disallows browser-locale date formatting methods (`toLocaleDateString`, `toLocaleString`, `toLocaleTimeString`, and `Intl.DateTimeFormat`) that produce inconsistent output across environments (e.g. `5/27/2026` vs `27/5/2026`). Use `formatDateTime`, `formatDate`, or `formatTime` from `src/utils/dateUtils.ts`, or the `DateCell` component for table cells.
+Disallows browser-locale date formatting methods (`toLocaleDateString`, `toLocaleString`, `toLocaleTimeString`) called directly in components, and restricts importing PatternFly's `Timestamp` component to the canonical wrapper components. This keeps every rendered date/time on the same `dateFormat`/`timeFormat` config instead of each call site hand-rolling its own.
+
+Use `DateCell` (table cells / detail fields), `UserTimestamp` (username + date), or `ExecutionTimestamp` (execution start/end ranges) — all in `src/components/table/` — instead of importing `Timestamp` from `@patternfly/react-core` directly. For the handful of plain-string contexts where JSX can't be used (dropdown option labels, `TextInput value=`), use `formatDateTime`/`formatExpirationDate` from `src/utils/dateUtils.ts`.
+
+**Config-level allowlist** — the canonical wrapper components and `dateUtils.ts` itself are exempted via `allowedFiles`:
+
+```javascript
+// eslint.config.js
+'syntara/no-locale-date-format': [
+  'error',
+  {
+    allowedFiles: [
+      '**/utils/dateUtils.ts',
+      '**/components/table/DateCell.tsx',
+      '**/components/table/ExecutionTimestamp.tsx',
+      '**/components/table/UserTimestamp.tsx',
+    ],
+  },
+],
+```
 
 ## Testing
 

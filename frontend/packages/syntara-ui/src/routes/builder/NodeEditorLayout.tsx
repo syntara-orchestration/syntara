@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, FlexItem, Stack, StackItem, Tooltip } from '@patternfly/react-core'
+import { Alert, Button, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
@@ -11,29 +11,20 @@ import { useNodeExecutionData } from './panels/hooks/useNodeExecutionData'
 import { NodeEditorPanelBody } from './panels/NodeEditorPanelBody'
 import type { WorkflowMetadata } from './types/workflowMetadata'
 
-function DocumentationButton({ href }: Readonly<{ href?: string }>) {
-  if (href) {
-    return (
-      <Button
-        variant="link"
-        icon={<RhUiExternalLinkIcon />}
-        iconPosition="end"
-        component="a"
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Documentation (opens in a new tab)"
-      >
-        Documentation
-      </Button>
-    )
-  }
+function DocumentationButton({ href }: Readonly<{ href: string }>) {
   return (
-    <Tooltip content="Coming soon">
-      <Button variant="link" icon={<RhUiExternalLinkIcon />} iconPosition="end" type="button" isDisabled>
-        Documentation
-      </Button>
-    </Tooltip>
+    <Button
+      variant="link"
+      icon={<RhUiExternalLinkIcon />}
+      iconPosition="end"
+      component="a"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Documentation (opens in a new tab)"
+    >
+      Documentation
+    </Button>
   )
 }
 
@@ -129,9 +120,11 @@ export function NodeEditorLayout({
                 alignItems={{ default: 'alignItemsCenter' }}
                 gap={{ default: 'gapSm' }}
               >
-                <FlexItem>
-                  <DocumentationButton href={docLink} />
-                </FlexItem>
+                {docLink ? (
+                  <FlexItem>
+                    <DocumentationButton href={docLink} />
+                  </FlexItem>
+                ) : null}
                 {headerActions && !readOnly && <FlexItem>{headerActions}</FlexItem>}
                 {showClose && (
                   <>

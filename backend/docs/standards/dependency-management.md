@@ -1,6 +1,6 @@
 # Dependency Management Standards
 
-This document defines dependency management standards for the Nexus Python monorepo.
+This document defines dependency management standards for the Syntara Python monorepo.
 
 ## Package Manager
 
@@ -189,7 +189,7 @@ When adding a new Python version:
 
 ### Snyk Security Scanning
 
-Nexus uses Snyk for two types of security scanning:
+Syntara uses Snyk for two types of security scanning:
 
 **SAST (Static Application Security Testing):**
 - Analyzes application code for security vulnerabilities (SQL injection, XSS, hardcoded secrets, etc.)

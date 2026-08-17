@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     DoWhileLoopState,
@@ -33,9 +33,9 @@ def mock_temporal_workflow() -> Generator[MagicMock]:
 
 def _make_workflow(
     pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.resolver = NamespaceResolver()

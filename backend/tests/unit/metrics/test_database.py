@@ -115,8 +115,8 @@ class TestBeforeAfterCursorExecute:
         """_before_cursor_execute stores a start timestamp on conn.info."""
         conn = _make_conn()
         _fire_before(conn)
-        assert "_nexus_query_start" in conn.info
-        assert isinstance(conn.info["_nexus_query_start"], float)
+        assert "_syntara_query_start" in conn.info
+        assert isinstance(conn.info["_syntara_query_start"], float)
 
     def test_after_records_query_duration(self, recorder: MetricsRecorder) -> None:
         """_after_cursor_execute records DATABASE_QUERY_RESPONSE_TIME."""
@@ -163,7 +163,7 @@ class TestBeforeAfterCursorExecute:
         with patch(_PATCH_RECORDER, return_value=recorder):
             _fire_after(conn)
 
-        assert "_nexus_query_start" not in conn.info
+        assert "_syntara_query_start" not in conn.info
 
     def test_statement_type_label_for_insert(self, recorder: MetricsRecorder) -> None:
         """INSERT statement gets the correct label."""

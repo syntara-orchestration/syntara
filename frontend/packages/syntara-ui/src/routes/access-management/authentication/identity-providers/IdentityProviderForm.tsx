@@ -278,8 +278,8 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
  */
 export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProps>) {
   const navigate = useNavigate()
-  const identityProvidersDocLink = useDocLink('identityProviders')
   const isEdit = mode === 'edit'
+  const identityProvidersDocLink = useDocLink(isEdit ? 'identityProviders' : 'addIdentityProvider')
   const pageTitle = isEdit ? 'Edit OIDC provider' : 'Add OIDC provider'
   const submitLabel = isEdit ? 'Save provider' : 'Add provider'
 

@@ -28,7 +28,7 @@
  * - Version conflict auto-refetches latest values
  */
 
-import { expect, test, toAppUrl } from './fixtures'
+import { createUnavailableGuard, expect, test, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { apiRequest } from './utils/api'
 
@@ -79,30 +79,25 @@ async function resetAllToDefaults(app: import('@playwright/test').Page) {
 }
 
 test.describe('Settings', () => {
-  // Settings tests share backend state — run serially to avoid conflicts
-  test.describe.configure({ mode: 'serial' })
-
-  // Cache tab unavailability after the first probe to avoid repeating the 10s
-  // timeout wait in every subsequent test when Settings has no tabs.
-  let settingsTabsUnavailable = false
+  // Settings tests share backend state — run serially to avoid conflicts.
+  // mode: 'serial' is set by createUnavailableGuard below.
+  const guard = createUnavailableGuard('Settings page has no tabs; backend may not have settings configured')
 
   test.beforeEach(async ({ app }) => {
-    test.skip(settingsTabsUnavailable, 'Settings page has no tabs; backend may not have settings configured')
-
     await app.goto(toAppUrl('/system-administration/settings'))
     const heading = app.getByRole('heading', { level: 1, name: 'Settings' })
     const hasPage = await heading
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasPage) guard.markUnavailable()
     test.skip(!hasPage, 'Settings page not available; backend may not be running')
-    // Wait for content to fully load (tabs + save button)
     const hasTabs = await app
       .getByRole('tab', { name: /Context Manager|System|Authentication/i })
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTabs) settingsTabsUnavailable = true
+    if (!hasTabs) guard.markUnavailable()
     test.skip(!hasTabs, 'Settings page has no tabs; backend may not have settings configured')
   })
 

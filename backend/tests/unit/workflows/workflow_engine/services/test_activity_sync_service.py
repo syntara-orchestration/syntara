@@ -25,6 +25,10 @@ from syntara.workflows.workflow_engine.services.activity_sync_service import (
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
+from syntara.workflows.workflow_engine.utils.timeout_messages import (
+    build_timeout_error_message,
+    format_timeout_friendly,
+)
 
 
 def create_test_metadata(
@@ -152,6 +156,68 @@ class TestActivitySyncService:
         assert task1.cancelled()
         assert task2.cancelled()
         assert service._sync_tasks == {}
+
+
+class TestPublishHelpersTreatRedisFailureAsNonFatal:
+    """_publish_snapshot/_publish_execution_patch must swallow publisher failures.
+
+    ActivityUpdatePublisher raises on Redis failure (it does not degrade
+    internally) specifically so this outer layer is the single place that
+    decides publishing is best-effort. These tests pin that contract: a
+    RedisConnectionError from the publisher must not propagate, and the
+    success-path "Published ..." log must not fire when nothing was
+    actually published.
+    """
+
+    def _make_service(self, mock_session_factory) -> tuple[ActivitySyncService, AsyncMock]:
+        mock_publisher = AsyncMock()
+        service = ActivitySyncService(Mock(), mock_session_factory, mock_publisher)
+        return service, mock_publisher
+
+    @pytest.mark.asyncio
+    async def test_publish_snapshot_swallows_redis_failure(self, mock_session_factory) -> None:
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        service, mock_publisher = self._make_service(mock_session_factory)
+        mock_publisher.publish_snapshot.side_effect = RedisConnectionError("pool exhausted")
+        execution = Execution(
+            id=uuid4(),
+            workflow_id=uuid4(),
+            workflow_version_id=uuid4(),
+            temporal_workflow_id="temporal-exec",
+            status=ExecutionStatus.RUNNING,
+            created_by=uuid4(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            updated_by=uuid4(),
+            input_data={},
+            labels={},
+            project_id=uuid4(),
+        )
+        execution.activities = []
+
+        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+            await service._publish_snapshot(execution, "initial_snapshot")  # does not raise
+
+        mock_logger.exception.assert_called_once()
+        assert mock_logger.exception.call_args.args[0] == "Failed to publish snapshot (non-fatal)"
+        assert not any(
+            call.args and call.args[0] == "Published snapshot for execution"
+            for call in mock_logger.debug.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_publish_execution_patch_swallows_redis_failure(self, mock_session_factory) -> None:
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        service, mock_publisher = self._make_service(mock_session_factory)
+        mock_publisher.publish_execution_patch.side_effect = RedisConnectionError("pool exhausted")
+
+        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+            await service._publish_execution_patch(uuid4(), [])  # does not raise
+
+        mock_logger.exception.assert_called_once()
+        assert mock_logger.exception.call_args.args[0] == "Failed to publish execution patch (non-fatal)"
 
 
 class TestRegisterActivityMonitoring:
@@ -527,7 +593,7 @@ class TestActivityEventProcessing:
             (
                 EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
                 ActivityStatus.FAILED,
-                "Activity timeout",
+                'The step "test-activity" did not finish within',
                 "Activity timeout",
             ),
             (EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED, ActivityStatus.CANCELLED, "Activity was canceled", None),
@@ -566,7 +632,7 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == expected_status
         assert self.metadata.pending_activity_updates[1]["completed_at"] is not None
         if expected_error:
-            assert self.metadata.pending_activity_updates[1]["error_details"] == expected_error
+            assert expected_error in self.metadata.pending_activity_updates[1]["error_details"]
 
     def test_process_activity_completed_sets_completed_for_approval_nodes(self) -> None:
         """Test that approval activities get COMPLETED status on ACTIVITY_TASK_COMPLETED."""
@@ -632,6 +698,74 @@ class TestActivityEventProcessing:
             with patch.object(self.service, handler_name) as mock_handler:
                 self.service._process_activity_event(event, metadata)
                 mock_handler.assert_called_once_with(event, metadata)
+
+
+# ---------------------------------------------------------------------------
+# AAP-87135: User-facing timeout messages must not expose Temporal jargon
+# ---------------------------------------------------------------------------
+
+
+class TestUserFacingTimeoutMessages:
+    """Regression tests for AAP-87135: no Temporal jargon in timeout messages."""
+
+    def test_format_timeout_friendly_seconds(self) -> None:
+        assert format_timeout_friendly(30) == "30 seconds"
+        assert format_timeout_friendly(1) == "1 second"
+
+    def test_format_timeout_friendly_minutes(self) -> None:
+        assert format_timeout_friendly(120) == "2 minutes"
+        assert format_timeout_friendly(60) == "1 minute"
+
+    def test_format_timeout_friendly_minutes_and_seconds(self) -> None:
+        assert format_timeout_friendly(90) == "1 minute 30 seconds"
+        assert format_timeout_friendly(121) == "2 minutes 1 second"
+
+    def test_format_timeout_friendly_none(self) -> None:
+        assert format_timeout_friendly(None) == "the configured timeout"
+        assert format_timeout_friendly(0) == "the configured timeout"
+
+    def test_timeout_message_includes_step_name(self) -> None:
+        msg = build_timeout_error_message(
+            step_name="Fetch Users",
+            is_agentic=False,
+            timeout_seconds=300,
+        )
+        assert '"Fetch Users"' in msg
+        assert "5 minutes" in msg
+
+    def test_timeout_message_falls_back_to_activity_id(self) -> None:
+        msg = build_timeout_error_message(step_name="fetch_data", is_agentic=False, timeout_seconds=60)
+        assert '"fetch_data"' in msg
+
+    def test_timeout_message_no_temporal_jargon(self) -> None:
+        msg = build_timeout_error_message(step_name="my_step", is_agentic=False, timeout_seconds=300)
+        assert "Temporal" not in msg
+        assert "StartToClose" not in msg
+        assert "start_to_close" not in msg
+
+    def test_agentic_node_gets_ai_agent_label(self) -> None:
+        msg = build_timeout_error_message(
+            step_name="Analyze Code",
+            is_agentic=True,
+            timeout_seconds=600,
+        )
+        assert 'The AI Agent step "Analyze Code"' in msg
+        assert "simplify the prompt" in msg
+        assert "agent may still be running" in msg
+
+    def test_non_agentic_node_gets_generic_label(self) -> None:
+        msg = build_timeout_error_message(
+            step_name="Fetch Data",
+            is_agentic=False,
+            timeout_seconds=300,
+        )
+        assert 'The step "Fetch Data"' in msg
+        assert "AI Agent" not in msg
+
+    def test_timeout_message_includes_guidance(self) -> None:
+        msg = build_timeout_error_message(step_name="step1", is_agentic=False, timeout_seconds=120)
+        assert "Timeout setting" in msg
+        assert "Increase the timeout" in msg
 
 
 class TestHandleEventPostProcessing:

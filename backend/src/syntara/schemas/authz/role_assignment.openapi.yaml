@@ -4,7 +4,7 @@ info:
   title: Syntara Role Assignments API
   version: 1.0.0
   description: |
-    Unified role assignment endpoints for the Nexus platform.
+    Unified role assignment endpoints for the Syntara platform.
 
     These endpoints manage role assignments to users and groups,
     both at the system level (global) and project-scoped.

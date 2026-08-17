@@ -5,11 +5,11 @@ are located in their respective subdomains (e.g., document_conversion/exceptions
 """
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.files.error_handlers.file_error_handler")
-class FileError(NexusError):
+class FileError(SyntaraError):
     """Base exception for all file-related errors."""
 
 

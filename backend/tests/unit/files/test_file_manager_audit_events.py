@@ -4,7 +4,7 @@ These tests verify that service methods correctly dispatch domain events
 which are then converted to AuditEvents by the registered handlers.
 """
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
@@ -50,20 +50,26 @@ class TestFileManagerAuditEvents:
         """Successful file upload should emit FilesUploadedEvent with file details."""
         # Arrange
         file_content = b"PDF content"
-        mock_file = Mock()
-        mock_file.filename = "test.pdf"
-        mock_file.size = len(file_content)
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=file_content)
-        mock_file.seek = AsyncMock()
+
+        async def _consume_stream(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+            total = 0
+            async for chunk in stream:
+                total += len(chunk)
+            return "orchestrator-uuid-test.pdf", total
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
+        mock_retriever.save_file_stream = AsyncMock(side_effect=_consume_stream)
         file_manager._retriever = mock_retriever
 
         # Act
-        with patch("magic.from_buffer", return_value="application/pdf"):
+        with patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            return_value=(b"", "application/pdf"),
+        ):
+            mock_file = Mock(filename="test.pdf")
+            mock_file.read = AsyncMock(side_effect=[file_content, b""])
             await file_manager.validate_and_save_files([mock_file], project_id=uuid4())
 
         # Assert - verify audit event was emitted
@@ -95,25 +101,31 @@ class TestFileManagerAuditEvents:
         mock_do_emit: AsyncMock,
     ) -> None:
         """Uploading multiple files should emit event with all file details."""
+
         # Arrange
+        async def _consume_stream(stream: AsyncGenerator[bytes], path: str) -> tuple[str, int]:
+            total = 0
+            async for chunk in stream:
+                total += len(chunk)
+            return "orchestrator-uuid-test.pdf", total
+
         mock_files = []
         for i in range(3):
-            file_content = f"File {i} content".encode()
-            mock_file = Mock()
-            mock_file.filename = f"test{i}.txt"
-            mock_file.size = len(file_content)
-            mock_file.content_type = "text/plain"
-            mock_file.read = AsyncMock(return_value=file_content)
-            mock_file.seek = AsyncMock()
-            mock_files.append(mock_file)
+            mf = Mock(filename=f"test{i}.txt")
+            mf.read = AsyncMock(side_effect=[f"File {i} content".encode(), b""])
+            mock_files.append(mf)
 
         file_manager = FileManager()
         mock_retriever = AsyncMock()
-        mock_retriever.save_file = AsyncMock(return_value="orchestrator-uuid-test.pdf")
+        mock_retriever.save_file_stream = AsyncMock(side_effect=_consume_stream)
         file_manager._retriever = mock_retriever
 
         # Act
-        with patch("magic.from_buffer", return_value="text/plain"):
+        with patch(
+            "syntara.files.file_manager.validators.validate_single_file",
+            new_callable=AsyncMock,
+            side_effect=[(b"", "text/plain")] * 3,
+        ):
             await file_manager.validate_and_save_files(cast("list[UploadFile]", mock_files), project_id=uuid4())
 
         # Assert
@@ -134,19 +146,20 @@ class TestFileManagerAuditEvents:
     ) -> None:
         """File validation error should emit error audit event before raising."""
         # Arrange
-        file_content = b"Unsupported content"
         mock_file = Mock()
         mock_file.filename = "bad.exe"
-        mock_file.size = len(file_content)
-        mock_file.content_type = "application/x-msdownload"
-        mock_file.read = AsyncMock(return_value=file_content)
-        mock_file.seek = AsyncMock()
 
         file_manager = FileManager()
+        mock_retriever = AsyncMock()
+        file_manager._retriever = mock_retriever
 
         # Act & Assert
         with (
-            patch("magic.from_buffer", return_value="application/x-msdownload"),
+            patch(
+                "syntara.files.file_manager.validators.validate_single_file",
+                new_callable=AsyncMock,
+                side_effect=FileValidationError("Unsupported MIME type"),
+            ),
             pytest.raises(FileValidationError),
         ):
             await file_manager.validate_and_save_files([mock_file], project_id=uuid4())
