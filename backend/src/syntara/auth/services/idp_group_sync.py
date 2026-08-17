@@ -354,15 +354,6 @@ async def _clear_provider_idp_groups(
                 user_groups.c.group_id.in_(to_remove),
             )
         )
-
-    await db.exec(
-        sa_delete(user_idp_groups).where(
-            user_idp_groups.c.user_id == user_id,
-            user_idp_groups.c.identity_provider_id == provider_id,
-        )
-    )
-
-    if to_remove:
         logger.info(
             "Provider-scoped IdP group clear on denied login",
             user_id=str(user_id),
@@ -370,6 +361,19 @@ async def _clear_provider_idp_groups(
             removed=len(to_remove),
             removed_group_ids=[str(gid) for gid in to_remove],
         )
+
+    await db.exec(
+        sa_delete(user_idp_groups).where(
+            user_idp_groups.c.user_id == user_id,
+            user_idp_groups.c.identity_provider_id == provider_id,
+        )
+    )
+    logger.info(
+        "Cleared IdP group tracking rows for provider",
+        user_id=str(user_id),
+        provider_id=str(provider_id),
+        tracking_rows_cleared=[str(gid) for gid in provider_group_ids],
+    )
 
     await dispatch_membership_diff_events(
         db,
