@@ -9,7 +9,10 @@ from temporalio.exceptions import ApplicationError
 from syntara.workflows.workflow_engine.activities.common import (
     ActivityExecutionError,
 )
-from syntara.workflows.workflow_engine.signals.processor import WorkflowSignalProcessor
+from syntara.workflows.workflow_engine.signals.processor import (
+    EMPTY_SIGNAL_ERROR_MESSAGE,
+    WorkflowSignalProcessor,
+)
 
 
 class TestWorkflowSignalProcessorProcessSignal:
@@ -85,7 +88,7 @@ class TestWorkflowSignalProcessorProcessSignal:
         assert "credentials" in str(exc_info.value)
 
     def test_process_signal_failure_with_minimal_error_info(self) -> None:
-        """Test that failed signal with minimal error info uses defaults."""
+        """Test that failed signal with minimal error info uses empty-signal fallback."""
         # Arrange - no error code, should be non-retryable
         signal_data = {
             "id": "invocation-minimal",
@@ -97,13 +100,13 @@ class TestWorkflowSignalProcessorProcessSignal:
         with pytest.raises(ApplicationError) as exc_info:
             WorkflowSignalProcessor.process_signal(signal_data, "task_minimal", "exec-minimal")
 
-        # Should use generic fallback with default message
         assert exc_info.value.non_retryable is True
-        assert "An unexpected error occurred" in str(exc_info.value)
-        assert "Agent execution failed" in str(exc_info.value)
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
+        assert "Agent execution failed" not in exc_info.value.message
+        assert not exc_info.value.message.startswith("UnknownError:")
 
     def test_process_signal_failure_without_error_dict(self) -> None:
-        """Test that failed signal without error dict uses defaults."""
+        """Test that failed signal without error dict uses empty-signal fallback."""
         # Arrange - no error code, should be non-retryable
         signal_data = {
             "id": "invocation-no-error",
@@ -116,7 +119,43 @@ class TestWorkflowSignalProcessorProcessSignal:
             WorkflowSignalProcessor.process_signal(signal_data, "task_no_error", "exec-no-error")
 
         assert exc_info.value.non_retryable is True
-        assert "An unexpected error occurred" in str(exc_info.value)
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
+        assert "Agent execution failed" not in exc_info.value.message
+
+    def test_process_signal_failure_with_empty_error_message(self) -> None:
+        """Empty/whitespace error.message uses the same actionable fallback."""
+        signal_data = {
+            "status": "failed",
+            "error": {
+                "message": "   ",
+                "error_type": "SomeError",
+            },
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            WorkflowSignalProcessor.process_signal(signal_data, "task_blank", "exec-blank")
+
+        assert exc_info.value.non_retryable is True
+        assert exc_info.value.message == EMPTY_SIGNAL_ERROR_MESSAGE
+        assert "SomeError:" not in exc_info.value.message
+
+    def test_process_signal_failure_preserves_real_error_message(self) -> None:
+        """When error.message is present, it is shown (not the empty-signal fallback)."""
+        signal_data = {
+            "status": "failed",
+            "error": {
+                "message": "API key is invalid",
+                "error_type": "AuthenticationError",
+            },
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            WorkflowSignalProcessor.process_signal(signal_data, "api_call", "exec-123")
+
+        assert "API key is invalid" in exc_info.value.message
+        assert "did not provide details" not in exc_info.value.message
+        assert "Authentication failed" in exc_info.value.message
+        assert "AuthenticationError:" not in exc_info.value.message
 
     def test_process_signal_failure_maps_known_error_types(self) -> None:
         """Test that known error types produce user-friendly messages without raw type names."""

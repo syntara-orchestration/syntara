@@ -242,7 +242,12 @@ export function BuilderContent(props: BuilderContentProps) {
     onVersionUpdated,
     onSaveWithValidationIssues: handleVerifySilent,
     onValidationFindings: (errors) => {
-      dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors })
+      if (errors.length === 0) {
+        dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
+        useWorkflowStore.getState().setValidationErrorCount(0)
+        return
+      }
+      dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors, source: 'save' })
       useWorkflowStore.getState().setValidationErrorCount(errors.length)
     },
     createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
@@ -550,6 +555,7 @@ export function BuilderContent(props: BuilderContentProps) {
                 <ValidationBanner
                   errors={state.validationErrors}
                   dismissed={state.validationBannerDismissed}
+                  source={state.validationSource ?? 'verify'}
                   dispatch={dispatch}
                   onNavigateToNode={handleNavigateToNode}
                 />

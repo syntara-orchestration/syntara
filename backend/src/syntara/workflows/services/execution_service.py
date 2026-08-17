@@ -58,6 +58,7 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
 if TYPE_CHECKING:
     from syntara.metrics.recorder import MetricsRecorder
@@ -1036,18 +1037,13 @@ class ExecutionService(BaseService):
 
         status = signal_data.get("status")
         if status == "failed":
-            error_info = signal_data.get("error", {})
-            if isinstance(error_info, dict):
-                error_msg = str(error_info.get("message", "Activity execution failed"))[:MAX_CALLBACK_ERROR_MSG_LENGTH]
-                error_type = str(error_info.get("error_type", "UnknownError"))
-            else:
-                error_msg = (str(error_info) if error_info else "Activity execution failed")[
-                    :MAX_CALLBACK_ERROR_MSG_LENGTH
-                ]
-                error_type = "UnknownError"
+            error_msg, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))
+            error_msg = error_msg[:MAX_CALLBACK_ERROR_MSG_LENGTH]
+            # Keep ErrorType prefix when a real message exists; empty fallback is already actionable.
+            application_message = f"{error_type}: {error_msg}" if has_error_detail else error_msg
 
             error = ApplicationError(
-                f"{error_type}: {error_msg}",
+                application_message,
                 type=error_type,
                 non_retryable=True,
             )
