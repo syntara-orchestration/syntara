@@ -52,7 +52,6 @@ async def create_internal_invocation(
 async def get_internal_invocation(
     invocation_id: Annotated[UUID, Path(description="UUID of the invocation")],
     db: Annotated[AsyncSession, Depends(get_db)],
-    _current_user: Annotated[User, Depends(get_current_user)],
 ) -> Invocation:
     """Retrieve an invocation by ID via internal route."""
     invocation = await db.get(Invocation, invocation_id)
