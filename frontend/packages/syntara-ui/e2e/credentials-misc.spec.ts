@@ -254,8 +254,8 @@ test.describe('Dynamic Field Renderer — Help Text', () => {
     test.skip(!hasHelpText, 'Credential type does not have help_text configured on this backend')
 
     await tokenHelpButton.click()
-    // PF Popover has no OUIA type and shares role="dialog" with the create modal.
-    await expect(app.getByText('Bearer token value')).toBeVisible({ timeout: 5_000 })
+    // Exact name — the create modal's accessible name also contains "Token help".
+    await expect(app.getByRole('dialog', { name: 'Token help', exact: true })).toBeVisible({ timeout: 5_000 })
 
     await selectCredentialType(modal, 'HTTP Basic Auth')
 
