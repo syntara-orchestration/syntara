@@ -68,6 +68,7 @@ def _make_db(
 ) -> AsyncMock:
     """Mock DB: first exec returns mapping entries; idp-rows query returns *idp_rows* once."""
     db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=AsyncMock())
     mapping_result = MagicMock()
     mapping_result.all = MagicMock(return_value=mapping_entries)
 

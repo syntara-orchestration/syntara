@@ -81,6 +81,7 @@ def _make_mock_db(
     empty results.
     """
     db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=AsyncMock())
 
     entries = mapping_entries or []
     mapping_result = MagicMock()
@@ -583,6 +584,7 @@ def _make_mock_db_for_aap(
     4+ Empty results for remaining queries (current_idp_groups, etc.)
     """
     db = AsyncMock()
+    db.begin_nested = MagicMock(return_value=AsyncMock())
     entries = mapping_entries or []
 
     mapping_result = MagicMock()
