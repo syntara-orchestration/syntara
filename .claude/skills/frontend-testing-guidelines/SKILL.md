@@ -40,12 +40,12 @@ npm run test:coverage        # Generate coverage report
 Without an explicit `include` glob, modules that are never imported in any test won't appear in coverage output at all — making overall numbers look better than they are:
 
 ```typescript
-// vitest.config.ts
+// vitest.config.ts — include all source so unused files appear in reports.
+// This repo does not set Vitest coverage.thresholds; CI uses nyc 85% statements.
 coverage: {
   provider: 'v8',
   include: ['src/**/*.{ts,tsx}'],           // required — include all source files
   exclude: ['src/**/*.stories.tsx', 'src/**/*.d.ts'],
-  thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
 }
 ```
 
