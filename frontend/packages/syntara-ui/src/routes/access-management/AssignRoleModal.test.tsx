@@ -149,6 +149,7 @@ describe('AssignRoleModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    queryClient.clear()
     setupMocks()
     vi.mocked(accessFetchClient.GET).mockResolvedValue({
       data: { resources: [], next: null },
@@ -579,8 +580,9 @@ describe('AssignRoleModal', () => {
         expect(screen.getByText('Failed to assign roles')).toBeInTheDocument()
       })
 
-      // onSuccess is NOT called when all assignments fail
+      // onSuccess and onClose are NOT called when all assignments fail
       expect(mockOnSuccess).not.toHaveBeenCalled()
+      expect(mockOnClose).not.toHaveBeenCalled()
     })
   })
 

@@ -65,6 +65,7 @@ type AssignRoleFormBodyProps = {
   onRoleSearchChange: (term: string) => void
   hasMoreRoles: boolean
   isRolesLoading: boolean
+  isAssignmentsError: boolean
 }
 
 function ScopeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -123,6 +124,7 @@ function AssignRoleFormBody({
   onRoleSearchChange,
   hasMoreRoles,
   isRolesLoading,
+  isAssignmentsError,
 }: Readonly<AssignRoleFormBodyProps>) {
   return (
     <>
@@ -267,6 +269,13 @@ function AssignRoleFormBody({
                   </HelperText>
                 </FormHelperText>
               )}
+              {isAssignmentsError && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant="warning">Unable to check existing assignments</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
             </>
           )}
         />
@@ -361,12 +370,11 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     [serviceAccountsQuery.data]
   )
 
-  const { assigned: alreadyAssignedRoles, isLoading: isAssignmentsLoading } = useAlreadyAssignedRoles(
-    principalType,
-    selectedPrincipalId ?? '',
-    isProjectScoped,
-    selectedProjectId ?? ''
-  )
+  const {
+    assigned: alreadyAssignedRoles,
+    isLoading: isAssignmentsLoading,
+    isError: isAssignmentsError,
+  } = useAlreadyAssignedRoles(principalType, selectedPrincipalId ?? '', isProjectScoped, selectedProjectId ?? '')
   const [roleSearchTerm, setRoleSearchTerm] = useState('')
   const debouncedRoleSearch = useDebouncedValue(roleSearchTerm)
   const systemRolesQuery = accessClient.useQuery('get', '/roles', {
@@ -476,6 +484,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
             onRoleSearchChange={setRoleSearchTerm}
             hasMoreRoles={!!activeRolesQuery.data?.next}
             isRolesLoading={activeRolesQuery.isFetching || isAssignmentsLoading}
+            isAssignmentsError={isAssignmentsError}
           />
         </Form>
       </ModalBody>

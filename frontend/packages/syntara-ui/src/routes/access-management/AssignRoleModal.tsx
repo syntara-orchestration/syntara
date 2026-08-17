@@ -16,7 +16,7 @@ import { type Ref, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
-import { FormFieldError } from '../../components/FormFieldError'
+import { FormFieldError, FormFieldWarning } from '../../components/FormFieldError'
 import { NxSelect } from '../../components/NxSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAlerts } from '../../providers/alerts'
@@ -181,12 +181,11 @@ export function AssignRoleModal({
     },
   })
 
-  const { assigned: alreadyAssigned, isLoading: isAssignmentsLoading } = useAlreadyAssignedRoles(
-    principalType,
-    principalId,
-    scope === 'project',
-    projectId ?? ''
-  )
+  const {
+    assigned: alreadyAssigned,
+    isLoading: isAssignmentsLoading,
+    isError: isAssignmentsError,
+  } = useAlreadyAssignedRoles(principalType, principalId, scope === 'project', projectId ?? '')
 
   const roleOptions = useMemo((): RoleOption[] => {
     if (isAssignmentsLoading) return []
@@ -237,8 +236,8 @@ export function AssignRoleModal({
     if (successCount > 0) {
       detachPromise(queryClient.invalidateQueries({ queryKey: roleAssignmentsQueryKey(principalType, principalId) }))
       onSuccess()
+      handleClose()
     }
-    handleClose()
   })
 
   const roleIds = useWatch({ control, name: 'roleIds' })
@@ -313,6 +312,7 @@ export function AssignRoleModal({
                     hasError={!!fieldState.error}
                   />
                   <FormFieldError message={fieldState.error?.message} />
+                  <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
                 </>
               )}
             />

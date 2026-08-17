@@ -10,3 +10,14 @@ export function FormFieldError({ message }: Readonly<{ message?: string }>) {
     </FormHelperText>
   )
 }
+
+export function FormFieldWarning({ message }: Readonly<{ message?: string }>) {
+  if (!message) return null
+  return (
+    <FormHelperText>
+      <HelperText>
+        <HelperTextItem variant="warning">{message}</HelperTextItem>
+      </HelperText>
+    </FormHelperText>
+  )
+}
