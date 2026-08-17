@@ -16,6 +16,7 @@ from uuid import UUID
 import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
@@ -1142,9 +1143,9 @@ class ActivitySyncService:
             raise
         except TemporalError:
             raise
-        except Exception:
+        except (SQLAlchemyError, OSError):
             logger.exception(
-                "Transient error in monitor loop, will retry",
+                "Transient error in monitor loop",
                 execution_id=execution_id,
             )
             return False

@@ -3548,8 +3548,9 @@ class TestRunMonitorLoop:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_returns_false_on_transient_error(self) -> None:
-        """Test that _run_monitor_loop returns False when a transient error occurs."""
+    async def test_returns_false_on_db_error(self) -> None:
+        """Test that _run_monitor_loop returns False when a SQLAlchemy error occurs."""
+        from sqlalchemy.exc import OperationalError
 
         async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
             await queue.put(None)
@@ -3557,12 +3558,54 @@ class TestRunMonitorLoop:
         with (
             patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
             patch.object(
-                self.service, "_sync_activities_to_db", new_callable=AsyncMock, side_effect=RuntimeError("DB pool full")
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=OperationalError("", [], Exception("pool exhausted")),
             ),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_os_error(self) -> None:
+        """Test that _run_monitor_loop returns False when a network-level OSError occurs."""
+
+        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
+            await queue.put(None)
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=ConnectionResetError("Connection reset by peer"),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_non_transient_error_propagates(self) -> None:
+        """Test that non-transient errors (e.g. programming bugs) propagate instead of being retried."""
+
+        async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
+            await queue.put(None)
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=TypeError("unexpected keyword argument"),
+            ),
+        ):
+            with pytest.raises(TypeError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 
     @pytest.mark.asyncio
     async def test_reraises_temporal_error(self) -> None:
@@ -3610,6 +3653,7 @@ class TestRunMonitorLoop:
     @pytest.mark.asyncio
     async def test_cleans_up_tasks_on_transient_error(self) -> None:
         """Test that background tasks are cancelled even when a transient error occurs."""
+        from sqlalchemy.exc import OperationalError
 
         async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
             await queue.put(None)
@@ -3617,7 +3661,10 @@ class TestRunMonitorLoop:
         with (
             patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
             patch.object(
-                self.service, "_sync_activities_to_db", new_callable=AsyncMock, side_effect=RuntimeError("transient")
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=OperationalError("", [], Exception("pool exhausted")),
             ),
             patch.object(self.service, "_cancel_background_tasks", new_callable=AsyncMock) as mock_cancel,
         ):
