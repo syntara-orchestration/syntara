@@ -557,7 +557,8 @@ async def list_credentials(
     params: Annotated[CredentialListParams, Depends()],
 ) -> CredentialListResponse:
     # Strip domain-specific query params before passing to parse_filters()
-    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k != "for_action"]
+    excluded = set(CredentialListParams.model_fields)
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k not in excluded]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,
@@ -567,6 +568,9 @@ async def list_credentials(
         for_action=params.for_action,
     )
 ```
+
+Derive the exclusion set from `model_fields` rather than hardcoding field names — this
+prevents silent breakage when fields are renamed or added to the params model.
 
 When a params model has no domain-specific fields (only inherits `BaseListParams`),
 no stripping is needed — pass `request.query_params.items()` directly:
@@ -766,7 +770,32 @@ Each exclusion requires:
        )
    ```
 
-5. **Add filter params to the OpenAPI sub-spec** — since filter params are parsed by `parse_filters()` (not from model fields), they won't appear in the auto-generated spec. Add them manually to the endpoint's sub-spec YAML with the operator-based `allOf` pattern and `x-spec-only: true`:
+5. **Add `FilterableModel` dependency** — this generates deepObject-style filter params in the exported OpenAPI spec from model metadata, so the drift checker validates them:
+
+   ```python
+   from syntara.core.openapi.filterable import FilterableModel
+
+   @router.get("", operation_id="get_my_resources")
+   async def get_my_resources(
+       request: Request,
+       service: Annotated[MyResourceService, Depends(get_my_resource_service)],
+       params: Annotated[MyResourceListParams, Query()],
+       _filterable: Annotated[None, Depends(FilterableModel(MyResource))],
+   ) -> MyResourceListResponse:
+       ...
+   ```
+
+   `FilterableModel` introspects `__filterable_fields__` and classifies each field's type to determine the operator set:
+   - **String fields**: `eq`, `contains`, `starts_with`, `gt`, `gte`, `lt`, `lte`
+   - **Boolean/enum/UUID fields**: `eq` only
+   - **Datetime fields**: `eq`, `gt`, `gte`, `lt`, `lte`
+   - **Numeric fields** (int/float): `eq`, `gt`, `gte`, `lt`, `lte`
+
+   The dependency is a no-op at runtime (returns `None`) — filter parsing is still handled by `parse_filters()`. Its purpose is to generate the correct OpenAPI params at export time via `_inject_filter_params()` in `tools/export_openapi.py`.
+
+   > **Transitional state:** Some endpoints still use hand-authored filter params in sub-spec YAMLs with `x-spec-only: true` markers. The export-time injection is disabled until those markers are removed. New endpoints should still add `FilterableModel` — the injection will cover them once enabled.
+
+6. **Add filter params to the OpenAPI sub-spec** — until the `FilterableModel` injection is fully enabled, also add filter params manually to the endpoint's sub-spec YAML with the operator-based `allOf` pattern:
 
    ```yaml
    - name: status
@@ -789,11 +818,6 @@ Each exclusion requires:
        - Exact match: `status=ACTIVE` or `status[eq]=ACTIVE`
    ```
 
-   Use the appropriate operator set for the field type:
-   - **String fields**: `eq`, `contains`, `starts_with`, `gt`, `gte`, `lt`, `lte`
-   - **Boolean/enum/UUID fields**: `eq` only
-   - **Datetime fields**: `eq`, `gt`, `gte`, `lt`, `lte`
-
    Shared filter params (`name`, `created_at`, `updated_at`) can reference the reusable definitions in `shared-resources.openapi.yaml`:
 
    ```yaml
@@ -809,7 +833,7 @@ Each exclusion requires:
    make gen-contracts
    ```
 
-6. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic. Service methods use `list_` (domain action) rather than `get_` (HTTP verb):
+7. **Call `list_resources()` in your service** — pagination, filtering, sorting, and error handling are automatic. Service methods use `list_` (domain action) rather than `get_` (HTTP verb):
 
    ```python
    async def list_my_resources(
@@ -833,7 +857,7 @@ Each exclusion requires:
        )
    ```
 
-7. **Run `make test-api-compliance`** — if you used `ResourcesResponse[T]` and `BaseListParams`, the compliance tests pass automatically. If the standard pattern doesn't apply, add the endpoint to `list_compliance_exclusions.yaml` with a justification.
+8. **Run `make test-api-compliance`** — if you used `ResourcesResponse[T]` and `BaseListParams`, the compliance tests pass automatically. If the standard pattern doesn't apply, add the endpoint to `list_compliance_exclusions.yaml` with a justification.
 
 ---
 
@@ -1174,11 +1198,14 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 | `src/syntara/core/utils/sorting.py` | Sort parsing and application |
 | `src/syntara/core/utils/cursor.py` | Cursor encoding/decoding |
 | `src/syntara/core/constants.py` | Pagination constants |
+| `src/syntara/core/openapi/filterable.py` | `FilterableModel` dependency factory for OpenAPI filter param generation |
 | `src/syntara/core/services/base.py` | `BaseService.list_resources()` |
 | `src/syntara/core/models/error.py` | `ErrorData` model (RFC 9457 Problem Details) |
 | `src/syntara/core/error_handlers.py` | Error handler functions and `PROBLEM_TYPES` registry |
 | `src/syntara/core/exceptions.py` | `SafeValueError` definition |
 | `src/syntara/core/exception_registry.py` | `@fastapi_exception` decorator |
+| `tools/export_openapi.py` | OpenAPI spec export with `_inject_filter_params()` and `_inject_permission_metadata()` |
+| `tools/ci/check_openapi_spec.py` | Drift checker for sub-spec vs exported spec consistency |
 | `src/syntara/aap/router.py` | AAP proxy endpoints (known exception) |
 | `src/syntara/aap/models/responses.py` | `AAPListResponse` model (known exception) |
 | `src/syntara/authz/services/role_assignment_service.py` | Custom sorting/pagination (known exception — joined columns) |
@@ -1189,6 +1216,8 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 | `tests/unit/api/compliance/test_crud_endpoint_compliance.py` | CRUD endpoint compliance validation tests |
 | `tests/unit/api/compliance/test_crud_endpoint_discovery.py` | CRUD endpoint discovery mechanism tests |
 | `tests/unit/api/compliance/endpoint_discovery.py` | Discovery logic and helpers |
+| `tests/unit/api/compliance/test_filterable_model_compliance.py` | FilterableModel compliance validation tests |
+| `tests/unit/core/openapi/test_filterable.py` | FilterableModel unit tests |
 | `tests/unit/api/compliance/list_compliance_exclusions.yaml` | List exclusion registry with justifications |
 | `tests/unit/api/compliance/crud_compliance_exclusions.yaml` | CRUD exclusion registry with justifications |
 
