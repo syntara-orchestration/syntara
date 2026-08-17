@@ -3732,6 +3732,23 @@ class TestRunMonitorLoop:
                 await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 
     @pytest.mark.asyncio
+    async def test_integrity_error_propagates(self) -> None:
+        """Test that IntegrityError (constraint violation) is not treated as transient."""
+        from sqlalchemy.exc import IntegrityError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=IntegrityError("", [], Exception("unique constraint violated")),
+            ),
+        ):
+            with pytest.raises(IntegrityError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+    @pytest.mark.asyncio
     async def test_reraises_temporal_error(self) -> None:
         """Test that TemporalError propagates out of _run_monitor_loop without being caught."""
         from temporalio.exceptions import TemporalError
@@ -3792,6 +3809,7 @@ class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
     _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
+    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.random.random"
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
@@ -3825,6 +3843,7 @@ class TestMonitorExecutionRetry:
             patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
             patch.object(self.service, "_run_monitor_loop", side_effect=side_effect) as mock_loop,
             patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
         ):
             await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
 
@@ -3838,6 +3857,7 @@ class TestMonitorExecutionRetry:
             patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
             patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(5)),
             patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
         ):
             await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
 
@@ -3851,11 +3871,26 @@ class TestMonitorExecutionRetry:
             patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
             patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(8)),
             patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
         ):
             await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
 
         delays = [call.args[0] for call in mock_sleep.call_args_list]
         assert delays == [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0]
+
+    @pytest.mark.asyncio
+    async def test_jitter_reduces_delay(self) -> None:
+        """Test that jitter randomises sleep within [delay*0.5, delay)."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(3)),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=0.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        delays = [call.args[0] for call in mock_sleep.call_args_list]
+        assert delays == [0.5, 1.0]
 
     @pytest.mark.asyncio
     async def test_stops_retrying_on_shutdown(self) -> None:

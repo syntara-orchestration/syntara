@@ -6,6 +6,7 @@ to the database in real-time by streaming Temporal history events.
 
 import asyncio
 import json
+import random
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from uuid import UUID
 import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 from sqlalchemy import or_
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
@@ -1087,7 +1088,8 @@ class ActivitySyncService:
                     attempt=attempt,
                     delay_s=delay,
                 )
-                await asyncio.sleep(delay)
+                jittered_delay = delay * (0.5 + random.random() * 0.5)  # noqa: S311
+                await asyncio.sleep(jittered_delay)
                 delay = min(delay * _MONITOR_RETRY_BACKOFF_FACTOR, _MONITOR_RETRY_MAX_DELAY_S)
 
         except asyncio.CancelledError:
@@ -1145,7 +1147,7 @@ class ActivitySyncService:
             raise
         except TemporalError:
             raise
-        except (SQLAlchemyError, OSError):
+        except (OperationalError, InterfaceError, OSError):
             logger.exception(
                 "Transient error in monitor loop",
                 execution_id=execution_id,
@@ -2320,6 +2322,7 @@ class ActivitySyncService:
                 saved_next_activity_index = metadata.next_activity_index
                 saved_activity_index_map = dict(metadata.activity_index_map)
                 saved_terminal_activity_ids = set(metadata.terminal_activity_ids)
+                saved_last_processed_event_id = metadata.last_processed_event_id
 
                 # Update activities from events (only those marked for sync)
                 for scheduled_event_id in metadata.pending_sync_event_ids:
@@ -2375,6 +2378,7 @@ class ActivitySyncService:
                 metadata.next_activity_index = saved_next_activity_index
                 metadata.activity_index_map = saved_activity_index_map
                 metadata.terminal_activity_ids = saved_terminal_activity_ids
+                metadata.last_processed_event_id = saved_last_processed_event_id
                 logger.exception(
                     "Error syncing activities to database for execution", execution_id=metadata.execution_id
                 )
