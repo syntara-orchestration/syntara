@@ -1068,6 +1068,32 @@ describe('useWorkflowStore', () => {
       expect(useWorkflowStore.getState().isDirty).toBe(true)
     })
 
+    it('wrappedUndo keeps isDirty true when non-temporal dirty changes exist', () => {
+      useWorkflowStore.getState().loadWorkflowWithEdges(makeWorkflow('Test'), [])
+
+      useWorkflowStore.getState().markDirty()
+      useWorkflowStore
+        .getState()
+        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      completeTemporalBatch()
+
+      wrappedUndo()
+      expect(useWorkflowStore.temporal.getState().pastStates.length).toBe(0)
+      expect(useWorkflowStore.getState().isDirty).toBe(true)
+    })
+
+    it('wrappedUndo keeps isDirty true when undoing past a save point', () => {
+      useWorkflowStore.getState().loadWorkflowWithEdges(makeWorkflow('v0'), [])
+
+      useWorkflowStore.getState().updateWorkflow((wf) => ({ ...wf, name: 'v1' }))
+      useWorkflowStore.getState().markClean()
+      expect(useWorkflowStore.getState().isDirty).toBe(false)
+
+      wrappedUndo()
+      expect(useWorkflowStore.temporal.getState().pastStates.length).toBe(0)
+      expect(useWorkflowStore.getState().isDirty).toBe(true)
+    })
+
     // --- Edge undo ---
 
     it('undoes edge changes', () => {

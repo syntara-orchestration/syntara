@@ -166,6 +166,8 @@ export type WorkflowStore = {
    */
   _positionsUserModified: boolean
   isDirty: boolean // Tracks whether changes have been made since last save/load
+  _undoBaselineMatchesSave: boolean // true when temporal baseline (pastStates=0) is the saved state
+  _nonTemporalDirty: boolean // true when markDirty() was called for changes not tracked by undo
   validationErrorCount: number // Number of errors from last verification; persists until re-verify
   setValidationErrorCount: (count: number) => void
   setWorkflow: (workflow: WorkflowDefinition | null, projectId?: string | null) => void
