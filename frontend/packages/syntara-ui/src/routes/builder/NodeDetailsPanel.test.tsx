@@ -288,8 +288,8 @@ describe('NodeDetailsPanel', () => {
       category: 'task',
       formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => Promise<boolean> }) => (
         <button
-          onClick={() => {
-            void onSubmit({}).then(onFormSettled)
+          onClick={async () => {
+            onFormSettled(await onSubmit({}))
           }}
           type="button"
         >
