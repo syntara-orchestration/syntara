@@ -1,6 +1,6 @@
 """IdP group mapping entry model.
 
-Maps identity provider group values to Nexus groups in a dedicated table,
+Maps identity provider group values to Syntara groups in a dedicated table,
 enabling FK constraints and ON DELETE CASCADE.
 """
 
@@ -11,16 +11,16 @@ from sqlmodel import Field, SQLModel
 
 
 class IdpGroupMappingEntry(SQLModel, table=True):
-    """Maps a single IdP group value to a Nexus group."""
+    """Maps a single IdP group value to a Syntara group."""
 
     __tablename__ = "idp_group_mapping_entries"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     identity_provider_id: UUID = Field(foreign_key="identity_providers.id", ondelete="CASCADE", index=True)
     idp_group_value: str = Field(min_length=1)
-    nexus_group_id: UUID = Field(foreign_key="groups.id", ondelete="CASCADE", index=True)
+    mapped_group_id: UUID = Field(foreign_key="groups.id", ondelete="CASCADE", index=True)
 
-    __table_args__ = (UniqueConstraint("identity_provider_id", "idp_group_value", "nexus_group_id"),)
+    __table_args__ = (UniqueConstraint("identity_provider_id", "idp_group_value", "mapped_group_id"),)
 
 
 class IdpGroupMappingEntryRead(SQLModel):
@@ -28,11 +28,11 @@ class IdpGroupMappingEntryRead(SQLModel):
 
     id: UUID
     idp_group_value: str
-    nexus_group_id: UUID
+    mapped_group_id: UUID
 
 
 class IdpGroupMappingEntryCreate(SQLModel):
     """Create schema for a group mapping entry."""
 
     idp_group_value: str = Field(min_length=1)
-    nexus_group_id: UUID
+    mapped_group_id: UUID

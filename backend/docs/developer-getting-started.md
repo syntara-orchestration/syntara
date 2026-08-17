@@ -1,6 +1,6 @@
 # Developer Getting Started Guide
 
-Welcome to Nexus! This guide provides architectural deep-dives and practical examples to help you understand and work with our codebase patterns.
+Welcome to Syntara! This guide provides architectural deep-dives and practical examples to help you understand and work with our codebase patterns.
 
 For setup instructions, see [README.md](../README.md).
 
@@ -42,7 +42,7 @@ class ToolProvider(Resource, table=True):
 
 ## Router Discovery Framework
 
-Nexus automatically discovers and registers FastAPI routers following specific conventions:
+Syntara automatically discovers and registers FastAPI routers following specific conventions:
 
 ### File Locations
 - `src/syntara/{domain}/router.py`
@@ -80,7 +80,7 @@ The discovery system (`src/syntara/core/router_discovery.py`) automatically scan
 
 ## Tool Manager Example - Complete Pattern
 
-`src/syntara/tool_manager/` demonstrates the full Nexus architecture pattern:
+`src/syntara/tool_manager/` demonstrates the full Syntara architecture pattern:
 
 ### 1. Models (`tool_manager/models/`)
 
@@ -165,7 +165,7 @@ async def create_provider(
 
 ## OpenAPI Schema Integration
 
-Nexus uses a structured approach to OpenAPI documentation:
+Syntara uses a structured approach to OpenAPI documentation:
 
 ### Shared Resources (`src/syntara/schemas/base/shared-resources.openapi.yaml`)
 ```yaml

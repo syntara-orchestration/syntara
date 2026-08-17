@@ -20,7 +20,7 @@ import httpx
 import pytest
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 from tests.e2e.service_accounts import create_sa, create_sa_with_credential, poll_until_status, token_request
@@ -44,7 +44,7 @@ class TestCrossProjectDelegation:
 
     def test_cross_project_delegation_full_flow(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
     ) -> None:
@@ -55,7 +55,7 @@ class TestCrossProjectDelegation:
 
         cred = admin_api.service_account_credentials.create(
             service_account_id=sa.id,
-            body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+            body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
         ).assert_and_get()
 
         admin_api.projects.create_role_assignment(
@@ -67,12 +67,12 @@ class TestCrossProjectDelegation:
         )
 
         try:
-            resp = token_request(nexus_base_url, cred.identifier, cred.client_secret)
+            resp = token_request(syntara_base_url, cred.identifier, cred.client_secret)
             assert resp.status_code == HTTPStatus.OK
             access_token = resp.parsed.access_token
 
             me_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/auth/me",
+                f"{syntara_base_url}/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -81,7 +81,7 @@ class TestCrossProjectDelegation:
 
             # SA can create a child SA in Project B (cross-project)
             child_resp = httpx.post(
-                f"{nexus_base_url}/api/v1/service_accounts",
+                f"{syntara_base_url}/api/v1/service_accounts",
                 json={"name": "xproj-child-sa", "project_id": str(proj_b_id)},
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
@@ -93,7 +93,7 @@ class TestCrossProjectDelegation:
 
             # SA cannot create in a project it has no role in
             proj_a_create = httpx.post(
-                f"{nexus_base_url}/api/v1/service_accounts",
+                f"{syntara_base_url}/api/v1/service_accounts",
                 json={"name": "xproj-noaccess-sa", "project_id": str(proj_a_id)},
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
@@ -104,7 +104,7 @@ class TestCrossProjectDelegation:
 
             # Clean up child SA
             httpx.delete(
-                f"{nexus_base_url}/api/v1/service_accounts/{child_sa_id}",
+                f"{syntara_base_url}/api/v1/service_accounts/{child_sa_id}",
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -123,7 +123,7 @@ class TestFullLifecycle:
 
     def test_full_sa_lifecycle(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
     ) -> None:
@@ -142,13 +142,13 @@ class TestFullLifecycle:
 
         try:
             # --- 2. Authenticate ---
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
             access_token = resp.parsed.access_token
 
             # --- 3. Authorized access ---
             me_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/auth/me",
+                f"{syntara_base_url}/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -163,7 +163,7 @@ class TestFullLifecycle:
             cred_id = cred_list.resources[0].id
 
             rotate_resp = httpx.post(
-                f"{nexus_base_url}/api/v1/service_accounts/{sa.id}/credentials/{cred_id}/rotate",
+                f"{syntara_base_url}/api/v1/service_accounts/{sa.id}/credentials/{cred_id}/rotate",
                 json={"grace_period_seconds": self.GRACE_PERIOD_SECONDS},
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
@@ -172,36 +172,36 @@ class TestFullLifecycle:
             new_secret = rotate_resp.json()["client_secret"]
 
             # --- 5. Grace period: old secret still works ---
-            old_secret_resp = token_request(nexus_base_url, client_id, client_secret)
+            old_secret_resp = token_request(syntara_base_url, client_id, client_secret)
             assert old_secret_resp.status_code == HTTPStatus.OK, "Old secret should still work during grace period"
 
             # New secret also works
-            new_secret_resp = token_request(nexus_base_url, client_id, new_secret)
+            new_secret_resp = token_request(syntara_base_url, client_id, new_secret)
             assert new_secret_resp.status_code == HTTPStatus.OK, "New secret should work immediately"
 
             # Wait for grace period to expire
             time.sleep(self.GRACE_PERIOD_SECONDS + 1)
 
-            old_secret_expired = token_request(nexus_base_url, client_id, client_secret)
+            old_secret_expired = token_request(syntara_base_url, client_id, client_secret)
             assert old_secret_expired.status_code == HTTPStatus.UNAUTHORIZED, (
                 "Old secret should be rejected after grace period expires"
             )
 
             # New secret still works after grace expiry
-            post_grace_resp = token_request(nexus_base_url, client_id, new_secret)
+            post_grace_resp = token_request(syntara_base_url, client_id, new_secret)
             assert post_grace_resp.status_code == HTTPStatus.OK
             fresh_token = post_grace_resp.parsed.access_token
 
             # --- 6. Disable → deny ---
             admin_api.service_accounts.disable(service_account_id=sa.id)
 
-            rejection = poll_until_status(nexus_base_url, fresh_token, HTTPStatus.UNAUTHORIZED)
+            rejection = poll_until_status(syntara_base_url, fresh_token, HTTPStatus.UNAUTHORIZED)
             assert rejection.status_code == HTTPStatus.UNAUTHORIZED, (
                 f"Token should be rejected after disable, got {rejection.status_code}"
             )
 
             # Token endpoint also rejects disabled SA
-            disabled_auth = token_request(nexus_base_url, client_id, new_secret)
+            disabled_auth = token_request(syntara_base_url, client_id, new_secret)
             assert disabled_auth.status_code == HTTPStatus.UNAUTHORIZED, "Disabled SA should not obtain new tokens"
 
         finally:

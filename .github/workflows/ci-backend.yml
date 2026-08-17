@@ -387,6 +387,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -428,6 +429,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -470,6 +472,11 @@ jobs:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
       PYTEST_XDIST_AUTO_NUM_WORKERS: "8"
+      SYNTARA_TELEMETRY_OVERHEAD_THRESHOLD_PCT: "50"
+      AUDIT_DRAIN_CYCLE_BASELINE_MS: "2000"
+      TOKEN_CONCURRENT_P95_THRESHOLD_MS: "15000"
+      TOKEN_CONCURRENT_CAPACITY_P95_THRESHOLD_MS: "20000"
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
 
     steps:
       - name: Checkout code
@@ -515,6 +522,8 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
     steps:
       - name: Free disk space
         run: |
@@ -551,57 +560,66 @@ jobs:
           RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
         run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
 
+      - name: Diagnose podman environment
+        run: |
+          podman --version
+          podman info --format json | python3 -c '
+          import sys, json
+          h = json.load(sys.stdin)["host"]
+          print("EventLogger=" + str(h.get("eventLogger", "?")))
+          print("CgroupVersion=" + str(h.get("cgroupVersion", h.get("cgroupsVersion", "?"))))
+          '
+
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_SEGMENT_WRITE_KEY: test-e2e-write-key
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
+          # The E2E MCP test server resolves to a private container IP; allowlist it so the
+          # write-time integration SSRF check accepts base_url=http://mcp-server:.../mcp.
+          APP_INTEGRATION_URL_ALLOWED_HOSTS: '["mcp-server"]'
         run: |
           ulimit -n 65535
+          # --no-deps: start all containers immediately without health dependency ordering.
+          # On Podman 5.x (events_logger=file), healthcheck timers are never created,
+          # so compose would hang waiting for depends_on service_healthy conditions.
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios up --build -d --no-deps \
+            database redis moto mcp-server mcp-server-scenarios mock-segment \
+            temporal syntara temporal-worker temporal-background-worker
 
-          COMPOSE="uvx podman-compose -p syntara-ci --profile telemetry-e2e"
+      - name: Verify services are healthy
+        timeout-minutes: 5
+        run: |
+          wait_healthy() {
+            local ctr=$1 timeout=${2:-120} elapsed=0
+            echo "Waiting for $ctr (timeout: ${timeout}s)..."
+            while [ $elapsed -lt $timeout ]; do
+              podman healthcheck run "$ctr" >/dev/null 2>&1 || true
+              status=$(podman inspect --format '{{.State.Health.Status}}' "$ctr" 2>/dev/null || echo "unknown")
+              if [ "$status" = "healthy" ]; then
+                echo "  $ctr is healthy (${elapsed}s)"
+                return 0
+              fi
+              sleep 5
+              elapsed=$((elapsed + 5))
+            done
+            echo "ERROR: $ctr not healthy after ${timeout}s (status: $status)"
+            podman inspect --format '{{json .State.Health}}' "$ctr" 2>&1 || true
+            return 1
+          }
 
-          # --no-deps: start services without waiting for compose's
-          # depends_on/service_healthy resolution. GH Actions runner image
-          # 20260810+ ships a podman version where podman-compose hangs
-          # indefinitely during dependency health resolution. We start in
-          # waves and use podman wait --condition=healthy between them.
+          # Wave 1: infrastructure (no upstream dependencies)
+          for svc in database redis moto mcp-server mcp-server-scenarios mock-segment; do
+            wait_healthy "syntara-ci_${svc}_1" 120
+          done
 
-          # Build locally-built images (syntara image is shared by workers)
-          $COMPOSE build syntara mcp-server
-
-          # Wave 1: infrastructure (no inter-service dependencies)
-          echo "::group::Wave 1: infrastructure"
-          $COMPOSE up --no-deps -d database redis moto mcp-server mock-segment
-          echo "::endgroup::"
-          echo "Waiting for infrastructure..."
-          podman wait --condition=healthy \
-            syntara-ci_database_1 \
-            syntara-ci_redis_1 \
-            syntara-ci_moto_1 \
-            syntara-ci_mcp-server_1 \
-            syntara-ci_mock-segment_1
-          echo "Infrastructure is healthy"
-
-          # Wave 2: temporal (needs database)
-          echo "::group::Wave 2: temporal"
-          $COMPOSE up --no-deps -d temporal
-          echo "::endgroup::"
-          echo "Waiting for temporal..."
-          podman wait --condition=healthy syntara-ci_temporal_1
-          echo "Temporal is healthy"
-
-          # Wave 3: application services (need temporal + infra)
-          echo "::group::Wave 3: application"
-          $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker
-          echo "::endgroup::"
-          echo "Waiting for application services..."
-          podman wait --condition=healthy \
-            syntara-ci_syntara_1 \
-            syntara-ci_temporal-worker_1 \
-            syntara-ci_temporal-background-worker_1
+          # Wave 2: services that depend on infrastructure
+          for svc in temporal syntara temporal-worker temporal-background-worker; do
+            wait_healthy "syntara-ci_${svc}_1" 180
+          done
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
@@ -612,6 +630,7 @@ jobs:
           retry_wait_seconds: 30
           command: cd backend && make test-e2e
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000
           APP_WORKER_BASE_URL: https://host.containers.internal:8000
           APP_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -633,12 +652,12 @@ jobs:
         if: failure()
         run: |
           echo "=== Compose logs ==="
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios logs database temporal syntara temporal-worker temporal-background-worker mcp-server mcp-server-scenarios mock-segment
 
       - name: Cleanup
         if: always()
         run: |
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e down -v || true
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios down -v || true
 
 
   combine:
@@ -975,11 +994,13 @@ jobs:
 
   snyk-sast:
     uses: ./.github/workflows/sast-snyk.yml
-    secrets: inherit
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   snyk-sca:
     uses: ./.github/workflows/sca-snyk.yml
-    secrets: inherit
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   required-checks:
     name: (Backend) Required Checks

@@ -22,8 +22,8 @@ metadata:
   namespace: nexus-tenant
 spec:
   timeouts:
-    pipeline: "8h"
-    tasks: "6h"
+    pipeline: "10h"
+    tasks: "8h"
     finally: "2h"
   params:
     - name: git-url
@@ -41,7 +41,7 @@ spec:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:6b24773b147242294ede80e08e0dffceb25a3af81f09823c4dc3a67a7e2e5b64
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:ba7f30c4125928fb7357d9c5ac2d4c9dfcfda15f40b0e0ce3078eadeae3652b6
       - name: kind
         value: pipeline
       - name: secret

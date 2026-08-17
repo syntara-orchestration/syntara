@@ -8,11 +8,11 @@ from datetime import datetime
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.workflows.models.validation_finding import ValidationResult
 
 
-class WorkflowError(NexusError):
+class WorkflowError(SyntaraError):
     """Base exception for all workflow errors."""
 
 
@@ -132,6 +132,20 @@ class TemporalUnavailableError(WorkflowError):
         """
         self.operation = operation
         super().__init__(f"Temporal service unavailable - cannot perform {operation}")
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_concurrency_limit_handler")
+class WorkflowConcurrencyLimitError(WorkflowError):
+    """Raised when the active workflow count has reached the configured limit."""
+
+    def __init__(self, limit: int, active: int) -> None:
+        """Initialize with the configured limit and current active count."""
+        self.limit = limit
+        self.active = active
+        super().__init__(
+            f"Workflow concurrency limit reached: {active}/{limit} active workflows. "
+            "Wait for a workflow to complete before starting a new one."
+        )
 
 
 # ============================================================================

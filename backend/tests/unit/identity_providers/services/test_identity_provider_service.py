@@ -23,13 +23,13 @@ from syntara.identity_providers.exceptions import (
 from syntara.identity_providers.models.identity_provider import (
     IdentityProvider,
     IdentityProviderCreate,
-    IdentityProviderPatch,
+    IdentityProviderUpdate,
 )
 from syntara.identity_providers.models.identity_provider_configuration import (
     OIDCClaimMapping,
     OIDCConfiguration,
-    OIDCConfigurationPatch,
     OIDCConfigurationResponse,
+    OIDCConfigurationUpdate,
     OIDCGroupMappingEntry,
 )
 from syntara.identity_providers.services.identity_provider_service import (
@@ -41,7 +41,7 @@ def _make_oidc_config(**overrides: object) -> OIDCConfiguration:
     """Build an OIDCConfiguration with sensible defaults."""
     defaults = {
         "issuer_url": "https://idp.example.com",
-        "client_id": "nexus-client",
+        "client_id": "syntara-client",
         "client_secret": "super-secret",
         "redirect_uri": "http://localhost:3000/auth/callback",
     }
@@ -87,7 +87,7 @@ def _make_provider(**overrides: object) -> IdentityProvider:
         "enabled": True,
         "configuration": OIDCConfigurationResponse(
             issuer_url="https://idp.example.com",
-            client_id="nexus-client",
+            client_id="syntara-client",
             redirect_uri="http://localhost:3000/auth/callback",
         ),
         "secret_id": uuid4(),
@@ -216,7 +216,7 @@ async def test_get_provider_not_found_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_patch_provider_name() -> None:
+async def test_update_provider_name() -> None:
     """Patching only the name should preserve other fields."""
     provider = _make_provider(name="OriginalName", description="original desc")
     mock_session = _make_mock_session()
@@ -234,9 +234,9 @@ async def test_patch_provider_name() -> None:
     mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
 
     service = _make_service(mock_session)
-    response = await service.patch_provider(
+    response = await service.update_provider(
         provider.id,
-        IdentityProviderPatch(name="UpdatedName"),
+        IdentityProviderUpdate(name="UpdatedName"),
     )
 
     assert response.name == "UpdatedName"
@@ -244,7 +244,7 @@ async def test_patch_provider_name() -> None:
 
 
 @pytest.mark.asyncio
-async def test_patch_provider_not_found_raises() -> None:
+async def test_update_provider_not_found_raises() -> None:
     """Patching a non-existent provider should raise IdentityProviderNotFoundError."""
     mock_session = _make_mock_session()
     mock_result = MagicMock()
@@ -254,16 +254,16 @@ async def test_patch_provider_not_found_raises() -> None:
     service = _make_service(mock_session)
 
     with pytest.raises(IdentityProviderNotFoundError):
-        await service.patch_provider(uuid4(), IdentityProviderPatch(name="Ghost"))
+        await service.update_provider(uuid4(), IdentityProviderUpdate(name="Ghost"))
 
 
 @pytest.mark.asyncio
-async def test_patch_provider_configuration_preserves_claim_mapping() -> None:
+async def test_update_provider_configuration_preserves_claim_mapping() -> None:
     """Patching config without claim_mapping preserves the existing one."""
     custom_mapping = OIDCClaimMapping(subject="sub", email="mail", username="upn", first_name="displayName")
     config = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
         claim_mapping=custom_mapping,
     )
@@ -279,15 +279,15 @@ async def test_patch_provider_configuration_preserves_claim_mapping() -> None:
     mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
 
     service = _make_service(mock_session)
-    patch_config = OIDCConfigurationPatch(
+    patch_config = OIDCConfigurationUpdate(
         issuer_url="https://new-issuer.example.com",
         client_id="new-client",
         redirect_uri="http://localhost:3000/auth/callback",
         enable_rp_initiated_logout=False,
     )
-    response = await service.patch_provider(
+    response = await service.update_provider(
         provider.id,
-        IdentityProviderPatch(configuration=patch_config),
+        IdentityProviderUpdate(configuration=patch_config),
     )
 
     # claim_mapping should be preserved from original
@@ -296,11 +296,11 @@ async def test_patch_provider_configuration_preserves_claim_mapping() -> None:
 
 
 @pytest.mark.asyncio
-async def test_patch_provider_configuration_preserves_jmespath() -> None:
+async def test_update_provider_configuration_preserves_jmespath() -> None:
     """Patching config without group_jmespath_expression preserves the existing one."""
     config = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
         group_jmespath_expression="token.groups",
     )
@@ -316,15 +316,15 @@ async def test_patch_provider_configuration_preserves_jmespath() -> None:
     mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
 
     service = _make_service(mock_session)
-    patch_config = OIDCConfigurationPatch(
+    patch_config = OIDCConfigurationUpdate(
         issuer_url="https://new.example.com",
         client_id="new-client",
         redirect_uri="http://localhost:3000/auth/callback",
         enable_rp_initiated_logout=False,
     )
-    response = await service.patch_provider(
+    response = await service.update_provider(
         provider.id,
-        IdentityProviderPatch(configuration=patch_config),
+        IdentityProviderUpdate(configuration=patch_config),
     )
 
     assert response.configuration.group_jmespath_expression == "token.groups"
@@ -480,11 +480,30 @@ def test_extract_group_mapping_entries_empty() -> None:
 def test_extract_group_mapping_entries_populated() -> None:
     """Extracting entries from config with entries returns them."""
     group_id = uuid4()
-    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", nexus_group_id=group_id)]
+    entries_in = [OIDCGroupMappingEntry(idp_group_value="role-a", mapped_group_id=group_id)]
     config = _make_oidc_config(group_mapping_entries=entries_in)
     entries_out = IdentityProviderService._extract_group_mapping_entries(config)
     assert len(entries_out) == 1
     assert entries_out[0].idp_group_value == "role-a"
+
+
+@pytest.mark.asyncio
+async def test_save_group_mapping_entries_stores_entry_rows() -> None:
+    """_save_group_mapping_entries validates group existence and inserts mapping rows."""
+    mock_session = _make_mock_session()
+    provider_id = uuid4()
+    group_id = uuid4()
+
+    mock_result = MagicMock()
+    mock_result.all.return_value = [group_id]
+    mock_session.exec = AsyncMock(return_value=mock_result)
+
+    service = _make_service(mock_session)
+    entries = [OIDCGroupMappingEntry(idp_group_value="admins", mapped_group_id=group_id)]
+
+    await service._save_group_mapping_entries(provider_id, entries)
+
+    mock_session.add.assert_called_once()
 
 
 def test_extract_group_mapping_entries_empty_list() -> None:
@@ -543,7 +562,7 @@ async def test_get_decrypted_config() -> None:
 
     config_data = OIDCConfigurationResponse(
         issuer_url="https://idp.example.com",
-        client_id="nexus-client",
+        client_id="syntara-client",
         redirect_uri="http://localhost:3000/auth/callback",
     )
     provider = _make_provider(name="DecryptTest", configuration=config_data, secret_id=secret_id)

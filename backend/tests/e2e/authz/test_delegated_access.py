@@ -44,7 +44,7 @@ def delegated_access_env(
     create_user: UserFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
     create_workflow: WorkflowFactory,
-    nexus_base_url: str,
+    syntara_base_url: str,
 ):
     """Create project, manager role, viewer role, manager user, newcomer user."""
     # Create project
@@ -68,7 +68,7 @@ def delegated_access_env(
     # Seed a workflow for the newcomer to read later
     create_workflow(admin_api, project_id, "tc13")
 
-    mgr_api = api_for(nexus_base_url, mgr_name, mgr_pass)
+    mgr_api = api_for(syntara_base_url, mgr_name, mgr_pass)
     return {
         "project_id": project_id,
         "viewer_role": viewer_role,
@@ -76,7 +76,7 @@ def delegated_access_env(
         "new_user": new_name,
         "new_pass": new_pass,
         "mgr_api": mgr_api,
-        "base_url": nexus_base_url,
+        "base_url": syntara_base_url,
     }
 
 

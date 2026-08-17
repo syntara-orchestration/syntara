@@ -12,6 +12,7 @@ import { NxPanel } from '../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import {
   FILE_STORAGE_UNAVAILABLE_MESSAGE,
   FILE_STORAGE_UNCONFIGURED_MESSAGE,
@@ -29,6 +30,20 @@ import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
 const basePath = AppRoute.SystemAdministration.Settings
+
+function buildBulkUpdates(
+  edits: Map<string, unknown>,
+  allSettings: { key: string; version: number }[]
+): Array<{ key: string; value: unknown; expected_version: number }> {
+  return Array.from(edits.entries()).reduce<Array<{ key: string; value: unknown; expected_version: number }>>(
+    (acc, [key, value]) => {
+      const setting = allSettings.find((s) => s.key === key)
+      if (setting) acc.push({ key, value, expected_version: setting.version })
+      return acc
+    },
+    []
+  )
+}
 
 function FileStorageAlert() {
   const { isConfigured, status } = useFileStorageStatus()
@@ -139,16 +154,8 @@ export default function Settings() {
   )
 
   const handleSave = useCallback(() => {
-    const updates = Array.from(edits.entries()).reduce<
-      Array<{ key: string; value: unknown; expected_version: number }>
-    >((acc, [key, value]) => {
-      const setting = allSettings.find((s) => s.key === key)
-      if (setting) acc.push({ key, value, expected_version: setting.version })
-      return acc
-    }, [])
-
     bulkUpdate(
-      { body: { updates } },
+      { body: { updates: buildBulkUpdates(edits, allSettings) } },
       {
         onSuccess: () => {
           setEdits(new Map())
@@ -172,6 +179,13 @@ export default function Settings() {
 
   const hasChanges = edits.size > 0
   const hasValidationErrors = validationErrors.size > 0
+
+  useDirtyFormGuard({
+    isDirty: hasChanges,
+    onDiscard: () => setEdits(new Map()),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved setting changes. Your changes will be lost if you leave.',
+  })
 
   if (!canRead || isForbidden) {
     return (

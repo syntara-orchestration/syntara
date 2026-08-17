@@ -20,9 +20,9 @@ from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.integration_create import IntegrationCreate
-from syntara_api_client.models.integration_patch import IntegrationPatch
 from syntara_api_client.models.integration_scope import IntegrationScope
 from syntara_api_client.models.integration_type import IntegrationType
+from syntara_api_client.models.integration_update import IntegrationUpdate
 from syntara_api_client.models.mcp_server_configuration_input import MCPServerConfigurationInput
 from syntara_api_client.models.project_create import ProjectCreate
 
@@ -110,7 +110,7 @@ class TestExecutionTimeScopeViolation:
                 name=unique_name("e2e-scope-violation"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-scope-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )
@@ -196,7 +196,7 @@ class TestNarrowGlobalToProjectScoped:
                 name=unique_name("e2e-narrow-scope"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-narrow-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.GLOBAL,
             )
@@ -238,7 +238,7 @@ class TestNarrowGlobalToProjectScoped:
 
             syntara_api.integrations.update(
                 integration_id=integration_id,
-                body=IntegrationPatch(scope=IntegrationScope.PROJECT),
+                body=IntegrationUpdate(scope=IntegrationScope.PROJECT),
             ).assert_and_get()
             syntara_api.integrations.assign_project(
                 integration_id=integration_id,
@@ -316,7 +316,7 @@ class TestExecutionTimeIntegrationStateErrors:
                 name=unique_name("e2e-disabled-integ"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-disabled-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )
@@ -345,7 +345,7 @@ class TestExecutionTimeIntegrationStateErrors:
 
             syntara_api.integrations.update(
                 integration_id=integration_id,
-                body=IntegrationPatch(enabled=False),
+                body=IntegrationUpdate(enabled=False),
             ).assert_and_get()
 
             execution = syntara_api.executions.create(
@@ -394,7 +394,7 @@ class TestExecutionTimeIntegrationStateErrors:
                 name=unique_name("e2e-deleted-integ"),
                 integration_type=IntegrationType.MCP_SERVER,
                 configuration=MCPServerConfigurationInput(
-                    base_url="https://mcp-deleted-test.example.com",
+                    base_url="https://example.com",
                 ),
                 scope=IntegrationScope.PROJECT,
             )

@@ -20,7 +20,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -90,7 +90,7 @@ class _ValidationRoute(APIRoute):
         return handler
 
 
-router = NexusRouter(prefix="/workflows", tags=["Workflows"])
+router = SyntaraRouter(prefix="/workflows", tags=["Workflows"])
 
 _wf_perm_read = PermissionChecker(
     "workflow",
@@ -233,22 +233,28 @@ def get_execution_service(
 # ============================================================================
 
 
-_validate_router = NexusRouter(route_class=_ValidationRoute)
+_validate_router = SyntaraRouter(route_class=_ValidationRoute)
 
 
 @_validate_router.post(
     "/validate",
     summary="Validate workflow definition",
     response_model=ValidationResult,
-    dependencies=[Depends(_wf_perm_create)],
+    dependencies=[NO_PERMISSION],
     operation_id="validate_workflow_definition",
     response_description="Validation result",
     responses={422: {"model": DetailedValidationProblemDetail, "description": "Unprocessable Content"}},
 )
 async def validate_workflow_definition(
     request: WorkflowValidateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],  # noqa: ARG001
 ) -> ValidationResult:
-    """Validate a workflow definition without saving it."""
+    """Validate a workflow definition without saving it.
+
+    Requires authentication but no specific workflow/project permission:
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
+    """
     result = workflow_validator.collect_findings(request.workflow_definition)
     if not result.is_valid:
         raise WorkflowDefinitionInvalidError(result)

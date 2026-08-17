@@ -4,12 +4,13 @@ import { expect, test as base, type Page, type Request } from '@playwright/test'
 import { APP_TITLE } from './helpers/appTitle'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
+import { type XfailEntry, loadXfailEntries, matchesXfail } from './xfailFromUrl'
 
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
 ).env
-export const appBaseUrl: string = processEnv['NEXUS_E2E_BASE_URL'] ?? 'http://localhost:4173'
-const e2ePassword: string | undefined = processEnv['NEXUS_E2E_PASSWORD']
+export const appBaseUrl: string = processEnv['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
+const e2ePassword: string | undefined = processEnv['SYNTARA_E2E_PASSWORD']
 const isRealBackend: boolean = isSkipWebServerForPlaywrightTests()
 
 export const toAppUrl = (path: string): string => new URL(path, appBaseUrl).toString()
@@ -68,7 +69,36 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
   ...fixtures.actionFixtures,
 })
 
-export const test = currentsBase.extend<
+const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
+  _xfailEntries: [
+    async ({}, use) => {
+      const base = processEnv['SYNTARA_XFAIL_SOURCE']
+      if (!base) {
+        await use([])
+        return
+      }
+      const source = base.endsWith('/') ? `${base}playwright.md` : `${base}/playwright.md`
+      const entries = await loadXfailEntries(source)
+      if (entries.length > 0) {
+        process.stderr.write(`xfail: loaded ${entries.length} pattern(s) from ${source}\n`)
+      }
+      await use(entries)
+    },
+    { scope: 'worker' },
+  ],
+  _xfailCheck: [
+    async ({ _xfailEntries }, use, testInfo) => {
+      const match = matchesXfail(testInfo, _xfailEntries)
+      if (match) {
+        testInfo.fail(true, `xfail: ${match.reason}`)
+      }
+      await use()
+    },
+    { auto: true },
+  ],
+})
+
+export const test = xfailBase.extend<
   { app: Page; auditorApp: Page; viewerApp: Page; userApp: Page; projectAdminApp: Page },
   { roleSetup: RoleSetupResult | null }
 >({
@@ -142,5 +172,34 @@ export const test = currentsBase.extend<
     await context.close()
   },
 })
+
+/**
+ * Creates a describe-scoped guard that skips all remaining tests without
+ * setting up fixtures once a data-availability check fails.
+ *
+ * Configures the enclosing describe as `mode: 'serial'` so the unavailable
+ * flag reliably propagates across tests (with `fullyParallel: true`, parallel
+ * tests land on separate workers that each have their own flag).
+ *
+ * Usage inside a test.describe:
+ *   const guard = createUnavailableGuard('No data available')
+ *   test.beforeEach(async ({ app }) => {
+ *     const hasData = await checkData(app)
+ *     if (!hasData) guard.markUnavailable()
+ *     test.skip(!hasData, 'No data available')
+ *   })
+ */
+export function createUnavailableGuard(reason: string) {
+  let unavailable = false
+  test.describe.configure({ mode: 'serial' })
+  test.beforeEach(() => {
+    test.skip(unavailable, reason)
+  })
+  return {
+    markUnavailable: () => {
+      unavailable = true
+    },
+  }
+}
 
 export { expect, type Page, type Request }

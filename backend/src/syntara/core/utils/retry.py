@@ -76,7 +76,7 @@ def is_retryable_error(error: Exception) -> bool:
         True if error should trigger retry, False otherwise
 
     """
-    # Check Nexus RetryableError marker and OpenAI SDK exceptions (primary path)
+    # Check Syntara RetryableError marker and OpenAI SDK exceptions (primary path)
     if isinstance(
         error,
         RetryableError | openai.APIConnectionError | openai.APITimeoutError | openai.RateLimitError,

@@ -14,12 +14,13 @@ import structlog
 from referencing.exceptions import Unresolvable
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
-from sqlmodel import and_, select
+from sqlmodel import and_, col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
@@ -34,6 +35,7 @@ from syntara.workflows.exceptions import (
     ExecutionNotRetryableError,
     TemporalUnavailableError,
     TriggerValidationError,
+    WorkflowConcurrencyLimitError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
@@ -56,6 +58,7 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
 if TYPE_CHECKING:
     from syntara.metrics.recorder import MetricsRecorder
@@ -63,6 +66,30 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 MAX_CALLBACK_ERROR_MSG_LENGTH = 500
+
+
+async def count_active_executions(session: "AsyncSession") -> int:
+    """Return the number of non-terminal, non-deleted executions.
+
+    Used by the concurrency gate in both ExecutionService and
+    ScheduledExecutionLauncher to avoid duplicating the query.
+
+    Note — TOCTOU: this count and the subsequent execution creation are not
+    serialised inside a single transaction. Concurrent requests can both read
+    the same count, both pass the gate, and both start new workflows, briefly
+    exceeding the configured limit.  For a soft cap this is acceptable; if
+    stricter enforcement is needed, serialise with SELECT ... FOR UPDATE or an
+    advisory lock scoped to the namespace.
+    """
+    active_count = await session.scalar(
+        select(func.count())
+        .select_from(Execution)
+        .where(
+            Execution.deleted_at.is_(None),  # type: ignore[union-attr]
+            col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+        )
+    )
+    return active_count or 0
 
 
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
@@ -358,6 +385,16 @@ class ExecutionService(BaseService):
         Starts Temporal first, then creates the DB record. On DB commit failure,
         attempts to cancel the orphaned Temporal workflow.
         """
+        # Enforce application-level concurrency cap before touching Temporal.
+        # Uses a DB count of non-terminal executions — accurate across API server
+        # restarts and cheaper than a Temporal round-trip.
+        settings = get_settings()
+        limit = settings.max_concurrent_workflows
+        if limit > 0:
+            active = await count_active_executions(self.session)
+            if active >= limit:
+                raise WorkflowConcurrencyLimitError(limit=limit, active=active)
+
         # Build workflow context for expression resolution.
         # Uses the reserved "workflow_context" namespace per the handbook proposal (P3).
         # "now" and "today" are NOT included here — they are resolved dynamically by the
@@ -1000,18 +1037,13 @@ class ExecutionService(BaseService):
 
         status = signal_data.get("status")
         if status == "failed":
-            error_info = signal_data.get("error", {})
-            if isinstance(error_info, dict):
-                error_msg = str(error_info.get("message", "Activity execution failed"))[:MAX_CALLBACK_ERROR_MSG_LENGTH]
-                error_type = str(error_info.get("error_type", "UnknownError"))
-            else:
-                error_msg = (str(error_info) if error_info else "Activity execution failed")[
-                    :MAX_CALLBACK_ERROR_MSG_LENGTH
-                ]
-                error_type = "UnknownError"
+            error_msg, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))
+            error_msg = error_msg[:MAX_CALLBACK_ERROR_MSG_LENGTH]
+            # Keep ErrorType prefix when a real message exists; empty fallback is already actionable.
+            application_message = f"{error_type}: {error_msg}" if has_error_detail else error_msg
 
             error = ApplicationError(
-                f"{error_type}: {error_msg}",
+                application_message,
                 type=error_type,
                 non_retryable=True,
             )

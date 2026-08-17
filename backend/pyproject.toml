@@ -48,6 +48,7 @@ dependencies = [
     "filelock>=3.20.0",
     "pypandoc>=1.14",
     "tiktoken>=0.5.0",
+    "tzdata>=2024.1",
     "scikit-learn>=1.7.2",
     "rapidfuzz>=3.14.3",
     "spacy>=3.8.11",
@@ -69,6 +70,7 @@ dependencies = [
     "wrapt>=1.17.3",
     "uuid-utils>=0.9.0",
     "pypdf>=5.1.0",
+    "nh3>=0.2.21",
 ]
 
 [project.optional-dependencies]
@@ -144,12 +146,11 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
-packages = ["src/syntara", "src/nexus"]
+packages = ["src/syntara"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
     "src/syntara",
-    "src/nexus",
     "README.md",
     "LICENSE",
     "uv.lock",
@@ -300,12 +301,13 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "mcp: marks tests that require MCP server infrastructure (deselect with '-m \"not mcp\"')",
-    "performance: marks tests as performance tests (excluded by default, run with '--run-performance')",
     "e2e: marks tests as end-to-end tests requiring full stack (Syntara API, Temporal, MCP server, OpenRouter)",
     "global_revocation: marks tests that set the global revocation timestamp (must run in an isolated pytest session to avoid poisoning other tests)",
     "compliance: marks tests as compliance tests (auth coverage, API contract enforcement)",
     "destructive: marks tests that mutate live cluster state (e.g. HPA autoscaling) — excluded from routine runs",
     "k8s_required: marks tests that need KUBECONFIG + PERF_K8S_NAMESPACE to reach a Kubernetes cluster",
+    "ssrf_enforced: keep write-time SSRF base_url validation active (opt out of the autouse bypass)",
+    "xfail_from_url: dynamically applied by --xfail-from-url from a remote URL",
 ]
 
 # Coverage configuration
@@ -320,6 +322,9 @@ omit = [
     "tools/*",  # Manual utilities, not production code
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
+    "src/syntara/core/database/migrations/**",  # Alembic migrations, not unit-testable
+    "src/syntara/workflows/worker.py",  # Entrypoint scripts, not unit-testable
+    "src/syntara/workflows/background_worker.py",
 ]
 
 [tool.coverage.report]
@@ -367,4 +372,5 @@ dev = [
     "respx>=0.22.0",
     "pypandoc-binary>=1.16.2",
     "pytest-order>=1.5.0",
+    "pytest-timeout>=2.4.0",
 ]

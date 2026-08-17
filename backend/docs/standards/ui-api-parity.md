@@ -4,7 +4,7 @@ Standards for maintaining functional parity between the backend REST API and the
 
 ## Overview
 
-Nexus ensures UI-API parity by design: the frontend communicates exclusively through typed API clients generated from the backend's OpenAPI spec. Every UI capability has a corresponding REST endpoint — if the UI can do it, the API can do it. This document codifies the conventions that maintain that property as the codebase evolves.
+Syntara ensures UI-API parity by design: the frontend communicates exclusively through typed API clients generated from the backend's OpenAPI spec. Every UI capability has a corresponding REST endpoint — if the UI can do it, the API can do it. This document codifies the conventions that maintain that property as the codebase evolves.
 
 ## Typed API Clients
 
@@ -34,7 +34,7 @@ All clients apply `authMiddleware` from `client.tsx`, which handles token inject
 
 | Mechanism | Scope | Behavior |
 |-----------|-------|----------|
-| ESLint rule `nexus/no-raw-http-calls` | `frontend/packages/syntara-ui/` | Blocks `fetch()`, `XMLHttpRequest`, and `axios` imports at lint time |
+| ESLint rule `syntara/no-raw-http-calls` | `frontend/packages/syntara-ui/` | Blocks `fetch()`, `XMLHttpRequest`, and `axios` imports at lint time |
 | `allowedFiles` config | ESLint config | Exempts specific files (e.g., `useFileUploadWithProgress.ts` for upload progress via XMLHttpRequest) |
 | Inline `eslint-disable-next-line` | Per-call | Requires justification after `--` (e.g., `-- pre-auth call before token middleware`) |
 
@@ -143,7 +143,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 
 | Rule | Enforced By | Exception |
 |------|-------------|-----------|
-| Use typed API clients only | ESLint `nexus/no-raw-http-calls` | `eslint-disable-next-line` with justification |
+| Use typed API clients only | ESLint `syntara/no-raw-http-calls` | `eslint-disable-next-line` with justification |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
 | Acknowledge breaking API changes | Pre-commit `backend-check-openapi-breaking` | `breaking-change-ack: <justification>` in PR description |
 | WebSocket is read-only streaming | Convention (see [WebSocket Standards](websocket.md)) | N/A — REST is the complete CRUD interface |

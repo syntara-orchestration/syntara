@@ -1,6 +1,6 @@
 """IdP group sync service for OIDC login.
 
-Handles syncing Nexus group memberships based on identity provider
+Handles syncing Syntara group memberships based on identity provider
 group mapping configuration during OIDC authentication flows.
 """
 
@@ -81,13 +81,13 @@ def match_group_entries(
         if pattern == "*":
             logger.warning(
                 "Wildcard '*' mapping matches all IdP groups — all provider users added to group",
-                nexus_group_id=str(entry.nexus_group_id),
+                mapped_group_id=str(entry.mapped_group_id),
             )
-            desired.add(entry.nexus_group_id)
+            desired.add(entry.mapped_group_id)
             continue
         for value in idp_group_values:
             if fnmatch(value, pattern):
-                desired.add(entry.nexus_group_id)
+                desired.add(entry.mapped_group_id)
                 break  # no need to check more values for this entry
     return desired
 
@@ -221,7 +221,7 @@ async def sync_idp_groups(
     raw_merged_claims: dict[str, Any],
     config: OIDCConfiguration,
 ) -> bool:
-    """Sync Nexus group memberships based on IdP group mapping.
+    """Sync Syntara group memberships based on IdP group mapping.
 
     Session-scoped: clears all IdP-managed group memberships from every
     provider and replaces them with groups from the current login's token.

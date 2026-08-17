@@ -58,6 +58,7 @@ async def _get_or_create_builtin_admin(session: AsyncSession) -> User:
         id=uuid4(),
         username="admin",
         first_name="Admin",
+        email="admin@example.com",
         password_hash=hash_password("adminpassword"),
         is_builtin=True,
     )
@@ -408,6 +409,27 @@ async def test_non_admin_cannot_modify_admin_fields(test_db_session: AsyncSessio
 
     with pytest.raises(AdminModifyError):
         await service.update_user(admin.id, first_name="Updated", last_name="Admin")
+
+
+@pytest.mark.asyncio
+async def test_admin_self_can_update_email(test_db_session: AsyncSession) -> None:
+    """Builtin admin may replace the bootstrap email placeholder on itself."""
+    admin = await _get_or_create_builtin_admin(test_db_session)
+    service = UsersService(test_db_session, admin)
+
+    updated = await service.update_user(admin.id, email="ops-admin@example.com")
+
+    assert updated.email == "ops-admin@example.com"
+
+
+@pytest.mark.asyncio
+async def test_admin_self_cannot_update_name(test_db_session: AsyncSession) -> None:
+    """Builtin admin still cannot change protected display-name fields."""
+    admin = await _get_or_create_builtin_admin(test_db_session)
+    service = UsersService(test_db_session, admin)
+
+    with pytest.raises(AdminModifyError):
+        await service.update_user(admin.id, first_name="Renamed")
 
 
 @pytest.mark.asyncio

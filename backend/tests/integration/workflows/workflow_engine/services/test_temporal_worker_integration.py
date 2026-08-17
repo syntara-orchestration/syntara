@@ -22,7 +22,7 @@ from syntara.workflows.worker import main
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
 
@@ -60,7 +60,7 @@ class MockWorkerService(TemporalWorkerService):
         self.worker = Worker(
             self.client,
             task_queue=self.task_queue,
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
         )
 
@@ -128,7 +128,7 @@ class TestTemporalWorkerServiceIntegration:
         worker_service.worker = Worker(
             temporal_env.client,
             task_queue="integration-test-queue",
-            workflows=[NexusWorkflow],
+            workflows=[OrchestratorWorkflow],
             activities=[execute_script_activity, manual_trigger],
         )
 

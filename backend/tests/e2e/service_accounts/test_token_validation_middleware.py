@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
@@ -22,10 +23,10 @@ import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client.models.role_assignment_create import RoleAssignmentCreate
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
-from tests.e2e.service_accounts import create_sa, create_sa_with_credential, token_request
+from tests.e2e.service_accounts import create_sa, create_sa_with_credential, poll_until_status, token_request
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -43,18 +44,18 @@ class TestTokenValidationAuthorized:
     """API-16: Token validation — authorized API access (Bearer token grants access)."""
 
     def test_bearer_token_grants_api_access(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """SA Bearer token is accepted by protected endpoints and returns SA identity."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
             access_token = resp.parsed.access_token
 
             me_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/auth/me",
+                f"{syntara_base_url}/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -71,7 +72,7 @@ class TestTokenValidationUnauthorized:
 
     def test_insufficient_permissions_returns_403(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
     ) -> None:
@@ -82,12 +83,12 @@ class TestTokenValidationUnauthorized:
         sa, client_id, client_secret = create_sa_with_credential(admin_api, proj_a_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
             access_token = resp.parsed.access_token
 
             create_resp = httpx.post(
-                f"{nexus_base_url}/api/v1/service_accounts",
+                f"{syntara_base_url}/api/v1/service_accounts",
                 json={"name": unique_name("unauth-sa"), "project_id": str(proj_b_id)},
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
@@ -101,7 +102,7 @@ class TestExpiredTokenRejected:
     """API-18: Token validation — expired token rejected, no refresh flow."""
 
     def test_token_has_correct_expiry_and_no_refresh(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """SA token has 15-min lifetime, and there is no refresh endpoint for SAs.
 
@@ -111,7 +112,7 @@ class TestExpiredTokenRejected:
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
 
         try:
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
 
             payload = pyjwt.decode(resp.parsed.access_token, options={"verify_signature": False})
@@ -126,10 +127,10 @@ class TestExpiredTokenRejected:
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
 
-    def test_malformed_bearer_token_returns_401(self, nexus_base_url: str) -> None:
+    def test_malformed_bearer_token_returns_401(self, syntara_base_url: str) -> None:
         """A completely invalid Bearer token is rejected with 401."""
         resp = httpx.get(
-            f"{nexus_base_url}/api/v1/auth/me",
+            f"{syntara_base_url}/api/v1/auth/me",
             headers={"Authorization": "Bearer invalid.token.here"},
             verify=e2e_ssl_context(),
         )
@@ -141,7 +142,7 @@ class TestProjectRoleAssignment:
 
     def test_sa_with_project_admin_role_accesses_project_resources(
         self,
-        nexus_base_url: str,
+        syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
         create_project: ProjectFactory,
     ) -> None:
@@ -159,16 +160,16 @@ class TestProjectRoleAssignment:
 
         cred = admin_api.service_account_credentials.create(
             service_account_id=sa.id,
-            body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+            body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
         ).assert_and_get()
 
         try:
-            resp = token_request(nexus_base_url, cred.identifier, cred.client_secret)
+            resp = token_request(syntara_base_url, cred.identifier, cred.client_secret)
             assert resp.status_code == HTTPStatus.OK
             access_token = resp.parsed.access_token
 
             list_resp = httpx.get(
-                f"{nexus_base_url}/api/v1/service_accounts",
+                f"{syntara_base_url}/api/v1/service_accounts",
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
@@ -180,26 +181,70 @@ class TestProjectRoleAssignment:
             admin_api.service_accounts.delete(service_account_id=sa.id)
 
 
+class TestExpiredCredentialMiddlewareRejection:
+    """Middleware rejects pre-issued JWTs after the underlying credential expires."""
+
+    CREDENTIAL_LIFETIME_SECONDS = 60
+
+    def test_pre_issued_jwt_rejected_after_credential_expires(
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
+    ) -> None:
+        """A JWT issued before credential expiry is rejected by middleware after expiry."""
+        sa = create_sa(syntara_api, first_project_id)
+        expires_at = datetime.now(UTC) + timedelta(seconds=self.CREDENTIAL_LIFETIME_SECONDS)
+
+        cred = syntara_api.service_account_credentials.create(
+            service_account_id=sa.id,
+            body=ServiceAccountCredentialCreate(
+                credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+                expires_at=expires_at,
+            ),
+        ).assert_and_get()
+
+        try:
+            resp = token_request(syntara_base_url, cred.identifier, cred.client_secret)
+            assert resp.status_code == HTTPStatus.OK
+            access_token = resp.parsed.access_token
+
+            me_resp = httpx.get(
+                f"{syntara_base_url}/api/v1/auth/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                verify=e2e_ssl_context(),
+            )
+            assert me_resp.status_code == HTTPStatus.OK, "Token should work before credential expiry"
+
+            result = poll_until_status(
+                syntara_base_url,
+                access_token,
+                HTTPStatus.UNAUTHORIZED,
+                timeout=self.CREDENTIAL_LIFETIME_SECONDS + 10,
+            )
+            assert result.status_code == HTTPStatus.UNAUTHORIZED
+            assert result.json()["code"] == "SA_CREDENTIAL_EXPIRED"
+        finally:
+            syntara_api.service_accounts.delete(service_account_id=sa.id)
+
+
 class TestConcurrentServiceAccounts:
     """API-37: Performance — 100 concurrent service accounts (scale validation)."""
 
     CONCURRENT_SA_COUNT = 100
 
     def test_100_concurrent_sa_auth(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """100 concurrent SAs can all authenticate and access the API simultaneously."""
         sa_data: list[tuple[Any, str]] = []
         try:
             for _ in range(self.CONCURRENT_SA_COUNT):
                 sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
-                resp = token_request(nexus_base_url, client_id, client_secret)
+                resp = token_request(syntara_base_url, client_id, client_secret)
                 assert resp.status_code == HTTPStatus.OK
                 sa_data.append((sa, resp.parsed.access_token))
 
             def _check_auth(access_token: str) -> int:
                 r = httpx.get(
-                    f"{nexus_base_url}/api/v1/auth/me",
+                    f"{syntara_base_url}/api/v1/auth/me",
                     headers={"Authorization": f"Bearer {access_token}"},
                     verify=e2e_ssl_context(),
                     timeout=30,
@@ -227,7 +272,7 @@ class TestLastAuthenticatedTimestamp:
     """API-38: Last authenticated timestamp updated on successful auth."""
 
     def test_last_authenticated_updated_on_auth(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """last_authenticated_at is null before first auth, then set after token issuance."""
         sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
@@ -238,7 +283,7 @@ class TestLastAuthenticatedTimestamp:
                 f"Expected null before first auth, got {before.last_authenticated_at}"
             )
 
-            resp = token_request(nexus_base_url, client_id, client_secret)
+            resp = token_request(syntara_base_url, client_id, client_secret)
             assert resp.status_code == HTTPStatus.OK
 
             after = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()

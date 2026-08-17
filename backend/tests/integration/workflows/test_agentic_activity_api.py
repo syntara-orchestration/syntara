@@ -77,7 +77,7 @@ class TestAgenticActivityExecution:
         """Test that agentic activity invokes Agent Orchestrator asynchronously."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -92,7 +92,7 @@ class TestAgenticActivityExecution:
         """Test that parameters are correctly mapped from config to Agent Orchestrator."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -103,7 +103,7 @@ class TestAgenticActivityExecution:
         call_args = mock_agent_client.invoke_agent_async.call_args
 
         # Check agent
-        assert call_args.kwargs["agent"] == "nexus-agent://default"
+        assert call_args.kwargs["agent"] == "syntara-agent://default"
 
         # Check llm_model_id is forwarded in metadata
         assert call_args.kwargs["metadata"]["llm_model_id"] == "550e8400-e29b-41d4-a716-446655440000"
@@ -116,7 +116,7 @@ class TestAgenticActivityExecution:
         """Test that activity invokes agent async and returns metadata."""
         input_config = {
             "prompt": "Research and calculate the answer",
-            "agent": "nexus-agent://default",
+            "agent": "syntara-agent://default",
             "llm_model_id": "550e8400-e29b-41d4-a716-446655440000",
         }
 
@@ -146,7 +146,11 @@ class TestAgenticActivityErrorHandling:
 
         with pytest.raises(ApplicationError) as exc_info:
             await execute_agentic_activity(input_config, None, project_id=str(uuid4()))
-        assert "agent orchestrator" in str(exc_info.value).lower()
+        error_message = str(exc_info.value)
+        assert "temporarily unavailable" in error_message.lower()
+        assert "try again" in error_message.lower()
+        assert "agent orchestrator" not in error_message.lower()
+        assert "Failed to connect to Agent Orchestrator" not in error_message
 
     @pytest.mark.asyncio
     async def test_handles_agent_orchestrator_timeout(self, mock_agent_client) -> None:

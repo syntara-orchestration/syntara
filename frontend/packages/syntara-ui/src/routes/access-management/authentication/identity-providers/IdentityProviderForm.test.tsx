@@ -8,6 +8,7 @@ import { axe } from 'vitest-axe'
 import { identityProvidersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import { routerTestState } from '../../../../test/setup'
+import type { DocKey } from '../../../../utils/docs/types'
 
 import { IdentityProviderForm } from './IdentityProviderForm'
 
@@ -19,6 +20,12 @@ type MutationCallbacks = {
 function getMutationCallbacks(mockFn: ReturnType<typeof vi.fn>): MutationCallbacks {
   return (mockFn.mock.calls[0]?.[1] ?? {}) as MutationCallbacks
 }
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -97,6 +104,17 @@ describe('IdentityProviderForm', () => {
 
       await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
       expect(screen.getByRole('button', { name: 'Add provider' })).toBeInTheDocument()
+    })
+
+    it('uses addIdentityProvider documentation key', () => {
+      setupMocks()
+      render(<IdentityProviderForm mode="add" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('addIdentityProvider')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+        'href',
+        'https://docs.example/addIdentityProvider'
+      )
     })
 
     it('renders test connection button', () => {
@@ -193,6 +211,17 @@ describe('IdentityProviderForm', () => {
 
       await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
       expect(screen.getByRole('button', { name: 'Save provider' })).toBeInTheDocument()
+    })
+
+    it('uses identityProviders documentation key', () => {
+      setupEditMocks()
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('identityProviders')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+        'href',
+        'https://docs.example/identityProviders'
+      )
     })
 
     it('populates form with provider data', () => {
@@ -382,6 +411,121 @@ describe('IdentityProviderForm', () => {
       render(<IdentityProviderForm mode="edit" />, { wrapper })
 
       expect(screen.getByLabelText(/Disable TLS certificate verification/)).not.toBeChecked()
+    })
+
+    it('defaults nexusGroupId to empty string when mapped_group_id is null in API response', () => {
+      const providerWithNullMapping = {
+        id: 'provider-1',
+        name: 'Azure AD',
+        enabled: true,
+        configuration: {
+          provider_type: 'oidc',
+          auto_discovery: true,
+          issuer_url: 'https://login.microsoftonline.com/tenant',
+          client_id: 'client-123',
+          scopes: 'openid profile email',
+          group_jmespath_expression: 'groups[*]',
+          group_mapping_entries: [{ idp_group_value: 'admins', mapped_group_id: null as unknown as string }],
+        },
+      }
+      vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
+        data: providerWithNullMapping,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+      vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+      } as never)
+
+      // Should render without crashing — null mapped_group_id defaults to ''
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+      expect(screen.getByRole('heading', { name: 'Edit OIDC provider' })).toBeInTheDocument()
+    })
+
+    it('populates group mapping form values from provider group_mapping_entries', () => {
+      const providerWithMappings = {
+        id: 'provider-1',
+        name: 'Azure AD',
+        enabled: true,
+        configuration: {
+          provider_type: 'oidc',
+          auto_discovery: true,
+          issuer_url: 'https://login.microsoftonline.com/tenant',
+          client_id: 'client-123',
+          scopes: 'openid profile email',
+          group_jmespath_expression: 'groups[*]',
+          group_mapping_entries: [
+            { idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' },
+          ],
+        },
+      }
+      vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
+        data: providerWithMappings,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+      vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+      } as never)
+
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+
+      // Form renders without error — group mapping data was correctly deserialized
+      expect(screen.getByRole('heading', { name: 'Edit OIDC provider' })).toBeInTheDocument()
+    })
+
+    it('includes mapped_group_id in patch payload when group mapping entries are present', async () => {
+      const mockPatch = vi.fn()
+      const providerWithMappings = {
+        id: 'provider-1',
+        name: 'Azure AD',
+        enabled: true,
+        configuration: {
+          provider_type: 'oidc',
+          auto_discovery: true,
+          issuer_url: 'https://login.microsoftonline.com/tenant',
+          client_id: 'client-123',
+          scopes: 'openid profile email',
+          group_jmespath_expression: 'groups[*]',
+          group_mapping_entries: [
+            { idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' },
+          ],
+        },
+      }
+      mockUseParams.mockReturnValue({ providerId: 'provider-1' })
+      vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
+        data: providerWithMappings,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+      vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+        if (method === 'patch') {
+          return { mutate: mockPatch, isPending: false }
+        }
+        return { mutate: vi.fn(), isPending: false }
+      }) as never)
+
+      const user = userEvent.setup()
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
+      await user.click(screen.getByRole('button', { name: 'Save provider' }))
+
+      await waitFor(() => expect(mockPatch).toHaveBeenCalled())
+
+      const body = (mockPatch.mock.calls[0] as [{ body: { configuration: { group_mapping_entries: unknown[] } } }])[0]
+        .body.configuration
+      expect(body.group_mapping_entries).toEqual([
+        { idp_group_value: 'admins', mapped_group_id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' },
+      ])
     })
   })
 

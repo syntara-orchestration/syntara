@@ -1,12 +1,12 @@
 # Workflow Engine Architecture
 
-Nexus compiles every user-defined workflow into the *same* Temporal workflow type. There is no per-workflow code generation — `NexusWorkflow` (`dynamic_workflow.py`) interprets a workflow's nodes and edges as data at runtime. This document explains the engine mechanics shared by every node type: how the graph is walked, why certain nodes complete asynchronously, how the three-tier live-status pipeline works, how data flows between nodes, and what's involved in adding a new node type.
+Syntara compiles every user-defined workflow into the *same* Temporal workflow type. There is no per-workflow code generation — `OrchestratorWorkflow` (`dynamic_workflow.py`) interprets a workflow's nodes and edges as data at runtime. This document explains the engine mechanics shared by every node type: how the graph is walked, why certain nodes complete asynchronously, how the three-tier live-status pipeline works, how data flows between nodes, and what's involved in adding a new node type.
 
 Per-node-type detail lives in the companion docs linked at the bottom. Read this one first.
 
 ## How the Engine Executes a Workflow Graph
 
-`NexusWorkflow.run()` (`dynamic_workflow.py`) loads a `WorkflowGraph` from the workflow definition, executes the trigger node (`_execute_trigger()`), then enters `_process_pending_tasks()` — an `asyncio.wait(pending_tasks, return_when=FIRST_COMPLETED)` loop over `pending_tasks: dict[node_id, asyncio.Task]`. Every time a task finishes, `_schedule_successors()` looks up the node's outgoing edges and creates one new `asyncio.create_task()` per successor, adding it back into `pending_tasks`.
+`OrchestratorWorkflow.run()` (`dynamic_workflow.py`) loads a `WorkflowGraph` from the workflow definition, executes the trigger node (`_execute_trigger()`), then enters `_process_pending_tasks()` — an `asyncio.wait(pending_tasks, return_when=FIRST_COMPLETED)` loop over `pending_tasks: dict[node_id, asyncio.Task]`. Every time a task finishes, `_schedule_successors()` looks up the node's outgoing edges and creates one new `asyncio.create_task()` per successor, adding it back into `pending_tasks`.
 
 ```mermaid
 flowchart TD

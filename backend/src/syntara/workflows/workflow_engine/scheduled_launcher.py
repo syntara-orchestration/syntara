@@ -2,7 +2,7 @@
 
 When a Temporal Schedule fires, it starts the ``ScheduledWorkflowLauncher``
 workflow which delegates DB setup to the ``ScheduledExecutionLauncher``
-activity, then starts ``NexusWorkflow`` as a child workflow and waits for
+activity, then starts ``OrchestratorWorkflow`` as a child workflow and waits for
 it to complete. This keeps the launcher alive for the full execution
 lifecycle so Temporal's schedule overlap policy (Skip/Buffer/etc.) applies
 to the actual work, not just the setup phase.
@@ -14,12 +14,14 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from temporalio import activity, workflow
+from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     import structlog
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
+    from temporalio.exceptions import ApplicationError
 
     from syntara.core.config.base import get_settings
     from syntara.core.models.principal import service_principal_id
@@ -43,13 +45,13 @@ _LAUNCHER_ACTIVITY_TIMEOUT_SECONDS = 60
 
 @workflow.defn(name="scheduled_workflow_launcher")
 class ScheduledWorkflowLauncher:
-    """Temporal workflow that launches a NexusWorkflow on behalf of a schedule.
+    """Temporal workflow that launches an OrchestratorWorkflow on behalf of a schedule.
 
     This is the action target for Temporal Schedules. When a schedule fires,
     Temporal starts this workflow which delegates to a setup activity for DB
-    operations, then starts NexusWorkflow as a child workflow.
+    operations, then starts OrchestratorWorkflow as a child workflow.
 
-    The launcher stays alive while NexusWorkflow runs, so Temporal's schedule
+    The launcher stays alive while OrchestratorWorkflow runs, so Temporal's schedule
     overlap policy (Skip/Buffer One/Buffer All) correctly detects whether a
     previous execution is still in progress.
     """
@@ -111,7 +113,7 @@ class ScheduledExecutionLauncher:
     2. Prepare execution identity and metadata
     3. Create Execution record in DB
 
-    Starting NexusWorkflow is handled by the launcher workflow via
+    Starting OrchestratorWorkflow is handled by the launcher workflow via
     ``execute_child_workflow``.
 
     """
@@ -125,7 +127,7 @@ class ScheduledExecutionLauncher:
 
         Args:
             session_factory: Async SQLModel session factory (e.g., ``AsyncSessionLocal``).
-            task_queue: Temporal task queue name for starting NexusWorkflow.
+            task_queue: Temporal task queue name for starting OrchestratorWorkflow.
 
         """
         self._session_factory = session_factory
@@ -137,7 +139,7 @@ class ScheduledExecutionLauncher:
 
         Loads the published workflow version, creates the Execution record in
         the database using the service principal identity, and returns all data
-        needed for the launcher workflow to start NexusWorkflow as a child
+        needed for the launcher workflow to start OrchestratorWorkflow as a child
         workflow. Records schedule timing metadata and Prometheus metrics.
 
         Args:
@@ -148,7 +150,8 @@ class ScheduledExecutionLauncher:
             Dict with execution setup data for child workflow start.
 
         Raises:
-            WorkflowNotPublishedError: If the workflow is not published.
+            ApplicationError: Non-retryable, if the workflow is missing,
+                soft-deleted, disabled, or has no published version.
 
         """
         workflow_id = UUID(workflow_id_str)
@@ -187,7 +190,7 @@ class ScheduledExecutionLauncher:
                 logger.debug("Failed to record success metric", exc_info=True)
 
             return result
-        except Exception:
+        except Exception as exc:
             try:
                 recorder.record(
                     MetricType.SCHEDULED_TRIGGER_FIRES,
@@ -196,6 +199,15 @@ class ScheduledExecutionLauncher:
                 )
             except Exception:  # noqa: BLE001
                 logger.debug("Failed to record error metric", exc_info=True)
+            if isinstance(exc, WorkflowNotPublishedError):
+                # Permanent state: workflow is missing, soft-deleted, disabled,
+                # or has no published version.  Mark non-retryable so Temporal
+                # does not retry the activity forever (AAP-86776).
+                raise ApplicationError(
+                    str(exc),
+                    type="WorkflowNotPublishedError",
+                    non_retryable=True,
+                ) from exc
             raise
 
     async def _create_execution(
@@ -211,7 +223,7 @@ class ScheduledExecutionLauncher:
         Phase 2: Prepare execution identity and metadata
         Phase 3: Create Execution record in DB (write session)
 
-        Returns all data the launcher workflow needs to start NexusWorkflow
+        Returns all data the launcher workflow needs to start OrchestratorWorkflow
         as a child workflow.
         """
         # Phase 1: Load published workflow definition (read-only session)
@@ -226,6 +238,21 @@ class ScheduledExecutionLauncher:
             workflow_def = wf_version.workflow_definition
 
             author_name = await resolve_user_display_name(session, wf_workflow.created_by)
+
+            limit = settings.max_concurrent_workflows
+            if limit > 0:
+                from syntara.workflows.services.execution_service import count_active_executions  # noqa: PLC0415
+
+                active = await count_active_executions(session)
+                if active >= limit:
+                    logger.warning(
+                        "Scheduled workflow skipped: concurrency limit reached",
+                        workflow_id=str(workflow_id),
+                        active=active,
+                        limit=limit,
+                    )
+                    msg = f"Workflow concurrency limit reached: {active}/{limit} active workflows."
+                    raise ApplicationError(msg, non_retryable=True)
 
         # Phase 2: Prepare execution identity and metadata
         pre_generated_execution_id = str(uuid4())

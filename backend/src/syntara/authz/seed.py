@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy import insert
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,6 +22,46 @@ from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
 
 logger = structlog.stdlib.get_logger(__name__)
+
+BOOTSTRAP_ADMIN_USERNAME = "admin"
+BOOTSTRAP_ADMIN_FIRST_NAME = "Administrator"
+# Placeholder only — operators should change this after install (self email update is allowed).
+BOOTSTRAP_ADMIN_EMAIL = "admin@example.com"
+
+
+def _is_duplicate_email_error(exc: IntegrityError) -> bool:
+    """Return True when IntegrityError is the users.email unique constraint."""
+    error_str = str(exc)
+    return "ix_users_email_unique" in error_str or "Key (email)" in error_str
+
+
+async def try_set_bootstrap_admin_email(session: AsyncSession, admin_user: User) -> bool:
+    """Set ``BOOTSTRAP_ADMIN_EMAIL`` on the admin user when the address is free.
+
+    Uses a savepoint so a unique-constraint conflict does not abort the outer
+    seed / password-sync transaction. On conflict, leaves ``admin_user.email``
+    unchanged and logs a warning.
+
+    Returns:
+        True if the placeholder email was assigned, False if it was left alone.
+
+    """
+    previous = admin_user.email
+    admin_user.email = BOOTSTRAP_ADMIN_EMAIL
+    try:
+        async with session.begin_nested():
+            await session.flush()
+    except IntegrityError as exc:
+        if not _is_duplicate_email_error(exc):
+            raise
+        admin_user.email = previous
+        logger.warning(
+            "Bootstrap admin placeholder email already in use; leaving admin email unchanged",
+            email=BOOTSTRAP_ADMIN_EMAIL,
+            user_id=str(admin_user.id),
+        )
+        return False
+    return True
 
 
 async def seed_groups_project_admin(session: AsyncSession) -> None:
@@ -219,21 +260,32 @@ async def _seed_assignments_and_admin(
             logger.info("Service principal created", cn=cn, principal_id=str(sp_id))
 
     # Bootstrap admin user
-    existing_admin_user = await session.exec(select(User).where(User.username == "admin"))
+    existing_admin_user = await session.exec(select(User).where(User.username == BOOTSTRAP_ADMIN_USERNAME))
     admin_user = existing_admin_user.one_or_none()
     if not admin_user:
         password_hash = _read_admin_password_hash()
+        # Assign placeholder email after insert so a taken address cannot fail create.
         admin_user = User(
             id=uuid4(),
-            username="admin",
-            first_name="Administrator",
+            username=BOOTSTRAP_ADMIN_USERNAME,
+            first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+            email=None,
             is_enabled=True,
             is_builtin=True,
             password_hash=password_hash,
         )
         session.add(admin_user)
         await session.flush()
-        logger.info("Bootstrap admin user created", user_id=str(admin_user.id))
+        await try_set_bootstrap_admin_email(session, admin_user)
+        logger.info("Bootstrap admin user created", user_id=str(admin_user.id), email=admin_user.email)
+    elif admin_user.email is None:
+        # Existing installs seeded before AAP-87627 had email=NULL in JWTs.
+        if await try_set_bootstrap_admin_email(session, admin_user):
+            logger.info(
+                "Backfilled bootstrap admin email placeholder",
+                user_id=str(admin_user.id),
+                email=BOOTSTRAP_ADMIN_EMAIL,
+            )
 
     await _ensure_group_membership(session, admin_user, auth_group)
     await _ensure_group_membership(session, admin_user, admin_group)

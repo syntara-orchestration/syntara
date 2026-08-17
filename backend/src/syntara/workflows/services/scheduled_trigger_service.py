@@ -2,7 +2,7 @@
 
 Scheduled triggers are managed entirely through Temporal Schedules. No database
 model is needed because the schedule ID is deterministic:
-``nexus-sched-{workflow_id}-{trigger_node_id}``.
+``orchestrator-sched-{workflow_id}-{trigger_node_id}``.
 
 This service synchronises Temporal Schedules when workflows are created,
 updated, published, unpublished, or deleted.
@@ -35,14 +35,17 @@ from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
     SCHEDULE_ID_PREFIX,
+    build_schedule_execution_workflow_id,
     build_schedule_id,
     config_to_temporal_schedule,
 )
+from syntara.workflows.validators import collect_scheduled_trigger_config_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflows.workflow_engine.workflow_auth import build_auth_header
 
 logger = structlog.stdlib.get_logger(__name__)
 
-SA_NEXUS_WORKFLOW_ID = SearchAttributeKey.for_keyword("NexusWorkflowId")
+SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkflowId")
 
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
@@ -83,7 +86,7 @@ def _invalidate_client_cache() -> None:
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
-    """Ensure the NexusWorkflowId search attribute is registered in Temporal.
+    """Ensure the OrchestratorWorkflowId search attribute is registered in Temporal.
 
     Returns True if the attribute is available for server-side filtering,
     False if the Temporal server does not support it.  The result is cached
@@ -99,14 +102,14 @@ async def _ensure_search_attribute(client: Client) -> bool:
         resp = await client.operator_service.list_search_attributes(
             ListSearchAttributesRequest(namespace=settings.temporal_namespace),
         )
-        attr_type = resp.custom_attributes.get(SA_NEXUS_WORKFLOW_ID.name)
+        attr_type = resp.custom_attributes.get(SA_ORCHESTRATOR_WORKFLOW_ID.name)
         if attr_type == IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD:
             _search_attr_available = True
-            logger.info("NexusWorkflowId search attribute already registered")
+            logger.info("OrchestratorWorkflowId search attribute already registered")
             return True
         if attr_type is not None:
             logger.warning(
-                "NexusWorkflowId has unexpected type, using prefix scan fallback",
+                "OrchestratorWorkflowId has unexpected type, using prefix scan fallback",
                 type=attr_type,
             )
             _search_attr_available = False
@@ -117,16 +120,16 @@ async def _ensure_search_attribute(client: Client) -> bool:
                 AddSearchAttributesRequest(
                     namespace=settings.temporal_namespace,
                     search_attributes={
-                        SA_NEXUS_WORKFLOW_ID.name: IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+                        SA_ORCHESTRATOR_WORKFLOW_ID.name: IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
                     },
                 ),
             )
         except RPCError as add_err:
             if add_err.status != RPCStatusCode.ALREADY_EXISTS:
                 raise
-            logger.info("NexusWorkflowId registered concurrently by another replica")
+            logger.info("OrchestratorWorkflowId registered concurrently by another replica")
         else:
-            logger.info("Registered NexusWorkflowId search attribute")
+            logger.info("Registered OrchestratorWorkflowId search attribute")
         _search_attr_available = True
         return True
 
@@ -196,6 +199,25 @@ class ScheduledTriggerService:
             return self._temporal_client
         return await _get_shared_client()
 
+    @staticmethod
+    def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
+        """Pre-validate all scheduled trigger configs without contacting Temporal.
+
+        Raise-first wrapper around
+        ``collect_scheduled_trigger_config_findings`` so Temporal sync and
+        ``WorkflowValidator.collect_findings`` share one walk / one id and
+        config-handling policy. Used by ``sync_scheduled_triggers`` as a
+        defense-in-depth guard after publish's pre-mutation
+        ``collect_findings`` check.
+
+        Raises:
+            TriggerValidationError: If any scheduled trigger config is invalid.
+
+        """
+        findings = collect_scheduled_trigger_config_findings(workflow_definition)
+        if findings:
+            raise TriggerValidationError(findings[0].message)
+
     async def sync_scheduled_triggers(
         self,
         workflow_id: str,
@@ -226,6 +248,8 @@ class ScheduledTriggerService:
             TriggerValidationError: If a scheduled trigger config is invalid.
 
         """
+        self.validate_trigger_configs(workflow_definition)
+
         # Extract scheduled trigger nodes from definition
         triggers = workflow_definition.get("triggers", [])
         scheduled_nodes: dict[str, dict[str, Any]] = {}
@@ -251,15 +275,9 @@ class ScheduledTriggerService:
         processed = 0
 
         try:
-            # Create or update schedules for current trigger nodes
+            # Create or update schedules for current trigger nodes.
+            # Configs are already validated by validate_trigger_configs() above.
             for node_id, config in scheduled_nodes.items():
-                # Validate config
-                try:
-                    ScheduledTriggerConfig.model_validate(config)
-                except ValidationError as e:
-                    msg = f"Invalid scheduled trigger config for node '{node_id}': {e}"
-                    raise TriggerValidationError(msg) from e
-
                 schedule_id = build_schedule_id(workflow_id, node_id)
                 await self._create_or_update_schedule(client, schedule_id, workflow_id, node_id, config, task_queue)
                 processed += 1
@@ -292,7 +310,7 @@ class ScheduledTriggerService:
     ) -> int:
         """Delete all Temporal Schedules for a workflow.
 
-        Finds schedules via the NexusWorkflowId search attribute when
+        Finds schedules via the OrchestratorWorkflowId search attribute when
         available, falling back to prefix scan otherwise.  Does not
         iterate the workflow definition, so schedules created by any
         version are cleaned up — not just those in the current draft.
@@ -391,11 +409,15 @@ class ScheduledTriggerService:
         """
         spec, policy = config_to_temporal_schedule(config)
 
+        schedule_workflow_id = build_schedule_execution_workflow_id(workflow_id, trigger_node_id)
         action = ScheduleActionStartWorkflow(
             "scheduled_workflow_launcher",
             args=[workflow_id, trigger_node_id],
-            id=f"sched-exec-{workflow_id}-{trigger_node_id}",
+            id=schedule_workflow_id,
             task_queue=task_queue,
+        )
+        action.headers = build_auth_header(
+            schedule_workflow_id, "scheduled_workflow_launcher", [workflow_id, trigger_node_id]
         )
 
         schedule = Schedule(
@@ -408,7 +430,7 @@ class ScheduledTriggerService:
         search_attrs: TypedSearchAttributes | None = None
         if await _ensure_search_attribute(client):
             search_attrs = TypedSearchAttributes(
-                [SearchAttributePair(SA_NEXUS_WORKFLOW_ID, workflow_id)],
+                [SearchAttributePair(SA_ORCHESTRATOR_WORKFLOW_ID, workflow_id)],
             )
 
         try:
@@ -439,27 +461,27 @@ class ScheduledTriggerService:
     async def _list_workflow_schedules(self, client: Client, workflow_id: str) -> set[str]:
         """List all Temporal Schedule IDs belonging to a workflow.
 
-        Uses server-side filtering via the NexusWorkflowId search attribute
-        when available, falling back to client-side prefix scan otherwise.
+        Uses the OrchestratorWorkflowId search attribute for server-side
+        filtering when available, falling back to prefix scan otherwise.
         """
         can_use_search_attr = await _ensure_search_attribute(client) and workflow_id.replace("-", "").isalnum()
         if can_use_search_attr:
-            query = f'{SA_NEXUS_WORKFLOW_ID.name} = "{workflow_id}"'
-            result = await self._list_schedules_by_query(client, query)
+            result = await self._list_schedules_by_query(
+                client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} = "{workflow_id}"'
+            )
             if result is not None:
                 return result
 
         return await self.list_schedules_by_prefix(client, workflow_id)
 
     async def list_all_schedules(self, client: Client) -> set[str]:
-        """List all nexus-managed Temporal Schedule IDs.
+        """List all orchestrator-managed Temporal Schedule IDs.
 
-        Uses server-side filtering via the NexusWorkflowId search attribute
-        when available, falling back to client-side prefix scan otherwise.
+        Uses the OrchestratorWorkflowId search attribute for server-side
+        filtering when available, falling back to prefix scan otherwise.
         """
         if await _ensure_search_attribute(client):
-            query = f'{SA_NEXUS_WORKFLOW_ID.name} != ""'
-            result = await self._list_schedules_by_query(client, query)
+            result = await self._list_schedules_by_query(client, f'{SA_ORCHESTRATOR_WORKFLOW_ID.name} != ""')
             if result is not None:
                 return result
 
@@ -485,15 +507,11 @@ class ScheduledTriggerService:
 
     @staticmethod
     async def list_schedules_by_prefix(client: Client, prefix: str = "") -> set[str]:
-        """List nexus-managed Temporal Schedule IDs, optionally narrowed by *prefix*.
-
-        Matches IDs starting with ``nexus-sched-{prefix}-`` when *prefix*
-        is given, or ``nexus-sched-`` when omitted.
-        """
-        full_prefix = f"{SCHEDULE_ID_PREFIX}{prefix}-" if prefix else SCHEDULE_ID_PREFIX
+        """List orchestrator-managed Temporal Schedule IDs, optionally narrowed by *prefix*."""
+        match_prefix = f"{SCHEDULE_ID_PREFIX}{prefix}-" if prefix else SCHEDULE_ID_PREFIX
         schedule_ids: set[str] = set()
         async for entry in await client.list_schedules():
-            if entry.id.startswith(full_prefix):
+            if entry.id.startswith(match_prefix):
                 schedule_ids.add(entry.id)
         return schedule_ids
 

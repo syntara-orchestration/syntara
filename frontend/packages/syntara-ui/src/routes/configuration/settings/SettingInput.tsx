@@ -13,7 +13,7 @@ import {
   TextInputGroupMain,
   TextInputGroupUtilities,
 } from '@patternfly/react-core'
-import { TimesIcon } from '@patternfly/react-icons'
+import { RhUiCloseIcon } from '@patternfly/react-icons'
 import type { SettingsAPI } from '@syntara/contracts'
 import React, { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
@@ -149,9 +149,8 @@ function JsonInput({ setting, value, pattern, onChange, stringError, onStringErr
               onChange(setting.key, [])
               setInputValue('')
             }}
-          >
-            <TimesIcon />
-          </Button>
+            icon={<RhUiCloseIcon />}
+          />
         </TextInputGroupUtilities>
       )}
     </TextInputGroup>

@@ -4,8 +4,9 @@ import { Table, Thead, Th, Tbody, Td, Tr } from '@patternfly/react-table'
 import type React from 'react'
 import { Fragment, useMemo } from 'react'
 
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
-import { formatExecutionDateTime, formatElapsedTime } from '../../utils/dateUtils'
+import { formatElapsedTime } from '../../utils/dateUtils'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -63,10 +64,6 @@ const ERROR_STYLE: React.CSSProperties = {
   margin: 0,
 }
 
-function formatOptionalDate(date: string | null | undefined) {
-  return date ? formatExecutionDateTime(date) : undefined
-}
-
 const AAP_LINK_STYLE: React.CSSProperties = {
   textDecoration: 'underline dotted',
   textUnderlineOffset: '3px',
@@ -115,8 +112,8 @@ function ActivityRow({
         isRowSelected={isSelected}
       >
         <Td dataLabel="Name">{displayName}</Td>
-        <Td dataLabel="Started">{formatOptionalDate(state?.startedAt) ?? DASH}</Td>
-        <Td dataLabel="Ended">{formatOptionalDate(state?.completedAt) ?? DASH}</Td>
+        <Td dataLabel="Started">{state?.startedAt ? <ExecutionTimestamp dateString={state.startedAt} /> : DASH}</Td>
+        <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
           <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} />

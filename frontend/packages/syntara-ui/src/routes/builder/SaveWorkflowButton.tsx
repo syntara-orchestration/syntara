@@ -1,9 +1,9 @@
-import { Button, Icon, Tooltip } from '@patternfly/react-core'
+import { Button, Icon, Timestamp, Tooltip } from '@patternfly/react-core'
 import { RhUiSaveFillIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { formatDateTime } from '../../utils/dateUtils'
+import { toDisplayDate } from '../../utils/dateUtils'
 
 type SaveWorkflowButtonProps = Readonly<{
   isPending: boolean
@@ -27,7 +27,12 @@ export function SaveWorkflowButton({
   isNodeEditorOpen,
 }: SaveWorkflowButtonProps) {
   const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isNodeEditorOpen
-  const lastSavedText = lastSavedAt ? `Last saved ${formatDateTime(lastSavedAt)}` : null
+  const lastSavedDate = toDisplayDate(lastSavedAt)
+  const lastSavedText = lastSavedDate ? (
+    <>
+      Last saved <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+    </>
+  ) : null
 
   let disabledTooltip: ReactNode
   if (!canEdit) {

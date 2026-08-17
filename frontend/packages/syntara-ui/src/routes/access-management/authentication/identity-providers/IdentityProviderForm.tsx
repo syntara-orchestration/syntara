@@ -26,6 +26,7 @@ import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
 import { NxPanel } from '../../../../components/layout/NxPanel'
 import { NxPageTitle } from '../../../../components/NxPageTitle'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage, getErrorStatus, isConflictError } from '../../../../utils/apiErrors'
@@ -79,7 +80,7 @@ function groupMappingFields(formData: IdentityProviderFormData) {
     group_jmespath_expression: formData.groupMapping.jmespathExpression,
     group_mapping_entries: (formData.groupMapping.entries ?? []).map((e) => ({
       idp_group_value: e.idpGroupValue,
-      nexus_group_id: e.nexusGroupId,
+      mapped_group_id: e.nexusGroupId,
     })),
   }
 }
@@ -155,7 +156,7 @@ function toGroupMappingValues(config?: ProviderConfig): IdentityProviderFormData
     jmespathExpression: config?.group_jmespath_expression ?? 'groups[*]',
     entries: (entries ?? []).map((e) => ({
       idpGroupValue: e.idp_group_value ?? '',
-      nexusGroupId: e.nexus_group_id ?? '',
+      nexusGroupId: e.mapped_group_id ?? '',
     })),
   }
 }
@@ -277,8 +278,8 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
  */
 export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProps>) {
   const navigate = useNavigate()
-  const identityProvidersDocLink = useDocLink('identityProviders')
   const isEdit = mode === 'edit'
+  const identityProvidersDocLink = useDocLink(isEdit ? 'identityProviders' : 'addIdentityProvider')
   const pageTitle = isEdit ? 'Edit OIDC provider' : 'Add OIDC provider'
   const submitLabel = isEdit ? 'Save provider' : 'Add provider'
 
@@ -314,13 +315,29 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   const formValues = providerData ? toFormValues(providerData) : undefined
 
   const schema = isEdit ? identityProviderEditSchema : identityProviderAddSchema
-  const { control, handleSubmit, setError, getValues, setValue, trigger } = useForm<IdentityProviderFormData>({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    getValues,
+    setValue,
+    trigger,
+    formState: { isDirty },
+    reset,
+  } = useForm<IdentityProviderFormData>({
     resolver: zodResolver(schema, undefined, { mode: 'sync' }),
     mode: 'onBlur',
     defaultValues: formValues ?? identityProviderDefaults,
     values: isEdit && formValues ? formValues : undefined,
   })
   const handleError = useFormMutationErrorHandler<IdentityProviderFormData>(setError)
+
+  const { dismiss } = useDirtyFormGuard({
+    isDirty,
+    onDiscard: () => reset(),
+    title: 'Discard unsaved changes?',
+    body: 'You have unsaved changes to this identity provider. Your changes will be lost if you leave.',
+  })
 
   const navigateBack = useCallback(
     () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root })),
@@ -346,6 +363,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
       const successTitle = isEdit ? 'Identity provider updated' : 'Identity provider created'
       const onSuccess = () => {
         showSuccess({ title: successTitle })
+        dismiss()
         navigateBack()
       }
 
@@ -358,7 +376,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
         createProvider({ body: toCreatePayload(formData) }, { onSuccess, onError: onConflict })
       }
     },
-    [isEdit, providerId, setError, handleError, showSuccess, navigateBack, patchProvider, createProvider]
+    [isEdit, providerId, setError, handleError, showSuccess, dismiss, navigateBack, patchProvider, createProvider]
   )
 
   const normalizeAndSubmit = useCallback(

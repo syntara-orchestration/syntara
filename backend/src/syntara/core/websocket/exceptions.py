@@ -3,12 +3,12 @@
 Provides base exceptions for WebSocket streaming error handling.
 """
 
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.core.models.error import ErrorData
 from syntara.core.websocket.close_codes import INTERNAL_ERROR, NORMAL_CLOSURE
 
 
-class StreamingValidationError(NexusError):
+class StreamingValidationError(SyntaraError):
     """Base exception for streaming validation errors.
 
     These exceptions are caught by stream_events_to_websocket() and converted

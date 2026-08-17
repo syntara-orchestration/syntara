@@ -1,10 +1,15 @@
 """Tests for URL validation utilities (SSRF prevention)."""
 
+import socket
 from unittest.mock import patch
 
 import pytest
 
-from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url, validate_url_no_ssrf
+from syntara.core.lib.url_validation import (
+    validate_endpoint_url,
+    validate_host_url,
+    validate_url_no_ssrf,
+)
 
 
 class TestValidateHostUrl:
@@ -350,3 +355,44 @@ class TestValidateUrlNoSsrf:
             pytest.raises(ValueError, match="SSRF blocked"),
         ):
             validate_url_no_ssrf("https://evil.example.com")
+
+    def test_allowlisted_host_unresolvable_rejected(self) -> None:
+        """Fail closed for an allowlisted host that fails DNS resolution.
+
+        Resolution must succeed so the resolved address can be inspected: there is no
+        request-time re-check, and DNS can return NXDOMAIN here yet resolve to a blocked
+        address (e.g. cloud metadata) at connect time.
+        """
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=socket.gaierror("Name or service not known")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["internal.example.com"]})(),
+            ),
+            pytest.raises(ValueError, match="resolve"),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")
+
+    def test_allowlisted_host_network_error_rejected(self) -> None:
+        """Fail closed for an allowlisted host when resolution hits a transient network (OSError) failure."""
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=OSError("Temporary failure in name resolution")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["internal.example.com"]})(),
+            ),
+            pytest.raises(ValueError),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")
+
+    def test_non_allowlisted_host_unresolvable_rejected(self) -> None:
+        """Still fail closed for a non-allowlisted host that fails DNS resolution."""
+        with (
+            patch(_PATCH_GETADDRINFO, side_effect=socket.gaierror("Name or service not known")),
+            patch(
+                "syntara.core.lib.url_validation.get_settings",
+                return_value=type("S", (), {"workflow_http_request_allowed_hosts": ["other.example.com"]})(),
+            ),
+            pytest.raises(ValueError, match="resolve"),
+        ):
+            validate_url_no_ssrf("https://internal.example.com")

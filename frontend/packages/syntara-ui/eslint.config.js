@@ -281,14 +281,29 @@ export default tseslint.config(
         'error',
         {
           // XMLHttpRequest required for upload progress (fetch lacks upload progress events)
-          allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts'],
+          allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
         },
       ],
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',
       'syntara/prefer-confirmation-dialog': 'error',
-      'syntara/no-locale-date-format': 'error',
+      'syntara/no-locale-date-format': [
+        'error',
+        {
+          // Canonical Timestamp wrapper components (own dateFormat/timeFormat) + dateUtils.ts
+          // (needs raw toLocaleTimeString for the same-day-collapse execution formatters).
+          allowedFiles: [
+            '**/utils/dateUtils.ts',
+            '**/components/table/DateCell.tsx',
+            '**/components/table/ExecutionTimestamp.tsx',
+            '**/components/table/UserTimestamp.tsx',
+            // Composes "Last saved <Timestamp>" inline inside a Tooltip's ReactNode content —
+            // no canonical wrapper fits a bare inline timestamp fragment like this.
+            '**/routes/builder/SaveWorkflowButton.tsx',
+          ],
+        },
+      ],
       // Catch unnecessary useEffect patterns. Aligns with https://react.dev/learn/you-might-not-need-an-effect
       'reactYouMightNotNeedAnEffect/no-derived-state': 'warn',
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',
@@ -319,6 +334,14 @@ export default tseslint.config(
     // Currents requires a default export for its config file — exempt from the default-export ban
     files: ['currents.config.ts'],
     rules: {
+      'no-restricted-exports': 'off',
+    },
+  },
+  {
+    // Playwright globalSetup runs in Node before tests — requires default export and uses console for logging
+    files: ['e2e/global-setup.ts'],
+    rules: {
+      'no-console': 'off',
       'no-restricted-exports': 'off',
     },
   },
@@ -505,6 +528,8 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'off',
       // Testing Library rules target RTL/vitest patterns; Playwright specs use locator-based APIs
       'testing-library/prefer-screen-queries': 'off',
+      // Playwright worker-scoped fixtures require destructured first arg even when no deps are needed
+      'no-empty-pattern': 'off',
     },
   },
   {

@@ -77,7 +77,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -120,7 +120,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -142,9 +142,9 @@ paths:
       security:
         - bearerAuth: []
     patch:
-      summary: Patch identity provider
-      description: Patch an identity provider.
-      operationId: patch_identity_provider
+      summary: Update identity provider
+      description: Update an identity provider.
+      operationId: update_identity_provider
       x-app-permission:
         resource: identity-provider
         action: update
@@ -161,14 +161,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IdentityProviderPatch'
+              $ref: '#/components/schemas/IdentityProviderUpdate'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -249,7 +249,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
         '401':
@@ -316,7 +316,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Nexus user fields to IdP-specific OIDC claim names.
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -344,13 +344,13 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Nexus group mapping entry.
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
       required:
         - idp_group_value
-        - nexus_group_id
+        - mapped_group_id
       additionalProperties: false
       properties:
         idp_group_value:
@@ -358,11 +358,11 @@ components:
           minLength: 1
           title: Idp Group Value
           description: Group value from the IdP token (e.g. GUID or role name)
-        nexus_group_id:
+        mapped_group_id:
           type: string
           format: uuid
-          title: Nexus Group Id
-          description: ID of the Nexus group to map to
+          title: Mapped Group Id
+          description: ID of the group to map to
 
     OIDCConfiguration:
       type: object
@@ -482,7 +482,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -611,7 +611,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -628,10 +628,10 @@ components:
           title: Disable Tls Verify
           description: Disable TLS certificate verification for requests to this identity provider (insecure)
 
-    OIDCConfigurationPatch:
+    OIDCConfigurationUpdate:
       type: object
-      title: OIDCConfigurationPatch
-      description: "Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted)."
+      title: OIDCConfigurationUpdate
+      description: "Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."
       additionalProperties: false
       required:
         - issuer_url
@@ -752,7 +752,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries (omit to keep existing)
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -803,9 +803,9 @@ components:
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
 
-    IdentityProviderPatch:
+    IdentityProviderUpdate:
       type: object
-      title: IdentityProviderPatch
+      title: IdentityProviderUpdate
       description: Schema for partially updating an identity provider.
       additionalProperties: false
       properties:
@@ -831,9 +831,9 @@ components:
             - discriminator:
                 propertyName: provider_type
                 mapping:
-                  oidc: '#/components/schemas/OIDCConfigurationPatch'
+                  oidc: '#/components/schemas/OIDCConfigurationUpdate'
               oneOf:
-                - $ref: '#/components/schemas/OIDCConfigurationPatch'
+                - $ref: '#/components/schemas/OIDCConfigurationUpdate'
             - type: 'null'
         enabled:
           title: Enabled
@@ -842,15 +842,15 @@ components:
             - type: boolean
             - type: 'null'
 
-    IdentityProviderResponse:
-      title: IdentityProviderResponse
+    IdentityProviderRead:
+      title: IdentityProviderRead
       description: Schema for IdentityProvider response with configuration details (excludes secrets).
       additionalProperties: false
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
         - type: object
-          title: IdentityProviderResponse
+          title: IdentityProviderRead
           required:
             - configuration
           properties:
@@ -875,7 +875,7 @@ components:
             resources:
               type: array
               items:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
       title: IdentityProviderListResponse
       description: Paginated list response for identity providers.
 

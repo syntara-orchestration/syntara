@@ -6,6 +6,9 @@ on:
     - cron: "0 8 * * 1"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   dast:
     # TODO(alex): temporal workaround, actions/runner-images#14473 will fix it
@@ -37,8 +40,11 @@ jobs:
 
       - name: Start services with podman-compose
         timeout-minutes: 5
+        env:
+          # Docs are enabled by default; kept explicit for clarity.
+          APP_ENABLE_API_DOCS: "true"
         run: |
-          uvx podman-compose -p syntara-ci up --build -d database redis temporal syntara
+          uvx podman-compose -f ../podman-compose.yml -p syntara-ci up --build -d database redis temporal syntara
         working-directory: backend
 
       - name: Verify services are healthy
@@ -85,11 +91,11 @@ jobs:
         if: failure()
         run: |
           echo "=== Compose logs ==="
-          uvx podman-compose -p syntara-ci logs database redis temporal syntara
+          uvx podman-compose -f ../podman-compose.yml -p syntara-ci logs database redis temporal syntara
         working-directory: backend
 
       - name: Cleanup
         if: always()
         run: |
-          uvx podman-compose -p syntara-ci down -v || true
+          uvx podman-compose -f ../podman-compose.yml -p syntara-ci down -v || true
         working-directory: backend

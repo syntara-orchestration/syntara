@@ -79,7 +79,7 @@ class TestAuditEventResourceUrnValidation:
             pytest.param(None, None, None, id="none_value_accepted"),
             # Invalid URNs - should be dropped with warnings
             pytest.param(
-                "nexus:workflow:123",
+                "syntara:workflow:123",
                 None,
                 "does not conform to RFC 8141",
                 id="invalid_missing_urn_prefix",

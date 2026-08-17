@@ -6,32 +6,34 @@ import { axe } from 'vitest-axe'
 import { ApprovalNodeForm } from './ApprovalNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
-// Mock the permission-filtered hooks
-const mockUseApprovalDecideUsers = vi.fn(() => ({
-  users: [
-    { id: 'user-1', username: 'approver1' },
-    { id: 'user-2', username: 'approver2' },
-  ],
-  isLoading: false,
-  error: null,
-  refetch: vi.fn(),
-}))
-
-const mockUseApprovalDecideGroups = vi.fn(() => ({
-  groups: [
-    { id: 'group-1', name: 'approvers' },
-    { id: 'group-2', name: 'admins' },
-  ],
-  isLoading: false,
-  error: null,
+// Mock the permission-filtered hooks — vi.hoisted ensures these are available when vi.mock factories run
+const { mockUseApprovalDecideUsers, mockUseApprovalDecideGroups } = vi.hoisted(() => ({
+  mockUseApprovalDecideUsers: vi.fn(() => ({
+    users: [
+      { id: 'user-1', username: 'approver1' },
+      { id: 'user-2', username: 'approver2' },
+    ],
+    isLoading: false,
+    isPermissionDenied: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  mockUseApprovalDecideGroups: vi.fn(() => ({
+    groups: [
+      { id: 'group-1', name: 'approvers' },
+      { id: 'group-2', name: 'admins' },
+    ],
+    isLoading: false,
+    error: null,
+  })),
 }))
 
 vi.mock('./useApprovalDecideUsers', () => ({
-  useApprovalDecideUsers: () => mockUseApprovalDecideUsers(),
+  useApprovalDecideUsers: mockUseApprovalDecideUsers,
 }))
 
 vi.mock('./useApprovalDecideGroups', () => ({
-  useApprovalDecideGroups: () => mockUseApprovalDecideGroups(),
+  useApprovalDecideGroups: mockUseApprovalDecideGroups,
 }))
 
 vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
@@ -108,7 +110,7 @@ describe('ApprovalNodeForm', () => {
     })
 
     it('renders permission-filtered user and group selects', () => {
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Verify both select fields are present
       expect(screen.getByText('Approver users')).toBeInTheDocument()
@@ -141,6 +143,7 @@ describe('ApprovalNodeForm', () => {
       renderWithHeader(
         <ApprovalNodeForm
           onSubmit={mockOnSubmit}
+          projectId="test-project"
           initialData={{
             name: 'Test Approval',
             prompt: 'Test approval message',
@@ -176,7 +179,7 @@ describe('ApprovalNodeForm', () => {
   describe('User Interactions', () => {
     it('allows selecting users', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Initially shows "Select users"
       expect(screen.getByPlaceholderText('Select users')).toBeInTheDocument()
@@ -207,6 +210,7 @@ describe('ApprovalNodeForm', () => {
       renderWithHeader(
         <ApprovalNodeForm
           onSubmit={mockOnSubmit}
+          projectId="test-project"
           initialData={{
             name: 'Test',
             prompt: 'Test',
@@ -255,7 +259,7 @@ describe('ApprovalNodeForm', () => {
 
     it('allows selecting multiple users', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -469,6 +473,7 @@ describe('ApprovalNodeForm', () => {
       mockUseApprovalDecideUsers.mockReturnValue({
         users: [],
         isLoading: true,
+        isPermissionDenied: false,
         error: null,
         refetch: vi.fn(),
       })
@@ -477,6 +482,67 @@ describe('ApprovalNodeForm', () => {
 
       // Verify label exists
       expect(screen.getByText('Approver users')).toBeInTheDocument()
+    })
+
+    it('shows warning alert when user lacks who_can permission', () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="some-project" />)
+
+      expect(screen.getByText('Dropdown unavailable')).toBeInTheDocument()
+      expect(
+        screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
+      ).toBeInTheDocument()
+    })
+
+    it('shows project-required info alert when no project is selected', () => {
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+
+      expect(screen.getByText('Project required')).toBeInTheDocument()
+      expect(
+        screen.getByText('Select a project to load approval users, or enter usernames manually.')
+      ).toBeInTheDocument()
+    })
+
+    it('shows permission-denied warning when project is set but user lacks permission', () => {
+      mockUseApprovalDecideUsers.mockReturnValue({
+        users: [],
+        isLoading: false,
+        isPermissionDenied: true,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="some-project" />)
+
+      expect(screen.getByText('Dropdown unavailable')).toBeInTheDocument()
+      expect(
+        screen.getByText("You don't have permission to list approval users. You can still enter usernames manually.")
+      ).toBeInTheDocument()
+    })
+
+    it('has no accessibility violations in no-project state', async () => {
+      const { container } = renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      expect(await screen.findByText('Project required')).toBeInTheDocument()
+      const results = await axe(container, {
+        rules: {
+          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          'aria-valid-attr-value': { enabled: false },
+        },
+      })
+      expect(results).toHaveNoViolations()
+    })
+
+    it('forwards projectId prop to useApprovalDecideUsers', () => {
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project-123" />)
+
+      expect(mockUseApprovalDecideUsers).toHaveBeenCalledWith('test-project-123')
     })
 
     it('renders with groups loading state', () => {
@@ -496,7 +562,7 @@ describe('ApprovalNodeForm', () => {
   describe('Typeahead Filtering', () => {
     it('filters users based on search input', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -546,7 +612,7 @@ describe('ApprovalNodeForm', () => {
 
     it('shows empty text when search returns no results', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -568,7 +634,7 @@ describe('ApprovalNodeForm', () => {
 
     it('clears search filter when dropdown is closed', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       const usersToggle = screen.getByPlaceholderText('Select users')
@@ -598,7 +664,7 @@ describe('ApprovalNodeForm', () => {
 
     it('search is case-insensitive', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} projectId="test-project" />)
 
       // Open users dropdown
       await user.click(screen.getByPlaceholderText('Select users'))
@@ -675,6 +741,7 @@ describe('ApprovalNodeForm', () => {
 
       const results = await axe(container, {
         rules: {
+          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })

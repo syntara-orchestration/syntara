@@ -116,7 +116,7 @@ make check-orphans
 ### Handling Failures
 
 1. **Genuinely dead module**: remove it
-2. **New module using an existing pattern** (e.g., a new router): existing patterns like `nexus/*/router.py` already cover it — no allowlist change needed
+2. **New module using an existing pattern** (e.g., a new router): existing patterns like `syntara/*/router.py` already cover it — no allowlist change needed
 3. **New discovery/registration pattern**: add a glob pattern to `known_orphan_modules.json` with a justification documenting the discovery mechanism. Every pattern must explain HOW the module is loaded at runtime
 4. **False positive from package-style import**: modules imported via `from syntara.X import module_name` (not `from syntara.X.module_name import ...`) are invisible to the import scanner — add a specific pattern with the import mechanism documented
 
@@ -126,7 +126,7 @@ Each pattern in `known_orphan_modules.json` maps to a justification string. Befo
 
 1. **Verify the module is actually used** — grep for its function/class names across the entire repo, not just import paths. Checking import paths alone misses package-style imports (`from syntara.X import module_name`)
 2. **Document the registration mechanism** — how does the module get loaded? (discovery scan, CLI entrypoint, `importlib`, package import, etc.)
-3. **Prefer specific patterns over broad ones** — `nexus/files/validators.py` is better than `nexus/*/validators.py` unless the pattern genuinely applies to all domains
+3. **Prefer specific patterns over broad ones** — `syntara/files/validators.py` is better than `syntara/*/validators.py` unless the pattern genuinely applies to all domains
 4. **Do not assume existing state is valid** — a module being in the repo does not mean it is used. Verify before allowlisting
 
 ## CI Integration

@@ -1,7 +1,7 @@
 ---
 # Test Playbook for AAP Job Template Activity
 # This playbook demonstrates various AAP parameters that can be controlled
-# through the Nexus AAP job template executor:
+# through the Syntara AAP job template executor:
 # - tags (skip_tags, tags)
 # - limit (host targeting)
 # - verbosity (logging detail)

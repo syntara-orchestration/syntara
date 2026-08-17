@@ -1,6 +1,7 @@
 """Audit events for service account token rejections in StaleTokenMiddleware."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from urllib.parse import quote
 
 from syntara.audit.handler import AuditEventHandler
@@ -77,6 +78,43 @@ class DisabledSACredentialRejectionHandler(AuditEventHandler[DisabledSACredentia
             event_action="disabled_sa_credential_rejected",
             event_message=(
                 f"Rejected request: SA credential {event.credential_status} (credential {event.credential_id})"
+            ),
+            source_component=_SOURCE_COMPONENT,
+            structured_data=data,
+            actor_type=PrincipalType.SERVICE_ACCOUNT,
+            resource_urn=f"urn:syntara:service-account:{quote(event.service_account_id, safe='')}",
+            resource_name=event.service_account_id,
+        )
+
+
+@dataclass
+class ExpiredSACredentialRejectionEvent:
+    """Emitted when a request is rejected because the SA credential has expired."""
+
+    service_account_id: str
+    credential_id: str
+    expires_at: datetime
+
+
+class ExpiredSACredentialRejectionHandler(AuditEventHandler[ExpiredSACredentialRejectionEvent]):
+    """Maps an ExpiredSACredentialRejectionEvent to a normalized AuditEvent."""
+
+    def handle(self, event: ExpiredSACredentialRejectionEvent) -> AuditEvent:
+        """Map an ExpiredSACredentialRejectionEvent to a normalized AuditEvent."""
+        data = AuditContextData(
+            data_type="expired-sa-credential-rejection",
+            credential_id=event.credential_id,
+            expires_at=event.expires_at.isoformat(),
+        )
+
+        return AuditEvent(
+            event_category=EventCategory.SECURITY_EVENT,
+            event_severity=EventSeverity.WARNING,
+            event_status=EventStatus.ERROR,
+            event_action="expired_sa_credential_rejected",
+            event_message=(
+                f"Rejected request: SA credential expired at {event.expires_at.isoformat()}"
+                f" (credential {event.credential_id})"
             ),
             source_component=_SOURCE_COMPONENT,
             structured_data=data,

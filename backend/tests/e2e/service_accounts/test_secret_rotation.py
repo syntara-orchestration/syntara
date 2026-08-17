@@ -18,9 +18,9 @@ from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client import Client
 from syntara_api_client.api.authentication.token import sync_detailed
 from syntara_api_client.models.body_token import BodyToken
-from syntara_api_client.models.sa_credential_create import SACredentialCreate
-from syntara_api_client.models.sa_credential_rotate_request import SACredentialRotateRequest
 from syntara_api_client.models.service_account_create import ServiceAccountCreate
+from syntara_api_client.models.service_account_credential_create import ServiceAccountCredentialCreate
+from syntara_api_client.models.service_account_credential_rotate_request import ServiceAccountCredentialRotateRequest
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class TestSecretRotationGracePeriod:
     """API-19: Secret rotation — grace period."""
 
     def test_grace_period_both_secrets_valid(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """During the grace period, both old and new secrets are accepted."""
         sa = syntara_api.service_accounts.create(
@@ -57,7 +57,7 @@ class TestSecretRotationGracePeriod:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+                body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
 
             old_secret = cred.client_secret
@@ -66,18 +66,18 @@ class TestSecretRotationGracePeriod:
             rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
-                body=SACredentialRotateRequest(grace_period_seconds=3600),
+                body=ServiceAccountCredentialRotateRequest(grace_period_seconds=3600),
             ).assert_and_get()
 
             new_secret = rotated.client_secret
             assert new_secret != old_secret
 
-            resp_old = _token_request(nexus_base_url, client_id, old_secret)
+            resp_old = _token_request(syntara_base_url, client_id, old_secret)
             assert resp_old.status_code == HTTPStatus.OK, (
                 f"Old secret should work during grace period, got {resp_old.status_code}"
             )
 
-            resp_new = _token_request(nexus_base_url, client_id, new_secret)
+            resp_new = _token_request(syntara_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should work, got {resp_new.status_code}"
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
@@ -91,7 +91,7 @@ class TestSecretRotationGraceExpiry:
     POLL_INTERVAL_SECONDS = 0.5
 
     def test_old_secret_rejected_after_grace(
-        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, nexus_base_url: str
+        self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """After the grace period, only the new secret works."""
         sa = syntara_api.service_accounts.create(
@@ -101,7 +101,7 @@ class TestSecretRotationGraceExpiry:
         try:
             cred = syntara_api.service_account_credentials.create(
                 service_account_id=sa.id,
-                body=SACredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+                body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
             ).assert_and_get()
 
             old_secret = cred.client_secret
@@ -110,13 +110,13 @@ class TestSecretRotationGraceExpiry:
             rotated = syntara_api.service_account_credentials.rotate(
                 service_account_id=sa.id,
                 credential_id=cred.id,
-                body=SACredentialRotateRequest(grace_period_seconds=self.GRACE_PERIOD_SECONDS),
+                body=ServiceAccountCredentialRotateRequest(grace_period_seconds=self.GRACE_PERIOD_SECONDS),
             ).assert_and_get()
 
             new_secret = rotated.client_secret
 
             # Verify old secret still works during grace period
-            resp_during = _token_request(nexus_base_url, client_id, old_secret)
+            resp_during = _token_request(syntara_base_url, client_id, old_secret)
             assert resp_during.status_code == HTTPStatus.OK, (
                 f"Old secret should work during grace period, got {resp_during.status_code}"
             )
@@ -126,7 +126,7 @@ class TestSecretRotationGraceExpiry:
             old_rejected = False
             while time.monotonic() < deadline:
                 time.sleep(self.POLL_INTERVAL_SECONDS)
-                resp_old = _token_request(nexus_base_url, client_id, old_secret)
+                resp_old = _token_request(syntara_base_url, client_id, old_secret)
                 if resp_old.status_code == HTTPStatus.UNAUTHORIZED:
                     old_rejected = True
                     break
@@ -136,7 +136,7 @@ class TestSecretRotationGraceExpiry:
                 f"(grace_period={self.GRACE_PERIOD_SECONDS}s)"
             )
 
-            resp_new = _token_request(nexus_base_url, client_id, new_secret)
+            resp_new = _token_request(syntara_base_url, client_id, new_secret)
             assert resp_new.status_code == HTTPStatus.OK, f"New secret should still work, got {resp_new.status_code}"
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)

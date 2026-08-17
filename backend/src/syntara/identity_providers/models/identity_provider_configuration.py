@@ -26,7 +26,7 @@ class OIDCIdpType(StrEnum):
 
 
 class OIDCClaimMapping(SQLModel):
-    """Maps Nexus user fields to IdP-specific OIDC claim names."""
+    """Maps Syntara user fields to IdP-specific OIDC claim names."""
 
     subject: str = Field(default="sub")
     email: str = Field(default="email")
@@ -38,14 +38,14 @@ class OIDCClaimMapping(SQLModel):
 
 
 class OIDCGroupMappingEntry(SQLModel):
-    """API-facing schema for a single IdP-to-Nexus group mapping entry.
+    """API-facing schema for a single IdP-to-Syntara group mapping entry.
 
     Used in API requests/responses. Actual storage is in the
     ``idp_group_mapping_entries`` table.
     """
 
     idp_group_value: str = Field(min_length=1, description="Group value from the IdP token (e.g. GUID or role name)")
-    nexus_group_id: UUID = Field(description="ID of the Nexus group to map to")
+    mapped_group_id: UUID = Field(description="ID of the group to map to")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -154,7 +154,7 @@ class OIDCConfiguration(BaseConsumerConfiguration):
     group_mapping_entries: list[OIDCGroupMappingEntry] = Field(
         default_factory=list,
         exclude=True,
-        description="IdP-to-Nexus group mapping entries",
+        description="IdP-to-Syntara group mapping entries",
     )
     allow_all_authenticated: bool = Field(
         default=False, description="Allow all users from this IdP to log in regardless of group mapping results"
@@ -259,7 +259,7 @@ class OIDCConfigurationResponse(SQLModel):
     claim_mapping: OIDCClaimMapping = Field(default_factory=OIDCClaimMapping)
     group_jmespath_expression: str | None = Field(default=None, description="JMESPath expression for group extraction")
     group_mapping_entries: list[OIDCGroupMappingEntry] = Field(
-        default_factory=list, description="IdP-to-Nexus group mapping entries"
+        default_factory=list, description="IdP-to-Syntara group mapping entries"
     )
     allow_all_authenticated: bool = Field(
         default=False, description="Allow all users from this IdP to log in regardless of group mapping results"
@@ -287,8 +287,8 @@ IdentityProviderConfiguration = Annotated[
 ]
 
 
-class OIDCConfigurationPatch(BaseConsumerConfiguration):
-    """Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
+class OIDCConfigurationUpdate(BaseConsumerConfiguration):
+    """Update schema for OIDC configuration (client_secret optional — preserves existing if omitted)."""
 
     provider_type: Literal["oidc"] = "oidc"
 
@@ -331,7 +331,7 @@ class OIDCConfigurationPatch(BaseConsumerConfiguration):
     group_mapping_entries: list[OIDCGroupMappingEntry] | None = Field(
         default=None,
         exclude=True,
-        description="IdP-to-Nexus group mapping entries (omit to keep existing)",
+        description="IdP-to-Syntara group mapping entries (omit to keep existing)",
     )
     allow_all_authenticated: bool | None = Field(
         default=None,
@@ -383,9 +383,9 @@ class OIDCConfigurationPatch(BaseConsumerConfiguration):
         return frozenset({"client_secret"})
 
 
-IdentityProviderConfigurationPatchTypes = OIDCConfigurationPatch
-IdentityProviderConfigurationPatch = Annotated[
-    IdentityProviderConfigurationPatchTypes,
+IdentityProviderConfigurationUpdateTypes = OIDCConfigurationUpdate
+IdentityProviderConfigurationUpdate = Annotated[
+    IdentityProviderConfigurationUpdateTypes,
     Field(discriminator="provider_type"),
 ]
 

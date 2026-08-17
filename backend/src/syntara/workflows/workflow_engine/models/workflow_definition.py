@@ -8,7 +8,7 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
 
@@ -20,6 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
+from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
 from syntara.workflows.utils.output_mapping import apply_output_mapping
 from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
@@ -275,15 +276,6 @@ class HTTPMethod(str, Enum):
     TRACE = "TRACE"
 
 
-class AuthenticationType(str, Enum):
-    """Supported authentication types for API requests."""
-
-    BASIC = "basic"
-    BEARER = "bearer"
-    API_KEY = "api_key"
-    OAUTH2 = "oauth2"
-
-
 # Node-level settings models
 
 
@@ -343,7 +335,7 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
     language: ScriptLanguage
     code: str = Field(min_length=1, description="Script code to execute")
     environment: dict[str, str] = Field(default_factory=dict, description="Environment variables")
-    credential_id: str | None = Field(default=None, description="Nexus credential UUID for credential scrubbing")
+    credential_id: str | None = Field(default=None, description="Syntara credential UUID for credential scrubbing")
 
     @field_validator("environment", mode="before")
     @classmethod
@@ -360,16 +352,6 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
         return v
 
 
-class Authentication(TemplateAwareBaseModel):
-    """Authentication configuration for API requests."""
-
-    type: AuthenticationType = Field(description="Authentication type")
-    credentials: str = Field(
-        description="Reference to stored credentials",
-        pattern=r"^\$\{secrets\.[a-zA-Z0-9_]+\}$",
-    )
-
-
 class APIExecutorParameters(TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
@@ -378,10 +360,9 @@ class APIExecutorParameters(TemplateAwareBaseModel):
     headers: dict[str, Any] = Field(default_factory=dict)
     body: dict[str, Any] | str | None = None
     query_params: dict[str, Any] = Field(default_factory=dict)
-    authentication: Authentication | None = None
     credential_id: str | None = Field(
         default=None,
-        description="Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.",
+        description="Syntara credential UUID for authentication or Secret URL.",
     )
 
     @field_validator("url")
@@ -409,7 +390,7 @@ class IntegrationConnectionConfig(BaseModel):
 
     integration_id: str = Field(description="UUID of the integration")
     credential_id: str = Field(
-        description="Nexus credential UUID for execution calls (distinct from management credential)"
+        description="Syntara credential UUID for execution calls (distinct from management credential)"
     )
 
     @field_validator("integration_id", "credential_id")
@@ -430,7 +411,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
     )
     credential_id: str | None = Field(
         default=None,
-        description="Nexus credential UUID for LLM provider authentication",
+        description="Syntara credential UUID for LLM provider authentication",
     )
     file_ids: list[str] = Field(
         default_factory=list,
@@ -556,7 +537,7 @@ class AAPResourceReferenceMixin(BaseModel):
     credential_id: str | None = Field(
         default=None,
         description=(
-            "Nexus credential UUID for Ansible Automation Platform API authentication. "
+            "Syntara credential UUID for Ansible Automation Platform API authentication. "
             "Separate from legacy credentials list."
         ),
     )
@@ -857,7 +838,7 @@ class WaitNodeParameters(BaseModel):
 class ApprovalNodeParameters(BaseModel):
     """Parameters for approval gate nodes."""
 
-    credential_id: str | None = Field(default=None, description="Nexus credential UUID")
+    credential_id: str | None = Field(default=None, description="Syntara credential UUID")
     approver_users: list[str] | None = Field(default=None, max_length=100, description="Usernames who can approve")
     approver_groups: list[str] | None = Field(
         default=None, max_length=50, description="Group names whose members can approve"
@@ -1105,7 +1086,11 @@ def _get_valid_timezones() -> frozenset[str]:
     """Return the set of valid IANA timezone names, cached after first call."""
     global _VALID_TIMEZONES  # noqa: PLW0603
     if _VALID_TIMEZONES is None:
-        _VALID_TIMEZONES = frozenset(available_timezones())
+        tzs = frozenset(available_timezones())
+        if not tzs:
+            msg = "No IANA timezone data found. Install the 'tzdata' package: pip install tzdata"
+            raise RuntimeError(msg)
+        _VALID_TIMEZONES = tzs
     return _VALID_TIMEZONES
 
 
@@ -1152,14 +1137,69 @@ class ScheduledTriggerConfig(TemplateAwareBaseModel):
         description="How to handle overlapping schedule executions",
     )
 
-    @field_validator("cron")
+    _SCHEDULE_SHAPE_FIELDS: ClassVar[tuple[str, ...]] = ("schedule_type", "interval", "cron", "timezone")
+
+    @model_validator(mode="before")
     @classmethod
-    def validate_cron_expression(cls, v: str | None) -> str | None:
-        """Validate that cron is a standard 5-field expression."""
+    def reject_template_schedule_fields(cls, data: Any) -> Any:  # noqa: ANN401
+        """Reject template expressions in schedule-shape fields.
+
+        Unlike other node parameters, ``schedule_type``/``interval``/``cron``/
+        ``timezone`` are materialized into a Temporal Schedule once at publish
+        time -- there is no per-execution runtime context to resolve
+        ``${...}`` expressions against later. Letting
+        ``TemplateAwareBaseModel``'s wildcard bypass wave these through would
+        let ``collect_findings`` / pre-mutation publish accept a config that
+        can never be turned into a schedule, then fail post-commit in
+        ``config_to_temporal_schedule``. Runs before field-level validation
+        (and before the wildcard bypass) so it can't be skipped.
+        """
+        if not isinstance(data, dict):
+            return data
+        for field_name in cls._SCHEDULE_SHAPE_FIELDS:
+            value = data.get(field_name)
+            if isinstance(value, str) and TEMPLATE_PATTERN.search(value):
+                msg = (
+                    f"Field '{field_name}' does not support template expressions. "
+                    "Scheduled trigger configs are fixed at publish time, not resolved at runtime."
+                )
+                raise SafeValueError(msg)
+        return data
+
+    @field_validator("interval")
+    @classmethod
+    def validate_interval_expression(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Validate that interval is a well-formed ISO 8601 repeating interval.
+
+        Skipped when ``schedule_type`` is not ``interval``: ``interval`` is
+        inactive in that case and ``config_to_temporal_schedule`` never reads
+        it, so a stale/invalid leftover value here must not block verify or
+        publish. Otherwise delegates to
+        ``iso8601_interval.parse_iso8601_repeating_interval``, the same
+        parser ``schedule_parser.parse_iso8601_interval`` uses to build
+        Temporal Schedule objects, so this model, ``/workflows/validate``,
+        publish, and Temporal sync all reject the same set of interval
+        strings.
+        """
         if v is None:
             return v
-        # Template expressions bypass validation
-        if isinstance(v, str) and TEMPLATE_PATTERN.search(v):
+        if info.data.get("schedule_type") not in (None, ScheduleType.INTERVAL):
+            return v
+        parse_iso8601_repeating_interval(v)
+        return v
+
+    @field_validator("cron")
+    @classmethod
+    def validate_cron_expression(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Validate that cron is a standard 5-field expression.
+
+        Skipped when ``schedule_type`` is not ``cron``, mirroring
+        ``validate_interval_expression`` -- ``config_to_temporal_schedule``
+        never reads ``cron`` for an interval schedule.
+        """
+        if v is None:
+            return v
+        if info.data.get("schedule_type") not in (None, ScheduleType.CRON):
             return v
         if not _CRON_PATTERN.match(v):
             msg = (
@@ -1176,9 +1216,6 @@ class ScheduledTriggerConfig(TemplateAwareBaseModel):
         """Validate that timezone is a valid IANA timezone name."""
         if v is None:
             return v
-        # Template expressions bypass validation
-        if isinstance(v, str) and TEMPLATE_PATTERN.search(v):
-            return v
         if v not in _get_valid_timezones():
             msg = f"Invalid timezone: '{v}'. Must be a valid IANA timezone name (e.g., 'America/New_York')."
             raise SafeValueError(msg)
@@ -1187,10 +1224,6 @@ class ScheduledTriggerConfig(TemplateAwareBaseModel):
     @model_validator(mode="after")
     def validate_schedule_fields(self) -> "ScheduledTriggerConfig":
         """Validate that required fields are present based on schedule_type."""
-        # Skip validation if schedule_type is a template expression
-        if isinstance(self.schedule_type, str) and TEMPLATE_PATTERN.search(self.schedule_type):
-            return self
-
         if self.schedule_type == ScheduleType.INTERVAL and not self.interval:
             msg = "Field 'interval' is required when schedule_type is 'interval'"
             raise SafeValueError(msg)

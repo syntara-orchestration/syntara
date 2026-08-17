@@ -27,7 +27,7 @@ from starlette import status
 
 from syntara.auth.exceptions import OIDCErrorCode
 from syntara.core.config.base import get_encryption_key, get_settings
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 from syntara.core.lib.encryption import EncryptionError, SecretEncryptor, key_from_string
 from syntara.core.lib.sanitization import escape_control_chars, has_control_chars
 from syntara.identity_providers.models.identity_provider_configuration import OIDCClaimMapping
@@ -87,7 +87,7 @@ def _is_ssl_verification_error(exc: Exception) -> bool:
     return _SSL_VERIFY_FAILED_MARKER in str(exc)
 
 
-class OIDCError(NexusError):
+class OIDCError(SyntaraError):
     """Base exception for OIDC flow errors."""
 
     def __init__(self, message: str, *, error_code: OIDCErrorCode | None = None) -> None:
@@ -491,7 +491,7 @@ class OIDCService:
 
         Args:
             id_token_claims: Decoded ID token claims
-            claim_mapping: Optional mapping of Nexus fields to IdP claim names.
+            claim_mapping: Optional mapping of Syntara fields to IdP claim names.
                 If None, uses default OIDC claim names.
 
         Returns:

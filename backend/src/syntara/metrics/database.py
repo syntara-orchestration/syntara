@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-_QUERY_START_KEY = "_nexus_query_start"
+_QUERY_START_KEY = "_syntara_query_start"
 
 
 def _before_cursor_execute(

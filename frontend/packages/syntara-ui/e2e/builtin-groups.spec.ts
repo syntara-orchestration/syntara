@@ -40,7 +40,7 @@ test.describe('UI-31: Default Builtin Groups — Visibility', () => {
 
     const token = await getAuthToken(app)
     if (!token) {
-      throw new Error('NEXUS_E2E_PASSWORD is required for API assertions')
+      throw new Error('SYNTARA_E2E_PASSWORD is required for API assertions')
     }
 
     for (const groupId of [auditors.id, users.id]) {

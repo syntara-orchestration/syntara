@@ -11,13 +11,13 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 0.1.0
+  version: 1.0.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
     description: API v1
 tags:
-  - name: Ansible Automation Platform
+  - name: Ansible Automation Platform Proxy
     description: Ansible Automation Platform resource proxy
   - name: Admin
     description: Administrative revocation operations
@@ -53,8 +53,6 @@ tags:
     description: Service account credential lifecycle management
   - name: Settings
     description: Runtime settings management
-  - name: Tool Metrics
-    description: Tool usage metrics and execution history
   - name: Users
     description: Local user account management
   - name: Groups
@@ -70,7 +68,7 @@ tags:
   - name: Webhooks
     description: Inbound webhook event receivers
 paths:
-  /aap/organizations:
+  /proxies/aap/organizations:
     get:
       summary: List organizations
       description: List Ansible Automation Platform organizations.
@@ -79,7 +77,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -109,7 +107,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -231,7 +229,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/job_templates:
+  /proxies/aap/job_templates:
     get:
       summary: List job templates
       description: List Ansible Automation Platform job templates, optionally filtered by organization.
@@ -240,7 +238,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -270,7 +268,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -401,7 +399,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/job_templates/{job_template_id}:
+  /proxies/aap/job_templates/{job_template_id}:
     get:
       summary: Get job template
       description: Get Ansible Automation Platform job template details including prompt-on-launch capabilities.
@@ -410,7 +408,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: path
           name: job_template_id
@@ -447,7 +445,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -569,7 +567,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/workflow_job_templates:
+  /proxies/aap/workflow_job_templates:
     get:
       summary: List workflow job templates
       description: List Ansible Automation Platform workflow job templates, optionally filtered by organization.
@@ -578,7 +576,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -608,7 +606,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -739,7 +737,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/workflow_job_templates/{workflow_job_template_id}:
+  /proxies/aap/workflow_job_templates/{workflow_job_template_id}:
     get:
       summary: Get workflow job template
       description: Get Ansible Automation Platform workflow job template details including prompt-on-launch capabilities.
@@ -748,7 +746,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: path
           name: workflow_job_template_id
@@ -785,7 +783,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -907,7 +905,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/inventories:
+  /proxies/aap/inventories:
     get:
       summary: List inventories
       description: List Ansible Automation Platform inventories, optionally filtered by organization.
@@ -916,7 +914,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -946,7 +944,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1077,7 +1075,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/execution_environments:
+  /proxies/aap/execution_environments:
     get:
       summary: List execution environments
       description: List Ansible Automation Platform execution environments, optionally filtered by organization.
@@ -1086,7 +1084,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1116,7 +1114,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1247,16 +1245,16 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/credentials:
+  /proxies/aap/credentials:
     get:
-      summary: List credentials
+      summary: List AAP credentials
       description: List Ansible Automation Platform credentials (not organization-scoped).
       operationId: list_aap_credentials
       x-app-permission:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1286,7 +1284,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1408,7 +1406,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/instance_groups:
+  /proxies/aap/instance_groups:
     get:
       summary: List instance groups
       description: List Ansible Automation Platform instance groups (not organization-scoped).
@@ -1417,7 +1415,7 @@ paths:
         resource: null
         action: null
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       parameters:
         - in: query
           name: search
@@ -1447,7 +1445,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1569,10 +1567,10 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /aap/labels:
+  /proxies/aap/labels:
     get:
       tags:
-        - Ansible Automation Platform
+        - Ansible Automation Platform Proxy
       summary: List labels
       description: List Ansible Automation Platform labels.
       operationId: list_aap_labels
@@ -1607,7 +1605,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Nexus credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -3363,7 +3361,7 @@ paths:
                 detail: Rate limit exceeded. Try again in 60 seconds.
                 code: RATE_LIMITED
                 retryable: true
-  /auth/ws-ticket:
+  /auth/ws_ticket:
     post:
       summary: Exchange JWT for a WebSocket connection ticket
       description: |
@@ -8992,7 +8990,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9117,7 +9115,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9221,9 +9219,9 @@ paths:
       security:
         - bearerAuth: []
     patch:
-      summary: Patch identity provider
-      description: Patch an identity provider.
-      operationId: patch_identity_provider
+      summary: Update identity provider
+      description: Update an identity provider.
+      operationId: update_identity_provider
       x-app-permission:
         resource: identity-provider
         action: update
@@ -9240,14 +9238,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IdentityProviderPatch'
+              $ref: '#/components/schemas/IdentityProviderUpdate'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -9490,7 +9488,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IdentityProviderResponse'
+                $ref: '#/components/schemas/IdentityProviderRead'
         '400':
           description: Bad Request
           content:
@@ -10201,7 +10199,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IntegrationPatch'
+              $ref: '#/components/schemas/IntegrationUpdate'
       responses:
         '200':
           description: Successful Response
@@ -12663,11 +12661,11 @@ paths:
         - Internal Metrics
       summary: Metrics store KPIs
       description: |-
-        Return a computed KPI dashboard covering all Nexus components.
+        Return a computed KPI dashboard covering all Syntara components.
 
-        Maps metrics to the KPIs defined in the Nexus KPI documents:
-        - Nexus Key Performance Indicators (KPIs)
-        - Nexus LLM/Agent Performance KPIs
+        Maps metrics to the KPIs defined in the Syntara KPI documents:
+        - Syntara Key Performance Indicators (KPIs)
+        - Syntara LLM/Agent Performance KPIs
       operationId: get_internal_metrics_kpis
       responses:
         '200':
@@ -19097,7 +19095,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Create credential
+      summary: Create service account credential
       description: Create a new credential for a service account; returns the one-time plaintext secret.
       operationId: create_service_account_credential
       security:
@@ -19115,14 +19113,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SACredentialCreate'
+              $ref: '#/components/schemas/ServiceAccountCredentialCreate'
       responses:
         '201':
           description: Credential created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialCreateResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialCreateResponse'
         '400':
           description: Bad Request
           content:
@@ -19227,7 +19225,7 @@ paths:
     get:
       tags:
         - Service Account Credentials
-      summary: List credentials
+      summary: List service account credentials
       description: List credentials for a service account with pagination.
       operationId: list_service_account_credentials
       security:
@@ -19307,7 +19305,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialListResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialListResponse'
         '400':
           description: Bad Request
           content:
@@ -19413,7 +19411,7 @@ paths:
     get:
       tags:
         - Service Account Credentials
-      summary: Get credential
+      summary: Get service account credential
       description: Get a credential by ID (secret is never included).
       operationId: get_service_account_credential
       security:
@@ -19439,7 +19437,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -19544,7 +19542,7 @@ paths:
     delete:
       tags:
         - Service Account Credentials
-      summary: Delete credential
+      summary: Delete service account credential
       description: Hard-delete a credential.
       operationId: delete_service_account_credential
       security:
@@ -19672,7 +19670,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Rotate credential
+      summary: Rotate service account credential
       description: Rotate a credential's secret; returns the new one-time plaintext secret.
       operationId: rotate_service_account_credential
       security:
@@ -19697,14 +19695,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SACredentialRotateRequest'
+              $ref: '#/components/schemas/ServiceAccountCredentialRotateRequest'
       responses:
         '200':
           description: Credential rotated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRotateResponse'
+                $ref: '#/components/schemas/ServiceAccountCredentialRotateResponse'
         '400':
           description: Bad Request
           content:
@@ -19810,7 +19808,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Disable credential
+      summary: Disable service account credential
       description: Set a credential's status to disabled.
       operationId: disable_service_account_credential
       security:
@@ -19836,7 +19834,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -19942,7 +19940,7 @@ paths:
     post:
       tags:
         - Service Account Credentials
-      summary: Enable credential
+      summary: Enable service account credential
       description: Set a credential's status to active.
       operationId: enable_service_account_credential
       security:
@@ -19968,7 +19966,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SACredentialRead'
+                $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
           description: Bad Request
           content:
@@ -20739,366 +20737,6 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /tool_manager/metrics/tools:
-    get:
-      operationId: get_tool_metrics
-      x-app-permission:
-        resource: null
-        action: null
-      summary: Get tool metrics summary
-      description: |-
-        Return aggregated per-tool metrics summary.
-
-        Supports filtering by namespaced_name and time range.
-        Uses UsageCounter for unfiltered queries (fast path) and SQL aggregation
-        for time-filtered queries (flexible path).
-      parameters:
-        - name: namespaced_name
-          in: query
-          description: Filter by tool namespaced name
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            description: Filter by tool namespaced name
-            title: Namespaced Name
-        - name: start_time
-          in: query
-          description: Start of time range (ISO 8601)
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: date-time
-              - type: 'null'
-            description: Start of time range (ISO 8601)
-            title: Start Time
-        - name: end_time
-          in: query
-          description: End of time range (ISO 8601)
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: date-time
-              - type: 'null'
-            description: End of time range (ISO 8601)
-            title: End Time
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ToolMetricsToolSummaryListResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-      tags:
-        - Tool Metrics
-  /tool_manager/metrics/executions:
-    get:
-      operationId: get_tool_executions
-      x-app-permission:
-        resource: null
-        action: null
-      summary: List tool executions
-      description: |-
-        Return paginated tool execution history.
-
-        Supports filtering by namespaced_name, status, and time range.
-        Uses cursor-based pagination consistent with other Nexus list endpoints.
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            exclusiveMinimum: 0
-            maximum: 100
-            default: 20
-            description: Maximum number of results per page
-            title: Limit
-          description: Maximum number of results per page
-        - name: cursor
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            description: Pagination cursor from previous response
-            title: Cursor
-          description: Pagination cursor from previous response
-        - name: sort
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                pattern: ^-?[a-z][a-z0-9_]*$
-              - type: 'null'
-            description: Sort parameter (e.g., 'name', '-created_at')
-            title: Sort
-          description: Sort parameter (e.g., 'name', '-created_at')
-        - name: include_total
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-            description: Include total count in response (expensive)
-            title: Include Total
-          description: Include total count in response (expensive)
-        - name: namespaced_name
-          in: query
-          description: Filter by tool namespaced name
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            description: Filter by tool namespaced name
-            title: Namespaced Name
-        - name: status
-          in: query
-          description: Filter by execution status
-          required: false
-          schema:
-            anyOf:
-              - $ref: '#/components/schemas/ToolExecutionStatus'
-              - type: 'null'
-            description: Filter by execution status
-            title: Status
-        - name: start_time
-          in: query
-          description: Start of time range (ISO 8601)
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: date-time
-              - type: 'null'
-            description: Start of time range (ISO 8601)
-            title: Start Time
-        - name: end_time
-          in: query
-          description: End of time range (ISO 8601)
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: date-time
-              - type: 'null'
-            description: End of time range (ISO 8601)
-            title: End Time
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ToolExecutionListResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-      tags:
-        - Tool Metrics
   /tools:
     get:
       summary: List Tools
@@ -23021,7 +22659,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /users_directory:
+  /users/directory:
     get:
       summary: List users directory
       description: Return a lightweight directory of users (id + username only).
@@ -23190,7 +22828,7 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
-  /groups_directory:
+  /groups/directory:
     get:
       summary: List groups directory
       description: Return a lightweight directory of groups (id + name only).
@@ -26587,15 +26225,20 @@ paths:
   /workflows/validate:
     post:
       summary: Validate workflow definition
-      description: Validate a workflow definition without saving it.
+      description: |
+        Validate a workflow definition without saving it.
+
+        Requires authentication but no specific workflow/project permission:
+        validation is a stateless, side-effect-free check of caller-supplied
+        data with no workflow_id or project_id in scope to authorize against.
       operationId: validate_workflow_definition
       tags:
         - Workflows
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: workflow
-        action: create
+        resource: null
+        action: null
       requestBody:
         required: true
         content:
@@ -31262,7 +30905,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Nexus user fields to IdP-specific OIDC claim names.
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -31289,13 +30932,13 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Nexus group mapping entry.
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
       required:
         - idp_group_value
-        - nexus_group_id
+        - mapped_group_id
       additionalProperties: false
       properties:
         idp_group_value:
@@ -31303,11 +30946,11 @@ components:
           minLength: 1
           title: Idp Group Value
           description: Group value from the IdP token (e.g. GUID or role name)
-        nexus_group_id:
+        mapped_group_id:
           type: string
           format: uuid
-          title: Nexus Group Id
-          description: ID of the Nexus group to map to
+          title: Mapped Group Id
+          description: ID of the group to map to
     OIDCConfiguration:
       type: object
       title: OIDCConfiguration
@@ -31426,7 +31069,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31554,7 +31197,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31570,10 +31213,10 @@ components:
           default: false
           title: Disable Tls Verify
           description: Disable TLS certificate verification for requests to this identity provider (insecure)
-    OIDCConfigurationPatch:
+    OIDCConfigurationUpdate:
       type: object
-      title: OIDCConfigurationPatch
-      description: Patch schema for OIDC configuration (client_secret optional — preserves existing if omitted).
+      title: OIDCConfigurationUpdate
+      description: Update schema for OIDC configuration (client_secret optional — preserves existing if omitted).
       additionalProperties: false
       required:
         - issuer_url
@@ -31694,7 +31337,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Nexus group mapping entries (omit to keep existing)
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -31743,9 +31386,9 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
-    IdentityProviderPatch:
+    IdentityProviderUpdate:
       type: object
-      title: IdentityProviderPatch
+      title: IdentityProviderUpdate
       description: Schema for partially updating an identity provider.
       additionalProperties: false
       properties:
@@ -31771,9 +31414,9 @@ components:
             - discriminator:
                 propertyName: provider_type
                 mapping:
-                  oidc: '#/components/schemas/OIDCConfigurationPatch'
+                  oidc: '#/components/schemas/OIDCConfigurationUpdate'
               oneOf:
-                - $ref: '#/components/schemas/OIDCConfigurationPatch'
+                - $ref: '#/components/schemas/OIDCConfigurationUpdate'
             - type: 'null'
         enabled:
           title: Enabled
@@ -31781,8 +31424,8 @@ components:
           anyOf:
             - type: boolean
             - type: 'null'
-    IdentityProviderResponse:
-      title: IdentityProviderResponse
+    IdentityProviderRead:
+      title: IdentityProviderRead
       description: Schema for IdentityProvider response with configuration details (excludes secrets).
       additionalProperties: false
       properties:
@@ -31891,7 +31534,7 @@ components:
           description: Array of resources in current page
           maxItems: 100
           items:
-            $ref: '#/components/schemas/IdentityProviderResponse'
+            $ref: '#/components/schemas/IdentityProviderRead'
       required:
         - resources
       type: object
@@ -32288,7 +31931,7 @@ components:
         - name
       title: InitialModelSelection
       type: object
-    IntegrationPatch:
+    IntegrationUpdate:
       description: Schema for partially updating an integration (user-facing).
       additionalProperties: false
       properties:
@@ -32348,7 +31991,7 @@ components:
             - type: 'null'
           title: Labels
           description: Key-value labels
-      title: IntegrationPatch
+      title: IntegrationUpdate
       type: object
     IntegrationTestConnection:
       description: Schema for testing a connection without saving an integration.
@@ -33401,7 +33044,7 @@ components:
       required:
         - component
       title: ComponentKPISummary
-      description: KPI summary for a single Nexus component.
+      description: KPI summary for a single Syntara component.
     KPIDashboard:
       properties:
         generated_at:
@@ -33419,7 +33062,7 @@ components:
       required:
         - generated_at
       title: KPIDashboard
-      description: Full KPI dashboard covering all Nexus components.
+      description: Full KPI dashboard covering all Syntara components.
     MetricRecord:
       description: |-
         Lightweight in-memory metric data point.
@@ -33468,6 +33111,8 @@ components:
         - cache_miss
         - cache_lookup_ms
         - cache_utilization_ratio
+        - cache_pool_retry_total
+        - cache_pool_retry_backoff_duration_ms
         - workflow_duration_ms
         - workflow_status
         - activity_duration_ms
@@ -34425,7 +34070,7 @@ components:
         - disabled
       title: ServiceAccountCredentialStatus
       description: Operational status of a service account credential.
-    SACredentialCreate:
+    ServiceAccountCredentialCreate:
       properties:
         credential_type:
           $ref: '#/components/schemas/ServiceAccountCredentialType'
@@ -34447,9 +34092,9 @@ components:
       type: object
       required:
         - credential_type
-      title: SACredentialCreate
+      title: ServiceAccountCredentialCreate
       description: Schema for creating a new service account credential.
-    SACredentialRead:
+    ServiceAccountCredentialRead:
       properties:
         id:
           type: string
@@ -34516,9 +34161,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialRead
+      title: ServiceAccountCredentialRead
       description: Schema for credential responses (excludes secrets).
-    SACredentialCreateResponse:
+    ServiceAccountCredentialCreateResponse:
       properties:
         id:
           type: string
@@ -34591,9 +34236,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialCreateResponse
+      title: ServiceAccountCredentialCreateResponse
       description: Schema for the create response — includes one-time plaintext secret(s).
-    SACredentialRotateRequest:
+    ServiceAccountCredentialRotateRequest:
       properties:
         grace_period_seconds:
           anyOf:
@@ -34604,9 +34249,9 @@ components:
           title: Grace Period Seconds
           description: Override grace period for this rotation (uses credential default if omitted)
       type: object
-      title: SACredentialRotateRequest
+      title: ServiceAccountCredentialRotateRequest
       description: Schema for rotating a credential's secret.
-    SACredentialRotateResponse:
+    ServiceAccountCredentialRotateResponse:
       properties:
         id:
           type: string
@@ -34679,9 +34324,9 @@ components:
         - created_by
         - created_at
         - updated_at
-      title: SACredentialRotateResponse
+      title: ServiceAccountCredentialRotateResponse
       description: Schema for the rotate response — same shape as create response.
-    SACredentialListResponse:
+    ServiceAccountCredentialListResponse:
       properties:
         next:
           anyOf:
@@ -34704,7 +34349,7 @@ components:
           description: Total count of resources (only when include_total=true)
         resources:
           items:
-            $ref: '#/components/schemas/SACredentialRead'
+            $ref: '#/components/schemas/ServiceAccountCredentialRead'
           type: array
           maxItems: 100
           title: Resources
@@ -34727,7 +34372,7 @@ components:
       type: object
       required:
         - resources
-      title: SACredentialListResponse
+      title: ServiceAccountCredentialListResponse
       description: Paginated list response for service account credentials.
       examples:
         - next: eyJpZCI6InV1aWQifQ
@@ -34977,278 +34622,6 @@ components:
           title: Resources
           items:
             $ref: '#/components/schemas/SettingCategoryRead'
-    ToolExecutionStatus:
-      type: string
-      title: ToolExecutionStatus
-      description: Status of a tool execution.
-      enum:
-        - running
-        - success
-        - error
-        - timeout
-    ToolExecutionListResponse:
-      title: ToolExecutionListResponse
-      description: Paginated list response for tool executions.
-      properties:
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-          description: Cursor for next page of results
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-          description: Cursor for previous page of results
-        total:
-          anyOf:
-            - minimum: 0.0
-              type: integer
-            - type: 'null'
-          title: Total
-          description: Total count of resources (only when include_total=true)
-        resources:
-          type: array
-          title: Resources
-          description: Array of resources in current page
-          maxItems: 100
-          items:
-            $ref: '#/components/schemas/ToolExecution'
-      required:
-        - resources
-      type: object
-      examples:
-        - next: eyJpZCI6InV1aWQifQ
-          total: 150
-        - next: eyJpZCI6Im5leHQifQ
-          prev: eyJpZCI6InByZXYifQ
-    ToolMetricsToolSummary:
-      type: object
-      title: ToolMetricsToolSummary
-      additionalProperties: false
-      description: Per-tool aggregated metrics summary for the metrics/tools endpoint.
-      required:
-        - namespaced_name
-        - total_executions
-        - success_count
-        - error_count
-        - timeout_count
-        - success_rate
-        - avg_duration_ms
-      properties:
-        namespaced_name:
-          type: string
-          title: Namespaced Name
-          description: Tool identifier (e.g., 'provider::tool')
-        total_executions:
-          type: integer
-          title: Total Executions
-          description: Total execution count
-        success_count:
-          type: integer
-          title: Success Count
-          description: Successful executions
-        error_count:
-          type: integer
-          title: Error Count
-          description: Error executions
-        timeout_count:
-          type: integer
-          title: Timeout Count
-          description: Timeout executions
-        success_rate:
-          type: number
-          title: Success Rate
-          description: Success rate (0.0 to 1.0)
-        avg_duration_ms:
-          type: number
-          title: Avg Duration Ms
-          description: Average execution duration in milliseconds
-        last_execution_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Last Execution At
-          description: Timestamp of most recent execution
-    ToolMetricsToolSummaryListResponse:
-      title: ToolMetricsToolSummaryListResponse
-      description: Paginated list response for tool metrics summaries.
-      examples:
-        - next: eyJpZCI6InV1aWQifQ
-          total: 150
-        - next: eyJpZCI6Im5leHQifQ
-          prev: eyJpZCI6InByZXYifQ
-      properties:
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-          description: Cursor for next page of results
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-          description: Cursor for previous page of results
-        total:
-          anyOf:
-            - minimum: 0.0
-              type: integer
-            - type: 'null'
-          title: Total
-          description: Total count of resources (only when include_total=true)
-        resources:
-          type: array
-          title: Resources
-          description: Array of resources in current page
-          maxItems: 100
-          items:
-            $ref: '#/components/schemas/ToolMetricsToolSummary'
-      required:
-        - resources
-      type: object
-    ToolExecution:
-      additionalProperties: false
-      title: ToolExecution
-      description: |-
-        Tool execution records stored in database.
-
-        Records individual Tool executions for performance monitoring and analysis.
-        This model matches the ToolExecution schema from the metrics contract.
-
-        Inherits from UserOwnedResource:
-            id: UUID primary key
-            created_at: Creation timestamp
-            updated_at: Last update timestamp
-            created_by: UUID of user who created the resource
-            updated_by: Optional UUID of user who last updated the resource
-            labels: Optional key-value metadata
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Resource ID
-          description: Unique identifier for the resource
-          example: 550e8400-e29b-41d4-a716-446655440000
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Created At
-          description: Timestamp when resource was created
-          example: '2025-10-09T12:00:00Z'
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Updated At
-          description: Timestamp when resource was last updated
-          example: '2025-10-09T12:30:00Z'
-        labels:
-          type: object
-          default: {}
-          title: Labels
-          description: Key-value pairs for resource labeling and filtering
-          additionalProperties:
-            type: string
-          example:
-            environment: production
-            region: us-east-1
-            team: platform
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Created By
-          description: User (or automation) that created the resource
-          example: 770e8400-e29b-41d4-a716-446655440000
-        updated_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          readOnly: true
-          title: Updated By
-          description: User (or automation) that last updated the resource
-          example: 880e8400-e29b-41d4-a716-446655440000
-        tool_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Tool Id
-          description: Foreign key to Tool
-        integration_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Integration Id
-          description: Foreign key to Integration (denormalized from tool)
-        user_id:
-          type: string
-          format: uuid
-          title: User Id
-          description: Identifier of executing user/agent
-        execution_start:
-          type: string
-          format: date-time
-          title: Execution Start
-          description: Execution start timestamp
-        execution_end:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Execution End
-          description: Execution completion timestamp
-        duration_ms:
-          anyOf:
-            - type: integer
-              minimum: 0
-            - type: 'null'
-          title: Duration Ms
-          description: Execution duration in milliseconds
-        status:
-          $ref: '#/components/schemas/ToolExecutionStatus'
-          description: Execution status
-        input_parameters:
-          type: object
-          additionalProperties: true
-          title: Input Parameters
-          description: Tool input parameters
-        output_data:
-          anyOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
-          title: Output Data
-          description: Tool output data
-        error_message:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Error Message
-          description: Error description for failed executions
-        error_code:
-          anyOf:
-            - type: string
-              maxLength: 100
-            - type: 'null'
-          title: Error Code
-          description: Structured error code
-      required:
-        - created_by
-        - user_id
-        - execution_start
-        - status
-        - input_parameters
-      type: object
     ToolStatus:
       type: string
       title: ToolStatus
@@ -37482,7 +36855,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Nexus Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -38078,7 +37451,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -38233,7 +37606,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -38349,16 +37722,12 @@ components:
           additionalProperties: true
           type: object
           title: Query Params
-        authentication:
-          anyOf:
-            - $ref: '#/components/schemas/Authentication'
-            - type: 'null'
         credential_id:
           anyOf:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for authentication or Secret URL. Takes priority over authentication field.
+          description: Syntara credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -38386,7 +37755,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for LLM provider authentication
+          description: Syntara credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -38440,7 +37809,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Nexus credential UUID for execution calls (distinct from management credential)
+          description: Syntara credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -38475,7 +37844,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID for credential scrubbing
+          description: Syntara credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -38489,7 +37858,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Nexus credential UUID
+          description: Syntara credential UUID
         approver_users:
           anyOf:
             - items:
@@ -38809,31 +38178,6 @@ components:
         All fields default to None — the engine merges with global catalog values
         (workflow_engine.retry_*) for any unset field. Set max_retries=0 to
         explicitly disable retry, overriding global defaults.
-    Authentication:
-      properties:
-        type:
-          $ref: '#/components/schemas/AuthenticationType'
-          description: Authentication type
-        credentials:
-          type: string
-          pattern: ^\$\{secrets\.[a-zA-Z0-9_]+\}$
-          title: Credentials
-          description: Reference to stored credentials
-      type: object
-      required:
-        - type
-        - credentials
-      title: Authentication
-      description: Authentication configuration for API requests.
-    AuthenticationType:
-      type: string
-      enum:
-        - basic
-        - bearer
-        - api_key
-        - oauth2
-      title: AuthenticationType
-      description: Supported authentication types for API requests.
     HTTPMethod:
       type: string
       enum:

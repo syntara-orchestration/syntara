@@ -107,42 +107,46 @@ test('undo history resets when navigating away from the builder', async ({ app }
   }
 })
 
-test('selecting execution from history navigates to execution page', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-undo-exec-view')
-  const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
+test.describe('Execution History Navigation', () => {
+  test.skip(!process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'], 'Execution engine unavailable (globalSetup probe)')
 
-  try {
-    await openWorkflowInBuilder(app, workflowName, id)
+  test('selecting execution from history navigates to execution page', async ({ app }) => {
+    const workflowName = buildUniqueName('e2e-undo-exec-view')
+    const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 
-    // Create an execution by running the workflow through the UI
-    await app.getByRole('button', { name: 'Run', exact: true }).click()
-    await app.getByRole('button', { name: 'Run now' }).click()
+    try {
+      await openWorkflowInBuilder(app, workflowName, id)
 
-    // Execution may fail if the workflow engine (Temporal) is unavailable
-    const didNavigate = await expect(app)
-      .toHaveURL(/\/executions\//)
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      // Create an execution by running the workflow through the UI
+      await app.getByRole('button', { name: 'Run', exact: true }).click()
+      await app.getByRole('button', { name: 'Run now' }).click()
 
-    // Navigate back to the builder
-    await openWorkflowInBuilder(app, workflowName, id)
+      // Execution may fail if the workflow engine (Temporal) is unavailable
+      const didNavigate = await expect(app)
+        .toHaveURL(/\/executions\//)
+        .then(() => true)
+        .catch(() => false)
+      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
 
-    // Open run history via kebab menu — the execution we just created should appear
-    await app.getByLabel('Workflow actions').click()
-    await app.getByRole('menuitem', { name: 'Run history' }).click()
-    await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
+      // Navigate back to the builder
+      await openWorkflowInBuilder(app, workflowName, id)
 
-    // Click the execution to navigate to the execution page
-    const runHistoryPanel = app.getByRole('heading', { name: 'Run history' }).locator('..')
-    const executionItems = runHistoryPanel.locator('button[class*="simpleList"]')
-    const itemCount = await executionItems.count()
-    if (itemCount > 0) {
-      await executionItems.nth(0).click()
-      await expect(app).toHaveURL(/\/executions\//)
-      await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
+      // Open run history via kebab menu — the execution we just created should appear
+      await app.getByLabel('Workflow actions').click()
+      await app.getByRole('menuitem', { name: 'Run history' }).click()
+      await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
+
+      // Click the execution to navigate to the execution page
+      const runHistoryPanel = app.getByRole('heading', { name: 'Run history' }).locator('..')
+      const executionItems = runHistoryPanel.locator('button[class*="simpleList"]')
+      const itemCount = await executionItems.count()
+      if (itemCount > 0) {
+        await executionItems.nth(0).click()
+        await expect(app).toHaveURL(/\/executions\//)
+        await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
+      }
+    } finally {
+      await deleteWorkflow(app, workflowName)
     }
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
+  })
 })

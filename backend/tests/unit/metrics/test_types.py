@@ -40,6 +40,8 @@ class TestMetricType:
             "CACHE_MISS",
             "CACHE_LOOKUP_DURATION",
             "CACHE_UTILIZATION",
+            "CACHE_POOL_RETRY",
+            "CACHE_POOL_RETRY_BACKOFF_DURATION",
             # Workflow
             "WORKFLOW_DURATION",
             "WORKFLOW_STATUS",
@@ -139,6 +141,8 @@ class TestMetricType:
         """Each category contains the right MetricType members including cross-refs."""
         assert MetricType.LLM_DURATION in METRIC_CATEGORIES[MetricsCategoryType.LLM]
         assert MetricType.CACHE_HIT in METRIC_CATEGORIES[MetricsCategoryType.CACHE]
+        assert MetricType.CACHE_POOL_RETRY in METRIC_CATEGORIES[MetricsCategoryType.CACHE]
+        assert MetricType.CACHE_POOL_RETRY_BACKOFF_DURATION in METRIC_CATEGORIES[MetricsCategoryType.CACHE]
         assert MetricType.WORKFLOW_DURATION in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW]
         assert MetricType.AGENT_ROUTING_DURATION in METRIC_CATEGORIES[MetricsCategoryType.AGENT]
         assert MetricType.ERROR in METRIC_CATEGORIES[MetricsCategoryType.ERROR]

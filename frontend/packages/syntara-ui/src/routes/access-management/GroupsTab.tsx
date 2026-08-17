@@ -12,12 +12,12 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useTableSort } from '../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../types/filters'
-import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 
 import { getGroupDescriptionFilterDefinition, getGroupNameFilterDefinition } from './groupFilters'
@@ -168,8 +168,12 @@ export function GroupsTab() {
                     <Td dataLabel="Members">
                       <Badge isRead>{group.member_count ?? 0}</Badge>
                     </Td>
-                    <Td dataLabel="Created">{formatDateTime(group.created_at)}</Td>
-                    <Td dataLabel="Updated">{formatDateTime(group.updated_at)}</Td>
+                    <Td dataLabel="Created">
+                      <DateCell dateString={group.created_at} />
+                    </Td>
+                    <Td dataLabel="Updated">
+                      <DateCell dateString={group.updated_at} />
+                    </Td>
                     <Td isActionCell>
                       {!group.is_builtin && (
                         <ActionsColumn

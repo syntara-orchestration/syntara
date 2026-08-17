@@ -2,7 +2,7 @@
 
 Tests converge node execution with different strategies (all, any),
 timeout configurations, and branch failure scenarios using the full
-Nexus stack (API, Temporal worker, containers).
+Syntara stack (API, Temporal worker, containers).
 
 Run with:
     APP_BASE_URL=http://localhost:8000 make test-e2e

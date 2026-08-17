@@ -2,8 +2,8 @@ import { Button, FlexItem, Label } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
-import { formatHistoryDateTime } from '../builder/historyDateUtils'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
 
 import { ApprovalActionButtons } from './ApprovalActionButtons'
@@ -31,7 +31,9 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       ) : null}
       {execution.created_at ? (
         <FlexItem>
-          <Label>{`Viewing run: ${formatHistoryDateTime(execution.created_at)}`}</Label>
+          <Label>
+            Viewing run: <ExecutionTimestamp dateString={execution.created_at} />
+          </Label>
         </FlexItem>
       ) : null}
     </>

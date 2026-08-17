@@ -1,6 +1,6 @@
 """AAP job execution audit events and handlers.
 
-Emits audit trail events when Nexus workflows launch, complete, or fail
+Emits audit trail events when Syntara workflows launch, complete, or fail
 AAP jobs (both job templates and workflow job templates).
 
 Requirements: AAP-84598
@@ -62,7 +62,7 @@ def _build_resource_urn(node_type: str, job_id: int | None) -> str | None:
 
 @dataclass
 class AAPJobLaunchedEvent:
-    """Domain event fired when a Nexus workflow launches an AAP job."""
+    """Domain event fired when a Syntara workflow launches an AAP job."""
 
     execution_id: UUID
     node_type: str

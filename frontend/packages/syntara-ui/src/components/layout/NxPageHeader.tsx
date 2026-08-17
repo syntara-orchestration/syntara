@@ -53,7 +53,7 @@ export type NxPageHeaderProps = Readonly<{
   titleProps?: Readonly<Pick<TitleProps, 'size' | 'className'>>
 }>
 
-function DocLinkButton({ href }: Readonly<{ href: string }>) {
+export function DocLinkButton({ href }: Readonly<{ href: string }>) {
   return (
     <Tooltip content="View documentation">
       <Button

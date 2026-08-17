@@ -20,19 +20,19 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.models.group import user_groups
-from syntara.core.nexus_router import NexusRouter
 from syntara.core.services.secret_service import create_secret_service
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
 from syntara.integrations.exceptions import IntegrationNotFoundError, IntegrationTypeMismatchError
 from syntara.integrations.models import (
     IntegrationCreate,
     IntegrationListParams,
     IntegrationListResponse,
-    IntegrationPatch,
     IntegrationProjectAssignmentListParams,
     IntegrationProjectAssignmentListResponse,
     IntegrationProjectAssignmentRead,
     IntegrationRead,
+    IntegrationUpdate,
 )
 from syntara.integrations.models.integration import (
     Integration,
@@ -59,7 +59,7 @@ from syntara.tool_manager.models.tool import (
 from syntara.tool_manager.models.tool_bulk_update import ToolBulkUpdate, ToolBulkUpdateResponse
 from syntara.tool_manager.services.tool_service import ToolService
 
-router = NexusRouter(tags=["Integrations"])
+router = SyntaraRouter(tags=["Integrations"])
 
 
 # ============================================================================
@@ -215,11 +215,11 @@ async def get_integration(
 @audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
 async def update_integration(
     integration_id: UUID,
-    data: IntegrationPatch,
+    data: IntegrationUpdate,
     service: Annotated[IntegrationService, Depends(get_integration_service)],
 ) -> IntegrationRead:
     """Update an integration."""
-    return await service.patch_integration(integration_id, data)
+    return await service.update_integration(integration_id, data)
 
 
 @router.delete(

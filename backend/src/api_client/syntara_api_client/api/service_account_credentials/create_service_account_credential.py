@@ -7,15 +7,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.sa_credential_create import SACredentialCreate
-from ...models.sa_credential_create_response import SACredentialCreateResponse
+from ...models.service_account_credential_create import ServiceAccountCredentialCreate
+from ...models.service_account_credential_create_response import ServiceAccountCredentialCreateResponse
 from ...types import Response
 
 
 def _get_kwargs(
     service_account_id: UUID,
     *,
-    body: SACredentialCreate,
+    body: ServiceAccountCredentialCreate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -34,9 +34,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | SACredentialCreateResponse | None:
+) -> ErrorData | ServiceAccountCredentialCreateResponse | None:
     if response.status_code == 201:
-        response_201 = SACredentialCreateResponse.from_dict(response.json())
+        response_201 = ServiceAccountCredentialCreateResponse.from_dict(response.json())
 
         return response_201
 
@@ -88,7 +88,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | SACredentialCreateResponse]:
+) -> Response[ErrorData | ServiceAccountCredentialCreateResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -103,22 +103,23 @@ def sync_detailed(
     service_account_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: SACredentialCreate,
-) -> Response[ErrorData | SACredentialCreateResponse]:
-    """Create credential
+    body: ServiceAccountCredentialCreate,
+) -> Response[ErrorData | ServiceAccountCredentialCreateResponse]:
+    """Create service account credential
 
      Create a new credential for a service account; returns the one-time plaintext secret.
 
     Args:
         service_account_id (UUID):
-        body (SACredentialCreate): Schema for creating a new service account credential.
+        body (ServiceAccountCredentialCreate): Schema for creating a new service account
+            credential.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialCreateResponse]
+        Response[ErrorData | ServiceAccountCredentialCreateResponse]
     """
 
     kwargs = _get_kwargs(
@@ -137,22 +138,23 @@ def sync(
     service_account_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: SACredentialCreate,
-) -> ErrorData | SACredentialCreateResponse | None:
-    """Create credential
+    body: ServiceAccountCredentialCreate,
+) -> ErrorData | ServiceAccountCredentialCreateResponse | None:
+    """Create service account credential
 
      Create a new credential for a service account; returns the one-time plaintext secret.
 
     Args:
         service_account_id (UUID):
-        body (SACredentialCreate): Schema for creating a new service account credential.
+        body (ServiceAccountCredentialCreate): Schema for creating a new service account
+            credential.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialCreateResponse
+        ErrorData | ServiceAccountCredentialCreateResponse
     """
 
     return sync_detailed(
@@ -166,22 +168,23 @@ async def asyncio_detailed(
     service_account_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: SACredentialCreate,
-) -> Response[ErrorData | SACredentialCreateResponse]:
-    """Create credential
+    body: ServiceAccountCredentialCreate,
+) -> Response[ErrorData | ServiceAccountCredentialCreateResponse]:
+    """Create service account credential
 
      Create a new credential for a service account; returns the one-time plaintext secret.
 
     Args:
         service_account_id (UUID):
-        body (SACredentialCreate): Schema for creating a new service account credential.
+        body (ServiceAccountCredentialCreate): Schema for creating a new service account
+            credential.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | SACredentialCreateResponse]
+        Response[ErrorData | ServiceAccountCredentialCreateResponse]
     """
 
     kwargs = _get_kwargs(
@@ -198,22 +201,23 @@ async def asyncio(
     service_account_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: SACredentialCreate,
-) -> ErrorData | SACredentialCreateResponse | None:
-    """Create credential
+    body: ServiceAccountCredentialCreate,
+) -> ErrorData | ServiceAccountCredentialCreateResponse | None:
+    """Create service account credential
 
      Create a new credential for a service account; returns the one-time plaintext secret.
 
     Args:
         service_account_id (UUID):
-        body (SACredentialCreate): Schema for creating a new service account credential.
+        body (ServiceAccountCredentialCreate): Schema for creating a new service account
+            credential.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | SACredentialCreateResponse
+        ErrorData | ServiceAccountCredentialCreateResponse
     """
 
     return (

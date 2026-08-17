@@ -83,7 +83,7 @@ class TestResolveValueMultiple:
         assert result == "count=3"
 
     def test_missing_namespace_raises(self, resolver: NamespaceResolver) -> None:
-        with pytest.raises(KeyError, match="unknown"):
+        with pytest.raises(KeyError, match='Step "unknown" was not found'):
             resolver.resolve_value("${unknown.field}")
 
     def test_string_template_in_mixed_expression(self, resolver: NamespaceResolver) -> None:
@@ -209,12 +209,41 @@ class TestLookupPath:
         assert result == [1, 2, 3]
 
     def test_missing_namespace_raises(self, resolver: NamespaceResolver) -> None:
-        with pytest.raises(KeyError, match="Namespace"):
+        with pytest.raises(KeyError, match='Step "unknown" was not found'):
             resolver._lookup_path("unknown.field")
 
     def test_missing_key_in_namespace_raises(self, resolver: NamespaceResolver) -> None:
-        with pytest.raises(KeyError):
+        with pytest.raises(
+            KeyError,
+            match=r'Property "nonexistent" not found in step "trigger" output at path "trigger\.nonexistent"',
+        ):
             resolver._lookup_path("trigger.nonexistent")
+
+    def test_list_index_in_path(self, resolver: NamespaceResolver) -> None:
+        assert resolver._lookup_path("node1.output.items.0") == 1
+
+    def test_invalid_list_index_in_path_raises(self, resolver: NamespaceResolver) -> None:
+        with pytest.raises(
+            KeyError,
+            match=r'Invalid list index "99" in step "node1" output at path "node1\.output\.items\.99"',
+        ):
+            resolver._lookup_path("node1.output.items.99")
+
+    def test_non_numeric_list_index_raises(self, resolver: NamespaceResolver) -> None:
+        with pytest.raises(
+            KeyError,
+            match=r'Invalid list index "abc" in step "node1" output at path "node1\.output\.items\.abc"',
+        ):
+            resolver._lookup_path("node1.output.items.abc")
+
+    def test_cannot_traverse_scalar_raises(self) -> None:
+        r = NamespaceResolver()
+        r.set_namespace("node", {"output": "done"})
+        with pytest.raises(
+            KeyError,
+            match=r"Cannot traverse into str with key 'field' in path 'node\.output\.field'",
+        ):
+            r._lookup_path("node.output.field")
 
 
 # ---------------------------------------------------------------------------
@@ -690,3 +719,36 @@ class TestGetCompleteNamespace:
         # Modifying one shouldn't affect the other
         namespace1["input"]["age"] = 30
         assert namespace2["input"]["age"] == 25
+
+
+# ---------------------------------------------------------------------------
+# AAP-87217: User-facing error messages must not use internal jargon
+# ---------------------------------------------------------------------------
+
+
+class TestUserFacingErrorMessages:
+    """Regression tests for AAP-87217: error messages must use user-friendly language."""
+
+    def test_missing_step_error_says_step_not_namespace(self) -> None:
+        """Error for missing step must say 'Step' not 'Namespace'."""
+        r = NamespaceResolver()
+        r.set_namespace("trigger", {"url": "https://example.com"})
+
+        with pytest.raises(KeyError, match=r'Step "fetch_data" was not found') as exc_info:
+            r.resolve_value("${fetch_data.result}")
+
+        error_msg = str(exc_info.value)
+        assert "Namespace" not in error_msg
+        assert "step name is correct" in error_msg
+        assert "runs before this step" in error_msg
+
+    def test_missing_step_error_includes_actionable_guidance(self) -> None:
+        """Error message must include guidance about step ordering."""
+        r = NamespaceResolver()
+
+        with pytest.raises(KeyError) as exc_info:
+            r.resolve_value("${nonexistent_step.output}")
+
+        error_msg = str(exc_info.value)
+        assert "has not produced output yet" in error_msg
+        assert "runs before this step in the workflow" in error_msg
