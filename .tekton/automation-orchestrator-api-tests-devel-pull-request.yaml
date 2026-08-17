@@ -39,12 +39,20 @@ spec:
   pipelineRef:
     resolver: git
     params:
-      - name: url
-        value: https://github.com/ansible-automation-platform/aap-konflux-pipelines.git
+      - name: org
+        value: ansible-automation-platform
+      - name: repo
+        value: aap-konflux-pipelines
       - name: revision
         value: fix/ao-e2e-script-nodes-ssrf-config
       - name: pathInRepo
         value: pipelines/test/ao-api-tests/0.1/pipeline.yaml
+      - name: token
+        value: github-aap-org-secret
+      - name: tokenKey
+        value: password
+      - name: scmType
+        value: github
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
