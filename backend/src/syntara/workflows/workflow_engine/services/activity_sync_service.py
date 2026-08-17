@@ -90,7 +90,7 @@ _PENDING_ACTIVITY_STATE_STARTED = PendingActivityState.PENDING_ACTIVITY_STATE_ST
 _MONITOR_RETRY_BASE_DELAY_S = 1.0
 _MONITOR_RETRY_MAX_DELAY_S = 30.0
 _MONITOR_RETRY_BACKOFF_FACTOR = 2.0
-_MONITOR_RETRY_MAX_ATTEMPTS = 50
+_MONITOR_RETRY_JITTER_FACTOR = 0.5
 
 
 @dataclass
@@ -1084,21 +1084,14 @@ class ActivitySyncService:
                     break
 
                 attempt += 1
-                if attempt >= _MONITOR_RETRY_MAX_ATTEMPTS:
-                    logger.error(
-                        "Activity monitor exceeded max retry attempts, giving up",
-                        execution_id=execution_id,
-                        attempts=attempt,
-                    )
-                    break
-
                 logger.warning(
                     "Retrying activity monitor after transient error",
                     execution_id=execution_id,
                     attempt=attempt,
                     delay_s=delay,
                 )
-                jittered_delay = delay * (0.5 + random.random() * 0.5)  # noqa: S311
+                jitter = (1 - _MONITOR_RETRY_JITTER_FACTOR) + random.random() * _MONITOR_RETRY_JITTER_FACTOR  # noqa: S311
+                jittered_delay = delay * jitter
                 await asyncio.sleep(jittered_delay)
                 delay = min(delay * _MONITOR_RETRY_BACKOFF_FACTOR, _MONITOR_RETRY_MAX_DELAY_S)
 
