@@ -483,6 +483,23 @@ class TestCredentialMaxLifetime:
         assert before + timedelta(days=90) <= mock_cred.expires_at <= after + timedelta(days=90)
 
     @pytest.mark.asyncio
+    async def test_create_rejects_zero_max_days(
+        self,
+        service: ServiceAccountCredentialService,
+        mock_session: AsyncMock,
+    ) -> None:
+        """0 is not a valid max_days: it would stamp expires_at=now, expiring the credential immediately."""
+        mock_session.exec.return_value = _mock_count_result(0)
+        with (
+            _mock_max_lifetime_days(0),
+            pytest.raises(ValueError, match="must be -1 or 1"),
+        ):
+            await service.create_credential(
+                service_account_id=uuid4(),
+                credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+            )
+
+    @pytest.mark.asyncio
     async def test_rotate_unlimited_clears_expires_at(
         self,
         service: ServiceAccountCredentialService,

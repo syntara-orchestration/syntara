@@ -4,7 +4,6 @@ Tests that token calculation meets performance targets:
 - p95 latency < 50ms per calculation
 """
 
-import gc
 import statistics
 import time
 
@@ -109,12 +108,10 @@ class TestTokenCalculationLatency:
 
         # Encoder should be created at most once (first call) and reused for the rest.
         assert new_misses <= 1, (
-            f"_get_encoder should be created at most once via lru_cache, "
-            f"but had {new_misses} new misses"
+            f"_get_encoder should be created at most once via lru_cache, but had {new_misses} new misses"
         )
         assert new_hits >= 19, (
-            f"_get_encoder should be served from cache for all subsequent calls, "
-            f"but only got {new_hits} new hits"
+            f"_get_encoder should be served from cache for all subsequent calls, but only got {new_hits} new hits"
         )
 
     def test_token_calculation_scales_linearly(self) -> None:

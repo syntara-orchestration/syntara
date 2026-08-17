@@ -82,6 +82,10 @@ class ServiceAccountCredentialService(BaseService):
 
         max_days = await get_runtime_settings().get_int("service_accounts.credential_max_lifetime_days")
 
+        if max_days not in (-1, *range(1, 731)):
+            msg = f"service_accounts.credential_max_lifetime_days must be -1 or 1-730, got {max_days}"
+            raise ValueError(msg)
+
         if max_days == -1:
             return requested
 
