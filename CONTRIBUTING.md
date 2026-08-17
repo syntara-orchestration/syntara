@@ -133,16 +133,24 @@ startup window (same behavior as today’s CI).
 
 Fork pull requests receive the same Konflux coverage as in-org PRs (container
 build, Conforma, and Konflux API/UI tests), subject to the same `.tekton/` path
-filters.
+filters. Konflux pipeline secrets are handled **inside** the pipeline, so the
+GitHub Actions “org secrets unavailable to forks” rule does **not** apply to
+Konflux.
 
-Differences that can still affect forks:
+**GitHub Actions** jobs that read org/repo secrets can still behave differently
+on fork PRs. Known examples (see
+[docs/ci/secrets-inventory.md](docs/ci/secrets-inventory.md)):
 
-- Some **GitHub Actions** jobs that need org secrets (for example Snyk) may not
-  run the same way on fork PRs. That does **not** apply to Konflux pipelines,
-  whose secrets are handled in-pipeline. Other GitHub Actions steps (such as
-  podman-compose E2E) may differ for forks; treat those as case-by-case.
-- Maintainer comment commands such as `/build-pr-image` only run for org
-  owners/members (see [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md#ci-commands-for-maintainers)).
+| Area | Secrets involved | What to expect on forks |
+| --- | --- | --- |
+| Snyk SAST / SCA | `SNYK_TOKEN` (org, downstream-only) | May skip, fail, or lack token access vs in-org PRs |
+| Podman Compose E2E | `RH_REGISTRY_USER` / `RH_REGISTRY_TOKEN` (and related repo secrets such as Currents / OpenRouter where used) | Not fully verified from forks yet — registry login and compose steps are the main suspects if these jobs fail only on fork PRs |
+| Maintainer comment commands | N/A | `/build-pr-image` (and similar) only run for org owners/members — see [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md#ci-commands-for-maintainers) |
+
+If you see **other** unexpected failures on a fork PR that look like missing
+credentials or secret accessibility (especially outside Konflux), please note
+them on the PR so maintainers can confirm and update this section. We are still
+collecting real fork results for GHA secret-gated steps.
 
 **If you opened a fork PR:** keep **upstream-open** checks green. If a
 downstream check fails or you need a maintainer-only command, ask on the PR
