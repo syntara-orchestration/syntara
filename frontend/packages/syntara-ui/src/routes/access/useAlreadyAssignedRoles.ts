@@ -67,9 +67,8 @@ export function useAlreadyAssignedRoles(
     const result = new Set<string>()
     for (const a of items) {
       const aIsProject = !!a.project_id
-      if (isProjectScoped && aIsProject && a.project_id === projectId) {
-        result.add(a.role_name)
-      } else if (!isProjectScoped && !aIsProject) {
+      const matches = isProjectScoped ? aIsProject && a.project_id === projectId : !aIsProject
+      if (matches) {
         result.add(a.role_name)
       }
     }
