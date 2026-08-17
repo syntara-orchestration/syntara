@@ -816,8 +816,9 @@ async def list_project_credentials(
     Use ``GET /credentials?for_action=use`` for use-permission-filtered listing.
     """
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[project_id])
-    # Strip for_action — not a DB-filterable field (not implemented on this endpoint)
-    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k != "for_action"]
+    filtered_query_params = [
+        (k, v) for k, v in request.query_params.items() if k not in set(CredentialListParams.model_fields)
+    ]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,

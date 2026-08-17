@@ -20,6 +20,7 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.models.group import user_groups
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.secret_service import create_secret_service
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
@@ -176,6 +177,7 @@ async def list_integrations(
     service: Annotated[IntegrationService, Depends(get_integration_service)],
     params: Annotated[IntegrationListParams, Query()],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+    _filterable: Annotated[None, Depends(FilterableModel(Integration))],
 ) -> IntegrationListResponse:
     """List integrations with filtering and pagination."""
     return await service.list_integrations(

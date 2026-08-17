@@ -41,36 +41,48 @@ def _is_parameter_object(obj: dict) -> bool:
     return "name" in obj and obj.get("in") in _PARAM_IN_VALUES
 
 
-def _strip_schema_description(param: dict) -> dict:
-    """Remove descriptions from a parameter object before comparison.
-
-    Two cases are handled:
-
-    1. Schema-level description (``parameters[i].schema.description``):
-       FastAPI copies the parameter description into the schema sub-object as a
-       redundant duplicate; our sub-specs only store it at the parameter level.
-
-    2. Query and path parameter top-level description (``parameters[i].description``):
-       descriptions are authored in sub-specs but FastAPI does not generate them,
-       causing widespread false-positive drift.
-    """
-    schema = param.get("schema")
-    if isinstance(schema, dict) and "description" in schema:
-        stripped_schema = {k: v for k, v in schema.items() if k != "description"}
-        param = {**param, "schema": stripped_schema}
-    if param.get("in") in ("query", "path") and "description" in param:
-        param = {k: v for k, v in param.items() if k != "description"}
-    return param
+def _strip_descriptions_recursive(obj: object) -> object:
+    """Recursively remove all 'description' keys from a schema tree."""
+    if isinstance(obj, dict):
+        return {k: _strip_descriptions_recursive(v) for k, v in obj.items() if k != "description"}
+    if isinstance(obj, list):
+        return [_strip_descriptions_recursive(item) for item in obj]
+    return obj
 
 
 def _is_spec_only(obj: object) -> bool:
-    """Return True if a parameter object is marked as spec-only."""
+    """Return True if a parameter object is marked as spec-only.
+
+    Transitional: once all list routes have FilterableModel and x-spec-only
+    markers are removed from sub-specs, delete this function and its callers.
+    """
     return isinstance(obj, dict) and obj.get("x-spec-only") is True
 
 
 def _strip_spec_only_params(items: list) -> list:
-    """Remove parameters marked with x-spec-only from a parameter list."""
+    """Remove parameters marked with x-spec-only from a parameter list.
+
+    Transitional: see _is_spec_only.
+    """
     return [item for item in items if not _is_spec_only(item)]
+
+
+def _strip_schema_description(param: dict) -> dict:
+    """Remove descriptions from a parameter object before comparison.
+
+    Strips descriptions at all levels: top-level parameter description,
+    schema-level description, and descriptions nested inside allOf/properties
+    (e.g., in deepObject filter params where sub-specs have hand-authored
+    descriptions that the generated spec omits).
+    """
+    schema = param.get("schema")
+    if isinstance(schema, dict):
+        param = {**param, "schema": _strip_descriptions_recursive(schema)}
+    if param.get("in") in ("query", "path") and "description" in param:
+        param = {k: v for k, v in param.items() if k != "description"}
+    if "x-spec-only" in param:
+        param = {k: v for k, v in param.items() if k != "x-spec-only"}
+    return param
 
 
 def _normalize_for_display(obj: object) -> object:
