@@ -18,7 +18,7 @@ This project ships with AI agent skills (in `.claude/skills/`) that handle the r
 - How to apply the **UX Design System** skill to match the project design language
 - How to review your implementation locally (dev server, browser states, keyboard/accessibility)
 - How to fix common guideline violations flagged during review
-- How to use the `/build-ui-feature` command to walk through the full workflow step by step
+- How to use `/frontend-build-ui-feature` to walk through the full workflow step by step
 
 The guide includes copy-ready prompt templates, a workflow diagram, and worked examples.
 
