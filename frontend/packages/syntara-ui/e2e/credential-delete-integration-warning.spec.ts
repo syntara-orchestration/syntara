@@ -11,9 +11,9 @@ import { deleteIntegrationViaApi } from './seeds/resources'
 import { apiRequest, createCredentialViaApi, deleteCredentialViaApi, ensureProject, getAuthToken } from './utils/api'
 
 // Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
-// mcp-server host (override via NEXUS_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
+// mcp-server host (override via SYNTARA_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
 const isRealBackend = isSkipWebServerForPlaywrightTests()
-const ssrfSafeIntegrationHost = process.env.NEXUS_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
+const ssrfSafeIntegrationHost = process.env.SYNTARA_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 test.describe('Credential Delete — Integration Impact Warning', () => {
   test('delete credential dialog warns about affected integrations', async ({ app }) => {

@@ -37,12 +37,12 @@ describe('TestSignInCallback', () => {
     const json = JSON.stringify(claims)
     const base64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
     const nonce = 'test-nonce-123'
-    localStorage.setItem('nexus-test-signin-nonce', nonce)
+    localStorage.setItem('syntara-test-signin-nonce', nonce)
     globalThis.location.hash = `#${base64}`
 
     render(<TestSignInCallback />)
 
-    const stored = localStorage.getItem('nexus-test-signin')
+    const stored = localStorage.getItem('syntara-test-signin')
     expect(stored).not.toBeNull()
     const parsed = JSON.parse(stored!) as { type: string; nonce: string; claims: Record<string, unknown> }
     expect(parsed.type).toBe('test-signin')
@@ -53,12 +53,12 @@ describe('TestSignInCallback', () => {
   it('leaves the nonce in localStorage for the parent to clean up', () => {
     const claims = { sub: 'user-123' }
     const base64 = btoa(JSON.stringify(claims))
-    localStorage.setItem('nexus-test-signin-nonce', 'some-nonce')
+    localStorage.setItem('syntara-test-signin-nonce', 'some-nonce')
     globalThis.location.hash = `#${base64}`
 
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin-nonce')).toBe('some-nonce')
+    expect(localStorage.getItem('syntara-test-signin-nonce')).toBe('some-nonce')
   })
 
   it('discards payload when no nonce is present in localStorage', () => {
@@ -68,25 +68,25 @@ describe('TestSignInCallback', () => {
 
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin')).toBeNull()
+    expect(localStorage.getItem('syntara-test-signin')).toBeNull()
   })
 
   it('rejects non-object claims (array)', () => {
-    localStorage.setItem('nexus-test-signin-nonce', 'nonce')
+    localStorage.setItem('syntara-test-signin-nonce', 'nonce')
     globalThis.location.hash = `#${btoa(JSON.stringify(['not', 'an', 'object']))}`
 
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin')).toBeNull()
+    expect(localStorage.getItem('syntara-test-signin')).toBeNull()
   })
 
   it('rejects non-object claims (primitive)', () => {
-    localStorage.setItem('nexus-test-signin-nonce', 'nonce')
+    localStorage.setItem('syntara-test-signin-nonce', 'nonce')
     globalThis.location.hash = `#${btoa(JSON.stringify('just a string'))}`
 
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin')).toBeNull()
+    expect(localStorage.getItem('syntara-test-signin')).toBeNull()
   })
 
   it('closes the window after processing', () => {
@@ -101,22 +101,22 @@ describe('TestSignInCallback', () => {
   })
 
   it('handles invalid base64 gracefully and still closes', () => {
-    localStorage.setItem('nexus-test-signin-nonce', 'nonce')
+    localStorage.setItem('syntara-test-signin-nonce', 'nonce')
     globalThis.location.hash = '#not-valid-base64!!!'
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin')).toBeNull()
+    expect(localStorage.getItem('syntara-test-signin')).toBeNull()
     expect(mockClose).toHaveBeenCalled()
   })
 
   it('handles invalid JSON in decoded base64 gracefully', () => {
-    localStorage.setItem('nexus-test-signin-nonce', 'nonce')
+    localStorage.setItem('syntara-test-signin-nonce', 'nonce')
     const base64 = btoa('not-json')
     globalThis.location.hash = `#${base64}`
 
     render(<TestSignInCallback />)
 
-    expect(localStorage.getItem('nexus-test-signin')).toBeNull()
+    expect(localStorage.getItem('syntara-test-signin')).toBeNull()
     expect(mockClose).toHaveBeenCalled()
   })
 })

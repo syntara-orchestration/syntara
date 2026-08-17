@@ -1,7 +1,7 @@
 /**
  * Playwright globalSetup — probes backend service health once before all tests.
  *
- * On a real backend (NEXUS_E2E_SKIP_WEB_SERVER=1), this creates a throwaway
+ * On a real backend (SYNTARA_E2E_SKIP_WEB_SERVER=1), this creates a throwaway
  * workflow, runs it, and checks whether the execution engine and Temporal worker
  * are operational. Results are exported as environment variables so test files
  * can skip entire describe blocks at collection time (0ms cost).
@@ -16,14 +16,14 @@
  */
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 
-const appBaseUrl: string = process.env['NEXUS_E2E_BASE_URL'] ?? 'http://localhost:4173'
+const appBaseUrl: string = process.env['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
 
 function apiUrl(path: string): string {
   return new URL(`/api/v1${path}`, appBaseUrl).toString()
 }
 
 async function authenticate(): Promise<string | null> {
-  const password = process.env['NEXUS_E2E_PASSWORD']
+  const password = process.env['SYNTARA_E2E_PASSWORD']
   if (!password) return null
 
   try {

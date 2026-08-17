@@ -77,7 +77,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
-const mockNexusGroups = [
+const mockMappedGroups = [
   { id: MOCK_GROUP_ID, name: 'admin', description: 'Admins', created_at: '2026-01-01T00:00:00Z' },
   { id: MOCK_GROUP_ID_2, name: 'users', description: 'Users', created_at: '2026-01-02T00:00:00Z' },
 ]
@@ -102,7 +102,7 @@ describe('EditGroupMapping', () => {
     routerTestState.navigate.mockClear()
     vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
     vi.mocked(useAllGroups).mockReturnValue({
-      groups: mockNexusGroups.map((g) => ({
+      groups: mockMappedGroups.map((g) => ({
         ...g,
         is_builtin: false,
         updated_at: g.created_at,
@@ -113,12 +113,12 @@ describe('EditGroupMapping', () => {
     })
 
     vi.mocked(usersClient.useQuery).mockReturnValue({
-      data: { resources: mockNexusGroups },
+      data: { resources: mockMappedGroups },
       isPending: false,
       isError: false,
       error: null,
       isFetching: false,
-      refetch: vi.fn().mockResolvedValue({ data: { resources: mockNexusGroups } }),
+      refetch: vi.fn().mockResolvedValue({ data: { resources: mockMappedGroups } }),
     } as never)
 
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
