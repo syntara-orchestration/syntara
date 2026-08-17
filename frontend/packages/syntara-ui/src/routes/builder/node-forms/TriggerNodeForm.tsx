@@ -27,6 +27,7 @@ import {
   SCHEDULE_EXPRESSION_HELP,
 } from '../../../components/forms/scheduleHelpText'
 import { NxSelect } from '../../../components/NxSelect'
+import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useIsVersionView } from '../VersionViewContext'
@@ -50,6 +51,43 @@ const scheduleExpressionLabelHelp = (
 const cronExpressionLabelHelp = <FieldHelpPopover headerContent="Cron expression" helpText={CRON_EXPRESSION_HELP} />
 
 export type { TriggerFormData }
+
+function resolveBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return 'UTC'
+  }
+}
+
+function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): TriggerFormData {
+  const values: TriggerFormData = {
+    name: '',
+    triggerType: initialData?.triggerType ?? TriggerTypeEnum.MANUAL_TRIGGER,
+    scheduleType: ScheduleTypeEnum.INTERVAL,
+    interval: '',
+    cron: '',
+    timezone: resolveBrowserTimezone(),
+    missedSchedulePolicy: MissedSchedulePolicyEnum.SKIP,
+    inputSchema: '',
+    webhookPath: '',
+    ...initialData,
+  }
+
+  if (WEBHOOK_TRIGGER_TYPES.has(values.triggerType) && !values.webhookPath) {
+    values.webhookPath = generateWebhookPath()
+  }
+
+  if (
+    values.triggerType === TriggerTypeEnum.SCHEDULED &&
+    values.scheduleType === ScheduleTypeEnum.INTERVAL &&
+    !values.interval?.trim()
+  ) {
+    values.interval = getDefaultRepeatingInterval(values.timezone ?? 'UTC')
+  }
+
+  return values
+}
 
 type TriggerNodeFormProps = Readonly<{
   onSubmit: (data: TriggerFormData) => void
@@ -310,7 +348,7 @@ function TriggerFormFields({
                             onChange={intervalField.onChange}
                             timezone={tzField.value ?? 'UTC'}
                             onTimezoneChange={tzField.onChange}
-                            required={false}
+                            required
                             error={!!errors.interval && !isEndDateError}
                             errorMessage={errors.interval?.message}
                           />
@@ -409,33 +447,7 @@ function TriggerFormFields({
 }
 
 export function TriggerNodeForm(props: TriggerNodeFormProps) {
-  const [defaultValues] = useState<TriggerFormData>(() => {
-    let defaultTimezone: string
-    try {
-      defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    } catch {
-      defaultTimezone = 'UTC'
-    }
-
-    const values: TriggerFormData = {
-      name: '',
-      triggerType: props.initialData?.triggerType ?? TriggerTypeEnum.MANUAL_TRIGGER,
-      scheduleType: ScheduleTypeEnum.INTERVAL,
-      interval: '',
-      cron: '',
-      timezone: defaultTimezone,
-      missedSchedulePolicy: MissedSchedulePolicyEnum.SKIP,
-      inputSchema: '',
-      webhookPath: '',
-      ...props.initialData,
-    }
-
-    if (WEBHOOK_TRIGGER_TYPES.has(values.triggerType) && !values.webhookPath) {
-      values.webhookPath = generateWebhookPath()
-    }
-
-    return values
-  })
+  const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(props.initialData))
 
   const methods = useForm<TriggerFormData>({
     resolver: zodResolver(triggerFormSchema, undefined, { mode: 'sync' }),

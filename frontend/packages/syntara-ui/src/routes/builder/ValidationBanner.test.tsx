@@ -178,6 +178,22 @@ describe('ValidationBanner', () => {
     expect(screen.getByText('Verification failed — 1 issue found')).toBeInTheDocument()
   })
 
+  it('uses Saved with issues for advisory save-time error findings', () => {
+    const errors: ValidationError[] = [{ message: "'interval' is a required property", nodeId: 't1' }]
+
+    render(<ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} source="save" />)
+
+    expect(screen.getByText('Saved with 1 issue')).toBeInTheDocument()
+  })
+
+  it('uses Saved with warnings for warning-only findings', () => {
+    const errors: ValidationError[] = [{ message: 'Unused credential', nodeId: null, severity: 'warning' }]
+
+    render(<ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} source="save" />)
+
+    expect(screen.getByText('Saved with 1 warning')).toBeInTheDocument()
+  })
+
   it('dispatches DISMISS_VALIDATION_BANNER when close button is clicked', async () => {
     const errors: ValidationError[] = [{ message: 'Some error', nodeId: null }]
 
