@@ -152,9 +152,10 @@ Checks failure?”).
 **How results show up (existing behavior):** Konflux pipelines appear as GitHub
 Checks on the PR (names like `Konflux kflux-prd-rh03 / …` and
 `Red Hat Konflux / …`). The `(Backend)/(Frontend) Konflux Gate` jobs wait on
-Conforma and feed into `(Backend)/(Frontend) Required Checks`. Konflux API/UI
-test runs may also post a summary comment on the PR when the Konflux CI bot
-reports results.
+the **container build + Conforma** checks and feed into
+`(Backend)/(Frontend) Required Checks`. Konflux API/UI test pipelines are
+separate checks (and may post a summary comment); they are not what the
+Konflux Gate waits on.
 
 Visual baseline updates via `/update-screenshots` are documented separately in
 [frontend/packages/syntara-ui/VISUAL_REGRESSION.md](frontend/packages/syntara-ui/VISUAL_REGRESSION.md)
