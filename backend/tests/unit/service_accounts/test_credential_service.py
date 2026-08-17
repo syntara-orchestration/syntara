@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
-
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from contextlib import AbstractContextManager
+    from collections.abc import Generator
+
+import pytest
 
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.credential_schemas import (
@@ -69,6 +69,18 @@ def _mock_count_result(count: int) -> MagicMock:
     return result
 
 
+@contextmanager
+def _mock_max_lifetime_days(days: int) -> Generator[None, None, None]:
+    """Patch the runtime settings cache to return a fixed credential_max_lifetime_days."""
+    mock_cache = MagicMock()
+    mock_cache.get_int = AsyncMock(return_value=days)
+    with patch(
+        "syntara.service_accounts.services.credential_service.get_runtime_settings",
+        return_value=mock_cache,
+    ):
+        yield
+
+
 class TestGenerateCredential:
     """Tests for credential generation."""
 
@@ -91,10 +103,11 @@ class TestCreateCredential:
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         sa_id = uuid4()
-        cred, secret = await service.create_credential(
-            service_account_id=sa_id,
-            credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
-        )
+        with _mock_max_lifetime_days(180):
+            cred, secret = await service.create_credential(
+                service_account_id=sa_id,
+                credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+            )
         assert cred.service_account_id == sa_id
         assert cred.credential_type == ServiceAccountCredentialType.CLIENT_CREDENTIALS
         assert cred.status == ServiceAccountCredentialStatus.ACTIVE
@@ -105,10 +118,11 @@ class TestCreateCredential:
         self, service: ServiceAccountCredentialService, mock_session: AsyncMock
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
-        await service.create_credential(
-            service_account_id=uuid4(),
-            credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
-        )
+        with _mock_max_lifetime_days(180):
+            await service.create_credential(
+                service_account_id=uuid4(),
+                credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+            )
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
         mock_session.commit.assert_called_once()
@@ -323,13 +337,12 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         past = datetime.now(tz=UTC) - timedelta(hours=1)
         sa_id = uuid4()
         with (
-            override_settings(sa_credential_max_lifetime_days=180),
+            _mock_max_lifetime_days(180),
             pytest.raises(CredentialExpirationInPastError, match="future"),
         ):
             await service.create_credential(
@@ -343,13 +356,12 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         past = datetime.now(tz=UTC) - timedelta(days=5)
         sa_id = uuid4()
         with (
-            override_settings(sa_credential_max_lifetime_days=-1),
+            _mock_max_lifetime_days(-1),
             pytest.raises(CredentialExpirationInPastError, match="future"),
         ):
             await service.create_credential(
@@ -363,10 +375,9 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
-        with override_settings(sa_credential_max_lifetime_days=30):
+        with _mock_max_lifetime_days(30):
             before = datetime.now(tz=UTC)
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
@@ -382,11 +393,10 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         requested = datetime.now(tz=UTC) + timedelta(days=10)
-        with override_settings(sa_credential_max_lifetime_days=30):
+        with _mock_max_lifetime_days(30):
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -400,13 +410,12 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         requested = datetime.now(tz=UTC) + timedelta(days=60)
         sa_id = uuid4()
         with (
-            override_settings(sa_credential_max_lifetime_days=30),
+            _mock_max_lifetime_days(30),
             pytest.raises(CredentialExpirationExceededError, match="30 days"),
         ):
             await service.create_credential(
@@ -420,10 +429,9 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
-        with override_settings(sa_credential_max_lifetime_days=-1):
+        with _mock_max_lifetime_days(-1):
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -436,11 +444,10 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         requested = datetime.now(tz=UTC) + timedelta(days=999)
-        with override_settings(sa_credential_max_lifetime_days=-1):
+        with _mock_max_lifetime_days(-1):
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -454,7 +461,6 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         old_expiry = datetime.now(tz=UTC) + timedelta(days=10)
         mock_cred = MagicMock(spec=ServiceAccountCredential)
@@ -467,7 +473,7 @@ class TestCredentialMaxLifetime:
         mock_result.one_or_none.return_value = mock_cred
         mock_session.exec.return_value = mock_result
 
-        with override_settings(sa_credential_max_lifetime_days=90):
+        with _mock_max_lifetime_days(90):
             before = datetime.now(tz=UTC)
             await service.rotate_credential(uuid4(), service_account_id=uuid4())
             after = datetime.now(tz=UTC)
@@ -481,7 +487,6 @@ class TestCredentialMaxLifetime:
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
-        override_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_cred = MagicMock(spec=ServiceAccountCredential)
         mock_cred.credential_type = ServiceAccountCredentialType.CLIENT_CREDENTIALS
@@ -492,7 +497,7 @@ class TestCredentialMaxLifetime:
         mock_result.one_or_none.return_value = mock_cred
         mock_session.exec.return_value = mock_result
 
-        with override_settings(sa_credential_max_lifetime_days=-1):
+        with _mock_max_lifetime_days(-1):
             await service.rotate_credential(uuid4(), service_account_id=uuid4())
 
         assert mock_cred.expires_at is None
@@ -552,6 +557,7 @@ class TestListCredentials:
         sa_id = uuid4()
         mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
+            _mock_max_lifetime_days(180),
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=5)) as mock_count,
         ):
@@ -571,6 +577,7 @@ class TestListCredentials:
         mock_response = ServiceAccountCredentialListResponse(resources=[])
         extra_params = [("status", "active")]
         with (
+            _mock_max_lifetime_days(180),
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)) as mock_list,
             patch.object(service, "count_resources", new=AsyncMock(return_value=0)),
         ):
@@ -593,6 +600,7 @@ class TestListCredentials:
         sa_id = uuid4()
         mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
+            _mock_max_lifetime_days(180),
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=3)) as mock_count,
         ):
@@ -612,6 +620,7 @@ class TestListCredentials:
     ) -> None:
         mock_response = ServiceAccountCredentialListResponse(resources=[])
         with (
+            _mock_max_lifetime_days(180),
             patch.object(service, "list_resources", new=AsyncMock(return_value=mock_response)),
             patch.object(service, "count_resources", new=AsyncMock(return_value=0)),
         ):

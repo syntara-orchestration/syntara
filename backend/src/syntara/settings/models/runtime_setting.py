@@ -39,6 +39,7 @@ class SettingCategory(str, Enum):
     APPLICATION = "application"
     AUTHENTICATION = "authentication"
     RATE_LIMITING = "rate_limiting"
+    SERVICE_ACCOUNTS = "service_accounts"
 
 
 # Same PostgreSQL ENUM migration constraints as SettingCategory apply.

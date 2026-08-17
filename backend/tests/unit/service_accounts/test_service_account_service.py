@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import UTC
-from unittest.mock import AsyncMock, MagicMock
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -387,6 +392,18 @@ class TestResolveProjectInfosBatch:
         assert missing not in result
 
 
+@contextmanager
+def _mock_max_lifetime_days(days: int) -> Generator[None, None, None]:
+    """Patch the runtime settings cache for service_account_service."""
+    mock_cache = MagicMock()
+    mock_cache.get_int = AsyncMock(return_value=days)
+    with patch(
+        "syntara.service_accounts.services.service_account_service.get_runtime_settings",
+        return_value=mock_cache,
+    ):
+        yield
+
+
 class TestListServiceAccounts:
     """Tests for listing service accounts with project info resolution."""
 
@@ -404,7 +421,10 @@ class TestListServiceAccounts:
         )
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            _mock_max_lifetime_days(180),
+            pytest.MonkeyPatch.context() as mp,
+        ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             mock_result = MagicMock()
@@ -432,7 +452,10 @@ class TestListServiceAccounts:
         )
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            _mock_max_lifetime_days(180),
+            pytest.MonkeyPatch.context() as mp,
+        ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             mock_result = MagicMock()
@@ -458,7 +481,10 @@ class TestListServiceAccounts:
         )
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            _mock_max_lifetime_days(180),
+            pytest.MonkeyPatch.context() as mp,
+        ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             mock_result = MagicMock()
@@ -474,7 +500,10 @@ class TestListServiceAccounts:
     async def test_list_empty_resources(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
         mock_response = ServiceAccountListResponse(resources=[], next=None)
 
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            _mock_max_lifetime_days(180),
+            pytest.MonkeyPatch.context() as mp,
+        ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             response = await service.list_service_accounts()
