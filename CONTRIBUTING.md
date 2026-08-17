@@ -59,7 +59,7 @@ Pull requests to `devel` run two kinds of required checks:
 | Classification | Meaning |
 | --- | --- |
 | **Upstream-open** | Runs in GitHub Actions on the PR. You can usually see logs and fix failures yourself. Prefer reproducing locally with `make format`, `make lint`, `make test`, and `make typecheck` (plus component docs linked above). |
-| **Downstream-only** | Runs on Konflux / Pipelines-as-Code (or needs org secrets). External fork contributors often cannot re-trigger or fully debug these alone — ask a maintainer for help. |
+| **Downstream-only** | Runs on Konflux / Pipelines-as-Code, or is a GitHub Actions job that needs org secrets. Prefer asking a maintainer if you cannot re-trigger or fully debug a failure yourself. |
 
 Branch protection is gated by the aggregate jobs **`(Backend) Required Checks`** and **`(Frontend) Required Checks`**. Those jobs pass when their dependencies succeed or are skipped (for example, doc-only PRs). Individual job names below are what you will see on the PR checks list.
 
@@ -110,9 +110,10 @@ SonarCloud analysis also runs on PRs for visibility; it is informational and doe
 
 ### Downstream-only (Konflux / org secrets)
 
-These depend on Konflux Pipelines-as-Code under `.tekton/` and/or org secrets
-that fork workflows do not receive the same way. Secret classification (shared
-vs downstream-only) is already documented in
+These include Konflux Pipelines-as-Code under `.tekton/` and GitHub Actions
+jobs that need org secrets. Konflux pipeline secrets are handled inside the
+pipeline (they are not org secrets on the GitHub Actions side). Secret
+classification for GitHub Actions (shared vs downstream-only) is documented in
 [docs/ci/secrets-inventory.md](docs/ci/secrets-inventory.md).
 
 | Check | What it covers |
@@ -120,34 +121,40 @@ vs downstream-only) is already documented in
 | `(Backend) Konflux Gate` / `(Frontend) Konflux Gate` | Waits for Konflux build + Conforma on the PR |
 | `Konflux kflux-prd-rh03 / ansible-automation-orchestrator-*-devel-on-pull-request` | Konflux container build for backend or UI |
 | `Red Hat Konflux / conforma-on-pull-request-devel / …` | Conforma policy checks on the built image |
-| `Konflux kflux-prd-rh03 / automation-orchestrator-api-tests-devel-pull-request` | AO Operator API E2E (when `backend/` changes) |
-| `Konflux kflux-prd-rh03 / automation-orchestrator-ui-tests-devel-pull-request` | AO Operator UI E2E (when `frontend/` and/or `backend/` changes) |
+| `Konflux kflux-prd-rh03 / automation-orchestrator-api-tests-devel-pull-request` | Konflux API tests (when `backend/` changes) |
+| `Konflux kflux-prd-rh03 / automation-orchestrator-ui-tests-devel-pull-request` | Konflux UI tests (when `frontend/` and/or `backend/` changes) |
 | Backend Snyk SAST / SCA jobs | Vulnerability scanning (needs `SNYK_TOKEN`) |
 
 Konflux pipelines use path filters in `.tekton/`. If those paths did not change,
 the pipeline may never start and the matching Konflux Gate job skips after its
 startup window (same behavior as today’s CI).
 
-### Fork PRs and AO Operator E2E
+### Fork PRs
 
-AO Operator API/UI E2E (and other Konflux Pipelines-as-Code jobs) are
-**downstream-only**. Pull requests from forks do not get the same Konflux / AO
-Operator coverage as PRs from branches in this org:
+Fork pull requests receive the same Konflux coverage as in-org PRs (container
+build, Conforma, and Konflux API/UI tests), subject to the same `.tekton/` path
+filters.
 
-- Fork workflows do not receive org secrets the same way in-org PRs do.
+Differences that can still affect forks:
+
+- Some **GitHub Actions** jobs that need org secrets (for example Snyk) may not
+  run the same way on fork PRs. That does **not** apply to Konflux pipelines,
+  whose secrets are handled in-pipeline. Other GitHub Actions steps (such as
+  podman-compose E2E) may differ for forks; treat those as case-by-case.
 - Maintainer comment commands such as `/build-pr-image` only run for org
   owners/members (see [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md#ci-commands-for-maintainers)).
 
-**If you opened a fork PR:** keep **upstream-open** checks green, then ask a
-maintainer on the PR to help with Konflux / AO Operator E2E (for example:
-“Could a maintainer please run Konflux / AO Operator E2E on this PR?”).
+**If you opened a fork PR:** keep **upstream-open** checks green. If a
+downstream check fails or you need a maintainer-only command, ask on the PR
+(for example: “Could a maintainer please help with this Konflux / Required
+Checks failure?”).
 
-**How results show up (existing behavior):** Konflux and AO Operator pipelines
-appear as GitHub Checks on the PR (names like `Konflux kflux-prd-rh03 / …` and
+**How results show up (existing behavior):** Konflux pipelines appear as GitHub
+Checks on the PR (names like `Konflux kflux-prd-rh03 / …` and
 `Red Hat Konflux / …`). The `(Backend)/(Frontend) Konflux Gate` jobs wait on
-Conforma and feed into `(Backend)/(Frontend) Required Checks`. AO Operator runs
-may also post a summary comment on the PR when the Konflux CI bot reports
-results.
+Conforma and feed into `(Backend)/(Frontend) Required Checks`. Konflux API/UI
+test runs may also post a summary comment on the PR when the Konflux CI bot
+reports results.
 
 Visual baseline updates via `/update-screenshots` are documented separately in
 [frontend/packages/syntara-ui/VISUAL_REGRESSION.md](frontend/packages/syntara-ui/VISUAL_REGRESSION.md)
