@@ -38,6 +38,20 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 
+def _default_task_agent_prompt() -> str:
+    """Resolve default for ``agentic.task_agent_system_prompt``.
+
+    Keeps the agent functional before the settings seeder has run.
+    """
+    from syntara.core.config.base import get_settings  # noqa: PLC0415
+
+    return (
+        f"You are an information assistant for the {get_settings().product_name} automation system. "
+        "Answer user questions concisely and accurately. "
+        "Focus on providing helpful, direct answers about tools, services, and capabilities."
+    )
+
+
 class _InvocationContext(NamedTuple):
     """Context fields extracted from AgentState for audit events."""
 
@@ -186,7 +200,10 @@ class GenericAgent(BaseAgent):
         # Use state["prompt"] which contains the context-enhanced prompt
         # (with retrieved documents) from the orchestrator, rather than
         # state["messages"] which only has the original user input.
-        system_prompt = await get_runtime_settings().get_str("agentic.task_agent_system_prompt")
+        system_prompt = await get_runtime_settings().get_str(
+            "agentic.task_agent_system_prompt",
+            default=_default_task_agent_prompt(),
+        )
         messages: list[AnyMessage] = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=state["prompt"]),
@@ -271,7 +288,10 @@ class GenericAgent(BaseAgent):
             # include_raw=True so we can read provider usage from the AIMessage
             structured_llm = self.llm.with_structured_output(response_schema, method="json_mode", include_raw=True)
             schema_str = _json.dumps(response_schema, indent=2)
-            system_prompt = await get_runtime_settings().get_str("agentic.task_agent_system_prompt")
+            system_prompt = await get_runtime_settings().get_str(
+                "agentic.task_agent_system_prompt",
+                default=_default_task_agent_prompt(),
+            )
             messages = [
                 SystemMessage(
                     content=f"{system_prompt}\n\n"

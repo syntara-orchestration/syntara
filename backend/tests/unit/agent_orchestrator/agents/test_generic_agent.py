@@ -443,6 +443,42 @@ class TestGenericAgentPromptEngineering:
         assert system_messages[0].content == custom_prompt
 
     @pytest.mark.asyncio
+    async def test_default_system_prompt_resolves_product_name(self) -> None:
+        """Default system prompt must contain the resolved product name, not the raw placeholder."""
+        from langchain_core.messages import SystemMessage
+
+        from syntara.core.config.base import get_settings
+
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(content="Done", response_metadata={})
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "test-model"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "hello",
+            "original_prompt": "hello",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("hello")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        await agent.execute_as_node(state)
+
+        messages_sent = mock_llm_with_tools.ainvoke.call_args[0][0]
+        system_messages = [m for m in messages_sent if isinstance(m, SystemMessage)]
+        assert len(system_messages) == 1
+        assert get_settings().product_name in system_messages[0].content
+        assert "{product_name}" not in system_messages[0].content
+
+    @pytest.mark.asyncio
     async def test_generic_agent_raises_on_empty_llm_response(self) -> None:
         """Test GenericAgent raises EmptyLLMResponseError on empty LLM response."""
         mock_llm = Mock()
