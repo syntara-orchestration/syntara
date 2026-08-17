@@ -1,6 +1,6 @@
 # Imports and Modules Standards
 
-This document defines standards for Python imports and module structure in the Nexus monorepo.
+This document defines standards for Python imports and module structure in the Syntara monorepo.
 
 ## Import Ordering
 
@@ -24,7 +24,7 @@ from pydantic import ConfigDict, ValidationError
 from sqlalchemy import BigInteger, String, Text, text
 from sqlmodel import Column, DateTime, Field, Index
 
-# 3. Local nexus imports (organized by domain, alphabetically)
+# 3. Local syntara imports (organized by domain, alphabetically)
 from syntara.agent_orchestrator.models.agent_state import AgentState
 from syntara.core.config.base import get_settings
 from syntara.core.models import User, UserRole
@@ -36,7 +36,7 @@ from syntara.workflows.models import Execution, ExecutionStatus, Workflow
 - Blank line separates each section
 - Within each section: alphabetical order by module path
 - Group `import` statements before `from ... import` statements within each section
-- Local nexus imports are sorted alphabetically by full module path (e.g., `syntara.agent_orchestrator` before `syntara.core`)
+- Local syntara imports are sorted alphabetically by full module path (e.g., `syntara.agent_orchestrator` before `syntara.core`)
 - No arbitrary grouping or domain-specific subsections within the local import block
 
 **Tooling Enforcement:**
@@ -54,7 +54,7 @@ Violations of import order will be caught by `make lint` and auto-fixed by `make
 
 ### No Re-exports
 
-Nexus is not a library — it has no external consumers or public API to maintain. `__init__.py` files should **not** re-export symbols. Re-exports introduce circular import risks and add complexity without value.
+Syntara is not a library — it has no external consumers or public API to maintain. `__init__.py` files should **not** re-export symbols. Re-exports introduce circular import risks and add complexity without value.
 
 **Standard:** Use full import paths to the defining module:
 
@@ -80,13 +80,13 @@ Exception modules (`exceptions.py`) wire themselves to error handlers via the `@
 ```python
 # Correct — string reference, no import of error_handlers needed
 @fastapi_exception(handler="syntara.aap.error_handlers.aap_not_configured_handler")
-class AAPNotConfiguredError(NexusError): ...
+class AAPNotConfiguredError(SyntaraError): ...
 
 # Wrong — direct import creates exceptions ↔ error_handlers cycle
 from syntara.aap.error_handlers import aap_not_configured_handler
 
 @fastapi_exception(handler=aap_not_configured_handler)
-class AAPNotConfiguredError(NexusError): ...
+class AAPNotConfiguredError(SyntaraError): ...
 ```
 
 The `@fastapi_exception` decorator resolves string paths via `importlib` at registration time. See `src/syntara/auth/exceptions.py` for the reference implementation. See `src/syntara/core/exception_registry.py` line 59.

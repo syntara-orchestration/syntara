@@ -260,6 +260,43 @@ describe('TriggerNodeForm Component', () => {
       expect(screen.getByRole('button', { name: 'Schedule expression' })).toHaveTextContent('Visual schedule builder')
       expect(screen.getByTestId('interval-input')).toHaveValue('R/2024-01-01T10:00:00Z/P1D')
     })
+
+    it('seeds a default interval so save can submit without waiting for the builder effect', async () => {
+      renderWithHeader(
+        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.SCHEDULED }} />
+      )
+
+      const intervalValue = screen.getByTestId('interval-input').getAttribute('value') ?? ''
+      expect(intervalValue.startsWith('R')).toBe(true)
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            triggerType: TriggerTypeEnum.SCHEDULED,
+            scheduleType: 'interval',
+            interval: intervalValue,
+          })
+        )
+      })
+    })
+
+    it('blocks submit when cron expression is empty', async () => {
+      renderWithHeader(
+        <TriggerNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{ triggerType: TriggerTypeEnum.SCHEDULED, scheduleType: 'cron' }}
+        />
+      )
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(screen.getByText('Cron expression is required')).toBeInTheDocument()
+      })
+      expect(mockOnSubmit).not.toHaveBeenCalled()
+    })
   })
 
   describe('Form State', () => {

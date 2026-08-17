@@ -1,0 +1,35 @@
+# Reference manifest for local/manual k8s deployment only.
+# Konflux pipelines (run-ao-api-tests / deploy-ao-using-aap-dev) do not
+# consume these files; operator-based wiring for Konflux is out of scope
+# for the initial PR and will be added when test phases are enabled there.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mcp-server-scenarios
+  labels:
+    app: mcp-server-scenarios
+spec:
+  containers:
+    - name: mcp-server-scenarios
+      image: ${MCP_IMAGE}
+      imagePullPolicy: Never
+      command: ["sh", "-c", "uv run python run_mcp_scenario_servers.py"]
+      env:
+        - name: MCP_HOST
+          value: "0.0.0.0"
+        - name: MCP_AUTH_PORT
+          value: "8766"
+        - name: MCP_FORBIDDEN_PORT
+          value: "8767"
+      ports:
+        - containerPort: 8766
+        - containerPort: 8767
+      readinessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - 'a=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8766/health); f=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8767/health); [ "$a" = "200" ] && [ "$f" = "403" ]'
+        initialDelaySeconds: 5
+        periodSeconds: 2

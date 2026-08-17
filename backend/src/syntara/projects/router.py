@@ -42,7 +42,7 @@ from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
 from syntara.credentials.models import (
     CredentialCreate,
@@ -51,7 +51,7 @@ from syntara.credentials.models import (
     CredentialRead,
     CredentialUpdate,
 )
-from syntara.credentials.models.credential import CredentialWorkflowRef, ProjectCredentialCreate
+from syntara.credentials.models.credential import Credential, CredentialWorkflowRef, ProjectCredentialCreate
 from syntara.credentials.router import get_credential_service
 from syntara.credentials.services.credential_service import CredentialService
 from syntara.projects.schemas import (
@@ -68,7 +68,7 @@ from syntara.workflows.models import WorkflowListParams
 from syntara.workflows.models.workflow import WorkflowListResponse
 from syntara.workflows.services import WorkflowService
 
-router = NexusRouter(prefix="/projects", tags=["Projects"])
+router = SyntaraRouter(prefix="/projects", tags=["Projects"])
 
 _perm_project_read = PermissionChecker("project", "read", project_param="project_id")
 _perm_project_update = PermissionChecker("project", "update", project_param="project_id")
@@ -87,7 +87,14 @@ _perm_policy_update = PermissionChecker("policy", "update", project_param="proje
 _perm_policy_delete = PermissionChecker("policy", "delete", project_param="project_id")
 _perm_credential_create = PermissionChecker("credential", "create", project_param="project_id")
 _perm_credential_read = PermissionChecker("credential", "read", project_param="project_id")
-_perm_credential_update = PermissionChecker("credential", "update", project_param="project_id")
+_perm_credential_update = PermissionChecker(
+    "credential",
+    "update",
+    project_param="project_id",
+    resource_model=Credential,
+    resource_id_param="credential_id",
+    owner_field="created_by",
+)
 _perm_credential_delete = PermissionChecker("credential", "delete", project_param="project_id")
 
 

@@ -6,11 +6,11 @@ RFC 9457 error responses via @fastapi_exception handlers.
 """
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.core.storage_error_handlers.storage_backend_error_handler")
-class StorageBackendError(NexusError):
+class StorageBackendError(SyntaraError):
     """Base exception for all storage backend failures."""
 
 

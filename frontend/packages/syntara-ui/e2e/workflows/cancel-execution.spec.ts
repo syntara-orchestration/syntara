@@ -14,23 +14,16 @@
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { buildUniqueName } from '../helpers/workflows'
-import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject, getAuthToken } from '../utils/api'
+import {
+  apiRequest,
+  createWorkflowViaApi,
+  deleteWorkflowViaApi,
+  ensureProject,
+  getAuthToken,
+  pollExecutionStatus,
+} from '../utils/api'
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
-
-async function pollExecutionStatus(
-  page: Page,
-  executionId: string,
-  token: string,
-  expectedStatuses: string[],
-  timeout = 90_000
-): Promise<void> {
-  await expect(async () => {
-    const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
-    const exec = (await resp.json()) as { status: string }
-    expect(expectedStatuses).toContain(exec.status)
-  }).toPass({ timeout, intervals: [1_000] })
-}
 
 let sleepWorkflowId: string | null = null
 let runningExecutionId: string | null = null
@@ -68,7 +61,7 @@ test.beforeAll(async ({ browser }) => {
     if (runResp.ok()) {
       const body = (await runResp.json()) as { id: string }
       runningExecutionId = body.id
-      await pollExecutionStatus(page, runningExecutionId, token, ['running'], 60_000)
+      await pollExecutionStatus(page, runningExecutionId, ['running'], { token, timeout: 60_000 })
     }
 
     const echoName = buildUniqueName('e2e-cancel-echo')
@@ -94,7 +87,7 @@ test.beforeAll(async ({ browser }) => {
     if (echoRunResp.ok()) {
       const body = (await echoRunResp.json()) as { id: string }
       completedExecutionId = body.id
-      await pollExecutionStatus(page, completedExecutionId, token, TERMINAL_STATUSES)
+      await pollExecutionStatus(page, completedExecutionId, TERMINAL_STATUSES, { token })
     }
   } finally {
     await page.close()

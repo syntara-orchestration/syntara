@@ -50,8 +50,10 @@ from syntara.workflows.workflow_engine.activities.common import (
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
+from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
+
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -1253,7 +1255,17 @@ class ActivitySyncService:
             timed_out_at = ensure_timezone_aware(event.event_time)
             update["completed_at"] = timed_out_at
             if attrs.failure:
-                update["error_details"] = attrs.failure.message
+                logger.warning(
+                    "Activity timed out (raw Temporal message)",
+                    activity_id=update["activity_id"],
+                    raw_message=attrs.failure.message,
+                )
+            activity_def = metadata.activity_definitions_map.get(update["activity_id"], {})
+            update["error_details"] = build_timeout_error_message(
+                step_name=activity_def.get("name") or update["activity_id"],
+                is_agentic=activity_def.get("type") == "agentic",
+                timeout_seconds=update.get("configured_timeout_seconds"),
+            )
 
             start_time = update.get("started_at") or update.get("scheduled_at")
             update["_timeout_info"] = {

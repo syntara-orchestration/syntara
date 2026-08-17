@@ -25,7 +25,7 @@ sequenceDiagram
     Svc-->>Router: workflow_id, trigger_node_id, input_schema
     Router->>Router: wrap payload as {"payload": <body>}
     Router->>ES: create_execution()<br/>(use_published=True)
-    ES->>Temporal: start NexusWorkflow
+    ES->>Temporal: start OrchestratorWorkflow
     Router-->>Ext: 202 Accepted<br/>{execution_id}
     Temporal->>Temporal: _execute_trigger()<br/>→ webhook_trigger activity
     Temporal->>Temporal: apply output mapping,<br/>register in namespaces

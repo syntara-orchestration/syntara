@@ -106,56 +106,58 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(dialog).not.toBeVisible()
   })
 
-  test('Add Member modal shows users in the typeahead dropdown', async ({ app }) => {
+  test.describe('Member typeahead (mock backend only)', () => {
     test.skip(!!process.env.SYNTARA_E2E_SKIP_WEB_SERVER, 'Group typeahead unreliable against real backend')
 
-    await app.goto(toAppUrl('/system-administration/access-management/groups'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+    test('Add Member modal shows users in the typeahead dropdown', async ({ app }) => {
+      await app.goto(toAppUrl('/system-administration/access-management/groups'))
+      await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
-    const groupsTable = app.getByRole('grid', { name: 'Groups table' })
-    const firstGroupRow = groupsTable.getByRole('row').nth(1)
-    const firstGroupButton = firstGroupRow.getByRole('button')
-    const hasGroup = await firstGroupButton
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasGroup, 'No groups available; seed data required')
+      const groupsTable = app.getByRole('grid', { name: 'Groups table' })
+      const firstGroupRow = groupsTable.getByRole('row').nth(1)
+      const firstGroupButton = firstGroupRow.getByRole('button')
+      const hasGroup = await firstGroupButton
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false)
+      test.skip(!hasGroup, 'No groups available; seed data required')
 
-    await firstGroupButton.click()
+      await firstGroupButton.click()
 
-    await expect(app).toHaveURL(/system-administration\/access-management\/groups\//)
+      await expect(app).toHaveURL(/system-administration\/access-management\/groups\//)
 
-    const membersTab = app.getByRole('tab', { name: /members/i })
-    const hasMembersTab = await membersTab
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)')
+      const membersTab = app.getByRole('tab', { name: /members/i })
+      const hasMembersTab = await membersTab
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false)
+      test.skip(!hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)')
 
-    await membersTab.click()
+      await membersTab.click()
 
-    const addMemberButton = app.getByRole('button', { name: /add member/i })
-    await expect(addMemberButton).toBeVisible({ timeout: 10_000 })
-    await addMemberButton.click()
+      const addMemberButton = app.getByRole('button', { name: /add member/i })
+      await expect(addMemberButton).toBeVisible({ timeout: 10_000 })
+      await addMemberButton.click()
 
-    const dialog = app.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('Add member')).toBeVisible()
+      const dialog = app.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByText('Add member')).toBeVisible()
 
-    const searchInput = dialog.getByPlaceholder('Search for a user...')
-    await searchInput.click()
+      const searchInput = dialog.getByPlaceholder('Search for a user...')
+      await searchInput.click()
 
-    const noResults = dialog.getByText(/No results match/i)
-    const userOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
-    const hasOptions = await userOptions
-      .or(noResults)
-      .waitFor({ state: 'visible', timeout: 15_000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasOptions, 'Typeahead dropdown did not populate')
-    expect(await userOptions.count()).toBeGreaterThan(0)
+      const noResults = dialog.getByText(/No results match/i)
+      const userOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
+      const hasOptions = await userOptions
+        .or(noResults)
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false)
+      test.skip(!hasOptions, 'Typeahead dropdown did not populate')
+      expect(await userOptions.count()).toBeGreaterThan(0)
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
-    await expect(dialog).not.toBeVisible()
+      await dialog.getByRole('button', { name: 'Cancel' }).click()
+      await expect(dialog).not.toBeVisible()
+    })
   })
 })

@@ -1,6 +1,6 @@
 """Base models package.
 
-This package contains foundational model classes for the Nexus application.
+This package contains foundational model classes for the Syntara application.
 """
 
 from syntara.core.models.base.base_resource import BaseResource

@@ -6,17 +6,26 @@ import { accessFetchClient } from '../../access/accessClient'
 
 type WhoCanUser = AuthzAPI.components['schemas']['WhoCanUser']
 
+class PermissionDeniedError extends Error {
+  constructor() {
+    super('Permission denied')
+    this.name = 'PermissionDeniedError'
+  }
+}
+
 /**
- * Hook to fetch all users who have approval:decide permission.
+ * Hook to fetch all users who have approval:decide permission in a project.
  *
  * Uses /authz/who_can endpoint with cursor pagination to fetch all authorized users.
- * When a project is specified, returns users who can approve on that specific project
- * (includes both system-level and project-scoped permissions).
+ * The query is disabled until a projectId is provided — the approval form shows a
+ * "select a project" prompt in the meantime rather than firing an unscoped request.
  *
- * @param projectId - Optional project ID to scope the permission check to a specific project.
- *                    If provided, returns users with approval:decide permission on that project.
- *                    If omitted, returns only users with system-level approval:decide permission.
- * @returns Object containing users array, loading state, and error
+ * If the endpoint returns 403, the hook surfaces `isPermissionDenied: true` so the
+ * UI can offer a manual-input fallback instead of an empty dropdown.
+ *
+ * @param projectId - Project ID to scope the permission check. The query does not
+ *                    run until this is a non-empty string.
+ * @returns Object containing users array, loading state, permission-denied flag, and error
  */
 export function useApprovalDecideUsers(projectId?: string | null) {
   async function fetchAllApprovalDecideUsers(): Promise<WhoCanUser[]> {
@@ -28,9 +37,13 @@ export function useApprovalDecideUsers(projectId?: string | null) {
           sort: 'username',
           limit: MAX_PAGE_SIZE,
           cursor,
-          ...(projectId && { resource_project: projectId }),
+          resource_project: projectId!,
         },
       })
+
+      if (result.error?.code === 'AUTHORIZATION_DENIED') {
+        throw new PermissionDeniedError()
+      }
 
       // WhoCanResponse already has the correct shape {resources, next} for fetchAllPages
       if (!result.data) {
@@ -47,19 +60,28 @@ export function useApprovalDecideUsers(projectId?: string | null) {
   const {
     data: users = [],
     isPending,
+    isFetching,
     error,
     refetch,
   } = useQuery({
     queryKey: ['approval-decide-users', projectId],
     queryFn: fetchAllApprovalDecideUsers,
+    enabled: !!projectId,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
+    retry: (failureCount, err) => {
+      if (err instanceof PermissionDeniedError) return false
+      return failureCount < 3
+    },
   })
+
+  const isPermissionDenied = error instanceof PermissionDeniedError
 
   return {
     users,
-    isLoading: isPending,
-    error,
+    isLoading: isPending && isFetching,
+    isPermissionDenied,
+    error: isPermissionDenied ? null : error,
     refetch,
   }
 }

@@ -28,13 +28,14 @@ import type { KebabAction } from '../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../components/NxKebabMenu'
 import { NxLink } from '../../components/NxLink'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCanI } from '../../hooks/useCanI'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
-import { formatDateTime, formatElapsedTime } from '../../utils/dateUtils'
+import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import {
   getExecutionStatusFilterDefinition,
@@ -47,7 +48,7 @@ import { useRetryExecution } from '../executions/useRetryExecution'
 import type { ExecutionMetadata } from '../workflows/stores/useExecutionStore'
 
 import { StatusLabel } from './ExecutionStatus'
-import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
+import { getDateGroupLabel } from './historyDateUtils'
 import { getClearFiltersHandler } from './hooks/historyRowModel'
 import styles from './WorkflowHistoryCard.module.css'
 
@@ -146,7 +147,7 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
           <FlexItem className={styles.historyRowTitle}>
             {execution.created_at && (
               <Content component={ContentVariants.p} className={styles.historyRowDatetime}>
-                {formatHistoryDateTime(execution.created_at)}
+                <ExecutionTimestamp dateString={execution.created_at} />
               </Content>
             )}
           </FlexItem>
@@ -166,9 +167,11 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
                   to={`/workflow-builder/${execution.workflow_id}?version=${String(execution.workflow_version)}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Truncate
-                    content={execution.workflow_version_name ?? formatDateTime(execution.workflow_version_created_at)}
-                  />
+                  {execution.workflow_version_name ? (
+                    <Truncate content={execution.workflow_version_name} />
+                  ) : (
+                    <ExecutionTimestamp dateString={execution.workflow_version_created_at} />
+                  )}
                 </NxLink>
               </Content>
             )}

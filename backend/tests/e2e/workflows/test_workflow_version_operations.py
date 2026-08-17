@@ -1,6 +1,6 @@
 """End-to-end tests for workflow version restore.
 
-Tests restore flows using the full Nexus stack (API + database).
+Tests restore flows using the full Syntara stack (API + database).
 
 Run with:
     APP_BASE_URL=http://localhost:8000 make test-e2e

@@ -20,11 +20,11 @@ import { NxLink } from '../../../components/NxLink'
 import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useUrlTab } from '../../../hooks/useUrlTab'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -75,9 +75,15 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
           </NxLabel>
         )}
       </NxDetail>
-      <NxDetail label="Created">{formatDateTime(serviceAccount.created_at)}</NxDetail>
+      <NxDetail label="Created">
+        <DateCell dateString={serviceAccount.created_at} />
+      </NxDetail>
       <NxDetail label="Last authenticated">
-        {serviceAccount.last_authenticated_at ? formatDateTime(serviceAccount.last_authenticated_at) : 'Never'}
+        {serviceAccount.last_authenticated_at ? (
+          <DateCell dateString={serviceAccount.last_authenticated_at} />
+        ) : (
+          'Never'
+        )}
       </NxDetail>
     </DescriptionList>
   )

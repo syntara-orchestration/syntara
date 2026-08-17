@@ -46,6 +46,21 @@ describe('FieldHelpPopover', () => {
     expect(screen.getByText('Body copy.')).toBeInTheDocument()
   })
 
+  it('uses a custom aria-label on the popover when provided', async () => {
+    const user = userEvent.setup()
+    render(
+      <FieldHelpPopover
+        helpText="Issuer URL help body."
+        headerContent="Issuer URL"
+        aria-label="Issuer URL field help"
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'More info for Issuer URL' }))
+
+    expect(screen.getByText('Issuer URL help body.')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = render(<FieldHelpPopover helpText="Help copy." headerContent="Field" />)
     const results = await axe(container)

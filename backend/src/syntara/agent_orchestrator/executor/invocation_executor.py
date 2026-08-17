@@ -987,7 +987,7 @@ class InvocationExecutor:
             return resolved.extra_vars.get(field_name)
 
     async def _resolve_mcp_execution_credential(self, credential_id: str) -> str | None:
-        """Resolve the bearer token from a Nexus execution credential for MCP tool calls.
+        """Resolve the bearer token from a Syntara execution credential for MCP tool calls.
 
         Returns None when the credential resolves without a bearer_token
         (unauthenticated path).

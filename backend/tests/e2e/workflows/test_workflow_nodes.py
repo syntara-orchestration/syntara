@@ -1,7 +1,7 @@
 """End-to-end tests for v2 workflow node types.
 
 Tests script, http_request, condition, loop, converge, and switch nodes
-using the full Nexus stack (API, Temporal worker, containers).
+using the full Syntara stack (API, Temporal worker, containers).
 
 Run with:
     APP_BASE_URL=http://localhost:8000 make test-e2e

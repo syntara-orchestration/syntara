@@ -1,6 +1,6 @@
 # Resilient Background Execution
 
-Nexus originally processed system operations — document conversion, agent execution — inside
+Syntara originally processed system operations — document conversion, agent execution — inside
 FastAPI `BackgroundTasks`. These are fire-and-forget callbacks that run in the same process as the
 HTTP request that triggered them: no retry, no durability, no visibility, and critically, they share
 a single-process execution slot with user workflows. A burst of file uploads could saturate the
@@ -30,7 +30,7 @@ own dedicated queue, served by their own dedicated worker deployment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Nexus API (FastAPI)                                                        │
+│  Syntara API (FastAPI)                                                        │
 │                                                                             │
 │  POST /executions  →  ExecutionService.start_workflow(is_builtin=False)    │
 │       ↓ task_queue = orchestrator-workflow-queue                                   │
@@ -82,7 +82,7 @@ conditional at the Temporal client call:
 
 ```python
 handle = await self.temporal_client.start_workflow(
-    NexusWorkflow.run,
+    OrchestratorWorkflow.run,
     args=[...],
     id=temporal_workflow_id,
     task_queue=self.background_task_queue if is_builtin else self.task_queue,
@@ -452,17 +452,32 @@ await execution_service.start_workflow(
 The service looks up `background_task_queue` from settings and routes the Temporal workflow
 there. From this point, execution is identical to any other workflow — visible in the Temporal
 UI under `orchestrator-background-queue`, status synced to the DB via `ActivitySyncService`, and
-surfaced in the Nexus UI for administrators with the builtin toggle enabled.
+surfaced in the Syntara UI for administrators with the builtin toggle enabled.
 
 ## Constraints and Known Gaps
 
-**OOM under sustained load**: the background worker Temporal SDK caches workflow state in
-memory. Under high invocation rates (~10/sec), `max_cached_workflows` (default: 1000) fills
-the cache faster than entries expire, causing heap growth and eventual OOM restart. The fix is
-to cap `max_cached_workflows=50` in the worker constructor call in `background_worker.py`. This
-is not yet in place — the background worker's built-in workflow footprint is small enough that
-cache entries are short-lived, so OOM requires a specific combination of high rate and
-long-running internal activities.
+**OOM under sustained LLM load**: The background worker executes memory-heavy LLM/agent activities
+(Document Conversion, Agent Execution). Under sustained load, uncapped activity concurrency can cause
+out-of-memory pod restarts. The fix involves two coordinated changes:
+
+1. **Activity concurrency cap**: `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES` (default: 10)
+   controls the maximum concurrent Temporal activities per pod. This is the primary knob. LLM activities
+   consume ~200-500MB each; 10 concurrent activities fit within a 1Gi pod budget.
+
+   **Behavior when cap is reached**: Activities do not fail when the concurrency limit is reached. Instead,
+   incoming activity tasks queue in the Temporal task queue until a worker slot becomes available. The
+   worker polls the queue and processes tasks in FIFO order. This is standard Temporal behavior — the queue
+   acts as a backpressure mechanism. If demand consistently exceeds per-pod capacity (10 activities), the
+   Kubernetes HPA scales the background worker deployment horizontally by adding replicas, distributing
+   load across multiple pods. This allows the system to handle arbitrarily high sustained load.
+
+2. **Pod memory limit**: Kubernetes pod memory limit should be **1Gi minimum** for background workers
+   (configured in the operator via `spec.backgroundWorker.resources.limits.memory`). The previous
+   512Mi default was insufficient even with concurrency capping.
+
+Note: `max_cached_workflows` (default: 1000) caps workflow history caching in Temporal SDK, not activity
+concurrency. These are separate tuning knobs — do not confuse them when diagnosing OOM. For high activity
+concurrency load, tune `APP_BACKGROUND_WORKER_MAX_CONCURRENT_ACTIVITIES`, not `max_cached_workflows`.
 
 **No CPU-independent HPA metric**: the HPA scales on CPU utilization. This works for CPU-bound
 activities but is a weak proxy for queue backlog depth. A better HPA trigger would be the
@@ -472,7 +487,7 @@ correct; the CPU trigger just responds to load with some lag rather than immedia
 
 ## Related Documentation
 
-- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `NexusWorkflow` executes both user and built-in workflows identically
+- [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md) — how `OrchestratorWorkflow` executes both user and built-in workflows identically
 - [Execution Runtime](execution-runtime.md) — `POST /executions` API, two-phase creation, live status
 - [Observability Standards](standards/observability.md) — `MetricsRecorder` usage, Prometheus gauge patterns
 - [Configuration Standards](standards/configuration.md) — adding new settings, Pydantic Settings patterns

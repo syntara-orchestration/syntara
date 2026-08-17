@@ -7,7 +7,14 @@ For configurable values, use get_settings() from syntara.core.config.base.
 # API configuration
 
 API_V1_PATH_PREFIX = "/api/v1"
+API_DOCS_V1_PATH_PREFIX = "/api_docs/v1"
 API_V1_VERSION = "1.0.0"
+
+# Full doc endpoint paths (concat avoids Sonar treating {PREFIX} in FastAPI
+# route decorators as path parameters).
+API_DOCS_V1_DOCS_PATH = API_DOCS_V1_PATH_PREFIX + "/docs"
+API_DOCS_V1_REDOC_PATH = API_DOCS_V1_PATH_PREFIX + "/redoc"
+API_DOCS_V1_OPENAPI_PATH = API_DOCS_V1_PATH_PREFIX + "/openapi.json"
 
 # Full path to the OIDC callback endpoint, used by the auth router and
 # referenced by the AAP setup service when registering redirect URIs.
@@ -24,12 +31,14 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
         "/healthz/ready",
         "/api",
         "/api/v1",
-        f"{API_V1_PATH_PREFIX}/docs",
-        f"{API_V1_PATH_PREFIX}/redoc",
-        f"{API_V1_PATH_PREFIX}/openapi.json",
+        "/docs",
+        API_DOCS_V1_DOCS_PATH,
+        API_DOCS_V1_REDOC_PATH,
+        API_DOCS_V1_OPENAPI_PATH,
     }
 )
 
 # Prefix for paths that should be excluded via startswith matching
 # (handles parameterised routes like /_internal/metrics/kpis/{component}).
-EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/",)
+# Any path under these prefixes bypasses audit, metrics, cert, and rate-limit middleware.
+EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/", "/api_docs/")

@@ -10,8 +10,8 @@ import { NxPanelContentStack } from '../../../components/layout/NxPanelContentSt
 import { NxLink } from '../../../components/NxLink'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { StatusLabel } from '../../builder/ExecutionStatus'
 
@@ -115,7 +115,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
                     : DASH}
                 </Td>
                 <Td dataLabel="Last execution">
-                  {workflow.last_execution_at ? formatDateTime(workflow.last_execution_at) : DASH}
+                  <DateCell dateString={workflow.last_execution_at} />
                 </Td>
                 <Td dataLabel="Status">
                   {workflow.last_execution_status ? (

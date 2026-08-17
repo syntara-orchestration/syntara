@@ -120,16 +120,18 @@ class ActivityUpdatePublisher:
         Used for both initial snapshot (first activity sync) and final snapshot
         (execution reaches terminal state).
 
+        Raises on failure rather than swallowing it: callers (``ActivitySyncService``)
+        already treat this as best-effort and catch/log non-fatal failures so that
+        a Redis outage never blocks workflow execution. Catching here too would
+        cause the caller's success-path log line to fire even when nothing was
+        published.
+
         Args:
             execution: The Execution model instance with loaded activities relationship
             snapshot_type: The snapshot type - either "initial_snapshot" or "final_snapshot"
 
         Returns:
             The Redis-generated event ID (e.g., "1642680000000-0")
-
-        Raises:
-            RedisConnectionError: If connection to Redis fails
-            ValueError: If required parameters are missing or invalid
 
         """
         stream_id = self._get_stream_id(execution.id)
@@ -146,7 +148,6 @@ class ActivityUpdatePublisher:
             timestamp=datetime.now(UTC),
         )
 
-        # Publish to Redis Streams
         async with StreamClient() as client:
             event_id = await client.publish(stream_id, message.model_dump(mode="json", exclude={"event_id"}))
             logger.debug(
@@ -168,6 +169,10 @@ class ActivityUpdatePublisher:
         Sends a patch message containing JSON Patch operations to apply to the
         activities array. This enables efficient incremental updates.
 
+        Raises on failure rather than swallowing it: callers (``ActivitySyncService``)
+        already treat this as best-effort and catch/log non-fatal failures so that
+        a Redis outage never blocks workflow execution.
+
         Args:
             execution_id: The execution UUID
             activity_updates: List of JsonPatch objects from jsonpatch.make_patch() containing
@@ -175,10 +180,6 @@ class ActivityUpdatePublisher:
 
         Returns:
             The Redis-generated event ID (e.g., "1642680123456-1")
-
-        Raises:
-            RedisConnectionError: If connection to Redis fails
-            ValueError: If required parameters are missing or invalid
 
         """
         stream_id = self._get_stream_id(execution_id)
@@ -209,7 +210,6 @@ class ActivityUpdatePublisher:
             timestamp=datetime.now(UTC),
         )
 
-        # Publish to Redis Streams
         async with StreamClient() as client:
             event_id = await client.publish(
                 stream_id, message.model_dump(mode="json", by_alias=True, exclude={"event_id"})
@@ -232,6 +232,10 @@ class ActivityUpdatePublisher:
 
         Sends a lightweight patch for execution status changes (e.g. RUNNING→PAUSED)
         instead of resending the full snapshot.
+
+        Raises on failure rather than swallowing it: callers (``ActivitySyncService``)
+        already treat this as best-effort and catch/log non-fatal failures so that
+        a Redis outage never blocks workflow execution.
 
         Args:
             execution_id: The execution UUID

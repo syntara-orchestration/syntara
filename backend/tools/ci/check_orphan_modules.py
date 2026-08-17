@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src"
-NEXUS_DIR = SRC_DIR / "syntara"
+SYNTARA_DIR = SRC_DIR / "syntara"
 ALLOWLIST_PATH = Path(__file__).parent / "known_orphan_modules.json"
 
 RED = "\033[91m"
@@ -33,7 +33,7 @@ SKIP_DIRS = {"__pycache__", ".mypy_cache", ".pytest_cache"}
 def get_source_files() -> list[Path]:
     """Get all .py files in src/syntara/ excluding __init__.py and tests."""
     files: list[Path] = []
-    for py_file in sorted(NEXUS_DIR.rglob("*.py")):
+    for py_file in sorted(SYNTARA_DIR.rglob("*.py")):
         if any(d in py_file.parts for d in SKIP_DIRS):
             continue
         if py_file.name == "__init__.py":

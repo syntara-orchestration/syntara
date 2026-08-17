@@ -1,10 +1,10 @@
 """Custom exceptions for agent orchestration system."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError, RetryableError
+from syntara.core.exceptions import RetryableError, SyntaraError
 
 
-class AgentOrchestratorError(NexusError):
+class AgentOrchestratorError(SyntaraError):
     """Base exception for all agent orchestration errors."""
 
     def __init__(self, message: str, invocation_id: str | None = None) -> None:
@@ -60,9 +60,9 @@ class CredentialResolutionError(AgentOrchestratorError):
 class EmptyLLMResponseError(AgentOrchestratorError, RetryableError):
     """Raised when the LLM returns an empty response with no tool calls.
 
-    MRO: EmptyLLMResponseError → AgentOrchestratorError → RetryableError → NexusError.
+    MRO: EmptyLLMResponseError → AgentOrchestratorError → RetryableError → SyntaraError.
     RetryableError is a pure marker (no __init__); super().__init__ chains through
-    AgentOrchestratorError to NexusError without conflict.
+    AgentOrchestratorError to SyntaraError without conflict.
     """
 
     def __init__(self, invocation_id: str | None = None) -> None:

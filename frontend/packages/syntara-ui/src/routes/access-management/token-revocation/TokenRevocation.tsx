@@ -15,13 +15,13 @@ import { adminClient } from '../../../client'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { DateCell } from '../../../components/table/DateCell'
 import { permissionTooltip } from '../../../hooks/permissionUtils'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
 import { useAuthStore } from '../../../stores/useAuthStore'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 
 export function TokenRevocationTab() {
@@ -72,13 +72,17 @@ export function TokenRevocationTab() {
                 <DescriptionListGroup>
                   <DescriptionListTerm>Tokens revoked before</DescriptionListTerm>
                   <DescriptionListDescription>
-                    {revoked_before ? formatDateTime(revoked_before) : 'No global revocation has been performed'}
+                    {revoked_before ? (
+                      <DateCell dateString={revoked_before} />
+                    ) : (
+                      'No global revocation has been performed'
+                    )}
                   </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Last updated</DescriptionListTerm>
                   <DescriptionListDescription>
-                    {updated_at ? formatDateTime(updated_at) : 'N/A'}
+                    {updated_at ? <DateCell dateString={updated_at} /> : 'N/A'}
                   </DescriptionListDescription>
                 </DescriptionListGroup>
               </DescriptionList>

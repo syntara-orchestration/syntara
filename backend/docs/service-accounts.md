@@ -251,7 +251,7 @@ Service account access tokens include:
 | Claim | Description |
 |-------|-------------|
 | `sub` | Service account UUID |
-| `iss` | Nexus server URL (same issuer as human tokens) |
+| `iss` | Syntara server URL (same issuer as human tokens) |
 | `aud` | Token audience |
 | `iat` | Issued-at timestamp |
 | `exp` | Expiration timestamp |

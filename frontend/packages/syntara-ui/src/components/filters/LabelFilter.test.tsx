@@ -139,6 +139,40 @@ describe('LabelFilter', () => {
       const keyInputs = screen.getAllByPlaceholderText('Key')
       expect(keyInputs).toHaveLength(4) // 1 original + 3 added
     })
+
+    it('adds an empty pair with temp id when existing labels use real keys only', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      const labels = { environment: 'prod' }
+
+      render(<ControlledLabelFilter {...defaultProps} initialLabels={labels} onChange={onChange} />)
+
+      await user.click(screen.getByText('Add label'))
+
+      expect(screen.getAllByPlaceholderText('Key')).toHaveLength(2)
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'labels[environment]': 'prod',
+          'labels[empty]': '',
+        })
+      )
+    })
+
+    it('assigns empty-1 temp id when adding from the default empty pair', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+
+      render(<ControlledLabelFilter {...defaultProps} onChange={onChange} />)
+
+      await user.click(screen.getByText('Add label'))
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'labels[empty]': '',
+          'labels[empty-1]': '',
+        })
+      )
+    })
   })
 
   describe('removing labels', () => {
@@ -197,6 +231,25 @@ describe('LabelFilter', () => {
   // Note: Tests for typing into label inputs are skipped due to complexity
   // of maintaining stable React keys during partial input state.
   // The component works correctly in actual usage - these are unit test limitations.
+
+  describe('editing labels', () => {
+    it('emits onChange when key and value are edited', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+
+      render(<ControlledLabelFilter {...defaultProps} onChange={onChange} />)
+
+      await user.type(screen.getByPlaceholderText('Key'), 'team')
+      await user.type(screen.getByPlaceholderText('Value'), 'platform')
+
+      expect(onChange).toHaveBeenCalled()
+      expect(onChange.mock.calls.at(-1)?.[0]).toEqual(
+        expect.objectContaining({
+          'labels[empty]': 'platform',
+        })
+      )
+    })
+  })
 
   describe('accessibility', () => {
     it('has proper aria-labels for inputs', () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate self-signed TLS certificates for local development.
 
-Creates a CA and per-service certificates for mTLS between Nexus services
+Creates a CA and per-service certificates for mTLS between Syntara services
 running in podman-compose. Each service gets a distinct CN matching the
 production naming convention (e.g., backend.ao.svc, worker.ao.svc) so the
 auth middleware can extract per-service identity from the client cert.

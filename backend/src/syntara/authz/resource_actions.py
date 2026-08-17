@@ -104,13 +104,53 @@ def get_project_eligible_resource_types() -> frozenset[str]:
     return _project_eligible
 
 
+def validate_own_scope_actions(statements: list[dict[str, Any]]) -> str | None:
+    """Validate that 'own' scope is only used with actions that resolve ownership.
+
+    The 'own' scope checks resource.metadata.created_by == user.id, which requires
+    the corresponding PermissionChecker to wire owner_field. Currently only
+    credential:update wires owner_field="created_by".
+
+    Actions like read/delete/use/decide/revoke would be valid semantically (they
+    operate on existing resources), but their checkers don't populate created_by
+    metadata, so an '*:action:own' policy for those actions would silently deny
+    all requests. Reject them upfront instead of fail-silent.
+
+    Returns a descriptive error string, or ``None`` if valid.
+    """
+    # Only actions whose PermissionChecker wires owner_field today
+    valid_own_actions = {"update"}
+
+    for stmt in statements:
+        if stmt.get("scope") != "own":
+            continue
+
+        for action_str in stmt.get("actions", []):
+            if ":" not in action_str:
+                continue
+            _, action = action_str.rsplit(":", 1)
+
+            # Wildcard not allowed with own scope
+            if action == "*":
+                return f"Wildcard actions not allowed with scope='own': {action_str}"
+
+            if action not in valid_own_actions:
+                return (
+                    f"Action '{action}' cannot use scope='own' (resource doesn't exist yet). "
+                    f"Valid own-scope actions: {', '.join(sorted(valid_own_actions))}. "
+                    f"Use scope='project' for '{action}' instead."
+                )
+
+    return None
+
+
 def validate_project_statements(statements: list[dict[str, Any]]) -> str | None:
     """Validate that statements are appropriate for project-scoped policies.
 
-    Enforces two invariants:
-    1. Scope must be ``"project"`` (future: attribute-based selectors
-       within project scope).
-    2. Actions must reference project-eligible resource types only.
+    Enforces three invariants:
+    1. Scope must be ``"project"`` or ``"own"``
+    2. Actions must reference project-eligible resource types only
+    3. ``"own"`` scope only used with actions on existing resources
 
     Returns a descriptive error string, or ``None`` if valid.
     """
@@ -118,9 +158,16 @@ def validate_project_statements(statements: list[dict[str, Any]]) -> str | None:
 
     for stmt in statements:
         scope = stmt.get("scope", "any")
-        if scope != "project":
-            return f"Project policies only accept scope='project', got scope='{scope}'"
+        if scope not in ("project", "own"):
+            return f"Project policies only accept scope='project' or 'own', got scope='{scope}'"
 
+    # Validate own-scope semantic constraints
+    own_error = validate_own_scope_actions(statements)
+    if own_error:
+        return own_error
+
+    # Validate that all actions reference project-eligible resource types
+    for stmt in statements:
         for action_str in stmt.get("actions", []):
             if ":" not in action_str:
                 continue

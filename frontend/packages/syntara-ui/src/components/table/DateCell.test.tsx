@@ -36,6 +36,13 @@ describe('DateCell', () => {
     expect(screen.getByText('-')).toBeInTheDocument()
   })
 
+  it('renders a semantic <time> element with a datetime attribute for a valid date', () => {
+    render(<DateCell dateString="2026-05-27T09:55:01Z" />)
+    const timeEl = screen.getByText(/May.*27.*2026/i)
+    expect(timeEl.tagName).toBe('TIME')
+    expect(timeEl).toHaveAttribute('datetime', '2026-05-27T09:55:01.000Z')
+  })
+
   it('has no accessibility violations with a valid date', async () => {
     const { container } = render(<DateCell dateString="2026-01-15T14:30:00Z" />)
     const results = await axe(container)

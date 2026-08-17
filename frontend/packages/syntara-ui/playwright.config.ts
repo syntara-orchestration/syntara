@@ -4,7 +4,10 @@ import { config } from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-config({ path: new URL('.env.local', import.meta.url).pathname })
+config({
+  path: new URL('.env.local', import.meta.url).pathname,
+  quiet: true,
+})
 
 import { isSkipWebServerForPlaywrightTests } from './e2e/playwrightWebServerEnv'
 
@@ -21,6 +24,7 @@ const useWebServer = !isSkipWebServerForPlaywrightTests()
 export const VISUAL_REGRESSION_CLOCK = '2026-06-15T10:00:00Z'
 
 export default defineConfig({
+  globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
   testIgnore: [...(useWebServer ? [] : ['**/visual-regression/**']), '**/credential-types.spec.ts'],
   fullyParallel: true,

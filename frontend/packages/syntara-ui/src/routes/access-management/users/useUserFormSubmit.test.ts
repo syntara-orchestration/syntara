@@ -122,7 +122,6 @@ describe('useUserFormSubmit', () => {
           first_name: 'Test',
           last_name: 'User',
           email: 'test@example.com',
-          is_enabled: true,
         },
       })
     })
@@ -145,54 +144,18 @@ describe('useUserFormSubmit', () => {
       expect(mockNavigateBack).toHaveBeenCalled()
       expect(logoutWithAlert).not.toHaveBeenCalled()
     })
-  })
 
-  describe('edit mode — self disable', () => {
-    it('calls logoutWithAlert when self disables account', () => {
-      const { result } = renderHook(() => useUserFormSubmit({ ...defaultOptions, isSelf: true }))
+    it('omits is_enabled from the edit PATCH body', () => {
+      const { result } = renderHook(() => useUserFormSubmit(defaultOptions))
 
       act(() => {
         result.current.onSubmit({ ...baseFormData, is_enabled: false })
       })
-      act(() => {
-        getOnSuccess()()
-      })
 
-      expect(logoutWithAlert).toHaveBeenCalledWith(mockLogout, mockShowAlert, 'Account disabled — signing out')
-      expect(mockNavigateBack).not.toHaveBeenCalled()
-    })
-
-    it('prioritizes disable-self over password change', () => {
-      const { result } = renderHook(() => useUserFormSubmit({ ...defaultOptions, isSelf: true }))
-
-      act(() => {
-        result.current.onSubmit({ ...baseFormData, is_enabled: false, password: COMPLIANT_TEST_PASSWORD })
-      })
-      act(() => {
-        getOnSuccess()()
-      })
-
-      expect(logoutWithAlert).toHaveBeenCalledWith(mockLogout, mockShowAlert, 'Account disabled — signing out')
-      expect(mockNavigateBack).not.toHaveBeenCalled()
-    })
-
-    it('does not logout when non-self user is disabled', () => {
-      const { result } = renderHook(() => useUserFormSubmit({ ...defaultOptions, isSelf: false }))
-
-      act(() => {
-        result.current.onSubmit({ ...baseFormData, is_enabled: false })
-      })
-      act(() => {
-        getOnSuccess()()
-      })
-
-      expect(mockShowAlert).toHaveBeenCalledWith({
-        title: 'User updated',
-        variant: 'success',
-        autoDismiss: true,
-      })
-      expect(mockNavigateBack).toHaveBeenCalled()
-      expect(logoutWithAlert).not.toHaveBeenCalled()
+      const patchArgs = mockUpdateMutate.mock.calls[0][0] as {
+        body: Record<string, unknown>
+      }
+      expect(patchArgs.body).not.toHaveProperty('is_enabled')
     })
   })
 
@@ -283,9 +246,7 @@ describe('useUserFormSubmit', () => {
       const callArg = mockUpdateMutate.mock.calls[0][0] as {
         body: Record<string, unknown>
       }
-      expect(callArg.body).toEqual({
-        is_enabled: true,
-      })
+      expect(callArg.body).toEqual({})
     })
   })
 

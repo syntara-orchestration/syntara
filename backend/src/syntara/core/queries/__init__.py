@@ -1,1 +1,1 @@
-"""Shared query utilities for the Nexus application."""
+"""Shared query utilities for the Syntara application."""

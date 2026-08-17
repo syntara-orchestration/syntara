@@ -28,6 +28,9 @@ from syntara.core.models.user import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
+# Must match the key used in authz.rego: input.resource.metadata.created_by
+_OWNER_METADATA_KEY = "created_by"
+
 
 def _record_authz_duration(start: float, resource_type: str, action: str) -> None:
     """Record authz check duration via the metrics recorder (fire-and-forget)."""
@@ -84,6 +87,7 @@ class PermissionChecker:
         resource_id_param: str | None = None,
         body_project_field: str | None = None,
         form_project_field: str | None = None,
+        owner_field: str | None = None,
     ) -> None:
         """Initialize permission checker.
 
@@ -104,6 +108,9 @@ class PermissionChecker:
             form_project_field: Multipart form field name containing a project UUID.
                 Used for multipart/form-data endpoints where ``body_project_field``
                 cannot be used (``request.json()`` fails on multipart forms).
+            owner_field: Model field name containing the owner's user UUID (e.g.,
+                "created_by"). When set, the resolved value is passed as
+                resource_metadata["created_by"] for ownership-based scope checks.
 
         """
         self.resource_type = resource_type
@@ -113,6 +120,7 @@ class PermissionChecker:
         self.resource_id_param = resource_id_param
         self.body_project_field = body_project_field
         self.form_project_field = form_project_field
+        self.owner_field = owner_field
 
     async def _resolve_project_name(self, db: AsyncSession, project_id: str | UUID) -> str:
         """Look up project name by ID, returning empty string if not found."""
@@ -195,6 +203,22 @@ class PermissionChecker:
             ) from None
         res = await db.exec(select(col(model.name)).where(model.id == rid))
         return res.first() or ""
+
+    async def _resolve_resource_owner(self, db: AsyncSession, resource_id: str) -> str:
+        """Look up resource owner (created_by) by ID for ownership-based scope checks."""
+        if not self.owner_field or not self.resource_model or not resource_id:
+            return ""
+        model = self.resource_model
+        owner_col = getattr(model, self.owner_field, None)
+        if owner_col is None:
+            return ""
+        try:
+            rid = UUID(str(resource_id))
+        except ValueError:
+            return ""
+        res = await db.exec(select(owner_col).where(model.id == rid))  # type: ignore[attr-defined]
+        owner_id = res.first()
+        return str(owner_id) if owner_id else ""
 
     async def _resolve_project_from_path(self, request: Request, db: AsyncSession) -> str:
         """Resolve project name from the project_param path parameter."""
@@ -331,6 +355,12 @@ class PermissionChecker:
             request, db
         )
 
+        resource_metadata: dict[str, str] = {}
+        if self.owner_field and resource_id:
+            owner_id = await self._resolve_resource_owner(db, resource_id)
+            if owner_id:
+                resource_metadata[_OWNER_METADATA_KEY] = owner_id
+
         authz_request = AuthzRequest(
             user_id=current_user.id,
             action=self.action,
@@ -338,6 +368,7 @@ class PermissionChecker:
             resource_id=resource_id,
             resource_project=resource_project,
             resource_labels=resource_labels,
+            resource_metadata=resource_metadata,
             user_labels=current_user.labels,
             user_metadata=current_user.authz_metadata,
         )

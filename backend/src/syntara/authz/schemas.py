@@ -22,7 +22,7 @@ OptionalNameField = Annotated[
 # Policy schemas
 # ---------------------------------------------------------------------------
 
-VALID_SCOPES = {"any", "self", "project"}
+VALID_SCOPES = {"any", "self", "project", "own"}
 VALID_EFFECTS = {"allow"}
 
 
@@ -96,7 +96,7 @@ class PolicyRead(SQLModel):
     @property
     def is_project_eligible(self) -> bool:
         """True when the policy belongs to a project or is a project-scoped builtin."""
-        return self.project_id is not None or self.scope == "project"
+        return self.project_id is not None or self.scope in ("project", "own")
 
 
 class PolicyListResponse(ResourcesResponse[PolicyRead]):

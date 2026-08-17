@@ -36,6 +36,10 @@ authenticated:
     path: /api/v1/authz/what_can_i
     justification: Checks caller's own permissions
 
+  - method: POST
+    path: /api/v1/authz/who_can
+    justification: Authorization enforced inline via authorize(); two-tier permission gate with authz:query fallback
+
   - method: GET
     path: /api/v1/roles
     justification: Read-only role catalog

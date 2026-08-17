@@ -8,6 +8,7 @@ import { axe } from 'vitest-axe'
 import { identityProvidersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import { routerTestState } from '../../../../test/setup'
+import type { DocKey } from '../../../../utils/docs/types'
 
 import { IdentityProviderForm } from './IdentityProviderForm'
 
@@ -19,6 +20,12 @@ type MutationCallbacks = {
 function getMutationCallbacks(mockFn: ReturnType<typeof vi.fn>): MutationCallbacks {
   return (mockFn.mock.calls[0]?.[1] ?? {}) as MutationCallbacks
 }
+
+const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
+
+vi.mock('../../../../utils/docs/useDocLink', () => ({
+  useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
 
 vi.mock('../../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -97,6 +104,17 @@ describe('IdentityProviderForm', () => {
 
       await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
       expect(screen.getByRole('button', { name: 'Add provider' })).toBeInTheDocument()
+    })
+
+    it('uses addIdentityProvider documentation key', () => {
+      setupMocks()
+      render(<IdentityProviderForm mode="add" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('addIdentityProvider')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+        'href',
+        'https://docs.example/addIdentityProvider'
+      )
     })
 
     it('renders test connection button', () => {
@@ -193,6 +211,17 @@ describe('IdentityProviderForm', () => {
 
       await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
       expect(screen.getByRole('button', { name: 'Save provider' })).toBeInTheDocument()
+    })
+
+    it('uses identityProviders documentation key', () => {
+      setupEditMocks()
+      render(<IdentityProviderForm mode="edit" />, { wrapper })
+
+      expect(useDocLinkMock).toHaveBeenCalledWith('identityProviders')
+      expect(screen.getByRole('link', { name: /documentation/i })).toHaveAttribute(
+        'href',
+        'https://docs.example/identityProviders'
+      )
     })
 
     it('populates form with provider data', () => {

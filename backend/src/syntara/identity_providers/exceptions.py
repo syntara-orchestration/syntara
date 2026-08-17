@@ -1,11 +1,11 @@
 """Domain exceptions for identity provider management."""
 
 from syntara.core.exception_registry import fastapi_exception
-from syntara.core.exceptions import NexusError
+from syntara.core.exceptions import SyntaraError
 
 
 @fastapi_exception(handler="syntara.identity_providers.error_handlers.identity_provider_error_handler")
-class IdentityProviderError(NexusError):
+class IdentityProviderError(SyntaraError):
     """Base exception for all identity provider errors."""
 
 

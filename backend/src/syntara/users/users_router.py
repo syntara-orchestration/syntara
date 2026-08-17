@@ -34,12 +34,12 @@ from syntara.core.models.user_schemas import (
     UserRead,
     UserUpdate,
 )
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.users.services.group_service import GroupsService
 from syntara.users.services.user_identity_service import UserIdentityService
 from syntara.users.services.user_service import UNSET, UsersService
 
-router = NexusRouter(prefix="/users", tags=["Users"])
+router = SyntaraRouter(prefix="/users", tags=["Users"])
 
 _user_create = PermissionChecker("user", "create")
 _user_read = PermissionChecker("user", "read", resource_id_param="user_id")

@@ -1,7 +1,7 @@
 """E2E tests for credential API endpoints.
 
 Covers tests 42, 44-52 from the ANSTRAT-1901 test plan — the API-side
-tests that belong in nexus rather than syntara-ui:
+tests that belong in syntara rather than syntara-ui:
 
 - Secret field masking ($encrypted$ sentinel)
 - Workflow execution with valid / disabled / deleted credentials

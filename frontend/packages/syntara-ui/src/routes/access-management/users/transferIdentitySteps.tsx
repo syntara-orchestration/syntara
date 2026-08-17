@@ -9,12 +9,12 @@ import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useTableSort } from '../../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { formatDateTime } from '../../../utils/dateUtils'
 import { getUserDetailPath } from '../accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from '../adminConstants'
 
@@ -284,7 +284,9 @@ export function SelectIdentityStep({
                     </NxLink>
                   </Td>
                   <Td dataLabel="Subject">{identity.subject}</Td>
-                  <Td dataLabel="Linked">{formatDateTime(identity.created_at)}</Td>
+                  <Td dataLabel="Linked">
+                    <DateCell dateString={identity.created_at} />
+                  </Td>
                 </Tr>
               )
             })}

@@ -172,3 +172,91 @@ class TestProjectScopeBoundaries:
             )
         )
         assert result["allow"] is False
+
+
+class TestOwnScope:
+    """Own-scoped policy allows when resource.metadata.created_by matches user.id."""
+
+    def test_own_scope_owner_in_project_allowed(self, opa_evaluate):
+        user_id = "user-uuid-123"
+        policies = [
+            allow_policy("credential:update:own", ["credential:update"], scope="own", project="proj-x"),
+        ]
+        result = opa_evaluate(
+            build_opa_input(
+                action="update",
+                resource_type="credential",
+                resource_project="proj-x",
+                resource_metadata={"created_by": user_id},
+                user_id=user_id,
+                effective_policies=policies,
+            )
+        )
+        assert result["allow"] is True
+
+    def test_own_scope_non_owner_denied(self, opa_evaluate):
+        policies = [
+            allow_policy("credential:update:own", ["credential:update"], scope="own", project="proj-x"),
+        ]
+        result = opa_evaluate(
+            build_opa_input(
+                action="update",
+                resource_type="credential",
+                resource_project="proj-x",
+                resource_metadata={"created_by": "other-user-id"},
+                user_id="test-user-id",
+                effective_policies=policies,
+            )
+        )
+        assert result["allow"] is False
+
+    def test_own_scope_wrong_project_denied(self, opa_evaluate):
+        user_id = "user-uuid-123"
+        policies = [
+            allow_policy("credential:update:own", ["credential:update"], scope="own", project="proj-x"),
+        ]
+        result = opa_evaluate(
+            build_opa_input(
+                action="update",
+                resource_type="credential",
+                resource_project="proj-y",
+                resource_metadata={"created_by": user_id},
+                user_id=user_id,
+                effective_policies=policies,
+            )
+        )
+        assert result["allow"] is False
+
+    def test_own_scope_no_project_context_denied(self, opa_evaluate):
+        """Own scope without project field denies even if owner matches."""
+        user_id = "user-uuid-123"
+        policies = [
+            allow_policy("credential:update:own", ["credential:update"], scope="own"),
+        ]
+        result = opa_evaluate(
+            build_opa_input(
+                action="update",
+                resource_type="credential",
+                resource_metadata={"created_by": user_id},
+                user_id=user_id,
+                effective_policies=policies,
+            )
+        )
+        assert result["allow"] is False
+
+    def test_own_scope_missing_metadata_denied(self, opa_evaluate):
+        """Own scope denies when resource has no created_by metadata."""
+        policies = [
+            allow_policy("credential:update:own", ["credential:update"], scope="own", project="proj-x"),
+        ]
+        result = opa_evaluate(
+            build_opa_input(
+                action="update",
+                resource_type="credential",
+                resource_project="proj-x",
+                resource_metadata={},
+                user_id="test-user-id",
+                effective_policies=policies,
+            )
+        )
+        assert result["allow"] is False

@@ -123,6 +123,13 @@ describe('UserFormFields', () => {
     expect(screen.getByText('Enabled')).toBeInTheDocument()
   })
 
+  it('hides the status switch in edit mode', () => {
+    render(<TestWrapper isEdit />)
+
+    expect(screen.queryByLabelText('Enabled')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More info for Status' })).not.toBeInTheDocument()
+  })
+
   it('shows "Disabled" label when status switch is toggled off', async () => {
     const user = userEvent.setup()
     render(<TestWrapper />)

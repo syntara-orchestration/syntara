@@ -6,6 +6,9 @@ asyncio.to_thread() for async integration.
 """
 
 import asyncio
+import contextlib
+import threading
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -21,7 +24,113 @@ from syntara.files.retrievers.base import BaseRetriever
 logger = structlog.stdlib.get_logger(__name__)
 
 _MULTIPART_THRESHOLD = 5 * 1024 * 1024  # 5 MB
+_DOWNLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
 _S3_ERRORS = (ClientError, EndpointConnectionError, NoCredentialsError)
+_SENTINEL = object()
+
+
+def _raise_s3_error(error: BaseException, file_path: str) -> None:
+    """Translate an S3 exception into a domain exception and raise it."""
+    if isinstance(error, ClientError):
+        if error.response["Error"]["Code"] == "NoSuchKey":
+            logger.warning("File not found in S3", key=file_path)
+            msg = f"File not found: {file_path}"
+            raise FileContentNotFoundError(msg) from error
+        logger.exception("Failed to stream file from S3", key=file_path)
+        msg = f"S3 storage unavailable: {error}"
+        raise FileError(msg) from error
+    if isinstance(error, (EndpointConnectionError, NoCredentialsError)):
+        logger.exception("S3 connection failed during streaming", key=file_path)
+        msg = f"S3 storage unavailable: {error}"
+        raise FileError(msg) from error
+    raise error
+
+
+class _StreamProducer:
+    """Reads S3 object chunks in a background thread and feeds them to an asyncio.Queue.
+
+    Attributes:
+        error: Captured S3 exception (if any) for the consumer to re-raise.
+
+    """
+
+    def __init__(
+        self,
+        client: Any,  # noqa: ANN401
+        bucket: str,
+        key: str,
+        chunk_size: int,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[bytes | object],
+        cancelled: threading.Event,
+    ) -> None:
+        self._client = client
+        self._bucket = bucket
+        self._key = key
+        self._chunk_size = chunk_size
+        self._loop = loop
+        self._queue = queue
+        self._cancelled = cancelled
+        self.error: BaseException | None = None
+        self._body: Any = None
+
+    def close_body(self) -> None:
+        """Close the S3 streaming body to unblock a stalled read."""
+        if self._body is not None:
+            self._body.close()
+
+    def _enqueue(self, item: bytes | object, *, timeout: float | None = None) -> None:
+        """Schedule *item* onto the async queue from the producer thread.
+
+        Blocks until the queue has space or the cancellation event is set,
+        polling every *timeout* seconds (default 1s).
+        """
+
+        async def _put() -> None:
+            await self._queue.put(item)
+
+        future = asyncio.run_coroutine_threadsafe(_put(), self._loop)
+        while not self._cancelled.is_set():
+            try:
+                future.result(timeout=timeout or 1)
+                return
+            except TimeoutError:
+                continue
+        future.cancel()
+
+    def __call__(self) -> None:
+        """Read S3 object body in chunks and enqueue them for the async consumer.
+
+        On S3 errors the exception is stored in ``self.error`` and the
+        sentinel is sent so the consumer unblocks and can re-raise.
+        """
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+        except _S3_ERRORS as e:
+            self.error = e
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, _SENTINEL)
+            return
+
+        body = response["Body"]
+        self._body = body
+        try:
+            while not self._cancelled.is_set():
+                chunk = body.read(self._chunk_size)
+                if not chunk:
+                    break
+                self._enqueue(chunk)
+        except _S3_ERRORS as e:
+            self.error = e
+        except Exception as e:
+            logger.exception("Unexpected error reading S3 stream", key=self._key)
+            err = FileError(f"Read error: {e}")
+            err.__cause__ = e
+            self.error = err
+        finally:
+            body.close()
+            if not self._cancelled.is_set():
+                with contextlib.suppress(TimeoutError, RuntimeError):
+                    self._enqueue(_SENTINEL, timeout=5)
 
 
 class S3FileRetriever(BaseRetriever):
@@ -99,6 +208,118 @@ class S3FileRetriever(BaseRetriever):
             msg = f"S3 storage unavailable: {e}"
             raise FileError(msg) from e
 
+    async def save_file_stream(
+        self,
+        stream: AsyncIterator[bytes],
+        file_path: str,
+    ) -> tuple[str, int]:
+        """Save file from an async chunk stream using S3 multipart upload.
+
+        Always uses multipart upload since total size is unknown upfront.
+        Incoming chunks are buffered until they reach the 5 MB multipart
+        threshold, then uploaded as one part.  Any remaining bytes are
+        flushed as a final part.  On any error (S3, cancellation, stream
+        failure) the in-progress multipart upload is aborted.
+        """
+        total_bytes = 0
+        try:
+            mpu = await asyncio.to_thread(
+                self._client.create_multipart_upload,
+                Bucket=self._bucket_name,
+                Key=file_path,
+            )
+            upload_id = mpu["UploadId"]
+
+            parts: list[dict[str, Any]] = []
+            part_number = 0
+            buffer = b""
+            completed = False
+
+            try:
+                async for chunk in stream:
+                    buffer += chunk
+                    total_bytes += len(chunk)
+
+                    while len(buffer) >= _MULTIPART_THRESHOLD:
+                        part_number += 1
+                        part_data = buffer[:_MULTIPART_THRESHOLD]
+                        buffer = buffer[_MULTIPART_THRESHOLD:]
+                        part = await asyncio.to_thread(
+                            self._client.upload_part,
+                            Bucket=self._bucket_name,
+                            Key=file_path,
+                            UploadId=upload_id,
+                            PartNumber=part_number,
+                            Body=part_data,
+                        )
+                        parts.append({"PartNumber": part_number, "ETag": part["ETag"]})
+
+                if buffer:
+                    part_number += 1
+                    part = await asyncio.to_thread(
+                        self._client.upload_part,
+                        Bucket=self._bucket_name,
+                        Key=file_path,
+                        UploadId=upload_id,
+                        PartNumber=part_number,
+                        Body=buffer,
+                    )
+                    parts.append({"PartNumber": part_number, "ETag": part["ETag"]})
+
+                if not parts:
+                    # Empty stream — abort multipart upload, use put_object instead.
+                    # S3 requires at least one part for complete_multipart_upload.
+                    await asyncio.to_thread(
+                        self._client.abort_multipart_upload,
+                        Bucket=self._bucket_name,
+                        Key=file_path,
+                        UploadId=upload_id,
+                    )
+                    await asyncio.to_thread(
+                        self._client.put_object,
+                        Bucket=self._bucket_name,
+                        Key=file_path,
+                        Body=b"",
+                    )
+                else:
+                    await asyncio.to_thread(
+                        self._client.complete_multipart_upload,
+                        Bucket=self._bucket_name,
+                        Key=file_path,
+                        UploadId=upload_id,
+                        MultipartUpload={"Parts": parts},  # type: ignore[typeddict-item]
+                    )
+                completed = True
+            finally:
+                if not completed:
+                    try:
+                        await asyncio.to_thread(
+                            self._client.abort_multipart_upload,
+                            Bucket=self._bucket_name,
+                            Key=file_path,
+                            UploadId=upload_id,
+                        )
+                    except _S3_ERRORS:
+                        logger.warning(
+                            "Failed to abort multipart upload",
+                            key=file_path,
+                            upload_id=upload_id,
+                            exc_info=True,
+                        )
+
+            logger.debug(
+                "File saved to S3 via streaming",
+                key=file_path,
+                bucket=self._bucket_name,
+                size_bytes=total_bytes,
+            )
+            return file_path, total_bytes
+
+        except _S3_ERRORS as e:
+            logger.exception("Failed to save file stream to S3", key=file_path)
+            msg = f"S3 storage unavailable: {e}"
+            raise FileError(msg) from e
+
     async def _multipart_upload(self, key: str, content: bytes) -> None:
         mpu = await asyncio.to_thread(
             self._client.create_multipart_upload,
@@ -171,6 +392,46 @@ class S3FileRetriever(BaseRetriever):
             logger.exception("S3 connection failed", key=file_path)
             msg = f"S3 storage unavailable: {e}"
             raise FileError(msg) from e
+
+    async def stream_file(self, file_path: str, chunk_size: int = _DOWNLOAD_CHUNK_SIZE) -> AsyncGenerator[bytes]:
+        """Stream file content from S3 in fixed-size chunks.
+
+        Uses a background thread to read from the S3 StreamingBody and an
+        asyncio.Queue to bridge chunks into the async world.  Memory usage
+        stays bounded: at most two chunks are in flight at any time (one
+        being read in the thread, one buffered in the queue).
+        """
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[bytes | object] = asyncio.Queue(maxsize=1)
+        cancelled = threading.Event()
+        producer = _StreamProducer(self._client, self._bucket_name, file_path, chunk_size, loop, queue, cancelled)
+        task: asyncio.Future[None] | None = None
+
+        try:
+            task = loop.run_in_executor(None, producer)
+
+            while True:
+                item = await queue.get()
+                if item is _SENTINEL:
+                    break
+                yield item  # type: ignore[misc]
+
+            await task
+
+            if producer.error is not None:
+                _raise_s3_error(producer.error, file_path)
+
+            logger.debug("File streamed from S3", key=file_path)
+        finally:
+            cancelled.set()
+            producer.close_body()
+            if task is not None:
+                try:
+                    await asyncio.wait_for(task, timeout=2)
+                except TimeoutError:
+                    logger.warning("stream_file producer did not exit within 2s timeout", key=file_path)
+                except asyncio.CancelledError:
+                    raise
 
     async def file_exists(self, file_path: str) -> bool:
         """Check if file exists in S3-compatible storage."""

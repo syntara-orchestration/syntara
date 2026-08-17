@@ -213,3 +213,85 @@ export function formatScheduleSummary(interval: string): string | null {
 
   return summary
 }
+
+function padTwoDigits(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+function toDateTimeOffset(dateStr: string, timeStr: string, tzOffset: string): string {
+  if (!dateStr) return ''
+  return `${dateStr}T${timeStr}${tzOffset}`
+}
+
+/**
+ * IANA timezone offset for a calendar date (`+00:00`, `-05:00`, or `Z`).
+ * Used when composing ISO 8601 repeating intervals for scheduled triggers.
+ */
+export function getTimezoneOffset(timezone: string, referenceDate?: string): string {
+  try {
+    const refDate = referenceDate ? new Date(`${referenceDate}T12:00:00`) : new Date()
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset',
+    })
+    const parts = formatter.formatToParts(refDate)
+    const tzPart = parts.find((p) => p.type === 'timeZoneName')
+    if (!tzPart) return 'Z'
+    const offset = tzPart.value.replace('GMT', '')
+    return offset || '+00:00'
+  } catch {
+    return 'Z'
+  }
+}
+
+type BuildRepeatingIntervalInput = {
+  startDate: string
+  startTime: string
+  endDate?: string
+  frequency: ScheduleFrequency
+  intervalCount: number
+  timezone: string
+  now?: Date
+}
+
+/**
+ * Build an ISO 8601 repeating interval from visual schedule builder fields.
+ * Empty start date/time fall back to `now` so a valid schedule exists before
+ * the builder's first paint (save must send `interval` when type is interval).
+ */
+export function buildRepeatingInterval(input: BuildRepeatingIntervalInput): string {
+  const now = input.now ?? new Date()
+  const effectiveDate =
+    input.startDate || `${now.getFullYear()}-${padTwoDigits(now.getMonth() + 1)}-${padTwoDigits(now.getDate())}`
+  const effectiveTime = input.startDate
+    ? input.startTime || '00:00'
+    : `${padTwoDigits(now.getHours())}:${padTwoDigits(now.getMinutes())}`
+
+  const tzOffset = getTimezoneOffset(input.timezone, effectiveDate)
+  const start = toDateTimeOffset(effectiveDate, `${effectiveTime}:00`, tzOffset)
+  if (!start) return ''
+
+  const duration = frequencyAndIntervalToDuration(input.frequency, input.intervalCount)
+  if (!duration) {
+    return `R1/${start}/PT0S`
+  }
+
+  let interval = `R/${start}/${duration}`
+  if (input.endDate) {
+    const endTzOffset = getTimezoneOffset(input.timezone, input.endDate)
+    interval += `/${toDateTimeOffset(input.endDate, '23:59:59', endTzOffset)}`
+  }
+  return interval
+}
+
+/** Default visual-builder interval: run once, starting now, in `timezone`. */
+export function getDefaultRepeatingInterval(timezone: string, now?: Date): string {
+  return buildRepeatingInterval({
+    startDate: '',
+    startTime: '',
+    frequency: 'none',
+    intervalCount: 1,
+    timezone,
+    now,
+  })
+}

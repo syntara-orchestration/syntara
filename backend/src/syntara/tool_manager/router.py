@@ -20,7 +20,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.router import integration_read_visibility
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.tool_manager.exceptions import ToolNotFoundError
@@ -32,7 +32,7 @@ from syntara.tool_manager.models.tool import (
 )
 from syntara.tool_manager.services.tool_service import ToolService
 
-router = NexusRouter(tags=["Tools"])
+router = SyntaraRouter(tags=["Tools"])
 
 _tool_read_gate = VisibilityFilter("tool", "read")
 _perm_tool_update = PermissionChecker("tool", "update")

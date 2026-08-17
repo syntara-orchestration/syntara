@@ -1,33 +1,44 @@
-import { useAllGroups } from '../../access/useAllGroups'
+import type { UsersAPI } from '@syntara/contracts'
+import { useQuery } from '@tanstack/react-query'
+
+import { usersFetchClient } from '../../../client'
+import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
+
+type GroupDirectoryEntry = UsersAPI.components['schemas']['GroupDirectoryEntry']
+
+async function fetchAllGroupDirectory(): Promise<GroupDirectoryEntry[]> {
+  return fetchAllPages<GroupDirectoryEntry>((cursor) =>
+    usersFetchClient.GET('/groups/directory', {
+      params: { query: { sort: 'name', limit: MAX_PAGE_SIZE, cursor } },
+    })
+  )
+}
 
 /**
- * Hook to get groups for approval approvers.
+ * Hook to fetch groups for the approval node approver-groups dropdown.
  *
- * MVP: Returns all groups without permission filtering.
- * Backend validates group membership at decision time.
- *
- * KNOWN LIMITATION: Users can select groups with no approval:decide members,
- * creating unapproachable approvals that hang forever. The helper text warns
- * about this, but there's no runtime check or visual indicator.
- *
- * Follow-up improvements:
- * 1. Backend: Add `member_count` or `has_decide_permission` flag to Group API response
- * 2. UI: Show warning badge on groups with zero eligible members
- * 3. Long-term: Implement /authz/which_groups_can endpoint for proper filtering
- *
- * Rationale for not filtering in MVP:
- * - The /authz/who_can endpoint returns users, not groups
- * - Client-side filtering would require N×M API calls (N groups × M members), causing poor performance
- * - Backend filtering requires new endpoint or additional fields on existing endpoint
- *
- * @returns Object containing groups array, loading state, and error
+ * Uses the lightweight `/groups/directory` endpoint (id + name only),
+ * which is accessible to the `user` role via `group-directory:read`.
+ * Note: groups are not filtered by approval:decide capability — the backend
+ * validates group membership at decision time.
  */
 export function useApprovalDecideGroups() {
-  const { groups, isLoading, error } = useAllGroups()
+  const {
+    data: groups = [],
+    isPending,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['approval-decide-groups'],
+    queryFn: fetchAllGroupDirectory,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+  })
 
   return {
     groups,
-    isLoading,
+    isLoading: isPending,
     error,
+    refetch,
   }
 }

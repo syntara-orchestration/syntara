@@ -81,17 +81,17 @@ All config fields support template expressions (e.g., `${trigger.host}`), resolv
 
 ## Authentication
 
-AAP nodes require an **AAP integration** (`integration_id` on the node config) for URL and TLS settings, and a **Nexus credential** (`credential_id`) for auth headers/token. Without an integration, the node fails with `ConfigError: "AAP integration not configured. Attach an AAP integration to this node."`
+AAP nodes require an **AAP integration** (`integration_id` on the node config) for URL and TLS settings, and a **Syntara credential** (`credential_id`) for auth headers/token. Without an integration, the node fails with `ConfigError: "AAP integration not configured. Attach an AAP integration to this node."`
 
 ## Cancellation Propagation
 
-When a Nexus execution is cancelled, the Temporal activity receives `CancelledError`. The `handle_cancellation()` function in `aap_common.py`:
+When a Syntara execution is cancelled, the Temporal activity receives `CancelledError`. The `handle_cancellation()` function in `aap_common.py`:
 
 1. Detects `activity.is_cancelled()`
 2. Sends `POST /api/controller/v2/{job_type}/{job_id}/cancel/` to AAP (best-effort — failure is logged, not retried)
 3. Raises `CancelledError` to terminate the activity
 
-**Why best-effort?** The AAP job may have already completed, or the AAP controller may be unreachable. Either way, the Nexus execution should transition to CANCELLED regardless of whether the AAP cancellation succeeded.
+**Why best-effort?** The AAP job may have already completed, or the AAP controller may be unreachable. Either way, the Syntara execution should transition to CANCELLED regardless of whether the AAP cancellation succeeded.
 
 ## Error Handling
 
