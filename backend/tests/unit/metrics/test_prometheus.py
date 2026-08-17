@@ -35,6 +35,7 @@ class TestMetricDefinitions:
         assert prom.llm_calls_total is not None
         assert prom.workflows_total is not None
         assert prom.tool_executions_total is not None
+        assert prom.cache_pool_retry_total is not None
 
     def test_histograms_defined(self, prom: OrchestratorPrometheusMetrics) -> None:
         """All required histograms are present."""
@@ -52,6 +53,7 @@ class TestMetricDefinitions:
         assert prom.system_e2e_latency_seconds is not None
         assert prom.authz_duration_seconds is not None
         assert prom.opa_request_duration_seconds is not None
+        assert prom.cache_pool_retry_backoff_duration_seconds is not None
 
     def test_gauges_defined(self, prom: OrchestratorPrometheusMetrics) -> None:
         """All required gauges are present."""

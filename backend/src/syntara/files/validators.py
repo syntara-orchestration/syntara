@@ -196,57 +196,42 @@ def validate_mime_type_from_bytes(
     return mime_type
 
 
-async def validate_files(
-    files: list[UploadFile],
-    settings: Settings,
-) -> list[tuple[bytes, str]]:
-    """Validate all uploaded files and return content with MIME types.
+_MIME_HEADER_SIZE = 8192  # 8 KB — enough for reliable MIME detection
 
-    This function performs comprehensive validation on all uploaded files:
-    1. File count validation
-    2. File size validation (without loading into memory)
-    3. Read each file once into memory (only if size is valid)
-    4. MIME type validation per file
+
+async def validate_single_file(
+    file: UploadFile,
+    settings: Settings,
+) -> tuple[bytes, str]:
+    """Validate a single file and return header bytes with detected MIME type.
+
+    Validates size without buffering, then reads only the first 8 KB for
+    MIME type detection.  The caller is responsible for streaming the
+    remainder of the file content.
 
     Args:
-        files: List of uploaded files
+        file: Uploaded file to validate
         settings: Application settings with validation limits
 
     Returns:
-        List of tuples (file_content, mime_type) for each file in same order
+        Tuple of (header_bytes, mime_type).  header_bytes contains at most
+        8 KB — enough for MIME detection.  The UploadFile position is left
+        at the end of the header; callers should continue reading from
+        that position for the remaining content.
 
     Raises:
-        FileValidationError: If any validation fails
+        FileValidationError: If size or MIME type validation fails
 
     """
-    # Validate file count
-    await validate_file_count(files, settings.file_upload_max_files)
+    await validate_file_size(file, settings.file_upload_max_size_mb)
 
-    # Validate each file's size BEFORE reading into memory
-    for file in files:
-        await validate_file_size(file, settings.file_upload_max_size_mb)
+    header = await file.read(_MIME_HEADER_SIZE)
+    filename = file.filename or "unknown"
 
-    # Read and validate each file (single read per file)
-    # Only files that passed size validation reach this point
-    validated_files: list[tuple[bytes, str]] = []
-
-    for file in files:
-        # Read file content ONCE (size already validated above)
-        file_content = await file.read()
-        filename = file.filename or "unknown"
-
-        # Validate and collect MIME type using bytes
-        mime_type = validate_mime_type_from_bytes(
-            file_content,
-            filename,
-            settings.file_upload_allowed_mime_types,
-        )
-
-        validated_files.append((file_content, mime_type))
-
-    logger.info(
-        "All files validated successfully",
-        file_count=len(files),
+    mime_type = validate_mime_type_from_bytes(
+        header,
+        filename,
+        settings.file_upload_allowed_mime_types,
     )
 
-    return validated_files
+    return header, mime_type

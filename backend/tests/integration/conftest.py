@@ -51,7 +51,7 @@ pytest_plugins = [
     "tests.integration.fixtures.users",
 ]
 
-_MOTO_BUCKET = "nexus-integration-test"
+_MOTO_BUCKET = "orchestrator-integration-test"
 _MOTO_REGION = "us-east-1"
 
 
@@ -266,19 +266,19 @@ def websocket_example_app(
     """
     # Create directory structure
     project_root = tmp_path / "project"
-    nexus_dir = project_root / "src" / "syntara"
-    core_dir = nexus_dir / "core" / "websocket"
+    syntara_dir = project_root / "src" / "syntara"
+    core_dir = syntara_dir / "core" / "websocket"
     core_dir.mkdir(parents=True)
 
-    component_dir = nexus_dir / "testcomp"
+    component_dir = syntara_dir / "testcomp"
     ws_dir = component_dir / "ws"
     ws_dir.mkdir(parents=True)
 
-    schemas_dir = nexus_dir / "schemas" / "testcomp"
+    schemas_dir = syntara_dir / "schemas" / "testcomp"
     schemas_dir.mkdir(parents=True)
 
     # Create __init__.py files
-    (nexus_dir / "__init__.py").touch()
+    (syntara_dir / "__init__.py").touch()
     (component_dir / "__init__.py").touch()
     (ws_dir / "__init__.py").touch()
     (core_dir / "__init__.py").touch()
@@ -782,7 +782,7 @@ components:
     (schemas_dir / "websocket-handlers2.yaml").write_text(handlers2_spec)
 
     # Add project to Python path
-    sys.path.insert(0, str(nexus_dir.parent))
+    sys.path.insert(0, str(syntara_dir.parent))
 
     # Mock __file__ to point to our temporary structure
     fake_endpoint_factory = core_dir / "endpoint_factory.py"
@@ -795,7 +795,7 @@ components:
     # Mock importlib.resources.files to return our temp schemas directory
     def mock_files(package: str) -> Path:
         if package == "syntara":
-            return nexus_dir
+            return syntara_dir
         msg = f"Package {package} not found"
         raise FileNotFoundError(msg)
 
@@ -809,7 +809,7 @@ components:
     yield project_root, app
 
     # Cleanup
-    sys.path.remove(str(nexus_dir.parent))
+    sys.path.remove(str(syntara_dir.parent))
 
 
 async def _wait_for_server(host: str, port: int) -> None:
@@ -899,3 +899,24 @@ def _moto_s3() -> Generator[None, None, None]:
         fm._retriever = retriever
         yield
         fm._retriever = original_retriever
+
+
+@pytest.fixture(autouse=True)
+def _skip_ssrf_validation(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Bypass integration SSRF base_url validation for tests using placeholder hostnames.
+
+    Integration configs in tests use non-resolvable hosts (e.g. gateway.example.com), so the
+    DNS-resolving SSRF check would reject them. The shared bypass covers every boundary that
+    routes through the ``validate_integration_url_no_ssrf`` choke point — write time
+    (create/patch) and the runtime resolve/connect paths. Tests that exercise the SSRF check
+    itself opt out with ``@pytest.mark.ssrf_enforced``. The probe/patch logic is shared with the
+    unit conftest via :mod:`tests.helpers.ssrf_bypass` so the safety-net rules cannot drift.
+    """
+    from tests.helpers.ssrf_bypass import bypass_integration_ssrf_validation
+
+    if request.node.get_closest_marker("ssrf_enforced"):
+        yield
+        return
+
+    with bypass_integration_ssrf_validation():
+        yield

@@ -49,8 +49,8 @@ class TestAAPCredentialInjection:
         resolved_creds = {
             "extra_vars": {
                 "auth_type": "aap",
-                "aap_username": "nexus-user",
-                "aap_password": "nexus-pass",
+                "aap_username": "syntara-user",
+                "aap_password": "syntara-pass",
                 "aap_oauth_token": "oauth-token-123",
             },
         }

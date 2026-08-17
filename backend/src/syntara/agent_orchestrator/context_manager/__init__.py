@@ -1,4 +1,4 @@
-"""Context Manager module for Nexus agent orchestration.
+"""Context Manager module for Syntara agent orchestration.
 
 Provides scaffolding for context retrieval, compression, and assembly
 to support coordinated AI agent workflows.

@@ -5,7 +5,10 @@ support for multiple storage backends (local filesystem, cloud storage, etc.).
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
+
+_DEFAULT_CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 
 class BaseRetriever(ABC):
@@ -66,6 +69,51 @@ class BaseRetriever(ABC):
             FileNotFoundError: If file does not exist at the specified path
             OSError: If file cannot be read due to I/O errors
             PermissionError: If insufficient permissions to read the file
+
+        """
+
+    @abstractmethod
+    async def stream_file(self, file_path: str, chunk_size: int = _DEFAULT_CHUNK_SIZE) -> AsyncGenerator[bytes]:
+        """Stream file content from storage in fixed-size chunks.
+
+        Implementations must yield file content in chunks of at most
+        *chunk_size* bytes with constant memory usage.
+
+        Args:
+            file_path: Storage-specific identifier for the file
+            chunk_size: Maximum bytes per yielded chunk
+
+        Yields:
+            File content in chunks of at most *chunk_size* bytes.
+
+        Raises:
+            FileNotFoundError: If file does not exist at the specified path
+            OSError: If file cannot be read due to I/O errors
+
+        """
+        yield b""  # pragma: no cover
+
+    @abstractmethod
+    async def save_file_stream(
+        self,
+        stream: AsyncIterator[bytes],
+        file_path: str,
+    ) -> tuple[str, int]:
+        """Save file content from an async stream to storage.
+
+        Reads chunks from *stream* and writes them to the backend without
+        buffering the full file in memory.
+
+        Args:
+            stream: Async generator yielding file content chunks
+            file_path: Destination path / key for the file
+
+        Returns:
+            Tuple of (storage path, total bytes written).
+
+        Raises:
+            OSError: If save operation fails
+            PermissionError: If insufficient permissions to write
 
         """
 

@@ -11,7 +11,7 @@ T = TypeVar("T", bound="OIDCGroupMappingEntry")
 
 @_attrs_define
 class OIDCGroupMappingEntry:
-    """API-facing schema for a single IdP-to-Nexus group mapping entry.
+    """API-facing schema for a single IdP-to-Syntara group mapping entry.
 
     Used in API requests/responses. Actual storage is in the
     ``idp_group_mapping_entries`` table.

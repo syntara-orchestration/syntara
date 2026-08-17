@@ -11,9 +11,16 @@ type ApprovalNodeDetailsProps = {
   nodeId: string
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
+  projectId?: string
 }
 
-export function ApprovalNodeDetails({ taskData, nodeId, onClose, onHeaderContentChange }: ApprovalNodeDetailsProps) {
+export function ApprovalNodeDetails({
+  taskData,
+  nodeId,
+  onClose,
+  onHeaderContentChange,
+  projectId,
+}: ApprovalNodeDetailsProps) {
   const { showError } = useAlerts()
   const updateActivity = useWorkflowStore((state) => state.updateActivity)
 
@@ -59,6 +66,11 @@ export function ApprovalNodeDetails({ taskData, nodeId, onClose, onHeaderContent
   }
 
   return (
-    <ApprovalNodeForm onSubmit={handleSubmit} initialData={initialData} onHeaderContentChange={onHeaderContentChange} />
+    <ApprovalNodeForm
+      onSubmit={handleSubmit}
+      initialData={initialData}
+      onHeaderContentChange={onHeaderContentChange}
+      projectId={projectId}
+    />
   )
 }

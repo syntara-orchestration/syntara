@@ -1,7 +1,7 @@
 import { Content, ContentVariants, Stack, StackItem } from '@patternfly/react-core'
 import { Table, Tbody, Td, Tr } from '@patternfly/react-table'
 
-import { formatTimeRange } from '../../utils/dateUtils'
+import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -28,7 +28,7 @@ export function CompactActivityList({
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
-          const timeRange = formatTimeRange(state?.startedAt, state?.completedAt)
+          const hasTimeRange = Boolean(state?.startedAt)
           const { baseId } = parseCompositeKey(id)
           const displayName = name ?? id
           const isSelected = baseId === selectedNodeId
@@ -43,10 +43,10 @@ export function CompactActivityList({
               <Td dataLabel="Name" className={styles.nameCell}>
                 <Stack>
                   <StackItem>{displayName}</StackItem>
-                  {timeRange && (
+                  {hasTimeRange && (
                     <StackItem>
                       <Content component={ContentVariants.small} className={styles.subtleText}>
-                        {timeRange}
+                        <ExecutionTimeRange startedAt={state?.startedAt} completedAt={state?.completedAt} />
                       </Content>
                     </StackItem>
                   )}

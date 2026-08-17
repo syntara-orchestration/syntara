@@ -573,17 +573,21 @@ jobs:
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_SEGMENT_WRITE_KEY: test-e2e-write-key
           APP_SEGMENT_ENDPOINT: http://mock-segment:9999
           APP_COLLECTION_INTERVAL_SECONDS: "10"
           APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS: '["host.containers.internal"]'
+          # The E2E MCP test server resolves to a private container IP; allowlist it so the
+          # write-time integration SSRF check accepts base_url=http://mcp-server:.../mcp.
+          APP_INTEGRATION_URL_ALLOWED_HOSTS: '["mcp-server"]'
         run: |
           ulimit -n 65535
           # --no-deps: start all containers immediately without health dependency ordering.
           # On Podman 5.x (events_logger=file), healthcheck timers are never created,
           # so compose would hang waiting for depends_on service_healthy conditions.
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e up --build -d --no-deps \
-            database redis moto mcp-server mock-segment \
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios up --build -d --no-deps \
+            database redis moto mcp-server mcp-server-scenarios mock-segment \
             temporal syntara temporal-worker temporal-background-worker
 
       - name: Verify services are healthy
@@ -608,7 +612,7 @@ jobs:
           }
 
           # Wave 1: infrastructure (no upstream dependencies)
-          for svc in database redis moto mcp-server mock-segment; do
+          for svc in database redis moto mcp-server mcp-server-scenarios mock-segment; do
             wait_healthy "syntara-ci_${svc}_1" 120
           done
 
@@ -626,6 +630,7 @@ jobs:
           retry_wait_seconds: 30
           command: cd backend && make test-e2e
         env:
+          APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000
           APP_WORKER_BASE_URL: https://host.containers.internal:8000
           APP_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -647,12 +652,12 @@ jobs:
         if: failure()
         run: |
           echo "=== Compose logs ==="
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios logs database temporal syntara temporal-worker temporal-background-worker mcp-server mcp-server-scenarios mock-segment
 
       - name: Cleanup
         if: always()
         run: |
-          uvx podman-compose -p syntara-ci --profile telemetry-e2e down -v || true
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e --profile mcp-scenarios down -v || true
 
 
   combine:

@@ -1,12 +1,13 @@
 """Integration tests for SA credential token invalidation.
 
-When a service account credential is disabled or deleted, tokens issued
-from that credential must be rejected by StaleTokenMiddleware with
-``SA_CREDENTIAL_DISABLED``, and the corresponding audit event must fire.
+When a service account credential is disabled, deleted, or expired, tokens
+issued from that credential must be rejected by StaleTokenMiddleware with
+the appropriate error code, and the corresponding audit event must fire.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -119,7 +120,7 @@ class TestCredentialDisableTokenInvalidation:
 
             mock_build_otel_log_record.reset_mock()
 
-            with patch("syntara.auth.middleware._check_cred_status", return_value="disabled"):
+            with patch("syntara.auth.middleware._check_cred_status", return_value=("disabled", None)):
                 me_resp2 = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
             assert me_resp2.status_code == 401, f"Expected 401 after disable, got {me_resp2.status_code}"
             assert me_resp2.json()["code"] == "SA_CREDENTIAL_DISABLED"
@@ -175,6 +176,48 @@ class TestCredentialDeleteTokenInvalidation:
             events = _find_events(mock_build_otel_log_record, "disabled_sa_credential_rejected")
             assert len(events) >= 1, (
                 f"Expected disabled_sa_credential_rejected event, found: "
+                f"{[c.args[0].event_action for c in mock_build_otel_log_record.call_args_list]}"
+            )
+        finally:
+            await base_client.delete(f"/api/v1/service_accounts/{sa['id']}", headers=headers)
+
+
+class TestCredentialExpiredTokenInvalidation:
+    """Expired credentials invalidate tokens from that credential."""
+
+    @patch("syntara.audit.outbox.worker._build_otel_log_record")
+    async def test_expired_credential_token_rejected(
+        self,
+        mock_build_otel_log_record: MagicMock,
+        base_client: AsyncClient,
+        admin_user: User,
+        create_jwt_for_user: Callable[[User], str],
+        test_project_id: UUID,
+    ) -> None:
+        token = create_jwt_for_user(admin_user)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        sa = await _create_sa(base_client, headers, test_project_id)
+        cred = await _create_credential(base_client, headers, sa["id"])
+
+        try:
+            sa_token = await _obtain_sa_token(base_client, cred["identifier"], cred["client_secret"])
+
+            me_resp = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
+            assert me_resp.status_code == 200, f"Token should work before expiry: {me_resp.status_code}"
+
+            mock_build_otel_log_record.reset_mock()
+
+            past = datetime.now(UTC) - timedelta(minutes=5)
+            with patch("syntara.auth.middleware._check_cred_status", return_value=("active", past)):
+                me_resp2 = await base_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {sa_token}"})
+            assert me_resp2.status_code == 401, f"Expected 401 after expiry, got {me_resp2.status_code}"
+            assert me_resp2.json()["code"] == "SA_CREDENTIAL_EXPIRED"
+
+            await get_outbox_worker().drain()
+            events = _find_events(mock_build_otel_log_record, "expired_sa_credential_rejected")
+            assert len(events) >= 1, (
+                f"Expected expired_sa_credential_rejected event, found: "
                 f"{[c.args[0].event_action for c in mock_build_otel_log_record.call_args_list]}"
             )
         finally:

@@ -4,7 +4,8 @@ Runs a diff-based reconciliation cycle that:
 
 1. Queries the database for all published workflow versions with scheduled
    triggers to build the *expected* set of Temporal Schedule IDs.
-2. Lists all ``nexus-sched-*`` Temporal Schedules to build the *actual* set.
+2. Lists all ``orchestrator-sched-*`` Temporal Schedules to build the *actual*
+   set.
 3. Creates missing schedules (from failed publishes) and deletes orphans
    (from unpublish/delete that couldn't reach Temporal).
 
@@ -100,7 +101,7 @@ async def reconcile_scheduled_triggers(
     expected_ids = set(lookup)
 
     # -- Step 2: Build actual state (1 Temporal list_schedules call) --
-    # Use NexusWorkflowId search attribute for server-side filtering when
+    # Use OrchestratorWorkflowId search attribute for server-side filtering when
     # available, falling back to client-side prefix scan otherwise.
     service = ScheduledTriggerService()
     client = await service.get_client()

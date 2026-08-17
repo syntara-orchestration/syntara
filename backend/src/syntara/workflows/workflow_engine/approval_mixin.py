@@ -41,7 +41,7 @@ class WorkflowApprovalMixin:
     timeout expiration, and previous-step context building.
 
     State attributes are declared as type annotations for mypy;
-    initialization remains in ``NexusWorkflow._initialize_state``.
+    initialization remains in ``OrchestratorWorkflow._initialize_state``.
     """
 
     execution_id: str

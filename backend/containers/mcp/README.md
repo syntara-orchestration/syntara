@@ -3,9 +3,9 @@
 ## Running
 `make mcp-start`
 
-## Registering with Nexus
+## Registering with Syntara
 
-When running Nexus via `docker compose`, register this MCP server using the service name instead of `localhost`:
+When running Syntara via `docker compose`, register this MCP server using the service name instead of `localhost`:
 
 - **Local development**: `http://localhost:8765/mcp`
 - **Docker compose**: `http://mcp-server:8765/mcp`

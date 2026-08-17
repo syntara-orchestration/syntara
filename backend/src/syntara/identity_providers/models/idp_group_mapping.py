@@ -1,6 +1,6 @@
 """IdP group mapping entry model.
 
-Maps identity provider group values to Nexus groups in a dedicated table,
+Maps identity provider group values to Syntara groups in a dedicated table,
 enabling FK constraints and ON DELETE CASCADE.
 """
 
@@ -11,7 +11,7 @@ from sqlmodel import Field, SQLModel
 
 
 class IdpGroupMappingEntry(SQLModel, table=True):
-    """Maps a single IdP group value to a Nexus group."""
+    """Maps a single IdP group value to a Syntara group."""
 
     __tablename__ = "idp_group_mapping_entries"
 

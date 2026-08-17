@@ -26,7 +26,7 @@ from syntara.auth.exceptions import InvalidTokenError
 from syntara.core.constants import WebhookLimits
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NexusRouter
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.workflows.audit.webhook_auth import WebhookAuthSuccessEvent
 from syntara.workflows.exceptions import (
     PayloadTooLargeError,
@@ -44,7 +44,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 
 logger = structlog.stdlib.get_logger(__name__)
 
-router = NexusRouter(prefix="/webhooks", tags=["Webhooks"])
+router = SyntaraRouter(prefix="/webhooks", tags=["Webhooks"])
 
 
 # ============================================================================

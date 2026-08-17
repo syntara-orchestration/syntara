@@ -1,6 +1,6 @@
 import { Alert, Button, Flex, FlexItem, LabelGroup, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
@@ -20,6 +20,7 @@ import { LinkCell } from '../../components/table/LinkCell'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
+import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
 import { useFilterState } from '../../hooks/useFilterState'
 import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
@@ -77,6 +78,10 @@ function RoleAssignmentsTable({
   onPerPageChange,
   permissions,
   visibleColumns,
+  expandedRows,
+  allRowsExpanded,
+  onToggleRow,
+  onCollapseAll,
 }: Readonly<{
   paginatedRows: RoleAssignmentRow[]
   sortedRows: RoleAssignmentRow[]
@@ -89,13 +94,19 @@ function RoleAssignmentsTable({
   onPerPageChange: (perPage: number) => void
   permissions: ReturnType<typeof useAssignmentPermissions>
   visibleColumns: ColumnDefinition[]
+  expandedRows: Set<string>
+  allRowsExpanded: boolean
+  onToggleRow: (rowId: string) => void
+  onCollapseAll: () => void
 }>) {
   const isVisible = (key: RoleAssignmentColumnKey) => visibleColumns.some((col) => col.key === key)
   const sortIndex = (key: RoleAssignmentColumnKey) => visibleColumns.findIndex((col) => col.key === key)
+  const expandableColumnCount = visibleColumns.length + 2
 
   return (
     <NxScrollableTableContainer
       caption="Role assignments table"
+      isExpandable
       footer={{
         page,
         perPage,
@@ -108,64 +119,87 @@ function RoleAssignmentsTable({
     >
       <Thead>
         <Tr>
+          <Th
+            expand={{
+              areAllExpanded: !allRowsExpanded,
+              collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',
+              onToggle: onCollapseAll,
+            }}
+            aria-label="Row expansion"
+          />
           {isVisible('roleName') && <Th sort={getSortParams(sortIndex('roleName'))}>Role name</Th>}
           {isVisible('description') && <Th sort={getSortParams(sortIndex('description'))}>Description</Th>}
           {isVisible('scope') && <Th sort={getSortParams(sortIndex('scope'))}>Scope</Th>}
           {isVisible('project') && <Th sort={getSortParams(sortIndex('project'))}>Project</Th>}
-          {isVisible('policies') && <Th>Policies</Th>}
           <Th screenReaderText="Actions" />
         </Tr>
       </Thead>
-      <Tbody>
-        {paginatedRows.map((row) => (
-          <Tr key={row.id}>
-            {isVisible('roleName') && (
-              <Td dataLabel="Role name">
-                <Truncate content={row.roleName} />
+      {paginatedRows.map((row, rowIndex) => {
+        const isExpanded = expandedRows.has(row.id)
+        return (
+          <Tbody key={row.id} isExpanded={isExpanded}>
+            <Tr isContentExpanded={isExpanded}>
+              {row.policies.length > 0 ? (
+                <Td
+                  expand={{
+                    rowIndex,
+                    isExpanded,
+                    onToggle: () => onToggleRow(row.id),
+                  }}
+                />
+              ) : (
+                <Td />
+              )}
+              {isVisible('roleName') && (
+                <Td dataLabel="Role name">
+                  <Truncate content={row.roleName} />
+                </Td>
+              )}
+              {isVisible('description') && (
+                <Td dataLabel="Description">
+                  <Truncate content={row.roleDescription ?? '-'} />
+                </Td>
+              )}
+              {isVisible('scope') && (
+                <Td dataLabel="Scope">
+                  <NxLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
+                    {row.scopeType === 'system' ? 'System' : 'Project'}
+                  </NxLabel>
+                </Td>
+              )}
+              {isVisible('project') && (
+                <Td dataLabel="Project">
+                  {row.scopeType === 'project' && row.projectId ? (
+                    <LinkCell href={getProjectDetailPath(row.projectId)}>
+                      <Truncate content={row.scope} />
+                    </LinkCell>
+                  ) : (
+                    '-'
+                  )}
+                </Td>
+              )}
+              <Td isActionCell>
+                <ActionsColumn items={getAssignmentActions(row, onUnassign, permissions)} />
               </Td>
+            </Tr>
+            {row.policies.length > 0 && (
+              <Tr isExpanded={isExpanded}>
+                <Td colSpan={expandableColumnCount}>
+                  <ExpandableRowContent>
+                    <LabelGroup isCompact numLabels={Infinity}>
+                      {row.policies.map((policy) => (
+                        <NxLabel key={policy.name} color="grey">
+                          {policy.name}
+                        </NxLabel>
+                      ))}
+                    </LabelGroup>
+                  </ExpandableRowContent>
+                </Td>
+              </Tr>
             )}
-            {isVisible('description') && (
-              <Td dataLabel="Description">
-                <Truncate content={row.roleDescription ?? '-'} />
-              </Td>
-            )}
-            {isVisible('scope') && (
-              <Td dataLabel="Scope">
-                <NxLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
-                  {row.scopeType === 'system' ? 'System' : 'Project'}
-                </NxLabel>
-              </Td>
-            )}
-            {isVisible('project') && (
-              <Td dataLabel="Project">
-                {row.scopeType === 'project' && row.projectId ? (
-                  <LinkCell href={getProjectDetailPath(row.projectId)}>
-                    <Truncate content={row.scope} />
-                  </LinkCell>
-                ) : (
-                  '-'
-                )}
-              </Td>
-            )}
-            {isVisible('policies') && (
-              <Td dataLabel="Policies">
-                {row.policies.length > 0 ? (
-                  <LabelGroup numLabels={3}>
-                    {row.policies.map((policy) => (
-                      <NxLabel key={policy.name}>{policy.name}</NxLabel>
-                    ))}
-                  </LabelGroup>
-                ) : (
-                  '-'
-                )}
-              </Td>
-            )}
-            <Td isActionCell>
-              <ActionsColumn items={getAssignmentActions(row, onUnassign, permissions)} />
-            </Td>
-          </Tr>
-        ))}
-      </Tbody>
+          </Tbody>
+        )
+      })}
     </NxScrollableTableContainer>
   )
 }
@@ -188,6 +222,10 @@ function TableContent({
   onPerPageChange,
   permissions,
   visibleColumns,
+  expandedRows,
+  allRowsExpanded,
+  onToggleRow,
+  onCollapseAll,
 }: Readonly<{
   filteredRows: RoleAssignmentRow[]
   rows: RoleAssignmentRow[]
@@ -206,6 +244,10 @@ function TableContent({
   onPerPageChange: (perPage: number) => void
   permissions: ReturnType<typeof useAssignmentPermissions>
   visibleColumns: ColumnDefinition[]
+  expandedRows: Set<string>
+  allRowsExpanded: boolean
+  onToggleRow: (rowId: string) => void
+  onCollapseAll: () => void
 }>) {
   if (filteredRows.length === 0) {
     if (rows.length === 0) {
@@ -245,6 +287,10 @@ function TableContent({
       onPerPageChange={onPerPageChange}
       permissions={permissions}
       visibleColumns={visibleColumns}
+      expandedRows={expandedRows}
+      allRowsExpanded={allRowsExpanded}
+      onToggleRow={onToggleRow}
+      onCollapseAll={onCollapseAll}
     />
   )
 }
@@ -303,6 +349,9 @@ export function RoleAssignmentsPanel({
     const start = (page - 1) * perPage
     return sortedRows.slice(start, start + perPage)
   }, [sortedRows, page, perPage])
+
+  const paginatedRowIds = useMemo(() => paginatedRows.map((row) => row.id), [paginatedRows])
+  const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(paginatedRowIds)
 
   const handleUnassign = () => {
     if (!rowToUnassign) return
@@ -428,6 +477,10 @@ export function RoleAssignmentsPanel({
           onPerPageChange={handlePerPageChange}
           permissions={assignmentPermissions}
           visibleColumns={visibleColumns}
+          expandedRows={expandedRows}
+          allRowsExpanded={allRowsExpanded}
+          onToggleRow={handleToggleRow}
+          onCollapseAll={handleCollapseAll}
         />
       </NxPanelContentStack>
 

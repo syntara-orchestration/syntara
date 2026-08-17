@@ -469,7 +469,7 @@ services-run: _ensure-secrets _ensure-certs ## Start all services (database + ca
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server moto
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
@@ -533,6 +533,27 @@ mcp-stop: ## Stop MCP server
 mcp-logs: ## View MCP server logs only
 	@echo "📋 Viewing MCP server logs (project: $(PODMAN_PROJECT))..."
 	$(COMPOSE_FINAL_CMD) logs -f mcp-server
+
+.PHONY: mcp-scenarios-start
+mcp-scenarios-start: ## Start auxiliary auth/forbidden MCP servers (used by test-e2e-mcp auth-failure tests)
+	@echo "🚀 Starting MCP scenario servers..."
+	@echo "📍 Auth-required MCP Server: http://localhost:$${MCP_AUTH_PORT:-8766}/mcp"
+	@echo "📍 Forbidden MCP Server: http://localhost:$${MCP_FORBIDDEN_PORT:-8767}/mcp"
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d mcp-server-scenarios
+	@echo "✅ MCP scenario servers started in background"
+	@echo "   Use 'make mcp-scenarios-logs' to view logs"
+	@echo "   Use 'make mcp-scenarios-stop' to stop servers"
+
+.PHONY: mcp-scenarios-stop
+mcp-scenarios-stop: ## Stop auxiliary auth/forbidden MCP servers
+	@echo "🛑 Stopping MCP scenario servers..."
+	$(COMPOSE_FINAL_CMD) stop mcp-server-scenarios
+	@echo "✅ MCP scenario servers stopped"
+
+.PHONY: mcp-scenarios-logs
+mcp-scenarios-logs: ## View auxiliary auth/forbidden MCP server logs only
+	@echo "📋 Viewing MCP scenario server logs (project: $(PODMAN_PROJECT))..."
+	$(COMPOSE_FINAL_CMD) logs -f mcp-server-scenarios
 
 .PHONY: run-clean
 run-clean: ## Stop all services and remove all data (destructive)

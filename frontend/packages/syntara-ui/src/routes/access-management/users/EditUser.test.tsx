@@ -106,6 +106,14 @@ describe('EditUser', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 
+  it('does not render the status toggle on the edit form', () => {
+    setupSuccessMocks()
+    render(<EditUser />, { wrapper })
+
+    expect(screen.queryByLabelText('Enabled')).not.toBeInTheDocument()
+    expect(screen.queryByText('Status')).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     setupSuccessMocks()
     const { container } = render(<EditUser />, { wrapper })

@@ -167,7 +167,7 @@ export const OIDC_AUTHORIZE_PATH = '/api/v1/auth/oidc/authorize'
 // for use in other modules that need direct fetch access (e.g., file downloads).
 // All API calls should use the typed query/mutation clients (e.g., usersClient)
 // rather than the raw fetchClient to ensure type safety and proper error handling.
-const usersFetchClient = createFetchClient<UsersAPI.paths>({ baseUrl: '/api/v1' })
+export const usersFetchClient = createFetchClient<UsersAPI.paths>({ baseUrl: '/api/v1' })
 usersFetchClient.use(interfaceTagMiddleware)
 usersFetchClient.use(authMiddleware)
 export const usersClient = createClient(usersFetchClient)

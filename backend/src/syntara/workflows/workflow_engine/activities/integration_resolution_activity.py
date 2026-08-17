@@ -14,6 +14,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.database.session import AsyncSessionLocal
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import AAPConfiguration
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -92,6 +93,14 @@ async def _resolve_integration(session: AsyncSession, integration_id: str) -> di
     if not isinstance(config, AAPConfiguration):
         msg = f"Integration '{integration_id}' has invalid configuration type"
         raise ApplicationError(msg, non_retryable=True)
+
+    # Re-run the integration SSRF policy at request time: the stored base_url may have been
+    # re-pointed to a private/metadata address (DNS rebinding) since write time.
+    try:
+        validate_integration_configuration_no_ssrf(config)
+    except ValueError as e:
+        msg = f"Integration '{integration_id}' base_url is not permitted by SSRF policy"
+        raise ApplicationError(msg, non_retryable=True) from e
 
     base_url = config.base_url.rstrip("/")
     verify_ssl = not config.insecure_skip_tls_verify

@@ -102,7 +102,7 @@ export interface components {
   schemas: {
     /**
      * OIDCClaimMapping
-     * @description Maps Nexus user fields to IdP-specific OIDC claim names.
+     * @description Maps Syntara user fields to IdP-specific OIDC claim names.
      */
     OIDCClaimMapping: {
       /**
@@ -133,7 +133,7 @@ export interface components {
     }
     /**
      * OIDCGroupMappingEntry
-     * @description API-facing schema for a single IdP-to-Nexus group mapping entry.
+     * @description API-facing schema for a single IdP-to-Syntara group mapping entry.
      *
      *     Used in API requests/responses. Actual storage is in the
      *     ``idp_group_mapping_entries`` table.
@@ -239,7 +239,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries
+       * @description IdP-to-Syntara group mapping entries
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][]
       /**
@@ -345,7 +345,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries
+       * @description IdP-to-Syntara group mapping entries
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][]
       /**
@@ -455,7 +455,7 @@ export interface components {
       group_jmespath_expression?: string | null
       /**
        * Group Mapping Entries
-       * @description IdP-to-Nexus group mapping entries (omit to keep existing)
+       * @description IdP-to-Syntara group mapping entries (omit to keep existing)
        */
       group_mapping_entries?: components['schemas']['OIDCGroupMappingEntry'][] | null
       /**

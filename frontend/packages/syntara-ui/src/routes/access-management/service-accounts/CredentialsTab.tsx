@@ -10,6 +10,7 @@ import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
@@ -17,7 +18,7 @@ import { useTableSort } from '../../../hooks/useTableSort'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { formatDateTime, formatExpirationDate } from '../../../utils/dateUtils'
+import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 
@@ -274,8 +275,12 @@ function CredentialsTable({
                 {cred.identifier}
               </ClipboardCopy>
             </Td>
-            <Td dataLabel="Created">{formatDateTime(cred.created_at)}</Td>
-            <Td dataLabel="Last used">{cred.last_used_at ? formatDateTime(cred.last_used_at) : '-'}</Td>
+            <Td dataLabel="Created">
+              <DateCell dateString={cred.created_at} />
+            </Td>
+            <Td dataLabel="Last used">
+              <DateCell dateString={cred.last_used_at} />
+            </Td>
             <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
             <Td dataLabel="State">
               <Switch

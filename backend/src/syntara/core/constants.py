@@ -1,4 +1,4 @@
-"""Constants for field validation and limits across the nexus core module.
+"""Constants for field validation and limits across the syntara core module.
 
 This module centralizes all magic numbers and limits used throughout the codebase
 to improve maintainability and consistency.

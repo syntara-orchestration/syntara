@@ -10,7 +10,9 @@ import {
   StackItem,
   Tooltip,
 } from '@patternfly/react-core'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
+
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
 import { formatHistoryDateTime } from './historyDateUtils'
 import styles from './VersionInfoCard.module.css'
@@ -62,7 +64,7 @@ function TruncatedText({
   return isTruncated ? <Tooltip content={text}>{content}</Tooltip> : content
 }
 
-function TimestampRow({ label, value }: Readonly<{ label: string; value: string }>) {
+function TimestampRow({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <StackItem>
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
@@ -80,15 +82,19 @@ function TimestampRow({ label, value }: Readonly<{ label: string; value: string 
 }
 
 function TimestampItems({
-  formattedDate,
+  createdAt,
   publishedAt,
   unpublishedAt,
-}: Readonly<{ formattedDate: string | null; publishedAt?: string | null; unpublishedAt?: string | null }>) {
+}: Readonly<{
+  createdAt?: string | null
+  publishedAt?: string | null
+  unpublishedAt?: string | null
+}>) {
   return (
     <>
-      {formattedDate && <TimestampRow label="Created" value={formattedDate} />}
-      {publishedAt && <TimestampRow label="Published" value={formatHistoryDateTime(publishedAt)} />}
-      {unpublishedAt && <TimestampRow label="Unpublished" value={formatHistoryDateTime(unpublishedAt)} />}
+      {createdAt && <TimestampRow label="Created" value={<ExecutionTimestamp dateString={createdAt} />} />}
+      {publishedAt && <TimestampRow label="Published" value={<ExecutionTimestamp dateString={publishedAt} />} />}
+      {unpublishedAt && <TimestampRow label="Unpublished" value={<ExecutionTimestamp dateString={unpublishedAt} />} />}
     </>
   )
 }
@@ -104,7 +110,7 @@ export function VersionInfoCard({ title, date, description, publishedAt, unpubli
   const sourceInfo = lines ? lines[0] : null
   const userDescription = lines ? lines.slice(1).join('\n') : formattedDescription
 
-  const showCreatedDate = title ? formattedDate : null
+  const showCreatedDate = title ? date : null
   const hasBody = showCreatedDate || publishedAt || unpublishedAt || sourceInfo || userDescription
 
   return (
@@ -123,7 +129,7 @@ export function VersionInfoCard({ title, date, description, publishedAt, unpubli
                 <TruncatedText text={userDescription} variant="p" className={styles.description} />
               </StackItem>
             )}
-            <TimestampItems formattedDate={showCreatedDate} publishedAt={publishedAt} unpublishedAt={unpublishedAt} />
+            <TimestampItems createdAt={showCreatedDate} publishedAt={publishedAt} unpublishedAt={unpublishedAt} />
           </Stack>
         </CardBody>
       )}

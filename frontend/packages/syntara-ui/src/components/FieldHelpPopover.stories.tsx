@@ -10,7 +10,7 @@ const meta: Meta<typeof FieldHelpPopover> = {
     docs: {
       description: {
         component:
-          'Shared PatternFly FormGroupLabelHelp + Popover for form field help. ' +
+          'Shared RhUi question-mark icon + Popover for form field help. ' +
           'Pass as `labelHelp` on FormGroup. Prefer a string `headerContent` so the trigger ' +
           'aria-label becomes "More info for {header}".',
       },

@@ -54,7 +54,7 @@ class TestSendCompletionCallback:
     @pytest.mark.asyncio
     async def test_callback_url_from_final_state_metadata(self, orchestration_service: OrchestrationService) -> None:
         """When final_state has metadata.callback_url, use it."""
-        callback_url = "http://nexus/signal/activity/123"
+        callback_url = "http://syntara/signal/activity/123"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={"callback_url": callback_url},
@@ -71,7 +71,7 @@ class TestSendCompletionCallback:
     @pytest.mark.asyncio
     async def test_callback_url_falls_back_to_ctx(self, orchestration_service: OrchestrationService) -> None:
         """When final_state has no metadata, fall back to typed ctx."""
-        callback_url = "http://nexus/signal/activity/456"
+        callback_url = "http://syntara/signal/activity/456"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata=None,
@@ -121,7 +121,7 @@ class TestSendCompletionCallback:
         """When final_state has no result, no signal is sent."""
         invocation_id = uuid4()
         final_state = _make_final_state(
-            metadata={"callback_url": "http://nexus/signal"},
+            metadata={"callback_url": "http://syntara/signal"},
             result=None,
         )
 
@@ -135,7 +135,7 @@ class TestSendCompletionCallback:
     @pytest.mark.asyncio
     async def test_empty_metadata_in_final_state_falls_back(self, orchestration_service: OrchestrationService) -> None:
         """When final_state metadata is {} (no callback_url), fall back."""
-        callback_url = "http://nexus/signal/activity/789"
+        callback_url = "http://syntara/signal/activity/789"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={},
@@ -155,7 +155,7 @@ class TestSendCompletionCallback:
         self, orchestration_service: OrchestrationService
     ) -> None:
         """used_tools is included in the signal payload without mutating shared result."""
-        callback_url = "http://nexus/signal/activity/tools"
+        callback_url = "http://syntara/signal/activity/tools"
         invocation_id = uuid4()
         shared_result: dict[str, Any] = {"content": "done"}
         final_state = _make_final_state(
@@ -193,7 +193,7 @@ class TestCallbackUrlRedaction:
     @pytest.mark.asyncio
     async def test_query_params_redacted_from_log(self, orchestration_service: OrchestrationService) -> None:
         """Query parameters are stripped from the logged URL but the full URL is sent to the signal."""
-        callback_url = "http://nexus/signal/activity/123?token=secret&session=abc"
+        callback_url = "http://syntara/signal/activity/123?token=secret&session=abc"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={"callback_url": callback_url},
@@ -216,12 +216,12 @@ class TestCallbackUrlRedaction:
             logged_url = info_calls[0].kwargs["callback_url"]
             assert "token=secret" not in logged_url
             assert "session=abc" not in logged_url
-            assert logged_url == "http://nexus/signal/activity/123"
+            assert logged_url == "http://syntara/signal/activity/123"
 
     @pytest.mark.asyncio
     async def test_fragment_redacted_from_log(self, orchestration_service: OrchestrationService) -> None:
         """Fragments are stripped from the logged URL."""
-        callback_url = "http://nexus/signal/activity/123#sensitive-anchor"
+        callback_url = "http://syntara/signal/activity/123#sensitive-anchor"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={"callback_url": callback_url},
@@ -242,12 +242,12 @@ class TestCallbackUrlRedaction:
             info_calls = [c for c in mock_logger.info.call_args_list if "Sending callback" in str(c)]
             logged_url = info_calls[0].kwargs["callback_url"]
             assert "sensitive-anchor" not in logged_url
-            assert logged_url == "http://nexus/signal/activity/123"
+            assert logged_url == "http://syntara/signal/activity/123"
 
     @pytest.mark.asyncio
     async def test_query_and_fragment_both_redacted(self, orchestration_service: OrchestrationService) -> None:
         """Both query params and fragments are stripped from the logged URL."""
-        callback_url = "http://nexus/signal/activity/123?key=val#frag"
+        callback_url = "http://syntara/signal/activity/123?key=val#frag"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={"callback_url": callback_url},
@@ -267,14 +267,14 @@ class TestCallbackUrlRedaction:
 
             info_calls = [c for c in mock_logger.info.call_args_list if "Sending callback" in str(c)]
             logged_url = info_calls[0].kwargs["callback_url"]
-            assert logged_url == "http://nexus/signal/activity/123"
+            assert logged_url == "http://syntara/signal/activity/123"
 
     @pytest.mark.asyncio
     async def test_url_without_sensitive_parts_logged_unchanged(
         self, orchestration_service: OrchestrationService
     ) -> None:
         """A plain URL with no query or fragment is logged as-is."""
-        callback_url = "http://nexus/signal/activity/123"
+        callback_url = "http://syntara/signal/activity/123"
         invocation_id = uuid4()
         final_state = _make_final_state(
             metadata={"callback_url": callback_url},

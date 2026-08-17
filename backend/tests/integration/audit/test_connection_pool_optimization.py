@@ -15,7 +15,7 @@ Evaluates connection pool optimization strategies for the audit subsystem:
    without exhausting the connection pool.
 
 Background:
-    The Nexus audit subsystem uses two connection pools after AAP-79901:
+    The Syntara audit subsystem uses two connection pools:
     - Main pool (pool_size=10, max_overflow=20): API requests + CRUD trigger writes
     - Worker pool (pool_size=5, max_overflow=2): Drain SELECT/DELETE + async writes
 
@@ -250,7 +250,7 @@ class TestPoolSizeOptimization:
 class TestPoolIsolation:
     """Compare shared pool vs. separate audit pool for workload isolation.
 
-    After AAP-79901, the audit worker uses a dedicated pool.  This test
+    The audit worker uses a dedicated pool.  This test
     quantifies the isolation benefit by comparing business query latency
     when audit operations share the main pool vs. use a dedicated pool.
     """

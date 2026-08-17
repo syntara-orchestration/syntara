@@ -1,4 +1,4 @@
-"""Unit tests for NexusWorkflow approval context preparation methods.
+"""Unit tests for OrchestratorWorkflow approval context preparation methods.
 
 Tests cover:
 - _get_previous_step_context: building previous step context for approval requests
@@ -15,7 +15,7 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -39,9 +39,9 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
 def _make_workflow(
     execution_id: str = "exec-123",
     resolver: NamespaceResolver | None = None,
-) -> NexusWorkflow:
-    """Create a NexusWorkflow with initialized state, bypassing __init__."""
-    wf = NexusWorkflow.__new__(NexusWorkflow)
+) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.execution_id = execution_id
     wf._project_id = "00000000-0000-0000-0000-000000000001"
     wf.skipped_nodes = set()

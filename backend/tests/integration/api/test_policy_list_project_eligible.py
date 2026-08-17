@@ -55,13 +55,13 @@ async def test_project_eligible_returns_200(
 async def test_project_eligible_filters_to_project_scope(
     admin_client: AsyncClient,
 ) -> None:
-    """project_eligible=true should only return policies with scope=project."""
+    """project_eligible=true should only return policies with scope=project or own."""
     resp = await admin_client.get("/api/v1/policies", params={"project_eligible": "true", "limit": 100})
     assert resp.status_code == 200
     data = resp.json()
     for policy in data["resources"]:
-        assert policy["scope"] == "project", (
-            f"Policy '{policy['name']}' has scope '{policy['scope']}', expected 'project'"
+        assert policy["scope"] in ("project", "own"), (
+            f"Policy '{policy['name']}' has scope '{policy['scope']}', expected 'project' or 'own'"
         )
 
 
@@ -79,7 +79,7 @@ async def test_project_eligible_with_name_filter(
     data = resp.json()
     for policy in data["resources"]:
         assert "workflow" in policy["name"].lower()
-        assert policy["scope"] == "project"
+        assert policy["scope"] in ("project", "own")
 
 
 @pytest.mark.asyncio

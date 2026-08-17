@@ -48,7 +48,7 @@ from syntara.workflows.workflow_engine.activities.http_request_activity import e
 from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.dynamic_workflow import NexusWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models import WorkflowResultResponse
 
 # Configure logging
@@ -117,7 +117,7 @@ async def run_workflow(
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[NexusWorkflow],
+        workflows=[OrchestratorWorkflow],
         activities=[
             # Workflow activities (no internal activities - CLI has no database)
             manual_trigger,
@@ -139,7 +139,7 @@ async def run_workflow(
         start_time = datetime.now(tz=UTC)
 
         result_dict = await client.execute_workflow(
-            NexusWorkflow.run,
+            OrchestratorWorkflow.run,
             args=[workflow_def, execution_id, trigger_id, inputs or {}, True],  # include_node_results=True for CLI
             id=workflow_id,
             task_queue=task_queue,

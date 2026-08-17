@@ -121,7 +121,6 @@ describe('registerActionNode', () => {
         headers: {},
         body: '',
         parameters: undefined,
-        authentication: undefined,
         credential_id: undefined,
       },
       onSuccess,

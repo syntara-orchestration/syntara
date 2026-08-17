@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,8 @@ import { axe } from 'vitest-axe'
 
 import { AlertProvider } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
+import { fetchAllProjectPoliciesForSelect } from '../../access/fetchAllPoliciesForSelect'
+import { SELECT_ALL_LOAD_ERROR } from '../../access/policySelectConstants'
 
 import { ProjectPolicySelect } from './ProjectPolicySelect'
 
@@ -17,10 +19,32 @@ vi.mock('../../access/accessClient', () => ({
   },
 }))
 
+vi.mock('../../access/fetchAllPoliciesForSelect', () => ({
+  fetchAllProjectPoliciesForSelect: vi.fn(),
+}))
+
 vi.mock('../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
+
+const mockShowError = vi.fn()
+
+vi.mock('../../../providers/alerts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../providers/alerts')>()
+  return {
+    ...actual,
+    useAlerts: () => ({
+      showAlert: vi.fn(),
+      showSuccess: vi.fn(),
+      showError: mockShowError,
+      showWarning: vi.fn(),
+      showInfo: vi.fn(),
+      dismissAlert: vi.fn(),
+      clearAllAlerts: vi.fn(),
+    }),
+  }
+})
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -59,6 +83,7 @@ describe('ProjectPolicySelect', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupMocks()
+    vi.mocked(fetchAllProjectPoliciesForSelect).mockResolvedValue(mockPolicies as never)
   })
 
   function renderSelect(selected: string[] = [], hasError = false) {
@@ -284,5 +309,119 @@ describe('ProjectPolicySelect', () => {
 
     const unselectedCheckbox = screen.getByRole('checkbox', { name: /write-policy/i })
     expect(unselectedCheckbox).not.toBeChecked()
+  })
+
+  describe('Select all', () => {
+    it('shows Select All option when policies are available', async () => {
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+
+      expect(screen.getByRole('option', { name: 'Select all' })).toBeInTheDocument()
+    })
+
+    it('fetches all project policies when Select All is clicked', async () => {
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      await waitFor(() => {
+        expect(fetchAllProjectPoliciesForSelect).toHaveBeenCalledWith('proj-1', undefined)
+      })
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(['read-policy', 'write-policy', 'admin-policy'])
+      })
+    })
+
+    it('includes policies beyond the first page when Select All is clicked', async () => {
+      vi.mocked(fetchAllProjectPoliciesForSelect).mockResolvedValue([
+        ...mockPolicies,
+        { id: 'p4', name: 'extra-policy', description: 'Extra access' },
+      ] as never)
+
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(['read-policy', 'write-policy', 'admin-policy', 'extra-policy'])
+      })
+    })
+
+    it('merges with existing selection when Select All is clicked', async () => {
+      const user = userEvent.setup()
+      renderSelect(['read-policy'])
+
+      await openDropdown(user)
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(['read-policy', 'write-policy', 'admin-policy'])
+      })
+    })
+
+    it('fetches and filters policies when a filter is active', async () => {
+      vi.mocked(fetchAllProjectPoliciesForSelect).mockResolvedValue([mockPolicies[0]] as never)
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+      const input = screen.getByRole('textbox', { name: /type to filter/i })
+      await user.type(input, 'read')
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      await waitFor(() => {
+        expect(fetchAllProjectPoliciesForSelect).toHaveBeenCalledWith('proj-1', 'read')
+      })
+      await waitFor(() => {
+        expect(mockOnChange).toHaveBeenCalledWith(['read-policy'])
+      })
+    })
+
+    it('does not show Select All when no policies are available', async () => {
+      setupMocks({ policies: [] })
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+
+      expect(screen.queryByRole('option', { name: 'Select all' })).not.toBeInTheDocument()
+    })
+
+    it('disables Select All while policies are being fetched', async () => {
+      vi.mocked(fetchAllProjectPoliciesForSelect).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve(mockPolicies as never), 100)
+          })
+      )
+
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      expect(screen.getByRole('option', { name: /Selecting all/i })).toBeDisabled()
+    })
+
+    it('shows an error alert when Select All fetch fails', async () => {
+      vi.mocked(fetchAllProjectPoliciesForSelect).mockRejectedValue(new Error('network'))
+
+      const user = userEvent.setup()
+      renderSelect()
+
+      await openDropdown(user)
+      await user.click(screen.getByRole('option', { name: 'Select all' }))
+
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith(SELECT_ALL_LOAD_ERROR)
+      })
+    })
   })
 })

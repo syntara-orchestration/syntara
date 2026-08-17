@@ -1,6 +1,6 @@
 """Tests for AAP credential resolution.
 
-Tests the credential_resolver module which resolves Nexus credentials
+Tests the credential_resolver module which resolves Syntara credentials
 to AAP authentication details for proxy endpoint authentication.
 Non-sensitive connection details (URL, TLS) come from integration configuration.
 """

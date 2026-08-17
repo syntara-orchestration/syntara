@@ -65,7 +65,7 @@ def generate_service_cert(
     certs_dir: Path,
     ca_key: rsa.RSAPrivateKey,
     ca_cert: x509.Certificate,
-    common_name: str = "backend.nexus.svc",
+    common_name: str = "backend.orchestrator.svc",
     filename: str = "service",
     not_valid_before: datetime | None = None,
     not_valid_after: datetime | None = None,

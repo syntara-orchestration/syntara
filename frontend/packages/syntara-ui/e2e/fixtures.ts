@@ -9,8 +9,8 @@ import { type XfailEntry, loadXfailEntries, matchesXfail } from './xfailFromUrl'
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
 ).env
-export const appBaseUrl: string = processEnv['NEXUS_E2E_BASE_URL'] ?? 'http://localhost:4173'
-const e2ePassword: string | undefined = processEnv['NEXUS_E2E_PASSWORD']
+export const appBaseUrl: string = processEnv['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
+const e2ePassword: string | undefined = processEnv['SYNTARA_E2E_PASSWORD']
 const isRealBackend: boolean = isSkipWebServerForPlaywrightTests()
 
 export const toAppUrl = (path: string): string => new URL(path, appBaseUrl).toString()
@@ -172,5 +172,34 @@ export const test = xfailBase.extend<
     await context.close()
   },
 })
+
+/**
+ * Creates a describe-scoped guard that skips all remaining tests without
+ * setting up fixtures once a data-availability check fails.
+ *
+ * Configures the enclosing describe as `mode: 'serial'` so the unavailable
+ * flag reliably propagates across tests (with `fullyParallel: true`, parallel
+ * tests land on separate workers that each have their own flag).
+ *
+ * Usage inside a test.describe:
+ *   const guard = createUnavailableGuard('No data available')
+ *   test.beforeEach(async ({ app }) => {
+ *     const hasData = await checkData(app)
+ *     if (!hasData) guard.markUnavailable()
+ *     test.skip(!hasData, 'No data available')
+ *   })
+ */
+export function createUnavailableGuard(reason: string) {
+  let unavailable = false
+  test.describe.configure({ mode: 'serial' })
+  test.beforeEach(() => {
+    test.skip(unavailable, reason)
+  })
+  return {
+    markUnavailable: () => {
+      unavailable = true
+    },
+  }
+}
 
 export { expect, type Page, type Request }

@@ -13,10 +13,10 @@ import type { KebabAction } from '../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../components/NxKebabMenu'
 import { ProjectGroupHeaderRow } from '../../components/ProjectGroupHeaderRow'
 import { DateCell } from '../../components/table/DateCell'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { LinkCell } from '../../components/table/LinkCell'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCanI } from '../../hooks/useCanI'
-import { formatDateTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { StatusLabel } from '../builder/ExecutionStatus'
@@ -182,9 +182,11 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
       <Td dataLabel="Version">
         {execution.workflow_version != null && execution.workflow_id ? (
           <LinkCell href={`/workflow-builder/${execution.workflow_id}?version=${String(execution.workflow_version)}`}>
-            <Truncate
-              content={execution.workflow_version_name ?? formatDateTime(execution.workflow_version_created_at)}
-            />
+            {execution.workflow_version_name ? (
+              <Truncate content={execution.workflow_version_name} />
+            ) : (
+              <ExecutionTimestamp dateString={execution.workflow_version_created_at} />
+            )}
           </LinkCell>
         ) : (
           '—'

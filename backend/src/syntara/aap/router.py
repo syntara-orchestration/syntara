@@ -4,13 +4,13 @@ Thin layer that validates query params, resolves dependencies,
 and delegates to AAPProxyService.
 
 Authentication: Endpoints support optional per-user credential forwarding
-via the ``credential_id`` query parameter. If provided, the specified Nexus
+via the ``credential_id`` query parameter. If provided, the specified Syntara
 credential (type: "Ansible Automation Platform") is decrypted and used to
 authenticate against the AAP Controller. If not provided, falls back to
 environment variables (APP_AAP_TOKEN or APP_AAP_USERNAME/PASSWORD).
 
 Authorization: The ``current_user`` dependency ensures only authenticated
-Nexus users can call these endpoints. When using credential_id, users can
+Syntara users can call these endpoints. When using credential_id, users can
 only use credentials they own (authorization check enforced). When using
 integration_id, project-scoped integration visibility is enforced via
 ``ProjectScopeFilter("integration", "read")``.

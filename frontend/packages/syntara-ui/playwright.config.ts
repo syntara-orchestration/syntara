@@ -4,13 +4,16 @@ import { config } from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-config({ path: new URL('.env.local', import.meta.url).pathname })
+config({
+  path: new URL('.env.local', import.meta.url).pathname,
+  quiet: true,
+})
 
 import { isSkipWebServerForPlaywrightTests } from './e2e/playwrightWebServerEnv'
 
-const uiPort = process.env.NEXUS_E2E_PORT ?? '4173'
-const apiPort = process.env.NEXUS_E2E_API_PORT ?? '3300'
-const baseURL = process.env.NEXUS_E2E_BASE_URL ?? `http://localhost:${uiPort}`
+const uiPort = process.env.SYNTARA_E2E_PORT ?? '4173'
+const apiPort = process.env.SYNTARA_E2E_API_PORT ?? '3300'
+const baseURL = process.env.SYNTARA_E2E_BASE_URL ?? `http://localhost:${uiPort}`
 const useWebServer = !isSkipWebServerForPlaywrightTests()
 
 /**
@@ -21,6 +24,7 @@ const useWebServer = !isSkipWebServerForPlaywrightTests()
 export const VISUAL_REGRESSION_CLOCK = '2026-06-15T10:00:00Z'
 
 export default defineConfig({
+  globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
   testIgnore: [...(useWebServer ? [] : ['**/visual-regression/**']), '**/credential-types.spec.ts'],
   fullyParallel: true,

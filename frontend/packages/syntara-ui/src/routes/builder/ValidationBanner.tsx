@@ -12,7 +12,7 @@ import {
 } from '@patternfly/react-core'
 import { useMemo } from 'react'
 
-import type { BuilderAction, ValidationError } from './builderReducer'
+import type { BuilderAction, ValidationError, ValidationSource } from './builderReducer'
 import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
@@ -49,22 +49,38 @@ function groupErrors(errors: ValidationError[]): ErrorGroup[] {
   }))
 }
 
+function bannerTitle(count: number, hasErrors: boolean, source: ValidationSource): string {
+  const plural = count === 1 ? '' : 's'
+  if (!hasErrors) {
+    return `Saved with ${count} warning${plural}`
+  }
+  if (source === 'save') {
+    return `Saved with ${count} issue${plural}`
+  }
+  return `Verification failed — ${count} issue${plural} found`
+}
+
 type ValidationBannerProps = Readonly<{
   errors: ValidationError[]
   dismissed: boolean
   dispatch: (action: BuilderAction) => void
   onNavigateToNode?: (nodeId: string) => void
+  /** Advisory save vs explicit verify. Defaults to verify. */
+  source?: ValidationSource
 }>
 
-export function ValidationBanner({ errors, dismissed, dispatch, onNavigateToNode }: ValidationBannerProps) {
+export function ValidationBanner({
+  errors,
+  dismissed,
+  dispatch,
+  onNavigateToNode,
+  source = 'verify',
+}: ValidationBannerProps) {
   const groups = useMemo(() => groupErrors(errors), [errors])
   const hasErrors = errors.some((e) => e.severity !== 'warning')
   const variant = hasErrors ? 'danger' : 'warning'
   const count = errors.length
-  const plural = count === 1 ? '' : 's'
-  const title = hasErrors
-    ? `Verification failed — ${count} issue${plural} found`
-    : `Saved with ${count} warning${plural}`
+  const title = bannerTitle(count, hasErrors, source)
 
   if (errors.length === 0 || dismissed) return null
 

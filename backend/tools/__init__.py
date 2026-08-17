@@ -1,4 +1,4 @@
-"""Tools package for Nexus utilities."""
+"""Tools package for Syntara utilities."""
 
 from syntara.core.logging.logging import configure_app_logging
 

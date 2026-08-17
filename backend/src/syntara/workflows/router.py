@@ -20,7 +20,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.nexus_router import NO_PERMISSION, NexusRouter
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -90,7 +90,7 @@ class _ValidationRoute(APIRoute):
         return handler
 
 
-router = NexusRouter(prefix="/workflows", tags=["Workflows"])
+router = SyntaraRouter(prefix="/workflows", tags=["Workflows"])
 
 _wf_perm_read = PermissionChecker(
     "workflow",
@@ -233,7 +233,7 @@ def get_execution_service(
 # ============================================================================
 
 
-_validate_router = NexusRouter(route_class=_ValidationRoute)
+_validate_router = SyntaraRouter(route_class=_ValidationRoute)
 
 
 @_validate_router.post(

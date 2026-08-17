@@ -1,6 +1,6 @@
 """Credential resolution for AAP proxy endpoints.
 
-Resolves Nexus credentials to extract AAP authentication details (token, username/password).
+Resolves Syntara credentials to extract AAP authentication details (token, username/password).
 Non-sensitive connection details (URL, TLS) come from the integration configuration.
 """
 
@@ -218,7 +218,7 @@ async def resolve_aap_connection_from_credential(
     credential_id: UUID | str,
     user_id: UUID,
 ) -> AAPConnection:
-    """Resolve AAP auth from a Nexus credential.
+    """Resolve AAP auth from a Syntara credential.
 
     Returns an AAPConnection with authentication fields populated.
     The caller must supply ``base_url`` and ``verify_ssl`` from the
