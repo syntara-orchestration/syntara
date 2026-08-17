@@ -358,6 +358,32 @@ def _build_provisioning_failure_cause(
     )
 
 
+def _build_selected_provisioning_failure_cause(
+    enabled_tools: list[ToolWithParameters],
+    namespaced_tools: list[NamespacedBaseTool],
+    selections: set[str] | frozenset[str],
+    provisioned_tools: list[BaseTool],
+) -> str:
+    """Diagnose SELECTED failure when siblings provisioned but selections were not.
+
+    Scopes connectivity/drift to owners of the *unavailable selected* tools so a
+    matched sibling is not reported as unmatched. If no selected ID is in the
+    enabled catalog, report that instead of all-enabled zero-match wording.
+    """
+    provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
+    provisioned_ids.discard("")
+    unavailable = selections - provisioned_ids
+
+    enabled_by_id = {str(tool.id): tool for tool in enabled_tools}
+    unavailable_enabled = [enabled_by_id[tid] for tid in sorted(unavailable) if tid in enabled_by_id]
+
+    if not unavailable_enabled:
+        return "selected tools were not among provisioned tools and are missing from the enabled catalog"
+
+    owner_cause = _build_provisioning_failure_cause(unavailable_enabled, namespaced_tools)
+    return f"selected tools were not among provisioned tools; {owner_cause}"
+
+
 def _require_provisioned_tools_when_enabled(
     enabled_tools: list[ToolWithParameters],
     provisioned_tools: list[BaseTool],
@@ -380,7 +406,12 @@ def _require_provisioned_tools_when_enabled(
     if provisioned_tools and (not is_selected or _selected_tools_provisioned(provisioned_tools, selections)):
         return
 
-    cause = _build_provisioning_failure_cause(enabled_tools, namespaced_tools)
+    if is_selected and provisioned_tools:
+        cause = _build_selected_provisioning_failure_cause(
+            enabled_tools, namespaced_tools, selections, provisioned_tools
+        )
+    else:
+        cause = _build_provisioning_failure_cause(enabled_tools, namespaced_tools)
 
     if is_selected:
         unavailable = sorted(selections)

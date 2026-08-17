@@ -400,6 +400,117 @@ class TestToolServices:
             )
         assert "check registry name/integration_id drift" in str(exc_info.value)
 
+    def test_require_provisioned_tools_selected_sibling_provision_scopes_cause(
+        self,
+    ) -> None:
+        """SELECTED with a provisioned sibling must not blame that sibling as unmatched."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_a = uuid4()
+        integration_b = uuid4()
+        tool_a_id = uuid4()
+        tool_b_id = uuid4()
+        enabled = [
+            ToolWithParameters(
+                id=tool_a_id,
+                name="tool_a",
+                namespaced_name="mcp_a::tool_a",
+                description="A",
+                integration_id=integration_a,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+            ToolWithParameters(
+                id=tool_b_id,
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+        ]
+        provisioned_b = MagicMock(spec=BaseTool)
+        provisioned_b.metadata = {"tool_id": str(tool_b_id)}
+        namespaced_b_matched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="tool_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [provisioned_b],
+                namespaced_tools=namespaced_b_matched,
+                tool_selection_strategy="SELECTED",
+                tool_selections={str(tool_a_id)},
+            )
+
+        msg = str(exc_info.value)
+        assert str(tool_a_id) in msg
+        assert "selected tools were not among provisioned tools" in msg
+        assert "check integration connectivity" in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
+    def test_require_provisioned_tools_selected_sibling_missing_from_catalog(
+        self,
+    ) -> None:
+        """SELECTED IDs absent from the enabled catalog must not use ALL zero-match wording."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_b = uuid4()
+        tool_b_id = uuid4()
+        missing_selected_id = str(uuid4())
+        enabled = [
+            ToolWithParameters(
+                id=tool_b_id,
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        provisioned_b = MagicMock(spec=BaseTool)
+        provisioned_b.metadata = {"tool_id": str(tool_b_id)}
+        namespaced_b_matched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="tool_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [provisioned_b],
+                namespaced_tools=namespaced_b_matched,
+                tool_selection_strategy="SELECTED",
+                tool_selections={missing_selected_id},
+            )
+
+        msg = str(exc_info.value)
+        assert missing_selected_id in msg
+        assert "missing from the enabled catalog" in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
     async def test_retrieve_tools_selected_soft_skip_raises_selection_unavailable(
         self,
         tool_manager_client: Mock,
