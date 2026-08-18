@@ -7,9 +7,11 @@ import { isValidWebhookPath } from '../../../utils/webhookPath'
 
 /**
  * Zod schema for the Trigger node form.
- * All fields are optional to allow adding incomplete triggers.
- * When a field IS provided, format/security validation still applies
- * (JSON structure, webhook path format, size limits).
+ * Manual and webhook fields stay optional so incomplete triggers can be added
+ * (advisory save). Scheduled interval/cron must be present because the backend
+ * schema requires them; omitting them produces a save-time schema error that
+ * does not match publish (publish uses the completed payload after the visual
+ * builder fills `interval`).
  */
 const triggerFormSchemaBase = z.object({
   name: z.string().optional(),
@@ -115,11 +117,27 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
   }
 
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.INTERVAL) {
-    validateScheduleInterval(data, ctx)
+    if (!data.interval?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A schedule is required',
+        path: ['interval'],
+      })
+    } else {
+      validateScheduleInterval(data, ctx)
+    }
   }
 
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.CRON) {
-    validateCronFormat(data.cron, ctx)
+    if (!data.cron?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Cron expression is required',
+        path: ['cron'],
+      })
+    } else {
+      validateCronFormat(data.cron, ctx)
+    }
   }
 
   if (WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {

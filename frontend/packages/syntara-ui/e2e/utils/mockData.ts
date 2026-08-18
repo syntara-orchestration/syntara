@@ -148,7 +148,7 @@ export const federatedUserIdentity2 = {
   id: IDENTITY_ID_3,
   user_id: FEDERATED_USER_ID,
   identity_provider_id: PROVIDER_ID_2,
-  issuer: 'https://keycloak.example.com/realms/nexus',
+  issuer: 'https://keycloak.example.com/realms/syntara',
   subject: 'asmith',
   created_at: '2024-03-15T10:00:00Z',
   updated_at: '2024-03-15T10:00:00Z',
@@ -223,7 +223,7 @@ export const identityProvidersFullResponse = {
       enabled: true,
       configuration: {
         provider_type: 'oidc',
-        issuer_url: 'https://keycloak.example.com/realms/nexus',
+        issuer_url: 'https://keycloak.example.com/realms/syntara',
         client_id: 'client-keycloak',
         redirect_uri: 'https://example.com/callback',
       },

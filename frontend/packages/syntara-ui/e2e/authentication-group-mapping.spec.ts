@@ -20,7 +20,7 @@ import {
 import { buildUniqueName } from './helpers/workflows'
 import { createIdentityProviderViaApi, deleteIdentityProviderViaApi, findIdentityProviderByName } from './utils/api'
 
-const VALID_JMESPATH = "groups[?starts_with(@, 'nexus-')]"
+const VALID_JMESPATH = "groups[?starts_with(@, 'syntara-')]"
 const INVALID_JMESPATH = '[[[bad'
 
 async function createMappingTestProvider(app: Page, namePrefix: string): Promise<string> {
@@ -44,7 +44,7 @@ async function saveGroupMapping(app: Page): Promise<void> {
   await app.getByRole('button', { name: /Save mapping/i }).click()
 }
 
-async function selectNexusGroupForRow(app: Page, groupName: string): Promise<void> {
+async function selectMappedGroupForRow(app: Page, groupName: string): Promise<void> {
   const mappingRow = app.getByRole('row').filter({
     has: app.getByRole('textbox', { name: 'IdP group value 1' }),
   })
@@ -79,13 +79,13 @@ test.describe('UI-11: Auto group mapping — configuration screen', () => {
 test.describe('UI-12: Manual group mapping — configuration screen', () => {
   const idpGroupValue = 'platform-admins'
 
-  test('creates manual mapping from IdP group value to Nexus group', async ({ app }) => {
+  test('creates manual mapping from IdP group value to Syntara group', async ({ app }) => {
     const providerId = await createMappingTestProvider(app, 'e2e-manual-mapping')
     try {
       await gotoGroupMappingEdit(app, providerId, 'new=1')
 
       await app.getByRole('textbox', { name: 'IdP group value 1' }).fill(idpGroupValue)
-      await selectNexusGroupForRow(app, 'admins')
+      await selectMappedGroupForRow(app, 'admins')
       await saveGroupMapping(app)
 
       await expect(app.getByText('Group mapping saved')).toBeVisible()

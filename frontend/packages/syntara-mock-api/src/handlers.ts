@@ -1200,7 +1200,7 @@ export const handlers = [
     if (!workflow) {
       return HttpResponse.json(
         {
-          type: 'https://api.nexus.com/errors/workflow-not-found',
+          type: 'https://api.example.com/errors/workflow-not-found',
           title: 'Workflow Not Found',
           detail: `Workflow with id '${workflowId}' not found`,
           code: 'WORKFLOW_NOT_FOUND',
@@ -2194,7 +2194,7 @@ export const handlers = [
       return HttpResponse.json({
         id: 'pr0j4dm1-0000-0000-0000-000000000000',
         username: 'project-admin',
-        email: 'project-admin@nexus.local',
+        email: 'project-admin@example.com',
         groups: ['authenticated'],
         project_id: 'p-001',
         rp_logout_enabled: rpLogoutEnabled,

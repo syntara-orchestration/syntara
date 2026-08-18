@@ -6,6 +6,9 @@ import type { FlowPosition } from './types'
 
 export type ValidationSeverity = 'error' | 'warning'
 
+/** Whether findings came from advisory save or an explicit verify/publish check. */
+export type ValidationSource = 'save' | 'verify'
+
 export type ValidationError = {
   message: string
   nodeId: string | null
@@ -45,6 +48,7 @@ export type BuilderState = {
   workflowDescription: string
   validationErrors: ValidationError[]
   validationBannerDismissed: boolean
+  validationSource: ValidationSource | null
 }
 
 // Builder action types
@@ -104,7 +108,7 @@ export type BuilderAction =
       type: 'INIT_WORKFLOW'
       payload: { name: string; description: string; initialViewVersion?: number | null }
     }
-  | { type: 'SET_VALIDATION_ERRORS'; payload: ValidationError[] }
+  | { type: 'SET_VALIDATION_ERRORS'; payload: ValidationError[]; source?: ValidationSource }
   | { type: 'CLEAR_VALIDATION_ERRORS' }
   | { type: 'DISMISS_VALIDATION_BANNER' }
 
@@ -361,10 +365,15 @@ const PANEL_ACTIONS = [
 
 function handleValidationAction(state: BuilderState, action: BuilderAction): BuilderState | null {
   if (action.type === 'SET_VALIDATION_ERRORS') {
-    return { ...state, validationErrors: action.payload, validationBannerDismissed: false }
+    return {
+      ...state,
+      validationErrors: action.payload,
+      validationBannerDismissed: false,
+      validationSource: action.payload.length === 0 ? null : (action.source ?? 'verify'),
+    }
   }
   if (action.type === 'CLEAR_VALIDATION_ERRORS') {
-    return { ...state, validationErrors: [], validationBannerDismissed: false }
+    return { ...state, validationErrors: [], validationBannerDismissed: false, validationSource: null }
   }
   if (action.type === 'DISMISS_VALIDATION_BANNER') {
     return { ...state, validationBannerDismissed: true }
@@ -484,6 +493,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         mostRecentRunPanelOpen: false,
         validationErrors: [],
         validationBannerDismissed: false,
+        validationSource: null,
         // Reset edge connection context
         sourceNodeId: null,
         targetNodeId: null,
@@ -529,5 +539,6 @@ export function getInitialBuilderState(): BuilderState {
     workflowDescription: '',
     validationErrors: [],
     validationBannerDismissed: false,
+    validationSource: null,
   }
 }

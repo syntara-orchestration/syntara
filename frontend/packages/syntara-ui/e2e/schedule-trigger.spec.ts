@@ -323,6 +323,9 @@ test.describe('Schedule Trigger — UI-19', () => {
         await expect(app.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 10_000 })
         await app.getByLabel('Schedule expression', { exact: true }).click()
         await app.getByRole('option', { name: 'Custom cron expression', exact: true }).click()
+        const cronInput = app.getByLabel('Cron expression', { exact: true })
+        await expect(cronInput).toBeVisible()
+        await cronInput.fill('0 9 * * *')
 
         const patchRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
