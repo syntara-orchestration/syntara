@@ -25,6 +25,7 @@ repos:
       - id: check-case-conflict
       - id: check-added-large-files
         args: [--maxkb=500]
+        exclude: ^backend/src/syntara/schemas/openapi.*\.yaml$
       - id: check-json
         exclude: tsconfig.*\.json$
       - id: check-toml
