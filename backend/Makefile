@@ -600,23 +600,23 @@ api-spec-bundle: ## Bundle all domain sub-specs into a single merged openapi.yam
 	@cp $(OPENAPI_SPEC) src/cli/orchestrator_cli/openapi.yaml
 	@echo "📎 Spec also copied to src/cli/orchestrator_cli/openapi.yaml"
 
-.PHONY: api-spec-public-bundle
-api-spec-public-bundle: ## Bundle public-facing spec (excludes internal endpoints)
+.PHONY: api-spec-bundle-public
+api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoints)
 	@echo "📦 Bundling public OpenAPI sub-specs..."
 	uv run python tools/bundle_openapi.py --public -o $(OPENAPI_PUBLIC_SPEC)
 	@uv run pre-commit run yamlfmt --files $(OPENAPI_PUBLIC_SPEC) > /dev/null 2>&1 || true
 	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC)"
 
-.PHONY: api-spec-public-drift
-api-spec-public-drift: ## Check that committed public spec matches the generated spec
+.PHONY: api-spec-drift-public
+api-spec-drift-public: ## Check that committed public spec matches the generated spec
 	@echo "🔍 Checking public OpenAPI spec is up to date..."
 	@uv run python tools/export_openapi.py --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
 
 .PHONY: api-spec-bundle-all
-api-spec-bundle-all: api-spec-bundle api-spec-public-bundle ## Bundle both full and public specs
+api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full and public specs
 
 .PHONY: api-spec-drift-all
-api-spec-drift-all: api-spec-drift api-spec-public-drift ## Check both specs match implementation
+api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
 
 
 # Tools

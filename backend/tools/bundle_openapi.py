@@ -251,15 +251,15 @@ def _resolve_refs(
 # ---------------------------------------------------------------------------
 
 
-def _discover_sub_specs(*, exclude_internal: bool = False) -> list[Path]:
+def _discover_sub_specs(*, include_internal: bool = True) -> list[Path]:
     """Find all domain OpenAPI sub-specs under schemas/.
 
     Args:
-        exclude_internal: When True, also skip domains in ``_INTERNAL_DOMAINS``
+        include_internal: When False, skip domains in ``_INTERNAL_DOMAINS``
             to produce the public-facing spec.
 
     """
-    skip = _SKIP_DIRS | _INTERNAL_DOMAINS if exclude_internal else _SKIP_DIRS
+    skip = _SKIP_DIRS if include_internal else _SKIP_DIRS | _INTERNAL_DOMAINS
     found: list[Path] = []
     for domain_dir in sorted(SCHEMAS_DIR.iterdir()):
         if not domain_dir.is_dir():
@@ -713,7 +713,7 @@ def main() -> None:
     """Discover sub-specs, merge them, and write the bundled OpenAPI document."""
     args = _parse_args()
 
-    sub_specs = _discover_sub_specs(exclude_internal=args.public)
+    sub_specs = _discover_sub_specs(include_internal=not args.public)
 
     if args.list_specs:
         label = "public " if args.public else ""
