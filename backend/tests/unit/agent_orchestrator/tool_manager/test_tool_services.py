@@ -266,7 +266,7 @@ class TestToolServices:
         with pytest.raises(ToolDiscoveryError, match=r"owning MCP integrations returned no tools"):
             tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=unrelated_tools)
 
-        # No enabled tools → no raise
+        # ALL with no enabled tools → no raise
         tool_services._require_provisioned_tools_when_enabled([], [], namespaced_tools=[])
 
         # Provisioned tools present → no raise
@@ -439,6 +439,28 @@ class TestToolServices:
         assert "unmatched" not in msg
         assert "none matched" not in msg
 
+    def test_require_provisioned_tools_selected_empty_enabled_catalog(
+        self,
+    ) -> None:
+        """SELECTED with zero enabled tools must catalog-miss, not skip the guard."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        selected_ids = [str(uuid4())]
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                [],
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+        msg = str(exc_info.value)
+        assert selected_ids[0] in msg
+        assert "missing from the enabled catalog" in msg
+        assert "Enabled tools could not be provisioned" not in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
     def test_require_provisioned_tools_selected_sibling_provision_scopes_cause(
         self,
     ) -> None:
@@ -608,6 +630,39 @@ class TestToolServices:
             retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
             result = await retriever.retrieve_tools()
             assert result == []
+
+    async def test_retrieve_tools_selected_empty_enabled_catalog_raises(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+    ) -> None:
+        """SELECTED must not COMPLETED+return [] when Tool Manager has no enabled tools."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = []
+        selected_ids = [str(uuid4())]
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+                await retriever.retrieve_tools(
+                    tool_selection_strategy="SELECTED",
+                    tool_selections=set(selected_ids),
+                )
+            msg = str(exc_info.value)
+            assert selected_ids[0] in msg
+            assert "missing from the enabled catalog" in msg
 
     async def test_tool_retrieval_integration(
         self,

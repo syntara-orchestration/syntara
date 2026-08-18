@@ -399,16 +399,20 @@ def _require_provisioned_tools_when_enabled(
     tool_selection_strategy: str | None = None,
     tool_selections: set[str] | frozenset[str] | None = None,
 ) -> None:
-    """Fail closed when enabled tools exist but none survived provisioning/filter.
+    """Fail closed when required tools cannot be provisioned.
 
     Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
     (and SELECTED) would continue toolless and the LLM may fabricate results.
-    """
-    if not enabled_tools:
-        return
 
+    ALL with an empty enabled catalog may continue toolless. SELECTED with
+    non-empty selections still fail-closes — same catalog-miss class as
+    selections absent from a non-empty catalog.
+    """
     selections = tool_selections or set()
     is_selected = tool_selection_strategy == "SELECTED" and bool(selections)
+
+    if not enabled_tools and not is_selected:
+        return
 
     if provisioned_tools and (not is_selected or _selected_tools_provisioned(provisioned_tools, selections)):
         return
