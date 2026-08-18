@@ -706,6 +706,19 @@ describe('AssignRoleModal', () => {
       expect(screen.getByRole('option', { name: /project-auditor/i })).toBeInTheDocument()
     })
 
+    it('shows warning when assignments request fails', async () => {
+      vi.mocked(accessFetchClient.GET).mockResolvedValue({
+        data: undefined,
+        error: { detail: 'Server error' },
+      } as never)
+
+      await renderModal({ principalType: 'user', principalId: 'user-1' })
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to check existing assignments')).toBeInTheDocument()
+      })
+    })
+
     it('shows all roles when no assignments exist', async () => {
       const user = userEvent.setup()
 

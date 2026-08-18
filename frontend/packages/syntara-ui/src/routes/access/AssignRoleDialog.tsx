@@ -20,6 +20,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
+import { FormFieldWarning } from '../../components/FormFieldError'
 import { NxSelect } from '../../components/NxSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
@@ -269,13 +270,7 @@ function AssignRoleFormBody({
                   </HelperText>
                 </FormHelperText>
               )}
-              {isAssignmentsError && (
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem variant="warning">Unable to check existing assignments</HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              )}
+              <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
             </>
           )}
         />

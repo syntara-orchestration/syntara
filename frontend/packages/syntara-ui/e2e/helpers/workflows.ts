@@ -170,6 +170,16 @@ export async function fillCodeEditor(
 ) {
   const typeInto = async (target: ReturnType<Page['locator']>) => {
     const textbox = target.getByRole('textbox', { name: label }).first()
+    const monacoSurface = target.locator('.monaco-editor').first()
+
+    // Wait for Monaco to finish async initialization — either the accessible
+    // textbox or the .monaco-editor wrapper must be present before interacting.
+    await expect(async () => {
+      const hasTextbox = await textbox.isVisible()
+      const hasMonaco = await monacoSurface.isVisible()
+      if (!hasTextbox && !hasMonaco) throw new Error('Monaco editor not ready')
+    }).toPass({ timeout: 15000, intervals: [500, 1000] })
+
     if (await textbox.isVisible()) {
       await textbox.click({ force: true })
       await page.keyboard.press('ControlOrMeta+A')
@@ -178,8 +188,6 @@ export async function fillCodeEditor(
       return
     }
 
-    const monacoSurface = target.locator('.monaco-editor').first()
-    await expect(monacoSurface).toBeVisible()
     await monacoSurface.click({ force: true })
     const usedMonacoApi = await page.evaluate((text) => {
       const w = window as unknown as Record<string, unknown>
