@@ -19,14 +19,8 @@ import { type Page } from '@playwright/test'
 
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
-import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
-
-// Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
-// mcp-server host (override via SYNTARA_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
-const isRealBackend = isSkipWebServerForPlaywrightTests()
-const ssrfSafeIntegrationHost = process.env.SYNTARA_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 async function ensureLlmCredentialId(app: Page): Promise<string> {
   const project = await ensureProject(app)
@@ -64,7 +58,7 @@ async function createLLMIntegration(app: Page, name: string): Promise<LLMIntegra
       configuration: {
         integration_type: 'llm_provider',
         provider_hint: 'custom',
-        base_url: isRealBackend ? ssrfSafeIntegrationHost : `https://${name}.example.com/v1`,
+        base_url: `https://example.com/v1`,
       },
       management_credential_id: credentialId,
       scope: 'global',
