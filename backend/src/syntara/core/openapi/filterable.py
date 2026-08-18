@@ -12,7 +12,7 @@ from __future__ import annotations
 import types
 from datetime import datetime
 from enum import Enum
-from typing import Any, get_args, get_origin
+from typing import Any, Union, get_args, get_origin
 from uuid import UUID
 
 from syntara.core.utils.filters import FilterOperator
@@ -36,7 +36,7 @@ _OPERATOR_TITLES: dict[FilterOperator, str] = {
 def _unwrap_optional(annotation: Any) -> Any:  # noqa: ANN401
     """Unwrap Optional[X] / X | None to the inner type X."""
     origin = get_origin(annotation)
-    if origin is types.UnionType:
+    if origin is types.UnionType or origin is Union:
         args = [a for a in get_args(annotation) if a is not type(None)]
         if len(args) == 1:
             return args[0]

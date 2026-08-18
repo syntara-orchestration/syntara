@@ -2,12 +2,15 @@
 
 Validates bidirectional consistency between list routes and their models:
 1. Every FilterableModel dependency references a valid model with __filterable_fields__
-2. Every list endpoint whose model has __filterable_fields__ has a FilterableModel dependency
+2. Every list route that uses parse_filters should have a FilterableModel dependency
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import yaml
 
 from syntara.api.constants import API_V1_PATH_PREFIX
 from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
@@ -19,9 +22,17 @@ _INFRA_PATH_PREFIXES = (
     "/_internal/",
 )
 
+_EXCLUSIONS_PATH = Path(__file__).parent / "list_compliance_exclusions.yaml"
+
+
+def _load_excluded_operation_ids() -> set[str]:
+    """Load operation IDs excluded from compliance checks."""
+    data = yaml.safe_load(_EXCLUSIONS_PATH.read_text(encoding="utf-8"))
+    return {e["operation_id"] for e in (data.get("exclusions") or [])}
+
 
 def _is_list_route(route: object) -> bool:
-    """Check if a route is a GET list endpoint (operation_id starts with 'list_')."""
+    """Check if a route is a GET list endpoint (operation_id starts with 'list_' or 'get_')."""
     methods = getattr(route, "methods", set()) or set()
     if "GET" not in methods:
         return False
@@ -63,15 +74,22 @@ class TestFilterableModelCompliance:
 
         assert not errors, "FilterableModel validation errors:\n" + "\n".join(errors)
 
-    def test_list_routes_with_filterable_model_have_correct_dependency(self, app):
-        """Routes with FilterableModel should list it as a dependency."""
-        routes_with_fm = []
+    def test_list_routes_without_filterable_model(self, app):
+        """List routes not in the exclusion list should have a FilterableModel dependency."""
+        excluded = _load_excluded_operation_ids()
+        missing = []
         for route in iter_api_routes(app):
+            if not _is_list_route(route):
+                continue
+            op_id = getattr(route, "operation_unique_id", "") or getattr(route, "name", "") or ""
+            if op_id in excluded:
+                continue
             fm = _extract_filterable_model(route)
-            if fm is not None:
-                routes_with_fm.append(route.path)
+            if fm is None:
+                missing.append(f"{route.path} ({op_id})")
 
-        assert len(routes_with_fm) > 0, (
-            "No routes found with FilterableModel dependency — "
-            "at least the credentials and integrations routes should have it"
+        assert not missing, (
+            "List routes missing FilterableModel dependency "
+            "(add the dependency or exclude in list_compliance_exclusions.yaml):\n"
+            + "\n".join(f"  - {m}" for m in missing)
         )

@@ -791,17 +791,14 @@ Each exclusion requires:
    - **Datetime fields**: `eq`, `gt`, `gte`, `lt`, `lte`
    - **Numeric fields** (int/float): `eq`, `gt`, `gte`, `lt`, `lte`
 
-   The dependency is a no-op at runtime (returns `None`) — filter parsing is still handled by `parse_filters()`. Its purpose is to generate the correct OpenAPI params at export time via `_inject_filter_params()` in `tools/export_openapi.py`.
+   The dependency is a no-op at runtime (returns `None`) — filter parsing is still handled by `parse_filters()`. Its purpose is to generate the correct OpenAPI params at export time via `_inject_filter_params()` in `tools/export_openapi.py`. The drift checker validates that hand-authored sub-spec filter params match what `FilterableModel` generates from model metadata.
 
-   > **Transitional state:** Some endpoints still use hand-authored filter params in sub-spec YAMLs with `x-spec-only: true` markers. The export-time injection is disabled until those markers are removed. New endpoints should still add `FilterableModel` — the injection will cover them once enabled.
-
-6. **Add filter params to the OpenAPI sub-spec** — until the `FilterableModel` injection is fully enabled, also add filter params manually to the endpoint's sub-spec YAML with the operator-based `allOf` pattern:
+6. **Add filter params to the OpenAPI sub-spec** — add filter params to the endpoint's sub-spec YAML with the operator-based `allOf` pattern. The drift checker validates these match the `FilterableModel` output:
 
    ```yaml
    - name: status
      in: query
      required: false
-     x-spec-only: true
      style: deepObject
      explode: true
      schema:

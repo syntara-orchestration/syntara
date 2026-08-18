@@ -93,6 +93,20 @@ class TestUnwrapOptional:
 
         assert _unwrap_optional(UUID | None) is UUID
 
+    def test_typing_optional(self):
+        from typing import Optional
+
+        from syntara.core.openapi.filterable import _unwrap_optional
+
+        assert _unwrap_optional(Optional[str]) is str
+
+    def test_typing_optional_uuid(self):
+        from typing import Optional
+
+        from syntara.core.openapi.filterable import _unwrap_optional
+
+        assert _unwrap_optional(Optional[UUID]) is UUID
+
 
 @pytest.mark.unit
 class TestFilterableModel:
