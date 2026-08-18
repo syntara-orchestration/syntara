@@ -403,7 +403,7 @@ class WorkflowService(BaseService):
 
         stmt = (
             select(Credential.id, CredentialType.injectors)
-            .join(CredentialType, Credential.credential_type_id == CredentialType.id)
+            .join(CredentialType, Credential.credential_type_id == CredentialType.id)  # type: ignore[arg-type]
             .where(Credential.id.in_(list(suspect.keys())))  # type: ignore[attr-defined]
         )
         result = await self.session.exec(stmt)
