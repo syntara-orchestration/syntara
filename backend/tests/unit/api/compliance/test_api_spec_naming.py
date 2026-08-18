@@ -22,6 +22,7 @@ def _collect_strings(obj: dict[str, object] | list[object] | str | object, path:
     results: list[tuple[str, str]] = []
     if isinstance(obj, dict):
         for key, value in obj.items():
+            results.extend(_collect_strings(key, f"{path}.<key>"))
             results.extend(_collect_strings(value, f"{path}.{key}"))
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
