@@ -284,6 +284,8 @@ class MetricsRecorder:
         """
         try:
             gauge = self._prometheus.active_workflows.labels(component=ComponentLabel.TEMPORAL_WORKER.value)
+            # prometheus_client has no public API for reading a gauge value;
+            # _value is a private ValueClass. The except guard handles library changes.
             return int(gauge._value.get())  # noqa: SLF001
         except Exception:  # noqa: BLE001
             return 0
