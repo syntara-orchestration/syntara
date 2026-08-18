@@ -10,7 +10,7 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core'
-import { useState, type ReactElement, type Ref } from 'react'
+import { useCallback, useState, type ReactElement, type Ref } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -104,12 +104,6 @@ function FallbackDecisionSelectToggle({
   return <DisabledFallbackToggleWrap tooltip={tooltip}>{toggle}</DisabledFallbackToggleWrap>
 }
 
-function createFallbackDecisionSelectToggleRenderer(
-  props: Omit<FallbackDecisionSelectToggleProps, 'toggleRef'>
-): (toggleRef: Ref<MenuToggleElement>) => ReactElement {
-  return (toggleRef) => <FallbackDecisionSelectToggle toggleRef={toggleRef} {...props} />
-}
-
 type FallbackDecisionSelectProps = Readonly<{
   value: string
   onChange: (value: 'approve' | 'reject') => void
@@ -119,13 +113,20 @@ type FallbackDecisionSelectProps = Readonly<{
 
 function FallbackDecisionSelect({ value, onChange, isDisabled, tooltip }: FallbackDecisionSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const renderToggle = createFallbackDecisionSelectToggleRenderer({
-    isOpen,
-    value,
-    isDisabled,
-    tooltip,
-    onToggle: () => setIsOpen((prev) => !prev),
-  })
+  const handleToggle = useCallback(() => setIsOpen((prev) => !prev), [])
+  const renderToggle = useCallback(
+    (toggleRef: Ref<MenuToggleElement>) => (
+      <FallbackDecisionSelectToggle
+        toggleRef={toggleRef}
+        isOpen={isOpen}
+        value={value}
+        isDisabled={isDisabled}
+        tooltip={tooltip}
+        onToggle={handleToggle}
+      />
+    ),
+    [handleToggle, isDisabled, isOpen, tooltip, value]
+  )
 
   return (
     <NxSelect
@@ -157,9 +158,10 @@ export function FallbackDecisionField() {
   const { control, setValue } = useFormContext<ApprovalFormData>()
   const { isEffectivelyEnabled, source } = useEffectiveContinueOnFailure()
 
-  const warningMessage = getFallbackDecisionDisabledMessage(isEffectivelyEnabled, source)
+  const disabledMessage = getFallbackDecisionDisabledMessage(source)
   const showDisabledGuidance = !isVersionView && !isEffectivelyEnabled
   const isDisabled = isVersionView || !isEffectivelyEnabled
+  const disabledGuidance = showDisabledGuidance ? disabledMessage : undefined
 
   function handleEnableContinueOnFailure() {
     setValue('settings.continue_on_failure', true, { shouldDirty: true })
@@ -177,7 +179,7 @@ export function FallbackDecisionField() {
                 value={field.value ?? 'reject'}
                 onChange={field.onChange}
                 isDisabled={isDisabled}
-                tooltip={showDisabledGuidance ? warningMessage : undefined}
+                tooltip={disabledGuidance}
               />
             )}
           />
@@ -185,7 +187,7 @@ export function FallbackDecisionField() {
         <StackItem>
           <HelperText isLiveRegion id={FALLBACK_HELPER_ID}>
             <HelperTextItem variant={isEffectivelyEnabled ? 'default' : 'warning'}>
-              {isEffectivelyEnabled ? APPROVAL_FALLBACK_ENABLED_HELPER : warningMessage}
+              {isEffectivelyEnabled ? APPROVAL_FALLBACK_ENABLED_HELPER : disabledMessage}
               {showDisabledGuidance ? (
                 <>
                   {' '}

@@ -113,6 +113,18 @@ describe('FallbackDecisionField', () => {
     expect(screen.queryByRole('button', { name: APPROVAL_FALLBACK_ENABLE_LINK })).not.toBeInTheDocument()
   })
 
+  it('enables fallback when the system default later becomes continue on failure', () => {
+    const { rerender } = renderField({ adminDefault: false })
+
+    expect(fallbackToggle()).toBeDisabled()
+
+    mockEngineDefaults(true)
+    rerender(<FallbackDecisionField />)
+
+    expect(fallbackToggle()).toBeEnabled()
+    expect(screen.getByText(APPROVAL_FALLBACK_ENABLED_HELPER)).toBeInTheDocument()
+  })
+
   it('shows a tooltip with the warning copy on the disabled dropdown', async () => {
     const user = userEvent.setup()
     renderField({ adminDefault: false })
