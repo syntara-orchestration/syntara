@@ -2,6 +2,7 @@ import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAlerts } from '../../../providers/alerts'
+import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
@@ -174,12 +175,7 @@ export function useExecutionApprovalPanel(
     if (!currentApproval || !workflowDefinition) return undefined
     const nodes = workflowDefinition.nodes ?? workflowDefinition.workflow?.activities ?? []
     const node = nodes.find((n) => n.id === currentApproval.approval_node_id)
-    if (!node) return undefined
-    const config = node.config
-    if (typeof config === 'object' && config !== null && 'prompt' in config && typeof config.prompt === 'string') {
-      return config.prompt
-    }
-    return undefined
+    return getApprovalPromptFromNode(node)
   }, [currentApproval, workflowDefinition])
 
   return { panelOpen, approvalMessage, open, close, dismiss }

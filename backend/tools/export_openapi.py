@@ -134,8 +134,14 @@ def _consolidate_identical_input_output_schemas(spec: dict[str, Any]) -> None:
             )
 
 
-def build_spec_app() -> FastAPI:
-    """Build a minimal FastAPI app with all routers for spec generation."""
+def build_spec_app(*, include_internal: bool = True) -> FastAPI:
+    """Build a minimal FastAPI app with all routers for spec generation.
+
+    Args:
+        include_internal: When False, omit ``/_internal/*`` routes to produce
+            the public-facing spec that matches the runtime ``app.openapi()``.
+
+    """
     from syntara.authz.resource_actions import build_resource_actions
 
     # Configure logging to stderr before router discovery (prevents log output from contaminating stdout YAML)
@@ -155,7 +161,8 @@ def build_spec_app() -> FastAPI:
         enable_validation=False,
     )
 
-    _register_internal_routes(app)
+    if include_internal:
+        _register_internal_routes(app)
 
     app.state.resource_actions = build_resource_actions(app)
 
@@ -221,9 +228,14 @@ def main() -> int:
         default="yaml",
         help="Output format (default: yaml)",
     )
+    parser.add_argument(
+        "--public",
+        action="store_true",
+        help="Exclude internal endpoints (/_internal/*) to produce the public-facing spec",
+    )
     args = parser.parse_args()
 
-    app = build_spec_app()
+    app = build_spec_app(include_internal=not args.public)
     spec = app.openapi()
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)

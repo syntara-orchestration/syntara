@@ -573,6 +573,7 @@ services-clean: ## Stop all services and remove all data (destructive)
 # API spec governance
 # ========================================================
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
+OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -598,6 +599,24 @@ api-spec-bundle: ## Bundle all domain sub-specs into a single merged openapi.yam
 	@echo "✅ Bundled spec written to $(OPENAPI_SPEC)"
 	@cp $(OPENAPI_SPEC) src/cli/orchestrator_cli/openapi.yaml
 	@echo "📎 Spec also copied to src/cli/orchestrator_cli/openapi.yaml"
+
+.PHONY: api-spec-bundle-public
+api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoints)
+	@echo "📦 Bundling public OpenAPI sub-specs..."
+	uv run python tools/bundle_openapi.py --public -o $(OPENAPI_PUBLIC_SPEC)
+	@uv run pre-commit run yamlfmt --files $(OPENAPI_PUBLIC_SPEC) > /dev/null 2>&1 || true
+	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC)"
+
+.PHONY: api-spec-drift-public
+api-spec-drift-public: ## Check that committed public spec matches the generated spec
+	@echo "🔍 Checking public OpenAPI spec is up to date..."
+	@uv run python tools/export_openapi.py --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
+
+.PHONY: api-spec-bundle-all
+api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full and public specs
+
+.PHONY: api-spec-drift-all
+api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
 
 
 # Tools
@@ -788,6 +807,24 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--head HEAD \
 			--format text \
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
+	fi
+	@echo "Checking public OpenAPI spec for breaking changes..."
+	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
+	if [ -n "$$PR_BODY_TEXT" ]; then \
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--pr-body "$$PR_BODY_TEXT"; \
+	else \
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml; \
 	fi
 	@echo "OpenAPI breaking changes check complete"
 

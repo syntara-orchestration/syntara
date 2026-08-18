@@ -24,7 +24,9 @@ from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
@@ -377,6 +379,44 @@ class WorkflowService(BaseService):
                 msg = "Not authorized to use one or more credentials in this workflow"
                 raise AuthorizationDeniedError(msg)
 
+    async def _validate_no_secret_url_conflicts(
+        self,
+        workflow_definition: dict[str, Any],
+    ) -> None:
+        """Reject HTTP request nodes that have both an explicit URL and a Secret URL credential.
+
+        A Secret URL credential provides the request destination; an explicit
+        ``parameters.url`` on the same node creates an ambiguous configuration
+        where the credential silently wins and the activity record advertises
+        the wrong host.
+        """
+        suspect: dict[str, str] = {}
+        for node in workflow_definition.get("nodes", []):
+            if node.get("type") != "http_request":
+                continue
+            params = node.get("parameters", {})
+            if params.get("url") and params.get("credential_id"):
+                suspect[params["credential_id"]] = node.get("name") or node.get("id", "unknown")
+
+        if not suspect:
+            return
+
+        stmt = (
+            select(Credential.id, CredentialType.injectors)
+            .join(CredentialType, Credential.credential_type_id == CredentialType.id)  # type: ignore[arg-type]
+            .where(Credential.id.in_(list(suspect.keys())))  # type: ignore[attr-defined]
+        )
+        result = await self.session.exec(stmt)
+        for cred_id, injectors in result.all():
+            extra_vars = (injectors or {}).get("extra_vars", {})
+            if extra_vars.get("auth_type") == AUTH_TYPE_URL:
+                node_name = suspect[str(cred_id)]
+                msg = (
+                    f"Node '{node_name}' has both an explicit URL and a Secret URL credential. "
+                    "Remove the URL from node parameters or use a different credential type."
+                )
+                raise SafeValueError(msg)
+
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate workflow name.
 
@@ -471,6 +511,7 @@ class WorkflowService(BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
+        await self._validate_no_secret_url_conflicts(workflow_definition)
         ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1015,6 +1056,7 @@ class WorkflowService(BaseService):
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
+            await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1205,6 +1247,7 @@ class WorkflowService(BaseService):
             await self._validate_credential_project_scope(
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
+            await self._validate_no_secret_url_conflicts(workflow_definition)
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )

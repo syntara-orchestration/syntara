@@ -233,7 +233,7 @@ describe('IdentityProviderForm', () => {
       expect(screen.getByDisplayValue('client-123')).toBeInTheDocument()
     })
 
-    it('shows not found state when provider does not exist', () => {
+    it('shows not found state when provider does not exist', async () => {
       const notFoundError = Object.assign(new Error('Not found'), { status: 404 })
       vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
         data: undefined,
@@ -247,11 +247,14 @@ describe('IdentityProviderForm', () => {
         isPending: false,
       } as never)
 
-      render(<IdentityProviderForm mode="edit" />, { wrapper })
+      const { container } = render(<IdentityProviderForm mode="edit" />, { wrapper })
 
       expect(screen.getByText('Identity provider not found')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Back to identity providers/ })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Retry/ })).toBeInTheDocument()
+
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
     })
 
     it('shows loading state while fetching provider', () => {

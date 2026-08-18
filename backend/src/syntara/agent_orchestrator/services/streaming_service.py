@@ -9,8 +9,8 @@ from typing import Any, cast
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.websockets import WebSocket
 
@@ -205,9 +205,9 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
             raise RuntimeError(msg)
 
         async with self._session_factory() as db_session:
-            stmt = select(Invocation).where(Invocation.id == invocation_id)  # type: ignore[arg-type]
-            result = await db_session.exec(stmt)  # type: ignore[call-overload]
-            invocation = result.one_or_none()
+            stmt = select(Invocation).where(Invocation.id == invocation_id)
+            result = await db_session.execute(stmt)
+            invocation = result.scalar_one_or_none()
 
             if invocation is None:
                 logger.warning("Invocation not found in database", invocation_id=invocation_id)
