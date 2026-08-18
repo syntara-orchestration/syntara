@@ -18,7 +18,7 @@ type ToastAlertItemProps = Readonly<{
 }>
 
 function ToastAlertItem({ alert, onDismiss }: ToastAlertItemProps) {
-  const alertDomId = `nexus-alert-${useId()}`
+  const alertDomId = `syntara-alert-${useId()}`
 
   return (
     <Alert

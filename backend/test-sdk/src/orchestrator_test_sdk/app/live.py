@@ -75,7 +75,7 @@ class _TokenRefreshTransport(httpx.BaseTransport):
                 new_token = _generate_live_token(self._base_url)
                 if new_token == old_token:
                     logger.warning(
-                        "Token refresh returned the same token (likely a static NEXUS_API_TOKEN). "
+                        "Token refresh returned the same token (likely a static SYNTARA_API_TOKEN). "
                         "Cannot auto-refresh — returning 401 response."
                     )
                     return response

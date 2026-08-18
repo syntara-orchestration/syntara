@@ -6,14 +6,14 @@ import { GroupFormModal } from '../../GroupFormModal'
 import { AdvancedSection, GroupMappingFormActions, MappingTable } from './GroupMappingComponents'
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { signInAlertTitle } from './groupMappingFormUtils'
-import type { NexusGroup } from './groupMappingUtils'
+import type { MappedGroup } from './groupMappingUtils'
 
 export type GroupMappingEditPanelProps = {
   signInAlert: { variant: 'success' | 'warning' | 'danger'; message: string } | null
   onDismissSignInAlert: () => void
   control: Control<GroupMappingEditFormValues>
   mappingRows: { rowId: string; index: number }[]
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   onRemove: (index: number) => void
   onAdd: () => void
   onCreateGroup: (index: number) => void
@@ -48,7 +48,7 @@ export function GroupMappingEditPanel({
   onDismissSignInAlert,
   control,
   mappingRows,
-  nexusGroups,
+  mappedGroups,
   onRemove,
   onAdd,
   onCreateGroup,
@@ -81,7 +81,7 @@ export function GroupMappingEditPanel({
             <MappingTable
               rows={mappingRows}
               control={control}
-              nexusGroups={nexusGroups}
+              mappedGroups={mappedGroups}
               onRemove={onRemove}
               onAdd={onAdd}
               onCreateGroup={onCreateGroup}

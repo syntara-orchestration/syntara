@@ -68,7 +68,7 @@ flowchart LR
     end
 
     subgraph Gen["Generation Process"]
-        Clone[git clone nexus]
+        Clone[git clone syntara]
         OT["openapi-typescript"]
     end
 

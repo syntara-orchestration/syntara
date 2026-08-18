@@ -413,7 +413,7 @@ describe('IdentityProviderForm', () => {
       expect(screen.getByLabelText(/Disable TLS certificate verification/)).not.toBeChecked()
     })
 
-    it('defaults nexusGroupId to empty string when mapped_group_id is null in API response', () => {
+    it('defaults mappedGroupId to empty string when mapped_group_id is null in API response', () => {
       const providerWithNullMapping = {
         id: 'provider-1',
         name: 'Azure AD',

@@ -250,7 +250,7 @@ describe('UserClaimMappingFields', () => {
     expect(screen.getByDisplayValue('sub')).toBeInTheDocument()
   })
 
-  it('handles claimAliases with no matching nexus field key', () => {
+  it('handles claimAliases with no matching syntara field key', () => {
     const claimsSupported = ['sub', 'email', 'name']
     const claimAliases = { unrelated_field: ['something'] }
 

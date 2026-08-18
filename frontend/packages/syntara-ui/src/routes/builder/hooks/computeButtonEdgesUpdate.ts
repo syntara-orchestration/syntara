@@ -101,7 +101,7 @@ function buildButtonHandleKeySets(existingButtonEdges: EdgeType[]): ButtonHandle
 }
 
 /** Tracks which `onAddNodeFromEdge` the edge's click handler was built with (in-memory only). */
-const BUTTON_EDGE_BOUND_ON_ADD = '__nexusButtonEdgeBoundOnAdd' as const
+const BUTTON_EDGE_BOUND_ON_ADD = '__syntaraButtonEdgeBoundOnAdd' as const
 
 function collectKeptButtonEdges(
   existingButtonEdges: EdgeType[],

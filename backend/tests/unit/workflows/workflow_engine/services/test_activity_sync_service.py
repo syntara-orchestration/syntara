@@ -3566,6 +3566,23 @@ class TestProcessHistoryEvent:
         assert len(self.probe_tasks) == 1
 
 
+def _make_mock_producer(
+    *events: Any,  # noqa: ANN401 — queue items are heterogeneous mock objects
+) -> Any:  # noqa: ANN401 — mock side_effect callable
+    """Return an async function matching _history_event_producer's signature.
+
+    Enqueues each event in order, then pushes the ``None`` sentinel so the
+    consumer loop terminates cleanly.
+    """
+
+    async def _producer(_handle: Mock, queue: asyncio.Queue[Any], _exec_id: UUID) -> None:
+        for ev in events:
+            await queue.put(ev)
+        await queue.put(None)
+
+    return _producer
+
+
 class TestMonitorExecutionIntegration:
     """Integration tests for _monitor_execution queue-based consumer."""
 
@@ -3597,12 +3614,9 @@ class TestMonitorExecutionIntegration:
             patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata),
             patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock) as mock_sync,
         ):
+            producer = _make_mock_producer(SyntheticActivityStarted(activity_id="my-activity", scheduled_event_id=5))
 
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(SyntheticActivityStarted(activity_id="my-activity", scheduled_event_id=5))
-                await queue.put(None)
-
-            with patch.object(self.service, "_history_event_producer", side_effect=mock_producer):
+            with patch.object(self.service, "_history_event_producer", side_effect=producer):
                 await self.service._monitor_execution(
                     self.execution_id,
                     "temporal-wf-id",
@@ -3623,13 +3637,8 @@ class TestMonitorExecutionIntegration:
         event.event_id = 5
 
         with patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata):
-
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(event)
-                await queue.put(None)
-
             with (
-                patch.object(self.service, "_history_event_producer", side_effect=mock_producer),
+                patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
                 patch.object(self.service, "_process_history_event", new_callable=AsyncMock) as mock_process,
             ):
                 await self.service._monitor_execution(
@@ -3645,15 +3654,343 @@ class TestMonitorExecutionIntegration:
         metadata = create_test_metadata(execution_id=self.execution_id)
 
         with patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=metadata):
-
-            async def mock_producer(handle: Mock, queue: asyncio.Queue[Any], exec_id: UUID) -> None:
-                await queue.put(None)
-
-            with patch.object(self.service, "_history_event_producer", side_effect=mock_producer):
+            with patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()):
                 await self.service._monitor_execution(
                     self.execution_id,
                     "temporal-wf-id",
                 )
+
+
+class TestRunMonitorLoop:
+    """Tests for _run_monitor_loop error handling and return values."""
+
+    def setup_method(self) -> None:
+        """Set up test fixtures."""
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+        self.handle = Mock()
+        self.metadata = create_test_metadata(execution_id=self.execution_id)
+
+    @pytest.mark.asyncio
+    async def test_returns_true_on_normal_completion(self) -> None:
+        """Test that _run_monitor_loop returns True when the event stream ends normally."""
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_db_error(self) -> None:
+        """Test that _run_monitor_loop returns False when a SQLAlchemy error occurs."""
+        from sqlalchemy.exc import OperationalError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=OperationalError("", [], Exception("pool exhausted")),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_pool_timeout(self) -> None:
+        """Test that _run_monitor_loop returns False on connection pool timeout."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=SATimeoutError("QueuePool limit reached"),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_os_error(self) -> None:
+        """Test that _run_monitor_loop returns False when a network-level OSError occurs."""
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=ConnectionResetError("Connection reset by peer"),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_non_transient_error_propagates(self) -> None:
+        """Test that non-transient errors (e.g. programming bugs) propagate instead of being retried."""
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=TypeError("unexpected keyword argument"),
+            ),
+        ):
+            with pytest.raises(TypeError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+    @pytest.mark.asyncio
+    async def test_integrity_error_propagates(self) -> None:
+        """Test that IntegrityError (constraint violation) is not treated as transient."""
+        from sqlalchemy.exc import IntegrityError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=IntegrityError("", [], Exception("unique constraint violated")),
+            ),
+        ):
+            with pytest.raises(IntegrityError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+    @pytest.mark.asyncio
+    async def test_reraises_temporal_error(self) -> None:
+        """Test that TemporalError propagates out of _run_monitor_loop without being caught."""
+        from temporalio.exceptions import TemporalError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=TemporalError("workflow not found"),
+            ),
+        ):
+            with pytest.raises(TemporalError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+    @pytest.mark.asyncio
+    async def test_reraises_cancelled_error(self) -> None:
+        """Test that CancelledError propagates out of _run_monitor_loop without being caught."""
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+        event.event_id = 5
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
+            patch.object(
+                self.service,
+                "_dispatch_queue_item",
+                new_callable=AsyncMock,
+                side_effect=asyncio.CancelledError,
+            ),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+    @pytest.mark.asyncio
+    async def test_cleans_up_tasks_on_transient_error(self) -> None:
+        """Test that background tasks are cancelled even when a transient error occurs."""
+        from sqlalchemy.exc import OperationalError
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer()),
+            patch.object(
+                self.service,
+                "_sync_activities_to_db",
+                new_callable=AsyncMock,
+                side_effect=OperationalError("", [], Exception("pool exhausted")),
+            ),
+            patch.object(self.service, "_cancel_background_tasks", new_callable=AsyncMock) as mock_cancel,
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+        mock_cancel.assert_called_once()
+
+
+class TestMonitorExecutionRetry:
+    """Tests for _monitor_execution retry logic with exponential backoff."""
+
+    _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
+    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.random.random"
+
+    def setup_method(self) -> None:
+        """Set up test fixtures."""
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+        self.metadata = create_test_metadata(execution_id=self.execution_id)
+
+    @staticmethod
+    def _fail_n_times(
+        n: int,
+    ) -> Any:  # noqa: ANN401 — mock side_effect callable
+        call_count = 0
+
+        async def _side_effect(
+            handle: Mock,
+            metadata: ExecutionMonitorMetadata,
+            execution_id: UUID,
+        ) -> bool:
+            nonlocal call_count
+            call_count += 1
+            return call_count >= n
+
+        return _side_effect
+
+    @pytest.mark.asyncio
+    async def test_retries_then_succeeds(self) -> None:
+        """Test that _monitor_execution retries on transient errors and succeeds when the loop recovers."""
+        side_effect = self._fail_n_times(3)
+
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=side_effect) as mock_loop,
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        assert mock_loop.call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exponential_backoff_delays(self) -> None:
+        """Test that retry delays follow exponential backoff pattern."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(5)),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        delays = [call.args[0] for call in mock_sleep.call_args_list]
+        assert delays == [1.0, 2.0, 4.0, 8.0]
+
+    @pytest.mark.asyncio
+    async def test_backoff_caps_at_max_delay(self) -> None:
+        """Test that backoff delay does not exceed _MONITOR_RETRY_MAX_DELAY_S."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(8)),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=1.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        delays = [call.args[0] for call in mock_sleep.call_args_list]
+        assert delays == [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0]
+
+    @pytest.mark.asyncio
+    async def test_jitter_reduces_delay(self) -> None:
+        """Test that jitter randomises sleep within [delay*0.5, delay)."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=self._fail_n_times(3)),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+            patch(self._RANDOM_PATH, return_value=0.0),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        delays = [call.args[0] for call in mock_sleep.call_args_list]
+        assert delays == [0.5, 1.0]
+
+    @pytest.mark.asyncio
+    async def test_stops_retrying_on_shutdown(self) -> None:
+        """Test that the retry loop exits when _shutdown is set between attempts."""
+
+        async def always_fail(
+            handle: Mock,
+            metadata: ExecutionMonitorMetadata,
+            execution_id: UUID,
+        ) -> bool:
+            self.service._shutdown = True
+            return False
+
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=always_fail) as mock_loop,
+            patch(self._SLEEP_PATH, new_callable=AsyncMock),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        mock_loop.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_temporal_error_not_retried(self) -> None:
+        """Test that TemporalError from _run_monitor_loop is not retried."""
+        from temporalio.exceptions import TemporalError
+
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(
+                self.service,
+                "_run_monitor_loop",
+                new_callable=AsyncMock,
+                side_effect=TemporalError("workflow terminated"),
+            ),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock) as mock_sleep,
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        mock_sleep.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_error_propagates(self) -> None:
+        """Test that CancelledError from _run_monitor_loop propagates without retry."""
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(
+                self.service,
+                "_run_monitor_loop",
+                new_callable=AsyncMock,
+                side_effect=asyncio.CancelledError,
+            ),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+    @pytest.mark.asyncio
+    async def test_metadata_preserved_across_retries(self) -> None:
+        """Test that the same metadata instance is reused across retries."""
+        metadata_instances: list[ExecutionMonitorMetadata] = []
+
+        async def capture_metadata(
+            handle: Mock,
+            metadata: ExecutionMonitorMetadata,
+            execution_id: UUID,
+        ) -> bool:
+            metadata_instances.append(metadata)
+            if len(metadata_instances) < 3:
+                metadata.last_processed_event_id = len(metadata_instances) * 10
+                return False
+            return True
+
+        with (
+            patch.object(self.service, "_initialize_monitoring", new_callable=AsyncMock, return_value=self.metadata),
+            patch.object(self.service, "_run_monitor_loop", side_effect=capture_metadata),
+            patch(self._SLEEP_PATH, new_callable=AsyncMock),
+        ):
+            await self.service._monitor_execution(self.execution_id, "temporal-wf-id")
+
+        assert len(metadata_instances) == 3
+        assert all(m is self.metadata for m in metadata_instances)
+        assert self.metadata.last_processed_event_id == 20
 
 
 class TestPendingSyncEventIds:
