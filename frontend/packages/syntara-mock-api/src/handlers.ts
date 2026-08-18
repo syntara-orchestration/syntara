@@ -3612,7 +3612,7 @@ export const handlers = [
         mime_type: known.mime_type ?? 'text/plain',
         status: 'converted',
         conversion_error: null,
-        is_project_deleted: false,
+        is_project_deleted: known.is_project_deleted ?? false,
       })
     }
     return new HttpResponse(null, { status: 404 })

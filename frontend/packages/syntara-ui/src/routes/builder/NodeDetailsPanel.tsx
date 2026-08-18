@@ -423,7 +423,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
                 if (replacementNodeId) {
                   if (!handleReplacement(newNodeId)) {
                     showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
-                    settle(true)
+                    settle(false)
                     return
                   }
                 } else if (sourceNodeId && newNodeId) {

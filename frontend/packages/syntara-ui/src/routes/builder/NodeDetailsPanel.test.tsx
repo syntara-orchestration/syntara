@@ -493,6 +493,7 @@ describe('NodeDetailsPanel', () => {
   it('shows error when replacement fails due to new activity not found', async () => {
     const user = userEvent.setup()
     const mockOnSubmit = vi.fn((_data, onSuccess: (nodeId?: string) => void) => onSuccess('new-1'))
+    let submitOutcome: boolean | void
 
     // Empty activities - the new-1 activity doesn't exist
     mockStoreState.currentWorkflow = {
@@ -507,8 +508,13 @@ describe('NodeDetailsPanel', () => {
       label: 'Action',
       icon: () => <div>ActionIcon</div>,
       category: 'task',
-      formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => void }) => (
-        <button onClick={() => onSubmit({})} type="button">
+      formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => Promise<boolean> | boolean | void }) => (
+        <button
+          onClick={async () => {
+            submitOutcome = await onSubmit({})
+          }}
+          type="button"
+        >
           Submit
         </button>
       ),
@@ -527,15 +533,20 @@ describe('NodeDetailsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /Submit/i }))
 
+    await waitFor(() => {
+      expect(submitOutcome).toBe(false)
+    })
     expect(mockShowError).toHaveBeenCalledWith({
       title: 'Replacement failed',
       description: 'Failed to replace step — step not found',
     })
+    expect(mockOnClose).not.toHaveBeenCalled()
   })
 
   it('shows error when replacement update fails due to activity not found', async () => {
     const user = userEvent.setup()
     const mockOnSubmit = vi.fn((_data, onSuccess: (nodeId?: string) => void) => onSuccess())
+    let submitOutcome: boolean | void
 
     mockStoreState.currentWorkflow = {
       triggers: [],
@@ -549,8 +560,17 @@ describe('NodeDetailsPanel', () => {
       label: 'Action',
       icon: () => <div>ActionIcon</div>,
       category: 'task',
-      formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => void }) => (
-        <button onClick={() => onSubmit({})} type="button">
+      formComponent: ({
+        onSubmit,
+      }: {
+        onSubmit: (data: Record<string, unknown>) => Promise<boolean> | boolean | void
+      }) => (
+        <button
+          onClick={async () => {
+            submitOutcome = await onSubmit({})
+          }}
+          type="button"
+        >
           Submit
         </button>
       ),
@@ -569,10 +589,14 @@ describe('NodeDetailsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /Submit/i }))
 
+    await waitFor(() => {
+      expect(submitOutcome).toBe(false)
+    })
     expect(mockShowError).toHaveBeenCalledWith({
       title: 'Replacement failed',
       description: 'Failed to replace step — step not found',
     })
+    expect(mockOnClose).not.toHaveBeenCalled()
   })
 
   it('renders form for node with subtypes', async () => {
