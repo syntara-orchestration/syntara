@@ -172,7 +172,7 @@ Include vitest-axe accessibility tests and 80%+ coverage.
 2. Test file (`*.test.tsx`) — happy path, empty states, delete flow, accessibility
 3. Mock handler in `packages/syntara-mock-api/src/handlers.ts` if needed
 
-If the result differs from the mockup, use the side-by-side technique from [§2](#2-bring-your-screenshots). Then run:
+If the result differs from the mockup, use the side-by-side technique from [§2](#2-bring-your-screenshots-optional). Then run:
 
 ```bash
 npm run check   # static analysis (lint, tsc, format, knip, mermaid)
