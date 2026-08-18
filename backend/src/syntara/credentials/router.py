@@ -34,6 +34,8 @@ from syntara.credentials.models import (
 from syntara.credentials.models.credential import Credential, CredentialWorkflowListResponse
 from syntara.credentials.services.credential_service import CredentialService
 
+_CREDENTIAL_LIST_PARAM_KEYS = frozenset(CredentialListParams.model_fields)
+
 router = SyntaraRouter(tags=["Credentials"])
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -159,9 +161,7 @@ async def list_credentials(
     When for_action=use, returns only credentials the user has credential:use
     permission on (for workflow builder credential selection).
     """
-    filtered_query_params = [
-        (k, v) for k, v in request.query_params.items() if k not in set(CredentialListParams.model_fields)
-    ]
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k not in _CREDENTIAL_LIST_PARAM_KEYS]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,

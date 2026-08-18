@@ -68,6 +68,8 @@ from syntara.workflows.models import WorkflowListParams
 from syntara.workflows.models.workflow import WorkflowListResponse
 from syntara.workflows.services import WorkflowService
 
+_CREDENTIAL_LIST_PARAM_KEYS = frozenset(CredentialListParams.model_fields)
+
 router = SyntaraRouter(prefix="/projects", tags=["Projects"])
 
 _perm_project_read = PermissionChecker("project", "read", project_param="project_id")
@@ -816,9 +818,7 @@ async def list_project_credentials(
     Use ``GET /credentials?for_action=use`` for use-permission-filtered listing.
     """
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[project_id])
-    filtered_query_params = [
-        (k, v) for k, v in request.query_params.items() if k not in set(CredentialListParams.model_fields)
-    ]
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k not in _CREDENTIAL_LIST_PARAM_KEYS]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,

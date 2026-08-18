@@ -116,25 +116,21 @@ class FilterableModel:
                 raise ValueError(msg)
 
         self.model = model
-        self._field_operators: dict[str, set[FilterOperator]] = {}
-        self._field_types: dict[str, type] = {}
+        self._fields: dict[str, tuple[set[FilterOperator], type]] = {}
 
         for field_name in filterable_fields:
             annotation = model_fields_map[field_name].annotation
             python_type = _unwrap_optional(annotation)
-            self._field_operators[field_name] = _classify_python_type(python_type)
-            self._field_types[field_name] = python_type
+            self._fields[field_name] = (_classify_python_type(python_type), python_type)
 
     def get_field_operators(self, field_name: str) -> set[FilterOperator]:
         """Return the operator set for a given filterable field."""
-        return self._field_operators[field_name]
+        return self._fields[field_name][0]
 
     def to_openapi_params(self) -> list[dict[str, Any]]:
         """Generate deepObject-style OpenAPI parameter dicts for all filterable fields."""
         params: list[dict[str, Any]] = []
-        for field_name in self._field_operators:
-            python_type = self._field_types[field_name]
-            operators = self._field_operators[field_name]
+        for field_name, (operators, python_type) in self._fields.items():
             base_schema = _python_type_to_openapi_schema(python_type)
 
             operator_properties: dict[str, Any] = {}

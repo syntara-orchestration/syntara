@@ -55,40 +55,23 @@ _EQ_ONLY = {FilterOperator.EQ}
 class TestClassifyPythonType:
     """Test type classification for operator set inference."""
 
-    def test_string_type(self):
+    @pytest.mark.parametrize(
+        ("python_type", "expected_ops"),
+        [
+            (str, _STRING_OPS),
+            (datetime, _COMPARISON_OPS),
+            (UUID, _EQ_ONLY),
+            (bool, _EQ_ONLY),
+            (SampleStatus, _EQ_ONLY),
+            (int, _COMPARISON_OPS),
+            (float, _COMPARISON_OPS),
+        ],
+        ids=["string", "datetime", "uuid", "bool", "enum", "int", "float"],
+    )
+    def test_type_classification(self, python_type, expected_ops):
         from syntara.core.openapi.filterable import _classify_python_type
 
-        assert _classify_python_type(str) == _STRING_OPS
-
-    def test_datetime_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(datetime) == _COMPARISON_OPS
-
-    def test_uuid_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(UUID) == _EQ_ONLY
-
-    def test_bool_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(bool) == _EQ_ONLY
-
-    def test_enum_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(SampleStatus) == _EQ_ONLY
-
-    def test_int_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(int) == _COMPARISON_OPS
-
-    def test_float_type(self):
-        from syntara.core.openapi.filterable import _classify_python_type
-
-        assert _classify_python_type(float) == _COMPARISON_OPS
+        assert _classify_python_type(python_type) == expected_ops
 
 
 @pytest.mark.unit
@@ -200,42 +183,23 @@ class TestFilterableModel:
 class TestPythonTypeToOpenAPISchema:
     """Test Python-to-OpenAPI type mapping."""
 
-    def test_string_type(self):
+    @pytest.mark.parametrize(
+        ("python_type", "expected_schema"),
+        [
+            (str, {"type": "string"}),
+            (datetime, {"type": "string", "format": "date-time"}),
+            (UUID, {"type": "string", "format": "uuid"}),
+            (bool, {"type": "boolean"}),
+            (int, {"type": "integer"}),
+            (float, {"type": "number"}),
+            (SampleStatus, {"$ref": "#/components/schemas/SampleStatus"}),
+        ],
+        ids=["string", "datetime", "uuid", "bool", "int", "float", "enum"],
+    )
+    def test_type_mapping(self, python_type, expected_schema):
         from syntara.core.openapi.filterable import _python_type_to_openapi_schema
 
-        assert _python_type_to_openapi_schema(str) == {"type": "string"}
-
-    def test_datetime_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(datetime) == {"type": "string", "format": "date-time"}
-
-    def test_uuid_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(UUID) == {"type": "string", "format": "uuid"}
-
-    def test_bool_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(bool) == {"type": "boolean"}
-
-    def test_int_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(int) == {"type": "integer"}
-
-    def test_float_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(float) == {"type": "number"}
-
-    def test_enum_type(self):
-        from syntara.core.openapi.filterable import _python_type_to_openapi_schema
-
-        assert _python_type_to_openapi_schema(SampleStatus) == {
-            "$ref": "#/components/schemas/SampleStatus",
-        }
+        assert _python_type_to_openapi_schema(python_type) == expected_schema
 
 
 @pytest.mark.unit

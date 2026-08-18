@@ -10,24 +10,14 @@ from __future__ import annotations
 import pytest
 
 from syntara.api.constants import API_V1_PATH_PREFIX
-from syntara.authz.resource_actions import _get_dep_instance, _iter_route_deps
-from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
+from tools.export_openapi import _extract_filterable_model
 
 _INFRA_PATH_PREFIXES = (
     "/health",
     "/metrics",
     "/_internal/",
 )
-
-
-def _get_filterable_model(route: object) -> FilterableModel | None:
-    """Extract FilterableModel instance from a route's dependencies."""
-    for dep in _iter_route_deps(route):
-        inner = _get_dep_instance(dep)
-        if isinstance(inner, FilterableModel):
-            return inner
-    return None
 
 
 def _is_list_route(route: object) -> bool:
@@ -63,7 +53,7 @@ class TestFilterableModelCompliance:
         """Every FilterableModel dependency should reference a model with __filterable_fields__."""
         errors = []
         for route in iter_api_routes(app):
-            fm = _get_filterable_model(route)
+            fm = _extract_filterable_model(route)
             if fm is None:
                 continue
             if not hasattr(fm.model, "__filterable_fields__"):
@@ -83,7 +73,7 @@ class TestFilterableModelCompliance:
         """Routes with FilterableModel should list it as a dependency."""
         routes_with_fm = []
         for route in iter_api_routes(app):
-            fm = _get_filterable_model(route)
+            fm = _extract_filterable_model(route)
             if fm is not None:
                 routes_with_fm.append(route.path)
 
