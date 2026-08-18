@@ -204,6 +204,31 @@ async def make_project_admin(
     return assignment
 
 
+async def make_project_user_via_group(
+    session: AsyncSession,
+    user: User,
+    project: "Project",
+) -> tuple[Group, RoleAssignment]:
+    """Assign project-user role to a user via group membership for a specific project.
+
+    Unlike make_project_user (which uses a direct principal_id assignment), this
+    exercises the group-membership code path: creates a dedicated group, assigns the
+    project-user role to the group for the given project, and adds the user to the group.
+    """
+    group = Group(name=f"project-user-grp-{uuid4()}", description="", labels={})
+    session.add(group)
+    await session.flush()
+    assignment = RoleAssignment(
+        group_id=group.id,
+        project_id=project.id,
+        role_name="project-user",
+    )
+    session.add(assignment)
+    await session.exec(insert(user_groups).values(user_id=user.id, group_id=group.id))
+    await session.commit()
+    return group, assignment
+
+
 @pytest_asyncio.fixture
 async def test_project_id(test_db_session: AsyncSession) -> str:
     """Create a test project and return its ID as a string."""

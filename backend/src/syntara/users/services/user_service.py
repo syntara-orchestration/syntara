@@ -188,6 +188,14 @@ class UsersService(BaseService):
         if AUTHENTICATED_GROUP_NAME not in resolved_names:
             resolved_names.append(AUTHENTICATED_GROUP_NAME)
 
+        # When no groups are explicitly specified, add the users group by default.
+        # The API documents "Omit group_names to use the default (users group)" — this
+        # ensures that omission actually delivers that default so newly created local users
+        # receive the project-user role (and therefore approval:decide) just as IdP-synced
+        # normal users do.
+        if not explicit and "users" not in resolved_names:
+            resolved_names.append("users")
+
         result = await self.session.exec(select(Group).where(col(Group.name).in_(resolved_names)))
         groups = list(result.all())
         found_names = {g.name for g in groups}

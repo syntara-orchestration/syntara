@@ -767,13 +767,34 @@ async def _user_group_names(session: AsyncSession, user: User) -> set[str]:
 
 @pytest.mark.asyncio
 async def test_create_user_no_groups_by_default(test_db_session: AsyncSession, test_user: User) -> None:
-    """When group_names is omitted, only the authenticated group is assigned."""
+    """When group_names is omitted, the user is added to both authenticated and users groups.
+
+    The API documents 'Omit to use the default (users group)' — this ensures that
+    locally-created users receive the same project-user role (and therefore
+    approval:decide) that IdP-synced normal users receive via group sync.
+    """
     service = UsersService(test_db_session, test_user)
     user = await service.create_user(
         username="defaultuser",
         first_name="Default",
         last_name="User",
         password=TEST_PASSWORD,
+    )
+
+    names = await _user_group_names(test_db_session, user)
+    assert names == {"authenticated", "users"}
+
+
+@pytest.mark.asyncio
+async def test_create_user_empty_groups_skips_users_default(test_db_session: AsyncSession, test_user: User) -> None:
+    """Explicit empty list skips the users default — only authenticated is added."""
+    service = UsersService(test_db_session, test_user)
+    user = await service.create_user(
+        username="nogrpuser",
+        first_name="No",
+        last_name="Groups",
+        password=TEST_PASSWORD,
+        group_names=[],
     )
 
     names = await _user_group_names(test_db_session, user)

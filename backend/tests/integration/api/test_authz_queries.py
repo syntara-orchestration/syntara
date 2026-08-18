@@ -31,6 +31,7 @@ from tests.integration.api.conftest import (
     make_auditor,
     make_project_admin,
     make_project_user,
+    make_project_user_via_group,
     make_user_role,
 )
 
@@ -549,6 +550,54 @@ async def test_who_can_tier1_strips_forged_labels(
 
     assert len(clean.json()["resources"]) > 0
     assert clean.json()["resources"] == forged.json()["resources"]
+
+
+@pytest.mark.asyncio
+async def test_who_can_group_granted_project_scoped_approval_decide(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+) -> None:
+    """WC-1b: who-can returns users who hold approval:decide via GROUP membership (not direct grant).
+
+    This is the normal case: most users get approval:decide through membership in a
+    group that has the project-user role for the project, NOT through a direct personal
+    role assignment.  Exercises the group_id→role_assignment→policy resolution path in
+    resolve_effective_policies for a project-scoped permission.
+    """
+    admin = await user_factory(username="admin-wc1b", email="admin-wc1b@test.com")
+    editor = await user_factory(username="editor-wc1b", email="editor-wc1b@test.com")
+    group_member = await user_factory(username="group-member-wc1b", email="group-member-wc1b@test.com")
+    await make_admin(test_db_session, admin)
+
+    # Editor has direct project-user role (for the gate: workflow:update/create)
+    auth_as(admin)
+    response = await auth_client.post("/api/v1/projects", json={"name": "wc-group-proj"})
+    assert response.status_code == 201
+    project_name = response.json()["name"]
+    project = (await test_db_session.exec(select(Project).where(Project.name == project_name))).first()
+    assert project is not None
+    await make_project_user(test_db_session, editor, project)
+
+    # group_member gets project-user role via GROUP membership (not direct assignment)
+    await make_project_user_via_group(test_db_session, group_member, project)
+
+    # Editor calls who_can — should see both themselves (direct) and group_member (via group)
+    auth_as(editor)
+    response = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "decide",
+            "resource_type": "approval",
+            "resource_project": project_name,
+        },
+    )
+    assert response.status_code == 200
+    usernames = {u["username"] for u in response.json()["resources"]}
+    assert editor.username in usernames, "direct-grant user must appear"
+    assert group_member.username in usernames, "group-granted user must appear in who_can"
 
 
 @pytest.mark.asyncio
