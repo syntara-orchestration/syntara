@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from uuid import UUID
 
 import nh3
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
@@ -192,7 +192,13 @@ class ApprovalDecisionRequest(SQLModel):
 
     status: ApprovalDecisionStatus = Field(..., description="Decision status")
     notes: str | None = Field(
-        None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
+        None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description=(
+            "Optional notes explaining the decision. Accepts either `notes` or "
+            "`decision_notes` (the key returned in responses) as the request field name."
+        ),
+        validation_alias=AliasChoices("notes", "decision_notes"),
     )
 
     @field_validator("notes", mode="before")
@@ -210,7 +216,13 @@ class BatchApprovalDecision(SQLModel):
     approval_id: UUID = Field(..., description="ID of the approval request")
     status: BatchApprovalDecisionStatus = Field(..., description="Decision status")
     notes: str | None = Field(
-        None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Optional notes explaining the decision"
+        None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description=(
+            "Optional notes explaining the decision. Accepts either `notes` or "
+            "`decision_notes` (the key returned in responses) as the request field name."
+        ),
+        validation_alias=AliasChoices("notes", "decision_notes"),
     )
 
     @field_validator("notes", mode="before")

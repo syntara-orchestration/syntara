@@ -357,7 +357,7 @@ export interface components {
       status: components['schemas']['ApprovalDecisionStatus']
       /**
        * Notes
-       * @description Optional notes explaining the decision
+       * @description Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
        */
       notes?: string | null
     }
@@ -384,7 +384,7 @@ export interface components {
       status: components['schemas']['BatchApprovalDecisionStatus']
       /**
        * Notes
-       * @description Optional notes explaining the decision
+       * @description Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
        */
       notes?: string | null
     }
