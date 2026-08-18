@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from datetime import UTC
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -392,23 +392,16 @@ class TestResolveProjectInfosBatch:
         assert missing not in result
 
 
-@contextmanager
-def _mock_max_lifetime_days(days: int) -> Generator[None, None, None]:
-    """Patch the runtime settings cache for service_account_service."""
-    mock_cache = MagicMock()
-    mock_cache.get_int = AsyncMock(return_value=days)
-    with patch(
-        "syntara.service_accounts.services.service_account_service.get_runtime_settings",
-        return_value=mock_cache,
-    ):
-        yield
-
-
 class TestListServiceAccounts:
     """Tests for listing service accounts with project info resolution."""
 
     @pytest.mark.asyncio
-    async def test_list_resolves_project_info(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
+    async def test_list_resolves_project_info(
+        self,
+        service: ServiceAccountService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
         proj_id = uuid4()
         sa_read = ServiceAccountRead(
             id=uuid4(),
@@ -422,7 +415,7 @@ class TestListServiceAccounts:
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
         with (
-            _mock_max_lifetime_days(180),
+            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
@@ -437,7 +430,12 @@ class TestListServiceAccounts:
         assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
-    async def test_list_marks_deleted_project(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
+    async def test_list_marks_deleted_project(
+        self,
+        service: ServiceAccountService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
         from datetime import datetime
 
         proj_id = uuid4()
@@ -453,7 +451,7 @@ class TestListServiceAccounts:
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
         with (
-            _mock_max_lifetime_days(180),
+            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
@@ -468,7 +466,12 @@ class TestListServiceAccounts:
         assert response.resources[0].is_project_deleted is True
 
     @pytest.mark.asyncio
-    async def test_list_handles_missing_project(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
+    async def test_list_handles_missing_project(
+        self,
+        service: ServiceAccountService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
         proj_id = uuid4()
         sa_read = ServiceAccountRead(
             id=uuid4(),
@@ -482,7 +485,7 @@ class TestListServiceAccounts:
         mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
 
         with (
-            _mock_max_lifetime_days(180),
+            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
@@ -497,11 +500,16 @@ class TestListServiceAccounts:
         assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
-    async def test_list_empty_resources(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
+    async def test_list_empty_resources(
+        self,
+        service: ServiceAccountService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
         mock_response = ServiceAccountListResponse(resources=[], next=None)
 
         with (
-            _mock_max_lifetime_days(180),
+            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
