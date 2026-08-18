@@ -170,18 +170,15 @@ test.describe('Integration Wizard @pr-check', () => {
   })
 
   test('connection test with unreachable endpoint returns connection error', async ({ app }) => {
-    test.skip(!isRealBackend, 'Requires real backend — mock API discover always returns success')
+    test.skip(!isRealBackend || !mcpServerUrl, 'Requires real backend with SYNTARA_E2E_MCP_SERVER_URL set')
     const name = buildUniqueName('e2e-wizard-t9a')
     const credName = buildUniqueName('e2e-wizard-t9a-cred')
     let credentialId: string | undefined
 
     try {
       credentialId = await createLlmCredential(app, credName)
-      // Step 1 — LLM Provider with base_url pointing to a closed port on the allowlisted,
-      // in-network mcp-server host (mirrors the backend e2e). The host is allowlisted so it passes
-      // write-time SSRF validation, while nothing listens on :9999 — TCP RST is immediate so the
-      // backend classifies this as connection_error, not timeout. A loopback address (127.0.0.1)
-      // cannot be used: it is not allowlisted and would be rejected as an SSRF risk before connect.
+      // Step 1 — LLM Provider with Red Hat AI hint, base_url pointing to a port with nothing
+      // listening. TCP RST is immediate so the backend classifies this as connection_error, not timeout.
       await app.goto(toAppUrl('/configuration/integrations/configure'))
       await expect(app.getByRole('heading', { name: 'Integration details', level: 2 })).toBeVisible()
 
