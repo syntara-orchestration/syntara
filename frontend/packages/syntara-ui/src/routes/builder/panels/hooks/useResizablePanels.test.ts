@@ -42,25 +42,25 @@ describe('useResizablePanels', () => {
 
   describe('localStorage restoration', () => {
     it('restores saved widths from localStorage', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
       const { result } = renderHook(() => useResizablePanels({ panelCount: 3, workflowId: 'wf-1', nodeId: 'node-1' }))
       expect(result.current.widths).toEqual([25, 50, 25])
     })
 
     it('falls back to defaults when saved panel count does not match', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([50, 50]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([50, 50]))
       const { result } = renderHook(() => useResizablePanels({ panelCount: 3, workflowId: 'wf-1', nodeId: 'node-1' }))
       expect(result.current.widths).toEqual([33.3, 33.3, 33.4])
     })
 
     it('falls back to defaults when localStorage contains invalid JSON', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', 'not-json')
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', 'not-json')
       const { result } = renderHook(() => useResizablePanels({ panelCount: 3, workflowId: 'wf-1', nodeId: 'node-1' }))
       expect(result.current.widths).toEqual([33.3, 33.3, 33.4])
     })
 
     it('falls back to defaults when workflowId is undefined', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
       const { result } = renderHook(() =>
         useResizablePanels({ panelCount: 3, workflowId: undefined, nodeId: 'node-1' })
       )
@@ -68,13 +68,13 @@ describe('useResizablePanels', () => {
     })
 
     it('falls back to defaults when nodeId is undefined', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
       const { result } = renderHook(() => useResizablePanels({ panelCount: 3, workflowId: 'wf-1', nodeId: undefined }))
       expect(result.current.widths).toEqual([33.3, 33.3, 33.4])
     })
 
     it('falls back to defaults when saved widths contain values below minimum', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([10, 45, 45]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([10, 45, 45]))
       const { result } = renderHook(() => useResizablePanels({ panelCount: 3, workflowId: 'wf-1', nodeId: 'node-1' }))
       expect(result.current.widths).toEqual([33.3, 33.3, 33.4])
     })
@@ -126,7 +126,7 @@ describe('useResizablePanels', () => {
         result.current.handleResizeEnd()
       })
 
-      const stored = localStorage.getItem('nexus-panel-sizes-wf-1-node-1')
+      const stored = localStorage.getItem('syntara-panel-sizes-wf-1-node-1')
       expect(stored).not.toBeNull()
       expect(JSON.parse(stored!)).toEqual([33.3, 33.3, 33.4])
     })
@@ -156,7 +156,7 @@ describe('useResizablePanels', () => {
 
   describe('panel count changes', () => {
     it('resets to defaults when panelCount changes from 3 to 2', () => {
-      localStorage.setItem('nexus-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
+      localStorage.setItem('syntara-panel-sizes-wf-1-node-1', JSON.stringify([25, 50, 25]))
       const { result, rerender } = renderHook(
         ({ panelCount }: { panelCount: 2 | 3 }) =>
           useResizablePanels({ panelCount, workflowId: 'wf-1', nodeId: 'node-1' }),
