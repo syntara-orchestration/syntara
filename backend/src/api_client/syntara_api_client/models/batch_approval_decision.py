@@ -22,7 +22,8 @@ class BatchApprovalDecision:
         status (BatchApprovalDecisionStatus): Status values that can be submitted in batch approval decisions.
 
             This is a subset of ApprovalRequestStatus containing only system-actionable values.
-        notes (None | str | Unset): Optional notes explaining the decision
+        notes (None | str | Unset): Optional notes explaining the decision. Accepts either `notes` or `decision_notes`
+            (the key returned in responses) as the request field name.
     """
 
     approval_id: UUID
