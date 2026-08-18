@@ -519,7 +519,9 @@ class TestInvocationExecutorLifecycleEvents:
             await executor.execute_invocation(invocation_id=invocation.id)
 
         fail_invocation.assert_awaited_once()
-        error_message = fail_invocation.await_args.kwargs["error_message"]
+        await_args = fail_invocation.await_args
+        assert await_args is not None
+        error_message = await_args.kwargs["error_message"]
         assert safe_fragment in error_message
         assert leaked_fragment not in error_message
         assert str(error) not in error_message
