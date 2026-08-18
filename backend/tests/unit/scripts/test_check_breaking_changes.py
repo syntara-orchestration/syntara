@@ -108,7 +108,7 @@ def _run_main(
     raw = output.read_text() if output.exists() else ""
     is_text = extra_args is not None and "text" in extra_args
     result: dict[str, Any] = {} if is_text or not raw else json.loads(raw)
-    return int(exc.value.code), result
+    return int(exc.value.code or 0), result
 
 
 class TestExtractInfoVersion:
@@ -368,7 +368,7 @@ class TestEvaluateGate:
         justification: str = "",
         cve_approved: bool = False,
         change_kind: str = "none",
-    ) -> check_breaking.GateDecision:
+    ) -> Any:
         return check_breaking.evaluate_gate(
             has_breaking=has_breaking,
             version_bump_type=version_bump_type,
