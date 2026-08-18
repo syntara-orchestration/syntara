@@ -10,22 +10,7 @@
  */
 import { type Page } from '@playwright/test'
 
-import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import { apiRequest, createCredentialViaApi, deleteCredentialViaApi, ensureProject, getAuthToken } from '../utils/api'
-
-const isRealBackend = isSkipWebServerForPlaywrightTests()
-
-/**
- * Real-backend base_url for seeded integrations.
- *
- * The real backend rejects an integration base_url whose hostname is neither in
- * APP_INTEGRATION_URL_ALLOWED_HOSTS nor resolvable to a public address, so random
- * `<name>.example.com` subdomains return NXDOMAIN and fail closed with a 422 at creation time.
- * Defaults to the compose-allowlisted, in-network `mcp-server` service (the podman-compose
- * default, resolvable without external DNS); override via SYNTARA_E2E_INTEGRATION_HOST. Mock mode
- * does not validate, so callers keep a descriptive `<name>.example.com` placeholder there.
- */
-const SSRF_SAFE_INTEGRATION_HOST = process.env.SYNTARA_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 export type SeededIntegration = {
   id: string
@@ -50,7 +35,7 @@ export async function createIntegrationViaApi(
       integration_type: 'mcp_server',
       configuration: {
         integration_type: 'mcp_server',
-        base_url: isRealBackend ? SSRF_SAFE_INTEGRATION_HOST : `https://${options.name}.example.com/api`,
+        base_url: `https://example.com`,
       },
       scope: 'global',
     }
