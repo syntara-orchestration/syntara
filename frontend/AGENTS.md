@@ -159,7 +159,7 @@ npm run tsc                # Type check only
 
 ## Connecting to Real Backend
 
-To use the real Syntara backend instead of the mock API:
+To use the real backend instead of the mock API:
 
 1. The backend is available at `../backend/` in this monorepo
 2. Follow the backend README (`../backend/README.md`) to start the API server
@@ -183,31 +183,31 @@ For how the UI is structured, see these comprehensive guides:
 
 ### Quick Navigation by Task
 
-| Working on...                       | Read this                                                                                                                                                                                                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New here / onboarding**           | [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) -- AI agent prompts, screenshot workflow, full example                                                                                                                                                                             |
-| **API integration**                 | [`docs/data-flow.md`](docs/data-flow.md) -- OpenAPI contracts and type-safe clients                                                                                                                                                                                                                     |
-| **Workflow transformations**        | [`docs/data-flow.md`](docs/data-flow.md) -- Nested to flat conversions                                                                                                                                                                                                                                  |
-| **Step registry (`NodeRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                          |
-| **Builder internals**               | [`docs/architecture.md`](docs/architecture.md) -- "Builder internals (advanced)"                                                                                                                                                                                                                        |
-| **State management**                | [`docs/zustand-architecture.md`](docs/zustand-architecture.md) -- Zustand guide                                                                                                                                                                                                                         |
-| **WebSocket / real-time**           | [`docs/websocket-architecture.md`](docs/websocket-architecture.md) -- multi-channel infrastructure                                                                                                                                                                                                      |
-| **Execution visualization**         | [`docs/execution-visualizer-protocol.md`](docs/execution-visualizer-protocol.md) -- protocol, endpoints, data specs                                                                                                                                                                                     |
-| **List filters / search**           | [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) -- FilterBar, `useCursorPagination`, types; [`docs/user-guides/filtering.md`](docs/user-guides/filtering.md) -- UX guide                                                                                                      |
+| Working on...                       | Read this                                                                                                                                                                                                                                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **New here / onboarding**           | [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) -- AI agent prompts, screenshot workflow, full example                                                                                                                                                                          |
+| **API integration**                 | [`docs/data-flow.md`](docs/data-flow.md) -- OpenAPI contracts and type-safe clients                                                                                                                                                                                                                  |
+| **Workflow transformations**        | [`docs/data-flow.md`](docs/data-flow.md) -- Nested to flat conversions                                                                                                                                                                                                                               |
+| **Step registry (`NodeRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                       |
+| **Builder internals**               | [`docs/architecture.md`](docs/architecture.md) -- "Builder internals (advanced)"                                                                                                                                                                                                                     |
+| **State management**                | [`docs/zustand-architecture.md`](docs/zustand-architecture.md) -- Zustand guide                                                                                                                                                                                                                      |
+| **WebSocket / real-time**           | [`docs/websocket-architecture.md`](docs/websocket-architecture.md) -- multi-channel infrastructure                                                                                                                                                                                                   |
+| **Execution visualization**         | [`docs/execution-visualizer-protocol.md`](docs/execution-visualizer-protocol.md) -- protocol, endpoints, data specs                                                                                                                                                                                  |
+| **List filters / search**           | [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) -- FilterBar, `useCursorPagination`, types; [`docs/user-guides/filtering.md`](docs/user-guides/filtering.md) -- UX guide                                                                                                   |
 | **PR sizing / stacking**            | [`.github/pull_request_template.md`](../.github/pull_request_template.md) -- PR template and guidelines                                                                                                                                                                                                 |
 | **List page with pagination**       | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useCursorPagination` pattern                                                                                                                                                            |
 | **Full list (dropdowns, settings)** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- section 22: `fetchAllPages` + `useAll*` hooks (not `limit: 100` single queries)                                                                                                          |
 | **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `NxConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-nxconfirmationdialog"` |
 | **Sonar S6478 / PF `toggle` props** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- nested components and PatternFly render props                                                                                                                                            |
 | **Dialog state management**         | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDialogState` hook                                                                                                                                                                    |
-| **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                          |
+| **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                       |
 | **Testing standards**               | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../.claude/skills/frontend-testing-guidelines/SKILL.md) -- coverage, queries, accessibility                                                                                                                                                     |
-| **Visual regression testing**       | [`packages/syntara-ui/VISUAL_REGRESSION.md`](packages/syntara-ui/VISUAL_REGRESSION.md) -- page registry, baselines, manual-only workflow                                                                                                                                                                |
-| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/nodes/QUICK_START.md`                                                                                                                                                                                                                                  |
+| **Visual regression testing**       | [`packages/syntara-ui/VISUAL_REGRESSION.md`](packages/syntara-ui/VISUAL_REGRESSION.md) -- page registry, baselines, manual-only workflow                                                                                                                                                             |
+| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/nodes/QUICK_START.md`                                                                                                                                                                                                                               |
 | **UX / PatternFly design system**   | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../.claude/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                   |
 | **Library docs / llms.txt links**   | [`.claude/skills/frontend-library-references/SKILL.md`](../.claude/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                       |
-| **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                          |
-| **Page content frame (`NxPanel`)**  | `packages/syntara-ui/src/components/layout/NxPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                           |
+| **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                       |
+| **Page content frame (`NxPanel`)**  | `packages/syntara-ui/src/components/layout/NxPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                        |
 | **Documentation links**             | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                   |
 
 ### Quick Reference: Common Tasks
@@ -341,12 +341,16 @@ See: [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) �
 
 #### How do I format dates?
 
-Use date utilities in `packages/syntara-ui/src/utils/dateUtils.ts`:
+For any **rendered/read-only** date or timestamp (table columns, detail views, tooltips), use `DateCell` / `UserTimestamp` (`packages/syntara-ui/src/components/table/DateCell.tsx`), which wrap PatternFly's `Timestamp` component (`dateFormat="medium" timeFormat="medium"`). For execution start/end ranges that collapse to time-only on the same day, use the `ExecutionTimestamp` helper. Do not call `toLocaleString()` or render date-fns output directly in JSX.
 
-- `formatDate(isoString)` — "Jan 15, 2024"
-- `formatTime(isoString)` — "2:30 PM"
-- `formatDateTime(isoString?)` — medium date + time with seconds (e.g. "May 27, 2026, 9:55:01 AM")
-- `formatElapsedTime(elapsedMs)` — "1h 2m 3s"
+`packages/syntara-ui/src/utils/dateUtils.ts` is now scoped to non-display helpers and to the handful of **plain-string** contexts where JSX can't be used (dropdown option labels, `TextInput value=`, model fields):
+
+- `formatDateForApi(date)` / `formatDateChipValue(isoValue)` — API/filter serialization
+- `formatDateYMD(date)` / `parseDateYMD(val)` — round-trip helpers for PF `DatePicker`
+- `formatElapsedTime(elapsedMs)` — "1h 2m 3s" (duration, not a calendar timestamp)
+- `formatTimeAgo(isoString)` — relative "5m ago" labels (no PF `Timestamp` equivalent)
+- `formatExpirationDate(isoString)` — plain-string date only, for `TextInput value=` contexts
+- `formatDateTime(isoString?)` — kept only for plain-string contexts (e.g. dropdown option labels, version-name fallbacks) that cannot render JSX; do not call this from new component render paths — use `DateCell`/`Timestamp` instead
 
 Use for UI display only, not in logic (per i18n guidelines). Trigger-specific interval formatting stays in `utils/triggerFormatting.ts`.
 
@@ -404,7 +408,6 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
 - **Authentication**: Basic (demo/coffee)
 - **Separate containers**: UI and Mock API
-- **Build script**: `./build-multiarch.sh` for multi-arch Podman builds
 
 ### Container Commands
 
@@ -418,8 +421,4 @@ npm run podman:build:mock-api     # Build mock API container only
 npm run podman:run                # Run all containers
 npm run podman:run:ui             # Run UI on port 4000
 npm run podman:run:mock-api       # Run API on port 3000
-
-# Multi-arch builds
-./build-multiarch.sh              # Build for AMD64 + ARM64
-./build-multiarch.sh push         # Build and push to registry
 ```
