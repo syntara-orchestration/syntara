@@ -667,7 +667,7 @@ components:
               maxLength: 2000
             - type: "null"
           title: Notes
-          description: Optional notes explaining the decision
+          description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
 
     BatchApprovalDecisionStatus:
       type: string
@@ -704,7 +704,7 @@ components:
               maxLength: 2000
             - type: "null"
           title: Notes
-          description: Optional notes explaining the decision
+          description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
 
     BatchApprovalRequest:
       type: object
