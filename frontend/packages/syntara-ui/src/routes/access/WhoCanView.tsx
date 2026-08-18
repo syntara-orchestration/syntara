@@ -14,7 +14,7 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiCaretLeftIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
-import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
@@ -22,6 +22,7 @@ import { z } from 'zod'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
 import { NxErrorState } from '../../components/states/NxErrorState'
 import { LinkCell } from '../../components/table/LinkCell'
+import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { getUserDetailPath } from '../access-management/accessManagementPaths'
 
@@ -82,26 +83,24 @@ function WhoCanResults({
       </StackItem>
       {users.length > 0 && (
         <>
-          <StackItem>
-            <Table aria-label="Users with access" isStriped style={{ width: '100%' }}>
-              <Thead>
-                <Tr>
-                  <Th>Username</Th>
+          <NxScrollableTableContainer caption="Users with access">
+            <Thead>
+              <Tr>
+                <Th>Username</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {users.map((u) => (
+                <Tr key={u.id}>
+                  <Td dataLabel="Username">
+                    <LinkCell href={getUserDetailPath(u.id)}>
+                      <Truncate content={u.username} />
+                    </LinkCell>
+                  </Td>
                 </Tr>
-              </Thead>
-              <Tbody>
-                {users.map((u) => (
-                  <Tr key={u.id}>
-                    <Td dataLabel="Username">
-                      <LinkCell href={getUserDetailPath(u.id)}>
-                        <Truncate content={u.username} />
-                      </LinkCell>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </StackItem>
+              ))}
+            </Tbody>
+          </NxScrollableTableContainer>
           <StackItem>
             <Flex
               justifyContent={{ default: 'justifyContentSpaceBetween' }}

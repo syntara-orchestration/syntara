@@ -285,6 +285,7 @@ describe('MappingTable', () => {
 
     expect(screen.getByText('IdP group value')).toBeInTheDocument()
     expect(screen.getByText(`${APP_TITLE} group`)).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Group mappings' })).toBeInTheDocument()
   })
 
   it('renders mapping entries with input values', () => {

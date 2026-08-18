@@ -11,6 +11,7 @@ describe('DataTableView', () => {
 
     expect(screen.getByRole('columnheader', { name: 'hostname' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'port' })).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Test data' })).toBeInTheDocument()
   })
 
   it('renders cell values', () => {

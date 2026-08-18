@@ -19,7 +19,7 @@ import {
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
-import { Tbody, Table } from '@patternfly/react-table'
+import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import { Controller, type Control } from 'react-hook-form'
 
@@ -218,7 +218,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <Table aria-label="Group mappings" variant="compact">
+    <NxScrollableTableContainer caption="Group mappings">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
       <Tbody>
         {rows.map((row) => {
@@ -260,7 +260,7 @@ export function MappingTable({
           )
         })}
       </Tbody>
-    </Table>
+    </NxScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -269,7 +269,7 @@ export function MappingTable({
 
   return (
     <Stack hasGutter>
-      <StackItem>{table}</StackItem>
+      {table}
       <StackItem>
         <Button variant="link" icon={<RhUiAddIcon />} onClick={onAdd}>
           Add mapping

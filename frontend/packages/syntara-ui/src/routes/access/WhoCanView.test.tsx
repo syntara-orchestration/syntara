@@ -175,6 +175,7 @@ describe('WhoCanView', () => {
 
     expect(screen.getByText('alice')).toBeInTheDocument()
     expect(screen.getByText('bob')).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Users with access' })).toBeInTheDocument()
   })
 
   it('links usernames to user detail pages', () => {
@@ -270,6 +271,22 @@ describe('WhoCanView', () => {
   })
 
   it('has no accessibility violations', async () => {
+    const { container } = render(<WhoCanView {...sampleResourceActions} />, { wrapper })
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no accessibility violations when results are shown', async () => {
+    mockMutationState({
+      isSuccess: true,
+      data: {
+        resources: [
+          { id: 'u1', username: 'alice' },
+          { id: 'u2', username: 'bob' },
+        ],
+      },
+    })
+
     const { container } = render(<WhoCanView {...sampleResourceActions} />, { wrapper })
     const results = await axe(container)
     expect(results).toHaveNoViolations()
