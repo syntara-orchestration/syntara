@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from tools.export_openapi import build_spec_app
+
+_SCHEMAS_DIR = Path(__file__).resolve().parents[4] / "src" / "syntara" / "schemas"
 
 
 @pytest.fixture(scope="module")
@@ -48,3 +51,22 @@ class TestNoSyntaraInSpec:
             return
         violations = [f"{path}: {value}" for path, value in _collect_strings(runtime_spec) if "Syntara" in value]
         assert violations == [], "Project name 'Syntara' found in API spec:\n" + "\n".join(f"  {v}" for v in violations)
+
+
+class TestNoSyntaraInJsonSchemas:
+    """Verify static JSON schema files use Orchestrator, not Syntara."""
+
+    def test_no_syntara_in_json_schemas(self) -> None:
+        """No JSON schema file should contain 'Syntara'."""
+        violations = []
+        for path in sorted(_SCHEMAS_DIR.rglob("*.schema.json")):
+            content = path.read_text(encoding="utf-8")
+            if "Syntara" in content:
+                data = json.loads(content)
+                rel = path.relative_to(_SCHEMAS_DIR)
+                for json_path, value in _collect_strings(data):
+                    if "Syntara" in value:
+                        violations.append(f"{rel}{json_path}: {value}")
+        assert violations == [], "Project name 'Syntara' found in JSON schema files:\n" + "\n".join(
+            f"  {v}" for v in violations
+        )
