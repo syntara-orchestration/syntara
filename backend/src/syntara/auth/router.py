@@ -88,7 +88,7 @@ from syntara.core.database.session import get_db
 from syntara.core.lib.encryption import SecretEncryptor, key_from_string
 from syntara.core.lib.sanitization import strip_control_chars
 from syntara.core.models import Group, User, UserIdentity
-from syntara.core.models.group import user_groups
+from syntara.core.models.group import user_groups, user_idp_groups
 from syntara.core.models.principal import PrincipalType
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import SUBJECT_MAX_LENGTH
@@ -2115,6 +2115,12 @@ async def _resolve_and_login_user(
             # or extraction failed) — check if the user has any group
             # memberships from other sources (manually assigned),
             # excluding the authenticated group which all users have.
+            # Subquery: group IDs tracked as IdP-managed.  IdP-tracked
+            # rows must never satisfy the manual-group fallback —
+            # including rows written earlier in this same login attempt.
+            idp_managed_subq = (
+                select(user_idp_groups.c.group_id).where(user_idp_groups.c.user_id == user.id).scalar_subquery()
+            )
             other_groups = await db.exec(
                 select(user_groups.c.group_id)
                 .join(Group, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
@@ -2122,16 +2128,27 @@ async def _resolve_and_login_user(
                     user_groups.c.user_id == user.id,
                     Group.name != AUTHENTICATED_GROUP_NAME,
                     Group.deleted_at.is_(None),  # type: ignore[union-attr]
+                    user_groups.c.group_id.notin_(idp_managed_subq),
                 )
                 .limit(1)
             )
             if other_groups.first() is None:
+                is_new_user = user.last_login is None
                 logger.error(
                     "Login denied: no group mappings matched and user has no other groups",
                     user_id=str(user.id),
                     provider=provider_name,
+                    is_new_user=is_new_user,
                 )
-                await db.rollback()
+                if is_new_user:
+                    # First-login deny: rollback to avoid persisting a JIT
+                    # user/identity that has no session and no groups.
+                    await db.rollback()
+                else:
+                    # Returning user: commit so the membership revocation
+                    # from sync_idp_groups persists — rollback would restore
+                    # stale IdP-managed groups the token no longer grants.
+                    await db.commit()
                 raise OIDCCallbackError(
                     _OIDC_ERR_NO_GROUP_MATCH, error_code=OIDCErrorCode.NO_GROUP_MATCH, origin=origin
                 )

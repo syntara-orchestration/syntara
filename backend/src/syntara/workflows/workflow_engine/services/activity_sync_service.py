@@ -6,6 +6,7 @@ to the database in real-time by streaming Temporal history events.
 
 import asyncio
 import json
+import random
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -16,6 +17,8 @@ from uuid import UUID
 import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 from sqlalchemy import or_
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
@@ -81,6 +84,13 @@ _ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
 _COMPOSITE_ITER_SEP = "#iter-"
 
 _PENDING_ACTIVITY_STATE_STARTED = PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
+
+# Retry parameters for the _monitor_execution loop when transient errors
+# (e.g. DB pool exhaustion, brief network blips) kill the monitoring task.
+_MONITOR_RETRY_BASE_DELAY_S = 1.0
+_MONITOR_RETRY_MAX_DELAY_S = 30.0
+_MONITOR_RETRY_BACKOFF_FACTOR = 2.0
+_MONITOR_RETRY_JITTER_FACTOR = 0.5
 
 
 @dataclass
@@ -1042,6 +1052,12 @@ class ActivitySyncService:
         describe-probe results are processed by a single consumer, avoiding
         race conditions between the two sources.
 
+        Transient errors (DB pool exhaustion, brief network blips) trigger
+        retries with exponential backoff. The event stream is re-established
+        from the last successfully processed event on each retry. Retries
+        stop once the execution reaches a terminal state or the service shuts
+        down.
+
         Args:
             execution_id: Database execution ID
             temporal_workflow_id: Temporal workflow ID
@@ -1059,36 +1075,25 @@ class ActivitySyncService:
 
             metadata = await self._initialize_monitoring(execution_id, request_id=request_id)
 
-            queue: asyncio.Queue[_QueueItem] = asyncio.Queue()
-            probe_tasks: list[asyncio.Task[None]] = []
-            producer_task: asyncio.Task[None] | None = None
+            delay = _MONITOR_RETRY_BASE_DELAY_S
+            attempt = 0
 
-            try:
-                producer_task = asyncio.create_task(self._history_event_producer(handle, queue, execution_id))
+            while not self._shutdown:
+                completed = await self._run_monitor_loop(handle, metadata, execution_id)
+                if completed:
+                    break
 
-                with actor_context(
-                    execution_id=metadata.execution_id,
-                    workflow_id=metadata.workflow_id,
-                    request_id=metadata.request_id,
-                ):
-                    while True:
-                        item = await queue.get()
-
-                        if item is None:
-                            break
-
-                        if not await self._dispatch_queue_item(
-                            item, metadata, handle, queue, probe_tasks, execution_id
-                        ):
-                            break
-
-                    if not self._shutdown:
-                        await self._sync_activities_to_db(metadata, handle)
-
-                logger.info("Activity monitoring completed for execution", execution_id=execution_id)
-
-            finally:
-                await self._cancel_background_tasks(producer_task, probe_tasks)
+                attempt += 1
+                logger.warning(
+                    "Retrying activity monitor after transient error",
+                    execution_id=execution_id,
+                    attempt=attempt,
+                    delay_s=delay,
+                )
+                jitter = (1 - _MONITOR_RETRY_JITTER_FACTOR) + random.random() * _MONITOR_RETRY_JITTER_FACTOR  # noqa: S311
+                jittered_delay = delay * jitter
+                await asyncio.sleep(jittered_delay)
+                delay = min(delay * _MONITOR_RETRY_BACKOFF_FACTOR, _MONITOR_RETRY_MAX_DELAY_S)
 
         except asyncio.CancelledError:
             logger.info("Activity monitoring cancelled for execution", execution_id=execution_id)
@@ -1101,6 +1106,58 @@ class ActivitySyncService:
             )
         except Exception:
             logger.exception("Error monitoring execution", execution_id=execution_id)
+
+    async def _run_monitor_loop(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        metadata: ExecutionMonitorMetadata,
+        execution_id: UUID,
+    ) -> bool:
+        """Run a single attempt of the event-processing monitor loop.
+
+        Returns True when monitoring completed normally (execution finished
+        or service is shutting down). Returns False when a transient error
+        occurred and the caller should retry.
+        """
+        queue: asyncio.Queue[_QueueItem] = asyncio.Queue()
+        probe_tasks: list[asyncio.Task[None]] = []
+        producer_task: asyncio.Task[None] | None = None
+
+        try:
+            producer_task = asyncio.create_task(self._history_event_producer(handle, queue, execution_id))
+
+            with actor_context(
+                execution_id=metadata.execution_id,
+                workflow_id=metadata.workflow_id,
+                request_id=metadata.request_id,
+            ):
+                while True:
+                    item = await queue.get()
+
+                    if item is None:
+                        break
+
+                    if not await self._dispatch_queue_item(item, metadata, handle, queue, probe_tasks, execution_id):
+                        break
+
+                if not self._shutdown:
+                    await self._sync_activities_to_db(metadata, handle)
+
+            logger.info("Activity monitoring completed for execution", execution_id=execution_id)
+            return True
+
+        except asyncio.CancelledError:
+            raise
+        except TemporalError:
+            raise
+        except (OperationalError, InterfaceError, SATimeoutError, OSError):
+            logger.exception(
+                "Transient error in monitor loop",
+                execution_id=execution_id,
+            )
+            return False
+        finally:
+            await self._cancel_background_tasks(producer_task, probe_tasks)
 
     def _process_activity_scheduled(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_SCHEDULED event."""
@@ -2268,6 +2325,7 @@ class ActivitySyncService:
                 saved_next_activity_index = metadata.next_activity_index
                 saved_activity_index_map = dict(metadata.activity_index_map)
                 saved_terminal_activity_ids = set(metadata.terminal_activity_ids)
+                saved_last_processed_event_id = metadata.last_processed_event_id
 
                 # Update activities from events (only those marked for sync)
                 for scheduled_event_id in metadata.pending_sync_event_ids:
@@ -2323,6 +2381,7 @@ class ActivitySyncService:
                 metadata.next_activity_index = saved_next_activity_index
                 metadata.activity_index_map = saved_activity_index_map
                 metadata.terminal_activity_ids = saved_terminal_activity_ids
+                metadata.last_processed_event_id = saved_last_processed_event_id
                 logger.exception(
                     "Error syncing activities to database for execution", execution_id=metadata.execution_id
                 )

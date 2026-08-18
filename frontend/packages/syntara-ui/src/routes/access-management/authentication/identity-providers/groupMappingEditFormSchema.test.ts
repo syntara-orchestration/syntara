@@ -12,7 +12,7 @@ describe('groupMappingEditFormSchema', () => {
   it('accepts a complete mapping row and valid JMESPath expression', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: 'admin', nexusGroupId: VALID_GROUP_ID }],
+      entries: [{ idpGroupValue: 'admin', mappedGroupId: VALID_GROUP_ID }],
     })
 
     expect(result.success).toBe(true)
@@ -30,7 +30,7 @@ describe('groupMappingEditFormSchema', () => {
   it('accepts blank rows that are filtered out on save', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: '', nexusGroupId: '' }],
+      entries: [{ idpGroupValue: '', mappedGroupId: '' }],
     })
 
     expect(result.success).toBe(true)
@@ -39,16 +39,16 @@ describe('groupMappingEditFormSchema', () => {
   it('rejects IdP group values over the max length', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: 'a'.repeat(GROUP_MAPPING_IDP_GROUP_VALUE_MAX_LENGTH + 1), nexusGroupId: '' }],
+      entries: [{ idpGroupValue: 'a'.repeat(GROUP_MAPPING_IDP_GROUP_VALUE_MAX_LENGTH + 1), mappedGroupId: '' }],
     })
 
     expect(result.success).toBe(false)
   })
 
-  it('rejects invalid Nexus group IDs', () => {
+  it('rejects invalid Syntara group IDs', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: 'admin', nexusGroupId: 'not-a-uuid' }],
+      entries: [{ idpGroupValue: 'admin', mappedGroupId: 'not-a-uuid' }],
     })
 
     expect(result.success).toBe(false)
@@ -72,10 +72,10 @@ describe('groupMappingEditFormSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects partial rows missing a Nexus group', () => {
+  it('rejects partial rows missing a Syntara group', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: 'admin', nexusGroupId: '' }],
+      entries: [{ idpGroupValue: 'admin', mappedGroupId: '' }],
     })
 
     expect(result.success).toBe(false)
@@ -84,7 +84,7 @@ describe('groupMappingEditFormSchema', () => {
   it('rejects partial rows missing an IdP group value', () => {
     const result = groupMappingEditFormSchema.safeParse({
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: '', nexusGroupId: VALID_GROUP_ID }],
+      entries: [{ idpGroupValue: '', mappedGroupId: VALID_GROUP_ID }],
     })
 
     expect(result.success).toBe(false)

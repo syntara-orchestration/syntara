@@ -16,16 +16,16 @@ import {
 } from './GroupMappingComponents'
 import type { MappingTableProps } from './GroupMappingComponents'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
-import type { GroupMappingEntry, NexusGroup } from './groupMappingUtils'
+import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
-const mockNexusGroups: NexusGroup[] = [
+const mockMappedGroups: MappedGroup[] = [
   { id: 'g1', name: 'admin', description: 'Administrators' },
   { id: 'g2', name: 'users', description: 'Regular users' },
 ]
 
 const mockEntries: GroupMappingEntry[] = [
-  { key: 'k1', idpGroupValue: 'idp-admin', nexusGroupId: 'g1' },
-  { key: 'k2', idpGroupValue: 'idp-users', nexusGroupId: 'g2' },
+  { key: 'k1', idpGroupValue: 'idp-admin', mappedGroupId: 'g1' },
+  { key: 'k2', idpGroupValue: 'idp-users', mappedGroupId: 'g2' },
 ]
 
 describe('EmptyMappingState', () => {
@@ -81,7 +81,7 @@ describe('AdvancedSection', () => {
     defaultValues,
     ...props
   }: {
-    defaultValues?: { expression: string; entries: { idpGroupValue: string; nexusGroupId: string }[] }
+    defaultValues?: { expression: string; entries: { idpGroupValue: string; mappedGroupId: string }[] }
     defaultExpression: string | null
     idpType?: string | null
     rawClaims: string | null
@@ -240,13 +240,13 @@ describe('GroupMappingFormActions', () => {
 })
 
 const mockRows = [
-  { rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', nexusGroupId: 'g1' },
-  { rowId: 'k2', index: 1, idpGroupValue: 'idp-users', nexusGroupId: 'g2' },
+  { rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' },
+  { rowId: 'k2', index: 1, idpGroupValue: 'idp-users', mappedGroupId: 'g2' },
 ]
 
 const editFormEntries = [
-  { idpGroupValue: 'idp-admin', nexusGroupId: 'g1' },
-  { idpGroupValue: 'idp-users', nexusGroupId: 'g2' },
+  { idpGroupValue: 'idp-admin', mappedGroupId: 'g1' },
+  { idpGroupValue: 'idp-users', mappedGroupId: 'g2' },
 ]
 
 function MappingTableFormHarness({
@@ -258,7 +258,7 @@ function MappingTableFormHarness({
   ...tableProps
 }: Omit<MappingTableProps, 'control' | 'rows'> & {
   rows?: MappingTableProps['rows']
-  entries?: { idpGroupValue: string; nexusGroupId: string }[]
+  entries?: { idpGroupValue: string; mappedGroupId: string }[]
 }) {
   const form = useForm({
     resolver: zodResolver(groupMappingEditFormSchema),
@@ -274,7 +274,7 @@ function MappingTableFormHarness({
 
 describe('MappingTable', () => {
   const defaultProps = {
-    nexusGroups: mockNexusGroups,
+    mappedGroups: mockMappedGroups,
     onRemove: vi.fn(),
     onAdd: vi.fn(),
     onCreateGroup: vi.fn(),
@@ -335,7 +335,7 @@ describe('MappingTable', () => {
       <MappingTableFormHarness
         {...defaultProps}
         rows={[{ rowId: 'k1', index: 0 }]}
-        entries={[{ idpGroupValue: '', nexusGroupId: '' }]}
+        entries={[{ idpGroupValue: '', mappedGroupId: '' }]}
       />
     )
 
@@ -366,7 +366,7 @@ describe('MappingTable', () => {
 describe('ReadOnlyView', () => {
   const readOnlyDefaults = {
     entries: mockEntries,
-    nexusGroups: mockNexusGroups,
+    mappedGroups: mockMappedGroups,
     onEditMapping: vi.fn(),
   }
 
@@ -378,7 +378,7 @@ describe('ReadOnlyView', () => {
   })
 
   it('hides Edit group mapping when onEditMapping is omitted', () => {
-    render(<ReadOnlyView entries={mockEntries} nexusGroups={mockNexusGroups} />)
+    render(<ReadOnlyView entries={mockEntries} mappedGroups={mockMappedGroups} />)
 
     expect(screen.getByPlaceholderText('Filter by keyword')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit group mapping/i })).not.toBeInTheDocument()
@@ -448,7 +448,7 @@ describe('ReadOnlyView', () => {
     const manyEntries: GroupMappingEntry[] = Array.from({ length: 21 }, (_, i) => ({
       key: `km${i}`,
       idpGroupValue: `idp-row-${i}`,
-      nexusGroupId: 'g1',
+      mappedGroupId: 'g1',
     }))
 
     render(<ReadOnlyView {...readOnlyDefaults} entries={manyEntries} />)
