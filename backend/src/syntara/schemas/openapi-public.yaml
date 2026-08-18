@@ -13,7 +13,7 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Syntara API
+  title: Orchestrator API
   version: 1.0.0
   description: A distributed multi-agent workflow orchestration system
 servers:
@@ -108,7 +108,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -269,7 +269,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -446,7 +446,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -607,7 +607,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -784,7 +784,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -945,7 +945,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1115,7 +1115,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1285,7 +1285,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1446,7 +1446,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1606,7 +1606,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
             If provided, the credential is decrypted and used instead of environment variables.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -30260,7 +30260,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Syntara user fields to IdP-specific OIDC claim names.
+      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -30287,7 +30287,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Syntara group mapping entry.
+        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -30424,7 +30424,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -30552,7 +30552,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -30692,7 +30692,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries (omit to keep existing)
+          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -35933,7 +35933,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -36529,7 +36529,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -36684,7 +36684,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -36805,7 +36805,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for authentication or Secret URL.
+          description: Orchestrator credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -36833,7 +36833,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for LLM provider authentication
+          description: Orchestrator credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -36887,7 +36887,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Syntara credential UUID for execution calls (distinct from management credential)
+          description: Orchestrator credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -36922,7 +36922,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for credential scrubbing
+          description: Orchestrator credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -36936,7 +36936,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID
+          description: Orchestrator credential UUID
         approver_users:
           anyOf:
             - items:
