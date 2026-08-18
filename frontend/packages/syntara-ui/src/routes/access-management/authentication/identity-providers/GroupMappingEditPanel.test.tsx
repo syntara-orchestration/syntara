@@ -34,7 +34,7 @@ const defaultPanelProps: Omit<GroupMappingEditPanelProps, 'control'> = {
   signInAlert: null,
   onDismissSignInAlert: () => undefined,
   mappingRows: [{ rowId: 'e1', index: 0 }],
-  nexusGroups: [{ id: MOCK_GROUP_ID, name: 'admin' }],
+  mappedGroups: [{ id: MOCK_GROUP_ID, name: 'admin' }],
   onRemove: () => undefined,
   onAdd: () => undefined,
   onCreateGroup: () => undefined,
@@ -53,7 +53,7 @@ function EditPanelHarness(props: Partial<GroupMappingEditPanelProps> = {}) {
     resolver: zodResolver(groupMappingEditFormSchema),
     defaultValues: {
       expression: 'groups[*]',
-      entries: [{ idpGroupValue: 'admin', nexusGroupId: MOCK_GROUP_ID }],
+      entries: [{ idpGroupValue: 'admin', mappedGroupId: MOCK_GROUP_ID }],
     },
   })
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create a workflow from JSON using the Nexus API.
+Create a workflow from JSON using the Syntara API.
 
 This tool is designed for PR reviews - paste JSON directly or use a file.
 
@@ -151,7 +151,7 @@ DEFAULT_EXAMPLE = "tools/workflow-creator/examples/hello-world.json"
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create a workflow from JSON using the Nexus API.",
+        description="Create a workflow from JSON using the Syntara API.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

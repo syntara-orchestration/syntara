@@ -19,8 +19,8 @@ WORKDIR /opt/app-root
 RUN uv init --no-readme --no-workspace --python 3.12
 RUN uv add "fastmcp>=3.2.0,<4.0.0" "structlog>=25.5.0"
 
-# Install nexus-test-sdk (provides ExampleMCPServer); --no-deps avoids pulling
-# nexus-api-client and pytest into the image since only stdlib + fastmcp are needed.
+# Install orchestrator-test-sdk (provides ExampleMCPServer); --no-deps avoids pulling
+# syntara-api-client and pytest into the image since only stdlib + fastmcp are needed.
 COPY test-sdk/ ./test-sdk/
 RUN VIRTUAL_ENV=/opt/app-root/.venv uv pip install --no-cache-dir --no-deps ./test-sdk/
 

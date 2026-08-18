@@ -1,6 +1,6 @@
 # Workflow Creator
 
-Create workflows from JSON using the Nexus API.
+Create workflows from JSON using the Syntara API.
 
 **Use case**: During PR reviews, test workflow definitions locally without manually creating them in the UI.
 
@@ -101,4 +101,4 @@ python3 create_workflow.py <json_file> [options]
 
 - Python 3.6+
 - No dependencies (uses built-in `urllib`)
-- Nexus API running locally
+- Syntara API running locally
