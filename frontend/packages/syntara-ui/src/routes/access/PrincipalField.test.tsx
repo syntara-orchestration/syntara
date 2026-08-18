@@ -72,14 +72,14 @@ describe('PrincipalField', () => {
     expect(screen.getByRole('option', { name: 'Bob' })).toBeInTheDocument()
   })
 
-  it('selects an option', async () => {
+  it('selects an option and closes the dropdown', async () => {
     const user = userEvent.setup()
     render(<Wrapper />)
 
     await user.click(screen.getByPlaceholderText('Select a user...'))
     await user.click(screen.getByRole('option', { name: 'Alice' }))
 
-    expect(screen.queryByRole('option', { name: 'Alice' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
   it('shows validation error on submit without selection', async () => {
