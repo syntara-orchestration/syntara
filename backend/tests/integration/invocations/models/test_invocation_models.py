@@ -9,7 +9,6 @@ Tests cover:
 - JSONB field operations (context_data, result, checkpoint_data)
 - Timestamp field behavior (created_at, started_at, completed_at, updated_at)
 - Field validation and constraints
-- List response models (InvocationListResponse)
 - Enum validation (InvocationStatus)
 """
 
@@ -23,7 +22,7 @@ from sqlalchemy import inspect
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.agent_orchestrator.models import Invocation, InvocationListResponse, InvocationStatus
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.core.models import User
 
 
@@ -341,51 +340,6 @@ class TestInvocationValidation:
         assert invocation.context_data == {"env": "prod"}
         assert invocation.result == {"workflow_id": "wf-123"}
         assert invocation.checkpoint_data == {"phase": "complete"}
-
-
-class TestInvocationListResponse:
-    """Tests for InvocationListResponse model."""
-
-    def test_empty_list_response(self) -> None:
-        """Test list response with no invocations."""
-        response = InvocationListResponse(
-            resources=[],
-            total=0,
-        )
-
-        assert response.resources == []
-        assert response.total == 0
-
-    def test_list_response_with_invocations(self) -> None:
-        """Test list response with multiple invocations."""
-        invocation_1 = Invocation(
-            id=uuid4(),
-            prompt="Test 1",
-            created_by=uuid4(),
-            project_id=uuid4(),
-            session_id="session-001",
-            status=InvocationStatus.RUNNING,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        invocation_2 = Invocation(
-            id=uuid4(),
-            prompt="Test 2",
-            created_by=uuid4(),
-            project_id=uuid4(),
-            session_id="session-002",
-            status=InvocationStatus.COMPLETED,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-
-        response = InvocationListResponse(
-            resources=[invocation_1, invocation_2],
-            total=2,
-        )
-
-        assert len(response.resources) == 2
-        assert response.total == 2
 
 
 class TestInvocationStatusEnum:

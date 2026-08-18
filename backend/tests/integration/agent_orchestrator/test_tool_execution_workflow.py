@@ -208,7 +208,9 @@ class TestToolExecutionWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -271,7 +273,9 @@ class TestToolExecutionWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -311,7 +315,9 @@ class TestToolExecutionWorkflow:
             "project_id": str(test_project_id),
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -366,7 +372,9 @@ class TestToolExecutionWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -412,7 +420,9 @@ class TestToolExecutionFailureRetryWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -462,7 +472,9 @@ class TestToolExecutionFailureRetryWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -519,7 +531,9 @@ class TestToolExecutionFailureRetryWorkflow:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
 
         invocation_response = create_response.json()
@@ -592,7 +606,9 @@ class TestToolEventWebSocketStreaming:
             "context_data": {"metadata": {"tool_selection_strategy": "ALL"}},
         }
 
-        create_response = await auth_client_with_tool_aware_mocked_llm.post("/api/v1/invocations", json=invocation_data)
+        create_response = await auth_client_with_tool_aware_mocked_llm.post(
+            "/_internal/invocations", json=invocation_data
+        )
         assert create_response.status_code == 202
         invocation_id = create_response.json()["id"]
 

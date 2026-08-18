@@ -22,6 +22,7 @@ from syntara.auth.services.token_service import TokenService
 from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.invocations.internal import _get_internal_caller_user
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -83,8 +84,12 @@ async def _ao_test_client(
     async def override_temporal() -> TemporalExecutionService:
         return _svc
 
+    async def override_internal_caller() -> User:
+        return test_user
+
     session_app.dependency_overrides[get_db] = override_get_db
     session_app.dependency_overrides[get_temporal_execution_service] = override_temporal
+    session_app.dependency_overrides[_get_internal_caller_user] = override_internal_caller
 
     with patch("syntara.auth.dependencies._check_global_revocation", new_callable=AsyncMock):
         async with AsyncClient(
@@ -96,6 +101,7 @@ async def _ao_test_client(
 
     session_app.dependency_overrides.pop(get_db, None)
     session_app.dependency_overrides.pop(get_temporal_execution_service, None)
+    session_app.dependency_overrides.pop(_get_internal_caller_user, None)
 
 
 @pytest_asyncio.fixture

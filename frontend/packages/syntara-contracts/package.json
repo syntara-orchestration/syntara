@@ -22,7 +22,6 @@
     "gen:local:aap": "openapi-typescript ../../../backend/src/syntara/schemas/aap/openapi.yaml --output ./src/aap-api.ts --default-non-nullable false",
     "gen:local:approvals": "openapi-typescript ../../../backend/src/syntara/schemas/approvals/openapi.yaml --output ./src/approvals-api.ts --default-non-nullable false",
     "gen:local:executions": "openapi-typescript ../../../backend/src/syntara/schemas/workflows/v2/executions_openapi.yaml --output ./src/executions-api.ts --default-non-nullable false",
-    "gen:local:invocations": "openapi-typescript ../../../backend/src/syntara/schemas/invocations/openapi.yaml --output ./src/invocations-api.ts --default-non-nullable false",
     "gen:local:metrics": "openapi-typescript ../../../backend/src/syntara/schemas/internal_metrics/openapi.yaml --output ./src/metrics-api.ts --default-non-nullable false",
     "gen:local:node-outputs": "node ./scripts/generate-node-output-schemas.mjs",
     "gen:local:settings": "openapi-typescript ../../../backend/src/syntara/schemas/settings/openapi.yaml --output ./src/settings-api.ts --default-non-nullable false",

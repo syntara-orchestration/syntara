@@ -484,11 +484,7 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "setting:write:any",
     # Authz query
     "authz:query:any",
-    # Invocations
-    "invocation:create:any",
-    "invocation:read:any",
-    "invocation:cancel:any",
-    # Files — E2E needs S3 (); authz path unit-tested
+    # Files — E2E needs S3 (operator#574 + aap-dev#746); authz path unit-tested
     "files:upload:any",
     "files:download:any",
     "files:upload:project",

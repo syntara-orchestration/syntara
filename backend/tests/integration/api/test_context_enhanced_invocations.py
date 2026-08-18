@@ -35,7 +35,7 @@ class TestContextEnhancedInvocations:
 
         # Create invocation via API
         response = await auth_client_with_mocked_llm.post(
-            "/api/v1/invocations",
+            "/_internal/invocations",
             json={
                 "prompt": prompt,
                 "created_by": str(test_user.id),

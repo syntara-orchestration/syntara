@@ -244,7 +244,7 @@ services:
       - APP_CACHE_HOST=redis
       - APP_CACHE_PASSWORD=${APP_CACHE_PASSWORD:-cache}
       - APP_WORKFLOW_BASE_URL=${APP_WORKFLOW_BASE_URL:-https://syntara:8000/api/v1}
-      - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000/api/v1}
+      - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000}
       - APP_APPROVALS_API_BASE_URL=${APP_APPROVALS_API_BASE_URL:-https://syntara:8000/api/v1}
       - APP_TOOL_MANAGER_BASE_URL=${APP_TOOL_MANAGER_BASE_URL:-https://syntara:8000/api/v1}
       - APP_AAP_BASE_URL=${APP_AAP_BASE_URL}
@@ -322,7 +322,7 @@ services:
       - APP_CACHE_HOST=redis
       - APP_CACHE_PASSWORD=${APP_CACHE_PASSWORD:-cache}
       - APP_WORKFLOW_BASE_URL=${APP_WORKFLOW_BASE_URL:-https://syntara:8000/api/v1}
-      - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000/api/v1}
+      - APP_AGENT_ORCHESTRATOR_BASE_URL=${APP_AGENT_ORCHESTRATOR_BASE_URL:-https://syntara:8000}
       - APP_APPROVALS_API_BASE_URL=${APP_APPROVALS_API_BASE_URL:-https://syntara:8000/api/v1}
       - APP_TOOL_MANAGER_BASE_URL=${APP_TOOL_MANAGER_BASE_URL:-https://syntara:8000/api/v1}
       # Must match the API (syntara) service: the execution-time integration SSRF check

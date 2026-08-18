@@ -40,7 +40,7 @@ class TestContextPerformanceImpact:
 
         # Create baseline invocation via API
         response = await auth_client_with_mocked_llm.post(
-            "/api/v1/invocations",
+            "/_internal/invocations",
             json={
                 "prompt": baseline_prompt,
                 "created_by": str(test_user.id),
@@ -83,7 +83,7 @@ class TestContextPerformanceImpact:
 
             # Create context invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": context_prompt,
                     "created_by": str(test_user.id),
@@ -142,7 +142,7 @@ class TestContextPerformanceImpact:
 
             # Create invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": prompt,
                     "created_by": str(test_user.id),
@@ -194,7 +194,7 @@ class TestContextPerformanceImpact:
             # Start all invocations concurrently
             for i in range(num_concurrent):
                 response = await auth_client_with_mocked_llm.post(
-                    "/api/v1/invocations",
+                    "/_internal/invocations",
                     json={
                         "prompt": f"Concurrent test prompt {i}",
                         "created_by": str(test_user.id),
@@ -260,7 +260,7 @@ class TestContextPerformanceImpact:
 
                 # Create invocation via API
                 response = await auth_client_with_mocked_llm.post(
-                    "/api/v1/invocations",
+                    "/_internal/invocations",
                     json={
                         "prompt": prompt,
                         "created_by": str(test_user.id),
@@ -312,7 +312,7 @@ class TestContextPerformanceImpact:
 
             # Create invocation via API
             response = await auth_client_with_mocked_llm.post(
-                "/api/v1/invocations",
+                "/_internal/invocations",
                 json={
                     "prompt": prompt,
                     "created_by": str(test_user.id),

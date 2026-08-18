@@ -19,7 +19,7 @@ async def test_agent_metrics_on_openmetrics_endpoint(
 ) -> None:
     """Agent invocation causes Prometheus counters/histograms to be non-zero."""
     response = await auth_client_with_mocked_llm.post(
-        "/api/v1/invocations",
+        "/_internal/invocations",
         json={"prompt": "What is 2+2?", "session_id": "prom-metrics-test", "project_id": str(test_project_id)},
     )
     assert response.status_code == 202

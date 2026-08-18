@@ -25,6 +25,7 @@ from syntara.authz.models import Project, RoleAssignment
 from syntara.authz.seed import seed_authz_data
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
+from syntara.invocations.internal import _get_internal_caller_user
 
 # Name for the test group that grants the 'user' role
 _TEST_GROUP_NAME = "test-users"
@@ -118,6 +119,7 @@ async def admin_client(base_client: AsyncClient, admin_user: User) -> AsyncClien
         return admin_user
 
     app.dependency_overrides[get_current_user] = override
+    app.dependency_overrides[_get_internal_caller_user] = override
     return base_client
 
 
@@ -134,6 +136,7 @@ def auth_as() -> Callable[[User], None]:
             return user
 
         app.dependency_overrides[get_current_user] = override
+        app.dependency_overrides[_get_internal_caller_user] = override
 
     return _do_auth_as
 

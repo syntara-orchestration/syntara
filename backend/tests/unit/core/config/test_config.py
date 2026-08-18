@@ -563,7 +563,7 @@ class TestWorkflowEngineSettings:
         assert settings.script_cleanup_terminate_timeout == pytest.approx(1.0)
         assert settings.script_cleanup_kill_timeout == pytest.approx(0.5)
         assert settings.max_env_var_length == 32768
-        assert str(settings.agent_orchestrator_base_url) == "http://localhost:8000/api/v1"
+        assert str(settings.agent_orchestrator_base_url) == "http://localhost:8000/"
 
     def test_workflow_engine_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test workflow engine settings can be configured via environment."""

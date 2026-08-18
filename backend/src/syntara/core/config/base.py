@@ -1493,8 +1493,8 @@ class WorkflowEngineSettings(BaseSettings):
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
-        default="http://localhost:8000/api/v1",
-        description="Base URL for Agent Orchestrator API",
+        default="http://localhost:8000",
+        description="Base URL for Agent Orchestrator API (internal)",
     )
 
     approvals_api_base_url: HttpUrl = Field(  # type: ignore[assignment]

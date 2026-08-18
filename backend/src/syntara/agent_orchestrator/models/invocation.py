@@ -2,18 +2,16 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict
 from sqlalchemy import Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import DateTime
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import UserOwnedResource
-from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.utils.sqlmodel import postgres_enum_column
 
 
@@ -163,20 +161,3 @@ class Invocation(UserOwnedResource, table=True):
 
         """
         return f"<Invocation(id={self.id}, status={self.status})>"
-
-
-class InvocationListResponse(ResourcesResponse[Invocation]):
-    """Paginated list response for invocations."""
-
-
-class InvocationTraceRead(SQLModel):
-    """Read schema for agent execution trace."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
-
-    invocation_id: UUID = Field(description="Invocation UUID")
-    status: InvocationStatus = Field(description="Current invocation status")
-    agent_trace: dict[str, Any] | None = Field(
-        default=None,
-        description="Agent execution trace with model, tokens, duration, and steps",
-    )

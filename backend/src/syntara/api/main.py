@@ -752,6 +752,22 @@ app.get(f"{_INTERNAL_METRICS_PREFIX}/kpis/{{component}}", include_in_schema=Fals
 )
 app.post(f"{_INTERNAL_METRICS_PREFIX}/reset", include_in_schema=False)(metrics_store_reset)
 
+# ---------------------------------------------------------------------------
+# Internal invocations endpoint (service-to-service only)
+# ---------------------------------------------------------------------------
+from syntara.invocations.internal import create_internal_invocation, get_internal_invocation  # noqa: E402
+
+_INTERNAL_INVOCATIONS_PREFIX = "/_internal/invocations"
+app.post(
+    _INTERNAL_INVOCATIONS_PREFIX,
+    include_in_schema=False,
+    status_code=status.HTTP_202_ACCEPTED,
+)(create_internal_invocation)
+app.get(
+    f"{_INTERNAL_INVOCATIONS_PREFIX}/{{invocation_id}}",
+    include_in_schema=False,
+)(get_internal_invocation)
+
 
 def _ssl_context_factory(
     config: uvicorn.Config,  # noqa: ARG001

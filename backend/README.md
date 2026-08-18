@@ -437,46 +437,36 @@ First, ensure database migrations have been run:
 uv run alembic upgrade head
 ```
 
-Then you can invoke agents:
+Invocation create/get is an **internal** service-to-service API (`/_internal/invocations`).
+It is hidden from OpenAPI and is **not** a public REST surface. Security relies on
+network isolation (NetworkPolicy / service mesh), not Bearer/JWT.
 
 ```bash
-# 1. Create an information query (routes to GenericAgent)
-curl -X POST http://localhost:8000/api/v1/invocations \
+# 1. Create an invocation (internal callers only)
+curl -X POST http://localhost:8000/_internal/invocations \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "What is Docker?", "createdBy": "550e8400-e29b-41d4-a716-446655440000", "sessionId": "session-456"}'
+  -H "X-On-Behalf-Of: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{"prompt": "What is Docker?", "sessionId": "session-456", "project_id": "<project-uuid>"}'
 
-# Response includes the invocation ID and result:
+# Response includes the invocation ID (status is typically "created" / "running"):
 # {
 #   "id": "4e51166b-f57f-4f19-a04a-69ae9afc6e2f",
-#   "status": "completed",
-#   "result": {
-#     "type": "answer",
-#     "content": "Docker is a platform that packages applications...",
-#     "metadata": {"model": "anthropic/claude-3.5-sonnet"}
-#   },
+#   "status": "created",
 #   ...
 # }
 
-# 2. Get invocation details by ID (NOTE: This endpoint is for testing/debugging)
-# Use the "id" field from the response above
-curl 'http://localhost:8000/api/v1/invocations/4e51166b-f57f-4f19-a04a-69ae9afc6e2f'
-
-# 3. Workflow request (routes to WorkflowGeneratorAgent)
-curl -X POST http://localhost:8000/api/v1/invocations \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Deploy customer service app to production", "createdBy": "550e8400-e29b-41d4-a716-446655440000", "sessionId": "session-789", "contextData": {"environment": "production"}}'
-
-# 4. List all completed invocations
-curl 'http://localhost:8000/api/v1/invocations?status=completed'
+# 2. Get invocation details by ID (testing/debugging / worker polling)
+curl 'http://localhost:8000/_internal/invocations/4e51166b-f57f-4f19-a04a-69ae9afc6e2f'
 ```
 
-**NOTE**: The GET `/api/v1/invocations/{id}` endpoint is designed for **testing and debugging**. In production, you would typically use WebSockets or Server-Sent Events for real-time result streaming instead of polling this endpoint.
+**NOTE**: There is no public list/cancel/trace REST API. GET `/_internal/invocations/{id}` is for **testing, debugging, and internal callers**. For real-time results, use the agent-orchestrator WebSocket, not polling.
 
-**Field Names**: The API uses camelCase field names per the OpenAPI contract:
-- `createdBy` (UUID) - user identifier (previously `user_id`)
-- `sessionId` (string) - session identifier (previously `session_id`)
-- `contextData` (object) - additional context (previously `context`)
-- Response fields: `id`, `createdAt`, `updatedAt`, `startedAt`, `completedAt`, etc.
+**Field Names**:
+- `prompt` (string, required)
+- `sessionId` / `session_id` (string, required)
+- `project_id` / `projectId` (UUID, required)
+- `contextData` / `context_data` (object, optional)
+- `created_by` is **not** a request body field — pass `X-On-Behalf-Of` for attribution, or omit it to use the internal service principal
 
 ### Development Commands
 
