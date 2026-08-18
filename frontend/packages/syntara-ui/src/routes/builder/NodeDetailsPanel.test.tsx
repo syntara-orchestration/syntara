@@ -508,7 +508,11 @@ describe('NodeDetailsPanel', () => {
       label: 'Action',
       icon: () => <div>ActionIcon</div>,
       category: 'task',
-      formComponent: ({ onSubmit }: { onSubmit: (data: Record<string, unknown>) => Promise<boolean> | boolean | void }) => (
+      formComponent: ({
+        onSubmit,
+      }: {
+        onSubmit: (data: Record<string, unknown>) => Promise<boolean> | boolean | void
+      }) => (
         <button
           onClick={async () => {
             submitOutcome = await onSubmit({})
