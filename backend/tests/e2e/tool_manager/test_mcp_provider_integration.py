@@ -75,6 +75,28 @@ requires_scenario_servers = pytest.mark.skipif(
 )
 
 
+def _check_mcp_server_reachable() -> bool:
+    """Return True if the primary mcp-server health endpoint responds."""
+    health_url = MCP_PROVIDER_URL.rsplit("/mcp", 1)[0] + "/health"
+    try:
+        import urllib.request
+
+        urllib.request.urlopen(health_url, timeout=3)  # noqa: S310
+    except Exception:
+        return False
+    return True
+
+
+requires_mcp_server = pytest.mark.skipif(
+    "not _check_mcp_server_reachable()",
+    reason=(
+        "mcp-server not reachable — connection-failure test requires a real MCP "
+        "server so that SSRF validation can resolve the hostname and the validate "
+        "endpoint returns a connection error instead of a gateway timeout"
+    ),
+)
+
+
 TRANSIENT_STATUSES = {HTTPStatus.INTERNAL_SERVER_ERROR, HTTPStatus.BAD_GATEWAY, HTTPStatus.SERVICE_UNAVAILABLE}
 
 
@@ -196,6 +218,7 @@ class TestMCPProviderIntegration:
         assert tool_detail.description is not None
 
     @pytest.mark.mcp
+    @requires_mcp_server
     def test_mcp_provider_connection_failure_handling(self, syntara_api: SyntaraApiRegistry) -> None:
         """Test MCP integration creation with unreachable server."""
         create_resp = _retry_api_call(
