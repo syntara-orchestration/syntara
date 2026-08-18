@@ -30,7 +30,7 @@ import { APP_TITLE } from '../../../../utils/appTitle'
 import { getGroupDetailPath } from '../../accessManagementPaths'
 
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
-import type { GroupMappingEntry, NexusGroup } from './groupMappingUtils'
+import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 
 const CREATE_GROUP_VALUE = '__create__' as const
@@ -89,9 +89,9 @@ export function IdpGroupValueInput({
   )
 }
 
-export type NexusGroupMappingSelectProps = {
+export type MappedGroupMappingSelectProps = {
   entry: GroupMappingEntry
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   showValidation?: boolean
   errorMessage?: string
@@ -100,7 +100,7 @@ export type NexusGroupMappingSelectProps = {
   toggleId?: string
 }
 
-type NexusGroupMappingSelectToggleProps = {
+type MappedGroupMappingSelectToggleProps = {
   toggleRef: Ref<MenuToggleElement>
   toggleId?: string
   isOpen: boolean
@@ -113,7 +113,7 @@ type NexusGroupMappingSelectToggleProps = {
   inputRef: RefObject<HTMLInputElement | null>
 }
 
-function NexusGroupMappingSelectToggle({
+function MappedGroupMappingSelectToggle({
   toggleRef,
   toggleId,
   isOpen,
@@ -124,7 +124,7 @@ function NexusGroupMappingSelectToggle({
   setFilterValue,
   setIsOpen,
   inputRef,
-}: Readonly<NexusGroupMappingSelectToggleProps>) {
+}: Readonly<MappedGroupMappingSelectToggleProps>) {
   return (
     <div style={{ display: 'contents' }} data-group-mapping-invalid={missingGroup ? 'true' : 'false'}>
       <MenuToggle
@@ -159,34 +159,34 @@ function NexusGroupMappingSelectToggle({
   )
 }
 
-export function NexusGroupMappingSelect({
+export function MappedGroupMappingSelect({
   entry,
-  nexusGroups,
+  mappedGroups,
   isReadOnly,
   showValidation,
   errorMessage,
   onChange,
   onCreateGroup,
   toggleId,
-}: Readonly<NexusGroupMappingSelectProps>) {
+}: Readonly<MappedGroupMappingSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const selectedGroup = nexusGroups.find((g) => g.id === entry.nexusGroupId)
+  const selectedGroup = mappedGroups.find((g) => g.id === entry.mappedGroupId)
   const missingGroup =
-    Boolean(errorMessage) || (showValidation === true && Boolean(entry.idpGroupValue) && entry.nexusGroupId === '')
+    Boolean(errorMessage) || (showValidation === true && Boolean(entry.idpGroupValue) && entry.mappedGroupId === '')
 
   const filteredGroups = useMemo(() => {
-    if (filterValue === '') return nexusGroups
+    if (filterValue === '') return mappedGroups
     const term = filterValue.toLowerCase()
-    return nexusGroups.filter((g) => g.name?.toLowerCase().includes(term))
-  }, [nexusGroups, filterValue])
+    return mappedGroups.filter((g) => g.name?.toLowerCase().includes(term))
+  }, [mappedGroups, filterValue])
 
   const selectedDisplayName = selectedGroup?.name ?? ''
 
   const renderToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
-      <NexusGroupMappingSelectToggle
+      <MappedGroupMappingSelectToggle
         toggleRef={toggleRef}
         toggleId={toggleId}
         isOpen={isOpen}
@@ -205,7 +205,7 @@ export function NexusGroupMappingSelect({
   return (
     <NxSelect
       isOpen={isOpen}
-      selected={entry.nexusGroupId || undefined}
+      selected={entry.mappedGroupId || undefined}
       onSelect={(_event, value) => {
         const val = String(value)
         if (val === CREATE_GROUP_VALUE) {
@@ -214,7 +214,7 @@ export function NexusGroupMappingSelect({
           setFilterValue('')
           return
         }
-        onChange({ ...entry, nexusGroupId: val })
+        onChange({ ...entry, mappedGroupId: val })
         setIsOpen(false)
         setFilterValue('')
       }}
@@ -233,7 +233,7 @@ export function NexusGroupMappingSelect({
               key={g.id}
               value={g.id}
               description={g.description ?? undefined}
-              isSelected={entry.nexusGroupId === g.id}
+              isSelected={entry.mappedGroupId === g.id}
             >
               {g.name}
             </SelectOption>
@@ -253,7 +253,7 @@ export function NexusGroupMappingSelect({
 type MappingRowProps = {
   entry: GroupMappingEntry
   index: number
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   /** When true with isReadOnly, show per-row delete (list view with actions column) */
   readOnlyAllowRemove?: boolean
@@ -261,9 +261,9 @@ type MappingRowProps = {
   readOnlyPlainCells?: boolean
   showValidation?: boolean
   idpErrorMessage?: string
-  nexusErrorMessage?: string
+  groupErrorMessage?: string
   onIdpGroupValueChange?: (index: number, value: string) => void
-  onNexusGroupIdChange?: (index: number, nexusGroupId: string) => void
+  onMappedGroupIdChange?: (index: number, mappedGroupId: string) => void
   onRemove: (index: number) => void
   onCreateGroup: (index: number) => void
 }
@@ -271,22 +271,22 @@ type MappingRowProps = {
 export function MappingRow({
   entry,
   index,
-  nexusGroups,
+  mappedGroups,
   isReadOnly,
   readOnlyAllowRemove,
   readOnlyPlainCells,
   showValidation,
   idpErrorMessage,
-  nexusErrorMessage,
+  groupErrorMessage,
   onIdpGroupValueChange,
-  onNexusGroupIdChange,
+  onMappedGroupIdChange,
   onRemove,
   onCreateGroup,
 }: Readonly<MappingRowProps>) {
   const showActionColumn = Boolean(isReadOnly !== true || readOnlyAllowRemove)
 
   if (isReadOnly === true && readOnlyPlainCells === true) {
-    const groupName = nexusGroups.find((g) => g.id === entry.nexusGroupId)?.name ?? ''
+    const groupName = mappedGroups.find((g) => g.id === entry.mappedGroupId)?.name ?? ''
     const idpDisplay = entry.idpGroupValue === '' ? '—' : entry.idpGroupValue
     const groupDisplay = groupName === '' ? '—' : groupName
     return (
@@ -295,8 +295,8 @@ export function MappingRow({
           <Content>{idpDisplay}</Content>
         </Td>
         <Td dataLabel={`${APP_TITLE} Group`}>
-          {entry.nexusGroupId !== '' && groupName !== '' ? (
-            <LinkCell href={getGroupDetailPath(entry.nexusGroupId)}>{groupDisplay}</LinkCell>
+          {entry.mappedGroupId !== '' && groupName !== '' ? (
+            <LinkCell href={getGroupDetailPath(entry.mappedGroupId)}>{groupDisplay}</LinkCell>
           ) : (
             <Content>{groupDisplay}</Content>
           )}
@@ -327,13 +327,13 @@ export function MappingRow({
         />
       </Td>
       <Td dataLabel={`${APP_TITLE} Group`}>
-        <NexusGroupMappingSelect
+        <MappedGroupMappingSelect
           entry={entry}
-          nexusGroups={nexusGroups}
+          mappedGroups={mappedGroups}
           isReadOnly={isReadOnly}
           showValidation={showValidation}
-          errorMessage={nexusErrorMessage}
-          onChange={(updated) => onNexusGroupIdChange?.(index, updated.nexusGroupId)}
+          errorMessage={groupErrorMessage}
+          onChange={(updated) => onMappedGroupIdChange?.(index, updated.mappedGroupId)}
           onCreateGroup={() => onCreateGroup(index)}
         />
       </Td>
@@ -355,7 +355,7 @@ export type EditMappingRowProps = {
   index: number
   rowId: string
   control: Control<GroupMappingEditFormValues>
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   onRemove: (index: number) => void
   onCreateGroup: (index: number) => void
 }
@@ -364,7 +364,7 @@ export function EditMappingRow({
   index,
   rowId,
   control,
-  nexusGroups,
+  mappedGroups,
   onRemove,
   onCreateGroup,
 }: Readonly<EditMappingRowProps>) {
@@ -388,14 +388,14 @@ export function EditMappingRow({
       </Td>
       <Td dataLabel={`${APP_TITLE} Group`}>
         <Controller
-          name={`entries.${index}.nexusGroupId`}
+          name={`entries.${index}.mappedGroupId`}
           control={control}
           render={({ field, fieldState }) => (
-            <NexusGroupMappingSelect
-              entry={{ key: rowId, idpGroupValue, nexusGroupId: field.value }}
-              nexusGroups={nexusGroups}
+            <MappedGroupMappingSelect
+              entry={{ key: rowId, idpGroupValue, mappedGroupId: field.value }}
+              mappedGroups={mappedGroups}
               errorMessage={fieldState.error?.message}
-              onChange={(updated) => field.onChange(updated.nexusGroupId)}
+              onChange={(updated) => field.onChange(updated.mappedGroupId)}
               onCreateGroup={() => onCreateGroup(index)}
             />
           )}

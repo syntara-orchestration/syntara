@@ -36,23 +36,23 @@ import { type IdentityProviderFormData } from './identityProviderFormSchema'
 import { idpHelp } from './idpFieldHelp'
 import { useTestSignIn } from './useTestSignIn'
 
-function NexusGroupSelect({
+function MappedGroupSelect({
   value,
   onChange,
   onBlur,
-  nexusGroups,
+  mappedGroups,
   ariaLabel,
   validated,
 }: {
   value: string
   onChange: (value: string) => void
   onBlur?: () => void
-  nexusGroups: { id?: string; name?: string }[]
+  mappedGroups: { id?: string; name?: string }[]
   ariaLabel: string
   validated?: 'error' | 'default'
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = nexusGroups.find((g) => g.id === value)?.name ?? value
+  const selectedLabel = mappedGroups.find((g) => g.id === value)?.name ?? value
   return (
     <NxSelect
       isOpen={isOpen}
@@ -80,7 +80,7 @@ function NexusGroupSelect({
       )}
     >
       <SelectList>
-        {nexusGroups.map((g) => (
+        {mappedGroups.map((g) => (
           <SelectOption key={g.id} value={g.id}>
             {g.name ?? g.id ?? ''}
           </SelectOption>
@@ -93,11 +93,11 @@ function NexusGroupSelect({
 type MappingEntryRowProps = {
   index: number
   control: Control<IdentityProviderFormData>
-  nexusGroups: { id?: string; name?: string }[]
+  mappedGroups: { id?: string; name?: string }[]
   onRemove: () => void
 }
 
-function MappingEntryRow({ index, control, nexusGroups, onRemove }: Readonly<MappingEntryRowProps>) {
+function MappingEntryRow({ index, control, mappedGroups, onRemove }: Readonly<MappingEntryRowProps>) {
   return (
     <div style={mappingRowStyle}>
       <Controller
@@ -115,15 +115,15 @@ function MappingEntryRow({ index, control, nexusGroups, onRemove }: Readonly<Map
         )}
       />
       <Controller
-        name={`groupMapping.entries.${index}.nexusGroupId`}
+        name={`groupMapping.entries.${index}.mappedGroupId`}
         control={control}
         render={({ field, fieldState }) => (
           <div style={flexOneStyle}>
-            <NexusGroupSelect
+            <MappedGroupSelect
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              nexusGroups={nexusGroups}
+              mappedGroups={mappedGroups}
               ariaLabel={`${APP_TITLE} group ${index + 1}`}
               validated={fieldState.error ? 'error' : 'default'}
             />
@@ -176,7 +176,7 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
 
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'groupMapping.entries' })
 
-  const { groups: nexusGroups } = useAllGroups()
+  const { groups: mappedGroups } = useAllGroups()
 
   const handleTestResult = useCallback(
     (claims: Record<string, unknown>) => {
@@ -185,11 +185,11 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
         key: nextKey(),
         ...e,
       }))
-      const result = processDiscoveredGroups(claims, expression, currentEntries, nexusGroups)
-      replace(result.newEntries.map(({ idpGroupValue, nexusGroupId }) => ({ idpGroupValue, nexusGroupId })))
+      const result = processDiscoveredGroups(claims, expression, currentEntries, mappedGroups)
+      replace(result.newEntries.map(({ idpGroupValue, mappedGroupId }) => ({ idpGroupValue, mappedGroupId })))
       setSignInAlert({ variant: result.variant, message: result.message })
     },
-    [groupMapping, nexusGroups, replace]
+    [groupMapping, mappedGroups, replace]
   )
 
   const handleTestError = useCallback(() => {
@@ -252,11 +252,11 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
             key={field.id}
             index={index}
             control={control}
-            nexusGroups={nexusGroups}
+            mappedGroups={mappedGroups}
             onRemove={() => remove(index)}
           />
         ))}
-        <Button variant="link" icon={<RhUiAddIcon />} onClick={() => append({ idpGroupValue: '', nexusGroupId: '' })}>
+        <Button variant="link" icon={<RhUiAddIcon />} onClick={() => append({ idpGroupValue: '', mappedGroupId: '' })}>
           Add mapping
         </Button>
       </FormGroup>

@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 const DEFAULTS_3 = [33.3, 33.3, 33.4]
 const DEFAULTS_2 = [33.3, 100 - 33.3]
 const MIN_WIDTH = 15
-const STORAGE_PREFIX = 'nexus-panel-sizes-'
+const STORAGE_PREFIX = 'syntara-panel-sizes-'
 
 function getStorageKey(workflowId: string, nodeId: string): string {
   return `${STORAGE_PREFIX}${workflowId}-${nodeId}`

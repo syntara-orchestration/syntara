@@ -24,9 +24,9 @@ import { deleteIntegrationViaApi, type SeededIntegration } from './seeds/resourc
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 // Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
-// mcp-server host (override via NEXUS_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
+// mcp-server host (override via SYNTARA_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
 const isRealBackend = isSkipWebServerForPlaywrightTests()
-const ssrfSafeIntegrationHost = process.env.NEXUS_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
+const ssrfSafeIntegrationHost = process.env.SYNTARA_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 async function ensureLlmCredentialId(app: Page): Promise<string> {
   const project = await ensureProject(app)
