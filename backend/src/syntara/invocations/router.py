@@ -150,6 +150,7 @@ def _validate_multipart_required_fields(prompt: str | None, session_id: str | No
     dependencies=[Depends(_invocation_perm_create_json)],
     operation_id="create_invocation",
     response_description="Invocation accepted",
+    include_in_schema=False,
     openapi_extra={
         "requestBody": {
             "content": {
@@ -223,6 +224,7 @@ async def create_invocation(
     dependencies=[Depends(_invocation_perm_create_form)],
     operation_id="create_invocation_chat",
     response_description="Invocation accepted",
+    include_in_schema=False,
 )
 async def create_invocation_chat(
     request: Request,
@@ -269,6 +271,7 @@ async def create_invocation_chat(
     dependencies=[Depends(_invocation_perm_read)],
     operation_id="list_invocations",
     response_description="List of invocations",
+    include_in_schema=False,
     openapi_extra={
         "responses": {
             "200": {
@@ -344,6 +347,7 @@ async def list_invocations(
     dependencies=[Depends(_invocation_perm_read)],
     operation_id="get_invocation_trace",
     response_description="Agent execution trace",
+    include_in_schema=False,
 )
 async def get_invocation_trace(
     invocation_id: Annotated[UUID, Path(description="UUID of the invocation")],
@@ -408,6 +412,7 @@ async def get_invocation_trace(
     dependencies=[Depends(_invocation_perm_read)],
     operation_id="get_invocation",
     response_description="Invocation details",
+    include_in_schema=False,
     openapi_extra={
         "responses": {
             "200": {
@@ -490,6 +495,7 @@ async def get_invocation(
     dependencies=[Depends(_invocation_perm_cancel)],
     operation_id="cancel_invocation",
     response_description="Cancellation result",
+    include_in_schema=False,
     openapi_extra={
         "requestBody": {
             "content": {
