@@ -438,7 +438,7 @@ jobs:
           ulimit -n 65535
           export PODMAN_BUILD_ARGS="--ulimit nofile=65535:65535"
 
-          COMPOSE="uvx podman-compose -p nexus-ci --profile telemetry-e2e"
+          COMPOSE="uvx podman-compose -p syntara-ci --profile telemetry-e2e"
 
           # --no-deps: bypass podman-compose depends_on/service_healthy resolution.
           # GH Actions runner image 20260810+ ships a podman version where both
@@ -471,24 +471,24 @@ jobs:
           echo "::group::Wave 1: infrastructure"
           $COMPOSE up --no-deps -d database mcp-server mock-segment
           echo "::endgroup::"
-          wait_healthy nexus-ci_database_1 120
-          wait_healthy nexus-ci_mcp-server_1 60
-          wait_healthy nexus-ci_mock-segment_1 60
+          wait_healthy syntara-ci_database_1 120
+          wait_healthy syntara-ci_mcp-server_1 60
+          wait_healthy syntara-ci_mock-segment_1 60
           echo "Infrastructure is healthy"
 
           # Wave 2: temporal (needs database)
           echo "::group::Wave 2: temporal"
           $COMPOSE up --no-deps -d temporal
           echo "::endgroup::"
-          wait_healthy nexus-ci_temporal_1 120
+          wait_healthy syntara-ci_temporal_1 120
           echo "Temporal is healthy"
 
           # Wave 3: application services (need temporal + infra)
           echo "::group::Wave 3: application"
           $COMPOSE up --no-deps -d syntara temporal-worker temporal-background-worker syntara-ui
           echo "::endgroup::"
-          wait_healthy nexus-ci_syntara_1 120
-          wait_healthy nexus-ci_temporal-background-worker_1 120
+          wait_healthy syntara-ci_syntara_1 120
+          wait_healthy syntara-ci_temporal-background-worker_1 120
           echo "All backend services are healthy"
 
       - name: Wait for syntara-ui to be reachable
@@ -504,7 +504,7 @@ jobs:
       - name: Initialize admin password
         working-directory: backend
         run: |
-          cat .secrets/admin-password | podman exec -i nexus-ci_syntara_1 \
+          cat .secrets/admin-password | podman exec -i syntara-ci_syntara_1 \
             python3 -m syntara.orchestrator_admin reset-password -u admin --password-stdin --yes
 
       - name: Read admin password
@@ -555,13 +555,13 @@ jobs:
       - name: Show service logs on failure
         if: failure()
         run: |
-          uvx podman-compose -p nexus-ci --profile telemetry-e2e logs \
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e logs \
             database temporal syntara temporal-worker temporal-background-worker mcp-server mock-segment syntara-ui
 
       - name: Cleanup
         if: always()
         run: |
-          uvx podman-compose -p nexus-ci --profile telemetry-e2e down -v || true
+          uvx podman-compose -p syntara-ci --profile telemetry-e2e down -v || true
 
   konflux-frontend-gate:
     name: (Frontend) Konflux Gate

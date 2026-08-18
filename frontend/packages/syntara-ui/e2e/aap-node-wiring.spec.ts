@@ -13,8 +13,8 @@ import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 // Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
-// mcp-server host (override via NEXUS_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
-const ssrfSafeIntegrationHost = process.env.NEXUS_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
+// mcp-server host (override via SYNTARA_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
+const ssrfSafeIntegrationHost = process.env.SYNTARA_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
 async function createAAPIntegration(
   app: import('@playwright/test').Page,

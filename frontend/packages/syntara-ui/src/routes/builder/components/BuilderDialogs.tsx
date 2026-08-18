@@ -19,7 +19,7 @@ import type { RunStepDialogData, RunStepExecutionCreatedOptions } from './RunSte
 import { RunStepDialog } from './RunStepDialog'
 import { RunWorkflowModal } from './RunWorkflowModal'
 
-const RUN_CONFIRM_DISMISSED_KEY = 'nexus-run-workflow-confirm-dismissed'
+const RUN_CONFIRM_DISMISSED_KEY = 'syntara-run-workflow-confirm-dismissed'
 
 function getRunConfirmDismissed(): boolean {
   try {

@@ -36,14 +36,14 @@ import { HintOrError } from './formFieldHelpers'
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { EditMappingRow, MappingRow } from './groupMappingFields'
 import { GroupMappingTableHead } from './groupMappingTableHead'
-import type { GroupMappingEntry, NexusGroup } from './groupMappingUtils'
+import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 
 function entryFieldErrorMessage(
   entryErrors: GroupMappingEditFormValues['entries'] | undefined,
   index: number,
-  field: 'idpGroupValue' | 'nexusGroupId'
+  field: 'idpGroupValue' | 'mappedGroupId'
 ): string | undefined {
   if (!Array.isArray(entryErrors)) return undefined
   const row = entryErrors[index]
@@ -180,13 +180,13 @@ export type MappingTableRow = {
   index: number
   /** Read-only list rows include display values */
   idpGroupValue?: string
-  nexusGroupId?: string
+  mappedGroupId?: string
 }
 
 export type MappingTableProps = {
   rows: MappingTableRow[]
   control?: Control<GroupMappingEditFormValues>
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   showValidation?: boolean
   entryErrors?: GroupMappingEditFormValues['entries']
@@ -200,7 +200,7 @@ export type MappingTableProps = {
 export function MappingTable({
   rows,
   control,
-  nexusGroups,
+  mappedGroups,
   isReadOnly,
   showValidation,
   entryErrors,
@@ -226,19 +226,19 @@ export function MappingTable({
             const entry: GroupMappingEntry = {
               key: row.rowId,
               idpGroupValue: row.idpGroupValue ?? '',
-              nexusGroupId: row.nexusGroupId ?? '',
+              mappedGroupId: row.mappedGroupId ?? '',
             }
             return (
               <MappingRow
                 key={row.rowId}
                 entry={entry}
                 index={row.index}
-                nexusGroups={nexusGroups}
+                mappedGroups={mappedGroups}
                 isReadOnly={isReadOnly}
                 readOnlyPlainCells={Boolean(isReadOnly)}
                 showValidation={showValidation}
                 idpErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'idpGroupValue')}
-                nexusErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'nexusGroupId')}
+                groupErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'mappedGroupId')}
                 onRemove={onRemove}
                 onCreateGroup={onCreateGroup}
               />
@@ -253,7 +253,7 @@ export function MappingTable({
               rowId={row.rowId}
               index={row.index}
               control={control}
-              nexusGroups={nexusGroups}
+              mappedGroups={mappedGroups}
               onRemove={onRemove}
               onCreateGroup={onCreateGroup}
             />
@@ -312,7 +312,7 @@ export function GroupMappingFormActions({ onAdd, onReDiscover, isListening }: Re
 const noopIdpGroupValueChange: (index: number, value: string) => void = () => {
   /* Read-only list view: controls are disabled; handler required by MappingRow */
 }
-const noopNexusGroupIdChange: (index: number, nexusGroupId: string) => void = () => {
+const noopMappedGroupIdChange: (index: number, mappedGroupId: string) => void = () => {
   /* Read-only list view */
 }
 const noopCreateGroup: (index: number) => void = () => {
@@ -359,12 +359,12 @@ function GroupMappingReadOnlyToolbar({
 
 export type ReadOnlyViewProps = {
   entries: GroupMappingEntry[]
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   /** When undefined, the "Edit group mapping" button is hidden (read-only mode). */
   onEditMapping?: () => void
 }
 
-export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
+export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
   const [filters, setFilters] = useState<FilterConfig[]>([])
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
@@ -395,10 +395,10 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
   const filteredEntries = useMemo(() => {
     if (!filterTerm) return entries
     return entries.filter((e) => {
-      const groupName = nexusGroups.find((g) => g.id === e.nexusGroupId)?.name ?? ''
+      const groupName = mappedGroups.find((g) => g.id === e.mappedGroupId)?.name ?? ''
       return e.idpGroupValue.toLowerCase().includes(filterTerm) || groupName.toLowerCase().includes(filterTerm)
     })
-  }, [entries, filterTerm, nexusGroups])
+  }, [entries, filterTerm, mappedGroups])
 
   const paginatedEntries = useMemo(() => {
     const start = (page - 1) * perPage
@@ -447,12 +447,12 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
                 key={entry.key}
                 entry={entry}
                 index={index}
-                nexusGroups={nexusGroups}
+                mappedGroups={mappedGroups}
                 isReadOnly
                 readOnlyPlainCells
                 showValidation={false}
                 onIdpGroupValueChange={noopIdpGroupValueChange}
-                onNexusGroupIdChange={noopNexusGroupIdChange}
+                onMappedGroupIdChange={noopMappedGroupIdChange}
                 onRemove={noopRemoveMapping}
                 onCreateGroup={noopCreateGroup}
               />

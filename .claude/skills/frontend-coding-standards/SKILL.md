@@ -1875,7 +1875,7 @@ export default function Workflows() {
 - **Static pages**: pass a string literal — `toPageTitle(['Credentials'])`
 - **Dynamic pages**: pass the entity name — `toPageTitle([integration.name])` (falls back gracefully if undefined/null)
 - **Loading/error states**: use a static fallback — `toPageTitle(['Integration'])`
-- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Nexus`
+- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Syntara`
 
 ## 38. React 19 Ref Patterns — No `forwardRef`; Prefer Ref Cleanup Functions
 

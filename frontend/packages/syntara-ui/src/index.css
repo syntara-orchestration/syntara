@@ -2,9 +2,9 @@
 @import '@patternfly/react-core/dist/styles/base.css';
 
 :root {
-  --nexus-form-max-width: 600px;
-  --nexus-disabled-opacity: 0.5;
-  --nexus-nav-logo-size: 28px;
+  --syntara-form-max-width: 600px;
+  --syntara-disabled-opacity: 0.5;
+  --syntara-nav-logo-size: 28px;
 }
 
 /* Pin the login container to the top so the brand logo does not jump

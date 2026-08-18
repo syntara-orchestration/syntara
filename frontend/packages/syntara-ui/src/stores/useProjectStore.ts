@@ -37,6 +37,6 @@ export const useProjectStore = create<ProjectState>()(
           return { favoriteProjectIds: [...s.favoriteProjectIds, projectId] }
         }),
     }),
-    { name: 'nexus-selected-project', version: 1 }
+    { name: 'syntara-selected-project', version: 1 }
   )
 )

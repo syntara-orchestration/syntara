@@ -53,7 +53,7 @@ Use the results to inform the wizard — if a check fails, mention it in the que
 Present a single `AskUserQuestion` with these questions:
 
 1. **Mode** — "Run against real backend or mock API?"
-   - **Real backend (Recommended)** — Tests against live Nexus API, database, and auth. Requires backend + frontend to be running.
+   - **Real backend (Recommended)** — Tests against live Syntara API, database, and auth. Requires backend + frontend to be running.
    - **Mock API** — Self-contained, Playwright auto-starts mock API + UI. No services needed.
 
 2. **What to run** — "Which tests?"
