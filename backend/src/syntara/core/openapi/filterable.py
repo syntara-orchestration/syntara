@@ -17,19 +17,25 @@ from uuid import UUID
 
 from syntara.core.utils.filters import FilterOperator
 
-_OPTIONAL_OPS = {FilterOperator.IN, FilterOperator.ISNULL}
-_STRING_OPS = set(FilterOperator) - _OPTIONAL_OPS
+_STRING_OPS = set(FilterOperator) - {FilterOperator.ISNULL}
 _COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS, FilterOperator.STARTS_WITH}
-_EQ_ONLY = {FilterOperator.EQ}
+_EQ_ONLY = {FilterOperator.EQ, FilterOperator.IN}
 
 _OPERATOR_TITLES: dict[FilterOperator, str] = {
     FilterOperator.EQ: "Equals",
+    FilterOperator.IN: "In",
     FilterOperator.CONTAINS: "Contains",
     FilterOperator.STARTS_WITH: "Starts With",
     FilterOperator.GT: "Greater Than",
     FilterOperator.GTE: "Greater Than or Equal",
     FilterOperator.LT: "Less Than",
     FilterOperator.LTE: "Less Than or Equal",
+    FilterOperator.ISNULL: "Is Null",
+}
+
+_OPERATOR_SCHEMA_OVERRIDES: dict[FilterOperator, dict[str, Any]] = {
+    FilterOperator.IN: {"type": "string"},
+    FilterOperator.ISNULL: {"type": "boolean"},
 }
 
 
@@ -116,7 +122,10 @@ class FilterableModel:
                 continue
             annotation = model_fields_map[field_name].annotation
             python_type = _unwrap_optional(annotation)
-            self._fields[field_name] = (_classify_python_type(python_type), python_type)
+            ops = _classify_python_type(python_type)
+            if python_type is not annotation:
+                ops = ops | {FilterOperator.ISNULL}
+            self._fields[field_name] = (ops, python_type)
 
     def get_field_operators(self, field_name: str) -> set[FilterOperator]:
         """Return the operator set for a given filterable field."""
@@ -130,8 +139,9 @@ class FilterableModel:
 
             operator_properties: dict[str, Any] = {}
             for op in sorted(operators, key=lambda o: o.value):
-                prop: dict[str, Any] = {"title": _OPERATOR_TITLES[op]}
-                prop.update(base_schema)
+                title = _OPERATOR_TITLES.get(op, op.value.replace("_", " ").title())
+                prop: dict[str, Any] = {"title": title}
+                prop.update(_OPERATOR_SCHEMA_OVERRIDES.get(op, base_schema))
                 operator_properties[op.value] = prop
 
             params.append(

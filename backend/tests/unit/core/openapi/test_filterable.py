@@ -45,10 +45,20 @@ class SampleModel(SQLModel, table=False):
     ]
 
 
-_OPTIONAL_OPS = {FilterOperator.IN, FilterOperator.ISNULL}
-_STRING_OPS = set(FilterOperator) - _OPTIONAL_OPS
+_STRING_OPS = set(FilterOperator) - {FilterOperator.ISNULL}
 _COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS, FilterOperator.STARTS_WITH}
-_EQ_ONLY = {FilterOperator.EQ}
+_EQ_ONLY = {FilterOperator.EQ, FilterOperator.IN}
+
+
+@pytest.mark.unit
+class TestOperatorTitlesCoverage:
+    """Ensure every FilterOperator has a title for spec generation."""
+
+    def test_all_operators_have_titles(self):
+        from syntara.core.openapi.filterable import _OPERATOR_TITLES
+
+        missing = set(FilterOperator) - set(_OPERATOR_TITLES)
+        assert not missing, f"Missing titles for operators: {missing}"
 
 
 @pytest.mark.unit
@@ -163,7 +173,7 @@ class TestFilterableModel:
 
         dep = FilterableModel(SampleModel)
         ops = dep.get_field_operators("description")
-        assert ops == _STRING_OPS
+        assert ops == _STRING_OPS | {FilterOperator.ISNULL}
 
     def test_operators_for_datetime_field(self):
         from syntara.core.openapi.filterable import FilterableModel
@@ -283,7 +293,7 @@ class TestToOpenAPIParams:
         id_param = next(p for p in params if p["name"] == "id")
 
         operator_obj = id_param["schema"]["allOf"][1]
-        assert set(operator_obj["properties"].keys()) == {"eq"}
+        assert set(operator_obj["properties"].keys()) == {"eq", "in"}
         assert operator_obj["properties"]["eq"]["type"] == "string"
         assert operator_obj["properties"]["eq"]["format"] == "uuid"
 
@@ -305,7 +315,7 @@ class TestToOpenAPIParams:
         enabled_param = next(p for p in params if p["name"] == "enabled")
 
         operator_obj = enabled_param["schema"]["allOf"][1]
-        assert set(operator_obj["properties"].keys()) == {"eq"}
+        assert set(operator_obj["properties"].keys()) == {"eq", "in"}
         assert operator_obj["properties"]["eq"]["type"] == "boolean"
 
     def test_datetime_field_operators(self):
@@ -334,12 +344,12 @@ class TestToOpenAPIParams:
         assert base_schema == {"$ref": "#/components/schemas/SampleStatus"}
 
         operator_obj = status_param["schema"]["allOf"][1]
-        assert set(operator_obj["properties"].keys()) == {"eq"}
+        assert set(operator_obj["properties"].keys()) == {"eq", "in"}
         assert operator_obj["properties"]["eq"]["$ref"] == "#/components/schemas/SampleStatus"
         assert operator_obj["properties"]["eq"]["title"] == "Equals"
 
-    def test_optional_field_same_as_non_optional(self):
-        """Optional[str] field should produce the same params as a plain str field."""
+    def test_optional_field_adds_isnull(self):
+        """Optional field should have isnull operator; non-optional should not."""
         from syntara.core.openapi.filterable import FilterableModel
 
         dep = FilterableModel(SampleModel)
@@ -350,8 +360,62 @@ class TestToOpenAPIParams:
         name_ops = name_param["schema"]["allOf"][1]["properties"]
         desc_ops = desc_param["schema"]["allOf"][1]["properties"]
 
-        assert set(name_ops.keys()) == set(desc_ops.keys())
+        assert "isnull" not in name_ops
+        assert "isnull" in desc_ops
+        assert set(desc_ops.keys()) == set(name_ops.keys()) | {"isnull"}
         assert name_param["schema"]["allOf"][0] == desc_param["schema"]["allOf"][0]
+
+
+@pytest.mark.unit
+class TestInAndIsnullSchemas:
+    """Test that IN and ISNULL operators generate correct schema types."""
+
+    def test_in_operator_uses_string_type_for_string_field(self):
+        from syntara.core.openapi.filterable import FilterableModel
+
+        dep = FilterableModel(SampleModel)
+        params = dep.to_openapi_params()
+        name_param = next(p for p in params if p["name"] == "name")
+
+        op_props = name_param["schema"]["allOf"][1]["properties"]
+        assert "in" in op_props
+        assert op_props["in"]["type"] == "string"
+        assert op_props["in"]["title"] == "In"
+
+    def test_in_operator_ignores_uuid_base_schema(self):
+        """IN should always be string type, not inherit the field's UUID format."""
+        from syntara.core.openapi.filterable import FilterableModel
+
+        dep = FilterableModel(SampleModel)
+        params = dep.to_openapi_params()
+        id_param = next(p for p in params if p["name"] == "id")
+
+        op_props = id_param["schema"]["allOf"][1]["properties"]
+        assert op_props["in"]["type"] == "string"
+        assert "format" not in op_props["in"]
+
+    def test_isnull_uses_boolean_for_optional_field(self):
+        """ISNULL should always be boolean, not inherit the field's type."""
+        from syntara.core.openapi.filterable import FilterableModel
+
+        dep = FilterableModel(SampleModel)
+        params = dep.to_openapi_params()
+        desc_param = next(p for p in params if p["name"] == "description")
+
+        op_props = desc_param["schema"]["allOf"][1]["properties"]
+        assert "isnull" in op_props
+        assert op_props["isnull"]["type"] == "boolean"
+        assert op_props["isnull"]["title"] == "Is Null"
+
+    def test_isnull_absent_for_non_optional_field(self):
+        from syntara.core.openapi.filterable import FilterableModel
+
+        dep = FilterableModel(SampleModel)
+        params = dep.to_openapi_params()
+        name_param = next(p for p in params if p["name"] == "name")
+
+        op_props = name_param["schema"]["allOf"][1]["properties"]
+        assert "isnull" not in op_props
 
 
 @pytest.mark.unit
