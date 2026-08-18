@@ -275,6 +275,19 @@ class MetricsRecorder:
             labels=labels,
         )
 
+    def _get_active_workflows_from_gauge(self) -> int:
+        """Read the current active_workflows value from the Prometheus gauge.
+
+        The poller sets this via ``record(MetricType.ACTIVE_WORKFLOWS, ...)``
+        which routes through ``_dispatch_component`` → ``.labels(...).set()``.
+        Before the first poll the gauge has no samples, so we return 0.
+        """
+        try:
+            gauge = self._prometheus.active_workflows.labels(component=ComponentLabel.TEMPORAL_WORKER.value)
+            return int(gauge._value.get())  # noqa: SLF001
+        except Exception:  # noqa: BLE001
+            return 0
+
     def get_summary(self) -> MetricsSummary:
         """Build a point-in-time summary of internal counters."""
         now = datetime.now(UTC)
@@ -287,7 +300,7 @@ class MetricsRecorder:
             cache_misses=counters_snapshot.get("cache_misses", 0),
             llm_calls=counters_snapshot.get("llm_calls", 0),
             total_workflows=counters_snapshot.get("total_workflows", 0),
-            active_workflows=counters_snapshot.get("active_workflows", 0),
+            active_workflows=self._get_active_workflows_from_gauge(),
             active_llm_requests=counters_snapshot.get("active_llm_requests", 0),
             db_transactions=counters_snapshot.get("db_transactions", 0),
             period_start=now - self._store.retention,
