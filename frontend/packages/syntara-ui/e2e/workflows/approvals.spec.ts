@@ -181,7 +181,7 @@ test.describe('Approval Workflow Operations', () => {
       await submitButton.click()
 
       // Step 7: Verify success notification
-      await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByText('Approvals submitted')).toBeVisible({ timeout: 10_000 })
 
       // Step 8: Verify selection cleared (batch toolbar should disappear)
       await expect(batchToolbar).not.toBeVisible()
@@ -244,7 +244,7 @@ test.describe('Approval Workflow Operations', () => {
       await submitButton.click()
 
       // Step 7: Verify success notification
-      await expect(app.getByText('Rejection submitted')).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByText('Approvals rejected')).toBeVisible({ timeout: 10_000 })
 
       // Step 8: Verify selection cleared
       await expect(app.getByText('2 selected')).not.toBeVisible()
