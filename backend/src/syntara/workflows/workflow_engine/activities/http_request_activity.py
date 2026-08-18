@@ -92,6 +92,12 @@ def _resolve_credentials_and_url(
             if not parsed.scheme or parsed.scheme not in ("http", "https"):
                 msg = "Secret URL must use http:// or https:// scheme."
                 raise ActivityExecutionError(msg)
+            if config.url:
+                msg = (
+                    "Conflict: node has an explicit URL in parameters and a Secret URL credential attached. "
+                    "Remove the URL from node parameters or use a different credential type."
+                )
+                raise ActivityExecutionError(msg)
             request_url = secret_url
             url_from_credential = True
         else:

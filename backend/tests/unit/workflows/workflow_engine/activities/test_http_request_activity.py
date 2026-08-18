@@ -328,10 +328,10 @@ class TestSecretUrlCredential:
     """Tests for Secret URL credential type (auth_type='url')."""
 
     @pytest.mark.asyncio
-    async def test_url_from_credential_overrides_config(self) -> None:
+    async def test_url_from_credential_used_when_no_explicit_url(self) -> None:
         resp = _mock_response(200, json_body={"ok": True})
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
@@ -345,10 +345,22 @@ class TestSecretUrlCredential:
         assert mock_req.call_args.kwargs["url"] == "https://hooks.slack.com/services/T/B/xxx"
 
     @pytest.mark.asyncio
+    async def test_url_credential_conflicts_with_explicit_url(self) -> None:
+        config = {
+            **VALID_CONFIG,
+            "_resolved_credentials": {
+                "credential_id": "cred-url-1",
+                "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
+            },
+        }
+        with pytest.raises(ActivityExecutionError, match="Conflict"):
+            await execute_http_request_activity(config, None)
+
+    @pytest.mark.asyncio
     async def test_url_credential_does_not_set_auth_headers(self) -> None:
         resp = _mock_response(200, json_body={})
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
@@ -386,7 +398,7 @@ class TestSecretUrlCredential:
         resp = _mock_response(401)
         secret_url = "https://hooks.slack.com/services/T/B/supersecret"  # noqa: S105
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": secret_url},
@@ -404,7 +416,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_ssrf_private_ip_rejected(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://internal.example.com/webhook"},
@@ -419,7 +431,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_schemeless_rejected(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "//evil.com/hook"},
