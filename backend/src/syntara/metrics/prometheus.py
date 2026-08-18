@@ -165,7 +165,7 @@ class OrchestratorPrometheusMetrics:
 
         self.active_workflows = Gauge(
             "orchestrator_active_workflows",
-            "Number of currently active workflows",
+            "Number of concurrent running workflow executions (queried from Temporal)",
             registry=self.registry,
         )
 
