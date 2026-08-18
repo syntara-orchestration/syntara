@@ -288,6 +288,7 @@ class MetricsRecorder:
             # _value is a private ValueClass. The except guard handles library changes.
             return int(gauge._value.get())  # noqa: SLF001
         except Exception:  # noqa: BLE001
+            logger.debug("active_workflows_gauge_read_failed", exc_info=True)
             return 0
 
     def get_summary(self) -> MetricsSummary:
