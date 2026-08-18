@@ -384,9 +384,11 @@ class TestProductionAppWiring:
     )
     def test_infra_endpoints_excluded_from_schema(self, path: str) -> None:
         """Infrastructure probe endpoints must never appear in the public OpenAPI spec."""
+        from starlette.routing import Route
+
         from syntara.api.main import app as real_app
 
-        matching = [r for r in real_app.routes if hasattr(r, "path") and r.path == path]
+        matching = [r for r in real_app.routes if isinstance(r, Route) and r.path == path]
         assert matching, f"Route {path} not found in app"
         for route in matching:
             assert route.include_in_schema is False, f"{path} must have include_in_schema=False"
