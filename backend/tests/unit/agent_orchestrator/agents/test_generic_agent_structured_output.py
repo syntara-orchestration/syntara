@@ -9,6 +9,9 @@ from syntara.audit.emitter import AuditActorContext
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
+    from contextlib import AbstractContextManager
+
+    from tests.fixtures.settings import FakeSettingsCache
 from uuid import uuid4
 
 import pytest
@@ -173,6 +176,54 @@ class TestGenericAgentStructuredOutputNoTools:
                 "usage_details": {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
             },
         ]
+
+
+class TestStructuredOutputSystemPrompt:
+    """Test that structured output uses the configurable system prompt."""
+
+    @pytest.mark.asyncio
+    async def test_structured_output_uses_runtime_system_prompt(
+        self,
+        mock_llm: MagicMock,
+        sample_state: AgentState,
+        server_info_schema: dict[str, Any],
+        override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]],
+    ) -> None:
+        """Test structured output prepends the runtime system prompt before JSON instructions."""
+        from langchain_core.messages import SystemMessage
+
+        sample_state["response_schema"] = server_info_schema
+
+        custom_prompt = "You are a task agent. Execute actions."
+
+        parsed_output = {"hostname": "server-01", "ip": "10.0.0.1"}
+        raw_message = AIMessage(
+            content='{"hostname":"server-01","ip":"10.0.0.1"}',
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(
+            return_value={"raw": raw_message, "parsed": parsed_output, "parsing_error": None}
+        )
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+
+        with (
+            patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
+            override_runtime_settings({"agentic.task_agent_system_prompt": custom_prompt}),
+        ):
+            mock_record.side_effect = _make_record_side_effect()
+            await agent.execute_as_node(sample_state)
+
+        mock_structured_llm.ainvoke.assert_called_once()
+        messages_sent = mock_structured_llm.ainvoke.call_args[0][0]
+        system_messages = [m for m in messages_sent if isinstance(m, SystemMessage)]
+        assert len(system_messages) == 1
+        content = system_messages[0].content
+        assert isinstance(content, str)
+        assert content.startswith(custom_prompt)
+        assert "JSON object" in content
 
 
 class TestGenericAgentStructuredOutputWithTools:
