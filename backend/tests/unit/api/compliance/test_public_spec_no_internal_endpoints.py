@@ -21,7 +21,8 @@ _PUBLIC_SPEC_PATH = _SCHEMAS_DIR / "openapi-public.yaml"
 def public_spec() -> dict[str, Any]:
     if not _PUBLIC_SPEC_PATH.exists():
         pytest.skip(f"Public spec not found at {_PUBLIC_SPEC_PATH}")
-    return yaml.safe_load(_PUBLIC_SPEC_PATH.read_text(encoding="utf-8"))
+    spec: dict[str, Any] = yaml.safe_load(_PUBLIC_SPEC_PATH.read_text(encoding="utf-8"))
+    return spec
 
 
 class TestNoInternalPaths:
