@@ -378,7 +378,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_empty_raises(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": ""},

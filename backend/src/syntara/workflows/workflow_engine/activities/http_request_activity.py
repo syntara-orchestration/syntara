@@ -84,6 +84,12 @@ def _resolve_credentials_and_url(
         resolved_creds = ensure_resolved_credentials_dict(resolved_creds)
         extra_vars = resolved_creds.get("extra_vars", {})
         if extra_vars.get("auth_type") == AUTH_TYPE_URL:
+            if config.url:
+                msg = (
+                    "Conflict: node has an explicit URL in parameters and a Secret URL credential attached. "
+                    "Remove the URL from node parameters or use a different credential type."
+                )
+                raise ActivityExecutionError(msg)
             secret_url = extra_vars.get("secret_url", "")
             if not secret_url:
                 msg = "Secret URL credential resolved but URL is empty. Re-save the credential with a valid URL."
@@ -91,12 +97,6 @@ def _resolve_credentials_and_url(
             parsed = urlparse(secret_url)
             if not parsed.scheme or parsed.scheme not in ("http", "https"):
                 msg = "Secret URL must use http:// or https:// scheme."
-                raise ActivityExecutionError(msg)
-            if config.url:
-                msg = (
-                    "Conflict: node has an explicit URL in parameters and a Secret URL credential attached. "
-                    "Remove the URL from node parameters or use a different credential type."
-                )
                 raise ActivityExecutionError(msg)
             request_url = secret_url
             url_from_credential = True

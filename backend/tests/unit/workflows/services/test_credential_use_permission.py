@@ -291,3 +291,45 @@ class TestValidateNoSecretUrlConflicts:  # noqa: D101
 
         definition = self._def_with_http_node(url="https://example.com/api", credential_id=str(cred_id))
         await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_multiple_nodes_only_conflicting_one_raises(self) -> None:
+        clean_cred, bad_cred = uuid4(), uuid4()
+        svc, session = _make_service()
+
+        db_result = MagicMock()
+        db_result.all.return_value = [
+            (clean_cred, {"extra_vars": {"auth_type": "bearer"}}),
+            (bad_cred, {"extra_vars": {"auth_type": "url", "secret_url": "{{url}}"}}),
+        ]
+        session.exec.return_value = db_result
+
+        definition: dict[str, object] = {
+            "schema_version": "2.0.0",
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": "http_request",
+                    "name": "API call",
+                    "parameters": {
+                        "method": "GET",
+                        "url": "https://api.example.com",
+                        "credential_id": str(clean_cred),
+                    },
+                },
+                {
+                    "id": "n2",
+                    "type": "http_request",
+                    "name": "Slack hook",
+                    "parameters": {
+                        "method": "POST",
+                        "url": "https://slack.com/hook",
+                        "credential_id": str(bad_cred),
+                    },
+                },
+            ],
+            "edges": [],
+            "triggers": [],
+        }
+        with pytest.raises(SafeValueError, match="Slack hook"):
+            await svc._validate_no_secret_url_conflicts(definition)
