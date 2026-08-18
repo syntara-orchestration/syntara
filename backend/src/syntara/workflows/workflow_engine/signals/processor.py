@@ -119,6 +119,19 @@ class WorkflowSignalProcessor:
         """
         signal_status = signal_data.get("status")
 
+        if signal_status == "cancelled":
+            reason = signal_data.get("reason", "Invocation cancelled")
+            with contextlib.suppress(Exception):
+                workflow.logger.warning(
+                    f"Agentic activity {activity_id} was cancelled: {reason}",
+                    extra={
+                        "activity_id": activity_id,
+                        "execution_id": execution_id,
+                    },
+                )
+            msg = f"InvocationCancelledError: {reason}"
+            raise ApplicationError(msg, type="InvocationCancelledError", non_retryable=True)
+
         if signal_status == "failed":
             # Extract error information and raise exception
             error_message, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))

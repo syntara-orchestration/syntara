@@ -92,6 +92,30 @@ class TestExecuteInternalActivity:
         assert result == {"output": {"status": "completed"}}
         mock_handler.assert_awaited_once_with({"invocation_id": str(inv_id)})
 
+    @pytest.mark.anyio
+    async def test_invocation_execution_raises_application_error_on_cancellation(self) -> None:
+        """Pre-start or mid-execution cancellation raises non-retryable ApplicationError."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        inv_id = uuid4()
+        mock_executor = AsyncMock()
+        mock_executor.execute_invocation.side_effect = InvocationCancelledError(str(inv_id), phase="pre_start")
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.InvocationExecutor",
+                return_value=mock_executor,
+            ),
+            pytest.raises(ApplicationError, match="InvocationCancelledError") as exc_info,
+        ):
+            await execute_internal_activity(
+                {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
+                None,
+            )
+
+        assert exc_info.value.type == "InvocationCancelledError"
+        assert exc_info.value.non_retryable
+
 
 def _session_factory(session: AsyncMock) -> Callable[[], AbstractAsyncContextManager[AsyncMock]]:
     """Build an ``AsyncSessionLocal``-shaped factory that always yields ``session``.
