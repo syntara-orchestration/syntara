@@ -125,7 +125,13 @@ def wait_for_agentic_activity(
     max_polls: int = 30,
     poll_interval: int = 1,
 ) -> None:
-    """Poll until the agentic activity appears in a non-complete state."""
+    """Poll until the agentic activity is waiting for a signal.
+
+    Only returns when the activity reaches ``waiting`` status, meaning the
+    Temporal workflow has registered the signal handler.  Earlier statuses
+    (``pending``, ``running``) indicate the workflow is still initialising
+    and cannot accept signals yet.
+    """
     for _ in range(max_polls):
         exec_state = _retry_api_call(lambda: api.executions.get(execution_id=execution_id, include="activities"))
         execution: ExecutionRead = exec_state.assert_and_get()
@@ -138,7 +144,7 @@ def wait_for_agentic_activity(
 
         activities_by_id = {a.activity_id: a for a in (execution.activities or [])}
         activity = activities_by_id.get(activity_id)
-        if activity and activity.status in {"pending", "running", "waiting"}:
+        if activity and activity.status == "waiting":
             return
 
         time.sleep(poll_interval)
