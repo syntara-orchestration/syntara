@@ -42,6 +42,7 @@ from syntara.agent_orchestrator.models import (
 )
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
+from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
 from syntara.agent_orchestrator.utils.context_helpers import (
     extract_execution_id,
@@ -53,6 +54,7 @@ from syntara.agent_orchestrator.utils.workflow_signal_client import WorkflowSign
 from syntara.audit.context_managers import actor_context as audit_actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import AuditActorContext
+from syntara.core.cache.stream import StreamClient
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models import User
@@ -154,6 +156,29 @@ class InvocationExecutor:
             actor_username=cn,
             actor_type=PrincipalType.SERVICE,
         )
+
+    async def _check_cancel_key(self, invocation_id: UUID, ctx: InvocationContextData) -> None:
+        """Check Redis cancel key with DB fallback; send cancel signal and raise if set."""
+        cancelled = False
+        try:
+            cancel_key = get_invocation_cancel_key(invocation_id)
+            async with StreamClient() as client:
+                cancelled = await client.key_exists(cancel_key) is True
+        except Exception:  # noqa: BLE001
+            try:
+                async with self.get_async_session_context() as session:
+                    inv = await session.get(Invocation, invocation_id)
+                    cancelled = inv is not None and inv.status == InvocationStatus.CANCELLED
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+        if cancelled:
+            cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
+            try:
+                await WorkflowSignalClient.send_cancellation_signal(cb_url, invocation_id)
+            except Exception:
+                logger.exception("Failed to send cancellation signal", invocation_id=invocation_id)
+            raise InvocationCancelledError(str(invocation_id), phase="pre_execution")
 
     async def _load_invocation(self, invocation_id: UUID) -> Invocation | None:
         """Load invocation from database.
@@ -323,7 +348,16 @@ class InvocationExecutor:
         # Check if invocation was cancelled before execution
         if invocation.status == InvocationStatus.CANCELLED:
             logger.info("Invocation was cancelled before execution", invocation_id=invocation_id)
-            return
+            raw_cb = (invocation.context_data or {}).get("callback_url")
+            cb_url = raw_cb if isinstance(raw_cb, str) else None
+            try:
+                await WorkflowSignalClient.send_cancellation_signal(cb_url, invocation.id)
+            except Exception:
+                logger.exception(
+                    "Failed to send pre-start cancellation signal",
+                    invocation_id=invocation_id,
+                )
+            raise InvocationCancelledError(str(invocation_id), phase="pre_start")
 
         logger.info(
             "Executing invocation",
@@ -333,8 +367,12 @@ class InvocationExecutor:
         # Parse context_data into typed model once, reused throughout execution
         ctx = InvocationContextData.model_validate(invocation.context_data or {})
 
+        await self._check_cancel_key(invocation_id, ctx)
+
         # Wait for file conversions to reach terminal state before proceeding
         await self._wait_for_file_conversions(ctx)
+
+        await self._check_cancel_key(invocation_id, ctx)
 
         # Log conversion failures but allow execution to proceed (FR-020)
         await self._log_conversion_failures(invocation, ctx)
@@ -389,23 +427,29 @@ class InvocationExecutor:
 
         try:
             # Mark invocation as started
-            if await self._update_invocation_status(
+            updated = await self._update_invocation_status(
                 invocation.id,
                 InvocationStatus.RUNNING,
                 started_at=datetime.now(UTC),
-            ):
-                # Dispatch RUNNING event
-                AuditEventDispatcher.dispatch(
-                    InvocationLifecycleEvent(
-                        session_id=invocation.session_id,
-                        invocation_id=invocation.id,
-                        execution_id=execution_id,
-                        request_id=request_id,
-                        status=InvocationStatus.RUNNING,
-                        activity_id=ctx.activity_id,
-                        activity_name=ctx.activity_name,
-                    )
+            )
+            if not updated:
+                logger.info(
+                    "Invocation cancelled before RUNNING update",
+                    invocation_id=invocation.id,
                 )
+                raise InvocationCancelledError(str(invocation.id), phase="pre_execution")  # noqa: TRY301
+
+            AuditEventDispatcher.dispatch(
+                InvocationLifecycleEvent(
+                    session_id=invocation.session_id,
+                    invocation_id=invocation.id,
+                    execution_id=execution_id,
+                    request_id=request_id,
+                    status=InvocationStatus.RUNNING,
+                    activity_id=ctx.activity_id,
+                    activity_name=ctx.activity_name,
+                )
+            )
 
             # Execute through OrchestrationService (which handles context enhancement internally)
             logger.info(
@@ -489,10 +533,22 @@ class InvocationExecutor:
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="success")
 
         except InvocationCancelledError:
-            # Invocation was cancelled during execution - this is expected behavior
-            # Don't mark as failed since cancellation is already handled
+            # Invocation was cancelled during execution - this is expected behavior.
+            # The terminal cancelled stream event is published by
+            # orchestration_service when it catches this error.
             logger.info("Invocation cancelled during execution", invocation_id=invocation.id)
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="cancelled")
+
+            # Notify workflow of cancellation (best-effort)
+            cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
+            try:
+                await WorkflowSignalClient.send_cancellation_signal(cb_url, invocation.id)
+            except Exception:
+                logger.exception(
+                    "Failed to send mid-execution cancellation signal",
+                    invocation_id=invocation.id,
+                )
+            raise
         except Exception as e:
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="error", error=e)
 
@@ -502,7 +558,7 @@ class InvocationExecutor:
                 error_type=type(e).__name__,
             )
 
-            if await self._fail_invocation_if_not_cancelled(
+            updated = await self._fail_invocation_if_not_cancelled(
                 invocation.id,
                 completed_at=datetime.now(UTC),
                 error_message=(
@@ -510,20 +566,31 @@ class InvocationExecutor:
                     if isinstance(e, (ToolDiscoveryError, ToolSelectionUnavailableError))
                     else f"{type(e).__name__}: {e}"
                 ),
-            ):
-                # Dispatch FAILED event
-                AuditEventDispatcher.dispatch(
-                    InvocationLifecycleEvent(
-                        session_id=invocation.session_id,
+            )
+            if not updated:
+                cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
+                try:
+                    await WorkflowSignalClient.send_cancellation_signal(cb_url, invocation.id)
+                except Exception:
+                    logger.exception(
+                        "Failed to send cancellation signal after error",
                         invocation_id=invocation.id,
-                        execution_id=execution_id,
-                        request_id=request_id,
-                        status=InvocationStatus.FAILED,
-                        error_type=type(e).__name__,
-                        activity_id=ctx.activity_id,
-                        activity_name=ctx.activity_name,
                     )
+                raise InvocationCancelledError(str(invocation.id), phase="error_after_cancel") from e
+
+            # Dispatch FAILED event
+            AuditEventDispatcher.dispatch(
+                InvocationLifecycleEvent(
+                    session_id=invocation.session_id,
+                    invocation_id=invocation.id,
+                    execution_id=execution_id,
+                    request_id=request_id,
+                    status=InvocationStatus.FAILED,
+                    error_type=type(e).__name__,
+                    activity_id=ctx.activity_id,
+                    activity_name=ctx.activity_name,
                 )
+            )
 
             # Send failure signal to workflow
             cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
@@ -659,22 +726,29 @@ class InvocationExecutor:
                 credential_resolver=self._make_mcp_credential_resolver(meta.integration_connections if meta else None),
                 tool_selection_strategy=(meta.tool_selection_strategy if meta else None) or "NONE",
                 tool_selections=list(meta.tool_selections) if meta else [],
+                session_factory=self.session_factory,
             )
             logger.info("LLM initialized successfully for invocation", invocation_id=invocation.id)
             return service, llm_http_client
         except (LLMConfigurationError, CredentialResolutionError) as e:
             logger.exception("LLM configuration failed for invocation", invocation_id=invocation.id)
             now = datetime.now(UTC)
-            await self._update_invocation_status(
+            updated = await self._update_invocation_status(
                 invocation.id,
                 InvocationStatus.FAILED,
                 started_at=now,
                 error_message=type(e).__name__,
                 completed_at=now,
             )
-            logger.exception("Invocation failed", invocation_id=invocation.id, error_message=str(e))
-
             cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
+            if not updated:
+                try:
+                    await WorkflowSignalClient.send_cancellation_signal(cb_url, invocation.id)
+                except Exception:
+                    logger.exception("Failed to send cancellation signal", invocation_id=invocation.id)
+                raise InvocationCancelledError(str(invocation.id), phase="init_after_cancel") from e
+
+            logger.exception("Invocation failed", invocation_id=invocation.id, error_message=str(e))
             await WorkflowSignalClient.send_failure_signal(cb_url, invocation.id, e)
             return None
 

@@ -43,7 +43,7 @@ import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import MaxConnectionsError, ResponseError
 
-from syntara.core.cache.base import BaseRedisClient, redis_operation_with_backoff
+from syntara.core.cache.base import BaseRedisClient, redis_error_handler, redis_operation_with_backoff
 from syntara.core.exceptions import SafeValueError
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -64,6 +64,46 @@ class StreamClient(BaseRedisClient):
     """
 
     _client_name = "stream"
+
+    async def key_exists(self, key: str) -> bool:
+        """Check whether a Redis key exists.
+
+        Args:
+            key: The Redis key to check
+
+        Returns:
+            True if the key exists, False otherwise
+
+        Raises:
+            RedisConnectionError: If connection to cache fails
+
+        """
+        client = self._ensure_connected()
+        return bool(await client.exists(key))
+
+    async def set_key(self, key: str, value: str, ttl: int) -> None:
+        """Set a Redis key with a TTL.
+
+        Uses the same retry-with-backoff wrapper as ``publish`` because
+        SETEX is idempotent and ``MaxConnectionsError`` (pool exhaustion)
+        is the most common transient failure.
+
+        Args:
+            key: The Redis key to set
+            value: The value to store
+            ttl: Time-to-live in seconds
+
+        Raises:
+            RedisConnectionError: If connection to cache fails
+
+        """
+        client = self._ensure_connected()
+
+        async def _setex() -> None:
+            async with redis_error_handler("set_key", key=key):
+                await client.setex(key, ttl, value)
+
+        await redis_operation_with_backoff(_setex, "set_key", key=key)
 
     async def publish(self, stream_id: str, data: dict[str, Any]) -> str:
         """Publish arbitrary event data to a cache stream.

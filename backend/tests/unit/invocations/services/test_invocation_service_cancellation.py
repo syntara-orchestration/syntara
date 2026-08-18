@@ -1,6 +1,6 @@
 """Unit tests for InvocationService cancellation functionality."""
 
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -77,6 +77,56 @@ class TestInvocationServiceCancellation:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_cancel_invocation_signals_via_redis(self, mock_user) -> None:
+        """Test that cancellation signals the agent loop via Redis after DB commit."""
+        mock_session = AsyncMock()
+        service = InvocationService(mock_session, mock_user)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.checkpoint_data = None
+        mock_invocation.context_data = {"file_ids": []}
+        mock_session.get.return_value = mock_invocation
+
+        with patch.object(service, "_signal_cancellation", new=AsyncMock()) as mock_signal:
+            result = await service.cancel_invocation(invocation_id, "test reason")
+
+            assert result == CancellationResult.SUCCESS
+            mock_session.commit.assert_called_once()
+            mock_signal.assert_awaited_once_with(invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_signal_cancellation_sets_redis_key_without_publishing(self, mock_user) -> None:
+        """Test _signal_cancellation sets the cancel key but does not publish a terminal event."""
+        mock_session = AsyncMock()
+        service = InvocationService(mock_session, mock_user)
+        invocation_id = uuid4()
+
+        mock_client = AsyncMock()
+
+        with patch("syntara.agent_orchestrator.services.invocation_service.StreamClient") as mock_stream_cls:
+            mock_stream_cls.return_value.__aenter__.return_value = mock_client
+
+            await service._signal_cancellation(invocation_id)
+
+            # TTL matches Agent Execution timeout (3600s)
+            mock_client.set_key.assert_awaited_once_with(f"invocation:{invocation_id}:cancelled", "1", 3600)
+            mock_client.publish.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_signal_cancellation_failure_does_not_prevent_cancellation(self, mock_user) -> None:
+        """Test that _signal_cancellation swallows Redis errors without raising."""
+        mock_session = AsyncMock()
+        service = InvocationService(mock_session, mock_user)
+        invocation_id = uuid4()
+
+        with patch("syntara.agent_orchestrator.services.invocation_service.StreamClient") as mock_cls:
+            mock_cls.return_value.__aenter__.side_effect = ConnectionError("Redis down")
+            await service._signal_cancellation(invocation_id)
+
+    @pytest.mark.asyncio
     async def test_cancel_with_files_calls_retriever_delete(self, mock_user) -> None:
         """Cancellation deletes files via the storage retriever."""
         mock_session = AsyncMock()
@@ -130,6 +180,31 @@ class TestInvocationServiceCancellation:
             "orchestrator-abc-content.md",
             "orchestrator-def-data.txt",
         ]
+
+    @pytest.mark.asyncio
+    async def test_cancel_returns_success_when_cleanup_raises(self, mock_user) -> None:
+        """A cleanup failure after DB commit must not 500 a successful cancel."""
+        mock_session = AsyncMock()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.checkpoint_data = None
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        service = InvocationService(mock_session, mock_user)
+
+        with (
+            patch.object(service, "_signal_cancellation", new=AsyncMock()) as mock_signal,
+            patch.object(service, "_cleanup_invocation_files", side_effect=RuntimeError("storage unavailable")),
+        ):
+            result = await service.cancel_invocation(invocation_id, "cleanup failure test")
+
+        assert result == CancellationResult.SUCCESS
+        mock_session.commit.assert_called_once()
+        mock_signal.assert_awaited_once_with(invocation_id)
 
     @pytest.mark.asyncio
     async def test_cancel_cleanup_continues_on_single_file_error(self, mock_user) -> None:

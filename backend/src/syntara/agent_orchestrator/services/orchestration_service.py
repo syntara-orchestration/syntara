@@ -8,7 +8,7 @@ import asyncio
 import contextlib
 import time
 from collections import defaultdict, deque
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any, cast
 from urllib.parse import urlparse, urlunparse
@@ -24,23 +24,27 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
+from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
-from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
 from syntara.agent_orchestrator.models.streaming_events import (
+    CancelledEventData,
     CompletionEventData,
     DeltaEventData,
     ToolCallEventData,
     ToolResultEventData,
 )
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_stream_id
+from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key, get_invocation_stream_id
 from syntara.agent_orchestrator.tool_manager import ToolRetriever
 from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     create_tool_awrapper,
@@ -54,6 +58,7 @@ from syntara.audit.decorators import audit
 from syntara.audit.emitter import AuditActorContext
 from syntara.audit.models.audit_event import EventCategory, EventSeverity
 from syntara.core.cache.stream import StreamClient
+from syntara.core.database.session import get_db
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.instrumentation import LLMStreamTracker
 
@@ -62,6 +67,7 @@ logger = structlog.stdlib.get_logger(__name__)
 
 _MAX_TOOL_OUTPUT_LENGTH = 10_000
 _MAX_TOOL_CONTENT_LENGTH = 200
+_CANCELLATION_POLL_INTERVAL = 2.0
 
 
 class _TraceAccumulator:
@@ -276,6 +282,7 @@ class OrchestrationService:
         credential_resolver: Callable[[UUID], Awaitable[str | None]] | None = None,
         tool_selection_strategy: str | None = None,
         tool_selections: list[str] | None = None,
+        session_factory: Callable[[], AsyncGenerator[AsyncSession, None]] = get_db,
     ) -> None:
         """Initialize the orchestration service.
 
@@ -287,6 +294,7 @@ class OrchestrationService:
                 integration are authenticated at tool-call time.
             tool_selection_strategy: "ALL", "NONE", or "SELECTED". None/absent treated as "NONE" (no tools).
             tool_selections: Tool UUIDs to make available when strategy is "SELECTED".
+            session_factory: Session factory for DB fallback in cancellation checks.
 
         """
         self.llm = llm
@@ -294,6 +302,7 @@ class OrchestrationService:
         self._credential_resolver = credential_resolver
         self._tool_selection_strategy = tool_selection_strategy
         self._tool_selections = set(tool_selections or [])
+        self._get_async_session_context = contextlib.asynccontextmanager(session_factory)
 
     async def _setup_graph(self, state: AgentState) -> CompiledStateGraph[AgentState, None, Any, Any]:
         """Set up the LangGraph state machine with ToolNode integration.
@@ -507,6 +516,15 @@ class OrchestrationService:
             response_schema=response_schema,
         )
 
+        cancel_key = get_invocation_cancel_key(invocation_id)
+        try:
+            async with StreamClient() as pre_client:
+                await self._check_cancellation_signal(pre_client, cancel_key, invocation_id)
+        except InvocationCancelledError:
+            raise
+        except Exception:  # noqa: BLE001, S110
+            pass
+
         trace_accumulator = _TraceAccumulator()
 
         async with StreamClient() as client:
@@ -547,15 +565,44 @@ class OrchestrationService:
                 # over stream-derived reasoning-step estimates for Agent Steps header.
                 self._apply_provider_token_totals(result)
 
-                # Publish completion event
+                # Accepted race: if cancel lands while the watcher is in
+                # asyncio.sleep (up to the poll interval) and the stream
+                # iterator then ends, cancel_event is never set and we take
+                # this success path.  Consequences:
+                #  - A terminal "completion" event is written to the Redis
+                #    stream; WebSocket clients treat it as final and will not
+                #    see a subsequent "cancelled" event.
+                #  - A "completed" signal is posted to Temporal; the executor
+                #    skips the COMPLETED DB update (conditional WHERE != CANCELLED)
+                #    but does not send send_cancellation_signal, so the workflow
+                #    activity may complete as success while the DB row is CANCELLED.
+                #
+                # This is accepted: cancellation is best-effort and non-atomic.
+                # Once the stream iterator has exhausted, the LLM has finished
+                # and all tools have run — cancel after that point is treated
+                # as completion.  Adding a synchronous DB/Redis check here
+                # would penalise every successful invocation to close a sub-2s
+                # window on an already-completed task.
                 await self._publish_completion_event(invocation_id, stream_id, client)
-
-                # Handle completion callback with enriched result payload.
                 await self._handle_completion_callback(final_state, invocation_id, ctx, signal_result=result)
 
                 logger.info("Streaming orchestration completed", invocation_id=invocation_id)
 
                 return result
+
+            except InvocationCancelledError:
+                logger.info("Invocation cancelled during orchestration", invocation_id=invocation_id)
+                try:
+                    cancelled_data = CancelledEventData(reason="user_cancelled")
+                    await self._publish_stream_event(
+                        client, stream_id, "cancelled", invocation_id, cancelled_data.model_dump()
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to publish cancelled stream event",
+                        invocation_id=invocation_id,
+                    )
+                raise
 
             except Exception as e:
                 # Handle streaming errors
@@ -571,6 +618,39 @@ class OrchestrationService:
                 await WorkflowSignalClient.send_failure_signal(cb_url, invocation_id, e)
 
                 raise
+
+    async def _cancellation_watcher(
+        self,
+        client: StreamClient,
+        cancel_key: str,
+        invocation_id: UUID,
+        cancel_event: asyncio.Event,
+        interval: float | None = None,
+    ) -> None:
+        """Poll for cancellation independently of the stream loop.
+
+        Runs as a concurrent task so that long-running tools that block
+        ``astream_events`` do not prevent cancellation from being detected.
+        Sets *cancel_event* when cancellation is found; the stream loop
+        checks the event between iterations and raises.
+
+        Known limitation: this watcher only improves *detection* latency.
+        The actual raise happens inside the ``async for`` body in the
+        stream loop, so an in-flight tool that blocks ``astream_events``
+        from yielding will keep running until it returns.  Cooperative
+        cancellation within tools is not yet implemented.
+        """
+        if interval is None:
+            interval = _CANCELLATION_POLL_INTERVAL
+        while not cancel_event.is_set():
+            try:
+                await self._check_cancellation_signal(client, cancel_key, invocation_id)
+            except InvocationCancelledError:
+                cancel_event.set()
+                return
+            except Exception:  # noqa: BLE001
+                logger.debug("Cancellation check failed, will retry", invocation_id=invocation_id, exc_info=True)
+            await asyncio.sleep(interval)
 
     async def _execute_graph_streaming(
         self,
@@ -603,20 +683,87 @@ class OrchestrationService:
             model=self._get_model_name(),
         )
 
-        # Stream events from LangGraph
-        async for event in graph.astream_events(initial_state, config, version="v2"):
-            # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
-            event_dict = cast("dict[str, Any]", event)
-            ttft_tracker.process_event(event_dict)
-            await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
+        cancel_key = get_invocation_cancel_key(invocation_id)
+        cancel_event = asyncio.Event()
 
-            # Accumulate for trace persistence
-            trace_accumulator.accumulate(event_dict)
+        watcher = asyncio.create_task(
+            self._cancellation_watcher(client, cancel_key, invocation_id, cancel_event),
+            name="cancellation_watcher",
+        )
+        try:
+            # Stream events from LangGraph
+            async for event in graph.astream_events(initial_state, config, version="v2"):
+                if cancel_event.is_set():
+                    raise InvocationCancelledError(str(invocation_id), phase="streaming")  # noqa: TRY301
 
-            # Capture final state from graph end events
-            final_state = self._extract_final_state(event_dict, final_state)
+                # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
+                event_dict = cast("dict[str, Any]", event)
+                ttft_tracker.process_event(event_dict)
+                await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
 
+                # Accumulate for trace persistence
+                trace_accumulator.accumulate(event_dict)
+
+                # Capture final state from graph end events
+                final_state = self._extract_final_state(event_dict, final_state)
+        except InvocationCancelledError:
+            raise
+        except Exception:
+            if cancel_event.is_set():
+                raise InvocationCancelledError(str(invocation_id), phase="streaming") from None
+            try:
+                async with self._get_async_session_context() as session:
+                    inv = await session.get(Invocation, invocation_id)
+                    if inv is not None and inv.status == InvocationStatus.CANCELLED:
+                        raise InvocationCancelledError(str(invocation_id), phase="streaming") from None  # noqa: TRY301
+            except InvocationCancelledError:
+                raise
+            except Exception:  # noqa: BLE001, S110
+                pass
+            raise
+        finally:
+            watcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await watcher
+
+        # No post-loop cancellation check: if cancellation lands after the last
+        # stream event, _complete_invocation_if_not_cancelled in the executor uses
+        # a conditional UPDATE (WHERE status != CANCELLED) to guarantee the DB
+        # never flips from CANCELLED to COMPLETED. The streaming-layer watcher is
+        # an optimisation to stop work early, not a correctness guarantee.
         return final_state
+
+    async def _check_cancellation_signal(
+        self,
+        client: StreamClient,
+        cancel_key: str,
+        invocation_id: UUID,
+    ) -> None:
+        """Check Redis for a cancellation signal; fall back to DB if Redis is unavailable."""
+        cancelled = False
+        redis_available = True
+
+        try:
+            cancelled = await client.key_exists(cancel_key) is True
+        except Exception:  # noqa: BLE001
+            redis_available = False
+            logger.debug("Redis cancellation check failed, falling back to DB", invocation_id=invocation_id)
+
+        if not redis_available and not cancelled:
+            try:
+                async with self._get_async_session_context() as session:
+                    invocation = await session.get(Invocation, invocation_id)
+                    cancelled = invocation is not None and invocation.status == InvocationStatus.CANCELLED
+            except (SQLAlchemyError, OSError) as e:
+                logger.warning(
+                    "DB cancellation fallback failed, continuing",
+                    invocation_id=invocation_id,
+                    error=str(e),
+                )
+
+        if cancelled:
+            logger.info("Cancellation signal detected", invocation_id=invocation_id)
+            raise InvocationCancelledError(str(invocation_id), phase="streaming")
 
     def _extract_final_state(
         self, event_dict: dict[str, Any], current_final_state: AgentState | None

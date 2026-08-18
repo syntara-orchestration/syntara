@@ -15,11 +15,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.websockets import WebSocket
 
 from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models.error import ErrorData
 from syntara.core.websocket.base_handler import BaseWebSocketStreamingHandler
 from syntara.core.websocket.close_codes import POLICY_VIOLATION
-from syntara.core.websocket.exceptions import EventsExpiredError, StreamingValidationError
+from syntara.core.websocket.exceptions import (
+    EventsExpiredError,
+    InvocationCancelledStreamError,
+    StreamingValidationError,
+)
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -43,6 +48,19 @@ def get_invocation_stream_id(invocation_id: UUID) -> str:
 
     """
     return f"invocation:{invocation_id}:events"
+
+
+def get_invocation_cancel_key(invocation_id: UUID) -> str:
+    """Get Redis key for an invocation's cancellation signal.
+
+    Args:
+        invocation_id: UUID of the invocation
+
+    Returns:
+        Redis key (e.g., "invocation:UUID:cancelled")
+
+    """
+    return f"invocation:{invocation_id}:cancelled"
 
 
 # Custom exceptions for invocation streaming errors
@@ -163,10 +181,19 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         invocation_status = session_state["invocation_status"]
 
         # Terminal statuses indicate invocation has finished
-        terminal_statuses = {InvocationStatus.COMPLETED, InvocationStatus.FAILED, InvocationStatus.CANCELLED}
+        terminal_statuses = {InvocationStatus.COMPLETED, InvocationStatus.FAILED}
+
+        if invocation_status == InvocationStatus.CANCELLED:
+            logger.warning(
+                "Invocation already cancelled, no stream to connect to",
+                invocation_id=invocation_id,
+            )
+            raise InvocationCancelledStreamError(
+                resource_id=str(invocation_id),
+                resource_type="invocation",
+            )
 
         if invocation_status in terminal_statuses:
-            # Invocation finished but stream doesn't exist - events expired
             logger.warning(
                 "Invocation is terminal but the Redis stream has expired",
                 invocation_id=invocation_id,
@@ -178,12 +205,35 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
                 resource_type="invocation",
             )
 
-        # Invocation still running - wait for stream to be created
+        cancel_key = get_invocation_cancel_key(invocation_id)
+
+        async def _check_cancel(client: StreamClient) -> None:
+            try:
+                cancelled = await client.key_exists(cancel_key)
+            except Exception:  # noqa: BLE001
+                # Redis failed — fall back to DB, same as _cancellation_watcher
+                logger.debug("Cancel key check failed, falling back to DB", invocation_id=invocation_id)
+                try:
+                    status = await self._check_invocation_exists(invocation_id)
+                    cancelled = status == InvocationStatus.CANCELLED
+                except StreamingValidationError:
+                    raise
+                except Exception:  # noqa: BLE001
+                    logger.debug("DB fallback also failed, will retry next poll", invocation_id=invocation_id)
+                    return
+            if cancelled:
+                logger.info("Invocation cancelled during stream wait", invocation_id=invocation_id)
+                raise InvocationCancelledStreamError(
+                    resource_id=str(invocation_id),
+                    resource_type="invocation",
+                )
+
         await self._wait_for_stream_creation(
             stream_id=stream_id,
             resource_id=str(invocation_id),
             resource_status=invocation_status.value,
             resource_type="invocation",
+            on_poll=_check_cancel,
         )
 
     async def _check_invocation_exists(self, invocation_id: UUID) -> InvocationStatus:

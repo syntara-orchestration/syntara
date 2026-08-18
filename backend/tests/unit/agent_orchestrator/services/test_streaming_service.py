@@ -14,10 +14,15 @@ from syntara.agent_orchestrator.services.streaming_service import (
     InvocationNotFoundError,
     StreamingService,
     WebSocketStreamingHandler,
+    get_invocation_cancel_key,
     get_invocation_stream_id,
 )
 from syntara.core.websocket.close_codes import POLICY_VIOLATION
-from syntara.core.websocket.exceptions import EventsExpiredError, StreamingValidationError
+from syntara.core.websocket.exceptions import (
+    EventsExpiredError,
+    InvocationCancelledStreamError,
+    StreamingValidationError,
+)
 
 
 def mock_db_session_factory(handler: WebSocketStreamingHandler, scalar_result: Any) -> None:  # noqa: ANN401
@@ -56,6 +61,16 @@ class TestGetInvocationStreamId:
         invocation_id = uuid4()
         stream_id = get_invocation_stream_id(invocation_id)
         assert stream_id == f"invocation:{invocation_id}:events"
+
+
+class TestGetInvocationCancelKey:
+    """Test get_invocation_cancel_key helper function."""
+
+    def test_generates_correct_cancel_key(self) -> None:
+        """Test that cancel key has correct format."""
+        invocation_id = uuid4()
+        cancel_key = get_invocation_cancel_key(invocation_id)
+        assert cancel_key == f"invocation:{invocation_id}:cancelled"
 
 
 class TestWebSocketStreamingHandlerCreateContext:
@@ -169,31 +184,151 @@ class TestWebSocketStreamingHandlerWaitForStreamReady:
         with pytest.raises(EventsExpiredError):
             await handler.wait_for_stream_ready(stream_id, context)
 
-    async def test_wait_for_stream_ready_raises_events_expired_for_cancelled(
+    async def test_wait_for_stream_ready_raises_cancelled_for_cancelled_invocation(
         self, handler: WebSocketStreamingHandler
     ) -> None:
-        """Test that wait_for_stream_ready raises EventsExpiredError for cancelled invocation."""
+        """Test that wait_for_stream_ready raises InvocationCancelledStreamError for cancelled invocation."""
         invocation_id = uuid4()
         stream_id = get_invocation_stream_id(invocation_id)
         context = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
 
-        with pytest.raises(EventsExpiredError):
+        with pytest.raises(InvocationCancelledStreamError) as exc_info:
             await handler.wait_for_stream_ready(stream_id, context)
 
+        assert exc_info.value.error_data.code == "INVOCATION_CANCELLED"
+
+    @pytest.mark.asyncio
     async def test_wait_for_stream_ready_waits_for_running_invocation(self, handler: WebSocketStreamingHandler) -> None:
-        """Test that wait_for_stream_ready waits for stream creation for running invocation."""
+        """Test that wait_for_stream_ready returns when stream appears."""
         invocation_id = uuid4()
         stream_id = get_invocation_stream_id(invocation_id)
         context = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
 
-        with patch.object(handler, "_wait_for_stream_creation") as mock_wait:
+        mock_client = AsyncMock()
+        mock_client.info.return_value = {"exists": True}
+        mock_client.key_exists.return_value = False
+
+        with (
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_cls,
+            patch("syntara.core.websocket.base_handler.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            mock_stream_cls.return_value.__aenter__.return_value = mock_client
             await handler.wait_for_stream_ready(stream_id, context)
-            mock_wait.assert_called_once_with(
-                stream_id=stream_id,
-                resource_id=str(invocation_id),
-                resource_status=InvocationStatus.RUNNING.value,
-                resource_type="invocation",
-            )
+
+    @pytest.mark.asyncio
+    async def test_wait_for_stream_ready_detects_cancel_key_during_wait(
+        self, handler: WebSocketStreamingHandler
+    ) -> None:
+        """Test that wait_for_stream_ready raises InvocationCancelledStreamError when cancel key appears."""
+        invocation_id = uuid4()
+        stream_id = get_invocation_stream_id(invocation_id)
+        context = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CREATED}
+
+        mock_client = AsyncMock()
+        mock_client.info.return_value = {"exists": False}
+        # Cancel key appears on second poll
+        mock_client.key_exists.side_effect = [False, True]
+
+        with (
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_cls,
+            patch("syntara.core.websocket.base_handler.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            mock_stream_cls.return_value.__aenter__.return_value = mock_client
+
+            with pytest.raises(InvocationCancelledStreamError) as exc_info:
+                await handler.wait_for_stream_ready(stream_id, context)
+
+            assert exc_info.value.error_data.code == "INVOCATION_CANCELLED"
+
+    @pytest.mark.asyncio
+    async def test_wait_for_stream_ready_detects_cancel_via_db_when_redis_down(
+        self, handler: WebSocketStreamingHandler
+    ) -> None:
+        """When Redis is down, DB fallback detects cancellation instead of timing out."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        invocation_id = uuid4()
+        stream_id = get_invocation_stream_id(invocation_id)
+        context = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CREATED}
+
+        mock_client = AsyncMock()
+        mock_client.info.side_effect = RedisConnectionError("Redis down")
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+
+        mock_invocation = MagicMock()
+        mock_invocation.status = InvocationStatus.CANCELLED
+
+        with (
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_cls,
+            patch("syntara.core.websocket.base_handler.asyncio.sleep", new_callable=AsyncMock),
+            patch.object(
+                handler,
+                "_check_invocation_exists",
+                new_callable=AsyncMock,
+                return_value=InvocationStatus.CANCELLED,
+            ),
+        ):
+            mock_stream_cls.return_value.__aenter__.return_value = mock_client
+
+            with pytest.raises(InvocationCancelledStreamError) as exc_info:
+                await handler.wait_for_stream_ready(stream_id, context)
+
+            assert exc_info.value.error_data.code == "INVOCATION_CANCELLED"
+
+
+class TestStreamEventsToWebsocketRedisDown:
+    """Test stream_events_to_websocket when Redis is unavailable at connect time."""
+
+    @pytest.mark.asyncio
+    async def test_info_redis_down_triggers_wait_path_db_cancel(
+        self,
+        handler: WebSocketStreamingHandler,
+        mock_websocket: MagicMock,
+    ) -> None:
+        """When info() raises RedisConnectionError the wait path is entered and DB fallback detects cancellation."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        invocation_id = uuid4()
+        stream_id = get_invocation_stream_id(invocation_id)
+
+        mock_client = AsyncMock()
+        mock_client.info.side_effect = RedisConnectionError("Redis down")
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+
+        with (
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_stream_cls,
+            patch("syntara.core.websocket.base_handler.get_connection_lifecycle_manager") as mock_lifecycle,
+            patch("syntara.core.websocket.base_handler.asyncio.sleep", new_callable=AsyncMock),
+            patch.object(
+                handler,
+                "create_session_state",
+                new_callable=AsyncMock,
+                return_value={
+                    "invocation_id": invocation_id,
+                    "invocation_status": InvocationStatus.RUNNING,
+                },
+            ),
+            patch.object(
+                handler,
+                "_check_invocation_exists",
+                new_callable=AsyncMock,
+                return_value=InvocationStatus.CANCELLED,
+            ),
+        ):
+            mock_stream_cls.return_value.__aenter__.return_value = mock_client
+            mock_stream_cls.return_value.__aexit__.return_value = None
+            mock_lifecycle_mgr = MagicMock()
+            mock_lifecycle_mgr.add_connection.return_value = "conn-1"
+            mock_lifecycle.return_value = mock_lifecycle_mgr
+
+            with pytest.raises(InvocationCancelledStreamError) as exc_info:
+                await handler.stream_events_to_websocket(
+                    websocket=mock_websocket,
+                    stream_id=stream_id,
+                    invocation_id=invocation_id,
+                )
+
+            assert exc_info.value.error_data.code == "INVOCATION_CANCELLED"
 
 
 class TestAAP86853InvocationStatusLookupRegression:

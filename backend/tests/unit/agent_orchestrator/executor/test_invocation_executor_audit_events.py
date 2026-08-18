@@ -149,7 +149,10 @@ class TestInvocationExecutorLifecycleEvents:
             for p in patches[1:]:
                 stack.enter_context(p)
 
-            await executor.execute_invocation(invocation_id=invocation.id)
+            try:
+                await executor.execute_invocation(invocation_id=invocation.id)
+            except InvocationCancelledError:
+                pass
 
         # Return all emitted events for test-specific assertions
         return [call.args[0] for call in mock_do_emit.call_args_list]
@@ -528,7 +531,7 @@ class TestInvocationExecutorLifecycleEvents:
 
     @pytest.mark.asyncio
     async def test_handle_execution_error_no_failed_event_when_cancelled(self) -> None:
-        """Exception during cancelled invocation does not emit FAILED event (race condition prevented)."""
+        """Exception during cancelled invocation raises InvocationCancelledError, no FAILED event."""
         execution_id = uuid4()
         user = _make_user()
 
@@ -572,7 +575,6 @@ class TestInvocationExecutorLifecycleEvents:
 
         executor = InvocationExecutor()
 
-        # Mock WorkflowSignalClient to prevent actual signal sending
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
@@ -580,20 +582,21 @@ class TestInvocationExecutorLifecycleEvents:
             patch(
                 "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
                 new_callable=AsyncMock,
-            ),
+            ) as mock_failure_signal,
         ):
-            await executor.execute_invocation(invocation_id=invocation.id)
+            try:
+                await executor.execute_invocation(invocation_id=invocation.id)
+            except InvocationCancelledError:
+                pass
 
         events: list[AuditEvent] = [call.args[0] for call in mock_do_emit.call_args_list]
         lifecycle_events = [e for e in events if e.event_action in ["invocation_running", "invocation_failed"]]
 
-        # Should only have RUNNING event
-        # (no FAILED event because _fail_invocation_status_if_not_cancelled returned False)
+        # Should only have RUNNING event — no FAILED because the row was
+        # already CANCELLED and InvocationCancelledError was raised instead
         assert len(lifecycle_events) == 1
         assert lifecycle_events[0].event_action == "invocation_running"
-        assert lifecycle_events[0].actor_id == user.id
-        assert lifecycle_events[0].actor_username == user.username
-        assert lifecycle_events[0].actor_type == PrincipalType.USER
+        mock_failure_signal.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_invocation_lifecycle_events_includes_context_identifiers(self) -> None:

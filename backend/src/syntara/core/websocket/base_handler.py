@@ -17,6 +17,8 @@ from starlette.websockets import WebSocket
 if TYPE_CHECKING:
     from uuid import UUID
 
+from redis.exceptions import ConnectionError as RedisConnectionError
+
 from syntara.core.cache.stream import StreamClient
 from syntara.core.constants import FieldLimits
 from syntara.core.models.error import ErrorData
@@ -277,12 +279,16 @@ class BaseWebSocketStreamingHandler(ABC):
             lifecycle_manager.activate_connection(lifecycle_conn_id)
 
             # Step 2: Check if stream exists
-            async with StreamClient() as client:
-                info = await client.info(stream_id)
+            stream_exists = False
+            try:
+                async with StreamClient() as client:
+                    info = await client.info(stream_id)
+                    stream_exists = info["exists"]
+            except (RedisConnectionError, OSError):
+                logger.debug("Redis unavailable for stream existence check, entering wait", stream_id=stream_id)
 
-                if not info["exists"]:
-                    # Stream doesn't exist - wait for it to be ready
-                    await self.wait_for_stream_ready(stream_id, session_state)
+            if not stream_exists:
+                await self.wait_for_stream_ready(stream_id, session_state)
 
             # Step 3: Determine streaming replay parameters
             start_id, replay = self.get_replay_parameters(replay_count, last_event_id, session_state)
@@ -412,6 +418,7 @@ class BaseWebSocketStreamingHandler(ABC):
         resource_status: str,
         resource_type: str = "resource",
         max_wait_seconds: int = 30,
+        on_poll: Callable[[StreamClient], Any] | None = None,
     ) -> None:
         """Wait for stream to be created in cache.
 
@@ -423,6 +430,9 @@ class BaseWebSocketStreamingHandler(ABC):
             resource_status: Current status of the resource
             resource_type: Type of resource (e.g., "invocation", "execution")
             max_wait_seconds: Maximum time to wait for stream creation
+            on_poll: Optional async callback invoked each iteration with the
+                StreamClient.  May raise to abort the wait early (e.g. when
+                a cancellation key is detected).
 
         Raises:
             WaitForStreamTimeoutError: If timeout waiting for stream creation
@@ -442,10 +452,18 @@ class BaseWebSocketStreamingHandler(ABC):
                 await asyncio.sleep(wait_interval)
                 total_waited += wait_interval
 
-                info = await client.info(stream_id)
-                if info["exists"]:
-                    logger.info("Stream created after wait", stream_id=stream_id, wait_time=total_waited)
-                    return
+                try:
+                    info = await client.info(stream_id)
+                    if info["exists"]:
+                        logger.info("Stream created after wait", stream_id=stream_id, wait_time=total_waited)
+                        return
+                except (RedisConnectionError, OSError):
+                    if on_poll is None:
+                        raise
+                    logger.debug("Stream info check failed, falling back to on_poll", stream_id=stream_id)
+
+                if on_poll is not None:
+                    await on_poll(client)
 
             # Timeout waiting for stream
             logger.error("Timeout waiting for stream to be created", stream_id=stream_id)

@@ -4,6 +4,8 @@ These tests verify that InvocationService methods correctly dispatch domain even
 which are then converted to AuditEvents by the registered handlers.
 """
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
@@ -18,6 +20,7 @@ from syntara.audit.models.audit_event import EventCategory, EventSeverity, Event
 from syntara.audit.sanitization import REDACTED
 from syntara.core.models import User
 from syntara.files.models import FileMetadata
+from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
     from syntara.audit.models.audit_event import AuditEvent
@@ -219,6 +222,13 @@ class TestInvocationServiceCreateAuditEvents:
 
 class TestInvocationServiceCancelAuditEvents:
     """Tests for audit event emission from InvocationService.cancel_invocation()."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_runtime_settings(  # type: ignore[misc]
+        self, override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]]
+    ) -> None:
+        with override_runtime_settings():
+            yield
 
     def setup_method(self) -> None:
         """Register invocations audit handlers before each test."""

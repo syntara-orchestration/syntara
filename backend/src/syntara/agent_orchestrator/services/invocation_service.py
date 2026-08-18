@@ -34,9 +34,11 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
 )
 from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.cache.stream import StreamClient
 from syntara.core.constants import CONTEXT_KEY_FILE_IDS
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -390,16 +392,33 @@ class InvocationService(BaseService):
         else:
             invocation.checkpoint_data = cancellation_data
 
-        # Clean up uploaded and converted files associated with this invocation
-        cleaned_file_ids = await self._cleanup_invocation_files(invocation)
-
         # Note: Document conversion workflows will complete harmlessly even for
         # cancelled invocations. Execution workflow cancellation is handled by Temporal.
 
+        cleaned_file_ids: list[UUID] = []
         try:
             await self.session.commit()
 
             logger.info("Invocation cancelled successfully", invocation_id=invocation_id, reason=reason)
+
+            # Signal the running agent loop via Redis so it stops.  The
+            # terminal cancelled stream event is published by
+            # orchestration_service when the agent actually stops.
+            await self._signal_cancellation(invocation_id)
+
+            # Clean up files AFTER the signal is sent.  The agent may still be
+            # executing a tool at this point (see _cancellation_watcher known
+            # limitation) so in-flight tools could see missing files — this is
+            # accepted since the invocation is already cancelled in the DB.
+            # Best-effort: cleanup failures must not 500 a cancel that already
+            # committed — a client retry would get NOT_CANCELLABLE.
+            try:
+                cleaned_file_ids = await self._cleanup_invocation_files(invocation)
+            except Exception:
+                logger.exception(
+                    "File cleanup failed after cancellation, continuing",
+                    invocation_id=invocation_id,
+                )
 
             # Dispatch success audit event
             AuditEventDispatcher.dispatch(
@@ -429,6 +448,36 @@ class InvocationService(BaseService):
                 )
             )
             raise
+
+    async def _signal_cancellation(self, invocation_id: UUID) -> None:
+        """Set Redis cancellation key so the agent loop detects cancellation.
+
+        Only sets the cancel key — does NOT publish a terminal ``cancelled``
+        event to the stream.  The orchestration service publishes the terminal
+        event when the agent actually stops, ensuring no stream traffic appears
+        after the terminal marker.
+
+        Best-effort: Redis failures are logged but do not prevent cancellation.
+        """
+        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+
+        cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
+        try:
+            async with StreamClient() as client:
+                cancel_key = get_invocation_cancel_key(invocation_id)
+                await client.set_key(cancel_key, "1", cancel_key_ttl_seconds)
+
+                logger.info(
+                    "Cancellation signal sent via Redis",
+                    invocation_id=invocation_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to signal cancellation via Redis,"
+                " agent may continue to completion if Redis stays healthy"
+                " (DB fallback only runs when Redis itself errors)",
+                invocation_id=invocation_id,
+            )
 
     async def _cleanup_files_from_paths(
         self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""
