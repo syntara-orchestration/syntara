@@ -54,7 +54,7 @@ from syntara.audit.emitter import AuditActorContext
 from syntara.audit.models.audit_event import EventCategory, EventSeverity
 from syntara.core.cache.stream import StreamClient
 from syntara.metrics.dependencies import get_metrics_recorder
-from syntara.metrics.instrumentation import LLMStreamTracker
+from syntara.metrics.instrumentation import LLM_DURATION_METADATA_KEY, LLMStreamTracker
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -864,6 +864,9 @@ class OrchestrationService:
                 if routing_ms is not None:
                     result.setdefault("response_metadata", {})["routing_duration_ms"] = routing_ms
                     result["response_metadata"]["routed_to_agent"] = final_state.get("current_agent", "unknown")
+                llm_ms = final_state.get("llm_duration_ms")
+                if llm_ms is not None:
+                    result.setdefault("response_metadata", {})[LLM_DURATION_METADATA_KEY] = llm_ms
                 return result
 
         # Fallback: Build placeholder response if no final state available

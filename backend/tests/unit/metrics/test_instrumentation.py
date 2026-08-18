@@ -9,11 +9,13 @@ import pytest
 from prometheus_client import CollectorRegistry
 
 from syntara.metrics.instrumentation import (
+    LLM_DURATION_METADATA_KEY,
     LLMCallMetrics,
     LLMStreamTracker,
     _extract_token_usage,
     _record_llm_metrics,
     _resolve_model_provider,
+    extract_llm_duration_ms,
     record_llm_call,
 )
 from syntara.metrics.recorder import MetricsRecorder
@@ -240,6 +242,55 @@ class TestRecordLLMCall:
         result = await record_llm_call(recorder, _async_response, model="m")
         assert isinstance(result, _FakeAIMessage)
         assert result.content == "Hello from LLM"
+
+    @pytest.mark.asyncio
+    async def test_attaches_duration_to_response_metadata(self, recorder: MetricsRecorder) -> None:
+        """Measured duration is stashed on response_metadata for poller bridging."""
+        result = await record_llm_call(
+            recorder,
+            lambda: _async_response(input_tokens=10, output_tokens=5),
+            model="m",
+        )
+        assert isinstance(result.response_metadata, dict)
+        assert LLM_DURATION_METADATA_KEY in result.response_metadata
+        assert result.response_metadata[LLM_DURATION_METADATA_KEY] > 0
+        assert extract_llm_duration_ms(result) == pytest.approx(result.response_metadata[LLM_DURATION_METADATA_KEY])
+
+    @pytest.mark.asyncio
+    async def test_records_metrics_when_attach_fails(
+        self, recorder: MetricsRecorder, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Attachment failure must not prevent the core metrics flush."""
+
+        def _boom(*_args: object, **_kwargs: object) -> None:
+            msg = "attach failed"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(
+            "syntara.metrics.instrumentation._attach_llm_duration",
+            _boom,
+        )
+        result = await record_llm_call(
+            recorder,
+            lambda: _async_response(input_tokens=10, output_tokens=5),
+            model="m",
+        )
+        assert isinstance(result, _FakeAIMessage)
+        durations = list(recorder.query(metric_types={MetricType.LLM_DURATION}))
+        assert len(durations) == 1
+        assert durations[0].value > 0
+
+    @pytest.mark.asyncio
+    async def test_attaches_duration_to_structured_raw_message(self, recorder: MetricsRecorder) -> None:
+        """include_raw structured responses get duration on the raw AIMessage."""
+
+        async def _structured() -> dict[str, Any]:
+            return {"parsed": {"answer": 1}, "raw": _make_response()}
+
+        result = await record_llm_call(recorder, _structured, model="m")
+        assert isinstance(result, dict)
+        assert extract_llm_duration_ms(result) is not None
+        assert extract_llm_duration_ms(result.get("raw")) == extract_llm_duration_ms(result)
 
     @pytest.mark.asyncio
     async def test_records_error_and_reraises(self, recorder: MetricsRecorder) -> None:

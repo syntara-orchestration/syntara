@@ -30,7 +30,7 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.config.base import get_settings
 from syntara.core.utils.retry import retry_with_backoff
 from syntara.metrics.dependencies import get_metrics_recorder
-from syntara.metrics.instrumentation import record_llm_call
+from syntara.metrics.instrumentation import extract_llm_duration_ms, record_llm_call
 
 if TYPE_CHECKING:
     from langchain.messages import AnyMessage
@@ -202,6 +202,7 @@ class GenericAgent(BaseAgent):
             lambda: llm_with_tools.ainvoke(messages),
             model=getattr(self.llm, "model_name", None),
         )
+        self._accumulate_llm_duration(state, result_message)
 
         # Tool-call-only responses (empty text but tool_calls present) are valid;
         # check BEFORE mutating state so retry_with_backoff replays the original messages.
@@ -292,6 +293,7 @@ class GenericAgent(BaseAgent):
                 model=getattr(self.llm, "model_name", None),
             )
             parsed_output, raw_message = self._unpack_structured_response(structured_response)
+            self._accumulate_llm_duration(state, raw_message)
         except Exception as e:  # noqa: BLE001
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
@@ -414,6 +416,7 @@ class GenericAgent(BaseAgent):
                 model=getattr(self.llm, "model_name", None),
             )
             parsed_output, raw_message = self._unpack_structured_response(structured_response)
+            self._accumulate_llm_duration(state, raw_message)
 
             # Count provider tokens for the extraction call even when parsing fails —
             # the LLM was billed regardless of whether parsed_output is usable.
@@ -481,6 +484,14 @@ class GenericAgent(BaseAgent):
             raw = response.get("raw")
             return response.get("parsed"), raw if isinstance(raw, AIMessage) else None
         return response, None
+
+    @staticmethod
+    def _accumulate_llm_duration(state: AgentState, response: object | None) -> None:
+        """Add measured LLM call duration from *response* onto AgentState."""
+        duration_ms = extract_llm_duration_ms(response)
+        if duration_ms is None:
+            return
+        state["llm_duration_ms"] = (state.get("llm_duration_ms") or 0.0) + duration_ms
 
     @staticmethod
     def _build_token_usage_entry(result_message: AIMessage) -> dict[str, Any] | None:
