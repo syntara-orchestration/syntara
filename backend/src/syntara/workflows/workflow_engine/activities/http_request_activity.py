@@ -5,7 +5,7 @@ import json
 import time
 from http import HTTPStatus
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse, urlsplit, urlunsplit
 
 import httpx
 import structlog
@@ -26,6 +26,18 @@ from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_r
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError, is_retryable_http_status
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+def _resolve_httpx_params(request_url: str, query_params: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    """Return httpx url/params; empty query_params → None so URL query is preserved."""
+    if not query_params:
+        return request_url, None
+
+    split = urlsplit(request_url)
+    url_params = dict(parse_qsl(split.query, keep_blank_values=True))
+    merged = {**url_params, **query_params}
+    clean_url = urlunsplit((split.scheme, split.netloc, split.path, "", split.fragment))
+    return clean_url, merged
 
 
 def _add_credential_auth_headers(headers: dict[str, Any], extra_vars: dict[str, Any]) -> None:
@@ -152,6 +164,7 @@ async def execute_http_request_activity(
         raise ApplicationError(str(exc), type="SSRFValidationError", non_retryable=True) from None
 
     timeout_seconds = int(input_config.get(constants.ENGINE_TIMEOUT_SECONDS_KEY, 30))
+    request_url, request_params = _resolve_httpx_params(request_url, config.query_params)
 
     start_time = time.time()
 
@@ -161,7 +174,7 @@ async def execute_http_request_activity(
                 method=config.method.value,
                 url=request_url,
                 headers=headers,
-                params=config.query_params,
+                params=request_params,
                 json=config.body if isinstance(config.body, dict) else None,
                 content=config.body if isinstance(config.body, str) else None,
                 timeout=float(timeout_seconds),
