@@ -275,7 +275,8 @@ class UsersService(BaseService):
 
         return user
 
-    def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
+    @staticmethod
+    def _is_duplicate_name_error(e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate group name."""
         error_str = str(e).lower()
         duplicate_key_violation = "duplicate key value violates unique constraint" in error_str
