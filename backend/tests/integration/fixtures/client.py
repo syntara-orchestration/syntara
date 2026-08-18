@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.dependencies import get_current_user
 from syntara.core.database.session import get_db
+from syntara.invocations.internal import _get_internal_caller_user
 from syntara.workflows.services.execution_streaming_service import ExecutionStreamingService
 
 if TYPE_CHECKING:
@@ -147,6 +148,7 @@ async def auth_client(base_client: AsyncClient, test_user: User) -> AsyncClient:
         return test_user
 
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[_get_internal_caller_user] = override_get_current_user
     return base_client
 
 
@@ -159,6 +161,7 @@ async def auth_client_with_mocked_llm(base_client_with_mocked_llm: AsyncClient, 
         return test_user
 
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[_get_internal_caller_user] = override_get_current_user
     return base_client_with_mocked_llm
 
 

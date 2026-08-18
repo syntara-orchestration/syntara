@@ -1,9 +1,18 @@
-"""Internal invocation endpoints for service-to-service calls.
+r"""Internal invocation endpoints for service-to-service calls.
 
 These endpoints are excluded from the public OpenAPI spec and intended
 for network-isolated internal callers (e.g. the Temporal worker).
 Security relies on network-level isolation (k8s NetworkPolicy / service mesh),
-not application-level mTLS.
+not application-level mTLS or Bearer/JWT.
+
+Example (internal callers only)::
+
+    curl -X POST http://localhost:8000/_internal/invocations \
+      -H "Content-Type: application/json" \
+      -H "X-On-Behalf-Of: 550e8400-e29b-41d4-a716-446655440000" \
+      -d '{"prompt": "What is Docker?", "sessionId": "session-456", "project_id": "<project-uuid>"}'
+
+    curl 'http://localhost:8000/_internal/invocations/<invocation-id>'
 """
 
 from typing import Annotated
@@ -28,6 +37,10 @@ def _get_internal_caller_user(request: Request) -> User:
     Internal endpoints skip auth middleware, so this reads the header
     directly rather than relying on cert or JWT authentication.
     Falls back to a service principal when the header is absent.
+
+    Unauthenticated POST /_internal/invocations therefore returns 202 if the
+    body is valid. Do not expose /_internal/ on a public ingress; network
+    isolation is the only access control.
     """
     on_behalf_of = request.headers.get("x-on-behalf-of")
     if on_behalf_of:
