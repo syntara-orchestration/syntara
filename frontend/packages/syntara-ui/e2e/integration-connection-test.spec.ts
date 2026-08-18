@@ -171,10 +171,6 @@ test.describe('Integration Wizard @pr-check', () => {
 
   test('connection test with unreachable endpoint returns connection error', async ({ app }) => {
     test.skip(!isRealBackend, 'Requires real backend — mock API discover always returns success')
-    test.skip(
-      isRealBackend && !mcpServerUrl,
-      'Requires a real mcp-server — without one, SSRF-allowlisted mcp-server:9999 times out instead of returning connection_error'
-    )
     const name = buildUniqueName('e2e-wizard-t9a')
     const credName = buildUniqueName('e2e-wizard-t9a-cred')
     let credentialId: string | undefined
