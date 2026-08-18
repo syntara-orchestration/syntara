@@ -250,3 +250,54 @@ class TestDecisionNotesSanitization:
             payload = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         with pytest.raises(ValidationError, match="deeply nested HTML encoding"):
             BatchApprovalDecision(approval_id=uuid4(), status="approved", notes=payload)
+
+
+class TestDecisionNotesAlias:
+    """Both request models accept ``notes`` and its ``decision_notes`` alias (AAP-87655).
+
+    The response schema returns the field as ``decision_notes``; consumers that model
+    their request on the response previously lost the value silently. Both keys must now
+    populate the same ``notes`` field, and sanitization must still run through the alias.
+    """
+
+    def test_single_accepts_decision_notes_alias(self) -> None:
+        request = ApprovalDecisionRequest.model_validate({"status": "approved", "decision_notes": "looks good"})
+        assert request.notes == "looks good"
+
+    def test_single_accepts_canonical_notes(self) -> None:
+        request = ApprovalDecisionRequest.model_validate({"status": "approved", "notes": "looks good"})
+        assert request.notes == "looks good"
+
+    def test_single_both_keys_produce_identical_result(self) -> None:
+        by_notes = ApprovalDecisionRequest.model_validate({"status": "approved", "notes": "same"})
+        by_alias = ApprovalDecisionRequest.model_validate({"status": "approved", "decision_notes": "same"})
+        assert by_notes.notes == by_alias.notes == "same"
+
+    def test_single_alias_input_is_sanitized(self) -> None:
+        """Sanitization runs on the field regardless of which alias supplied the value."""
+        request = ApprovalDecisionRequest.model_validate(
+            {"status": "approved", "decision_notes": "<script>alert(1)</script>keep"}
+        )
+        assert request.notes == "keep"
+
+    def test_batch_accepts_decision_notes_alias(self) -> None:
+        decision = BatchApprovalDecision.model_validate(
+            {"approval_id": str(uuid4()), "status": "approved", "decision_notes": "batch note"}
+        )
+        assert decision.notes == "batch note"
+
+    def test_batch_both_keys_produce_identical_result(self) -> None:
+        approval_id = str(uuid4())
+        by_notes = BatchApprovalDecision.model_validate(
+            {"approval_id": approval_id, "status": "approved", "notes": "same"}
+        )
+        by_alias = BatchApprovalDecision.model_validate(
+            {"approval_id": approval_id, "status": "approved", "decision_notes": "same"}
+        )
+        assert by_notes.notes == by_alias.notes == "same"
+
+    def test_batch_alias_input_is_sanitized(self) -> None:
+        decision = BatchApprovalDecision.model_validate(
+            {"approval_id": str(uuid4()), "status": "approved", "decision_notes": "<b>bold</b> note"}
+        )
+        assert decision.notes == "bold note"

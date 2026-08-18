@@ -12,7 +12,6 @@ import { AlertProvider } from '../../../providers/alerts'
 import { CredentialIntegrationsTab } from './CredentialIntegrationsTab'
 
 const mockRefetch = vi.fn()
-const mockNavigate = vi.fn()
 
 vi.mock('../../../client', () => ({
   integrationsClient: {
@@ -21,14 +20,6 @@ vi.mock('../../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
-
-vi.mock('@tanstack/react-router', async () => {
-  const actual = await vi.importActual('@tanstack/react-router')
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  }
-})
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -65,6 +56,20 @@ const mockIntegrations = [
   },
 ]
 
+function mockQuery(
+  data: { resources: unknown[] } | undefined,
+  extra: Record<string, unknown> = {}
+): ReturnType<typeof integrationsClient.useQuery> {
+  return {
+    data,
+    isPending: false,
+    error: null,
+    isFetching: false,
+    refetch: mockRefetch,
+    ...extra,
+  } as never
+}
+
 describe('CredentialIntegrationsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -72,29 +77,37 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('has no accessibility violations with integrations', async () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     const { container } = render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
+  it('has no accessibility violations when a description row is expanded', async () => {
+    const user = userEvent.setup()
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(
+      mockQuery({
+        resources: [
+          {
+            id: 'int-1',
+            name: 'GitHub Copilot',
+            description: 'AI coding assistant',
+            integration_type: 'mcp_server',
+            validation_status: 'available',
+            scope: 'global',
+          },
+        ],
+      })
+    )
+
+    const { container } = render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
+    await user.click(screen.getByRole('button', { name: /expand all/i }))
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('has no accessibility violations in empty state', async () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: [] },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: [] }))
 
     const { container } = render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
     const results = await axe(container)
@@ -102,14 +115,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('renders empty state when no integrations', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: [] },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: [] }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -121,32 +127,27 @@ describe('CredentialIntegrationsTab', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders integration names in table', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+  it('renders integration names as table links', () => {
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('GitHub Copilot')).toBeInTheDocument()
-    expect(screen.getByText('Jira Integration')).toBeInTheDocument()
-    expect(screen.getByText('Red Hat AI')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'GitHub Copilot' })).toHaveAttribute(
+      'href',
+      '/configuration/integrations/int-1'
+    )
+    expect(screen.getByRole('link', { name: 'Jira Integration' })).toHaveAttribute(
+      'href',
+      '/configuration/integrations/int-2'
+    )
+    expect(screen.getByRole('link', { name: 'Red Hat AI' })).toHaveAttribute(
+      'href',
+      '/configuration/integrations/int-3'
+    )
   })
 
   it('renders table headers', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -157,14 +158,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('renders footer with pagination', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -172,14 +166,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('renders footer with singular count', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: [mockIntegrations[0]] },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: [mockIntegrations[0]] }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -187,14 +174,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('renders loading state', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: undefined,
-      isPending: true,
-      error: null,
-      isFetching: true,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery(undefined, { isPending: true, isFetching: true }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -204,48 +184,25 @@ describe('CredentialIntegrationsTab', () => {
 
   it('renders error state', () => {
     const mockError = new Error('Network error')
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: undefined,
-      isPending: false,
-      error: mockError,
-      isError: true,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery(undefined, { error: mockError, isError: true }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
     expect(screen.getByTestId('error-state')).toBeInTheDocument()
   })
 
-  it('calls refetch when retry button clicked', () => {
+  it('calls refetch when retry button clicked', async () => {
+    const user = userEvent.setup()
     const mockError = { detail: 'Server error', status: 500 }
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: undefined,
-      isPending: false,
-      error: mockError,
-      isError: true,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery(undefined, { error: mockError, isError: true }))
 
     const { rerender } = render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    const retryButton = screen.getByRole('button', { name: 'Retry' })
-    retryButton.click()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(mockRefetch).toHaveBeenCalled()
 
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     rerender(<CredentialIntegrationsTab credentialId="cred-1" />)
 
@@ -253,14 +210,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('uses correct API endpoint with credential ID', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: [] },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: [] }))
 
     render(<CredentialIntegrationsTab credentialId="test-credential-123" />, { wrapper })
 
@@ -270,14 +220,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('renders table with accessible label', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -286,14 +229,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('handles undefined data gracefully', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: undefined,
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery(undefined))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -301,14 +237,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('displays integration type labels correctly', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -318,13 +247,7 @@ describe('CredentialIntegrationsTab', () => {
 
   it('shows validation error tooltip on hover for error status', async () => {
     const user = userEvent.setup()
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-    } as never)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -334,14 +257,7 @@ describe('CredentialIntegrationsTab', () => {
   })
 
   it('displays scope correctly', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: mockIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -349,51 +265,46 @@ describe('CredentialIntegrationsTab', () => {
     expect(screen.getByText('Project')).toBeInTheDocument()
   })
 
-  it('renders integration description when present', () => {
-    const integrationsWithDescription = [
-      {
-        id: 'int-1',
-        name: 'GitHub Copilot',
-        description: 'AI coding assistant',
-        integration_type: 'mcp_server',
-        validation_status: 'available',
-        scope: 'global',
-        created_by: 'admin',
-      },
-    ]
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: integrationsWithDescription },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+  it('hides descriptions until the row is expanded', async () => {
+    const user = userEvent.setup()
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(
+      mockQuery({
+        resources: [
+          {
+            id: 'int-1',
+            name: 'GitHub Copilot',
+            description: 'AI coding assistant',
+            integration_type: 'mcp_server',
+            validation_status: 'available',
+            scope: 'global',
+            created_by: 'admin',
+          },
+        ],
+      })
+    )
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('AI coding assistant')).toBeInTheDocument()
+    expect(screen.getByText('AI coding assistant')).not.toBeVisible()
+    await user.click(screen.getByRole('button', { name: /details/i }))
+    expect(screen.getByText('AI coding assistant')).toBeVisible()
   })
 
   it('renders Created by column with username', () => {
-    const integrationsWithCreator = [
-      {
-        id: 'int-1',
-        name: 'GitHub Copilot',
-        integration_type: 'mcp_server',
-        validation_status: 'available',
-        scope: 'global',
-        created_by: 'admin',
-      },
-    ]
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: integrationsWithCreator },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(
+      mockQuery({
+        resources: [
+          {
+            id: 'int-1',
+            name: 'GitHub Copilot',
+            integration_type: 'mcp_server',
+            validation_status: 'available',
+            scope: 'global',
+            created_by: 'admin',
+          },
+        ],
+      })
+    )
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
@@ -401,40 +312,27 @@ describe('CredentialIntegrationsTab', () => {
     expect(screen.getByText('admin')).toBeInTheDocument()
   })
 
-  it('renders clickable rows', () => {
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: mockIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+  it('links to an empty integration id when the id is missing', () => {
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(
+      mockQuery({
+        resources: [
+          {
+            id: null,
+            name: 'No ID Integration',
+            integration_type: 'mcp_server',
+            validation_status: 'available',
+            scope: 'global',
+            created_by: 'admin',
+          },
+        ],
+      })
+    )
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    const rows = screen.getAllByRole('row')
-    const dataRows = rows.filter((row) => row.getAttribute('class')?.includes('clickable'))
-    expect(dataRows.length).toBe(3)
-  })
-
-  it('navigates to integration detail on row click', async () => {
-    const user = userEvent.setup()
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: [mockIntegrations[0]] },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
-
-    render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
-
-    await user.click(screen.getByText('GitHub Copilot'))
-
-    expect(mockNavigate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: expect.stringContaining('int-1') as string })
+    expect(screen.getByRole('link', { name: 'No ID Integration' })).toHaveAttribute(
+      'href',
+      '/configuration/integrations/'
     )
   })
 
@@ -448,90 +346,44 @@ describe('CredentialIntegrationsTab', () => {
       scope: 'global',
       created_by: 'admin',
     }))
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: manyIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: manyIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    // First page: 20 data rows + 1 header = 21
     expect(screen.getAllByRole('row').length).toBe(21)
     expect(screen.getByText('Integration 0')).toBeInTheDocument()
 
-    // Click next page
-    const nextButton = screen.getByRole('button', { name: /next/i })
-    await user.click(nextButton)
+    await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Second page: 5 data rows + 1 header = 6
     expect(screen.getAllByRole('row').length).toBe(6)
     expect(screen.getByText('Integration 20')).toBeInTheDocument()
 
-    // Click previous page
-    const prevButton = screen.getByRole('button', { name: /prev/i })
-    await user.click(prevButton)
+    await user.click(screen.getByRole('button', { name: /prev/i }))
 
-    // Back to first page
     expect(screen.getAllByRole('row').length).toBe(21)
   })
 
   it('renders integration with missing optional fields', () => {
-    const integrationWithMissingFields = [
-      {
-        id: null,
-        name: 'Bare Integration',
-        integration_type: null,
-        validation_status: null,
-        scope: 'project',
-        created_by: null,
-      },
-    ]
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: integrationWithMissingFields },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(
+      mockQuery({
+        resources: [
+          {
+            id: null,
+            name: 'Bare Integration',
+            integration_type: null,
+            validation_status: null,
+            scope: 'project',
+            created_by: null,
+          },
+        ],
+      })
+    )
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
     expect(screen.getByText('Bare Integration')).toBeInTheDocument()
-    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText('\u2014')).toBeInTheDocument()
     expect(screen.getByText('Project')).toBeInTheDocument()
-  })
-
-  it('navigates with empty string when integration id is null', async () => {
-    const user = userEvent.setup()
-    const integrationWithNullId = [
-      {
-        id: null,
-        name: 'No ID Integration',
-        integration_type: 'mcp_server',
-        validation_status: 'available',
-        scope: 'global',
-        created_by: 'admin',
-      },
-    ]
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: integrationWithNullId },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
-
-    render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
-
-    await user.click(screen.getByText('No ID Integration'))
-
-    expect(mockNavigate).toHaveBeenCalled()
   })
 
   it('changes per-page count and resets to page 1', async () => {
@@ -544,29 +396,18 @@ describe('CredentialIntegrationsTab', () => {
       scope: 'global',
       created_by: 'admin',
     }))
-    vi.mocked(integrationsClient.useQuery).mockReturnValue({
-      data: { resources: manyIntegrations },
-      isPending: false,
-      error: null,
-      isFetching: false,
-      refetch: mockRefetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: manyIntegrations }))
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    // Default: 20 per page, 20 data rows + 1 header = 21
     expect(screen.getAllByRole('row').length).toBe(21)
 
-    // Click the per-page toggle (shows "1 - 20" range)
     const perPageToggle = screen.getByRole('button', { name: /1 - 20/i })
     await user.click(perPageToggle)
 
-    // Select 50 per page
     const option50 = await screen.findByRole('menuitem', { name: /50 per page/i })
     await user.click(option50)
 
-    // Now 50 data rows + 1 header = 51
     expect(screen.getAllByRole('row').length).toBe(51)
   })
 })

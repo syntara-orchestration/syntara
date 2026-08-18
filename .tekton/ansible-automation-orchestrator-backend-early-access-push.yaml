@@ -39,8 +39,8 @@ spec:
         - BUILDER_IMAGE=registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a
     - name: build-platforms
       value:
-        - linux-c8xlarge/amd64
-        - linux-c8xlarge/arm64
+        - linux-c4xlarge/amd64
+        - linux-c4xlarge/arm64
     - name: hermetic
       value: "true"
     - name: prefetch-input

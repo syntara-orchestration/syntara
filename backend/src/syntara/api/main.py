@@ -575,7 +575,7 @@ async def health_check(request: Request) -> dict[str, Any]:  # noqa: ARG001
     }
 
 
-@app.get("/healthz/live", tags=["Health"])
+@app.get("/healthz/live", tags=["Health"], include_in_schema=False)
 async def liveness_check() -> dict[str, str]:
     """Liveness probe: report whether the process itself is still serving.
 
@@ -610,7 +610,7 @@ async def liveness_check() -> dict[str, str]:
     }
 
 
-@app.get("/healthz/ready", tags=["Health"])
+@app.get("/healthz/ready", tags=["Health"], include_in_schema=False)
 async def readiness_check() -> dict[str, Any]:
     """Readiness probe: report whether the API can serve traffic.
 
