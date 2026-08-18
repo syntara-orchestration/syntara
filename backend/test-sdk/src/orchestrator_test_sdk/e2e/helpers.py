@@ -125,12 +125,12 @@ def wait_for_agentic_activity(
     max_polls: int = 30,
     poll_interval: int = 1,
 ) -> None:
-    """Poll until the agentic activity is waiting for a signal.
+    """Poll until the agentic activity is running and ready for a signal.
 
-    Only returns when the activity reaches ``waiting`` status, meaning the
-    Temporal workflow has registered the signal handler.  Earlier statuses
-    (``pending``, ``running``) indicate the workflow is still initialising
-    and cannot accept signals yet.
+    Agentic nodes stay in ``running`` while blocked on the completion
+    callback — they never reach ``waiting`` (that status is only for
+    approval and wait nodes).  ``pending`` is too early: the Temporal
+    workflow may not have started yet.
     """
     for _ in range(max_polls):
         exec_state = _retry_api_call(lambda: api.executions.get(execution_id=execution_id, include="activities"))
@@ -144,12 +144,12 @@ def wait_for_agentic_activity(
 
         activities_by_id = {a.activity_id: a for a in (execution.activities or [])}
         activity = activities_by_id.get(activity_id)
-        if activity and activity.status == "waiting":
+        if activity and activity.status in {"running", "waiting"}:
             return
 
         time.sleep(poll_interval)
 
-    pytest.fail(f"Agentic activity '{activity_id}' did not enter waiting state within {max_polls * poll_interval}s")
+    pytest.fail(f"Agentic activity '{activity_id}' did not reach running state within {max_polls * poll_interval}s")
 
 
 def create_and_run_workflow(
