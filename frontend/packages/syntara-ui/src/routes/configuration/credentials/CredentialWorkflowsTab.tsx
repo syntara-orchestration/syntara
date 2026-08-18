@@ -1,10 +1,11 @@
-import { Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { LabelGroup, Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
+import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
@@ -97,9 +98,9 @@ function WorkflowsTable({
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <Label key={nodeName} variant="outline" isCompact>
+                      <NxLabel key={nodeName} variant="outline" isCompact>
                         {nodeName}
-                      </Label>
+                      </NxLabel>
                     ))}
                   </LabelGroup>
                 ) : (
