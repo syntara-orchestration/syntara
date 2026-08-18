@@ -327,10 +327,11 @@ class TestToolServices:
         from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
 
         owning_integration_id = uuid4()
-        selected_ids = sorted([str(uuid4()), str(uuid4())])
+        enabled_tool_id = uuid4()
+        selected_ids = [str(enabled_tool_id)]
         enabled = [
             ToolWithParameters(
-                id=uuid4(),
+                id=enabled_tool_id,
                 name="code_search",
                 namespaced_name="dev_tools::code_search",
                 description="Search",
@@ -341,7 +342,7 @@ class TestToolServices:
                 created_by=uuid4(),
             )
         ]
-        # Total soft-skip (no MCP tools) → connectivity cause
+        # Total soft-skip (no MCP tools) → connectivity cause scoped to the selected owner
         with pytest.raises(
             ToolSelectionUnavailableError,
             match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
@@ -354,6 +355,7 @@ class TestToolServices:
                 tool_selections=set(selected_ids),
             )
         assert "check integration connectivity" in str(exc_info.value)
+        assert "missing from the enabled catalog" not in str(exc_info.value)
 
     def test_require_provisioned_tools_selected_with_drift_includes_drift_cause(
         self,
@@ -363,10 +365,11 @@ class TestToolServices:
         from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
 
         owning_integration_id = uuid4()
-        selected_ids = sorted([str(uuid4()), str(uuid4())])
+        enabled_tool_id = uuid4()
+        selected_ids = [str(enabled_tool_id)]
         enabled = [
             ToolWithParameters(
-                id=uuid4(),
+                id=enabled_tool_id,
                 name="code_search",
                 namespaced_name="dev_tools::code_search",
                 description="Search",
@@ -399,6 +402,42 @@ class TestToolServices:
                 tool_selections=set(selected_ids),
             )
         assert "check registry name/integration_id drift" in str(exc_info.value)
+        assert "missing from the enabled catalog" not in str(exc_info.value)
+
+    def test_require_provisioned_tools_selected_empty_provision_catalog_miss(
+        self,
+    ) -> None:
+        """SELECTED IDs absent from the catalog must not blame an unrelated enabled owner."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        missing_selected_id = str(uuid4())
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=uuid4(),
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections={missing_selected_id},
+            )
+        msg = str(exc_info.value)
+        assert missing_selected_id in msg
+        assert "missing from the enabled catalog" in msg
+        assert "check integration connectivity" not in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
 
     def test_require_provisioned_tools_selected_sibling_provision_scopes_cause(
         self,
@@ -522,7 +561,8 @@ class TestToolServices:
 
         tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
         tool_manager_client.get_all_tools.return_value = sample_tools
-        selected_ids = sorted([str(uuid4()), str(uuid4())])
+        enabled_tool = next(tool for tool in sample_tools if tool.enabled)
+        selected_ids = [str(enabled_tool.id)]
 
         with (
             patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,

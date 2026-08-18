@@ -370,11 +370,12 @@ def _build_selected_provisioning_failure_cause(
     selections: set[str] | frozenset[str],
     provisioned_tools: list[BaseTool],
 ) -> str:
-    """Diagnose SELECTED failure when siblings provisioned but selections were not.
+    """Diagnose SELECTED failure when none of the selected IDs were provisioned.
 
-    Scopes connectivity/drift to owners of the *unavailable selected* tools so a
-    matched sibling is not reported as unmatched. If no selected ID is in the
-    enabled catalog, report that instead of all-enabled zero-match wording.
+    Used for both empty-provision and sibling-provision. Scopes connectivity/drift
+    to owners of the *unavailable selected* tools so a matched sibling or an
+    unrelated enabled tool is not reported as unmatched. If no selected ID is in
+    the enabled catalog, report that instead of all-enabled zero-match wording.
     """
     provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
     provisioned_ids.discard("")
@@ -412,7 +413,7 @@ def _require_provisioned_tools_when_enabled(
     if provisioned_tools and (not is_selected or _selected_tools_provisioned(provisioned_tools, selections)):
         return
 
-    if is_selected and provisioned_tools:
+    if is_selected:
         cause = _build_selected_provisioning_failure_cause(
             enabled_tools, namespaced_tools, selections, provisioned_tools
         )
