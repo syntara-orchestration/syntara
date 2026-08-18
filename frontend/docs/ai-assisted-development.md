@@ -349,26 +349,26 @@ Shortest path from "I need to build this page" to an open PR:
 
 Skills are detailed reference guides the agent consults while working. You can also ask the agent to use a specific skill by name.
 
-| Skill                           | File                                         | What it does                                                                                                                                                              | When to use it                                                                                                                               |
-| ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Coding Standards**            | `frontend-coding-standards/SKILL.md`         | Patterns with code examples: typed API clients, `useQueryState`, Zod forms, error handling, design tokens, accessibility                                                  | Every implementation task. The agent reads this automatically, but you can say "check against the coding standards skill" to force a review. |
-| **Testing Guidelines**          | `frontend-testing-guidelines/SKILL.md`       | Coverage requirements, query priority (`getByRole` > `getByLabelText` > `getByText`), `userEvent` over `fireEvent`, `vitest-axe` accessibility tests, mock patterns        | Writing or reviewing tests. Say "use the frontend-testing-guidelines skill" to verify test quality.                                          |
-| **PR Review**                   | `frontend-pr-review/SKILL.md`                | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                             | Before opening a PR. Type `/frontend-review-pr` and the agent runs the full checklist.                                                       |
-| **Playwright E2E**              | `frontend-playwright-e2e/SKILL.md`           | E2E test writing: fixtures, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                      | Writing browser-level tests for user flows. Say "use the frontend-playwright-e2e skill" to write E2E tests.                                  |
-| **PatternFly UX Design System** | `frontend-patternfly-ux/SKILL.md`            | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                                   | Verifying that your UI matches the design system. Paste a screenshot and say "use the frontend-patternfly-ux skill to check this."           |
-| **Frontend Specialist**         | `frontend-specialist/SKILL.md`               | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                             | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
-| **Library References**          | `frontend-library-references/SKILL.md`       | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                              | Before writing code that uses any of these libraries. Triggered automatically via AGENTS.md.                                                 |
-| **Build UI feature**            | `frontend-build-ui-feature/SKILL.md`         | Guided wizard: asks what to build, then implements using project skills (optionally Playwright E2E)                                                                       | Type `/frontend-build-ui-feature` to walk through a new page or component.                                                                   |
+| Skill                           | File                                   | What it does                                                                                                                                                        | When to use it                                                                                                                               |
+| ------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Coding Standards**            | `frontend-coding-standards/SKILL.md`   | Patterns with code examples: typed API clients, `useQueryState`, Zod forms, error handling, design tokens, accessibility                                            | Every implementation task. The agent reads this automatically, but you can say "check against the coding standards skill" to force a review. |
+| **Testing Guidelines**          | `frontend-testing-guidelines/SKILL.md` | Coverage requirements, query priority (`getByRole` > `getByLabelText` > `getByText`), `userEvent` over `fireEvent`, `vitest-axe` accessibility tests, mock patterns | Writing or reviewing tests. Say "use the frontend-testing-guidelines skill" to verify test quality.                                          |
+| **PR Review**                   | `frontend-pr-review/SKILL.md`          | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                       | Before opening a PR. Type `/frontend-review-pr` and the agent runs the full checklist.                                                       |
+| **Playwright E2E**              | `frontend-playwright-e2e/SKILL.md`     | E2E test writing: fixtures, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                | Writing browser-level tests for user flows. Say "use the frontend-playwright-e2e skill" to write E2E tests.                                  |
+| **PatternFly UX Design System** | `frontend-patternfly-ux/SKILL.md`      | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                             | Verifying that your UI matches the design system. Paste a screenshot and say "use the frontend-patternfly-ux skill to check this."           |
+| **Frontend Specialist**         | `frontend-specialist/SKILL.md`         | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                       | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
+| **Library References**          | `frontend-library-references/SKILL.md` | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                        | Before writing code that uses any of these libraries. Triggered automatically via AGENTS.md.                                                 |
+| **Build UI feature**            | `frontend-build-ui-feature/SKILL.md`   | Guided wizard: asks what to build, then implements using project skills (optionally Playwright E2E)                                                                 | Type `/frontend-build-ui-feature` to walk through a new page or component.                                                                   |
 
 ### User-invocable skills
 
 Type these in the agent chat. They live under `.claude/skills/` (this repository does not ship `.claude/commands/`).
 
-| Command                       | What it does                                                                              |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `/frontend-review-pr`         | Runs the full PR review skill against your current branch                                 |
-| `/frontend-build-ui-feature`  | Guided wizard: asks what to build, then implements using project skills (optionally E2E)  |
-| `/frontend-run-e2e`           | Runs Playwright E2E tests with the project's runner and defaults                          |
+| Command                      | What it does                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `/frontend-review-pr`        | Runs the full PR review skill against your current branch                                |
+| `/frontend-build-ui-feature` | Guided wizard: asks what to build, then implements using project skills (optionally E2E) |
+| `/frontend-run-e2e`          | Runs Playwright E2E tests with the project's runner and defaults                         |
 
 ### Typical flow for a new feature
 
@@ -482,16 +482,16 @@ The skill lives at [`.claude/skills/frontend-build-ui-feature/SKILL.md`](../../.
 
 ## Further Reading
 
-| Topic                       | Document                                                                                            |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| Coding standards            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)                       |
-| Testing standards           | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md)                   |
-| PR review process           | [`.claude/skills/frontend-pr-review/SKILL.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                                     |
-| Playwright E2E              | [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)                           |
-| PatternFly UX design system | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md) |
+| Topic                       | Document                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Coding standards            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)     |
+| Testing standards           | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md) |
+| PR review process           | [`.claude/skills/frontend-pr-review/SKILL.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                   |
+| Playwright E2E              | [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)         |
+| PatternFly UX design system | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md)           |
 | Frontend specialist         | [`.claude/skills/frontend-specialist/SKILL.md`](../../.claude/skills/frontend-specialist/SKILL.md)                 |
-| Library references          | [`.claude/skills/frontend-library-references/SKILL.md`](../../.claude/skills/frontend-library-references/SKILL.md)                   |
-| Architecture overview       | [`architecture.md`](./architecture.md)                                                              |
-| Error handling              | [`error-handling.md`](./error-handling.md)                                                          |
-| Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                             |
-| PR template                 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md)                           |
+| Library references          | [`.claude/skills/frontend-library-references/SKILL.md`](../../.claude/skills/frontend-library-references/SKILL.md) |
+| Architecture overview       | [`architecture.md`](./architecture.md)                                                                             |
+| Error handling              | [`error-handling.md`](./error-handling.md)                                                                         |
+| Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                                            |
+| PR template                 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md)                                       |
