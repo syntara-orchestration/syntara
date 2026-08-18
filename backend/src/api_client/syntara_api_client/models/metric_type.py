@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class MetricType(str, Enum):
+    ACTIVE_WORKFLOWS = "active_workflows"
     ACTIVITY_DURATION_MS = "activity_duration_ms"
     ACTIVITY_EXECUTION_SUCCESS_RATE = "activity_execution_success_rate"
     AGENT_INVOCATION_MS = "agent_invocation_ms"
