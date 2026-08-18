@@ -93,7 +93,8 @@ Backend (when `backend/` changes; aggregated by `(Backend) Required Checks`):
 | `(Backend) Test Podman Compose E2E` | Compose-based backend E2E |
 | `(Backend) Shared Checks Gate` | Waits on shared jobs such as `Pre-commit` |
 
-Frontend (when `frontend/` changes; aggregated by `(Frontend) Required Checks`):
+Frontend (when `frontend/` or `backend/` changes — backend so the UI is
+checked when the API changes; aggregated by `(Frontend) Required Checks`):
 
 | Check | What it covers |
 | --- | --- |
