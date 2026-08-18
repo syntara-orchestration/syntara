@@ -766,14 +766,32 @@ async def _user_group_names(session: AsyncSession, user: User) -> set[str]:
 
 
 @pytest.mark.asyncio
-async def test_create_user_no_groups_by_default(test_db_session: AsyncSession, test_user: User) -> None:
-    """When group_names is omitted, only the authenticated group is assigned."""
+async def test_create_user_assigns_users_group_by_default(test_db_session: AsyncSession, test_user: User) -> None:
+    """When group_names is omitted, users gets default users + authenticated groups."""
     service = UsersService(test_db_session, test_user)
     user = await service.create_user(
         username="defaultuser",
         first_name="Default",
         last_name="User",
         password=TEST_PASSWORD,
+    )
+
+    names = await _user_group_names(test_db_session, user)
+    assert names == {"authenticated", "users"}
+
+
+@pytest.mark.asyncio
+async def test_create_user_with_empty_group_names_skips_default_users_group(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """When group_names is an empty list, only authenticated is assigned."""
+    service = UsersService(test_db_session, test_user)
+    user = await service.create_user(
+        username="nogroupsuser",
+        first_name="No",
+        last_name="Groups",
+        password=TEST_PASSWORD,
+        group_names=[],
     )
 
     names = await _user_group_names(test_db_session, user)

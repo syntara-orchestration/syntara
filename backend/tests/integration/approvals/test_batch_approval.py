@@ -130,6 +130,54 @@ class TestBatchApprovalContract:
             assert call_kwargs["decision_notes"] == batch_payload["decisions"][i]["notes"]
 
     @pytest.mark.asyncio
+    async def test_batch_approval_accepts_decision_notes_alias(
+        self,
+        auth_client: AsyncClient,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """Regression for AAP-87655: batch decisions accept the ``decision_notes`` alias.
+
+        A decision that supplies the response-shaped ``decision_notes`` key must have
+        its notes stored, echoed in the result, and forwarded on the workflow signal
+        rather than silently dropped.
+        """
+        # Arrange
+        executions = await executions_factory.create_executions(count=1)
+        approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=executions[0].id)
+
+        batch_payload = {
+            "decisions": [
+                {"approval_id": str(approvals[0].id), "status": "approved", "decision_notes": "Batch alias note"},
+            ]
+        }
+
+        # Act
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client.send_approval_signal = AsyncMock()
+
+            response = await auth_client.post("/api/v1/approvals/batch", json=batch_payload)
+
+        # Assert - value is not silently dropped
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_success"] == 1
+        assert data["total_failed"] == 0
+        assert data["results"][0]["decision_notes"] == "Batch alias note"
+
+        mock_client.send_approval_signal.assert_called_once_with(
+            execution_id=approvals[0].execution_id,
+            approval_node_id=approvals[0].approval_node_id,
+            decision="approved",
+            approval_id=approvals[0].id,
+            decided_by=ANY,
+            decided_at=ANY,
+            decision_notes="Batch alias note",
+        )
+
+    @pytest.mark.asyncio
     async def test_batch_approval_mixed_success_failure_response_schema(
         self,
         auth_client: AsyncClient,

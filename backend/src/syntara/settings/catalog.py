@@ -623,6 +623,27 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         ),
         helper_text="0 = no limit (provider default).",
     ),
+    SettingDefinition(
+        key="agentic.task_agent_system_prompt",
+        name="Task agent system prompt",
+        category=SettingCategory.AI_LLM,
+        value_type=SettingValueType.STRING,
+        default_value=(
+            "You are an information assistant for the {product_name} automation system. "
+            "Answer user questions concisely and accurately. "
+            "Focus on providing helpful, direct answers about tools, services, and capabilities."
+        ),
+        description=(
+            "System prompt prepended to every task agent LLM call. Controls "
+            "the agent's persona and behavioral framing. Cannot be blank."
+        ),
+        helper_text=(
+            "Customizes how task agents introduce themselves to the LLM. "
+            "Maximum 2000 characters. For structured output requests, "
+            "JSON schema instructions are appended after this prompt."
+        ),
+        validation_schema={"pattern": "\\S[\\s\\S]{0,1999}"},
+    ),
     # Workflow Execution — Timeouts
     SettingDefinition(
         key="workflow_engine.max_loop_iterations",
