@@ -1024,13 +1024,13 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         default_value=180,
         description=(
             "Maximum lifetime for service account credentials in days. "
-            "Set to -1 to allow credentials with no expiry date. "
-            "When set, any credential created or renewed cannot expire beyond "
-            "this many days from now. Changes take effect on the next "
-            "credential create or renew without a restart."
+            "Set to 0 to allow credentials with no expiry date. "
+            "When set to a positive value, any credential created or renewed "
+            "cannot expire beyond this many days from now. Changes take effect "
+            "on the next credential create or renew without a restart."
         ),
-        helper_text="-1 = unlimited. Range: 1-730 days. Default: 180 days.",
+        helper_text="0 = unlimited. Range: 1-730 days. Default: 180 days.",
         requires_restart=False,
-        validation_schema={"min": -1, "max": 730},
+        validation_schema={"min": 0, "max": 730},
     ),
 ]

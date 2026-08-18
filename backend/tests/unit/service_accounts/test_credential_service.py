@@ -361,7 +361,7 @@ class TestCredentialMaxLifetime:
         past = datetime.now(tz=UTC) - timedelta(days=5)
         sa_id = uuid4()
         with (
-            _mock_max_lifetime_days(-1),
+            _mock_max_lifetime_days(0),
             pytest.raises(CredentialExpirationInPastError, match="future"),
         ):
             await service.create_credential(
@@ -431,7 +431,7 @@ class TestCredentialMaxLifetime:
         mock_session: AsyncMock,
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
-        with _mock_max_lifetime_days(-1):
+        with _mock_max_lifetime_days(0):
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -447,7 +447,7 @@ class TestCredentialMaxLifetime:
     ) -> None:
         mock_session.exec.return_value = _mock_count_result(0)
         requested = datetime.now(tz=UTC) + timedelta(days=999)
-        with _mock_max_lifetime_days(-1):
+        with _mock_max_lifetime_days(0):
             cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -483,21 +483,19 @@ class TestCredentialMaxLifetime:
         assert before + timedelta(days=90) <= mock_cred.expires_at <= after + timedelta(days=90)
 
     @pytest.mark.asyncio
-    async def test_create_rejects_zero_max_days(
+    async def test_create_unlimited_via_zero(
         self,
         service: ServiceAccountCredentialService,
         mock_session: AsyncMock,
     ) -> None:
-        """0 is not a valid max_days: it would stamp expires_at=now, expiring the credential immediately."""
+        """0 means unlimited (no expiry), consistent with rate_limiting.requests_per_window."""
         mock_session.exec.return_value = _mock_count_result(0)
-        with (
-            _mock_max_lifetime_days(0),
-            pytest.raises(ValueError, match="must be -1 or 1"),
-        ):
-            await service.create_credential(
+        with _mock_max_lifetime_days(0):
+            cred, _ = await service.create_credential(
                 service_account_id=uuid4(),
                 credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
             )
+        assert cred.expires_at is None
 
     @pytest.mark.asyncio
     async def test_rotate_unlimited_clears_expires_at(
@@ -514,7 +512,7 @@ class TestCredentialMaxLifetime:
         mock_result.one_or_none.return_value = mock_cred
         mock_session.exec.return_value = mock_result
 
-        with _mock_max_lifetime_days(-1):
+        with _mock_max_lifetime_days(0):
             await service.rotate_credential(uuid4(), service_account_id=uuid4())
 
         assert mock_cred.expires_at is None
