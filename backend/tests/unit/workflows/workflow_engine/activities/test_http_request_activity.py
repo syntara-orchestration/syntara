@@ -10,6 +10,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.workflows.workflow_engine.activities.common import ActivityExecutionError
 from syntara.workflows.workflow_engine.activities.http_request_activity import (
     _add_credential_auth_headers,
+    _resolve_httpx_params,
     execute_http_request_activity,
 )
 
@@ -166,6 +167,52 @@ class TestExecuteHttpRequestActivitySuccess:
         with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
             await execute_http_request_activity(config, None)
         assert mock_req.call_args.kwargs["params"] == {"page": "1"}
+
+    @pytest.mark.asyncio
+    async def test_empty_query_params_preserves_url_query_string(self) -> None:
+        resp = _mock_response(200, json_body={})
+        config = {
+            **VALID_CONFIG,
+            "url": "https://example.com/get?token=abc123&keep=yes",
+        }
+        with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
+            await execute_http_request_activity(config, None)
+        assert mock_req.call_args.kwargs["url"] == "https://example.com/get?token=abc123&keep=yes"
+        assert mock_req.call_args.kwargs["params"] is None
+
+    @pytest.mark.asyncio
+    async def test_query_params_merge_with_url_query_string(self) -> None:
+        resp = _mock_response(200, json_body={})
+        config = {
+            **VALID_CONFIG,
+            "url": "https://example.com/api?token=from-url&keep=yes",
+            "query_params": {"token": "from-params", "page": "1"},
+        }
+        with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
+            await execute_http_request_activity(config, None)
+        assert mock_req.call_args.kwargs["url"] == "https://example.com/api"
+        assert mock_req.call_args.kwargs["params"] == {
+            "token": "from-params",
+            "keep": "yes",
+            "page": "1",
+        }
+
+
+class TestResolveHttpxParams:
+    """Tests for _resolve_httpx_params."""
+
+    def test_empty_params_returns_none(self) -> None:
+        url, params = _resolve_httpx_params("https://example.com/get?a=1", {})
+        assert url == "https://example.com/get?a=1"
+        assert params is None
+
+    def test_merge_prefers_explicit_params(self) -> None:
+        url, params = _resolve_httpx_params(
+            "https://example.com/get?a=url&b=1",
+            {"a": "explicit", "c": "2"},
+        )
+        assert url == "https://example.com/get"
+        assert params == {"a": "explicit", "b": "1", "c": "2"}
 
 
 class TestExecuteHttpRequestActivityFailures:
