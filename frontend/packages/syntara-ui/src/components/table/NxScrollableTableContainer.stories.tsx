@@ -118,6 +118,7 @@ const meta: Meta<typeof NxScrollableTableContainer> = {
           '- `isExpandable` — set when using expandable rows so PatternFly can size columns correctly ' +
           '(disables `table-layout: fixed`).\n' +
           '- `useFixedLayout` — opt out of fixed layout for non-expandable tables (rarely needed).\n' +
+          '- `variant` — pass `compact` for dense tables in tight panels (PatternFly table density).\n' +
           '- `footer` — pass `PaginationFooterProps` to render a `PaginationFooter` below the table.',
       },
     },

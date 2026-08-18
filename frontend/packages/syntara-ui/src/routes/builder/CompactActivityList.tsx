@@ -25,7 +25,7 @@ export function CompactActivityList({
   selectedNodeId,
 }: Readonly<CompactActivityListProps>) {
   return (
-    <NxScrollableTableContainer caption="Activity list" useFixedLayout={false}>
+    <NxScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)

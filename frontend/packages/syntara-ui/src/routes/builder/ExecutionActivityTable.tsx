@@ -145,7 +145,7 @@ export function ExecutionActivityTable({
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
   return (
-    <NxScrollableTableContainer caption="Activity states" useFixedLayout={false}>
+    <NxScrollableTableContainer caption="Activity states" useFixedLayout={false} variant="compact">
       <Thead>
         <Tr>
           <Th modifier="nowrap">Name</Th>

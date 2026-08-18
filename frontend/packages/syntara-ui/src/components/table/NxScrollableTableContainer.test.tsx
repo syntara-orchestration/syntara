@@ -43,6 +43,28 @@ describe('NxScrollableTableContainer', () => {
     expect(region).toHaveAttribute('tabindex', '0')
   })
 
+  it('uses default density when variant is omitted', () => {
+    render(
+      <Stack style={{ height: '240px' }}>
+        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+      </Stack>
+    )
+
+    expect(screen.getByRole('grid')).not.toHaveClass('pf-m-compact')
+  })
+
+  it('applies compact density when variant is compact', () => {
+    render(
+      <Stack style={{ height: '240px' }}>
+        <NxScrollableTableContainer caption="Demo table" variant="compact">
+          {minimalTable}
+        </NxScrollableTableContainer>
+      </Stack>
+    )
+
+    expect(screen.getByRole('grid')).toHaveClass('pf-m-compact')
+  })
+
   it('has no accessibility violations in the supported Stack layout', async () => {
     const { container } = render(
       <Stack style={{ height: '240px' }}>

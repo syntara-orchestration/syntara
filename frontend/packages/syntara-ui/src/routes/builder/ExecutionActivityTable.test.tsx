@@ -202,7 +202,7 @@ describe('ExecutionActivityTable', () => {
       expect(screen.getByRole('columnheader', { name: 'Ended' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Elapsed time' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
-      expect(screen.getByRole('grid', { name: 'Activity states' })).toBeInTheDocument()
+      expect(screen.getByRole('grid', { name: 'Activity states' })).toHaveClass('pf-m-compact')
       // Type column was removed — activities execute in chronological order
       expect(screen.queryByRole('columnheader', { name: 'Type' })).not.toBeInTheDocument()
     })

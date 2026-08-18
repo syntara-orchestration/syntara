@@ -1,5 +1,5 @@
 import { Stack, StackItem } from '@patternfly/react-core'
-import { Caption, Table } from '@patternfly/react-table'
+import { Caption, Table, type TableProps } from '@patternfly/react-table'
 import type { ReactNode } from 'react'
 
 import { NxPanel } from '../layout/NxPanel'
@@ -22,6 +22,8 @@ type NxScrollableTableContainerProps = {
   isExpandable?: boolean
   /** Opt out of fixed table layout when not expandable */
   useFixedLayout?: boolean
+  /** PatternFly table density. Use `compact` for dense tables in tight panels. */
+  variant?: TableProps['variant']
 }
 
 /**
@@ -37,6 +39,7 @@ export function NxScrollableTableContainer({
   caption,
   isExpandable,
   useFixedLayout = true,
+  variant,
 }: NxScrollableTableContainerProps) {
   const useFixed = !isExpandable && useFixedLayout
   const { scrollRef, wrapperRef } = useScrollOverflow()
@@ -57,7 +60,7 @@ export function NxScrollableTableContainer({
               aria-label={caption}
               data-testid="scroll-container"
             >
-              <Table isPlain isStickyHeader isExpandable={isExpandable} className={tableClassName}>
+              <Table isPlain isStickyHeader isExpandable={isExpandable} variant={variant} className={tableClassName}>
                 <Caption className="pf-v6-u-screen-reader">{caption}</Caption>
                 {children}
               </Table>
