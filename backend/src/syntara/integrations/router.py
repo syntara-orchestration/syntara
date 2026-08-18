@@ -42,6 +42,7 @@ from syntara.integrations.models.integration import (
     RefreshResult,
 )
 from syntara.integrations.models.llm_model import (
+    LLMModel,
     LLMModelBulkUpdate,
     LLMModelBulkUpdateResponse,
     LLMModelListParams,
@@ -53,6 +54,7 @@ from syntara.integrations.services.integration_service import IntegrationService
 from syntara.integrations.services.llm_model_service import LLMModelService
 from syntara.tool_manager.models import ToolListParams
 from syntara.tool_manager.models.tool import (
+    Tool,
     ToolListResponse,
     ToolUpdate,
     ToolWithParameters,
@@ -471,6 +473,7 @@ async def list_integration_models(
     request: Request,
     service: Annotated[LLMModelService, Depends(get_llm_model_service)],
     params: Annotated[LLMModelListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(LLMModel))],
 ) -> LLMModelListResponse:
     """List LLM models for an integration with filtering, sorting, and pagination."""
     query_items = [*request.query_params.items(), ("integration_id", str(integration_id))]
@@ -572,6 +575,7 @@ async def list_integration_tools(
     request: Request,
     service: Annotated[ToolService, Depends(get_tool_service)],
     params: Annotated[ToolListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Tool))],
 ) -> ToolListResponse:
     """List tools for an integration with filtering, sorting, and pagination."""
     query_items = [*request.query_params.items(), ("integration_id", str(integration_id))]

@@ -48,7 +48,6 @@ paths:
         - name: username
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -100,7 +99,6 @@ paths:
         - name: first_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -152,7 +150,6 @@ paths:
         - name: last_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -204,7 +201,6 @@ paths:
         - name: auth_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -223,7 +219,6 @@ paths:
         - name: auth_source
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -771,7 +766,6 @@ paths:
         - name: username
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -866,7 +860,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -968,7 +961,6 @@ paths:
         - name: source
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

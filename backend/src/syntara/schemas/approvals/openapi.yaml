@@ -51,7 +51,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -69,7 +68,6 @@ paths:
         - name: execution_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

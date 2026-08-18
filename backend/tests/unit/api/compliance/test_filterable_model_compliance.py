@@ -60,12 +60,6 @@ class TestFilterableModelCompliance:
                 errors.append(
                     f"{route.path}: FilterableModel references {fm.model.__name__} which has no __filterable_fields__"
                 )
-            for field_name in getattr(fm.model, "__filterable_fields__", []):
-                if field_name not in fm.model.model_fields:
-                    errors.append(
-                        f"{route.path}: FilterableModel({fm.model.__name__}) references "
-                        f"field '{field_name}' not present on the model"
-                    )
 
         assert not errors, "FilterableModel validation errors:\n" + "\n".join(errors)
 

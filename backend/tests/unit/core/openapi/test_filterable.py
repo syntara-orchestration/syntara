@@ -126,15 +126,16 @@ class TestFilterableModel:
         with pytest.raises(ValueError, match="__filterable_fields__"):
             FilterableModel(NoFilterModel)
 
-    def test_rejects_filterable_field_not_on_model(self):
+    def test_skips_filterable_field_not_on_model(self):
         from syntara.core.openapi.filterable import FilterableModel
 
-        class BadFieldModel(SQLModel, table=False):
+        class VirtualFieldModel(SQLModel, table=False):
             name: str = ""
             __filterable_fields__: ClassVar[list[str]] = ["name", "nonexistent"]
 
-        with pytest.raises(ValueError, match="nonexistent"):
-            FilterableModel(BadFieldModel)
+        dep = FilterableModel(VirtualFieldModel)
+        assert "name" in dep._fields
+        assert "nonexistent" not in dep._fields
 
     def test_operators_for_string_field(self):
         from syntara.core.openapi.filterable import FilterableModel

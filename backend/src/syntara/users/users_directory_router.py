@@ -13,6 +13,7 @@ from syntara.core.database.session import get_db
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.base import BaseService
 from syntara.core.syntara_router import SyntaraRouter
 
@@ -77,6 +78,7 @@ async def list_users_directory(
     request: Request,
     service: Annotated[_UserDirectoryService, Depends(_get_service)],
     params: Annotated[UserDirectoryListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(User))],
 ) -> UserDirectoryListResponse:
     """Return a lightweight directory of users (id + username only)."""
     return await service.list_directory(

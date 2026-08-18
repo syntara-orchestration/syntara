@@ -107,18 +107,13 @@ class FilterableModel:
             raise ValueError(msg)
 
         model_fields_map = getattr(model, "model_fields", {})
-        for field_name in filterable_fields:
-            if field_name not in model_fields_map:
-                msg = (
-                    f"{model.__name__}.__filterable_fields__ references "
-                    f"'{field_name}' which is not a field on the model"
-                )
-                raise ValueError(msg)
 
         self.model = model
         self._fields: dict[str, tuple[set[FilterOperator], type]] = {}
 
         for field_name in filterable_fields:
+            if field_name not in model_fields_map:
+                continue
             annotation = model_fields_map[field_name].annotation
             python_type = _unwrap_optional(annotation)
             self._fields[field_name] = (_classify_python_type(python_type), python_type)

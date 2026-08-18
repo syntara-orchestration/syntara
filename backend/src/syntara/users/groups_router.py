@@ -37,6 +37,7 @@ from syntara.core.models.group import (
 )
 from syntara.core.models.user_schemas import GroupMemberListResponse
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.users.services.group_service import GroupsService
 
 router = SyntaraRouter(prefix="/groups", tags=["Groups"])
@@ -115,6 +116,7 @@ async def list_groups(
     service: Annotated[GroupsService, Depends(get_group_service)],
     params: Annotated[GroupListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("group", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(Group))],
 ) -> GroupListResponse:
     """Retrieve list of groups with visibility filtering.
 

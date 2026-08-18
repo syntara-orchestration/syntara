@@ -38,7 +38,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -57,7 +56,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -75,7 +73,6 @@ paths:
         - name: integration_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -96,7 +93,6 @@ paths:
         - name: namespaced_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

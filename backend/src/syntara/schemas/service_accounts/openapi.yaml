@@ -107,7 +107,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -126,7 +125,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -525,7 +523,6 @@ paths:
         - name: credential_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -544,7 +541,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

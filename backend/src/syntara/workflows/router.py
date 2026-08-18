@@ -21,6 +21,7 @@ from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -302,6 +303,7 @@ async def list_workflows(
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
     params: Annotated[WorkflowListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(Workflow))],
 ) -> WorkflowListResponse:
     """List workflows the current user has read access to.
 
@@ -438,6 +440,7 @@ async def list_workflow_versions(
     request: Request,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
     params: Annotated[WorkflowVersionListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(WorkflowVersion))],
 ) -> WorkflowVersionListResponse:
     """List versions for a workflow with cursor-based pagination."""
     return await service.list_workflow_versions_cursor(

@@ -25,6 +25,7 @@ from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 
 router = SyntaraRouter(prefix="/approvals", tags=["Approvals"])
 
@@ -96,6 +97,7 @@ async def list_approvals(
     service: Annotated[ApprovalService, Depends(get_approval_service)],
     params: Annotated[ApprovalListParams, Depends()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("approval", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(ApprovalRequest))],
 ) -> ApprovalListResponse:
     """List approval requests with filtering, sorting, and pagination.
 

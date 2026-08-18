@@ -17,8 +17,9 @@ from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
-from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     Execution,
     ExecutionCreate,
@@ -108,6 +109,7 @@ async def list_executions(
     service: Annotated[ExecutionService, Depends(get_execution_service)],
     params: Annotated[ExecutionListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("execution", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(Execution))],
 ) -> ExecutionListResponse:
     """List executions with filtering, sorting, and pagination.
 
@@ -315,6 +317,7 @@ async def list_execution_activities(
     execution_id: UUID,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
     params: Annotated[ActivityListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(ActivityExecution))],
 ) -> ActivityExecutionListResponse:
     """List activities for a workflow execution with cursor-based pagination.
 

@@ -14,6 +14,7 @@ from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.service_accounts.schemas import (
     ServiceAccountCreate,
@@ -111,6 +112,7 @@ async def list_service_accounts(
     service: Annotated[ServiceAccountService, Depends(get_service_account_service)],
     params: Annotated[ServiceAccountListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("service_account", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(ServiceAccount))],
 ) -> ServiceAccountListResponse:
     """List service accounts with project-scoped visibility and pagination."""
     return await service.list_service_accounts(

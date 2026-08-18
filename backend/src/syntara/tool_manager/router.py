@@ -21,11 +21,13 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.integrations.router import integration_read_visibility
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.tool_manager.exceptions import ToolNotFoundError
 from syntara.tool_manager.models import ToolListParams
 from syntara.tool_manager.models.tool import (
+    Tool,
     ToolListResponse,
     ToolUpdate,
     ToolWithParameters,
@@ -71,6 +73,7 @@ async def list_tools(
     params: Annotated[ToolListParams, Query()],
     db: Annotated[AsyncSession, Depends(get_db)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_tool_read_visibility)],
+    _filterable: Annotated[None, Depends(FilterableModel(Tool))],
 ) -> ToolListResponse:
     """List tools with filtering, sorting, and pagination.
 

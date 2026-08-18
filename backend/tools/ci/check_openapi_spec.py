@@ -50,23 +50,6 @@ def _strip_descriptions_recursive(obj: object) -> object:
     return obj
 
 
-def _is_spec_only(obj: object) -> bool:
-    """Return True if a parameter object is marked as spec-only.
-
-    Transitional: once all list routes have FilterableModel and x-spec-only
-    markers are removed from sub-specs, delete this function and its callers.
-    """
-    return isinstance(obj, dict) and obj.get("x-spec-only") is True
-
-
-def _strip_spec_only_params(items: list) -> list:
-    """Remove parameters marked with x-spec-only from a parameter list.
-
-    Transitional: see _is_spec_only.
-    """
-    return [item for item in items if not _is_spec_only(item)]
-
-
 def _strip_schema_description(param: dict) -> dict:
     """Remove descriptions from a parameter object before comparison.
 
@@ -80,8 +63,6 @@ def _strip_schema_description(param: dict) -> dict:
         param = {**param, "schema": _strip_descriptions_recursive(schema)}
     if param.get("in") in ("query", "path") and "description" in param:
         param = {k: v for k, v in param.items() if k != "description"}
-    if "x-spec-only" in param:
-        param = {k: v for k, v in param.items() if k != "x-spec-only"}
     return param
 
 
@@ -98,7 +79,7 @@ def _normalize_for_display(obj: object) -> object:
             obj = _strip_schema_description(obj)
         return {k: _normalize_for_display(v) for k, v in obj.items() if k not in _EXCLUDED_OPERATION_KEYS}
     if isinstance(obj, list):
-        return [_normalize_for_display(item) for item in _strip_spec_only_params(obj)]
+        return [_normalize_for_display(item) for item in obj]
     return obj
 
 
@@ -113,7 +94,7 @@ def _normalize_for_comparison(obj: object) -> object:
             if k not in _EXCLUDED_OPERATION_KEYS
         }
     if isinstance(obj, list):
-        return [_normalize_for_comparison(item) for item in _strip_spec_only_params(obj)]
+        return [_normalize_for_comparison(item) for item in obj]
     return obj
 
 

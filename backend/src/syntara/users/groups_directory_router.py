@@ -14,6 +14,7 @@ from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import Group
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.base import BaseService
 from syntara.core.syntara_router import SyntaraRouter
 
@@ -78,6 +79,7 @@ async def list_groups_directory(
     request: Request,
     service: Annotated[_GroupDirectoryService, Depends(_get_service)],
     params: Annotated[GroupDirectoryListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Group))],
 ) -> GroupDirectoryListResponse:
     """Return a lightweight directory of groups (id + name only)."""
     return await service.list_directory(

@@ -41,7 +41,6 @@ paths:
         - name: category
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -93,7 +92,6 @@ paths:
         - name: group
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

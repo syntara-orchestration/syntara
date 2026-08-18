@@ -284,8 +284,7 @@ def main() -> int:
     spec = app.openapi()
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)
-    # Transitional: enable once sub-spec x-spec-only markers are removed and filter params updated
-    # _inject_filter_params(app, spec)  # noqa: ERA001
+    _inject_filter_params(app, spec)
     _consolidate_identical_input_output_schemas(spec)
 
     # Strip auth responses from explicitly unauthenticated endpoints

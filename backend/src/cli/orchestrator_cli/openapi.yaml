@@ -2251,7 +2251,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -2269,7 +2268,6 @@ paths:
         - name: execution_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5042,7 +5040,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5085,7 +5082,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5102,7 +5098,6 @@ paths:
         - name: project_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5121,7 +5116,6 @@ paths:
         - name: project_eligible
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5138,7 +5132,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -5967,7 +5960,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -6010,7 +6002,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -6027,7 +6018,6 @@ paths:
         - name: project_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -6046,7 +6036,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -6089,7 +6078,6 @@ paths:
         - name: policy_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -7407,7 +7395,6 @@ paths:
         - name: credential_type_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -7426,7 +7413,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -9115,7 +9101,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -9158,7 +9143,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -9194,7 +9178,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -9230,7 +9213,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -9247,7 +9229,6 @@ paths:
         - name: provider_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -10192,7 +10173,6 @@ paths:
         - name: integration_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -10210,7 +10190,6 @@ paths:
         - name: validation_status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -10228,7 +10207,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -10245,7 +10223,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -10263,7 +10240,6 @@ paths:
         - name: management_credential_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -11767,7 +11743,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -11803,7 +11778,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -11839,7 +11813,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -11856,7 +11829,6 @@ paths:
         - name: is_default
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -11873,7 +11845,6 @@ paths:
         - name: model_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12481,7 +12452,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12524,7 +12494,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12560,7 +12529,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12596,7 +12564,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12613,7 +12580,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -12638,7 +12604,6 @@ paths:
         - name: namespaced_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -14023,7 +13988,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -14041,7 +14005,6 @@ paths:
         - name: created_by
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -14060,7 +14023,6 @@ paths:
         - name: session_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -14104,7 +14066,6 @@ paths:
         - name: prompt
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -14966,7 +14927,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15009,7 +14969,6 @@ paths:
         - name: is_default
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15026,7 +14985,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15723,7 +15681,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15766,7 +15723,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15802,7 +15758,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15838,7 +15793,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15855,7 +15809,6 @@ paths:
         - name: is_enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -15872,7 +15825,6 @@ paths:
         - name: has_validation_issues
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16060,7 +16012,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16078,7 +16029,6 @@ paths:
         - name: execution_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16867,7 +16817,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16910,7 +16859,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16927,7 +16875,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -16970,7 +16917,6 @@ paths:
         - name: policy_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -17855,7 +17801,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -17898,7 +17843,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -17915,7 +17859,6 @@ paths:
         - name: project_eligible
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -17932,7 +17875,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -18820,7 +18762,6 @@ paths:
         - name: credential_type_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -18839,7 +18780,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -19685,7 +19625,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -19704,7 +19643,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -20675,7 +20613,6 @@ paths:
         - name: credential_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -20694,7 +20631,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -21534,7 +21470,6 @@ paths:
         - name: category
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -21584,7 +21519,6 @@ paths:
         - name: group
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22289,7 +22223,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22332,7 +22265,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22368,7 +22300,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22404,7 +22335,6 @@ paths:
         - name: enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22421,7 +22351,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22439,7 +22368,6 @@ paths:
         - name: integration_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22458,7 +22386,6 @@ paths:
         - name: namespaced_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22928,7 +22855,6 @@ paths:
         - name: username
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -22978,7 +22904,6 @@ paths:
         - name: first_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -23028,7 +22953,6 @@ paths:
         - name: last_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -23078,7 +23002,6 @@ paths:
         - name: auth_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -23097,7 +23020,6 @@ paths:
         - name: auth_source
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -24606,7 +24528,6 @@ paths:
         - name: username
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -24815,7 +24736,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -25028,7 +24948,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -25071,7 +24990,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -25107,7 +25025,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -25143,7 +25060,6 @@ paths:
         - name: source
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27136,7 +27052,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27172,7 +27087,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27208,7 +27122,6 @@ paths:
         - name: workflow_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27227,7 +27140,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27245,7 +27157,6 @@ paths:
         - name: mode
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27263,7 +27174,6 @@ paths:
         - name: approval_pending
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27948,7 +27858,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -27984,7 +27893,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28020,7 +27928,6 @@ paths:
         - name: activity_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28062,7 +27969,6 @@ paths:
         - name: node_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28080,7 +27986,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28402,7 +28307,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28445,7 +28349,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28481,7 +28384,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28517,7 +28419,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28534,7 +28435,6 @@ paths:
         - name: is_enabled
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28551,7 +28451,6 @@ paths:
         - name: has_validation_issues
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -28568,7 +28467,6 @@ paths:
         - name: project_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -29500,7 +29398,6 @@ paths:
         - name: created_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -29536,7 +29433,6 @@ paths:
         - name: updated_at
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -29572,7 +29468,6 @@ paths:
         - name: version
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

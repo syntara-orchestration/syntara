@@ -78,7 +78,6 @@ paths:
         - name: name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -123,7 +122,6 @@ paths:
         - name: is_builtin
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -142,7 +140,6 @@ paths:
         - name: project_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -163,7 +160,6 @@ paths:
         - name: scope
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -208,7 +204,6 @@ paths:
         - name: policy_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:

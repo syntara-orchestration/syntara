@@ -58,7 +58,6 @@ paths:
         - name: workflow_id
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -79,7 +78,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -97,7 +95,6 @@ paths:
         - name: mode
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -115,7 +112,6 @@ paths:
         - name: approval_pending
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -361,7 +357,6 @@ paths:
         - name: activity_name
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -405,7 +400,6 @@ paths:
         - name: node_type
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
@@ -423,7 +417,6 @@ paths:
         - name: status
           in: query
           required: false
-          x-spec-only: true
           style: deepObject
           explode: true
           schema:
