@@ -12,7 +12,6 @@ import {
   Flex,
   FlexItem,
   Label,
-  StackItem,
   Switch,
   Tab,
   TabTitleText,
@@ -192,9 +191,9 @@ function IdentityProviderDetailEarlyLayout({ children }: Readonly<{ children: Re
   return (
     <NxPage>
       <NxPageHeader title="Identity Provider Details" breadcrumbs={breadcrumbsIdentityProviderDetailEarlyShell()} />
-      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+      <NxPageBody>
         <NxPanel isFullHeight>{children}</NxPanel>
-      </StackItem>
+      </NxPageBody>
     </NxPage>
   )
 }
