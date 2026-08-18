@@ -4,7 +4,7 @@ info:
   title: Agent Orchestrator API
   version: 1.0.0
   description: |
-    REST and WebSocket API for the Agent Orchestrator - the central agentic intelligence layer of the Syntara platform.
+    REST and WebSocket API for the Agent Orchestrator - the central agentic intelligence layer of the Orchestrator platform.
 
     ## Overview
     The Agent Orchestrator provides an async-only API that returns invocation IDs immediately and streams all progress and results via WebSocket. This design provides better scalability, lower latency, and bidirectional communication capabilities.

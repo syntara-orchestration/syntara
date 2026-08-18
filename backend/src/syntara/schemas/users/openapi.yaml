@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Users & Groups API
+  title: Orchestrator Users & Groups API
   version: 1.0.0
   description: |
-    User and group management endpoints for the Syntara platform.
+    User and group management endpoints for the Orchestrator platform.
 
     ## Key Features
     - User CRUD (local user account management)
