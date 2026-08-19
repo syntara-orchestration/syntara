@@ -4,6 +4,7 @@ Tests the tool discovery, retrieval, and error reporting functions
 in the tool_services module.
 """
 
+import re
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
@@ -95,9 +96,10 @@ class TestToolServices:
 
             tool_manager_client.update_tool_status.assert_called_once()
 
-    async def test_graceful_handling_of_tool_manager_unavailability(self, tool_manager_client: Mock) -> None:
-        """Test graceful handling of Tool Manager API unavailability."""
-        # Setup Tool Manager client to raise connection error
+    async def test_discovery_failure_raises_tool_discovery_error(self, tool_manager_client: Mock) -> None:
+        """Discovery must raise ToolDiscoveryError instead of returning [] on API failure."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
         tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
 
         # Mock the ToolManagerClient context manager
@@ -105,11 +107,562 @@ class TestToolServices:
             mock_client_class.return_value.__aenter__.return_value = tool_manager_client
             mock_client_class.return_value.__aexit__.return_value = None
 
-            # This should return empty list when Tool Manager is unavailable (graceful handling)
-            all_integrations = await tool_services._discover_mcp_integrations()
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"Failed to discover MCP integrations: ConnectionError: Tool Manager unavailable",
+            ):
+                await tool_services._discover_mcp_integrations()
 
-            # Should return empty list when Tool Manager is unavailable
-            assert all_integrations == []
+    async def test_discover_tools_failure_raises_tool_discovery_error(self, tool_manager_client: Mock) -> None:
+        """Tool discovery must raise ToolDiscoveryError instead of returning empty lists."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_tools.side_effect = ConnectionError("Tool Manager unavailable")
+
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"Failed to discover tools from Tool Manager: ConnectionError: Tool Manager unavailable",
+            ):
+                await tool_services._discover_tools()
+
+    async def test_retrieve_tools_propagates_discovery_failure(self, tool_manager_client: Mock) -> None:
+        """ToolRetriever.retrieve_tools must re-raise discovery failures after audit."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_mcp_integrations.side_effect = ConnectionError("Tool Manager unavailable")
+
+        with patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(ToolDiscoveryError):
+                await retriever.retrieve_tools()
+
+    async def test_retrieve_tools_fails_when_enabled_tools_cannot_be_provisioned(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """ALL/SELECTED must fail closed when MCP yields zero tools (connectivity/soft-skip)."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = sample_tools
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"owning MCP integrations returned no tools",
+            ):
+                await retriever.retrieve_tools()
+
+    async def test_retrieve_tools_fails_when_mcp_tools_do_not_match_enabled(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """Fail closed must blame registry/match drift when MCP returned tools but 0 matched."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+        from tests.unit.agent_orchestrator.tool_manager.conftest import INTEGRATION_1_ID
+
+        # Single owning integration so soft-skip of a sibling owner cannot flip the message.
+        single_owner_tools = [t for t in sample_tools if t.integration_id == INTEGRATION_1_ID]
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = single_owner_tools
+
+        unmatched = [
+            NamespacedBaseTool(
+                integration_id=INTEGRATION_1_ID,
+                integration_name="dev_tools",
+                tool_name="unrelated_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=unmatched,
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(
+                ToolDiscoveryError,
+                match=r"owning integrations returned 1 tool\(s\) but none matched",
+            ):
+                await retriever.retrieve_tools()
+
+    def test_require_provisioned_tools_distinguishes_empty_mcp_vs_zero_match(self) -> None:
+        """Guard messages must distinguish MCP emptiness from post-filter zero-match."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        owning_integration_id = uuid4()
+        other_integration_id = uuid4()
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=owning_integration_id,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+
+        # No MCP tools at all → connectivity/provisioning blame
+        with pytest.raises(ToolDiscoveryError, match=r"owning MCP integrations returned no tools"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=[])
+
+        # Owning integration returned tools but none matched → registry drift blame
+        owning_tools = [
+            NamespacedBaseTool(
+                integration_id=owning_integration_id,
+                integration_name="dev_tools",
+                tool_name="unmatched_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+            for _ in range(3)
+        ]
+        with pytest.raises(ToolDiscoveryError, match=r"owning integrations returned 3 tool\(s\) but none matched"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=owning_tools)
+
+        # Only unrelated integration returned tools → still connectivity blame (owning count = 0)
+        unrelated_tools = [
+            NamespacedBaseTool(
+                integration_id=other_integration_id,
+                integration_name="other_mcp",
+                tool_name="some_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+        with pytest.raises(ToolDiscoveryError, match=r"owning MCP integrations returned no tools"):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=unrelated_tools)
+
+        # ALL with no enabled tools → no raise
+        tool_services._require_provisioned_tools_when_enabled([], [], namespaced_tools=[])
+
+        # Provisioned tools present → no raise
+        tool_services._require_provisioned_tools_when_enabled(
+            enabled, [MagicMock(spec=BaseTool)], namespaced_tools=owning_tools
+        )
+
+    def test_require_provisioned_tools_mixed_soft_skip_and_unmatched_sibling(self) -> None:
+        """Multi-owner: soft-skipped A + unmatched tools from B must not pure-blame drift."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_a = uuid4()
+        integration_b = uuid4()
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="tool_a",
+                namespaced_name="mcp_a::tool_a",
+                description="A",
+                integration_id=integration_a,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+            ToolWithParameters(
+                id=uuid4(),
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+        ]
+        # A soft-skipped (no tools); B returned unmatched tools only
+        sibling_unmatched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="unrelated_on_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+        with pytest.raises(
+            ToolDiscoveryError,
+            match=r"one or more owning MCP integrations returned no tools while others returned 1 unmatched",
+        ):
+            tool_services._require_provisioned_tools_when_enabled(enabled, [], namespaced_tools=sibling_unmatched)
+
+    def test_require_provisioned_tools_selected_total_soft_skip_raises_selection_unavailable(
+        self,
+    ) -> None:
+        """SELECTED zero-provision via soft-skip must raise ToolSelectionUnavailableError with IDs and cause."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        owning_integration_id = uuid4()
+        enabled_tool_id = uuid4()
+        selected_ids = [str(enabled_tool_id)]
+        enabled = [
+            ToolWithParameters(
+                id=enabled_tool_id,
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=owning_integration_id,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        # Total soft-skip (no MCP tools) → connectivity cause scoped to the selected owner
+        with pytest.raises(
+            ToolSelectionUnavailableError,
+            match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+        ) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+        assert "check integration connectivity" in str(exc_info.value)
+        assert "missing from the enabled catalog" not in str(exc_info.value)
+
+    def test_require_provisioned_tools_selected_with_drift_includes_drift_cause(
+        self,
+    ) -> None:
+        """SELECTED zero-provision via registry drift must include drift diagnostic."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        owning_integration_id = uuid4()
+        enabled_tool_id = uuid4()
+        selected_ids = [str(enabled_tool_id)]
+        enabled = [
+            ToolWithParameters(
+                id=enabled_tool_id,
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=owning_integration_id,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        # Owning integration returned tools but none matched enabled entries
+        owning_unmatched = [
+            NamespacedBaseTool(
+                integration_id=owning_integration_id,
+                integration_name="dev_tools",
+                tool_name="unmatched_tool",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+            for _ in range(2)
+        ]
+        with pytest.raises(
+            ToolSelectionUnavailableError,
+            match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+        ) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=owning_unmatched,
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+        assert "check registry name/integration_id drift" in str(exc_info.value)
+        assert "missing from the enabled catalog" not in str(exc_info.value)
+
+    def test_require_provisioned_tools_selected_empty_provision_catalog_miss(
+        self,
+    ) -> None:
+        """SELECTED IDs absent from the catalog must not blame an unrelated enabled owner."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        missing_selected_id = str(uuid4())
+        enabled = [
+            ToolWithParameters(
+                id=uuid4(),
+                name="code_search",
+                namespaced_name="dev_tools::code_search",
+                description="Search",
+                integration_id=uuid4(),
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections={missing_selected_id},
+            )
+        msg = str(exc_info.value)
+        assert missing_selected_id in msg
+        assert "missing from the enabled catalog" in msg
+        assert "check integration connectivity" not in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
+    def test_require_provisioned_tools_selected_empty_enabled_catalog(
+        self,
+    ) -> None:
+        """SELECTED with zero enabled tools must catalog-miss, not skip the guard."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        selected_ids = [str(uuid4())]
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                [],
+                [],
+                namespaced_tools=[],
+                tool_selection_strategy="SELECTED",
+                tool_selections=set(selected_ids),
+            )
+        msg = str(exc_info.value)
+        assert selected_ids[0] in msg
+        assert "missing from the enabled catalog" in msg
+        assert "Enabled tools could not be provisioned" not in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
+    def test_require_provisioned_tools_selected_sibling_provision_scopes_cause(
+        self,
+    ) -> None:
+        """SELECTED with a provisioned sibling must not blame that sibling as unmatched."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_a = uuid4()
+        integration_b = uuid4()
+        tool_a_id = uuid4()
+        tool_b_id = uuid4()
+        enabled = [
+            ToolWithParameters(
+                id=tool_a_id,
+                name="tool_a",
+                namespaced_name="mcp_a::tool_a",
+                description="A",
+                integration_id=integration_a,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+            ToolWithParameters(
+                id=tool_b_id,
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            ),
+        ]
+        provisioned_b = MagicMock(spec=BaseTool)
+        provisioned_b.metadata = {"tool_id": str(tool_b_id)}
+        namespaced_b_matched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="tool_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [provisioned_b],
+                namespaced_tools=namespaced_b_matched,
+                tool_selection_strategy="SELECTED",
+                tool_selections={str(tool_a_id)},
+            )
+
+        msg = str(exc_info.value)
+        assert str(tool_a_id) in msg
+        assert "selected tools were not among provisioned tools" in msg
+        assert "check integration connectivity" in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
+    def test_require_provisioned_tools_selected_sibling_missing_from_catalog(
+        self,
+    ) -> None:
+        """SELECTED IDs absent from the enabled catalog must not use ALL zero-match wording."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+        from syntara.agent_orchestrator.tool_manager.types import NamespacedBaseTool
+
+        integration_b = uuid4()
+        tool_b_id = uuid4()
+        missing_selected_id = str(uuid4())
+        enabled = [
+            ToolWithParameters(
+                id=tool_b_id,
+                name="tool_b",
+                namespaced_name="mcp_b::tool_b",
+                description="B",
+                integration_id=integration_b,
+                enabled=True,
+                status="available",
+                parameters=[],
+                created_by=uuid4(),
+            )
+        ]
+        provisioned_b = MagicMock(spec=BaseTool)
+        provisioned_b.metadata = {"tool_id": str(tool_b_id)}
+        namespaced_b_matched = [
+            NamespacedBaseTool(
+                integration_id=integration_b,
+                integration_name="mcp_b",
+                tool_name="tool_b",
+                base_tool=MagicMock(spec=BaseTool),
+            )
+        ]
+
+        with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+            tool_services._require_provisioned_tools_when_enabled(
+                enabled,
+                [provisioned_b],
+                namespaced_tools=namespaced_b_matched,
+                tool_selection_strategy="SELECTED",
+                tool_selections={missing_selected_id},
+            )
+
+        msg = str(exc_info.value)
+        assert missing_selected_id in msg
+        assert "missing from the enabled catalog" in msg
+        assert "unmatched" not in msg
+        assert "none matched" not in msg
+
+    async def test_retrieve_tools_selected_soft_skip_raises_selection_unavailable(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+        sample_tools: list[ToolWithParameters],
+    ) -> None:
+        """SELECTED + total soft-skip must raise ToolSelectionUnavailableError (not ToolDiscoveryError)."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = sample_tools
+        enabled_tool = next(tool for tool in sample_tools if tool.enabled)
+        selected_ids = [str(enabled_tool.id)]
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(
+                ToolSelectionUnavailableError,
+                match=rf"unavailable tool IDs: {re.escape(str(selected_ids))}",
+            ):
+                await retriever.retrieve_tools(
+                    tool_selection_strategy="SELECTED",
+                    tool_selections=set(selected_ids),
+                )
+
+    async def test_retrieve_tools_allows_empty_when_no_enabled_tools(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+    ) -> None:
+        """Zero provisioned tools is OK when Tool Manager reports no enabled tools."""
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = []
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            result = await retriever.retrieve_tools()
+            assert result == []
+
+    async def test_retrieve_tools_selected_empty_enabled_catalog_raises(
+        self,
+        tool_manager_client: Mock,
+        sample_mcp_integrations: list[IntegrationRead],
+    ) -> None:
+        """SELECTED must not COMPLETED+return [] when Tool Manager has no enabled tools."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        tool_manager_client.get_all_mcp_integrations.return_value = sample_mcp_integrations
+        tool_manager_client.get_all_tools.return_value = []
+        selected_ids = [str(uuid4())]
+
+        with (
+            patch("syntara.agent_orchestrator.tool_manager.tool_services.ToolManagerClient") as mock_client_class,
+            patch(
+                "syntara.agent_orchestrator.tool_manager.tool_services._retrieve_base_tools_from_integrations",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_client_class.return_value.__aenter__.return_value = tool_manager_client
+            mock_client_class.return_value.__aexit__.return_value = None
+
+            retriever = tool_services.ToolRetriever("session-abc", uuid4(), execution_id=uuid4())
+            with pytest.raises(ToolSelectionUnavailableError) as exc_info:
+                await retriever.retrieve_tools(
+                    tool_selection_strategy="SELECTED",
+                    tool_selections=set(selected_ids),
+                )
+            msg = str(exc_info.value)
+            assert selected_ids[0] in msg
+            assert "missing from the enabled catalog" in msg
 
     async def test_tool_retrieval_integration(
         self,

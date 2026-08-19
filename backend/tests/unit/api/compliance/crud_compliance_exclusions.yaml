@@ -25,14 +25,6 @@ exclusions:
     crud_type: create
     reason: "Short-lived WS ticket, not a persisted resource — returns 200 by design"
 
-  - operation_id: create_invocation
-    crud_type: create
-    reason: "Async job submission, returns 202 Accepted — invocation is queued, not synchronously created"
-
-  - operation_id: create_invocation_chat
-    crud_type: create
-    reason: "Async chat invocation, returns 202 Accepted — same pattern as create_invocation"
-
 # ===========================================================================
 # TEMPORARY EXCLUSIONS (tech debt - should fix)
 # ===========================================================================

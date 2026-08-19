@@ -37,6 +37,50 @@ class TestUsersCreateContract:
         assert data["is_enabled"] is True  # default
 
     @pytest.mark.asyncio
+    async def test_create_user_omitted_group_names_assigns_default_users_group(self, admin_client: AsyncClient) -> None:
+        """Omitting group_names should assign users + authenticated groups.
+
+        Note: relies on seeded built-in groups (or create_user fallback creation).
+        """
+        user_data = {
+            "username": "defaultgroupuser",
+            "email": "defaultgroupuser@example.com",
+            "first_name": "Default",
+            "last_name": "Group",
+            "password": "SecurePassword123!",
+        }
+
+        response = await admin_client.post(USERS_URL, json=user_data)
+        assert response.status_code == 201
+        created = response.json()
+
+        groups_response = await admin_client.get(f"{USERS_URL}/{created['id']}/groups")
+        assert groups_response.status_code == 200
+        group_names = {resource["name"] for resource in groups_response.json()["resources"]}
+        assert group_names == {"users", "authenticated"}
+
+    @pytest.mark.asyncio
+    async def test_create_user_empty_group_names_skips_default_users_group(self, admin_client: AsyncClient) -> None:
+        """Explicit empty group_names should skip default users group assignment."""
+        user_data = {
+            "username": "emptygroupuser",
+            "email": "emptygroupuser@example.com",
+            "first_name": "Empty",
+            "last_name": "Group",
+            "password": "SecurePassword123!",
+            "group_names": [],
+        }
+
+        response = await admin_client.post(USERS_URL, json=user_data)
+        assert response.status_code == 201
+        created = response.json()
+
+        groups_response = await admin_client.get(f"{USERS_URL}/{created['id']}/groups")
+        assert groups_response.status_code == 200
+        group_names = {resource["name"] for resource in groups_response.json()["resources"]}
+        assert group_names == {"authenticated"}
+
+    @pytest.mark.asyncio
     async def test_create_user_with_all_fields(self, admin_client: AsyncClient) -> None:
         """Test creating user with all explicit fields."""
         user_data = {

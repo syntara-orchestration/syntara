@@ -16,82 +16,29 @@ import {
   SelectOption,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
+import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
+import { FormFieldWarning } from '../../components/FormFieldError'
 import { NxSelect } from '../../components/NxSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
+import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody, RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
 import { assignRoleSchema } from './assignRoleSchema'
 import type { AssignRoleFormData } from './assignRoleSchema'
+import { PrincipalField } from './PrincipalField'
 import { PrincipalTypeSelect } from './PrincipalTypeSelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
+import { PRINCIPAL_ID_FIELD, roleAssignmentsQueryKey, useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 const PAGE_SIZE = 20
-
-// ── Principal selector field ──────────────────────────────────────────────
-
-type PrincipalFieldProps = {
-  control: ReturnType<typeof useForm<AssignRoleFormData>>['control']
-  name: 'userId' | 'groupId' | 'serviceAccountId'
-  label: string
-  fieldId: string
-  options: { value: string; label: string }[]
-  placeholder: string
-  onSearchChange?: (term: string) => void
-  hasMore?: boolean
-  isLoading?: boolean
-}
-
-function PrincipalField({
-  control,
-  name,
-  label,
-  fieldId,
-  options,
-  placeholder,
-  onSearchChange,
-  hasMore,
-  isLoading,
-}: Readonly<PrincipalFieldProps>) {
-  return (
-    <FormGroup label={label} isRequired fieldId={fieldId}>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field, fieldState }) => (
-          <>
-            <TypeaheadSelect
-              id={fieldId}
-              ariaLabel={label}
-              options={options}
-              selected={field.value ?? ''}
-              onChange={field.onChange}
-              placeholder={placeholder}
-              hasError={!!fieldState.error}
-              onSearchChange={onSearchChange}
-              hasMore={hasMore}
-              isLoading={isLoading}
-            />
-            {fieldState.error && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </>
-        )}
-      />
-    </FormGroup>
-  )
-}
 
 // ── Form body (extracted to stay within max-lines-per-function) ───────────
 
@@ -119,6 +66,7 @@ type AssignRoleFormBodyProps = {
   onRoleSearchChange: (term: string) => void
   hasMoreRoles: boolean
   isRolesLoading: boolean
+  isAssignmentsError: boolean
 }
 
 function ScopeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -177,6 +125,7 @@ function AssignRoleFormBody({
   onRoleSearchChange,
   hasMoreRoles,
   isRolesLoading,
+  isAssignmentsError,
 }: Readonly<AssignRoleFormBodyProps>) {
   return (
     <>
@@ -321,6 +270,7 @@ function AssignRoleFormBody({
                   </HelperText>
                 </FormHelperText>
               )}
+              <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
             </>
           )}
         />
@@ -337,6 +287,7 @@ type AssignRoleDialogProps = {
 }
 
 export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDialogProps>) {
+  const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
 
   const { handleSubmit, control, setValue, setError } = useForm<AssignRoleFormData>({
@@ -355,6 +306,7 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const principalType = useWatch({ control, name: 'principalType' })
   const scope = useWatch({ control, name: 'scope' })
   const selectedProjectId = useWatch({ control, name: 'projectId' })
+  const selectedPrincipalId = useWatch({ control, name: PRINCIPAL_ID_FIELD[principalType] })
   const isProjectScoped = scope === 'project'
 
   const { projects: allProjects, isLoading: isProjectsLoading } = useSelectableProjects()
@@ -413,6 +365,11 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     [serviceAccountsQuery.data]
   )
 
+  const {
+    assigned: alreadyAssignedRoles,
+    isLoading: isAssignmentsLoading,
+    isError: isAssignmentsError,
+  } = useAlreadyAssignedRoles(principalType, selectedPrincipalId ?? '', isProjectScoped, selectedProjectId ?? '')
   const [roleSearchTerm, setRoleSearchTerm] = useState('')
   const debouncedRoleSearch = useDebouncedValue(roleSearchTerm)
   const systemRolesQuery = accessClient.useQuery('get', '/roles', {
@@ -442,8 +399,13 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   )
   const activeRolesQuery = isProjectScoped ? projectRolesQuery : systemRolesQuery
   const roleOptions = useMemo(
-    () => (activeRolesQuery.data?.resources ?? []).map((role) => ({ value: role.name, label: role.name })),
-    [activeRolesQuery.data]
+    () =>
+      isAssignmentsLoading
+        ? []
+        : (activeRolesQuery.data?.resources ?? [])
+            .filter((r) => !alreadyAssignedRoles.has(r.name))
+            .map((r) => ({ value: r.name, label: r.name })),
+    [activeRolesQuery.data, alreadyAssignedRoles, isAssignmentsLoading]
   )
 
   const { mutate: createRoleAssignment, isPending: isPendingSystem } = accessClient.useMutation(
@@ -459,12 +421,6 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const handleError = useFormMutationErrorHandler<AssignRoleFormData>(setError)
 
   const onSubmit = (data: AssignRoleFormData) => {
-    const onMutationSuccess = () => {
-      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
-      onSuccess()
-      onClose()
-    }
-    const onMutationError = handleError({ title: 'Failed to add assignment' })
     const principalIdByType: Record<RolePrincipalType, string> = {
       [RolePrincipalType.USER]: data.userId,
       [RolePrincipalType.GROUP]: data.groupId,
@@ -472,6 +428,17 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
     }
     const principalId = principalIdByType[data.principalType]
     const body = buildAssignmentBody(data.principalType, principalId, data.roleName)
+    const onMutationSuccess = () => {
+      detachPromise(
+        queryClient.invalidateQueries({
+          queryKey: roleAssignmentsQueryKey(data.principalType, principalId),
+        })
+      )
+      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
+      onSuccess()
+      onClose()
+    }
+    const onMutationError = handleError({ title: 'Failed to add assignment' })
 
     if (data.scope === 'project') {
       createProjectRoleAssignment(
@@ -511,7 +478,8 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
             isServiceAccountsLoading={serviceAccountsQuery.isFetching}
             onRoleSearchChange={setRoleSearchTerm}
             hasMoreRoles={!!activeRolesQuery.data?.next}
-            isRolesLoading={activeRolesQuery.isFetching}
+            isRolesLoading={activeRolesQuery.isFetching || isAssignmentsLoading}
+            isAssignmentsError={isAssignmentsError}
           />
         </Form>
       </ModalBody>

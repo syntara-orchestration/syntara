@@ -2,6 +2,7 @@ import { Button, Content, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
@@ -223,6 +224,7 @@ function AssignmentsTableBody({
 }
 
 export function AssignmentsTab() {
+  const queryClient = useQueryClient()
   const permissions = useAssignmentPermissions()
   const { showSuccess, showError } = useAlerts()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -271,6 +273,7 @@ export function AssignmentsTab() {
     const displayName = row.principalName
     const onSuccess = () => {
       showSuccess({ title: 'Permission removed', description: `Removed ${row.assignmentName} from ${displayName}` })
+      detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
       refetch()
     }
     const onError = (error: unknown) => showError({ title: 'Remove failed', description: getErrorMessage(error) })

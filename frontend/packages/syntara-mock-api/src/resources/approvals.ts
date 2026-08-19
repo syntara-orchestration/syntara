@@ -14,6 +14,7 @@ export const approvals: Approval[] = [
     approval_node_id: 'approval_gate',
     name: 'Production Deployment Approval',
     status: 'pending',
+    prompt: 'Review the staging test results and approve deployment of v${inputs.version} to ${inputs.environment}.',
     timeout_at: mockDate.hoursFromNow23,
     approver_users: [{ id: 'user-admin', username: 'admin' }],
     approver_groups: [],

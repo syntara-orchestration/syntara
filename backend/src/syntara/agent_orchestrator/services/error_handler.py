@@ -6,6 +6,7 @@ RFC 9457 Problem Details format for WebSocket error events.
 
 from uuid import UUID
 
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.core.models.error import ErrorData
 
 # Base URI for error types
@@ -42,6 +43,49 @@ def _is_network_error(error_msg: str) -> bool:
     return _contains_any(error_msg, ["connection", "network", "unreachable"])
 
 
+def _classify_by_exception_type(exception: Exception, instance: str | None) -> ErrorData | None:
+    """Classify exceptions by type before message heuristics.
+
+    Tool discovery/selection failures and timeouts are classified here so their
+    embedded cause names (e.g. ``ConnectionError``) are not mismatched by the
+    message-based heuristics downstream.
+    """
+    if isinstance(exception, ToolDiscoveryError):
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/tool-discovery-error",
+            title="Tool Discovery Failed",
+            detail=(
+                "Required tools could not be discovered or provisioned."
+                " Check integration connectivity and tool configuration."
+            ),
+            code="TOOL_DISCOVERY_FAILED",
+            retryable=False,
+            instance=instance,
+        )
+
+    if isinstance(exception, ToolSelectionUnavailableError):
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/tool-selection-unavailable",
+            title="Selected Tools Unavailable",
+            detail="None of the requested tools could be provisioned. Verify tool availability and integration status.",
+            code="TOOL_SELECTION_UNAVAILABLE",
+            retryable=False,
+            instance=instance,
+        )
+
+    if isinstance(exception, TimeoutError):
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/timeout-error",
+            title="Streaming Timeout",
+            detail="LLM streaming request timed out. Please try again.",
+            code="STREAM_TIMEOUT",
+            retryable=True,
+            instance=instance,
+        )
+
+    return None
+
+
 def classify_streaming_error(exception: Exception, invocation_id: UUID | None = None) -> ErrorData:
     """Classify streaming exception into RFC 9457 Problem Details format.
 
@@ -60,19 +104,13 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
         True
 
     """
-    error_msg = str(exception).lower()
     instance = _build_instance_uri(invocation_id)
 
-    # Handle timeout errors
-    if isinstance(exception, TimeoutError):
-        return ErrorData(
-            type=f"{ERROR_TYPE_BASE_URI}/timeout-error",
-            title="Streaming Timeout",
-            detail="LLM streaming request timed out. Please try again.",
-            code="STREAM_TIMEOUT",
-            retryable=True,
-            instance=instance,
-        )
+    typed = _classify_by_exception_type(exception, instance)
+    if typed is not None:
+        return typed
+
+    error_msg = str(exception).lower()
 
     # Rate limiting (429 status)
     if _is_rate_limit_error(error_msg):

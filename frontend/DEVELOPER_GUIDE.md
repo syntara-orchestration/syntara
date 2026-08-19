@@ -110,9 +110,6 @@ npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/executions
 npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/activity_types_openapi.yaml \
   --output ./src/activity-types-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/syntara/src/syntara/schemas/invocations/openapi.yaml \
-  --output ./src/invocations-api.ts --default-non-nullable false
-
 npx openapi-typescript /path/to/syntara/src/syntara/schemas/metrics/openapi.yaml \
   --output ./src/metrics-api.ts --default-non-nullable false
 
@@ -156,7 +153,6 @@ This will:
 | `tool-manager.ts`               | `schemas/tool_manager/openapi.yaml`             | Tool and provider management         |
 | `files-api.ts`                  | `schemas/files/openapi.yaml`                    | File upload and management           |
 | `approvals-api.ts`              | `schemas/approvals/openapi.yaml`                | Approval requests                    |
-| `invocations-api.ts`            | `schemas/invocations/openapi.yaml`              | Invocations                          |
 | `metrics-api.ts`                | `schemas/metrics/openapi.yaml`                  | Metrics                              |
 | `settings-api.ts`               | `schemas/settings/openapi.yaml`                 | Runtime settings                     |
 | `auth-api.ts`                   | `schemas/auth/openapi.yaml`                     | Authentication                       |

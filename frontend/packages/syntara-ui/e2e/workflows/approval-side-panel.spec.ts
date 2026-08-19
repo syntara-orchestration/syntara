@@ -3,7 +3,7 @@
  *
  * Critical paths covered:
  * - Deep-link from approvals list navigates to execution detail with side panel
- * - Side panel displays approval details (step name, workflow, approve/reject buttons)
+ * - Side panel displays approval details (step name, workflow, designer message, approve/reject buttons)
  * - Approve and reject flows with notes and undo
  * - Panel and run history card are mutually exclusive
  * - Viewer role cannot approve or reject (permission gating)
@@ -85,6 +85,8 @@ test.describe('Approval Side Panel — deep-link', () => {
     await expect(app.getByText('Workflow', { exact: true })).toBeVisible()
     await expect(app.locator('dd').getByText('deployment-approval', { exact: true })).toBeVisible()
     await expect(app.getByText('Approval initiated', { exact: true })).toBeVisible()
+    await expect(app.getByText('Message', { exact: true })).toBeVisible()
+    await expect(app.getByText(/Review the staging test results/)).toBeVisible()
   })
 
   test('clicking approve shows notes input and submit button', async ({ app }) => {

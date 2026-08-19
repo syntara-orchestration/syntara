@@ -30,9 +30,9 @@ def mock_db_session_factory(handler: WebSocketStreamingHandler, scalar_result: A
     """
     # Create mock session and result
     mock_session = AsyncMock()
-    mock_result = MagicMock()  # Not AsyncMock - one_or_none is not async
-    mock_result.one_or_none.return_value = scalar_result
-    mock_session.exec.return_value = mock_result
+    mock_result = MagicMock()  # Not AsyncMock - scalar_one_or_none is not async
+    mock_result.scalar_one_or_none.return_value = scalar_result
+    mock_session.execute.return_value = mock_result
 
     # Create async context manager mock
     mock_cm = AsyncMock()
@@ -194,6 +194,28 @@ class TestWebSocketStreamingHandlerWaitForStreamReady:
                 resource_status=InvocationStatus.RUNNING.value,
                 resource_type="invocation",
             )
+
+
+class TestAAP86853InvocationStatusLookupRegression:
+    """Regression tests for AAP-86853 Row vs Invocation model status access."""
+
+    def test_row_shaped_lookup_result_lacks_status_attribute_aap_86853(self) -> None:
+        """Row-like one_or_none() results are not ORM models and lack .status."""
+
+        class RowShapedLookup:
+            """Minimal stand-in for sqlalchemy Row returned by one_or_none()."""
+
+            def __init__(self, status_value: InvocationStatus) -> None:
+                self._values = (status_value,)
+
+            def __getitem__(self, index: int) -> InvocationStatus:
+                return self._values[index]
+
+        row_shaped = RowShapedLookup(InvocationStatus.RUNNING)
+
+        assert row_shaped[0] == InvocationStatus.RUNNING
+        with pytest.raises(AttributeError):
+            _ = row_shaped.status  # type: ignore[attr-defined]
 
 
 class TestWebSocketStreamingHandlerCheckInvocationExists:
