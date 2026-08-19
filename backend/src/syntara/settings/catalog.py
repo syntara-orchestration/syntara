@@ -84,12 +84,6 @@ CATEGORY_CATALOG: list[CategoryDefinition] = [
         description="API rate limiting and throttling settings",
         display_order=55,
     ),
-    CategoryDefinition(
-        slug="service_accounts",
-        name="Service Accounts",
-        description="Service account credential lifetime and security settings",
-        display_order=60,
-    ),
 ]
 
 
@@ -1036,21 +1030,20 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         helper_text="Range: 1-86400 seconds. Default: 60 seconds.",
         validation_schema={"min": 1, "max": 86400},
     ),
-    # Service Accounts
+    # Service accounts — credential lifetime
     SettingDefinition(
         key="service_accounts.credential_max_lifetime_days",
         name="Credential maximum lifetime (days)",
-        category=SettingCategory.SERVICE_ACCOUNTS,
+        category=SettingCategory.AUTHENTICATION,
         value_type=SettingValueType.INTEGER,
         default_value=180,
         description=(
-            "Maximum lifetime for service account credentials in days. "
-            "Set to 0 to allow credentials with no expiry date. "
-            "When set to a positive value, any credential created or renewed "
-            "cannot expire beyond this many days from now. Changes take effect "
-            "on the next credential create or renew without a restart."
+            "Caps how long service account credentials remain valid. When set to a "
+            "positive number, any credential created or renewed is forced to expire "
+            "within that many days. Set to 0 for no expiry (credentials never expire). "
+            "Existing credentials keep their current expiry until they are renewed."
         ),
-        helper_text="0 = unlimited. Range: 1-730 days. Default: 180 days.",
+        helper_text="Days until credentials expire (0 = never). Max 730. Default 180.",
         requires_restart=False,
         validation_schema={"min": 0, "max": 730},
     ),

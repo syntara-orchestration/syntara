@@ -508,7 +508,7 @@ The API usage accumulator (`src/syntara/telemetry/api_usage_accumulator.py`) tra
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `jwt_sa_access_token_lifetime_minutes` | int | 15 | SA access token lifetime (range: 1–60 minutes) |
-| `service_accounts.credential_max_lifetime_days` | int | 180 | Maximum credential expiration in days (0 = unlimited, 1–730). Managed as a runtime setting — no restart required. |
+| `service_accounts.credential_max_lifetime_days` | int | 180 | Caps how long credentials stay valid (0 = never expire, 1–730 days). Lives under the **Authentication** tab in the Settings UI — no restart required. |
 
 ## Error Handling
 
