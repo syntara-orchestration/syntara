@@ -32,9 +32,103 @@ paths:
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
-        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: enabled
           in: query
           required: false
@@ -43,16 +137,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the enabled state. ?enabled=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the enabled state. ?enabled[eq]=true
                     type: boolean
-          description: |
-            Filter tools by enabled state.
-            - Exact match: `enabled=true` or `enabled[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: status
           in: query
           required: false
@@ -64,12 +156,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the tool status. ?status[eq]=available
                     $ref: '#/components/schemas/ToolStatus'
-          description: |
-            Filter tools by status.
-            - Exact match: `status=available` or `status[eq]=available`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: integration_id
           in: query
           required: false
@@ -79,17 +170,15 @@ paths:
             allOf:
               - type: string
                 format: uuid
-                description: Exact match of the integration ID. ?integration_id=<uuid>
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the integration ID. ?integration_id[eq]=<uuid>
                     type: string
                     format: uuid
-          description: |
-            Filter tools by integration ID.
-            - Exact match: `integration_id=<uuid>` or `integration_id[eq]=<uuid>`
+                  in:
+                    title: In
+                    type: string
         - name: namespaced_name
           in: query
           required: false
@@ -98,49 +187,32 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the namespaced name. ?namespaced_name=<name>
               - type: object
                 properties:
-                  eq:
-                    title: Equals
-                    description: Exact match of the namespaced name. ?namespaced_name[eq]=<name>
-                    type: string
-                  in:
-                    title: In
-                    description: Match any of a comma-separated list. ?namespaced_name[in]=a,b,c
-                    type: string
                   contains:
                     title: Contains
-                    description: Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
+                  eq:
+                    title: Equals
                     type: string
                   gt:
                     title: Greater Than
-                    description: Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
                     type: string
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?namespaced_name[gte]=<name>
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
                     type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
                     type: string
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?namespaced_name[lte]=<name>
+                    title: Less Than or Equal
                     type: string
-                  isnull:
-                    title: Is Null
-                    description: Null check (true = IS NULL, false = IS NOT NULL). ?namespaced_name[isnull]=true
-                    type: boolean
-          description: |
-            Filter tools by namespaced name.
-            - Exact match: `namespaced_name=value`
-            - Contains: `namespaced_name[contains]=value`
+                  starts_with:
+                    title: Starts With
+                    type: string
       responses:
         '200':
           description: Successful Response

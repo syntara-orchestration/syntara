@@ -38,6 +38,197 @@ paths:
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: created_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: updated_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: name
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: key
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
         - name: category
           in: query
           required: false
@@ -46,49 +237,32 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the category. ?category=value
               - type: object
                 properties:
-                  eq:
-                    title: Equals
-                    description: Exact match of the category. ?category[eq]=value
-                    type: string
-                  in:
-                    title: In
-                    description: Match any of a comma-separated list. ?category[in]=a,b,c
-                    type: string
                   contains:
                     title: Contains
-                    description: Substring match (case-insensitive). ?category[contains]=substring
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?category[starts_with]=prefix
+                  eq:
+                    title: Equals
                     type: string
                   gt:
                     title: Greater Than
-                    description: Greater than comparison (lexicographical). ?category[gt]=value
                     type: string
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?category[gte]=value
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
                     type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison (lexicographical). ?category[lt]=value
                     type: string
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?category[lte]=value
+                    title: Less Than or Equal
                     type: string
-                  isnull:
-                    title: Is Null
-                    description: Null check (true = IS NULL, false = IS NOT NULL). ?category[isnull]=true
-                    type: boolean
-          description: |
-            Filter settings by category.
-            - Exact match: `category=value`
-            - Contains: `category[contains]=substring`
+                  starts_with:
+                    title: Starts With
+                    type: string
         - name: group
           in: query
           required: false
@@ -97,49 +271,51 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the group. ?group=value
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: requires_restart
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: boolean
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the group. ?group[eq]=value
-                    type: string
+                    type: boolean
                   in:
                     title: In
-                    description: Match any of a comma-separated list. ?group[in]=a,b,c
                     type: string
-                  contains:
-                    title: Contains
-                    description: Substring match (case-insensitive). ?group[contains]=substring
-                    type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?group[starts_with]=prefix
-                    type: string
-                  gt:
-                    title: Greater Than
-                    description: Greater than comparison (lexicographical). ?group[gt]=value
-                    type: string
-                  gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?group[gte]=value
-                    type: string
-                  lt:
-                    title: Less Than
-                    description: Less than comparison (lexicographical). ?group[lt]=value
-                    type: string
-                  lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?group[lte]=value
-                    type: string
-                  isnull:
-                    title: Is Null
-                    description: Null check (true = IS NULL, false = IS NOT NULL). ?group[isnull]=true
-                    type: boolean
-          description: |
-            Filter settings by group.
-            - Exact match: `group=value`
-            - Contains: `group[contains]=substring`
       responses:
         "200":
           description: Paginated list of runtime settings

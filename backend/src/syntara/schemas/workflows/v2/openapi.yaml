@@ -78,9 +78,161 @@ paths:
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
-        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: deleted_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: deleted_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: is_builtin
           in: query
           required: false
@@ -89,16 +241,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the builtin flag. ?is_builtin=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the builtin flag. ?is_builtin[eq]=true
                     type: boolean
-          description: |
-            Filter workflows by builtin flag.
-            - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: is_enabled
           in: query
           required: false
@@ -107,16 +257,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the enabled state. ?is_enabled=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the enabled state. ?is_enabled[eq]=true
                     type: boolean
-          description: |
-            Filter workflows by enabled state.
-            - Exact match: `is_enabled=true` or `is_enabled[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: has_validation_issues
           in: query
           required: false
@@ -125,16 +273,35 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match. ?has_validation_issues=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match. ?has_validation_issues[eq]=true
                     type: boolean
-          description: |
-            Filter workflows by validation issues.
-            - Exact match: `has_validation_issues=true` or `has_validation_issues[eq]=true`
+                  in:
+                    title: In
+                    type: string
+        - name: published_version_id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: project_id
           in: query
           required: false
@@ -144,17 +311,15 @@ paths:
             allOf:
               - type: string
                 format: uuid
-                description: Exact match of the project ID. ?project_id=<uuid>
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the project ID. ?project_id[eq]=<uuid>
                     type: string
                     format: uuid
-          description: |
-            Filter workflows by project ID.
-            - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
+                  in:
+                    title: In
+                    type: string
       responses:
         '200':
           description: List of workflows
@@ -503,8 +668,65 @@ paths:
             type: boolean
             default: false
             title: Include Total
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: version
           in: query
           required: false
@@ -513,33 +735,26 @@ paths:
           schema:
             allOf:
               - type: integer
-                description: Exact match of the version number. ?version=1
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the version number. ?version[eq]=1
                     type: integer
                   gt:
                     title: Greater Than
-                    description: Greater than comparison. ?version[gt]=1
                     type: integer
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?version[gte]=1
+                    title: Greater Than or Equal
                     type: integer
+                  in:
+                    title: In
+                    type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison. ?version[lt]=5
                     type: integer
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?version[lte]=5
+                    title: Less Than or Equal
                     type: integer
-          description: |
-            Filter versions by version number.
-            - Exact match: `version=1` or `version[eq]=1`
-            - Range: `version[gt]=1&version[lt]=5`
       responses:
         '200':
           description: Workflow version history

@@ -40,6 +40,212 @@ paths:
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
         - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Project Id
+          description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: created_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: updated_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: name
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: integration_type
           in: query
           required: false
@@ -51,12 +257,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the integration type. ?integration_type[eq]=aap_controller
                     $ref: '#/components/schemas/IntegrationType'
-          description: |
-            Filter by integration type.
-            - Exact match: `integration_type=aap_controller` or `integration_type[eq]=aap_controller`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: validation_status
           in: query
           required: false
@@ -68,12 +273,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the validation status. ?validation_status[eq]=valid
                     $ref: '#/components/schemas/IntegrationStatus'
-          description: |
-            Filter by validation status.
-            - Exact match: `validation_status=valid` or `validation_status[eq]=valid`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: enabled
           in: query
           required: false
@@ -82,16 +286,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the enabled status. ?enabled=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the enabled status. ?enabled[eq]=true
                     type: boolean
-          description: |
-            Filter by enabled status.
-            - Exact match: `enabled=true` or `enabled[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: scope
           in: query
           required: false
@@ -103,12 +305,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the visibility scope. ?scope[eq]=global
                     $ref: '#/components/schemas/IntegrationScope'
-          description: |
-            Filter by visibility scope.
-            - Exact match: `scope=global` or `scope[eq]=global`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: management_credential_id
           in: query
           required: false
@@ -118,27 +319,18 @@ paths:
             allOf:
               - type: string
                 format: uuid
-                description: Exact match of the management credential ID. ?management_credential_id=<uuid>
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the management credential ID. ?management_credential_id[eq]=<uuid>
                     type: string
                     format: uuid
-          description: |
-            Filter by management credential ID (credential used for admin operations like validation and tool/model discovery).
-            - Exact match: `management_credential_id=<uuid>` or `management_credential_id[eq]=<uuid>`
-        - name: project_id
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: uuid
-              - type: 'null'
-            title: Project Id
-          description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
       responses:
         "200":
           description: Successful Response
@@ -665,6 +857,24 @@ paths:
             title: Sort
           description: "Sort parameter (e.g., 'name', '-created_at')"
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
         - name: enabled
@@ -675,16 +885,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the enabled state. ?enabled=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the enabled state. ?enabled[eq]=true
                     type: boolean
-          description: |
-            Filter models by enabled state.
-            - Exact match: `enabled=true` or `enabled[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: is_default
           in: query
           required: false
@@ -693,16 +901,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the default flag. ?is_default=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the default flag. ?is_default[eq]=true
                     type: boolean
-          description: |
-            Filter models by default flag.
-            - Exact match: `is_default=true` or `is_default[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: model_id
           in: query
           required: false
@@ -711,41 +917,32 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the model ID. ?model_id=gpt-4
               - type: object
                 properties:
-                  eq:
-                    title: Equals
-                    description: Exact match of the model ID. ?model_id[eq]=gpt-4
-                    type: string
                   contains:
                     title: Contains
-                    description: Substring match (case-insensitive). ?model_id[contains]=gpt
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?model_id[starts_with]=gpt
+                  eq:
+                    title: Equals
                     type: string
                   gt:
                     title: Greater Than
-                    description: Greater than comparison (lexicographical). ?model_id[gt]=<value>
                     type: string
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?model_id[gte]=<value>
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
                     type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison (lexicographical). ?model_id[lt]=<value>
                     type: string
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?model_id[lte]=<value>
+                    title: Less Than or Equal
                     type: string
-          description: |
-            Filter models by model ID.
-            - Exact match: `model_id=gpt-4` or `model_id[eq]=gpt-4`
-            - Contains: `model_id[contains]=gpt`
+                  starts_with:
+                    title: Starts With
+                    type: string
       responses:
         '200':
           description: Successful Response
@@ -950,9 +1147,103 @@ paths:
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
-        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - $ref: ../base/shared-resources.openapi.yaml#/components/parameters/nameFilterParam
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: enabled
           in: query
           required: false
@@ -961,16 +1252,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of the enabled state. ?enabled=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the enabled state. ?enabled[eq]=true
                     type: boolean
-          description: |
-            Filter tools by enabled state.
-            - Exact match: `enabled=true` or `enabled[eq]=true`
+                  in:
+                    title: In
+                    type: string
         - name: status
           in: query
           required: false
@@ -978,25 +1267,15 @@ paths:
           explode: true
           schema:
             allOf:
-              - type: string
-                enum:
-                  - available
-                  - missing
-                  - error
-                description: Exact match of the tool status. ?status=available
+              - $ref: '#/components/schemas/ToolStatus'
               - type: object
                 properties:
                   eq:
+                    $ref: '#/components/schemas/ToolStatus'
                     title: Equals
-                    description: Exact match of the tool status. ?status[eq]=available
+                  in:
+                    title: In
                     type: string
-                    enum:
-                      - available
-                      - missing
-                      - error
-          description: |
-            Filter tools by status.
-            - Exact match: `status=available` or `status[eq]=available`
         - name: namespaced_name
           in: query
           required: false
@@ -1005,41 +1284,32 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the namespaced name. ?namespaced_name=<name>
               - type: object
                 properties:
-                  eq:
-                    title: Equals
-                    description: Exact match of the namespaced name. ?namespaced_name[eq]=<name>
-                    type: string
                   contains:
                     title: Contains
-                    description: Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
+                  eq:
+                    title: Equals
                     type: string
                   gt:
                     title: Greater Than
-                    description: Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
                     type: string
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?namespaced_name[gte]=<name>
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
                     type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
                     type: string
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?namespaced_name[lte]=<name>
+                    title: Less Than or Equal
                     type: string
-          description: |
-            Filter tools by namespaced name.
-            - Exact match: `namespaced_name=value`
-            - Contains: `namespaced_name[contains]=value`
+                  starts_with:
+                    title: Starts With
+                    type: string
       responses:
         '200':
           description: Successful Response

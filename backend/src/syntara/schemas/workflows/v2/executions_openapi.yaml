@@ -53,8 +53,123 @@ paths:
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+        - name: deleted_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: deleted_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: workflow_id
           in: query
           required: false
@@ -64,17 +179,51 @@ paths:
             allOf:
               - type: string
                 format: uuid
-                description: Exact match of the workflow ID. ?workflow_id=<uuid>
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the workflow ID. ?workflow_id[eq]=<uuid>
                     type: string
                     format: uuid
-          description: |
-            Filter executions by workflow ID.
-            - Exact match: `workflow_id=<uuid>` or `workflow_id[eq]=<uuid>`
+                  in:
+                    title: In
+                    type: string
+        - name: workflow_version_id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: project_id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - name: status
           in: query
           required: false
@@ -86,12 +235,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the execution status. ?status[eq]=running
                     $ref: '#/components/schemas/ExecutionStatus'
-          description: |
-            Filter executions by status.
-            - Exact match: `status=running` or `status[eq]=running`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: mode
           in: query
           required: false
@@ -103,12 +251,48 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the execution mode. ?mode[eq]=standard
                     $ref: '#/components/schemas/ExecutionMode'
-          description: |
-            Filter executions by mode.
-            - Exact match: `mode=standard` or `mode[eq]=standard`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
+        - name: completed_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
         - name: approval_pending
           in: query
           required: false
@@ -117,16 +301,14 @@ paths:
           schema:
             allOf:
               - type: boolean
-                description: Exact match of approval pending state. ?approval_pending=true
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match. ?approval_pending[eq]=true
                     type: boolean
-          description: |
-            Filter executions by approval pending state.
-            - Exact match: `approval_pending=true` or `approval_pending[eq]=true`
+                  in:
+                    title: In
+                    type: string
       responses:
         '200':
           description: Successful Response
@@ -352,6 +534,24 @@ paths:
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/createdAtFilterParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/updatedAtFilterParam
         - name: activity_name
@@ -362,41 +562,32 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the activity name. ?activity_name=<name>
               - type: object
                 properties:
-                  eq:
-                    title: Equals
-                    description: Exact match of the activity name. ?activity_name[eq]=<name>
-                    type: string
                   contains:
                     title: Contains
-                    description: Substring match (case-insensitive). ?activity_name[contains]=<substring>
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?activity_name[starts_with]=<prefix>
+                  eq:
+                    title: Equals
                     type: string
                   gt:
                     title: Greater Than
-                    description: Greater than comparison (lexicographical). ?activity_name[gt]=<value>
                     type: string
                   gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?activity_name[gte]=<value>
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
                     type: string
                   lt:
                     title: Less Than
-                    description: Less than comparison (lexicographical). ?activity_name[lt]=<value>
                     type: string
                   lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?activity_name[lte]=<value>
+                    title: Less Than or Equal
                     type: string
-          description: |
-            Filter activities by name.
-            - Exact match: `activity_name=<name>` or `activity_name[eq]=<name>`
-            - Contains: `activity_name[contains]=<substring>`
+                  starts_with:
+                    title: Starts With
+                    type: string
         - name: node_type
           in: query
           required: false
@@ -408,12 +599,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the node type. ?node_type[eq]=condition
                     $ref: '#/components/schemas/NodeType'
-          description: |
-            Filter activities by node type.
-            - Exact match: `node_type=condition` or `node_type[eq]=condition`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
         - name: status
           in: query
           required: false
@@ -425,12 +615,11 @@ paths:
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the activity status. ?status[eq]=completed
                     $ref: '#/components/schemas/ActivityStatus'
-          description: |
-            Filter activities by status.
-            - Exact match: `status=completed` or `status[eq]=completed`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
       responses:
         '200':
           description: Successful Response

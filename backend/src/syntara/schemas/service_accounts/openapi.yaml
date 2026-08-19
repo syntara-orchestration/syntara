@@ -104,24 +104,92 @@ paths:
             default: false
             title: Include Total
           description: Include total count in response (expensive)
-        - name: status
+        - name: id
           in: query
           required: false
           style: deepObject
           explode: true
           schema:
             allOf:
-              - $ref: '#/components/schemas/ServiceAccountStatus'
-                description: Exact match of the status. ?status=active
+              - type: string
+                format: uuid
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the status. ?status[eq]=active
-                    $ref: '#/components/schemas/ServiceAccountStatus'
-          description: |
-            Filter service accounts by status.
-            - Exact match: `status=active` or `status[eq]=active`
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: created_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: updated_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
         - name: name
           in: query
           required: false
@@ -130,49 +198,179 @@ paths:
           schema:
             allOf:
               - type: string
-                description: Exact match of the name. ?name=value
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: description
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the name. ?name[eq]=value
                     type: string
+                    format: uuid
                   in:
                     title: In
-                    description: Match any of a comma-separated list. ?name[in]=a,b,c
                     type: string
-                  contains:
-                    title: Contains
-                    description: Substring match (case-insensitive). ?name[contains]=substring
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
                     type: string
-                  starts_with:
-                    title: Starts With
-                    description: Prefix match (case-insensitive). ?name[starts_with]=prefix
-                    type: string
-                  gt:
-                    title: Greater Than
-                    description: Greater than comparison (lexicographical). ?name[gt]=value
-                    type: string
-                  gte:
-                    title: Greater Than Or Equal
-                    description: Greater than or equal comparison. ?name[gte]=value
-                    type: string
-                  lt:
-                    title: Less Than
-                    description: Less than comparison (lexicographical). ?name[lt]=value
-                    type: string
-                  lte:
-                    title: Less Than Or Equal
-                    description: Less than or equal comparison. ?name[lte]=value
+                    format: uuid
+                  in:
+                    title: In
                     type: string
                   isnull:
                     title: Is Null
-                    description: Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
                     type: boolean
-          description: |
-            Filter service accounts by name.
-            - Exact match: `name=value`
-            - Contains: `name[contains]=substring`
+        - name: status
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ServiceAccountStatus'
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ServiceAccountStatus'
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
+        - name: project_id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: last_authenticated_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
       responses:
         '200':
           description: List of service accounts
@@ -520,6 +718,131 @@ paths:
             default: false
             title: Include Total
           description: Include total count in response (expensive)
+        - name: id
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: created_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: updated_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: created_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+        - name: updated_by
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: uuid
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: uuid
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
         - name: credential_type
           in: query
           required: false
@@ -528,16 +851,48 @@ paths:
           schema:
             allOf:
               - $ref: '#/components/schemas/ServiceAccountCredentialType'
-                description: Exact match of the credential type. ?credential_type=client_credentials
               - type: object
                 properties:
                   eq:
-                    title: Equals
-                    description: Exact match of the credential type. ?credential_type[eq]=client_credentials
                     $ref: '#/components/schemas/ServiceAccountCredentialType'
-          description: |
-            Filter credentials by credential type.
-            - Exact match: `credential_type=client_credentials` or `credential_type[eq]=client_credentials`
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
+        - name: identifier
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+              - type: object
+                properties:
+                  contains:
+                    title: Contains
+                    type: string
+                  eq:
+                    title: Equals
+                    type: string
+                  gt:
+                    title: Greater Than
+                    type: string
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                  in:
+                    title: In
+                    type: string
+                  lt:
+                    title: Less Than
+                    type: string
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                  starts_with:
+                    title: Starts With
+                    type: string
         - name: status
           in: query
           required: false
@@ -546,16 +901,88 @@ paths:
           schema:
             allOf:
               - $ref: '#/components/schemas/ServiceAccountCredentialStatus'
-                description: Exact match of the status. ?status=active
+              - type: object
+                properties:
+                  eq:
+                    $ref: '#/components/schemas/ServiceAccountCredentialStatus'
+                    title: Equals
+                  in:
+                    title: In
+                    type: string
+        - name: expires_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
               - type: object
                 properties:
                   eq:
                     title: Equals
-                    description: Exact match of the status. ?status[eq]=active
-                    $ref: '#/components/schemas/ServiceAccountCredentialStatus'
-          description: |
-            Filter credentials by status.
-            - Exact match: `status=active` or `status[eq]=active`
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
+        - name: last_used_at
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            allOf:
+              - type: string
+                format: date-time
+              - type: object
+                properties:
+                  eq:
+                    title: Equals
+                    type: string
+                    format: date-time
+                  gt:
+                    title: Greater Than
+                    type: string
+                    format: date-time
+                  gte:
+                    title: Greater Than or Equal
+                    type: string
+                    format: date-time
+                  in:
+                    title: In
+                    type: string
+                  isnull:
+                    title: Is Null
+                    type: boolean
+                  lt:
+                    title: Less Than
+                    type: string
+                    format: date-time
+                  lte:
+                    title: Less Than or Equal
+                    type: string
+                    format: date-time
       responses:
         '200':
           description: List of credentials
