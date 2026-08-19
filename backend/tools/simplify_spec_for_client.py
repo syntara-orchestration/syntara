@@ -32,17 +32,18 @@ def _simplify_filter_params(spec: dict[str, Any]) -> None:
                     continue
                 schema = param.get("schema", {})
                 all_of = schema.get("allOf")
-                if not isinstance(all_of, list) or len(all_of) != 2:
+                _expected_allof_len = 2
+                if not isinstance(all_of, list) or len(all_of) != _expected_allof_len:
                     continue
-                object_items = [
-                    item for item in all_of if isinstance(item, dict) and item.get("type") == "object"
-                ]
+                object_items = [item for item in all_of if isinstance(item, dict) and item.get("type") == "object"]
                 if len(object_items) == 1:
                     param["schema"] = object_items[0]
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    """Simplify the bundled spec and write to the output path."""
+    _expected_argc = 3
+    if len(sys.argv) != _expected_argc:
         sys.stderr.write(f"Usage: {sys.argv[0]} INPUT_SPEC OUTPUT_SPEC\n")
         return 1
 
