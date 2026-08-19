@@ -326,7 +326,7 @@ class TestToolsListContract:
             response,
             error_type="https://api.example.com/errors/validation-error",
             title="Validation Error",
-            detail="Invalid value 'nonexistent' for field 'status'. Valid values are: available, missing, error",
+            detail="Invalid value for field 'status': Input should be 'available', 'missing' or 'error'",
             code="VALIDATION_ERROR",
             retryable=False,
         )

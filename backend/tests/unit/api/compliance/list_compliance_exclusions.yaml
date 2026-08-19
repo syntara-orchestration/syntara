@@ -77,4 +77,3 @@ exclusions:
 
   - operation_id: list_group_role_assignments
     reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"
-
