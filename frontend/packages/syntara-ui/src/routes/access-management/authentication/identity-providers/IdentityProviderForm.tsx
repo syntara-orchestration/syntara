@@ -1,12 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  EmptyState,
-  EmptyStateActions,
-  EmptyStateBody,
-  EmptyStateFooter,
-  StackItem,
-} from '@patternfly/react-core'
+import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { type IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
@@ -238,7 +231,7 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
         title="Edit OIDC provider"
         breadcrumbs={breadcrumbsIdentityProviderFormLoading('Edit OIDC provider')}
       />
-      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+      <NxPageBody>
         <NxPanel isFullHeight>
           <EmptyState headingLevel="h2" titleText="Identity provider not found" icon={RhUiSearchIcon} isFullHeight>
             <EmptyStateBody>
@@ -256,7 +249,7 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
             </EmptyStateFooter>
           </EmptyState>
         </NxPanel>
-      </StackItem>
+      </NxPageBody>
     </NxPage>
   )
 }

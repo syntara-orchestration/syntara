@@ -170,8 +170,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
     },
   })
 
-  const data = query.data
-  const assignments = useMemo(() => data?.resources ?? [], [data])
+  const assignments = useMemo(() => query.data?.resources ?? [], [query.data])
 
   useCursorReset(assignments.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
 
@@ -179,6 +178,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
     refetch()
+    detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
   }, [queryClient, refetch])
 
   const assignedRolesByPrincipal = useMemo(() => {
@@ -305,7 +305,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(data)}>
+          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
             <RoleAssignmentsTable
               assignments={assignments}
               getSortParams={getSortParams}

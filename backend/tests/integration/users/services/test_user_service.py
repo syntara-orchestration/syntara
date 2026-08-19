@@ -766,21 +766,8 @@ async def _user_group_names(session: AsyncSession, user: User) -> set[str]:
 
 
 @pytest.mark.asyncio
-async def test_create_user_no_groups_by_default(test_db_session: AsyncSession, test_user: User) -> None:
-    """When group_names is omitted, the user is added to both authenticated and users groups.
-
-    The API documents 'Omit to use the default (users group)' — this ensures that
-    locally-created users receive the same project-user role (and therefore
-    approval:decide) that IdP-synced normal users receive via group sync.
-
-    This test directory does not run the full seed_authz_data fixture, so the
-    users builtin group is created explicitly here.
-    """
-    # Create the builtin users group (normally seeded by seed_authz_data)
-    users_group = Group(id=uuid4(), name="users", is_builtin=True, labels={})
-    test_db_session.add(users_group)
-    await test_db_session.flush()
-
+async def test_create_user_assigns_users_group_by_default(test_db_session: AsyncSession, test_user: User) -> None:
+    """When group_names is omitted, users gets default users + authenticated groups."""
     service = UsersService(test_db_session, test_user)
     user = await service.create_user(
         username="defaultuser",
@@ -794,12 +781,13 @@ async def test_create_user_no_groups_by_default(test_db_session: AsyncSession, t
 
 
 @pytest.mark.asyncio
-async def test_create_user_empty_groups_skips_users_default(test_db_session: AsyncSession, test_user: User) -> None:
-    """Explicit empty list skips the users default — only authenticated is added."""
-    # users group is not needed here since group_names=[] skips the default
+async def test_create_user_with_empty_group_names_skips_default_users_group(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """When group_names is an empty list, only authenticated is assigned."""
     service = UsersService(test_db_session, test_user)
     user = await service.create_user(
-        username="nogrpuser",
+        username="nogroupsuser",
         first_name="No",
         last_name="Groups",
         password=TEST_PASSWORD,

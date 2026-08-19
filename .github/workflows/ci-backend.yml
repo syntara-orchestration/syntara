@@ -116,14 +116,14 @@ jobs:
         run: make install
         working-directory: backend
 
-      - name: Bundle OpenAPI sub-specs
-        run: make api-spec-bundle
+      - name: Bundle OpenAPI sub-specs (full + public)
+        run: make api-spec-bundle-all
         working-directory: backend
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml 2>/dev/null; then
-            echo "::error::Bundled OpenAPI spec has uncommitted changes. Run 'make -C backend api-spec-bundle' locally and commit the changes."
+          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml backend/src/syntara/schemas/openapi-public.yaml 2>/dev/null; then
+            echo "::error::Bundled OpenAPI specs have uncommitted changes. Run 'make -C backend api-spec-bundle-all' locally and commit the changes."
             exit 1
           fi
 
@@ -152,8 +152,8 @@ jobs:
         run: make install
         working-directory: backend
 
-      - name: Check OpenAPI spec matches implementation
-        run: make api-spec-drift
+      - name: Check OpenAPI specs match implementation (full + public)
+        run: make api-spec-drift-all
         working-directory: backend
 
   generate-api-client:

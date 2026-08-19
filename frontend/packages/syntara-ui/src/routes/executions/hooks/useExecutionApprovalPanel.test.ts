@@ -222,6 +222,34 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
+  it('returns approvalMessage from v2 parameters.prompt', () => {
+    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const wfDef = {
+      nodes: [{ id: 'node-1', parameters: { prompt: 'Message will go here. User inputs it' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('Message will go here. User inputs it')
+  })
+
+  it('prefers parameters.prompt over config.prompt', () => {
+    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const wfDef = {
+      nodes: [
+        {
+          id: 'node-1',
+          parameters: { prompt: 'From parameters' },
+          config: { prompt: 'From config' },
+        },
+      ],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('From parameters')
+  })
+
   it('returns undefined approvalMessage when no matching node', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
@@ -432,7 +460,7 @@ describe('useExecutionApprovalPanel', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
       workflow: {
-        activities: [{ id: 'node-1', config: { prompt: 'Approve deployment?' } }],
+        activities: [{ id: 'node-1', parameters: { prompt: 'Approve deployment?' } }],
       },
     }
 

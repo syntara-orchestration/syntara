@@ -518,7 +518,6 @@ class ExecutionService(BaseService):
             },
         )
         recorder.increment("total_workflows")
-        recorder.increment_gauge("active_workflows")
 
         self._emit_lifecycle_event(
             execution_id=execution.id,

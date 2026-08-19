@@ -1,3 +1,4 @@
+import type { Approval } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, act } from '@testing-library/react'
 import type { Node } from '@xyflow/react'
@@ -15,6 +16,10 @@ import { useBuilderApproval } from './useBuilderApproval'
 const mockFetchForNode = vi.fn()
 const mockClear = vi.fn()
 
+const { approvalState } = vi.hoisted(() => ({
+  approvalState: { pending: null as Approval | null },
+}))
+
 vi.mock('../../executions/hooks/useExecutionApproval', () => {
   const isWaitingApprovalNode = (node: { type?: string; data: Record<string, unknown> }) =>
     node.type === 'approval' && (node.data.__executionState as { status?: string } | undefined)?.status === 'waiting'
@@ -22,10 +27,12 @@ vi.mock('../../executions/hooks/useExecutionApproval', () => {
   return {
     isWaitingApprovalNode,
     useExecutionApproval: () => ({
-      pendingApproval: null,
+      pendingApproval: approvalState.pending,
       isLoading: false,
       handleNodeClick: vi.fn(),
       clearPendingApproval: mockClear,
+      setPendingApproval: vi.fn(),
+      fetchForNode: vi.fn(),
     }),
   }
 })
@@ -76,6 +83,7 @@ describe('useBuilderApproval', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    approvalState.pending = null
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: mockFetchForNode } as never)
@@ -239,5 +247,64 @@ describe('useBuilderApproval', () => {
     })
 
     expect(result.current.activityNameMap.size).toBe(0)
+  })
+
+  it('returns approvalMessage from v2 parameters.prompt', () => {
+    approvalState.pending = {
+      id: 'approval-1',
+      project_id: 'project-1',
+      name: 'Approval',
+      status: 'pending',
+      execution_id: 'exec-1',
+      approval_node_id: 'a2',
+      created_at: '2026-01-01T00:00:00Z',
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
+    }
+
+    const workflow: WorkflowDefinition = {
+      schema_version: '2.0.0',
+      name: 'test',
+      workflow: {
+        activities: [
+          { id: 'a1', name: 'Step One', type: 'script', parameters: {} },
+          { id: 'a2', name: 'Approval', type: 'approval', parameters: { prompt: 'Please review this change.' } },
+        ],
+      },
+    }
+
+    const { result } = renderHook(() => useBuilderApproval(defaultParams({ currentWorkflow: workflow })), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(result.current.approvalMessage).toBe('Please review this change.')
+  })
+
+  it('returns undefined approvalMessage when the approval node has no prompt', () => {
+    approvalState.pending = {
+      id: 'approval-1',
+      project_id: 'project-1',
+      name: 'Approval',
+      status: 'pending',
+      execution_id: 'exec-1',
+      approval_node_id: 'a2',
+      created_at: '2026-01-01T00:00:00Z',
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
+    }
+
+    const workflow: WorkflowDefinition = {
+      schema_version: '2.0.0',
+      name: 'test',
+      workflow: {
+        activities: [{ id: 'a2', name: 'Approval', type: 'approval', parameters: {} }],
+      },
+    }
+
+    const { result } = renderHook(() => useBuilderApproval(defaultParams({ currentWorkflow: workflow })), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(result.current.approvalMessage).toBeUndefined()
   })
 })

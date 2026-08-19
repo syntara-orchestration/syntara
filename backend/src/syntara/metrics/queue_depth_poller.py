@@ -1,13 +1,17 @@
-"""Background poller that emits Temporal task queue depth metrics.
+"""Background poller that emits Temporal task queue depth and active workflow metrics.
 
-Periodically queries the Temporal server via ``describe_task_queue`` to
-obtain the approximate backlog count and records it as a
-``TEMPORAL_QUEUE_DEPTH`` metric in both the in-memory MetricsStore and the
-Prometheus gauge.
+Periodically queries the Temporal server to obtain:
+
+* **Queue depth** — via ``describe_task_queue`` for approximate backlog counts,
+  recorded as ``TEMPORAL_QUEUE_DEPTH``.
+* **Active workflows** — via ``count_workflows`` for the true number of
+  currently running workflow executions, recorded as ``ACTIVE_WORKFLOWS``.
+  This replaces the former in-process increment/decrement gauge which drifted
+  on pod restarts.
 
 Uses ``PeriodicWorker`` with ``coordinate=False`` so that every API-server
-instance independently polls the same Temporal task queue; Prometheus
-handles aggregation at scrape time.
+instance independently polls the same Temporal server; Prometheus handles
+aggregation at scrape time.
 """
 
 from __future__ import annotations
@@ -81,6 +85,17 @@ async def _query_queue_depth(client: Client, task_queue: str, namespace: str) ->
     return 0
 
 
+async def _query_running_workflow_count(client: Client) -> int:
+    """Query Temporal for the number of currently running workflow executions.
+
+    Uses the Temporal visibility ``count_workflows`` API with an
+    ``ExecutionStatus='Running'`` filter.  This reflects the true cluster
+    state and is not affected by pod restarts.
+    """
+    result = await client.count_workflows("ExecutionStatus='Running'")
+    return result.count
+
+
 def _make_poll_callback(
     temporal_address: str,
     namespace: str,
@@ -88,10 +103,13 @@ def _make_poll_callback(
 ) -> Any:  # noqa: ANN401
     """Build the async callback consumed by ``PeriodicWorker``.
 
-    Polls every queue in *task_queues* on each tick and emits one
-    ``TEMPORAL_QUEUE_DEPTH`` record per queue, labelled with the queue name
-    so Prometheus can distinguish background-queue depth from workflow-queue
-    depth when configuring HPA rules.
+    Each tick:
+
+    1. Emits one ``TEMPORAL_QUEUE_DEPTH`` record per queue, labelled with the
+       queue name so Prometheus can distinguish background-queue depth from
+       workflow-queue depth when configuring HPA rules.
+    2. Emits one ``ACTIVE_WORKFLOWS`` record with the true count of running
+       workflow executions obtained from Temporal's visibility API.
     """
 
     async def _poll(_sf: object) -> None:
@@ -111,6 +129,17 @@ def _make_poll_callback(
                 component=ComponentLabel.TEMPORAL_WORKER,
                 labels={"task_queue": task_queue},
             )
+
+        try:
+            running_count = await _query_running_workflow_count(client)
+        except RPCError:
+            logger.debug("workflow_count_poller_rpc_error", exc_info=True)
+            return
+        recorder.record(
+            MetricType.ACTIVE_WORKFLOWS,
+            float(running_count),
+            component=ComponentLabel.TEMPORAL_WORKER,
+        )
 
     return _poll
 

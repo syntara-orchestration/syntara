@@ -3,6 +3,7 @@ import type { Node } from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
 import { useAutoApprovalDetection } from '../../executions/hooks/useAutoApprovalDetection'
 import {
   type ExecutionNode,
@@ -92,9 +93,7 @@ export function useBuilderApproval({
     if (!pendingApproval || !currentWorkflow) return undefined
     const activity = currentWorkflow.workflow?.activities?.find((a) => a.id === pendingApproval.approval_node_id)
     if (activity?.type !== ActivityTypeEnum.APPROVAL) return undefined
-    const config = activity.config as Record<string, unknown> | undefined
-    const prompt = config?.prompt
-    return typeof prompt === 'string' && prompt ? prompt : undefined
+    return getApprovalPromptFromNode(activity)
   }, [pendingApproval, currentWorkflow])
 
   const wrappedHandleNodeClick = useCallback(

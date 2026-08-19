@@ -74,6 +74,14 @@ class TestNewCatalogEntries:
             assert d.validation_schema is not None
             assert d.validation_schema.get("min") is not None, f"{key} missing min constraint"
 
+    def test_task_agent_system_prompt(self) -> None:
+        d = _catalog_by_key["agentic.task_agent_system_prompt"]
+        assert d.category == SettingCategory.AI_LLM
+        assert d.value_type == SettingValueType.STRING
+        assert isinstance(d.default_value, str)
+        assert "{product_name}" in d.default_value
+        assert d.validation_schema == {"pattern": "\\S[\\s\\S]{0,1999}"}
+
     def test_removed_settings_not_in_catalog(self) -> None:
         removed = [
             "retriever.llm_model",

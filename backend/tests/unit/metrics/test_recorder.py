@@ -97,47 +97,47 @@ class TestRecorderGaugeHelpers:
     """Tests for increment_gauge() and decrement_gauge()."""
 
     def test_increment_gauge_updates_counter_and_prometheus(self, recorder: MetricsRecorder) -> None:
-        recorder.increment_gauge("active_workflows")
-        recorder.increment_gauge("active_workflows")
+        recorder.increment_gauge("active_llm_requests")
+        recorder.increment_gauge("active_llm_requests")
 
-        assert recorder.get_summary().active_workflows == 2
-        assert recorder.prometheus.active_workflows._value.get() == pytest.approx(2.0)
+        assert recorder.get_summary().active_llm_requests == 2
+        assert recorder.prometheus.active_llm_requests._value.get() == pytest.approx(2.0)
 
     def test_decrement_gauge_updates_counter_and_prometheus(self, recorder: MetricsRecorder) -> None:
         for _ in range(3):
-            recorder.increment_gauge("active_workflows")
+            recorder.increment_gauge("active_llm_requests")
 
-        recorder.decrement_gauge("active_workflows")
+        recorder.decrement_gauge("active_llm_requests")
 
-        assert recorder.get_summary().active_workflows == 2
-        assert recorder.prometheus.active_workflows._value.get() == pytest.approx(2.0)
+        assert recorder.get_summary().active_llm_requests == 2
+        assert recorder.prometheus.active_llm_requests._value.get() == pytest.approx(2.0)
 
     def test_decrement_gauge_floors_at_zero(self, recorder: MetricsRecorder) -> None:
         """Decrementing a gauge that is already at 0 must not go negative."""
-        assert recorder.get_summary().active_workflows == 0
+        assert recorder.get_summary().active_llm_requests == 0
 
-        recorder.decrement_gauge("active_workflows")
+        recorder.decrement_gauge("active_llm_requests")
 
-        assert recorder.get_summary().active_workflows == 0
-        assert recorder.prometheus.active_workflows._value.get() == pytest.approx(0.0)
+        assert recorder.get_summary().active_llm_requests == 0
+        assert recorder.prometheus.active_llm_requests._value.get() == pytest.approx(0.0)
 
     def test_decrement_gauge_floors_after_multiple(self, recorder: MetricsRecorder) -> None:
         """Several decrements below zero all stay at 0."""
-        recorder.increment_gauge("active_workflows")
+        recorder.increment_gauge("active_llm_requests")
 
-        recorder.decrement_gauge("active_workflows")
-        recorder.decrement_gauge("active_workflows")
-        recorder.decrement_gauge("active_workflows")
+        recorder.decrement_gauge("active_llm_requests")
+        recorder.decrement_gauge("active_llm_requests")
+        recorder.decrement_gauge("active_llm_requests")
 
-        assert recorder.get_summary().active_workflows == 0
-        assert recorder.prometheus.active_workflows._value.get() == pytest.approx(0.0)
+        assert recorder.get_summary().active_llm_requests == 0
+        assert recorder.prometheus.active_llm_requests._value.get() == pytest.approx(0.0)
 
     def test_gauge_helpers_disabled_is_noop(self, disabled_recorder: MetricsRecorder) -> None:
-        disabled_recorder.increment_gauge("active_workflows")
-        assert disabled_recorder.get_summary().active_workflows == 0
+        disabled_recorder.increment_gauge("active_llm_requests")
+        assert disabled_recorder.get_summary().active_llm_requests == 0
 
-        disabled_recorder.decrement_gauge("active_workflows")
-        assert disabled_recorder.get_summary().active_workflows == 0
+        disabled_recorder.decrement_gauge("active_llm_requests")
+        assert disabled_recorder.get_summary().active_llm_requests == 0
 
 
 # =============================================================================
@@ -214,14 +214,19 @@ class TestRecorderSummary:
 
     def test_summary_reflects_increments(self, recorder: MetricsRecorder) -> None:
         """Summary counters reflect what was incremented."""
+        from syntara.metrics.types import ComponentLabel
+
         recorder.increment("requests", 10)
         recorder.increment("errors", 2)
         recorder.increment("cache_hits", 7)
         recorder.increment("cache_misses", 3)
         recorder.increment("llm_calls", 8)
         recorder.increment("total_workflows", 15)
-        for _ in range(2):
-            recorder.increment_gauge("active_workflows")
+        recorder.record(
+            MetricType.ACTIVE_WORKFLOWS,
+            2.0,
+            component=ComponentLabel.TEMPORAL_WORKER,
+        )
 
         summary = recorder.get_summary()
         assert summary.total_requests == 10
@@ -482,6 +487,35 @@ class TestRecorderPrometheus:
         )._value.get()
         assert wf_value == pytest.approx(10.0)
         assert bg_value == pytest.approx(5.0)
+
+    def test_active_workflows_updates_gauge(self, recorder: MetricsRecorder) -> None:
+        """Recording ACTIVE_WORKFLOWS sets the gauge with the component label."""
+        recorder.record(
+            MetricType.ACTIVE_WORKFLOWS,
+            15.0,
+            component=ComponentLabel.TEMPORAL_WORKER,
+        )
+        sample_value = recorder.prometheus.active_workflows.labels(
+            component="temporal_worker",
+        )._value.get()
+        assert sample_value == pytest.approx(15.0)
+
+    def test_active_workflows_overwrites_on_subsequent_record(self, recorder: MetricsRecorder) -> None:
+        """Each ACTIVE_WORKFLOWS record replaces the previous value (gauge.set semantics)."""
+        recorder.record(
+            MetricType.ACTIVE_WORKFLOWS,
+            10.0,
+            component=ComponentLabel.TEMPORAL_WORKER,
+        )
+        recorder.record(
+            MetricType.ACTIVE_WORKFLOWS,
+            3.0,
+            component=ComponentLabel.TEMPORAL_WORKER,
+        )
+        sample_value = recorder.prometheus.active_workflows.labels(
+            component="temporal_worker",
+        )._value.get()
+        assert sample_value == pytest.approx(3.0)
 
     def test_tool_execution_duration_dispatches_to_histogram_and_counter(self, recorder: MetricsRecorder) -> None:
         """TOOL_EXECUTION_DURATION updates histogram (observe) and counter (inc)."""

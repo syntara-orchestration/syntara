@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { FormFieldError } from './FormFieldError'
+import { FormFieldError, FormFieldWarning } from './FormFieldError'
 
 describe('FormFieldError', () => {
   it('renders nothing when message is omitted', () => {
@@ -17,6 +17,23 @@ describe('FormFieldError', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(<FormFieldError message="Select at least one role" />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+describe('FormFieldWarning', () => {
+  it('renders nothing when message is omitted', () => {
+    const { container } = render(<FormFieldWarning />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders warning message when provided', () => {
+    render(<FormFieldWarning message="Unable to check existing assignments" />)
+    expect(screen.getByText('Unable to check existing assignments')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<FormFieldWarning message="Unable to check existing assignments" />)
     expect(await axe(container)).toHaveNoViolations()
   })
 })
