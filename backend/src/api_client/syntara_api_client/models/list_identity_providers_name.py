@@ -15,28 +15,31 @@ T = TypeVar("T", bound="ListIdentityProvidersName")
 class ListIdentityProvidersName:
     """
     Attributes:
-        contains (str | Unset):
-        eq (str | Unset):
-        gt (str | Unset):
-        gte (str | Unset):
+        contains (str | Unset): Substring to match within the name (case-insensitive). ?name[contains]=<substring>
+        starts_with (str | Unset): Prefix to match at the start of the name (case-insensitive).
+            ?name[starts_with]=<prefix>
+        eq (str | Unset): Exact match of the name (case-insensitive). ?name[eq]=<name>
+        gt (str | Unset): Greater than comparison (lexicographical). ?name[gt]=<name>
+        gte (str | Unset): Greater than or equal comparison (lexicographical). ?name[gte]=<name>
+        lt (str | Unset): Less than comparison (lexicographical). ?name[lt]=<name>
         in_ (str | Unset):
-        lt (str | Unset):
-        lte (str | Unset):
-        starts_with (str | Unset):
+        lte (str | Unset): Less than or equal comparison (lexicographical). ?name[lte]=<name>
     """
 
     contains: str | Unset = UNSET
+    starts_with: str | Unset = UNSET
     eq: str | Unset = UNSET
     gt: str | Unset = UNSET
     gte: str | Unset = UNSET
-    in_: str | Unset = UNSET
     lt: str | Unset = UNSET
+    in_: str | Unset = UNSET
     lte: str | Unset = UNSET
-    starts_with: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         contains = self.contains
+
+        starts_with = self.starts_with
 
         eq = self.eq
 
@@ -44,33 +47,31 @@ class ListIdentityProvidersName:
 
         gte = self.gte
 
-        in_ = self.in_
-
         lt = self.lt
 
-        lte = self.lte
+        in_ = self.in_
 
-        starts_with = self.starts_with
+        lte = self.lte
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
         if contains is not UNSET:
             field_dict["contains"] = contains
+        if starts_with is not UNSET:
+            field_dict["starts_with"] = starts_with
         if eq is not UNSET:
             field_dict["eq"] = eq
         if gt is not UNSET:
             field_dict["gt"] = gt
         if gte is not UNSET:
             field_dict["gte"] = gte
-        if in_ is not UNSET:
-            field_dict["in"] = in_
         if lt is not UNSET:
             field_dict["lt"] = lt
+        if in_ is not UNSET:
+            field_dict["in"] = in_
         if lte is not UNSET:
             field_dict["lte"] = lte
-        if starts_with is not UNSET:
-            field_dict["starts_with"] = starts_with
 
         return field_dict
 
@@ -79,29 +80,29 @@ class ListIdentityProvidersName:
         d = dict(src_dict)
         contains = d.pop("contains", UNSET)
 
+        starts_with = d.pop("starts_with", UNSET)
+
         eq = d.pop("eq", UNSET)
 
         gt = d.pop("gt", UNSET)
 
         gte = d.pop("gte", UNSET)
 
-        in_ = d.pop("in", UNSET)
-
         lt = d.pop("lt", UNSET)
+
+        in_ = d.pop("in", UNSET)
 
         lte = d.pop("lte", UNSET)
 
-        starts_with = d.pop("starts_with", UNSET)
-
         list_identity_providers_name = cls(
             contains=contains,
+            starts_with=starts_with,
             eq=eq,
             gt=gt,
             gte=gte,
-            in_=in_,
             lt=lt,
+            in_=in_,
             lte=lte,
-            starts_with=starts_with,
         )
 
         list_identity_providers_name.additional_properties = d

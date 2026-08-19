@@ -42,7 +42,7 @@ class TestListGroupsDirectory:
         params.sort = None
         params.include_total = False
 
-        result = await list_groups_directory(request, service, params)
+        result = await list_groups_directory(request, service, params, _filterable=None)
 
         assert len(result.resources) == 2
         assert result.resources[0].name == "admins"
@@ -64,7 +64,7 @@ class TestListGroupsDirectory:
         params.sort = "name"
         params.include_total = True
 
-        result = await list_groups_directory(request, service, params)
+        result = await list_groups_directory(request, service, params, _filterable=None)
 
         service.list_directory.assert_called_once_with(
             limit=5,
@@ -90,7 +90,7 @@ class TestListGroupsDirectory:
         params.sort = None
         params.include_total = True
 
-        result = await list_groups_directory(request, service, params)
+        result = await list_groups_directory(request, service, params, _filterable=None)
 
         assert result.resources == []
         assert result.total == 0

@@ -23,6 +23,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin, PostProcessingMixin
 from syntara.core.services.types import TModel, TResponse
 from syntara.core.utils.cursor import (
@@ -739,8 +740,7 @@ class BaseService:
         """
         limit = min(limit, FieldLimits.MAX_ITEMS_PER_PAGE)
 
-        # Extract filtering parameters from query params, excluding pagination/sorting params
-        excluded_params = {"limit", "cursor", "sort", "include_total"}
+        excluded_params = set(BaseListParams.model_fields)
         query_params: dict[str, str] = {}
 
         if query_params_items:

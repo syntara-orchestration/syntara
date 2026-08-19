@@ -56,65 +56,24 @@ exclusions:
   - operation_id: list_user_identities
     reason: "Has correct response shape but missing pagination parameters (limit, cursor, sort, include_total)"
 
-  # These endpoints use simple direct value filtering (e.g., ?status=pending)
-  # instead of the standard operator-based pattern (e.g., ?status[eq]=pending).
-  # They should be migrated to use allOf schema with operator properties.
-  - operation_id: list_approvals
-    reason: "Uses simple value filters instead of operator-based pattern - status/execution_id need allOf schema with {eq}"
-
-  - operation_id: list_policies
-    reason: "Uses simple value filters instead of operator-based pattern - name/scope need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_id/project_eligible need {eq}"
-
-  - operation_id: list_roles
-    reason: "Uses simple value filters instead of operator-based pattern - name/scope/policy_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_id need {eq}"
+  # ===========================================================================
+  # SIMPLE FILTER FORMAT (params used directly in router/service code)
+  # ===========================================================================
+  # These endpoints pass filter values as named kwargs (params.field_name) to
+  # services instead of using parse_filters(). Migrating to operator-based
+  # format requires refactoring the router/service layer.
 
   - operation_id: list_integrations
-    reason: "Uses simple value filters instead of operator-based pattern - integration_type/status/enabled/scope need allOf schema with {eq}"
-
-  - operation_id: list_projects
-    reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_default/is_builtin need {eq}"
-
-  - operation_id: list_project_approvals
-    reason: "Uses simple value filters instead of operator-based pattern - status/execution_id need allOf schema with {eq}"
-
-  - operation_id: list_project_roles
-    reason: "Uses simple value filters instead of operator-based pattern - name/scope/policy_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin need {eq}"
-
-  - operation_id: list_project_policies
-    reason: "Uses simple value filters instead of operator-based pattern - name/scope need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_eligible need {eq}"
-
-  - operation_id: list_groups_directory
-    reason: "Uses simple name filter instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}"
+    reason: "project_id param used directly via params.project_id in router for visibility scoping — needs router/service refactor for operator format"
 
   - operation_id: list_role_assignments
-    reason: "Uses simple value filters instead of operator-based pattern - principal_type/principal_name/role_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, principal_id/project_id need {eq}"
+    reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"
 
   - operation_id: list_project_role_assignments
-    reason: "Uses simple value filters instead of operator-based pattern - principal_type/principal_name/role_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, principal_id need {eq}"
-
-  - operation_id: list_credentials
-    reason: "Uses simple value filters instead of operator-based pattern - credential_type_id needs allOf schema with {eq}, enabled needs {eq}"
-
-  - operation_id: list_project_credentials
-    reason: "Uses simple value filters instead of operator-based pattern - credential_type_id needs allOf schema with {eq}, enabled needs {eq}"
-
-  - operation_id: list_settings
-    reason: "Uses simple value filters instead of operator-based pattern - category/group need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}"
-
-  - operation_id: list_users
-    reason: "Uses simple value filters instead of operator-based pattern - username/first_name/last_name/auth_source need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, auth_type needs {eq}"
-
-  - operation_id: list_users_directory
-    reason: "Uses simple username filter instead of operator-based pattern - needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}"
+    reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"
 
   - operation_id: list_user_role_assignments
-    reason: "Uses simple value filters instead of operator-based pattern - role_name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, project_id needs {eq}"
+    reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"
 
   - operation_id: list_group_role_assignments
-    reason: "Uses simple value filters instead of operator-based pattern - role_name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, project_id needs {eq}"
-
-  - operation_id: list_service_accounts
-    reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, status needs {eq}. Sort parameter also missing pattern constraint."
-
-  - operation_id: list_service_account_credentials
-    reason: "Uses simple value filters instead of operator-based pattern - credential_type/status need allOf schema with {eq}. Sort parameter also missing pattern constraint."
+    reason: "Filter params used directly via params.field_name in role_assignment_router — needs router/service refactor for operator format"

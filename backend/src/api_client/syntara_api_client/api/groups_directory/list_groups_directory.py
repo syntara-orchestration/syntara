@@ -6,6 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_groups_directory_created_at import ListGroupsDirectoryCreatedAt
+from ...models.list_groups_directory_created_by import ListGroupsDirectoryCreatedBy
+from ...models.list_groups_directory_description import ListGroupsDirectoryDescription
+from ...models.list_groups_directory_id import ListGroupsDirectoryId
+from ...models.list_groups_directory_name import ListGroupsDirectoryName
+from ...models.list_groups_directory_source import ListGroupsDirectorySource
+from ...models.list_groups_directory_updated_at import ListGroupsDirectoryUpdatedAt
 from ...models.resources_response_group_directory_entry import ResourcesResponseGroupDirectoryEntry
 from ...types import UNSET, Response, Unset
 
@@ -16,7 +23,13 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
+    id: ListGroupsDirectoryId | Unset = UNSET,
+    created_at: ListGroupsDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsDirectoryUpdatedAt | Unset = UNSET,
+    name: ListGroupsDirectoryName | Unset = UNSET,
+    description: ListGroupsDirectoryDescription | Unset = UNSET,
+    created_by: ListGroupsDirectoryCreatedBy | Unset = UNSET,
+    source: ListGroupsDirectorySource | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -41,12 +54,47 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_name: None | str | Unset
-    if isinstance(name, Unset):
-        json_name = UNSET
-    else:
-        json_name = name
-    params["name"] = json_name
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_source: dict[str, Any] | Unset = UNSET
+    if not isinstance(source, Unset):
+        json_source = source.to_dict()
+    if not isinstance(json_source, Unset):
+        params.update(json_source)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -133,7 +181,13 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
+    id: ListGroupsDirectoryId | Unset = UNSET,
+    created_at: ListGroupsDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsDirectoryUpdatedAt | Unset = UNSET,
+    name: ListGroupsDirectoryName | Unset = UNSET,
+    description: ListGroupsDirectoryDescription | Unset = UNSET,
+    created_by: ListGroupsDirectoryCreatedBy | Unset = UNSET,
+    source: ListGroupsDirectorySource | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | ResourcesResponseGroupDirectoryEntry]:
     """List groups directory
@@ -145,8 +199,13 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset): Filter by group name (name=exact, name[contains]=substring,
-            name[starts_with]=prefix)
+        id (ListGroupsDirectoryId | Unset):
+        created_at (ListGroupsDirectoryCreatedAt | Unset):
+        updated_at (ListGroupsDirectoryUpdatedAt | Unset):
+        name (ListGroupsDirectoryName | Unset):
+        description (ListGroupsDirectoryDescription | Unset):
+        created_by (ListGroupsDirectoryCreatedBy | Unset):
+        source (ListGroupsDirectorySource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +220,13 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
         additional_params=additional_params,
     )
 
@@ -179,7 +244,13 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
+    id: ListGroupsDirectoryId | Unset = UNSET,
+    created_at: ListGroupsDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsDirectoryUpdatedAt | Unset = UNSET,
+    name: ListGroupsDirectoryName | Unset = UNSET,
+    description: ListGroupsDirectoryDescription | Unset = UNSET,
+    created_by: ListGroupsDirectoryCreatedBy | Unset = UNSET,
+    source: ListGroupsDirectorySource | Unset = UNSET,
 ) -> ErrorData | ResourcesResponseGroupDirectoryEntry | None:
     """List groups directory
 
@@ -190,8 +261,13 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset): Filter by group name (name=exact, name[contains]=substring,
-            name[starts_with]=prefix)
+        id (ListGroupsDirectoryId | Unset):
+        created_at (ListGroupsDirectoryCreatedAt | Unset):
+        updated_at (ListGroupsDirectoryUpdatedAt | Unset):
+        name (ListGroupsDirectoryName | Unset):
+        description (ListGroupsDirectoryDescription | Unset):
+        created_by (ListGroupsDirectoryCreatedBy | Unset):
+        source (ListGroupsDirectorySource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,7 +283,13 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
     ).parsed
 
 
@@ -218,7 +300,13 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
+    id: ListGroupsDirectoryId | Unset = UNSET,
+    created_at: ListGroupsDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsDirectoryUpdatedAt | Unset = UNSET,
+    name: ListGroupsDirectoryName | Unset = UNSET,
+    description: ListGroupsDirectoryDescription | Unset = UNSET,
+    created_by: ListGroupsDirectoryCreatedBy | Unset = UNSET,
+    source: ListGroupsDirectorySource | Unset = UNSET,
 ) -> Response[ErrorData | ResourcesResponseGroupDirectoryEntry]:
     """List groups directory
 
@@ -229,8 +317,13 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset): Filter by group name (name=exact, name[contains]=substring,
-            name[starts_with]=prefix)
+        id (ListGroupsDirectoryId | Unset):
+        created_at (ListGroupsDirectoryCreatedAt | Unset):
+        updated_at (ListGroupsDirectoryUpdatedAt | Unset):
+        name (ListGroupsDirectoryName | Unset):
+        description (ListGroupsDirectoryDescription | Unset):
+        created_by (ListGroupsDirectoryCreatedBy | Unset):
+        source (ListGroupsDirectorySource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -245,7 +338,13 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -260,7 +359,13 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
+    id: ListGroupsDirectoryId | Unset = UNSET,
+    created_at: ListGroupsDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsDirectoryUpdatedAt | Unset = UNSET,
+    name: ListGroupsDirectoryName | Unset = UNSET,
+    description: ListGroupsDirectoryDescription | Unset = UNSET,
+    created_by: ListGroupsDirectoryCreatedBy | Unset = UNSET,
+    source: ListGroupsDirectorySource | Unset = UNSET,
 ) -> ErrorData | ResourcesResponseGroupDirectoryEntry | None:
     """List groups directory
 
@@ -271,8 +376,13 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset): Filter by group name (name=exact, name[contains]=substring,
-            name[starts_with]=prefix)
+        id (ListGroupsDirectoryId | Unset):
+        created_at (ListGroupsDirectoryCreatedAt | Unset):
+        updated_at (ListGroupsDirectoryUpdatedAt | Unset):
+        name (ListGroupsDirectoryName | Unset):
+        description (ListGroupsDirectoryDescription | Unset):
+        created_by (ListGroupsDirectoryCreatedBy | Unset):
+        source (ListGroupsDirectorySource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -289,6 +399,12 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
             name=name,
+            description=description,
+            created_by=created_by,
+            source=source,
         )
     ).parsed

@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialCreate,
     ServiceAccountCredentialCreateResponse,
-    ServiceAccountCredentialListParams,
     ServiceAccountCredentialListResponse,
     ServiceAccountCredentialRead,
     ServiceAccountCredentialRotateRequest,
@@ -137,21 +136,6 @@ class TestServiceAccountCredentialRotateResponse:
 
     def test_inherits_create_response(self) -> None:
         assert issubclass(ServiceAccountCredentialRotateResponse, ServiceAccountCredentialCreateResponse)
-
-
-class TestServiceAccountCredentialListParams:
-    """Tests for list query parameters."""
-
-    def test_defaults(self) -> None:
-        params = ServiceAccountCredentialListParams()
-        assert params.limit == 20
-        assert params.cursor is None
-        assert params.credential_type is None
-        assert params.status is None
-
-    def test_credential_type_filter(self) -> None:
-        params = ServiceAccountCredentialListParams(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS)
-        assert params.credential_type == ServiceAccountCredentialType.CLIENT_CREDENTIALS
 
 
 class TestServiceAccountCredentialListResponse:

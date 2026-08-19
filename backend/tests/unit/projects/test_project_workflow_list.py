@@ -37,6 +37,7 @@ class TestListProjectWorkflows:
             request=mock_request,
             service=mock_service,
             params=mock_params,
+            _filterable=None,
         )
 
         expected_allowed = AllowedProjectsResult(all_projects=False, project_ids=[project_id])

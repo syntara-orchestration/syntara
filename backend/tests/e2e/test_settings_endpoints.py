@@ -246,7 +246,9 @@ class TestSettingsFiltering:
 
     def test_filter_by_category(self, syntara_api: SyntaraApiRegistry) -> None:
         """GET /settings?category= returns only settings in that category."""
-        settings_list = syntara_api.settings.list(category="context_manager").assert_and_get()
+        settings_list = syntara_api.settings.list(
+            additional_params={"category": "context_manager"},
+        ).assert_and_get()
         settings = settings_list.resources
         assert len(settings) > 0
         for setting in settings:
@@ -254,7 +256,9 @@ class TestSettingsFiltering:
 
     def test_filter_by_category_and_group(self, syntara_api: SyntaraApiRegistry) -> None:
         """GET /settings?category=&group= returns only matching settings."""
-        settings_list = syntara_api.settings.list(category="context_manager", group="Compression").assert_and_get()
+        settings_list = syntara_api.settings.list(
+            additional_params={"category": "context_manager", "group": "Compression"},
+        ).assert_and_get()
         settings = settings_list.resources
         assert len(settings) > 0
         for setting in settings:

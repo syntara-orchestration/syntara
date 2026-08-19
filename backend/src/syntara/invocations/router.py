@@ -21,7 +21,6 @@ from syntara.agent_orchestrator.models import (
     InvocationCancelRequest,
     InvocationCancelResponse,
     InvocationCreateRequest,
-    InvocationListParams,
     InvocationListResponse,
     InvocationRequestWithFile,
     InvocationTraceRead,
@@ -33,6 +32,8 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.utils.session_factory import create_session_factory_from_request
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -303,8 +304,9 @@ async def create_invocation_chat(
 async def list_invocations(
     request: Request,
     service: Annotated[InvocationService, Depends(get_invocation_service)],
-    params: Annotated[InvocationListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("invocation", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(Invocation))],
 ) -> InvocationListResponse:
     """List invocations with filtering, sorting, and pagination.
 

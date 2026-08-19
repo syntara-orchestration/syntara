@@ -7,6 +7,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_workflow_versions_created_at import ListWorkflowVersionsCreatedAt
+from ...models.list_workflow_versions_created_by import ListWorkflowVersionsCreatedBy
+from ...models.list_workflow_versions_id import ListWorkflowVersionsId
+from ...models.list_workflow_versions_updated_at import ListWorkflowVersionsUpdatedAt
+from ...models.list_workflow_versions_updated_by import ListWorkflowVersionsUpdatedBy
+from ...models.list_workflow_versions_version import ListWorkflowVersionsVersion
 from ...models.workflow_version_list_response import WorkflowVersionListResponse
 from ...types import UNSET, Response, Unset
 
@@ -18,6 +24,12 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListWorkflowVersionsId | Unset = UNSET,
+    created_at: ListWorkflowVersionsCreatedAt | Unset = UNSET,
+    updated_at: ListWorkflowVersionsUpdatedAt | Unset = UNSET,
+    created_by: ListWorkflowVersionsCreatedBy | Unset = UNSET,
+    updated_by: ListWorkflowVersionsUpdatedBy | Unset = UNSET,
+    version: ListWorkflowVersionsVersion | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -41,6 +53,42 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_updated_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_by, Unset):
+        json_updated_by = updated_by.to_dict()
+    if not isinstance(json_updated_by, Unset):
+        params.update(json_updated_by)
+
+    json_version: dict[str, Any] | Unset = UNSET
+    if not isinstance(version, Unset):
+        json_version = version.to_dict()
+    if not isinstance(json_version, Unset):
+        params.update(json_version)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -128,6 +176,12 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListWorkflowVersionsId | Unset = UNSET,
+    created_at: ListWorkflowVersionsCreatedAt | Unset = UNSET,
+    updated_at: ListWorkflowVersionsUpdatedAt | Unset = UNSET,
+    created_by: ListWorkflowVersionsCreatedBy | Unset = UNSET,
+    updated_by: ListWorkflowVersionsUpdatedBy | Unset = UNSET,
+    version: ListWorkflowVersionsVersion | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | WorkflowVersionListResponse]:
     """List workflow versions
@@ -140,6 +194,12 @@ def sync_detailed(
         cursor (None | str | Unset):
         sort (None | str | Unset):
         include_total (bool | Unset):  Default: False.
+        id (ListWorkflowVersionsId | Unset):
+        created_at (ListWorkflowVersionsCreatedAt | Unset):
+        updated_at (ListWorkflowVersionsUpdatedAt | Unset):
+        created_by (ListWorkflowVersionsCreatedBy | Unset):
+        updated_by (ListWorkflowVersionsUpdatedBy | Unset):
+        version (ListWorkflowVersionsVersion | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -155,6 +215,12 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        version=version,
         additional_params=additional_params,
     )
 
@@ -173,6 +239,12 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListWorkflowVersionsId | Unset = UNSET,
+    created_at: ListWorkflowVersionsCreatedAt | Unset = UNSET,
+    updated_at: ListWorkflowVersionsUpdatedAt | Unset = UNSET,
+    created_by: ListWorkflowVersionsCreatedBy | Unset = UNSET,
+    updated_by: ListWorkflowVersionsUpdatedBy | Unset = UNSET,
+    version: ListWorkflowVersionsVersion | Unset = UNSET,
 ) -> ErrorData | WorkflowVersionListResponse | None:
     """List workflow versions
 
@@ -184,6 +256,12 @@ def sync(
         cursor (None | str | Unset):
         sort (None | str | Unset):
         include_total (bool | Unset):  Default: False.
+        id (ListWorkflowVersionsId | Unset):
+        created_at (ListWorkflowVersionsCreatedAt | Unset):
+        updated_at (ListWorkflowVersionsUpdatedAt | Unset):
+        created_by (ListWorkflowVersionsCreatedBy | Unset):
+        updated_by (ListWorkflowVersionsUpdatedBy | Unset):
+        version (ListWorkflowVersionsVersion | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -200,6 +278,12 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        version=version,
     ).parsed
 
 
@@ -211,6 +295,12 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListWorkflowVersionsId | Unset = UNSET,
+    created_at: ListWorkflowVersionsCreatedAt | Unset = UNSET,
+    updated_at: ListWorkflowVersionsUpdatedAt | Unset = UNSET,
+    created_by: ListWorkflowVersionsCreatedBy | Unset = UNSET,
+    updated_by: ListWorkflowVersionsUpdatedBy | Unset = UNSET,
+    version: ListWorkflowVersionsVersion | Unset = UNSET,
 ) -> Response[ErrorData | WorkflowVersionListResponse]:
     """List workflow versions
 
@@ -222,6 +312,12 @@ async def asyncio_detailed(
         cursor (None | str | Unset):
         sort (None | str | Unset):
         include_total (bool | Unset):  Default: False.
+        id (ListWorkflowVersionsId | Unset):
+        created_at (ListWorkflowVersionsCreatedAt | Unset):
+        updated_at (ListWorkflowVersionsUpdatedAt | Unset):
+        created_by (ListWorkflowVersionsCreatedBy | Unset):
+        updated_by (ListWorkflowVersionsUpdatedBy | Unset):
+        version (ListWorkflowVersionsVersion | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -237,6 +333,12 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        version=version,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -252,6 +354,12 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListWorkflowVersionsId | Unset = UNSET,
+    created_at: ListWorkflowVersionsCreatedAt | Unset = UNSET,
+    updated_at: ListWorkflowVersionsUpdatedAt | Unset = UNSET,
+    created_by: ListWorkflowVersionsCreatedBy | Unset = UNSET,
+    updated_by: ListWorkflowVersionsUpdatedBy | Unset = UNSET,
+    version: ListWorkflowVersionsVersion | Unset = UNSET,
 ) -> ErrorData | WorkflowVersionListResponse | None:
     """List workflow versions
 
@@ -263,6 +371,12 @@ async def asyncio(
         cursor (None | str | Unset):
         sort (None | str | Unset):
         include_total (bool | Unset):  Default: False.
+        id (ListWorkflowVersionsId | Unset):
+        created_at (ListWorkflowVersionsCreatedAt | Unset):
+        updated_at (ListWorkflowVersionsUpdatedAt | Unset):
+        created_by (ListWorkflowVersionsCreatedBy | Unset):
+        updated_by (ListWorkflowVersionsUpdatedBy | Unset):
+        version (ListWorkflowVersionsVersion | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -280,5 +394,11 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            created_by=created_by,
+            updated_by=updated_by,
+            version=version,
         )
     ).parsed

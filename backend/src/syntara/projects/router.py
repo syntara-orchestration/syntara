@@ -10,8 +10,7 @@ from uuid import UUID
 from fastapi import Depends, Path, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.approvals.models.approval_request import ApprovalListResponse
-from syntara.approvals.models.query_params import ApprovalListParams
+from syntara.approvals.models.approval_request import ApprovalListResponse, ApprovalRequest
 from syntara.approvals.services.approval_service import ApprovalService
 from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
@@ -19,6 +18,9 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import AllowedProjectsResult, VisibilityResult
 from syntara.authz.exceptions import PolicyNotFoundError, RoleNotFoundError
+from syntara.authz.models.policy import Policy
+from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
 from syntara.authz.role_assignment_router import (
     ProjectRoleAssignmentListParams,
     RoleAssignmentCreate,
@@ -28,11 +30,9 @@ from syntara.authz.role_assignment_router import (
     _redact_project_names,
 )
 from syntara.authz.schemas import (
-    PolicyListParams,
     PolicyListResponse,
     PolicyRead,
     PolicyUpdate,
-    RoleListParams,
     RoleListResponse,
     RoleRead,
     RoleUpdate,
@@ -42,7 +42,8 @@ from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.models.base.query_params import BaseListParams
+from syntara.core.models.base import BaseListParams
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
 from syntara.credentials.models import (
@@ -57,7 +58,6 @@ from syntara.credentials.router import get_credential_service
 from syntara.credentials.services.credential_service import CredentialService
 from syntara.projects.schemas import (
     ProjectCreate,
-    ProjectListParams,
     ProjectListResponse,
     ProjectPolicyCreate,
     ProjectRead,
@@ -65,8 +65,10 @@ from syntara.projects.schemas import (
     ProjectUpdate,
 )
 from syntara.projects.service import ProjectService
-from syntara.workflows.models.workflow import WorkflowListResponse
+from syntara.workflows.models.workflow import Workflow, WorkflowListResponse
 from syntara.workflows.services import WorkflowService
+
+_CREDENTIAL_LIST_PARAM_KEYS = frozenset(CredentialListParams.model_fields)
 
 router = SyntaraRouter(prefix="/projects", tags=["Projects"])
 
@@ -170,7 +172,8 @@ async def list_projects(
     request: Request,
     service: Annotated[ProjectService, Depends(get_project_service)],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("project", "read"))],
-    params: Annotated[ProjectListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Project))],
 ) -> ProjectListResponse:
     """List projects the current user has read access to."""
     return await service.list_projects_cursor(
@@ -290,6 +293,7 @@ async def list_project_workflows(
     request: Request,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
     params: Annotated[BaseListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Workflow))],
 ) -> WorkflowListResponse:
     """List workflows belonging to a specific project.
 
@@ -333,7 +337,8 @@ async def list_project_approvals(
     project_id: UUID,
     request: Request,
     service: Annotated[ApprovalService, Depends(get_approval_service)],
-    params: Annotated[ApprovalListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
+    _filterable: Annotated[None, Depends(FilterableModel(ApprovalRequest))],
 ) -> ApprovalListResponse:
     """List approval requests belonging to a specific project.
 
@@ -494,8 +499,9 @@ async def create_project_role(
 async def list_project_roles(
     project_id: Annotated[UUID, Path(description="Project UUID")],
     request: Request,
-    params: Annotated[RoleListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
     service: Annotated[RoleService, Depends(get_role_service)],
+    _filterable: Annotated[None, Depends(FilterableModel(Role))],
 ) -> RoleListResponse:
     """List roles visible within this project.
 
@@ -651,8 +657,9 @@ async def create_project_policy(
 async def list_project_policies(
     project_id: Annotated[UUID, Path(description="Project UUID")],
     request: Request,
-    params: Annotated[PolicyListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
     service: Annotated[PolicyService, Depends(get_policy_service)],
+    _filterable: Annotated[None, Depends(FilterableModel(Policy))],
 ) -> PolicyListResponse:
     """List policies visible within this project.
 
@@ -809,6 +816,7 @@ async def list_project_credentials(
     request: Request,
     service: Annotated[CredentialService, Depends(get_credential_service)],
     params: Annotated[CredentialListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Credential))],
 ) -> CredentialListResponse:
     """List credentials belonging to this project. Requires: credential:read permission.
 
@@ -816,8 +824,7 @@ async def list_project_credentials(
     Use ``GET /credentials?for_action=use`` for use-permission-filtered listing.
     """
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[project_id])
-    # Strip for_action — not a DB-filterable field (not implemented on this endpoint)
-    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k != "for_action"]
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k not in _CREDENTIAL_LIST_PARAM_KEYS]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,

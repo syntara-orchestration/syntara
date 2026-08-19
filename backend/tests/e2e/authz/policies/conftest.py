@@ -141,7 +141,7 @@ def _role_create_proj(api: SyntaraApiRegistry, pid: UUID, ctx: dict[str, Any]) -
 
 
 def _role_list_proj(api: SyntaraApiRegistry, pid: UUID, ctx: dict[str, Any]) -> Response[Any]:
-    return api.roles.list(project_id=pid)
+    return api.roles.list(additional_params={"project_id": str(pid)})
 
 
 def _role_assignment_assign_proj(api: SyntaraApiRegistry, pid: UUID, ctx: dict[str, Any]) -> Response[Any]:
@@ -175,7 +175,7 @@ def _policy_create_proj(api: SyntaraApiRegistry, pid: UUID, ctx: dict[str, Any])
 
 
 def _policy_list_proj(api: SyntaraApiRegistry, pid: UUID, ctx: dict[str, Any]) -> Response[Any]:
-    return api.policies.list(project_id=pid)
+    return api.policies.list(additional_params={"project_id": str(pid)})
 
 
 # ---------------------------------------------------------------------------

@@ -10,10 +10,13 @@ from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.schemas import RoleCreate, RoleListParams, RoleListResponse, RoleRead, RoleUpdate
+from syntara.authz.models.role import Role
+from syntara.authz.schemas import RoleCreate, RoleListResponse, RoleRead, RoleUpdate
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 
 router = SyntaraRouter(prefix="/roles", tags=["Roles"])
@@ -53,8 +56,9 @@ async def create_role(
 @router.get("", summary="List roles", dependencies=[NO_PERMISSION], operation_id="list_roles")
 async def list_roles(
     request: Request,
-    params: Annotated[RoleListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
     service: Annotated[RoleService, Depends(get_role_service)],
+    _filterable: Annotated[None, Depends(FilterableModel(Role))],
 ) -> RoleListResponse:
     """List roles with filtering and pagination."""
     return await service.list_roles(

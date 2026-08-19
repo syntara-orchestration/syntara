@@ -66,6 +66,7 @@ from syntara.integrations.models.integration import (
 )
 from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
 from syntara.integrations.models.llm_model import LLMModel
+from syntara.integrations.models.query_params import IntegrationListParams
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.tool_manager.models.tool import Tool, ToolParameter, ToolParameterType, ToolStatus
@@ -519,7 +520,12 @@ class IntegrationService(BaseService):
             )
             id_restriction = self._intersect_id_restrictions(id_restriction, project_scoped_ids)
 
-        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else None
+        _integration_param_fields = set(IntegrationListParams.model_fields)
+        filtered_params = (
+            [(k, v) for k, v in query_params_items if k not in _integration_param_fields]
+            if query_params_items
+            else None
+        )
 
         response = await self.list_resources(
             model=Integration,

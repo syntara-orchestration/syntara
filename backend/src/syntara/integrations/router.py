@@ -19,8 +19,9 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.models.base.query_params import BaseListParams
+from syntara.core.models.base import BaseListParams
 from syntara.core.models.group import user_groups
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.secret_service import create_secret_service
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
@@ -42,6 +43,7 @@ from syntara.integrations.models.integration import (
     RefreshResult,
 )
 from syntara.integrations.models.llm_model import (
+    LLMModel,
     LLMModelBulkUpdate,
     LLMModelBulkUpdateResponse,
     LLMModelListParams,
@@ -52,6 +54,7 @@ from syntara.integrations.models.llm_model import (
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.integrations.services.llm_model_service import LLMModelService
 from syntara.tool_manager.models.tool import (
+    Tool,
     ToolListResponse,
     ToolUpdate,
     ToolWithParameters,
@@ -176,6 +179,7 @@ async def list_integrations(
     service: Annotated[IntegrationService, Depends(get_integration_service)],
     params: Annotated[IntegrationListParams, Query()],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+    _filterable: Annotated[None, Depends(FilterableModel(Integration))],
 ) -> IntegrationListResponse:
     """List integrations with filtering and pagination."""
     return await service.list_integrations(
@@ -469,6 +473,7 @@ async def list_integration_models(
     request: Request,
     service: Annotated[LLMModelService, Depends(get_llm_model_service)],
     params: Annotated[LLMModelListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(LLMModel))],
 ) -> LLMModelListResponse:
     """List LLM models for an integration with filtering, sorting, and pagination."""
     query_items = [*request.query_params.items(), ("integration_id", str(integration_id))]
@@ -570,6 +575,7 @@ async def list_integration_tools(
     request: Request,
     service: Annotated[ToolService, Depends(get_tool_service)],
     params: Annotated[BaseListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Tool))],
 ) -> ToolListResponse:
     """List tools for an integration with filtering, sorting, and pagination."""
     query_items = [*request.query_params.items(), ("integration_id", str(integration_id))]

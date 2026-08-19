@@ -57,6 +57,7 @@ class TestWorkflowEndpoints:
             service=mock_service,
             params=mock_params,
             visibility=mock_visibility,
+            _filterable=None,
         )
 
         mock_service.list_workflows_cursor.assert_awaited_once_with(
@@ -141,6 +142,7 @@ class TestWorkflowEndpoints:
             request=mock_request,
             service=mock_service,
             params=mock_params,
+            _filterable=None,
         )
 
         mock_service.list_workflow_versions_cursor.assert_awaited_once_with(

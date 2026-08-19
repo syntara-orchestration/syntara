@@ -10,10 +10,13 @@ from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.schemas import PolicyCreate, PolicyListParams, PolicyListResponse, PolicyRead, PolicyUpdate
+from syntara.authz.models.policy import Policy
+from syntara.authz.schemas import PolicyCreate, PolicyListResponse, PolicyRead, PolicyUpdate
 from syntara.authz.services.policy_service import PolicyService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 
 router = SyntaraRouter(prefix="/policies", tags=["Policies"])
@@ -60,8 +63,9 @@ async def create_policy(
 )
 async def list_policies(
     request: Request,
-    params: Annotated[PolicyListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
     service: Annotated[PolicyService, Depends(get_policy_service)],
+    _filterable: Annotated[None, Depends(FilterableModel(Policy))],
 ) -> PolicyListResponse:
     """List policies with filtering and pagination."""
     return await service.list_policies(

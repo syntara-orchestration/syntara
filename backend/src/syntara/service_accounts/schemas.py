@@ -8,7 +8,6 @@ from pydantic import ConfigDict
 from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.service_accounts.models.service_account import ServiceAccountStatus
 
@@ -68,13 +67,6 @@ class ServiceAccountRead(SQLModel):
     created_at: datetime
     updated_at: datetime
     labels: dict[str, str] = Field(default_factory=dict)
-
-
-class ServiceAccountListParams(BaseListParams):
-    """Query parameters for listing service accounts."""
-
-    status: ServiceAccountStatus | None = Field(default=None, description="Filter by status")
-    name: str | None = Field(default=None, description="Filter by name")
 
 
 class ServiceAccountListResponse(ResourcesResponse[ServiceAccountRead]):

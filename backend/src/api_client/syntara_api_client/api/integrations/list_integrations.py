@@ -8,9 +8,18 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.integration_list_response import IntegrationListResponse
-from ...models.integration_scope import IntegrationScope
-from ...models.integration_status import IntegrationStatus
-from ...models.integration_type import IntegrationType
+from ...models.list_integrations_created_at import ListIntegrationsCreatedAt
+from ...models.list_integrations_created_by import ListIntegrationsCreatedBy
+from ...models.list_integrations_description import ListIntegrationsDescription
+from ...models.list_integrations_enabled import ListIntegrationsEnabled
+from ...models.list_integrations_id import ListIntegrationsId
+from ...models.list_integrations_integration_type import ListIntegrationsIntegrationType
+from ...models.list_integrations_management_credential_id import ListIntegrationsManagementCredentialId
+from ...models.list_integrations_name import ListIntegrationsName
+from ...models.list_integrations_scope import ListIntegrationsScope
+from ...models.list_integrations_updated_at import ListIntegrationsUpdatedAt
+from ...models.list_integrations_updated_by import ListIntegrationsUpdatedBy
+from ...models.list_integrations_validation_status import ListIntegrationsValidationStatus
 from ...types import UNSET, Response, Unset
 
 
@@ -20,12 +29,19 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationType | None | Unset = UNSET,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
+    id: ListIntegrationsId | Unset = UNSET,
+    created_at: ListIntegrationsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationsUpdatedAt | Unset = UNSET,
+    name: ListIntegrationsName | Unset = UNSET,
+    description: ListIntegrationsDescription | Unset = UNSET,
+    created_by: ListIntegrationsCreatedBy | Unset = UNSET,
+    updated_by: ListIntegrationsUpdatedBy | Unset = UNSET,
+    integration_type: ListIntegrationsIntegrationType | Unset = UNSET,
+    validation_status: ListIntegrationsValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationsEnabled | Unset = UNSET,
+    scope: ListIntegrationsScope | Unset = UNSET,
+    management_credential_id: ListIntegrationsManagementCredentialId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -50,49 +66,6 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_integration_type: None | str | Unset
-    if isinstance(integration_type, Unset):
-        json_integration_type = UNSET
-    elif isinstance(integration_type, IntegrationType):
-        json_integration_type = integration_type.value
-    else:
-        json_integration_type = integration_type
-    params["integration_type"] = json_integration_type
-
-    json_validation_status: None | str | Unset
-    if isinstance(validation_status, Unset):
-        json_validation_status = UNSET
-    elif isinstance(validation_status, IntegrationStatus):
-        json_validation_status = validation_status.value
-    else:
-        json_validation_status = validation_status
-    params["validation_status"] = json_validation_status
-
-    json_enabled: bool | None | Unset
-    if isinstance(enabled, Unset):
-        json_enabled = UNSET
-    else:
-        json_enabled = enabled
-    params["enabled"] = json_enabled
-
-    json_scope: None | str | Unset
-    if isinstance(scope, Unset):
-        json_scope = UNSET
-    elif isinstance(scope, IntegrationScope):
-        json_scope = scope.value
-    else:
-        json_scope = scope
-    params["scope"] = json_scope
-
-    json_management_credential_id: None | str | Unset
-    if isinstance(management_credential_id, Unset):
-        json_management_credential_id = UNSET
-    elif isinstance(management_credential_id, UUID):
-        json_management_credential_id = str(management_credential_id)
-    else:
-        json_management_credential_id = management_credential_id
-    params["management_credential_id"] = json_management_credential_id
-
     json_project_id: None | str | Unset
     if isinstance(project_id, Unset):
         json_project_id = UNSET
@@ -101,6 +74,78 @@ def _get_kwargs(
     else:
         json_project_id = project_id
     params["project_id"] = json_project_id
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_updated_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_by, Unset):
+        json_updated_by = updated_by.to_dict()
+    if not isinstance(json_updated_by, Unset):
+        params.update(json_updated_by)
+
+    json_integration_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(integration_type, Unset):
+        json_integration_type = integration_type.to_dict()
+    if not isinstance(json_integration_type, Unset):
+        params.update(json_integration_type)
+
+    json_validation_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(validation_status, Unset):
+        json_validation_status = validation_status.to_dict()
+    if not isinstance(json_validation_status, Unset):
+        params.update(json_validation_status)
+
+    json_enabled: dict[str, Any] | Unset = UNSET
+    if not isinstance(enabled, Unset):
+        json_enabled = enabled.to_dict()
+    if not isinstance(json_enabled, Unset):
+        params.update(json_enabled)
+
+    json_scope: dict[str, Any] | Unset = UNSET
+    if not isinstance(scope, Unset):
+        json_scope = scope.to_dict()
+    if not isinstance(json_scope, Unset):
+        params.update(json_scope)
+
+    json_management_credential_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(management_credential_id, Unset):
+        json_management_credential_id = management_credential_id.to_dict()
+    if not isinstance(json_management_credential_id, Unset):
+        params.update(json_management_credential_id)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -187,12 +232,19 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationType | None | Unset = UNSET,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
+    id: ListIntegrationsId | Unset = UNSET,
+    created_at: ListIntegrationsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationsUpdatedAt | Unset = UNSET,
+    name: ListIntegrationsName | Unset = UNSET,
+    description: ListIntegrationsDescription | Unset = UNSET,
+    created_by: ListIntegrationsCreatedBy | Unset = UNSET,
+    updated_by: ListIntegrationsUpdatedBy | Unset = UNSET,
+    integration_type: ListIntegrationsIntegrationType | Unset = UNSET,
+    validation_status: ListIntegrationsValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationsEnabled | Unset = UNSET,
+    scope: ListIntegrationsScope | Unset = UNSET,
+    management_credential_id: ListIntegrationsManagementCredentialId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | IntegrationListResponse]:
     """List integrations
@@ -204,12 +256,19 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationType | None | Unset):
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
         project_id (None | Unset | UUID):
+        id (ListIntegrationsId | Unset):
+        created_at (ListIntegrationsCreatedAt | Unset):
+        updated_at (ListIntegrationsUpdatedAt | Unset):
+        name (ListIntegrationsName | Unset):
+        description (ListIntegrationsDescription | Unset):
+        created_by (ListIntegrationsCreatedBy | Unset):
+        updated_by (ListIntegrationsUpdatedBy | Unset):
+        integration_type (ListIntegrationsIntegrationType | Unset):
+        validation_status (ListIntegrationsValidationStatus | Unset):
+        enabled (ListIntegrationsEnabled | Unset):
+        scope (ListIntegrationsScope | Unset):
+        management_credential_id (ListIntegrationsManagementCredentialId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -224,12 +283,19 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        project_id=project_id,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
         integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
         management_credential_id=management_credential_id,
-        project_id=project_id,
         additional_params=additional_params,
     )
 
@@ -247,12 +313,19 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationType | None | Unset = UNSET,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
+    id: ListIntegrationsId | Unset = UNSET,
+    created_at: ListIntegrationsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationsUpdatedAt | Unset = UNSET,
+    name: ListIntegrationsName | Unset = UNSET,
+    description: ListIntegrationsDescription | Unset = UNSET,
+    created_by: ListIntegrationsCreatedBy | Unset = UNSET,
+    updated_by: ListIntegrationsUpdatedBy | Unset = UNSET,
+    integration_type: ListIntegrationsIntegrationType | Unset = UNSET,
+    validation_status: ListIntegrationsValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationsEnabled | Unset = UNSET,
+    scope: ListIntegrationsScope | Unset = UNSET,
+    management_credential_id: ListIntegrationsManagementCredentialId | Unset = UNSET,
 ) -> ErrorData | IntegrationListResponse | None:
     """List integrations
 
@@ -263,12 +336,19 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationType | None | Unset):
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
         project_id (None | Unset | UUID):
+        id (ListIntegrationsId | Unset):
+        created_at (ListIntegrationsCreatedAt | Unset):
+        updated_at (ListIntegrationsUpdatedAt | Unset):
+        name (ListIntegrationsName | Unset):
+        description (ListIntegrationsDescription | Unset):
+        created_by (ListIntegrationsCreatedBy | Unset):
+        updated_by (ListIntegrationsUpdatedBy | Unset):
+        integration_type (ListIntegrationsIntegrationType | Unset):
+        validation_status (ListIntegrationsValidationStatus | Unset):
+        enabled (ListIntegrationsEnabled | Unset):
+        scope (ListIntegrationsScope | Unset):
+        management_credential_id (ListIntegrationsManagementCredentialId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -284,12 +364,19 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        project_id=project_id,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
         integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
         management_credential_id=management_credential_id,
-        project_id=project_id,
     ).parsed
 
 
@@ -300,12 +387,19 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationType | None | Unset = UNSET,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
+    id: ListIntegrationsId | Unset = UNSET,
+    created_at: ListIntegrationsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationsUpdatedAt | Unset = UNSET,
+    name: ListIntegrationsName | Unset = UNSET,
+    description: ListIntegrationsDescription | Unset = UNSET,
+    created_by: ListIntegrationsCreatedBy | Unset = UNSET,
+    updated_by: ListIntegrationsUpdatedBy | Unset = UNSET,
+    integration_type: ListIntegrationsIntegrationType | Unset = UNSET,
+    validation_status: ListIntegrationsValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationsEnabled | Unset = UNSET,
+    scope: ListIntegrationsScope | Unset = UNSET,
+    management_credential_id: ListIntegrationsManagementCredentialId | Unset = UNSET,
 ) -> Response[ErrorData | IntegrationListResponse]:
     """List integrations
 
@@ -316,12 +410,19 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationType | None | Unset):
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
         project_id (None | Unset | UUID):
+        id (ListIntegrationsId | Unset):
+        created_at (ListIntegrationsCreatedAt | Unset):
+        updated_at (ListIntegrationsUpdatedAt | Unset):
+        name (ListIntegrationsName | Unset):
+        description (ListIntegrationsDescription | Unset):
+        created_by (ListIntegrationsCreatedBy | Unset):
+        updated_by (ListIntegrationsUpdatedBy | Unset):
+        integration_type (ListIntegrationsIntegrationType | Unset):
+        validation_status (ListIntegrationsValidationStatus | Unset):
+        enabled (ListIntegrationsEnabled | Unset):
+        scope (ListIntegrationsScope | Unset):
+        management_credential_id (ListIntegrationsManagementCredentialId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -336,12 +437,19 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        project_id=project_id,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
         integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
         management_credential_id=management_credential_id,
-        project_id=project_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -356,12 +464,19 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationType | None | Unset = UNSET,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
+    id: ListIntegrationsId | Unset = UNSET,
+    created_at: ListIntegrationsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationsUpdatedAt | Unset = UNSET,
+    name: ListIntegrationsName | Unset = UNSET,
+    description: ListIntegrationsDescription | Unset = UNSET,
+    created_by: ListIntegrationsCreatedBy | Unset = UNSET,
+    updated_by: ListIntegrationsUpdatedBy | Unset = UNSET,
+    integration_type: ListIntegrationsIntegrationType | Unset = UNSET,
+    validation_status: ListIntegrationsValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationsEnabled | Unset = UNSET,
+    scope: ListIntegrationsScope | Unset = UNSET,
+    management_credential_id: ListIntegrationsManagementCredentialId | Unset = UNSET,
 ) -> ErrorData | IntegrationListResponse | None:
     """List integrations
 
@@ -372,12 +487,19 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationType | None | Unset):
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
         project_id (None | Unset | UUID):
+        id (ListIntegrationsId | Unset):
+        created_at (ListIntegrationsCreatedAt | Unset):
+        updated_at (ListIntegrationsUpdatedAt | Unset):
+        name (ListIntegrationsName | Unset):
+        description (ListIntegrationsDescription | Unset):
+        created_by (ListIntegrationsCreatedBy | Unset):
+        updated_by (ListIntegrationsUpdatedBy | Unset):
+        integration_type (ListIntegrationsIntegrationType | Unset):
+        validation_status (ListIntegrationsValidationStatus | Unset):
+        enabled (ListIntegrationsEnabled | Unset):
+        scope (ListIntegrationsScope | Unset):
+        management_credential_id (ListIntegrationsManagementCredentialId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -394,11 +516,18 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            project_id=project_id,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            name=name,
+            description=description,
+            created_by=created_by,
+            updated_by=updated_by,
             integration_type=integration_type,
             validation_status=validation_status,
             enabled=enabled,
             scope=scope,
             management_credential_id=management_credential_id,
-            project_id=project_id,
         )
     ).parsed
