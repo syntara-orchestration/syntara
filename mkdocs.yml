@@ -6,6 +6,9 @@ edit_uri: edit/devel/docs/
 hooks:
   - docs/hooks/resolve_symlink_edit_urls.py
 
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
   features:
