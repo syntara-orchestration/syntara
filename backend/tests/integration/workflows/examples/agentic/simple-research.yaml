@@ -24,14 +24,14 @@ nodes:
       agent: production://research-agent
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Research the following topic and provide a comprehensive summary: ${input.topic}
+        Research the following topic and provide a comprehensive summary: ${trigger.topic}
 
         Include:
         1. Key facts and statistics
         2. Recent developments (if applicable)
         3. Relevant context
     inputs:
-      topic: ${inputs.research_topic}
+      topic: ${trigger.research_topic}
     outputs:
       summary: $.result.content
 edges: []

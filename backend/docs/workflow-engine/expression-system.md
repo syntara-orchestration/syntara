@@ -11,7 +11,6 @@ ${namespace.field.nested_field}
 | Expression | Resolves To |
 |------------|-------------|
 | `${trigger.hostname}` | Trigger input field |
-| `${input.hostname}` / `${inputs.hostname}` | Same payload as `${trigger.hostname}` |
 | `${step_1.stdout_json.result}` | Upstream node output, nested JSON |
 | `${workflow_context.now}` | Current timestamp |
 | `${workflow_context.today}` | Current date |
@@ -26,12 +25,14 @@ ${namespace.field.nested_field}
 | Namespace | Source | Availability |
 |-----------|--------|---------------|
 | `trigger` | Trigger node output | All downstream nodes |
-| `input` / `inputs` | Aliases of the trigger payload | All downstream nodes |
 | `{node_id}` | Any upstream node's output | Nodes downstream of that node |
 | `workflow_context` | Workflow metadata (`now`, `today`, execution info) | All nodes |
 | `loop` | Loop iteration data (`item`, `index`), scoped to the enclosing loop | Inside a loop body only |
+| `input` / `inputs` | Leftover V1 names for trigger payload | **Not supported** — rejected at save-time validation. Use `${trigger.*}` |
 | `variables` | Workflow-level variables | **Not implemented** — rejected at save-time validation |
 | `secrets` | Resolved credential values | **Not available as a namespace** — credentials are injected per-node via `credential_id` and never placed in the resolver |
+
+There is no `input`/`inputs` namespace — workflow input data flows through `trigger` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)).
 
 ## Type Preservation
 
@@ -79,7 +80,7 @@ outputs:
 
 ## Workflow-Level Inputs
 
-Input arrives via the selected trigger — manual (`input_data` on the execution request) or webhook (request payload) — and is registered as the `trigger` namespace. The same payload is also available as `${input.*}` and `${inputs.*}`. See [Trigger System Overview](triggers/overview.md) for trigger selection and multi-trigger workflows.
+Input arrives via the selected trigger — manual (`input_data` on the execution request) or webhook (request payload) — and is registered as the `trigger` namespace. See [Trigger System Overview](triggers/overview.md) for trigger selection and multi-trigger workflows.
 
 ## Security
 

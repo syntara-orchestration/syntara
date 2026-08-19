@@ -21,14 +21,14 @@ nodes:
         echo "Value is: $INPUT_VALUE"
         echo "{\"value\": $INPUT_VALUE}"
     inputs:
-      value: ${input.number}
+      value: ${trigger.number}
     outputs:
       result: $.stdout
 
   - id: positive_branch
     name: Positive Branch
     type: script
-    condition: ${input.number} > 0
+    condition: ${trigger.number} > 0
     parameters:
       language: bash
       code: |
@@ -37,7 +37,7 @@ nodes:
   - id: negative_branch
     name: Negative Branch
     type: script
-    condition: ${input.number} < 0
+    condition: ${trigger.number} < 0
     parameters:
       language: bash
       code: |
@@ -46,7 +46,7 @@ nodes:
   - id: zero_branch
     name: Zero Branch
     type: script
-    condition: ${input.number} == 0
+    condition: ${trigger.number} == 0
     parameters:
       language: bash
       code: |

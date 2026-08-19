@@ -23,145 +23,39 @@ function makeTriggerWithInputs(fields: string[]): Activity {
 }
 
 describe('validateVariableReferences', () => {
-  describe('input references (AC1)', () => {
-    it('returns no warnings when input reference matches a defined workflow input', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${input.username}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username', 'password'])] }
+  describe('unsupported leftover namespaces', () => {
+    it.each(['input', 'inputs', 'variables'])(
+      'errors on ${%s.*} even when the field exists on the trigger schema',
+      (namespace) => {
+        const activities: Activity[] = [
+          makeActivity({
+            id: 'task-1',
+            type: 'script',
+            parameters: { code: `echo \${${namespace}.username}` },
+          }),
+        ]
+        const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
 
-      const warnings = validateVariableReferences(activities, [], context)
-      expect(warnings).toEqual([])
-    })
+        const errors = validateVariableReferences(activities, [], context)
+        expect(errors).toHaveLength(1)
+        expect(errors[0].severity).toBe('error')
+        expect(errors[0].nodeId).toBe('task-1')
+        expect(errors[0].message).toContain(`"${namespace}" is not a supported namespace`)
+        if (namespace === 'variables') {
+          expect(errors[0].suggestion).toContain('variables')
+        } else {
+          expect(errors[0].suggestion).toContain('${trigger.field}')
+        }
+      }
+    )
 
-    it('returns warning when input reference does not match any defined input', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${input.nonexistent}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
-
-      const warnings = validateVariableReferences(activities, [], context)
-      expect(warnings).toHaveLength(1)
-      expect(warnings[0].severity).toBe('error')
-      expect(warnings[0].nodeId).toBe('task-1')
-      expect(warnings[0].message).toContain('nonexistent')
-      expect(warnings[0].message).toContain('not a defined input field')
-      expect(warnings[0].suggestion).toContain('username')
-    })
-
-    it('errors on input reference when no triggers are provided', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${input.anything}' },
-        }),
-      ]
-
-      const errors = validateVariableReferences(activities, [])
-      expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('anything')
-      expect(errors[0].message).toContain('not a defined input field')
-    })
-
-    it('accepts inputs alias when the field exists on the trigger schema', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${inputs.username}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
-
-      expect(validateVariableReferences(activities, [], context)).toEqual([])
-    })
-
-    it('errors on inputs alias when the field is not on the trigger schema', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${inputs.missing}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
+    it('errors on a bare ${input} reference', () => {
+      const activities: Activity[] = [makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input}' } })]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['foo'])] }
 
       const errors = validateVariableReferences(activities, [], context)
       expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('missing')
-      expect(errors[0].message).toContain('not a defined inputs field')
-    })
-
-    it('errors on input reference when triggers have no input schema', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo ${input.anything}' },
-        }),
-      ]
-      const context: ValidationContext = {
-        triggers: [makeActivity({ id: 'trigger-0', type: 'manual', parameters: {} })],
-      }
-
-      const errors = validateVariableReferences(activities, [], context)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('anything')
-      expect(errors[0].message).toContain('not a defined input field')
-    })
-
-    it('validates top-level input field name for nested paths', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: '${input.config.nested.value}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['config'])] }
-
-      const warnings = validateVariableReferences(activities, [], context)
-      expect(warnings).toEqual([])
-    })
-
-    it('reports warning for invalid top-level field in nested input path', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: '${input.missing.nested}' },
-        }),
-      ]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['config'])] }
-
-      const warnings = validateVariableReferences(activities, [], context)
-      expect(warnings).toHaveLength(1)
-      expect(warnings[0].message).toContain('missing')
-    })
-
-    it('collects inputs from multiple triggers', () => {
-      const activities: Activity[] = [
-        makeActivity({
-          id: 'task-1',
-          type: 'script',
-          parameters: { code: '${input.fromWebhook}' },
-        }),
-      ]
-      const context: ValidationContext = {
-        triggers: [makeTriggerWithInputs(['fromManual']), makeTriggerWithInputs(['fromWebhook'])],
-      }
-
-      const warnings = validateVariableReferences(activities, [], context)
-      expect(warnings).toEqual([])
+      expect(errors[0].message).toContain('"input" is not a supported namespace')
     })
   })
 
@@ -326,6 +220,21 @@ describe('validateVariableReferences', () => {
       expect(errors[0].message).toContain('anything')
       expect(errors[0].message).toContain('not a defined trigger field')
     })
+
+    it('collects schema fields from multiple triggers', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'task-1',
+          type: 'script',
+          parameters: { code: '${trigger.fromWebhook}' },
+        }),
+      ]
+      const context: ValidationContext = {
+        triggers: [makeTriggerWithInputs(['fromManual']), makeTriggerWithInputs(['fromWebhook'])],
+      }
+
+      expect(validateVariableReferences(activities, [], context)).toEqual([])
+    })
   })
 
   describe('edge cases', () => {
@@ -419,14 +328,6 @@ describe('validateVariableReferences', () => {
       ]
 
       const warnings = validateVariableReferences(activities, [])
-      expect(warnings).toEqual([])
-    })
-
-    it('does not warn when input reference has no field path', () => {
-      const activities: Activity[] = [makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input}' } })]
-      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['foo'])] }
-
-      const warnings = validateVariableReferences(activities, [], context)
       expect(warnings).toEqual([])
     })
   })

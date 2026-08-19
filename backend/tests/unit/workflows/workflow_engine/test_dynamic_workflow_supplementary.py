@@ -400,8 +400,8 @@ class TestUnselectedTriggerSkipping:
         assert len(wf.skipped_nodes) == 0
 
     @pytest.mark.asyncio
-    async def test_trigger_payload_registered_as_input_aliases(self) -> None:
-        """${input.*} and ${inputs.*} resolve the same payload as ${trigger.*}."""
+    async def test_trigger_payload_not_registered_as_input_aliases(self) -> None:
+        """${input.*} and ${inputs.*} are leftover V1 names and are not registered."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
@@ -422,8 +422,10 @@ class TestUnselectedTriggerSkipping:
             )
 
         assert wf.resolver.resolve_value("${trigger.env}") == "prod"
-        assert wf.resolver.resolve_value("${input.env}") == "prod"
-        assert wf.resolver.resolve_value("${inputs.env}") == "prod"
+        with pytest.raises(KeyError, match="input"):
+            wf.resolver.resolve_value("${input.env}")
+        with pytest.raises(KeyError, match="inputs"):
+            wf.resolver.resolve_value("${inputs.env}")
 
 
 class TestAllowedTriggerTypes:

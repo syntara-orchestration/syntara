@@ -390,7 +390,7 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${input.missing_field}')
+      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
       await app.getByRole('button', { name: 'Save' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
@@ -400,7 +400,7 @@ test.describe('Variable reference validation', () => {
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/is not a defined input field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText(/is not a defined trigger field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

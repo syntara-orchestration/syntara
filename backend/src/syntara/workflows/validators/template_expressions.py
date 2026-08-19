@@ -15,8 +15,6 @@ TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
 BUILTIN_SCOPES: frozenset[str] = frozenset(
     {
-        "input",
-        "inputs",
         "trigger",
         "workflow_context",
     }

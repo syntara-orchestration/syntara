@@ -246,7 +246,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
                 onBlur={handleFieldBlur}
                 onDrop={handleFieldDrop}
                 onDragOver={(e) => e.preventDefault()}
-                placeholder="e.g. ${input.age}"
+                placeholder="e.g. ${trigger.age}"
                 style={{ fontFamily: 'monospace', fontSize: 'var(--pf-t--global--font--size--body--sm)' }}
                 validated={fieldValidated}
               />

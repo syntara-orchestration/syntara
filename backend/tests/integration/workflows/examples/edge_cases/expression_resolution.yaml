@@ -29,7 +29,7 @@ nodes:
       code: |
         echo "Greeting: $INPUT_GREETING"
     inputs:
-      greeting: Hello, ${input.firstName} ${input.lastName}!
+      greeting: Hello, ${trigger.firstName} ${trigger.lastName}!
     outputs:
       result: $.stdout
 

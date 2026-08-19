@@ -60,7 +60,7 @@ def _loop_definition(
     loop = {
         "id": loop_id,
         "type": "loop",
-        "parameters": loop_params or {"type": "for_each", "items": "${input.items}"},
+        "parameters": loop_params or {"type": "for_each", "items": "${trigger.items}"},
     }
     converge = {"id": "converge_node", "type": "converge", "parameters": {}}
     nodes = [loop, *body_nodes, converge]
@@ -182,16 +182,24 @@ class TestInvalidNamespaceScope:
         assert len(errors) == 1
         assert "iteration_index" in errors[0].message
 
-    def test_variables_scope_is_rejected(self) -> None:
+    @pytest.mark.parametrize(
+        ("expression", "scope"),
+        [
+            ("${variables.count}", "variables"),
+            ("${input.env}", "input"),
+            ("${inputs.env}", "inputs"),
+        ],
+    )
+    def test_unsupported_scopes_are_rejected(self, expression: str, scope: str) -> None:
         defn = _base_definition(
-            nodes=[_script_node("n1", environment={"X": "${variables.count}"})],
+            nodes=[_script_node("n1", environment={"X": expression})],
             edges=[{"from": "t1", "to": "n1"}],
         )
         node_ids = {"t1", "n1"}
         errors = check_template_expressions(defn, node_ids)
         assert len(errors) == 1
         assert errors[0].category == ValidationCategory.invalid_reference
-        assert "variables" in errors[0].message
+        assert scope in errors[0].message
 
 
 # ---------------------------------------------------------------------------
@@ -203,8 +211,6 @@ class TestAllValidExpressions:
     @pytest.mark.parametrize(
         "expression",
         [
-            "${input.name}",
-            "${inputs.name}",
             "${trigger.data}",
             "${workflow_context.execution.id}",
             "${workflow_context.now}",
@@ -377,7 +383,7 @@ class TestLoopVariables:
         inner_body = _script_node("inner_body", environment={"X": "${loop.item}"})
         defn = _base_definition(
             nodes=[
-                {"id": "outer_loop", "type": "loop", "parameters": {"type": "for_each", "items": "${input.items}"}},
+                {"id": "outer_loop", "type": "loop", "parameters": {"type": "for_each", "items": "${trigger.items}"}},
                 inner_loop,
                 inner_body,
                 {"id": "converge_node", "type": "converge", "parameters": {}},
@@ -572,7 +578,7 @@ class TestTriggerExpressions:
                 {
                     "id": "t1",
                     "type": "webhook",
-                    "parameters": {"value": "${input.data}"},
+                    "parameters": {"value": "${trigger.data}"},
                 },
             ],
             nodes=[_script_node("n1")],
