@@ -1494,7 +1494,7 @@ class TestOrchestrationServiceCancellation:
         mock_graph = AsyncMock()
         mock_graph.astream_events = lambda *_a, **_kw: stream_with_yield()
 
-        async def run_streaming() -> Any:
+        async def run_streaming() -> object:
             with patch.object(service, "_cancellation_watcher", side_effect=watcher_that_cancels_parent_on_teardown):
                 return await service._execute_graph_streaming(
                     graph=mock_graph,

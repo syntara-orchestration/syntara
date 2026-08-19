@@ -468,7 +468,7 @@ class TestGetOnIdle:
 
     @pytest.mark.asyncio
     async def test_on_idle_raises_when_session_status_is_cancelled(self, handler: WebSocketStreamingHandler) -> None:
-        """on_idle must raise immediately when session_state already says CANCELLED, even if key_exists returns False."""
+        """on_idle raises when session_state says CANCELLED, even if key_exists is False."""
         invocation_id = uuid4()
         session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
         mock_client = AsyncMock()
@@ -507,8 +507,10 @@ class TestCheckBeforeStreamingWiring:
 
     @pytest.mark.asyncio
     async def test_cancelled_status_aborts_before_events(self, mock_session_factory: MagicMock) -> None:
-        """stream_events_to_websocket must raise InvocationCancelledStreamError
-        for a CANCELLED invocation with an existing stream, without calling client.events()."""
+        """stream_events_to_websocket raises for CANCELLED with an existing stream.
+
+        Asserts InvocationCancelledStreamError and client.events() never called.
+        """
         handler = WebSocketStreamingHandler(session_factory=mock_session_factory)
         invocation_id = uuid4()
         session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
