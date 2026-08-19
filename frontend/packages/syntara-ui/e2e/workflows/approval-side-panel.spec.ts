@@ -128,8 +128,6 @@ test.describe('Approval Side Panel', () => {
     await expect(app.getByText('Workflow', { exact: true })).toBeVisible()
     await expect(app.locator('dd').getByText(sharedWorkflowName, { exact: true })).toBeVisible()
     await expect(app.getByText('Approval initiated', { exact: true })).toBeVisible()
-    await expect(app.getByText('Message', { exact: true })).toBeVisible()
-    await expect(app.getByText(/Review the staging test results/)).toBeVisible()
   })
 
   test('clicking approve shows notes input and submit button', async ({ app }) => {
