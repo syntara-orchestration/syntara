@@ -32,9 +32,9 @@ theme:
 
 validation:
   links:
-    not_found: info
-    absolute_links: info
-    unrecognized_links: info
+    not_found: warn
+    absolute_links: warn
+    unrecognized_links: warn
 
 markdown_extensions:
   - toc:
@@ -142,3 +142,6 @@ nav:
       - Approval Execution Integration: frontend/features/approval-execution-integration.md
     - User Guides:
       - Using Search and Filters: frontend/user-guides/filtering.md
+  - CI:
+    - Secrets Inventory: ci/secrets-inventory.md
+    - Secrets Storage: ci/secrets-storage.md

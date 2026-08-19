@@ -103,7 +103,7 @@ The `tool_selection_strategy` and `tool_selections` parameters control which MCP
 
 ## Live Status During Execution
 
-The agentic activity sends `HEARTBEAT_STOP_MONITOR: True` immediately at dispatch to tell the `ActivitySyncService` to stop probing for status. Because the activity remains in STARTED state after `raise_complete_async()` until the orchestrator calls back, the sync service's normal poll-based monitoring is not useful — status is instead driven by the signal callback. For details on the three-tier live status pipeline, see [Workflow Engine Architecture — Three-Tier Live Status Sync](workflow-engine-overview.md#three-tier-live-status-sync-temporal--db--redis--websocket).
+The agentic activity sends `HEARTBEAT_STOP_MONITOR: True` immediately at dispatch to tell the `ActivitySyncService` to stop probing for status. Because the activity remains in STARTED state after `raise_complete_async()` until the orchestrator calls back, the sync service's normal poll-based monitoring is not useful — status is instead driven by the signal callback. For details on the three-tier live status pipeline, see [Workflow Engine Architecture — Three-Tier Live Status Sync](workflow-engine-overview.md#three-tier-live-status-sync-temporal-db-redis-websocket).
 
 ## Design Decisions
 
