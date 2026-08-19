@@ -209,15 +209,15 @@ class TestNarrowGlobalToProjectScoped:
         credential_id: UUID | None = None
         try:
             list_a = syntara_api.integrations.list(
-                integration_type=IntegrationType.MCP_SERVER,
                 project_id=first_project_id,
+                additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
             ).assert_and_get()
             ids_a = {str(r.id) for r in list_a.resources}
             assert str(integration_id) in ids_a, "Global integration should be visible in project A"
 
             list_b = syntara_api.integrations.list(
-                integration_type=IntegrationType.MCP_SERVER,
                 project_id=project_b_id,
+                additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
             ).assert_and_get()
             ids_b = {str(r.id) for r in list_b.resources}
             assert str(integration_id) in ids_b, "Global integration should be visible in project B"
@@ -246,15 +246,15 @@ class TestNarrowGlobalToProjectScoped:
             )
 
             list_b_after = syntara_api.integrations.list(
-                integration_type=IntegrationType.MCP_SERVER,
                 project_id=project_b_id,
+                additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
             ).assert_and_get()
             ids_b_after = {str(r.id) for r in list_b_after.resources}
             assert str(integration_id) not in ids_b_after, "Integration should no longer be visible in project B"
 
             list_a_after = syntara_api.integrations.list(
-                integration_type=IntegrationType.MCP_SERVER,
                 project_id=first_project_id,
+                additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
             ).assert_and_get()
             ids_a_after = {str(r.id) for r in list_a_after.resources}
             assert str(integration_id) in ids_a_after, "Integration should still be visible in project A"

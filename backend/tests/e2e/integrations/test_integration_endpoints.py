@@ -211,7 +211,9 @@ class TestListIntegrations:
     ) -> None:
         integration_factory(_mcp_create())
         integration_factory(_llm_create(management_credential_id=e2e_llm_credential_id))
-        result = syntara_api.integrations.list(integration_type=IntegrationType.MCP_SERVER).assert_and_get()
+        result = syntara_api.integrations.list(
+            additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
+        ).assert_and_get()
         for r in result.resources:
             assert r.integration_type == IntegrationType.MCP_SERVER
 
@@ -226,7 +228,9 @@ class TestListIntegrations:
                 enabled=False,
             )
         )
-        result = syntara_api.integrations.list(enabled=False).assert_and_get()
+        result = syntara_api.integrations.list(
+            additional_params={"enabled": "false"},
+        ).assert_and_get()
         for r in result.resources:
             assert r.enabled is False
 
