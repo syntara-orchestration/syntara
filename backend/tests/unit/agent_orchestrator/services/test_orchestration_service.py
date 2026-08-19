@@ -1447,3 +1447,59 @@ class TestOrchestrationServiceCancellation:
                     client=mock_client,
                     trace_accumulator=_TraceAccumulator(),
                 )
+
+    @pytest.mark.asyncio
+    async def test_parent_cancellation_during_watcher_teardown_propagates(self) -> None:
+        """CancelledError injected into this task at await watcher must propagate, not be swallowed."""
+        import asyncio
+
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        parent_task: asyncio.Task[Any] | None = None
+
+        async def watcher_that_cancels_parent(
+            _key: str,
+            _inv_id: object,
+            _cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            # Finish immediately so watcher.cancel() is a no-op.
+            # Then the finally's `await watcher` is a yield point
+            # where the parent's CancelledError arrives.
+            pass
+
+        async def stream_then_cancel_parent() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+            yield {"event": "on_chain_end", "data": {}}
+            # Cancel the parent task after stream ends but before finally runs
+            if parent_task is not None:
+                parent_task.cancel()
+            await asyncio.sleep(0)
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_then_cancel_parent()
+
+        async def run_streaming() -> Any:
+            with patch.object(service, "_cancellation_watcher", side_effect=watcher_that_cancels_parent):
+                return await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+        parent_task = asyncio.create_task(run_streaming())
+
+        with pytest.raises(asyncio.CancelledError):
+            await parent_task
