@@ -391,8 +391,8 @@ class TestListApprovalsContract:
             error_type="https://api.example.com/errors/validation-error",
             title="Validation Error",
             detail=(
-                "Invalid UUID value 'not-a-uuid' for field 'execution_id'. "
-                "Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                "Invalid value for field 'execution_id': "
+                "Input should be a valid UUID, invalid character: found `n` at 1"
             ),
             code="VALIDATION_ERROR",
             retryable=False,
