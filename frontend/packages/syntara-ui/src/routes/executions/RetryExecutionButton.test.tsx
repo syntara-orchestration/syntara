@@ -94,6 +94,12 @@ describe('RetryExecutionButton', () => {
     expect(mockMutate).toHaveBeenCalled()
   })
 
+  it('passes resourceProject to useCanI when projectId is provided', () => {
+    renderButton({ projectId: 'proj-42' })
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-42' })
+  })
+
   it('is aria-disabled when user lacks execution:run permission', () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
 

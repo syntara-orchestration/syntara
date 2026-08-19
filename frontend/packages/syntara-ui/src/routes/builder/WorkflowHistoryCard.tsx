@@ -84,7 +84,9 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
 
   /* v8 ignore start -- v8 emits phantom branches from compiled hook destructuring */
-  const { allowed: canRun, isChecking } = useCanI('run', 'execution')
+  const { allowed: canRun, isChecking } = useCanI('run', 'execution', {
+    resourceProject: execution.project_id,
+  })
   const {
     isCurrentVersion,
     versionLabel,

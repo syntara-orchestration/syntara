@@ -25,6 +25,7 @@ type BuilderToolbarContentProps = Readonly<{
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
+  projectId?: string
   hasApprovalPending?: boolean
   isApprovalLoading?: boolean
   isApprovalPanelOpen?: boolean
@@ -73,6 +74,7 @@ function BuilderToolbarContent({
   isLiveRunActive,
   executionId,
   executionStatus,
+  projectId,
   hasApprovalPending,
   isApprovalLoading,
   isApprovalPanelOpen,
@@ -161,7 +163,7 @@ function BuilderToolbarContent({
             Review approval
           </Button>
         )}
-        {isCancellable && executionId && <CancelExecutionButton executionId={executionId} />}
+        {isCancellable && executionId && <CancelExecutionButton executionId={executionId} projectId={projectId} />}
         <Button variant="primary" onClick={onBackToEditor}>
           Back to editor
         </Button>
@@ -294,6 +296,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
+  projectId?: string
   onBackToEditor?: () => void
   hasApprovalPending?: boolean
   isApprovalLoading?: boolean
@@ -341,6 +344,7 @@ export function BuilderWorkflowPageHeader({
   isLiveRunActive,
   executionId,
   executionStatus,
+  projectId,
   onBackToEditor,
   hasApprovalPending,
   isApprovalLoading,
@@ -378,6 +382,7 @@ export function BuilderWorkflowPageHeader({
       isLiveRunActive={isLiveRunActive}
       executionId={executionId}
       executionStatus={executionStatus}
+      projectId={projectId}
       hasApprovalPending={hasApprovalPending}
       isApprovalLoading={isApprovalLoading}
       isApprovalPanelOpen={isApprovalPanelOpen}

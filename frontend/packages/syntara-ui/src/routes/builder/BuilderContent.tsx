@@ -528,6 +528,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     isLiveRunActive={isLiveRunActive}
                     executionId={mostRecentExecutionId}
                     executionStatus={mostRecentExecution?.status}
+                    projectId={builderProjectId}
                     onBackToEditor={isLiveRunActive ? handleCloseMostRecentRunPanel : undefined}
                     hasApprovalPending={!!pendingApproval}
                     isApprovalLoading={isApprovalLoading}
