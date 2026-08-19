@@ -1450,7 +1450,15 @@ class TestOrchestrationServiceCancellation:
 
     @pytest.mark.asyncio
     async def test_parent_cancellation_during_watcher_teardown_propagates(self) -> None:
-        """CancelledError injected into this task at await watcher must propagate, not be swallowed."""
+        """CancelledError injected into the parent at ``await watcher`` must propagate.
+
+        The watcher blocks until cancelled (simulating the real 2s poll).
+        The stream finishes normally.  In the ``finally`` block,
+        ``watcher.cancel()`` cancels the watcher; the watcher's teardown
+        also cancels the parent, so ``task.cancelling() > 0`` when the
+        ``except CancelledError`` handler runs.  Without the guard the
+        CancelledError would be suppressed and the function would return.
+        """
         import asyncio
 
         from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
@@ -1465,30 +1473,29 @@ class TestOrchestrationServiceCancellation:
 
         parent_task: asyncio.Task[Any] | None = None
 
-        async def watcher_that_cancels_parent(
+        async def watcher_that_cancels_parent_on_teardown(
             _key: str,
             _inv_id: object,
             _cancel_event: asyncio.Event,
             **_kw: object,
         ) -> None:
-            # Finish immediately so watcher.cancel() is a no-op.
-            # Then the finally's `await watcher` is a yield point
-            # where the parent's CancelledError arrives.
-            pass
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                if parent_task is not None:
+                    parent_task.cancel()
+                raise
 
-        async def stream_then_cancel_parent() -> AsyncGenerator[dict[str, Any], None]:
-            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
-            yield {"event": "on_chain_end", "data": {}}
-            # Cancel the parent task after stream ends but before finally runs
-            if parent_task is not None:
-                parent_task.cancel()
+        async def stream_with_yield() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Done")
             await asyncio.sleep(0)
+            yield {"event": "on_chain_end", "data": {}}
 
         mock_graph = AsyncMock()
-        mock_graph.astream_events = lambda *_a, **_kw: stream_then_cancel_parent()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yield()
 
         async def run_streaming() -> Any:
-            with patch.object(service, "_cancellation_watcher", side_effect=watcher_that_cancels_parent):
+            with patch.object(service, "_cancellation_watcher", side_effect=watcher_that_cancels_parent_on_teardown):
                 return await service._execute_graph_streaming(
                     graph=mock_graph,
                     initial_state={},  # type: ignore[typeddict-item]
@@ -1500,6 +1507,7 @@ class TestOrchestrationServiceCancellation:
                 )
 
         parent_task = asyncio.create_task(run_streaming())
+        await asyncio.sleep(0)
 
         with pytest.raises(asyncio.CancelledError):
             await parent_task
