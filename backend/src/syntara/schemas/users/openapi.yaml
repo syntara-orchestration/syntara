@@ -282,8 +282,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/AuthType'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -1020,8 +1020,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/AuthType'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string

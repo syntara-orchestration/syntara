@@ -556,11 +556,78 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
     /**
      * @description Filter resources by name.
      *     - Exact match: `name=value`
      *     - Contains: `name[contains]=value`
-     * @example auth
      */
     nameFilterParam: string & {
       /**
@@ -584,7 +651,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * @description Greater than or equal comparison (lexicographical). ?name[gte]=<name>
        */
       gte?: string
@@ -593,73 +660,11 @@ export interface components {
        * @description Less than comparison (lexicographical). ?name[lt]=<name>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * @description Less than or equal comparison (lexicographical). ?name[lte]=<name>
-       */
-      lte?: string
-    }
-    createdAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?created_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?created_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
-       */
-      lte?: string
-    }
-    updatedAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?updated_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
        */
       lte?: string
     }
@@ -681,100 +686,101 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
         /**
          * @description Filter resources by name.
          *     - Exact match: `name=value`
          *     - Contains: `name[contains]=value`
-         * @example auth
          */
         name?: components['parameters']['nameFilterParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter tools by enabled state.
-         *     - Exact match: `enabled=true` or `enabled[eq]=true`
-         */
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         enabled?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the enabled state. ?enabled[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter tools by status.
-         *     - Exact match: `status=available` or `status[eq]=available`
-         */
         status?: components['schemas']['ToolStatus'] & {
-          /**
-           * Equals
-           * @description Exact match of the tool status. ?status[eq]=available
-           */
-          eq?: components['schemas']['ToolStatus']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter tools by integration ID.
-         *     - Exact match: `integration_id=<uuid>` or `integration_id[eq]=<uuid>`
-         */
         integration_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the integration ID. ?integration_id[eq]=<uuid>
            */
           eq?: string
-        }
-        /**
-         * @description Filter tools by namespaced name.
-         *     - Exact match: `namespaced_name=value`
-         *     - Contains: `namespaced_name[contains]=value`
-         */
-        namespaced_name?: string & {
-          /**
-           * Equals
-           * @description Exact match of the namespaced name. ?namespaced_name[eq]=<name>
-           */
-          eq?: string
-          /**
-           * In
-           * @description Match any of a comma-separated list. ?namespaced_name[in]=a,b,c
-           */
+          /** In */
           in?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
-           */
+        }
+        namespaced_name?: string & {
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?namespaced_name[gte]=<name>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?namespaced_name[lte]=<name>
-           */
+          /** Less Than or Equal */
           lte?: string
-          /**
-           * Is Null
-           * @description Null check (true = IS NULL, false = IS NOT NULL). ?namespaced_name[isnull]=true
-           */
-          isnull?: boolean
+          /** Starts With */
+          starts_with?: string
         }
       }
       header?: never

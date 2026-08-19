@@ -511,109 +511,172 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter settings by category.
-         *     - Exact match: `category=value`
-         *     - Contains: `category[contains]=substring`
-         */
-        category?: string & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the category. ?category[eq]=value
+           * Format: uuid
            */
           eq?: string
-          /**
-           * In
-           * @description Match any of a comma-separated list. ?category[in]=a,b,c
-           */
+          /** In */
           in?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?category[contains]=substring
-           */
-          contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?category[starts_with]=prefix
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?category[gt]=value
-           */
-          gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?category[gte]=value
-           */
-          gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?category[lt]=value
-           */
-          lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?category[lte]=value
-           */
-          lte?: string
-          /**
-           * Is Null
-           * @description Null check (true = IS NULL, false = IS NOT NULL). ?category[isnull]=true
-           */
-          isnull?: boolean
         }
-        /**
-         * @description Filter settings by group.
-         *     - Exact match: `group=value`
-         *     - Contains: `group[contains]=substring`
-         */
-        group?: string & {
+        created_at?: string & {
           /**
            * Equals
-           * @description Exact match of the group. ?group[eq]=value
+           * Format: date-time
            */
           eq?: string
           /**
-           * In
-           * @description Match any of a comma-separated list. ?group[in]=a,b,c
-           */
-          in?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?group[contains]=substring
-           */
-          contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?group[starts_with]=prefix
-           */
-          starts_with?: string
-          /**
            * Greater Than
-           * @description Greater than comparison (lexicographical). ?group[gt]=value
+           * Format: date-time
            */
           gt?: string
           /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?group[gte]=value
+           * Greater Than or Equal
+           * Format: date-time
            */
           gte?: string
+          /** In */
+          in?: string
           /**
            * Less Than
-           * @description Less than comparison (lexicographical). ?group[lt]=value
+           * Format: date-time
            */
           lt?: string
           /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?group[lte]=value
+           * Less Than or Equal
+           * Format: date-time
            */
           lte?: string
+        }
+        updated_at?: string & {
           /**
-           * Is Null
-           * @description Null check (true = IS NULL, false = IS NOT NULL). ?group[isnull]=true
+           * Equals
+           * Format: date-time
            */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
           isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        key?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        category?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        group?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        requires_restart?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
         }
       }
       header?: never

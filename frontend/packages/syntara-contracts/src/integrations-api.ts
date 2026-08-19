@@ -1147,6 +1147,12 @@ export interface components {
       updated_at: string
     }
     /**
+     * ToolStatus
+     * @description Status of a tool.
+     * @enum {string}
+     */
+    ToolStatus: 'available' | 'missing' | 'error'
+    /**
      * Paginated Response Base
      * @description Pagination metadata structure for list responses
      * @example {
@@ -1315,12 +1321,6 @@ export interface components {
        */
       instance?: string | null
     }
-    /**
-     * ToolStatus
-     * @description Status of a tool.
-     * @enum {string}
-     */
-    ToolStatus: 'available' | 'missing' | 'error'
     /**
      * ToolParameterType
      * @description Parameter types for tools.
@@ -1537,7 +1537,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * Format: date-time
        * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
        */
@@ -1548,8 +1548,10 @@ export interface components {
        * @description Less than comparison. ?created_at[lt]=<timestamp>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * Format: date-time
        * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
        */
@@ -1569,7 +1571,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * Format: date-time
        * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
        */
@@ -1580,8 +1582,10 @@ export interface components {
        * @description Less than comparison. ?updated_at[lt]=<timestamp>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * Format: date-time
        * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
        */
@@ -1591,7 +1595,6 @@ export interface components {
      * @description Filter resources by name.
      *     - Exact match: `name=value`
      *     - Contains: `name[contains]=value`
-     * @example auth
      */
     nameFilterParam: string & {
       /**
@@ -1615,7 +1618,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * @description Greater than or equal comparison (lexicographical). ?name[gte]=<name>
        */
       gte?: string
@@ -1624,8 +1627,10 @@ export interface components {
        * @description Less than comparison (lexicographical). ?name[lt]=<name>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * @description Less than or equal comparison (lexicographical). ?name[lte]=<name>
        */
       lte?: string
@@ -1648,64 +1653,168 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by integration type.
-         *     - Exact match: `integration_type=aap_controller` or `integration_type[eq]=aap_controller`
-         */
+        /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
+        project_id?: string | null
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         integration_type?: components['schemas']['IntegrationType'] & {
-          /**
-           * Equals
-           * @description Exact match of the integration type. ?integration_type[eq]=aap_controller
-           */
-          eq?: components['schemas']['IntegrationType']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by validation status.
-         *     - Exact match: `validation_status=valid` or `validation_status[eq]=valid`
-         */
         validation_status?: components['schemas']['IntegrationStatus'] & {
-          /**
-           * Equals
-           * @description Exact match of the validation status. ?validation_status[eq]=valid
-           */
-          eq?: components['schemas']['IntegrationStatus']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by enabled status.
-         *     - Exact match: `enabled=true` or `enabled[eq]=true`
-         */
         enabled?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the enabled status. ?enabled[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by visibility scope.
-         *     - Exact match: `scope=global` or `scope[eq]=global`
-         */
         scope?: components['schemas']['IntegrationScope'] & {
-          /**
-           * Equals
-           * @description Exact match of the visibility scope. ?scope[eq]=global
-           */
-          eq?: components['schemas']['IntegrationScope']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by management credential ID (credential used for admin operations like validation and tool/model discovery).
-         *     - Exact match: `management_credential_id=<uuid>` or `management_credential_id[eq]=<uuid>`
-         */
         management_credential_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the management credential ID. ?management_credential_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
         }
-        /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
-        project_id?: string | null
       }
       header?: never
       path?: never
@@ -2058,71 +2167,46 @@ export interface operations {
         sort?: string | null
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter models by enabled state.
-         *     - Exact match: `enabled=true` or `enabled[eq]=true`
-         */
-        enabled?: boolean & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the enabled state. ?enabled[eq]=true
-           */
-          eq?: boolean
-        }
-        /**
-         * @description Filter models by default flag.
-         *     - Exact match: `is_default=true` or `is_default[eq]=true`
-         */
-        is_default?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the default flag. ?is_default[eq]=true
-           */
-          eq?: boolean
-        }
-        /**
-         * @description Filter models by model ID.
-         *     - Exact match: `model_id=gpt-4` or `model_id[eq]=gpt-4`
-         *     - Contains: `model_id[contains]=gpt`
-         */
-        model_id?: string & {
-          /**
-           * Equals
-           * @description Exact match of the model ID. ?model_id[eq]=gpt-4
+           * Format: uuid
            */
           eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?model_id[contains]=gpt
-           */
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        enabled?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
+        is_default?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
+        model_id?: string & {
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?model_id[starts_with]=gpt
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?model_id[gt]=<value>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?model_id[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?model_id[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?model_id[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
       }
       header?: never
@@ -2263,79 +2347,92 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
         /**
          * @description Filter resources by name.
          *     - Exact match: `name=value`
          *     - Contains: `name[contains]=value`
-         * @example auth
          */
         name?: components['parameters']['nameFilterParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter tools by enabled state.
-         *     - Exact match: `enabled=true` or `enabled[eq]=true`
-         */
-        enabled?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the enabled state. ?enabled[eq]=true
-           */
-          eq?: boolean
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
         }
-        /**
-         * @description Filter tools by status.
-         *     - Exact match: `status=available` or `status[eq]=available`
-         */
-        status?: ('available' | 'missing' | 'error') & {
+        created_by?: string & {
           /**
            * Equals
-           * @description Exact match of the tool status. ?status[eq]=available
-           * @enum {string}
-           */
-          eq?: 'available' | 'missing' | 'error'
-        }
-        /**
-         * @description Filter tools by namespaced name.
-         *     - Exact match: `namespaced_name=value`
-         *     - Contains: `namespaced_name[contains]=value`
-         */
-        namespaced_name?: string & {
-          /**
-           * Equals
-           * @description Exact match of the namespaced name. ?namespaced_name[eq]=<name>
+           * Format: uuid
            */
           eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
           /**
-           * Contains
-           * @description Substring match (case-insensitive). ?namespaced_name[contains]=<substring>
+           * Equals
+           * Format: uuid
            */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        enabled?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
+        status?: components['schemas']['ToolStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        namespaced_name?: string & {
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?namespaced_name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?namespaced_name[gt]=<name>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?namespaced_name[gte]=<name>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?namespaced_name[lt]=<name>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?namespaced_name[lte]=<name>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
       }
       header?: never

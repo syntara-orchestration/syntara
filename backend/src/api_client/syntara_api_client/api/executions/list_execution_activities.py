@@ -8,6 +8,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.activity_execution_list_response import ActivityExecutionListResponse
 from ...models.error_data import ErrorData
+from ...models.list_execution_activities_activity_name import ListExecutionActivitiesActivityName
+from ...models.list_execution_activities_created_at import ListExecutionActivitiesCreatedAt
+from ...models.list_execution_activities_id import ListExecutionActivitiesId
+from ...models.list_execution_activities_node_type import ListExecutionActivitiesNodeType
+from ...models.list_execution_activities_status import ListExecutionActivitiesStatus
+from ...models.list_execution_activities_updated_at import ListExecutionActivitiesUpdatedAt
 from ...types import UNSET, Response, Unset
 
 
@@ -18,6 +24,12 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionActivitiesId | Unset = UNSET,
+    created_at: ListExecutionActivitiesCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionActivitiesUpdatedAt | Unset = UNSET,
+    activity_name: ListExecutionActivitiesActivityName | Unset = UNSET,
+    node_type: ListExecutionActivitiesNodeType | Unset = UNSET,
+    status: ListExecutionActivitiesStatus | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -41,6 +53,42 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_activity_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(activity_name, Unset):
+        json_activity_name = activity_name.to_dict()
+    if not isinstance(json_activity_name, Unset):
+        params.update(json_activity_name)
+
+    json_node_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(node_type, Unset):
+        json_node_type = node_type.to_dict()
+    if not isinstance(json_node_type, Unset):
+        params.update(json_node_type)
+
+    json_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(status, Unset):
+        json_status = status.to_dict()
+    if not isinstance(json_status, Unset):
+        params.update(json_status)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -128,6 +176,12 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionActivitiesId | Unset = UNSET,
+    created_at: ListExecutionActivitiesCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionActivitiesUpdatedAt | Unset = UNSET,
+    activity_name: ListExecutionActivitiesActivityName | Unset = UNSET,
+    node_type: ListExecutionActivitiesNodeType | Unset = UNSET,
+    status: ListExecutionActivitiesStatus | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ActivityExecutionListResponse | ErrorData]:
     """List activity executions
@@ -140,6 +194,12 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionActivitiesId | Unset):
+        created_at (ListExecutionActivitiesCreatedAt | Unset):
+        updated_at (ListExecutionActivitiesUpdatedAt | Unset):
+        activity_name (ListExecutionActivitiesActivityName | Unset):
+        node_type (ListExecutionActivitiesNodeType | Unset):
+        status (ListExecutionActivitiesStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -155,6 +215,12 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        activity_name=activity_name,
+        node_type=node_type,
+        status=status,
         additional_params=additional_params,
     )
 
@@ -173,6 +239,12 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionActivitiesId | Unset = UNSET,
+    created_at: ListExecutionActivitiesCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionActivitiesUpdatedAt | Unset = UNSET,
+    activity_name: ListExecutionActivitiesActivityName | Unset = UNSET,
+    node_type: ListExecutionActivitiesNodeType | Unset = UNSET,
+    status: ListExecutionActivitiesStatus | Unset = UNSET,
 ) -> ActivityExecutionListResponse | ErrorData | None:
     """List activity executions
 
@@ -184,6 +256,12 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionActivitiesId | Unset):
+        created_at (ListExecutionActivitiesCreatedAt | Unset):
+        updated_at (ListExecutionActivitiesUpdatedAt | Unset):
+        activity_name (ListExecutionActivitiesActivityName | Unset):
+        node_type (ListExecutionActivitiesNodeType | Unset):
+        status (ListExecutionActivitiesStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -200,6 +278,12 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        activity_name=activity_name,
+        node_type=node_type,
+        status=status,
     ).parsed
 
 
@@ -211,6 +295,12 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionActivitiesId | Unset = UNSET,
+    created_at: ListExecutionActivitiesCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionActivitiesUpdatedAt | Unset = UNSET,
+    activity_name: ListExecutionActivitiesActivityName | Unset = UNSET,
+    node_type: ListExecutionActivitiesNodeType | Unset = UNSET,
+    status: ListExecutionActivitiesStatus | Unset = UNSET,
 ) -> Response[ActivityExecutionListResponse | ErrorData]:
     """List activity executions
 
@@ -222,6 +312,12 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionActivitiesId | Unset):
+        created_at (ListExecutionActivitiesCreatedAt | Unset):
+        updated_at (ListExecutionActivitiesUpdatedAt | Unset):
+        activity_name (ListExecutionActivitiesActivityName | Unset):
+        node_type (ListExecutionActivitiesNodeType | Unset):
+        status (ListExecutionActivitiesStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -237,6 +333,12 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        activity_name=activity_name,
+        node_type=node_type,
+        status=status,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -252,6 +354,12 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionActivitiesId | Unset = UNSET,
+    created_at: ListExecutionActivitiesCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionActivitiesUpdatedAt | Unset = UNSET,
+    activity_name: ListExecutionActivitiesActivityName | Unset = UNSET,
+    node_type: ListExecutionActivitiesNodeType | Unset = UNSET,
+    status: ListExecutionActivitiesStatus | Unset = UNSET,
 ) -> ActivityExecutionListResponse | ErrorData | None:
     """List activity executions
 
@@ -263,6 +371,12 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionActivitiesId | Unset):
+        created_at (ListExecutionActivitiesCreatedAt | Unset):
+        updated_at (ListExecutionActivitiesUpdatedAt | Unset):
+        activity_name (ListExecutionActivitiesActivityName | Unset):
+        node_type (ListExecutionActivitiesNodeType | Unset):
+        status (ListExecutionActivitiesStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -280,5 +394,11 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            activity_name=activity_name,
+            node_type=node_type,
+            status=status,
         )
     ).parsed

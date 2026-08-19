@@ -7,6 +7,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_integration_models_created_at import ListIntegrationModelsCreatedAt
+from ...models.list_integration_models_enabled import ListIntegrationModelsEnabled
+from ...models.list_integration_models_id import ListIntegrationModelsId
+from ...models.list_integration_models_is_default import ListIntegrationModelsIsDefault
+from ...models.list_integration_models_model_id import ListIntegrationModelsModelId
+from ...models.list_integration_models_updated_at import ListIntegrationModelsUpdatedAt
 from ...models.llm_model_list_response import LLMModelListResponse
 from ...types import UNSET, Response, Unset
 
@@ -18,6 +24,12 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListIntegrationModelsId | Unset = UNSET,
+    created_at: ListIntegrationModelsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationModelsUpdatedAt | Unset = UNSET,
+    enabled: ListIntegrationModelsEnabled | Unset = UNSET,
+    is_default: ListIntegrationModelsIsDefault | Unset = UNSET,
+    model_id: ListIntegrationModelsModelId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -41,6 +53,42 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_enabled: dict[str, Any] | Unset = UNSET
+    if not isinstance(enabled, Unset):
+        json_enabled = enabled.to_dict()
+    if not isinstance(json_enabled, Unset):
+        params.update(json_enabled)
+
+    json_is_default: dict[str, Any] | Unset = UNSET
+    if not isinstance(is_default, Unset):
+        json_is_default = is_default.to_dict()
+    if not isinstance(json_is_default, Unset):
+        params.update(json_is_default)
+
+    json_model_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(model_id, Unset):
+        json_model_id = model_id.to_dict()
+    if not isinstance(json_model_id, Unset):
+        params.update(json_model_id)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -128,6 +176,12 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListIntegrationModelsId | Unset = UNSET,
+    created_at: ListIntegrationModelsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationModelsUpdatedAt | Unset = UNSET,
+    enabled: ListIntegrationModelsEnabled | Unset = UNSET,
+    is_default: ListIntegrationModelsIsDefault | Unset = UNSET,
+    model_id: ListIntegrationModelsModelId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | LLMModelListResponse]:
     """List integration models
@@ -140,6 +194,12 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListIntegrationModelsId | Unset):
+        created_at (ListIntegrationModelsCreatedAt | Unset):
+        updated_at (ListIntegrationModelsUpdatedAt | Unset):
+        enabled (ListIntegrationModelsEnabled | Unset):
+        is_default (ListIntegrationModelsIsDefault | Unset):
+        model_id (ListIntegrationModelsModelId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -155,6 +215,12 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        enabled=enabled,
+        is_default=is_default,
+        model_id=model_id,
         additional_params=additional_params,
     )
 
@@ -173,6 +239,12 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListIntegrationModelsId | Unset = UNSET,
+    created_at: ListIntegrationModelsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationModelsUpdatedAt | Unset = UNSET,
+    enabled: ListIntegrationModelsEnabled | Unset = UNSET,
+    is_default: ListIntegrationModelsIsDefault | Unset = UNSET,
+    model_id: ListIntegrationModelsModelId | Unset = UNSET,
 ) -> ErrorData | LLMModelListResponse | None:
     """List integration models
 
@@ -184,6 +256,12 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListIntegrationModelsId | Unset):
+        created_at (ListIntegrationModelsCreatedAt | Unset):
+        updated_at (ListIntegrationModelsUpdatedAt | Unset):
+        enabled (ListIntegrationModelsEnabled | Unset):
+        is_default (ListIntegrationModelsIsDefault | Unset):
+        model_id (ListIntegrationModelsModelId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -200,6 +278,12 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        enabled=enabled,
+        is_default=is_default,
+        model_id=model_id,
     ).parsed
 
 
@@ -211,6 +295,12 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListIntegrationModelsId | Unset = UNSET,
+    created_at: ListIntegrationModelsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationModelsUpdatedAt | Unset = UNSET,
+    enabled: ListIntegrationModelsEnabled | Unset = UNSET,
+    is_default: ListIntegrationModelsIsDefault | Unset = UNSET,
+    model_id: ListIntegrationModelsModelId | Unset = UNSET,
 ) -> Response[ErrorData | LLMModelListResponse]:
     """List integration models
 
@@ -222,6 +312,12 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListIntegrationModelsId | Unset):
+        created_at (ListIntegrationModelsCreatedAt | Unset):
+        updated_at (ListIntegrationModelsUpdatedAt | Unset):
+        enabled (ListIntegrationModelsEnabled | Unset):
+        is_default (ListIntegrationModelsIsDefault | Unset):
+        model_id (ListIntegrationModelsModelId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -237,6 +333,12 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        enabled=enabled,
+        is_default=is_default,
+        model_id=model_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -252,6 +354,12 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListIntegrationModelsId | Unset = UNSET,
+    created_at: ListIntegrationModelsCreatedAt | Unset = UNSET,
+    updated_at: ListIntegrationModelsUpdatedAt | Unset = UNSET,
+    enabled: ListIntegrationModelsEnabled | Unset = UNSET,
+    is_default: ListIntegrationModelsIsDefault | Unset = UNSET,
+    model_id: ListIntegrationModelsModelId | Unset = UNSET,
 ) -> ErrorData | LLMModelListResponse | None:
     """List integration models
 
@@ -263,6 +371,12 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListIntegrationModelsId | Unset):
+        created_at (ListIntegrationModelsCreatedAt | Unset):
+        updated_at (ListIntegrationModelsUpdatedAt | Unset):
+        enabled (ListIntegrationModelsEnabled | Unset):
+        is_default (ListIntegrationModelsIsDefault | Unset):
+        model_id (ListIntegrationModelsModelId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -280,5 +394,11 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            enabled=enabled,
+            is_default=is_default,
+            model_id=model_id,
         )
     ).parsed

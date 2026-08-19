@@ -2465,11 +2465,78 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
     /**
      * @description Filter resources by name.
      *     - Exact match: `name=value`
      *     - Contains: `name[contains]=value`
-     * @example auth
      */
     nameFilterParam: string & {
       /**
@@ -2493,7 +2560,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * @description Greater than or equal comparison (lexicographical). ?name[gte]=<name>
        */
       gte?: string
@@ -2502,73 +2569,11 @@ export interface components {
        * @description Less than comparison (lexicographical). ?name[lt]=<name>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * @description Less than or equal comparison (lexicographical). ?name[lte]=<name>
-       */
-      lte?: string
-    }
-    createdAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?created_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?created_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
-       */
-      lte?: string
-    }
-    updatedAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?updated_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
        */
       lte?: string
     }
@@ -2590,59 +2595,142 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
         /**
          * @description Filter resources by name.
          *     - Exact match: `name=value`
          *     - Contains: `name[contains]=value`
-         * @example auth
          */
         name?: components['parameters']['nameFilterParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter workflows by builtin flag.
-         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
-         */
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        deleted_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        deleted_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         is_builtin?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the builtin flag. ?is_builtin[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter workflows by enabled state.
-         *     - Exact match: `is_enabled=true` or `is_enabled[eq]=true`
-         */
         is_enabled?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the enabled state. ?is_enabled[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter workflows by validation issues.
-         *     - Exact match: `has_validation_issues=true` or `has_validation_issues[eq]=true`
-         */
         has_validation_issues?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
+        published_version_id?: string & {
           /**
            * Equals
-           * @description Exact match. ?has_validation_issues[eq]=true
+           * Format: uuid
            */
-          eq?: boolean
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
         }
-        /**
-         * @description Filter workflows by project ID.
-         *     - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
-         */
         project_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the project ID. ?project_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
         }
       }
       header?: never
@@ -2875,38 +2963,49 @@ export interface operations {
         cursor?: string | null
         sort?: string | null
         include_total?: boolean
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter versions by version number.
-         *     - Exact match: `version=1` or `version[eq]=1`
-         *     - Range: `version[gt]=1&version[lt]=5`
-         */
-        version?: number & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the version number. ?version[eq]=1
+           * Format: uuid
            */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        version?: number & {
+          /** Equals */
           eq?: number
-          /**
-           * Greater Than
-           * @description Greater than comparison. ?version[gt]=1
-           */
+          /** Greater Than */
           gt?: number
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?version[gte]=1
-           */
+          /** Greater Than or Equal */
           gte?: number
-          /**
-           * Less Than
-           * @description Less than comparison. ?version[lt]=5
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: number
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?version[lte]=5
-           */
+          /** Less Than or Equal */
           lte?: number
         }
       }

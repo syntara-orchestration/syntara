@@ -235,8 +235,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ExecutionStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -251,8 +251,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ExecutionMode'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -599,8 +599,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/NodeType'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -615,8 +615,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ActivityStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string

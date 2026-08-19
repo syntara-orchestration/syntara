@@ -965,8 +965,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ApprovalRequestStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string

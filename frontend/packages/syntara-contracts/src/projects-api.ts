@@ -1589,11 +1589,78 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
     /**
      * @description Filter resources by name.
      *     - Exact match: `name=value`
      *     - Contains: `name[contains]=value`
-     * @example auth
      */
     nameFilterParam: string & {
       /**
@@ -1617,7 +1684,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * @description Greater than or equal comparison (lexicographical). ?name[gte]=<name>
        */
       gte?: string
@@ -1626,73 +1693,11 @@ export interface components {
        * @description Less than comparison (lexicographical). ?name[lt]=<name>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * @description Less than or equal comparison (lexicographical). ?name[lte]=<name>
-       */
-      lte?: string
-    }
-    createdAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?created_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?created_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
-       */
-      lte?: string
-    }
-    updatedAtFilterParam: string & {
-      /**
-       * Equals
-       * Format: date-time
-       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
-       */
-      eq?: string
-      /**
-       * Greater Than
-       * Format: date-time
-       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
-       */
-      gt?: string
-      /**
-       * Greater Than Or Equal
-       * Format: date-time
-       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
-       */
-      gte?: string
-      /**
-       * Less Than
-       * Format: date-time
-       * @description Less than comparison. ?updated_at[lt]=<timestamp>
-       */
-      lt?: string
-      /**
-       * Less Than Or Equal
-       * Format: date-time
-       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
        */
       lte?: string
     }
@@ -1714,70 +1719,164 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by project name.
-         *     - Exact match: `name=value`
-         *     - Contains: `name[contains]=value`
-         *     - Starts with: `name[starts_with]=value`
-         */
-        name?: string & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the project name. ?name[eq]=<value>
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
            */
           eq?: string
           /**
-           * Contains
-           * @description Substring match (case-insensitive). ?name[contains]=<substring>
-           */
-          contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
            * Greater Than
-           * @description Greater than comparison (lexicographical). ?name[gt]=<value>
+           * Format: date-time
            */
           gt?: string
           /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?name[gte]=<value>
+           * Greater Than or Equal
+           * Format: date-time
            */
           gte?: string
+          /** In */
+          in?: string
           /**
            * Less Than
-           * @description Less than comparison (lexicographical). ?name[lt]=<value>
+           * Format: date-time
            */
           lt?: string
           /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?name[lte]=<value>
+           * Less Than or Equal
+           * Format: date-time
            */
           lte?: string
         }
-        /**
-         * @description Filter by default project status.
-         *     - Exact match: `is_default=true` or `is_default[eq]=true`
-         */
-        is_default?: boolean & {
+        updated_at?: string & {
           /**
            * Equals
-           * @description Exact match of the default project status. ?is_default[eq]=true
+           * Format: date-time
            */
-          eq?: boolean
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
         }
-        /**
-         * @description Filter by built-in project status.
-         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
-         */
-        is_builtin?: boolean & {
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        deleted_at?: string & {
           /**
            * Equals
-           * @description Exact match of the built-in project status. ?is_builtin[eq]=true
+           * Format: date-time
            */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        deleted_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        is_default?: boolean & {
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
+        }
+        is_builtin?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
         }
       }
       header?: never
@@ -1978,47 +2077,133 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
         /**
          * @description Filter resources by name.
          *     - Exact match: `name=value`
          *     - Contains: `name[contains]=value`
-         * @example auth
          */
         name?: components['parameters']['nameFilterParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter workflows by builtin flag.
-         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
-         */
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        deleted_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        deleted_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         is_builtin?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the builtin flag. ?is_builtin[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter workflows by enabled state.
-         *     - Exact match: `is_enabled=true` or `is_enabled[eq]=true`
-         */
         is_enabled?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the enabled state. ?is_enabled[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter workflows by validation issues.
-         *     - Exact match: `has_validation_issues=true` or `has_validation_issues[eq]=true`
-         */
         has_validation_issues?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
+        published_version_id?: string & {
           /**
            * Equals
-           * @description Exact match. ?has_validation_issues[eq]=true
+           * Format: uuid
            */
-          eq?: boolean
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
         }
       }
       header?: never
@@ -2060,28 +2245,136 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by approval status.
-         *     - Exact match: `status=pending` or `status[eq]=pending`
-         */
-        status?: components['schemas']['ApprovalRequestStatus'] & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the approval status. ?status[eq]=pending
+           * Format: uuid
            */
-          eq?: components['schemas']['ApprovalRequestStatus']
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by parent execution ID.
-         *     - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
-         */
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
         execution_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
+        }
+        status?: components['schemas']['ApprovalRequestStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        timeout_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
         }
       }
       header?: never
@@ -2235,145 +2528,134 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by role name.
-         *     - Exact match: `name=value`
-         *     - Contains: `name[contains]=value`
-         *     - Starts with: `name[starts_with]=value`
-         */
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
         name?: string & {
-          /**
-           * Equals
-           * @description Exact match of the role name. ?name[eq]=<value>
-           */
-          eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?name[contains]=<substring>
-           */
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?name[gt]=<value>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?name[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?name[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?name[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
-        /**
-         * @description Filter by builtin status.
-         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
-         */
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
         is_builtin?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the builtin status. ?is_builtin[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by scope.
-         *     - Exact match: `scope=value`
-         *     - Contains: `scope[contains]=value`
-         *     - Starts with: `scope[starts_with]=value`
-         */
         scope?: string & {
-          /**
-           * Equals
-           * @description Exact match of the scope. ?scope[eq]=<value>
-           */
-          eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?scope[contains]=<substring>
-           */
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?scope[gt]=<value>
-           */
-          gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?scope[gte]=<value>
-           */
-          gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?scope[lt]=<value>
-           */
-          lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?scope[lte]=<value>
-           */
-          lte?: string
-        }
-        /**
-         * @description Filter by policy name.
-         *     - Exact match: `policy_name=value`
-         *     - Contains: `policy_name[contains]=value`
-         *     - Starts with: `policy_name[starts_with]=value`
-         */
-        policy_name?: string & {
-          /**
-           * Equals
-           * @description Exact match of the policy name. ?policy_name[eq]=<value>
-           */
+          /** Equals */
           eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?policy_name[contains]=<substring>
-           */
-          contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?policy_name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?policy_name[gt]=<value>
-           */
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?policy_name[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?policy_name[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?policy_name[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
       }
       header?: never
@@ -2588,113 +2870,134 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by policy name.
-         *     - Exact match: `name=value`
-         *     - Contains: `name[contains]=value`
-         *     - Starts with: `name[starts_with]=value`
-         */
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
         name?: string & {
-          /**
-           * Equals
-           * @description Exact match of the policy name. ?name[eq]=<value>
-           */
-          eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?name[contains]=<substring>
-           */
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?name[gt]=<value>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?name[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?name[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?name[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
-        /**
-         * @description Filter by builtin status.
-         *     - Exact match: `is_builtin=true` or `is_builtin[eq]=true`
-         */
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
         is_builtin?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the builtin status. ?is_builtin[eq]=true
-           */
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by project eligibility.
-         *     - Exact match: `project_eligible=true` or `project_eligible[eq]=true`
-         */
-        project_eligible?: boolean & {
-          /**
-           * Equals
-           * @description Exact match of the project eligibility. ?project_eligible[eq]=true
-           */
-          eq?: boolean
-        }
-        /**
-         * @description Filter by scope.
-         *     - Exact match: `scope=value`
-         *     - Contains: `scope[contains]=value`
-         *     - Starts with: `scope[starts_with]=value`
-         */
         scope?: string & {
-          /**
-           * Equals
-           * @description Exact match of the scope. ?scope[eq]=<value>
-           */
-          eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?scope[contains]=<substring>
-           */
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?scope[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?scope[gt]=<value>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?scope[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?scope[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?scope[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
       }
       header?: never
@@ -2909,31 +3212,159 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by credential type ID.
-         *     - Exact match: `credential_type_id=<uuid>` or `credential_type_id[eq]=<uuid>`
-         */
+        /** @description Filter by permission action. Currently accepted but not enforced on this endpoint; use GET /credentials?for_action=use for use-filtered listing. */
+        for_action?: 'use' | null
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         credential_type_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the credential type ID. ?credential_type_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by enabled state.
-         *     - Exact match: `enabled=true` or `enabled[eq]=true`
-         */
-        enabled?: boolean & {
+        secret_id?: string & {
           /**
            * Equals
-           * @description Exact match of the enabled state. ?enabled[eq]=true
+           * Format: uuid
            */
-          eq?: boolean
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
         }
-        /** @description Filter by permission action. Currently accepted but not enforced on this endpoint; use GET /credentials?for_action=use for use-filtered listing. */
-        for_action?: 'use' | null
+        enabled?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
       }
       header?: never
       path: {

@@ -156,8 +156,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ToolStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string

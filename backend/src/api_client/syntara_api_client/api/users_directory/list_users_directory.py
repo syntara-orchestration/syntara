@@ -6,6 +6,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_users_directory_auth_type import ListUsersDirectoryAuthType
+from ...models.list_users_directory_created_at import ListUsersDirectoryCreatedAt
+from ...models.list_users_directory_email import ListUsersDirectoryEmail
+from ...models.list_users_directory_first_name import ListUsersDirectoryFirstName
+from ...models.list_users_directory_id import ListUsersDirectoryId
+from ...models.list_users_directory_is_enabled import ListUsersDirectoryIsEnabled
+from ...models.list_users_directory_last_name import ListUsersDirectoryLastName
+from ...models.list_users_directory_updated_at import ListUsersDirectoryUpdatedAt
+from ...models.list_users_directory_username import ListUsersDirectoryUsername
 from ...models.resources_response_user_directory_entry import ResourcesResponseUserDirectoryEntry
 from ...types import UNSET, Response, Unset
 
@@ -16,7 +25,15 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    username: None | str | Unset = UNSET,
+    id: ListUsersDirectoryId | Unset = UNSET,
+    created_at: ListUsersDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListUsersDirectoryUpdatedAt | Unset = UNSET,
+    username: ListUsersDirectoryUsername | Unset = UNSET,
+    email: ListUsersDirectoryEmail | Unset = UNSET,
+    first_name: ListUsersDirectoryFirstName | Unset = UNSET,
+    last_name: ListUsersDirectoryLastName | Unset = UNSET,
+    is_enabled: ListUsersDirectoryIsEnabled | Unset = UNSET,
+    auth_type: ListUsersDirectoryAuthType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -41,12 +58,59 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_username: None | str | Unset
-    if isinstance(username, Unset):
-        json_username = UNSET
-    else:
-        json_username = username
-    params["username"] = json_username
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_username: dict[str, Any] | Unset = UNSET
+    if not isinstance(username, Unset):
+        json_username = username.to_dict()
+    if not isinstance(json_username, Unset):
+        params.update(json_username)
+
+    json_email: dict[str, Any] | Unset = UNSET
+    if not isinstance(email, Unset):
+        json_email = email.to_dict()
+    if not isinstance(json_email, Unset):
+        params.update(json_email)
+
+    json_first_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(first_name, Unset):
+        json_first_name = first_name.to_dict()
+    if not isinstance(json_first_name, Unset):
+        params.update(json_first_name)
+
+    json_last_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(last_name, Unset):
+        json_last_name = last_name.to_dict()
+    if not isinstance(json_last_name, Unset):
+        params.update(json_last_name)
+
+    json_is_enabled: dict[str, Any] | Unset = UNSET
+    if not isinstance(is_enabled, Unset):
+        json_is_enabled = is_enabled.to_dict()
+    if not isinstance(json_is_enabled, Unset):
+        params.update(json_is_enabled)
+
+    json_auth_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(auth_type, Unset):
+        json_auth_type = auth_type.to_dict()
+    if not isinstance(json_auth_type, Unset):
+        params.update(json_auth_type)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -133,7 +197,15 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    username: None | str | Unset = UNSET,
+    id: ListUsersDirectoryId | Unset = UNSET,
+    created_at: ListUsersDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListUsersDirectoryUpdatedAt | Unset = UNSET,
+    username: ListUsersDirectoryUsername | Unset = UNSET,
+    email: ListUsersDirectoryEmail | Unset = UNSET,
+    first_name: ListUsersDirectoryFirstName | Unset = UNSET,
+    last_name: ListUsersDirectoryLastName | Unset = UNSET,
+    is_enabled: ListUsersDirectoryIsEnabled | Unset = UNSET,
+    auth_type: ListUsersDirectoryAuthType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | ResourcesResponseUserDirectoryEntry]:
     """List users directory
@@ -145,8 +217,15 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        username (None | str | Unset): Filter by username (username=exact,
-            username[contains]=substring, username[starts_with]=prefix)
+        id (ListUsersDirectoryId | Unset):
+        created_at (ListUsersDirectoryCreatedAt | Unset):
+        updated_at (ListUsersDirectoryUpdatedAt | Unset):
+        username (ListUsersDirectoryUsername | Unset):
+        email (ListUsersDirectoryEmail | Unset):
+        first_name (ListUsersDirectoryFirstName | Unset):
+        last_name (ListUsersDirectoryLastName | Unset):
+        is_enabled (ListUsersDirectoryIsEnabled | Unset):
+        auth_type (ListUsersDirectoryAuthType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +240,15 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         username=username,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        is_enabled=is_enabled,
+        auth_type=auth_type,
         additional_params=additional_params,
     )
 
@@ -179,7 +266,15 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    username: None | str | Unset = UNSET,
+    id: ListUsersDirectoryId | Unset = UNSET,
+    created_at: ListUsersDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListUsersDirectoryUpdatedAt | Unset = UNSET,
+    username: ListUsersDirectoryUsername | Unset = UNSET,
+    email: ListUsersDirectoryEmail | Unset = UNSET,
+    first_name: ListUsersDirectoryFirstName | Unset = UNSET,
+    last_name: ListUsersDirectoryLastName | Unset = UNSET,
+    is_enabled: ListUsersDirectoryIsEnabled | Unset = UNSET,
+    auth_type: ListUsersDirectoryAuthType | Unset = UNSET,
 ) -> ErrorData | ResourcesResponseUserDirectoryEntry | None:
     """List users directory
 
@@ -190,8 +285,15 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        username (None | str | Unset): Filter by username (username=exact,
-            username[contains]=substring, username[starts_with]=prefix)
+        id (ListUsersDirectoryId | Unset):
+        created_at (ListUsersDirectoryCreatedAt | Unset):
+        updated_at (ListUsersDirectoryUpdatedAt | Unset):
+        username (ListUsersDirectoryUsername | Unset):
+        email (ListUsersDirectoryEmail | Unset):
+        first_name (ListUsersDirectoryFirstName | Unset):
+        last_name (ListUsersDirectoryLastName | Unset):
+        is_enabled (ListUsersDirectoryIsEnabled | Unset):
+        auth_type (ListUsersDirectoryAuthType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,7 +309,15 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         username=username,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        is_enabled=is_enabled,
+        auth_type=auth_type,
     ).parsed
 
 
@@ -218,7 +328,15 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    username: None | str | Unset = UNSET,
+    id: ListUsersDirectoryId | Unset = UNSET,
+    created_at: ListUsersDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListUsersDirectoryUpdatedAt | Unset = UNSET,
+    username: ListUsersDirectoryUsername | Unset = UNSET,
+    email: ListUsersDirectoryEmail | Unset = UNSET,
+    first_name: ListUsersDirectoryFirstName | Unset = UNSET,
+    last_name: ListUsersDirectoryLastName | Unset = UNSET,
+    is_enabled: ListUsersDirectoryIsEnabled | Unset = UNSET,
+    auth_type: ListUsersDirectoryAuthType | Unset = UNSET,
 ) -> Response[ErrorData | ResourcesResponseUserDirectoryEntry]:
     """List users directory
 
@@ -229,8 +347,15 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        username (None | str | Unset): Filter by username (username=exact,
-            username[contains]=substring, username[starts_with]=prefix)
+        id (ListUsersDirectoryId | Unset):
+        created_at (ListUsersDirectoryCreatedAt | Unset):
+        updated_at (ListUsersDirectoryUpdatedAt | Unset):
+        username (ListUsersDirectoryUsername | Unset):
+        email (ListUsersDirectoryEmail | Unset):
+        first_name (ListUsersDirectoryFirstName | Unset):
+        last_name (ListUsersDirectoryLastName | Unset):
+        is_enabled (ListUsersDirectoryIsEnabled | Unset):
+        auth_type (ListUsersDirectoryAuthType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -245,7 +370,15 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         username=username,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        is_enabled=is_enabled,
+        auth_type=auth_type,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -260,7 +393,15 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    username: None | str | Unset = UNSET,
+    id: ListUsersDirectoryId | Unset = UNSET,
+    created_at: ListUsersDirectoryCreatedAt | Unset = UNSET,
+    updated_at: ListUsersDirectoryUpdatedAt | Unset = UNSET,
+    username: ListUsersDirectoryUsername | Unset = UNSET,
+    email: ListUsersDirectoryEmail | Unset = UNSET,
+    first_name: ListUsersDirectoryFirstName | Unset = UNSET,
+    last_name: ListUsersDirectoryLastName | Unset = UNSET,
+    is_enabled: ListUsersDirectoryIsEnabled | Unset = UNSET,
+    auth_type: ListUsersDirectoryAuthType | Unset = UNSET,
 ) -> ErrorData | ResourcesResponseUserDirectoryEntry | None:
     """List users directory
 
@@ -271,8 +412,15 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        username (None | str | Unset): Filter by username (username=exact,
-            username[contains]=substring, username[starts_with]=prefix)
+        id (ListUsersDirectoryId | Unset):
+        created_at (ListUsersDirectoryCreatedAt | Unset):
+        updated_at (ListUsersDirectoryUpdatedAt | Unset):
+        username (ListUsersDirectoryUsername | Unset):
+        email (ListUsersDirectoryEmail | Unset):
+        first_name (ListUsersDirectoryFirstName | Unset):
+        last_name (ListUsersDirectoryLastName | Unset):
+        is_enabled (ListUsersDirectoryIsEnabled | Unset):
+        auth_type (ListUsersDirectoryAuthType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -289,6 +437,14 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
             username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            is_enabled=is_enabled,
+            auth_type=auth_type,
         )
     ).parsed

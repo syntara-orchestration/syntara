@@ -827,28 +827,145 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        /**
-         * @description Filter by approval status.
-         *     - Exact match: `status=pending` or `status[eq]=pending`
-         */
-        status?: components['schemas']['ApprovalRequestStatus'] & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the approval status. ?status[eq]=pending
+           * Format: uuid
            */
-          eq?: components['schemas']['ApprovalRequestStatus']
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter by parent execution ID.
-         *     - Exact match: `execution_id=<uuid>` or `execution_id[eq]=<uuid>`
-         */
+        created_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
         execution_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the parent execution ID. ?execution_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
+        }
+        project_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        status?: components['schemas']['ApprovalRequestStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        timeout_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
         }
       }
       header?: never

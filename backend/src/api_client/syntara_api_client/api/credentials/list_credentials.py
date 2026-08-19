@@ -1,6 +1,5 @@
 from http import HTTPStatus
 from typing import Any, Literal
-from uuid import UUID
 
 import httpx
 
@@ -8,6 +7,17 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.credential_list_response import CredentialListResponse
 from ...models.error_data import ErrorData
+from ...models.list_credentials_created_at import ListCredentialsCreatedAt
+from ...models.list_credentials_created_by import ListCredentialsCreatedBy
+from ...models.list_credentials_credential_type_id import ListCredentialsCredentialTypeId
+from ...models.list_credentials_description import ListCredentialsDescription
+from ...models.list_credentials_enabled import ListCredentialsEnabled
+from ...models.list_credentials_id import ListCredentialsId
+from ...models.list_credentials_name import ListCredentialsName
+from ...models.list_credentials_project_id import ListCredentialsProjectId
+from ...models.list_credentials_secret_id import ListCredentialsSecretId
+from ...models.list_credentials_updated_at import ListCredentialsUpdatedAt
+from ...models.list_credentials_updated_by import ListCredentialsUpdatedBy
 from ...types import UNSET, Response, Unset
 
 
@@ -17,9 +27,18 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type_id: None | Unset | UUID = UNSET,
-    enabled: bool | None | Unset = UNSET,
     for_action: Literal["use"] | None | Unset = UNSET,
+    id: ListCredentialsId | Unset = UNSET,
+    created_at: ListCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListCredentialsUpdatedAt | Unset = UNSET,
+    name: ListCredentialsName | Unset = UNSET,
+    description: ListCredentialsDescription | Unset = UNSET,
+    created_by: ListCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListCredentialsUpdatedBy | Unset = UNSET,
+    credential_type_id: ListCredentialsCredentialTypeId | Unset = UNSET,
+    secret_id: ListCredentialsSecretId | Unset = UNSET,
+    enabled: ListCredentialsEnabled | Unset = UNSET,
+    project_id: ListCredentialsProjectId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -44,28 +63,78 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_credential_type_id: None | str | Unset
-    if isinstance(credential_type_id, Unset):
-        json_credential_type_id = UNSET
-    elif isinstance(credential_type_id, UUID):
-        json_credential_type_id = str(credential_type_id)
-    else:
-        json_credential_type_id = credential_type_id
-    params["credential_type_id"] = json_credential_type_id
-
-    json_enabled: bool | None | Unset
-    if isinstance(enabled, Unset):
-        json_enabled = UNSET
-    else:
-        json_enabled = enabled
-    params["enabled"] = json_enabled
-
     json_for_action: Literal["use"] | None | Unset
     if isinstance(for_action, Unset):
         json_for_action = UNSET
     else:
         json_for_action = for_action
     params["for_action"] = json_for_action
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_updated_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_by, Unset):
+        json_updated_by = updated_by.to_dict()
+    if not isinstance(json_updated_by, Unset):
+        params.update(json_updated_by)
+
+    json_credential_type_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(credential_type_id, Unset):
+        json_credential_type_id = credential_type_id.to_dict()
+    if not isinstance(json_credential_type_id, Unset):
+        params.update(json_credential_type_id)
+
+    json_secret_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(secret_id, Unset):
+        json_secret_id = secret_id.to_dict()
+    if not isinstance(json_secret_id, Unset):
+        params.update(json_secret_id)
+
+    json_enabled: dict[str, Any] | Unset = UNSET
+    if not isinstance(enabled, Unset):
+        json_enabled = enabled.to_dict()
+    if not isinstance(json_enabled, Unset):
+        params.update(json_enabled)
+
+    json_project_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(project_id, Unset):
+        json_project_id = project_id.to_dict()
+    if not isinstance(json_project_id, Unset):
+        params.update(json_project_id)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -152,9 +221,18 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type_id: None | Unset | UUID = UNSET,
-    enabled: bool | None | Unset = UNSET,
     for_action: Literal["use"] | None | Unset = UNSET,
+    id: ListCredentialsId | Unset = UNSET,
+    created_at: ListCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListCredentialsUpdatedAt | Unset = UNSET,
+    name: ListCredentialsName | Unset = UNSET,
+    description: ListCredentialsDescription | Unset = UNSET,
+    created_by: ListCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListCredentialsUpdatedBy | Unset = UNSET,
+    credential_type_id: ListCredentialsCredentialTypeId | Unset = UNSET,
+    secret_id: ListCredentialsSecretId | Unset = UNSET,
+    enabled: ListCredentialsEnabled | Unset = UNSET,
+    project_id: ListCredentialsProjectId | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[CredentialListResponse | ErrorData]:
     """List credentials
@@ -169,9 +247,18 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type_id (None | Unset | UUID): Filter by credential type ID
-        enabled (bool | None | Unset): Filter by enabled status
         for_action (Literal['use'] | None | Unset):
+        id (ListCredentialsId | Unset):
+        created_at (ListCredentialsCreatedAt | Unset):
+        updated_at (ListCredentialsUpdatedAt | Unset):
+        name (ListCredentialsName | Unset):
+        description (ListCredentialsDescription | Unset):
+        created_by (ListCredentialsCreatedBy | Unset):
+        updated_by (ListCredentialsUpdatedBy | Unset):
+        credential_type_id (ListCredentialsCredentialTypeId | Unset):
+        secret_id (ListCredentialsSecretId | Unset):
+        enabled (ListCredentialsEnabled | Unset):
+        project_id (ListCredentialsProjectId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -186,9 +273,18 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        credential_type_id=credential_type_id,
-        enabled=enabled,
         for_action=for_action,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
+        credential_type_id=credential_type_id,
+        secret_id=secret_id,
+        enabled=enabled,
+        project_id=project_id,
         additional_params=additional_params,
     )
 
@@ -206,9 +302,18 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type_id: None | Unset | UUID = UNSET,
-    enabled: bool | None | Unset = UNSET,
     for_action: Literal["use"] | None | Unset = UNSET,
+    id: ListCredentialsId | Unset = UNSET,
+    created_at: ListCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListCredentialsUpdatedAt | Unset = UNSET,
+    name: ListCredentialsName | Unset = UNSET,
+    description: ListCredentialsDescription | Unset = UNSET,
+    created_by: ListCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListCredentialsUpdatedBy | Unset = UNSET,
+    credential_type_id: ListCredentialsCredentialTypeId | Unset = UNSET,
+    secret_id: ListCredentialsSecretId | Unset = UNSET,
+    enabled: ListCredentialsEnabled | Unset = UNSET,
+    project_id: ListCredentialsProjectId | Unset = UNSET,
 ) -> CredentialListResponse | ErrorData | None:
     """List credentials
 
@@ -222,9 +327,18 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type_id (None | Unset | UUID): Filter by credential type ID
-        enabled (bool | None | Unset): Filter by enabled status
         for_action (Literal['use'] | None | Unset):
+        id (ListCredentialsId | Unset):
+        created_at (ListCredentialsCreatedAt | Unset):
+        updated_at (ListCredentialsUpdatedAt | Unset):
+        name (ListCredentialsName | Unset):
+        description (ListCredentialsDescription | Unset):
+        created_by (ListCredentialsCreatedBy | Unset):
+        updated_by (ListCredentialsUpdatedBy | Unset):
+        credential_type_id (ListCredentialsCredentialTypeId | Unset):
+        secret_id (ListCredentialsSecretId | Unset):
+        enabled (ListCredentialsEnabled | Unset):
+        project_id (ListCredentialsProjectId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -240,9 +354,18 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        credential_type_id=credential_type_id,
-        enabled=enabled,
         for_action=for_action,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
+        credential_type_id=credential_type_id,
+        secret_id=secret_id,
+        enabled=enabled,
+        project_id=project_id,
     ).parsed
 
 
@@ -253,9 +376,18 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type_id: None | Unset | UUID = UNSET,
-    enabled: bool | None | Unset = UNSET,
     for_action: Literal["use"] | None | Unset = UNSET,
+    id: ListCredentialsId | Unset = UNSET,
+    created_at: ListCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListCredentialsUpdatedAt | Unset = UNSET,
+    name: ListCredentialsName | Unset = UNSET,
+    description: ListCredentialsDescription | Unset = UNSET,
+    created_by: ListCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListCredentialsUpdatedBy | Unset = UNSET,
+    credential_type_id: ListCredentialsCredentialTypeId | Unset = UNSET,
+    secret_id: ListCredentialsSecretId | Unset = UNSET,
+    enabled: ListCredentialsEnabled | Unset = UNSET,
+    project_id: ListCredentialsProjectId | Unset = UNSET,
 ) -> Response[CredentialListResponse | ErrorData]:
     """List credentials
 
@@ -269,9 +401,18 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type_id (None | Unset | UUID): Filter by credential type ID
-        enabled (bool | None | Unset): Filter by enabled status
         for_action (Literal['use'] | None | Unset):
+        id (ListCredentialsId | Unset):
+        created_at (ListCredentialsCreatedAt | Unset):
+        updated_at (ListCredentialsUpdatedAt | Unset):
+        name (ListCredentialsName | Unset):
+        description (ListCredentialsDescription | Unset):
+        created_by (ListCredentialsCreatedBy | Unset):
+        updated_by (ListCredentialsUpdatedBy | Unset):
+        credential_type_id (ListCredentialsCredentialTypeId | Unset):
+        secret_id (ListCredentialsSecretId | Unset):
+        enabled (ListCredentialsEnabled | Unset):
+        project_id (ListCredentialsProjectId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -286,9 +427,18 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        credential_type_id=credential_type_id,
-        enabled=enabled,
         for_action=for_action,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        updated_by=updated_by,
+        credential_type_id=credential_type_id,
+        secret_id=secret_id,
+        enabled=enabled,
+        project_id=project_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -303,9 +453,18 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type_id: None | Unset | UUID = UNSET,
-    enabled: bool | None | Unset = UNSET,
     for_action: Literal["use"] | None | Unset = UNSET,
+    id: ListCredentialsId | Unset = UNSET,
+    created_at: ListCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListCredentialsUpdatedAt | Unset = UNSET,
+    name: ListCredentialsName | Unset = UNSET,
+    description: ListCredentialsDescription | Unset = UNSET,
+    created_by: ListCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListCredentialsUpdatedBy | Unset = UNSET,
+    credential_type_id: ListCredentialsCredentialTypeId | Unset = UNSET,
+    secret_id: ListCredentialsSecretId | Unset = UNSET,
+    enabled: ListCredentialsEnabled | Unset = UNSET,
+    project_id: ListCredentialsProjectId | Unset = UNSET,
 ) -> CredentialListResponse | ErrorData | None:
     """List credentials
 
@@ -319,9 +478,18 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type_id (None | Unset | UUID): Filter by credential type ID
-        enabled (bool | None | Unset): Filter by enabled status
         for_action (Literal['use'] | None | Unset):
+        id (ListCredentialsId | Unset):
+        created_at (ListCredentialsCreatedAt | Unset):
+        updated_at (ListCredentialsUpdatedAt | Unset):
+        name (ListCredentialsName | Unset):
+        description (ListCredentialsDescription | Unset):
+        created_by (ListCredentialsCreatedBy | Unset):
+        updated_by (ListCredentialsUpdatedBy | Unset):
+        credential_type_id (ListCredentialsCredentialTypeId | Unset):
+        secret_id (ListCredentialsSecretId | Unset):
+        enabled (ListCredentialsEnabled | Unset):
+        project_id (ListCredentialsProjectId | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -338,8 +506,17 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
-            credential_type_id=credential_type_id,
-            enabled=enabled,
             for_action=for_action,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            name=name,
+            description=description,
+            created_by=created_by,
+            updated_by=updated_by,
+            credential_type_id=credential_type_id,
+            secret_id=secret_id,
+            enabled=enabled,
+            project_id=project_id,
         )
     ).parsed

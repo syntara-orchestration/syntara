@@ -1974,7 +1974,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * Format: date-time
        * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
        */
@@ -1985,8 +1985,10 @@ export interface components {
        * @description Less than comparison. ?created_at[lt]=<timestamp>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * Format: date-time
        * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
        */
@@ -2006,7 +2008,7 @@ export interface components {
        */
       gt?: string
       /**
-       * Greater Than Or Equal
+       * Greater Than or Equal
        * Format: date-time
        * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
        */
@@ -2017,8 +2019,10 @@ export interface components {
        * @description Less than comparison. ?updated_at[lt]=<timestamp>
        */
       lt?: string
+      /** In */
+      in?: string
       /**
-       * Less Than Or Equal
+       * Less Than or Equal
        * Format: date-time
        * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
        */
@@ -2042,52 +2046,154 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
         created_at?: components['parameters']['createdAtFilterParam']
         updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter executions by workflow ID.
-         *     - Exact match: `workflow_id=<uuid>` or `workflow_id[eq]=<uuid>`
-         */
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        deleted_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        deleted_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
         workflow_id?: string & {
           /**
            * Equals
            * Format: uuid
-           * @description Exact match of the workflow ID. ?workflow_id[eq]=<uuid>
            */
           eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter executions by status.
-         *     - Exact match: `status=running` or `status[eq]=running`
-         */
+        workflow_version_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        project_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
         status?: components['schemas']['ExecutionStatus'] & {
-          /**
-           * Equals
-           * @description Exact match of the execution status. ?status[eq]=running
-           */
-          eq?: components['schemas']['ExecutionStatus']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter executions by mode.
-         *     - Exact match: `mode=standard` or `mode[eq]=standard`
-         */
         mode?: components['schemas']['ExecutionMode'] & {
-          /**
-           * Equals
-           * @description Exact match of the execution mode. ?mode[eq]=standard
-           */
-          eq?: components['schemas']['ExecutionMode']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter executions by approval pending state.
-         *     - Exact match: `approval_pending=true` or `approval_pending[eq]=true`
-         */
-        approval_pending?: boolean & {
+        completed_at?: string & {
           /**
            * Equals
-           * @description Exact match. ?approval_pending[eq]=true
+           * Format: date-time
            */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        approval_pending?: boolean & {
+          /** Equals */
           eq?: boolean
+          /** In */
+          in?: string
         }
       }
       header?: never
@@ -2248,71 +2354,46 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
-        created_at?: components['parameters']['createdAtFilterParam']
-        updated_at?: components['parameters']['updatedAtFilterParam']
-        /**
-         * @description Filter activities by name.
-         *     - Exact match: `activity_name=<name>` or `activity_name[eq]=<name>`
-         *     - Contains: `activity_name[contains]=<substring>`
-         */
-        activity_name?: string & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the activity name. ?activity_name[eq]=<name>
+           * Format: uuid
            */
           eq?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?activity_name[contains]=<substring>
-           */
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        activity_name?: string & {
+          /** Contains */
           contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?activity_name[starts_with]=<prefix>
-           */
-          starts_with?: string
-          /**
-           * Greater Than
-           * @description Greater than comparison (lexicographical). ?activity_name[gt]=<value>
-           */
+          /** Equals */
+          eq?: string
+          /** Greater Than */
           gt?: string
-          /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?activity_name[gte]=<value>
-           */
+          /** Greater Than or Equal */
           gte?: string
-          /**
-           * Less Than
-           * @description Less than comparison (lexicographical). ?activity_name[lt]=<value>
-           */
+          /** In */
+          in?: string
+          /** Less Than */
           lt?: string
-          /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?activity_name[lte]=<value>
-           */
+          /** Less Than or Equal */
           lte?: string
+          /** Starts With */
+          starts_with?: string
         }
-        /**
-         * @description Filter activities by node type.
-         *     - Exact match: `node_type=condition` or `node_type[eq]=condition`
-         */
         node_type?: components['schemas']['NodeType'] & {
-          /**
-           * Equals
-           * @description Exact match of the node type. ?node_type[eq]=condition
-           */
-          eq?: components['schemas']['NodeType']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter activities by status.
-         *     - Exact match: `status=completed` or `status[eq]=completed`
-         */
         status?: components['schemas']['ActivityStatus'] & {
-          /**
-           * Equals
-           * @description Exact match of the activity status. ?status[eq]=completed
-           */
-          eq?: components['schemas']['ActivityStatus']
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
         }
       }
       header?: never

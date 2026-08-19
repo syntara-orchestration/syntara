@@ -820,68 +820,176 @@ export interface operations {
         sort?: string | null
         /** @description Include total count in response (expensive) */
         include_total?: boolean
-        /**
-         * @description Filter service accounts by status.
-         *     - Exact match: `status=active` or `status[eq]=active`
-         */
-        status?: components['schemas']['ServiceAccountStatus'] & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the status. ?status[eq]=active
+           * Format: uuid
            */
-          eq?: components['schemas']['ServiceAccountStatus']
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter service accounts by name.
-         *     - Exact match: `name=value`
-         *     - Contains: `name[contains]=substring`
-         */
-        name?: string & {
+        created_at?: string & {
           /**
            * Equals
-           * @description Exact match of the name. ?name[eq]=value
+           * Format: date-time
            */
           eq?: string
           /**
-           * In
-           * @description Match any of a comma-separated list. ?name[in]=a,b,c
-           */
-          in?: string
-          /**
-           * Contains
-           * @description Substring match (case-insensitive). ?name[contains]=substring
-           */
-          contains?: string
-          /**
-           * Starts With
-           * @description Prefix match (case-insensitive). ?name[starts_with]=prefix
-           */
-          starts_with?: string
-          /**
            * Greater Than
-           * @description Greater than comparison (lexicographical). ?name[gt]=value
+           * Format: date-time
            */
           gt?: string
           /**
-           * Greater Than Or Equal
-           * @description Greater than or equal comparison. ?name[gte]=value
+           * Greater Than or Equal
+           * Format: date-time
            */
           gte?: string
+          /** In */
+          in?: string
           /**
            * Less Than
-           * @description Less than comparison (lexicographical). ?name[lt]=value
+           * Format: date-time
            */
           lt?: string
           /**
-           * Less Than Or Equal
-           * @description Less than or equal comparison. ?name[lte]=value
+           * Less Than or Equal
+           * Format: date-time
            */
           lte?: string
+        }
+        updated_at?: string & {
           /**
-           * Is Null
-           * @description Null check (true = IS NULL, false = IS NOT NULL). ?name[isnull]=true
+           * Equals
+           * Format: date-time
            */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        description?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
           isnull?: boolean
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        status?: components['schemas']['ServiceAccountStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        project_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        last_authenticated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
         }
       }
       header?: never
@@ -1104,27 +1212,184 @@ export interface operations {
         sort?: string | null
         /** @description Include total count in response (expensive) */
         include_total?: boolean
-        /**
-         * @description Filter credentials by credential type.
-         *     - Exact match: `credential_type=client_credentials` or `credential_type[eq]=client_credentials`
-         */
-        credential_type?: components['schemas']['ServiceAccountCredentialType'] & {
+        id?: string & {
           /**
            * Equals
-           * @description Exact match of the credential type. ?credential_type[eq]=client_credentials
+           * Format: uuid
            */
-          eq?: components['schemas']['ServiceAccountCredentialType']
+          eq?: string
+          /** In */
+          in?: string
         }
-        /**
-         * @description Filter credentials by status.
-         *     - Exact match: `status=active` or `status[eq]=active`
-         */
-        status?: components['schemas']['ServiceAccountCredentialStatus'] & {
+        created_at?: string & {
           /**
            * Equals
-           * @description Exact match of the status. ?status[eq]=active
+           * Format: date-time
            */
-          eq?: components['schemas']['ServiceAccountCredentialStatus']
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        updated_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        credential_type?: components['schemas']['ServiceAccountCredentialType'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        identifier?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        status?: components['schemas']['ServiceAccountCredentialStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        expires_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        last_used_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
         }
       }
       header?: never

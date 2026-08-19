@@ -341,8 +341,9 @@ class TestToOpenAPIParams:
 
         operator_obj = status_param["schema"]["allOf"][1]
         assert set(operator_obj["properties"].keys()) == {"eq", "in"}
-        assert operator_obj["properties"]["eq"]["$ref"] == "#/components/schemas/SampleStatus"
+        assert operator_obj["properties"]["eq"]["type"] == "string"
         assert operator_obj["properties"]["eq"]["title"] == "Equals"
+        assert "$ref" not in operator_obj["properties"]["eq"]
 
     def test_optional_field_adds_isnull(self):
         """Optional field should have isnull operator; non-optional should not."""

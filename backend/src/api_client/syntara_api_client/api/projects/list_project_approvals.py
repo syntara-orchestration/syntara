@@ -7,8 +7,14 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.approval_list_response import ApprovalListResponse
-from ...models.approval_request_status import ApprovalRequestStatus
 from ...models.error_data import ErrorData
+from ...models.list_project_approvals_created_at import ListProjectApprovalsCreatedAt
+from ...models.list_project_approvals_execution_id import ListProjectApprovalsExecutionId
+from ...models.list_project_approvals_id import ListProjectApprovalsId
+from ...models.list_project_approvals_name import ListProjectApprovalsName
+from ...models.list_project_approvals_status import ListProjectApprovalsStatus
+from ...models.list_project_approvals_timeout_at import ListProjectApprovalsTimeoutAt
+from ...models.list_project_approvals_updated_at import ListProjectApprovalsUpdatedAt
 from ...types import UNSET, Response, Unset
 
 
@@ -19,8 +25,13 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    status: ApprovalRequestStatus | None | Unset = UNSET,
-    execution_id: None | Unset | UUID = UNSET,
+    id: ListProjectApprovalsId | Unset = UNSET,
+    created_at: ListProjectApprovalsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectApprovalsUpdatedAt | Unset = UNSET,
+    name: ListProjectApprovalsName | Unset = UNSET,
+    execution_id: ListProjectApprovalsExecutionId | Unset = UNSET,
+    status: ListProjectApprovalsStatus | Unset = UNSET,
+    timeout_at: ListProjectApprovalsTimeoutAt | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -45,23 +56,47 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_status: None | str | Unset
-    if isinstance(status, Unset):
-        json_status = UNSET
-    elif isinstance(status, ApprovalRequestStatus):
-        json_status = status.value
-    else:
-        json_status = status
-    params["status"] = json_status
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
 
-    json_execution_id: None | str | Unset
-    if isinstance(execution_id, Unset):
-        json_execution_id = UNSET
-    elif isinstance(execution_id, UUID):
-        json_execution_id = str(execution_id)
-    else:
-        json_execution_id = execution_id
-    params["execution_id"] = json_execution_id
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_execution_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(execution_id, Unset):
+        json_execution_id = execution_id.to_dict()
+    if not isinstance(json_execution_id, Unset):
+        params.update(json_execution_id)
+
+    json_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(status, Unset):
+        json_status = status.to_dict()
+    if not isinstance(json_status, Unset):
+        params.update(json_status)
+
+    json_timeout_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(timeout_at, Unset):
+        json_timeout_at = timeout_at.to_dict()
+    if not isinstance(json_timeout_at, Unset):
+        params.update(json_timeout_at)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -149,8 +184,13 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    status: ApprovalRequestStatus | None | Unset = UNSET,
-    execution_id: None | Unset | UUID = UNSET,
+    id: ListProjectApprovalsId | Unset = UNSET,
+    created_at: ListProjectApprovalsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectApprovalsUpdatedAt | Unset = UNSET,
+    name: ListProjectApprovalsName | Unset = UNSET,
+    execution_id: ListProjectApprovalsExecutionId | Unset = UNSET,
+    status: ListProjectApprovalsStatus | Unset = UNSET,
+    timeout_at: ListProjectApprovalsTimeoutAt | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ApprovalListResponse | ErrorData]:
     """List project approvals
@@ -166,8 +206,13 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        status (ApprovalRequestStatus | None | Unset):
-        execution_id (None | Unset | UUID):
+        id (ListProjectApprovalsId | Unset):
+        created_at (ListProjectApprovalsCreatedAt | Unset):
+        updated_at (ListProjectApprovalsUpdatedAt | Unset):
+        name (ListProjectApprovalsName | Unset):
+        execution_id (ListProjectApprovalsExecutionId | Unset):
+        status (ListProjectApprovalsStatus | Unset):
+        timeout_at (ListProjectApprovalsTimeoutAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -183,8 +228,13 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        status=status,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
         execution_id=execution_id,
+        status=status,
+        timeout_at=timeout_at,
         additional_params=additional_params,
     )
 
@@ -203,8 +253,13 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    status: ApprovalRequestStatus | None | Unset = UNSET,
-    execution_id: None | Unset | UUID = UNSET,
+    id: ListProjectApprovalsId | Unset = UNSET,
+    created_at: ListProjectApprovalsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectApprovalsUpdatedAt | Unset = UNSET,
+    name: ListProjectApprovalsName | Unset = UNSET,
+    execution_id: ListProjectApprovalsExecutionId | Unset = UNSET,
+    status: ListProjectApprovalsStatus | Unset = UNSET,
+    timeout_at: ListProjectApprovalsTimeoutAt | Unset = UNSET,
 ) -> ApprovalListResponse | ErrorData | None:
     """List project approvals
 
@@ -219,8 +274,13 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        status (ApprovalRequestStatus | None | Unset):
-        execution_id (None | Unset | UUID):
+        id (ListProjectApprovalsId | Unset):
+        created_at (ListProjectApprovalsCreatedAt | Unset):
+        updated_at (ListProjectApprovalsUpdatedAt | Unset):
+        name (ListProjectApprovalsName | Unset):
+        execution_id (ListProjectApprovalsExecutionId | Unset):
+        status (ListProjectApprovalsStatus | Unset):
+        timeout_at (ListProjectApprovalsTimeoutAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -237,8 +297,13 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        status=status,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
         execution_id=execution_id,
+        status=status,
+        timeout_at=timeout_at,
     ).parsed
 
 
@@ -250,8 +315,13 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    status: ApprovalRequestStatus | None | Unset = UNSET,
-    execution_id: None | Unset | UUID = UNSET,
+    id: ListProjectApprovalsId | Unset = UNSET,
+    created_at: ListProjectApprovalsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectApprovalsUpdatedAt | Unset = UNSET,
+    name: ListProjectApprovalsName | Unset = UNSET,
+    execution_id: ListProjectApprovalsExecutionId | Unset = UNSET,
+    status: ListProjectApprovalsStatus | Unset = UNSET,
+    timeout_at: ListProjectApprovalsTimeoutAt | Unset = UNSET,
 ) -> Response[ApprovalListResponse | ErrorData]:
     """List project approvals
 
@@ -266,8 +336,13 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        status (ApprovalRequestStatus | None | Unset):
-        execution_id (None | Unset | UUID):
+        id (ListProjectApprovalsId | Unset):
+        created_at (ListProjectApprovalsCreatedAt | Unset):
+        updated_at (ListProjectApprovalsUpdatedAt | Unset):
+        name (ListProjectApprovalsName | Unset):
+        execution_id (ListProjectApprovalsExecutionId | Unset):
+        status (ListProjectApprovalsStatus | Unset):
+        timeout_at (ListProjectApprovalsTimeoutAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -283,8 +358,13 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        status=status,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
         execution_id=execution_id,
+        status=status,
+        timeout_at=timeout_at,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -300,8 +380,13 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    status: ApprovalRequestStatus | None | Unset = UNSET,
-    execution_id: None | Unset | UUID = UNSET,
+    id: ListProjectApprovalsId | Unset = UNSET,
+    created_at: ListProjectApprovalsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectApprovalsUpdatedAt | Unset = UNSET,
+    name: ListProjectApprovalsName | Unset = UNSET,
+    execution_id: ListProjectApprovalsExecutionId | Unset = UNSET,
+    status: ListProjectApprovalsStatus | Unset = UNSET,
+    timeout_at: ListProjectApprovalsTimeoutAt | Unset = UNSET,
 ) -> ApprovalListResponse | ErrorData | None:
     """List project approvals
 
@@ -316,8 +401,13 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        status (ApprovalRequestStatus | None | Unset):
-        execution_id (None | Unset | UUID):
+        id (ListProjectApprovalsId | Unset):
+        created_at (ListProjectApprovalsCreatedAt | Unset):
+        updated_at (ListProjectApprovalsUpdatedAt | Unset):
+        name (ListProjectApprovalsName | Unset):
+        execution_id (ListProjectApprovalsExecutionId | Unset):
+        status (ListProjectApprovalsStatus | Unset):
+        timeout_at (ListProjectApprovalsTimeoutAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -335,7 +425,12 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
-            status=status,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            name=name,
             execution_id=execution_id,
+            status=status,
+            timeout_at=timeout_at,
         )
     ).parsed

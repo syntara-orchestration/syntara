@@ -79,11 +79,13 @@ _TYPE_TO_OPENAPI: list[tuple[type, dict[str, Any]]] = [
 ]
 
 
-def _python_type_to_openapi_schema(python_type: type) -> dict[str, Any]:
+def _python_type_to_openapi_schema(python_type: type, *, allow_ref: bool = True) -> dict[str, Any]:
     """Convert a Python type to its OpenAPI schema representation."""
     if isinstance(python_type, type):
         if issubclass(python_type, Enum):
-            return {"$ref": f"#/components/schemas/{python_type.__name__}"}
+            if allow_ref:
+                return {"$ref": f"#/components/schemas/{python_type.__name__}"}
+            return {"type": "string"}
         for base_type, schema in _TYPE_TO_OPENAPI:
             if issubclass(python_type, base_type):
                 return schema
@@ -136,12 +138,13 @@ class FilterableModel:
         params: list[dict[str, Any]] = []
         for field_name, (operators, python_type) in self._fields.items():
             base_schema = _python_type_to_openapi_schema(python_type)
+            op_schema = _python_type_to_openapi_schema(python_type, allow_ref=False)
 
             operator_properties: dict[str, Any] = {}
             for op in sorted(operators, key=lambda o: o.value):
                 title = _OPERATOR_TITLES.get(op, op.value.replace("_", " ").title())
                 prop: dict[str, Any] = {"title": title}
-                prop.update(_OPERATOR_SCHEMA_OVERRIDES.get(op, base_schema))
+                prop.update(_OPERATOR_SCHEMA_OVERRIDES.get(op, op_schema))
                 operator_properties[op.value] = prop
 
             params.append(

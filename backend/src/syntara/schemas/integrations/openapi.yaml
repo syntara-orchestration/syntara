@@ -257,8 +257,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/IntegrationType'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -273,8 +273,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/IntegrationStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -305,8 +305,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/IntegrationScope'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -1271,8 +1271,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ToolStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -2543,6 +2543,8 @@ components:
       $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdate'
     ToolBulkUpdateResponse:
       $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdateResponse'
+    ToolStatus:
+      $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolStatus'
 
   securitySchemes:
     bearerAuth:

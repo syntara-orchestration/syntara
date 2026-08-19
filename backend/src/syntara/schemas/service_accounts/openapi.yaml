@@ -311,8 +311,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ServiceAccountStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -854,8 +854,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ServiceAccountCredentialType'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
@@ -904,8 +904,8 @@ paths:
               - type: object
                 properties:
                   eq:
-                    $ref: '#/components/schemas/ServiceAccountCredentialStatus'
                     title: Equals
+                    type: string
                   in:
                     title: In
                     type: string
