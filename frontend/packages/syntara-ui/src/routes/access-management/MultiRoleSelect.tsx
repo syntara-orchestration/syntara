@@ -14,6 +14,8 @@ import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
 import { NxSelect } from '../../components/NxSelect'
 
+import styles from './AssignRoleModal.module.css'
+
 export type RoleOption = {
   id: string
   name: string
@@ -24,7 +26,7 @@ function renderSelectOptions(options: RoleOption[], filterValue: string, hasMore
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
   }
-  if (options.length === 0) {
+  if (options.length === 0 && !hasMore) {
     return (
       <SelectOption isDisabled>{filterValue ? `No results match "${filterValue}"` : 'No roles available'}</SelectOption>
     )
@@ -177,7 +179,7 @@ export function MultiRoleSelect({
       onSelect={handleSelect}
       toggle={toggle}
     >
-      <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
+      <SelectList className={styles.rolesList}>
         {renderSelectOptions(filteredOptions, filterValue, hasMore, isLoading)}
       </SelectList>
     </NxSelect>

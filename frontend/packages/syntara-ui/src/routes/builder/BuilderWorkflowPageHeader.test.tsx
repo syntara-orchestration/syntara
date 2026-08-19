@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { expectPageTitle } from '../../test/pageTitle'
+
 import { BuilderWorkflowPageHeader, type BuilderWorkflowPageHeaderProps } from './BuilderWorkflowPageHeader'
 
 const mockWorkflowStoreState = vi.hoisted(() => ({
@@ -734,5 +736,23 @@ describe('BuilderWorkflowPageHeader', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument()
+  })
+
+  it('prepends dirty indicator to page title when isDirty is true', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={false} workflowName="my-workflow" />)
+
+    expectPageTitle(['● my-workflow', 'Workflows'])
+  })
+
+  it('does not prepend dirty indicator to page title when isDirty is false', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={false} isNew={false} workflowName="my-workflow" />)
+
+    expectPageTitle(['my-workflow', 'Workflows'])
+  })
+
+  it('prepends dirty indicator to new workflow page title when isDirty is true', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={true} />)
+
+    expectPageTitle(['● New Workflow', 'Workflows'])
   })
 })

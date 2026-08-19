@@ -148,7 +148,6 @@ def _emit_workflow(
     duration_ms = (execution.completed_at - execution.created_at).total_seconds() * 1000
     recorder.record(MetricType.WORKFLOW_DURATION, duration_ms, unit="ms", labels=labels)
     recorder.record(MetricType.WORKFLOW_STATUS, value=1, labels=labels)
-    recorder.decrement_gauge("active_workflows")
 
     with _workflow_completion_lock:
         _workflow_completion_counts[1] += 1

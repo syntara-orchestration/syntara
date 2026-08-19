@@ -222,6 +222,7 @@ export interface components {
       | 'workflow_serialization_duration_ms'
       | 'workflow_validation_duration_ms'
       | 'temporal_queue_depth'
+      | 'active_workflows'
       | 'activity_execution_success_rate'
       | 'workflow_start_latency_ms'
       | 'workflow_completion_rate'

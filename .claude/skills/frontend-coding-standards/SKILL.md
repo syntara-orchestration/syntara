@@ -5,7 +5,7 @@ user-invocable: false
 
 # Coding Standards
 
-Detailed code examples and patterns for this project. Referenced from CLAUDE.md's condensed checklist.
+Detailed code examples and patterns for this project. Referenced from frontend/AGENTS.md's condensed checklist.
 
 ---
 

@@ -139,6 +139,16 @@ jobs:
             frontend/packages/syntara-ui/playwright-report/
           retention-days: 7
 
+      # Run on success OR failure: screenshots uses continue-on-error, so a
+      # mid-suite failure can still leave rewritten PNGs that Detect would
+      # otherwise stage unfiltered. No continue-on-error: a filter crash must
+      # fail the job rather than Detect staging unfiltered noise.
+      - name: Filter noisy baseline diffs
+        id: filter-noise
+        if: always() && steps.checkout.outcome != 'failure' && steps.screenshots.outcome != 'skipped'
+        working-directory: frontend/packages/syntara-ui
+        run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
+
       - name: Detect changed baselines
         id: detect
         if: steps.checkout.outcome != 'failure'
@@ -266,6 +276,7 @@ jobs:
           ADDED: ${{ steps.detect.outputs.added }}
           MODIFIED: ${{ steps.detect.outputs.modified }}
           CHECKOUT_FAILED: ${{ steps.checkout.outcome == 'failure' }}
+          FILTER_FAILED: ${{ steps.filter-noise.outcome == 'failure' }}
           TESTS_FAILED: ${{ steps.screenshots.outcome == 'failure' || steps.screenshots.conclusion == 'failure' }}
           COMMIT_FAILED: ${{ steps.commit.outcome == 'failure' }}
           COMMIT_OUTCOME: ${{ steps.commit.outcome }}
@@ -279,6 +290,7 @@ jobs:
             const added = process.env.ADDED || '0';
             const modified = process.env.MODIFIED || '0';
             const checkoutFailed = process.env.CHECKOUT_FAILED === 'true';
+            const filterFailed = process.env.FILTER_FAILED === 'true';
             const testsFailed = process.env.TESTS_FAILED === 'true';
             const commitFailed = process.env.COMMIT_FAILED === 'true';
             const commitOutcome = process.env.COMMIT_OUTCOME || '';
@@ -302,6 +314,14 @@ jobs:
                   'merge, since that\'s what PR CI actually renders — see the workflow file for why).',
                 '',
                 'Merge or rebase onto the base branch locally, push, then re-run `/update-screenshots`.',
+              ].join('\n');
+            } else if (filterFailed) {
+              body = [
+                '### :x: Visual baselines not updated — noise filter failed',
+                '',
+                'Screenshots were generated but the keep/restore filter crashed, so no baselines were committed.',
+                '',
+                `Check the [workflow run](${runUrl}) logs for the Filter noisy baseline diffs step.`,
               ].join('\n');
             } else if (commitFailed && testsFailed) {
               body = [
@@ -379,13 +399,14 @@ jobs:
               body,
             });
 
-      - name: Fail job if checkout, scoping, screenshots, or commit had errors
+      - name: Fail job if checkout, scoping, screenshots, filter, or commit had errors
         if: >-
           steps.checkout.outcome == 'failure' ||
           steps.scope.outcome == 'failure' ||
           steps.screenshots.outcome == 'failure' ||
+          steps.filter-noise.outcome == 'failure' ||
           steps.detect.outcome == 'failure' ||
           steps.commit.outcome == 'failure'
         run: |
-          echo "::error::Merge-commit checkout, scope detection, screenshot generation, or commit had failures — see comment on PR"
+          echo "::error::Merge-commit checkout, scope detection, screenshot generation, noise filter, or commit had failures — see comment on PR"
           exit 1

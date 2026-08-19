@@ -446,6 +446,13 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByText('Deploy to production?')).toBeInTheDocument()
   })
 
+  it('does not render message when prompt is only whitespace', () => {
+    const withPrompt = { ...mockApproval, prompt: '   ' } as Approval
+    render(<ApprovalDetailContent approval={withPrompt} />, { wrapper })
+
+    expect(screen.queryByText('Message')).not.toBeInTheDocument()
+  })
+
   it('prefers description over prompt when both exist', () => {
     const both = {
       ...mockApproval,

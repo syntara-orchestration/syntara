@@ -39,6 +39,15 @@ def _to_dict(output: object) -> dict[str, Any]:
     return output if isinstance(output, dict) else getattr(output, "additional_properties", {})
 
 
+@pytest.mark.xfail(
+    reason=(
+        "Test races the real agent orchestrator: when APP_OPENROUTER_API_KEY is set "
+        "and OpenRouter has credits, the agent completes the LLM call and signals "
+        "the workflow before the test can send its own manual signal. The execution "
+        "reaches a terminal state before wait_for_agentic_activity sees 'waiting'."
+    ),
+    strict=False,
+)
 class TestWorkflowAgenticSignal:
     """E2E tests for AI Agent node signal-based completion."""
 

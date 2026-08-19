@@ -415,9 +415,12 @@ export function BuilderWorkflowPageHeader({
     />
   )
 
+  const titleSegment = isNew ? 'New Workflow' : workflowName
+  const dirtyTitle = isDirty ? `● ${titleSegment}` : titleSegment
+
   return (
     <>
-      <NxPageTitle segments={[isNew ? 'New Workflow' : workflowName, 'Workflows']} />
+      <NxPageTitle segments={[dirtyTitle, 'Workflows']} />
       {isViewingVersion ? (
         <NxPageHeader
           title={workflowName}

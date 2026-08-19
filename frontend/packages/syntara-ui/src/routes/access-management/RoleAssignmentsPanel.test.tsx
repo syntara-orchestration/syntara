@@ -45,6 +45,12 @@ vi.mock('../access/useAssignmentPermissions', () => ({
   }),
 }))
 
+vi.mock('../access/useAlreadyAssignedRoles', () => ({
+  useAlreadyAssignedRoles: () => ({ assigned: new Set<string>(), isLoading: false, isError: false }),
+  roleAssignmentsQueryKey: (...args: unknown[]) => ['role-assignments', ...args],
+  PRINCIPAL_ID_FIELD: { user: 'userId', group: 'groupId', service_account: 'serviceAccountId' },
+}))
+
 vi.mock('../../hooks/routing/useSearchParams', async () => {
   const { useState, useEffect } = await import('react')
   const { searchParamsMock: mock } = await import('../../test/searchParamsMock')
