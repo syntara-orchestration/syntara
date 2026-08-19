@@ -30036,6 +30036,13 @@ components:
             - type: 'null'
           description: Username or UUID of the workflow creator
           title: Created By
+        created_at:
+          anyOf:
+            - format: date-time
+              type: string
+            - type: 'null'
+          description: Timestamp when the workflow was created
+          title: Created At
         description:
           anyOf:
             - type: string

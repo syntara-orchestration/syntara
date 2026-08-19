@@ -10,6 +10,7 @@ import { NxListPanelTable, NxListPanelView } from '../../../components/panels/li
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { StatusLabel } from '../../builder/ExecutionStatus'
@@ -91,7 +92,7 @@ function WorkflowsTable({
                 </LinkCell>
               </Td>
               <Td dataLabel="Created by">
-                <Truncate content={workflow.created_by ?? RELATED_RESOURCE_DASH} />
+                <UserTimestamp user={workflow.created_by} timestamp={workflow.created_at ?? undefined} inline />
               </Td>
               <Td dataLabel="Steps using credential">
                 {workflow.node_names && workflow.node_names.length > 0 ? (

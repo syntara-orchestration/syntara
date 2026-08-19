@@ -9,17 +9,13 @@ import { NxPanelContentStack } from '../../../components/layout/NxPanelContentSt
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { INTEGRATION_TYPE_LABELS } from '../integrations/integrationFilters'
 import { StatusLabel } from '../integrations/StatusLabel'
 
-import {
-  expandableRowIds,
-  hasTrimmedDescription,
-  RELATED_RESOURCE_DASH,
-  relatedResourceRowId,
-} from './credentialRelatedTableUtils'
+import { expandableRowIds, hasTrimmedDescription, relatedResourceRowId } from './credentialRelatedTableUtils'
 import { DescriptionExpandableContent } from './DescriptionExpandableContent'
 
 type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
@@ -98,7 +94,7 @@ function IntegrationsTable({
                 {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
               </Td>
               <Td dataLabel="Created by">
-                <Truncate content={integration.created_by ?? RELATED_RESOURCE_DASH} />
+                <UserTimestamp user={integration.created_by} timestamp={integration.created_at} inline />
               </Td>
               <Td dataLabel="Status">
                 <StatusLabel

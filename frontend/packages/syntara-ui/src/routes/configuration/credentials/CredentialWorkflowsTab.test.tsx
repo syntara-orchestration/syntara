@@ -228,7 +228,7 @@ describe('CredentialWorkflowsTab', () => {
     expect(screen.queryByRole('button', { name: /details/i })).not.toBeInTheDocument()
   })
 
-  it('renders node name labels, created by, and execution status', () => {
+  it('renders node name labels, created by with date, and execution status', () => {
     vi.mocked(credentialsClient.useQuery).mockReturnValue(
       mockQuery({
         resources: [
@@ -236,6 +236,7 @@ describe('CredentialWorkflowsTab', () => {
             id: 'wf-1',
             name: 'Production Deployment',
             created_by: 'admin',
+            created_at: '2026-07-01T12:00:00Z',
             node_names: ['Fetch secrets', 'Deploy'],
             last_execution_status: 'completed',
           },
@@ -246,6 +247,7 @@ describe('CredentialWorkflowsTab', () => {
     render(<CredentialWorkflowsTab credentialId="cred-1" />, { wrapper })
 
     expect(screen.getByText('admin')).toBeInTheDocument()
+    expect(screen.getByText(/Jul.*1.*2026/i)).toBeInTheDocument()
     expect(screen.getByText('Fetch secrets')).toBeInTheDocument()
     expect(screen.getByText('Deploy')).toBeInTheDocument()
     expect(screen.getByText('Completed')).toBeInTheDocument()
