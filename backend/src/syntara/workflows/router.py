@@ -252,9 +252,8 @@ async def validate_workflow_definition(
     """Validate a workflow definition without saving it.
 
     Requires authentication but no specific workflow/project permission:
-    no workflow_id or project_id is in scope to authorize against.
-    Reads the admin-level continue_on_failure default from the settings
-    cache to resolve approval fallback_decision warnings accurately.
+    validation is a stateless, side-effect-free check of caller-supplied
+    data with no workflow_id or project_id in scope to authorize against.
     """
     system_cof = await get_system_continue_on_failure()
     result = workflow_validator.collect_findings(
