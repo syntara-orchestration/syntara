@@ -1704,18 +1704,8 @@ export interface operations {
            */
           eq?: string
         }
-        /**
-         * @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
-         *     - Exact match: `project_id=<uuid>` or `project_id[eq]=<uuid>`
-         */
-        project_id?: string & {
-          /**
-           * Equals
-           * Format: uuid
-           * @description Exact match of the project ID. ?project_id[eq]=<uuid>
-           */
-          eq?: string
-        }
+        /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
+        project_id?: string | null
       }
       header?: never
       path?: never
