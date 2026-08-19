@@ -247,7 +247,7 @@ def auditor_client(syntara_base_url: str, syntara_api: SyntaraApiRegistry) -> Au
         pytest.fail(f"Failed to create auditor user: {resp.status_code} {resp.content!r}")
 
     if resp.status_code == HTTPStatus.CONFLICT:
-        users_list = syntara_api.users.list(username=username).assert_and_get()
+        users_list = syntara_api.users.list(additional_params={"username": username}).assert_and_get()
         user_id = users_list.resources[0].id
     else:
         user = resp.assert_and_get()
@@ -345,7 +345,9 @@ def mcp_integration_id(syntara_api: SyntaraApiRegistry, require_mcp_server: None
     finds an existing Integration named MCP_PROVIDER_NAME or creates one.  Both validate
     and refresh_resources are synchronous — status is final when they return.
     """
-    integrations_resp = syntara_api.integrations.list(integration_type=IntegrationType.MCP_SERVER)
+    integrations_resp = syntara_api.integrations.list(
+        additional_params={"integration_type": IntegrationType.MCP_SERVER.value},
+    )
     integrations_list = integrations_resp.assert_and_get()
 
     existing = next(
