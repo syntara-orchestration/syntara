@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -690,6 +691,13 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exclude internal domains to produce the public-facing spec",
     )
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["json", "yaml"],
+        default="yaml",
+        help="Output format (default: yaml)",
+    )
     return parser.parse_args()
 
 
@@ -732,21 +740,23 @@ def main() -> None:
 
     merged = _build_merged_spec(sub_specs)
 
-    output_yaml = yaml.dump(
-        merged,
-        Dumper=_build_dumper(),
-        default_flow_style=False,
-        allow_unicode=True,
-        sort_keys=False,
-        width=120,
-    )
-    # Strip trailing spaces/tabs from each line (yaml.dump can leave them).
-    # Use [ \t] instead of \s to avoid stripping blank lines (which are
-    # significant in YAML literal block scalars for preserving \n\n).
-    output_yaml = re.sub(r"[ \t]+$", "", output_yaml, flags=re.MULTILINE)
-
-    header = GENERATED_PUBLIC_HEADER if args.public else GENERATED_HEADER
-    full_output = header + output_yaml
+    if args.format == "json":
+        full_output = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
+    else:
+        output_yaml = yaml.dump(
+            merged,
+            Dumper=_build_dumper(),
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+            width=120,
+        )
+        # Strip trailing spaces/tabs from each line (yaml.dump can leave them).
+        # Use [ \t] instead of \s to avoid stripping blank lines (which are
+        # significant in YAML literal block scalars for preserving \n\n).
+        output_yaml = re.sub(r"[ \t]+$", "", output_yaml, flags=re.MULTILINE)
+        header = GENERATED_PUBLIC_HEADER if args.public else GENERATED_HEADER
+        full_output = header + output_yaml
 
     if args.dry_run:
         print(full_output)

@@ -4751,7 +4751,7 @@
             }
           },
           "403": {
-            "description": "CSRF cookie missing \u2014 not authenticated via cookie flow"
+            "description": "CSRF cookie missing — not authenticated via cookie flow"
           },
           "404": {
             "description": "Not Found",
@@ -4994,7 +4994,7 @@
     "/auth/refresh": {
       "post": {
         "summary": "Refresh access token",
-        "description": "Exchange a valid refresh token for a new access token.\n\nThe refresh token is read from the `ao_refresh_token` HttpOnly cookie.\nIt is not rotated \u2014 the same refresh token remains valid for its entire\nlifetime (default 8 hours from login). The cookie is re-set on every\nsuccessful refresh so the `max-age` counter restarts.\n",
+        "description": "Exchange a valid refresh token for a new access token.\n\nThe refresh token is read from the `ao_refresh_token` HttpOnly cookie.\nIt is not rotated — the same refresh token remains valid for its entire\nlifetime (default 8 hours from login). The cookie is re-set on every\nsuccessful refresh so the `max-age` counter restarts.\n",
         "operationId": "refresh_token",
         "tags": [
           "Authentication"
@@ -5465,7 +5465,7 @@
     "/auth/providers": {
       "get": {
         "summary": "List enabled identity providers",
-        "description": "Returns a list of enabled identity providers for the login page.\nThis is a public endpoint that does not require authentication.\nOnly returns provider id, name, and type \u2014 no secrets or configuration details.\n",
+        "description": "Returns a list of enabled identity providers for the login page.\nThis is a public endpoint that does not require authentication.\nOnly returns provider id, name, and type — no secrets or configuration details.\n",
         "operationId": "list_auth_providers",
         "tags": [
           "Authentication"
@@ -27941,7 +27941,7 @@
     "/tools": {
       "get": {
         "summary": "List Tools",
-        "description": "List tools with filtering, sorting, and pagination.\n\nTools are filtered by the caller's integration visibility \u2014 only tools\nbelonging to visible integrations are returned.",
+        "description": "List tools with filtering, sorting, and pagination.\n\nTools are filtered by the caller's integration visibility — only tools\nbelonging to visible integrations are returned.",
         "operationId": "list_tools",
         "x-app-permission": {
           "resource": "tool",
@@ -39321,7 +39321,7 @@
       "AAPCredential": {
         "type": "object",
         "title": "AAPCredential",
-        "description": "Ansible Automation Platform credential resource.\n\nOnly ``id`` and ``name`` are exposed \u2014 descriptions are omitted to avoid\nleaking infrastructure details (e.g. \"prod-aws-root-key\") to all users.",
+        "description": "Ansible Automation Platform credential resource.\n\nOnly ``id`` and ``name`` are exposed — descriptions are omitted to avoid\nleaking infrastructure details (e.g. \"prod-aws-root-key\") to all users.",
         "required": [
           "id",
           "name"
@@ -40631,7 +40631,7 @@
             "type": "boolean",
             "title": "Check Any Project",
             "default": false,
-            "description": "When true, allow if the user has the permission in any project (project-scoped policies match without a concrete resource_project). Mutually exclusive with a non-empty resource_project. Default false preserves strict project matching \u2014 empty resource_project alone is never a wildcard.\n"
+            "description": "When true, allow if the user has the permission in any project (project-scoped policies match without a concrete resource_project). Mutually exclusive with a non-empty resource_project. Default false preserves strict project matching — empty resource_project alone is never a wildcard.\n"
           }
         }
       },
@@ -43232,7 +43232,7 @@
       "OIDCConfigurationUpdate": {
         "type": "object",
         "title": "OIDCConfigurationUpdate",
-        "description": "Update schema for OIDC configuration (client_secret optional \u2014 preserves existing if omitted).",
+        "description": "Update schema for OIDC configuration (client_secret optional — preserves existing if omitted).",
         "additionalProperties": false,
         "required": [
           "issuer_url",
@@ -43547,7 +43547,7 @@
           },
           "configuration": {
             "title": "Configuration",
-            "description": "Provider-specific configuration (client_secret optional \u2014 preserves existing if omitted)",
+            "description": "Provider-specific configuration (client_secret optional — preserves existing if omitted)",
             "anyOf": [
               {
                 "discriminator": {
@@ -47058,7 +47058,7 @@
           "updated_at"
         ],
         "title": "ServiceAccountCredentialCreateResponse",
-        "description": "Schema for the create response \u2014 includes one-time plaintext secret(s)."
+        "description": "Schema for the create response — includes one-time plaintext secret(s)."
       },
       "ServiceAccountCredentialRotateRequest": {
         "properties": {
@@ -47196,7 +47196,7 @@
           "updated_at"
         ],
         "title": "ServiceAccountCredentialRotateResponse",
-        "description": "Schema for the rotate response \u2014 same shape as create response."
+        "description": "Schema for the rotate response — same shape as create response."
       },
       "ServiceAccountCredentialListResponse": {
         "properties": {
@@ -50243,7 +50243,7 @@
       "PublishWorkflowVersionResponse": {
         "type": "object",
         "title": "PublishWorkflowVersionResponse",
-        "description": "Publish endpoint response \u2014 extends WorkflowReadWithVersion with a warning field.",
+        "description": "Publish endpoint response — extends WorkflowReadWithVersion with a warning field.",
         "required": [
           "name",
           "id",
@@ -50921,7 +50921,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Triggers",
-            "description": "Trigger nodes that define how the workflow is initiated. Must contain at least one trigger. Trigger nodes must be graph entry points (no incoming edges) \u2014 enforced by application-level validation."
+            "description": "Trigger nodes that define how the workflow is initiated. Must contain at least one trigger. Trigger nodes must be graph entry points (no incoming edges) — enforced by application-level validation."
           },
           "nodes": {
             "items": {
@@ -52249,7 +52249,7 @@
               }
             ],
             "title": "Execution Environment",
-            "description": "Execution environment override (deferred \u2014 requires ID resolution)"
+            "description": "Execution environment override (deferred — requires ID resolution)"
           },
           "instance_group_id": {
             "anyOf": [
@@ -53018,7 +53018,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "NodeSettingsBase",
-        "description": "Base node settings \u2014 no user-configurable fields."
+        "description": "Base node settings — no user-configurable fields."
       },
       "NodeSettingsCof": {
         "properties": {
@@ -53220,7 +53220,7 @@
         },
         "type": "object",
         "title": "RetryPolicyParameters",
-        "description": "Retry policy parameters for a node.\n\nOnly applies to nodes whose settings class is NodeSettingsFull\n(http_request, aap_job_template, aap_workflow_job_template).\n\nAll fields default to None \u2014 the engine merges with global catalog values\n(workflow_engine.retry_*) for any unset field. Set max_retries=0 to\nexplicitly disable retry, overriding global defaults."
+        "description": "Retry policy parameters for a node.\n\nOnly applies to nodes whose settings class is NodeSettingsFull\n(http_request, aap_job_template, aap_workflow_job_template).\n\nAll fields default to None — the engine merges with global catalog values\n(workflow_engine.retry_*) for any unset field. Set max_retries=0 to\nexplicitly disable retry, overriding global defaults."
       },
       "HTTPMethod": {
         "type": "string",

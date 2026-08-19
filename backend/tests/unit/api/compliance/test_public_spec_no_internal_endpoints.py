@@ -29,6 +29,14 @@ def public_spec() -> dict[str, Any]:
     return spec
 
 
+@pytest.fixture(scope="module")
+def public_spec_json() -> dict[str, Any]:
+    if not _PUBLIC_SPEC_JSON_PATH.exists():
+        pytest.fail(f"Public JSON spec not found at {_PUBLIC_SPEC_JSON_PATH}")
+    spec: dict[str, Any] = json.loads(_PUBLIC_SPEC_JSON_PATH.read_text(encoding="utf-8"))
+    return spec
+
+
 class TestNoInternalPaths:
     """Verify no /_internal/ paths leak into the public spec."""
 
@@ -131,20 +139,6 @@ class TestPublicSpecIsValid:
 class TestPublicSpecJsonFormat:
     """Verify the JSON version of the public spec is valid and in sync with YAML."""
 
-    def test_json_spec_exists(self) -> None:
-        if not _PUBLIC_SPEC_JSON_PATH.exists():
-            pytest.fail(f"Public JSON spec not found at {_PUBLIC_SPEC_JSON_PATH}")
-
-    def test_json_spec_is_valid(self) -> None:
-        """The JSON file must be valid JSON."""
-        if not _PUBLIC_SPEC_JSON_PATH.exists():
-            pytest.fail("Public JSON spec not found")
-        json.loads(_PUBLIC_SPEC_JSON_PATH.read_text(encoding="utf-8"))
-
-    def test_json_matches_yaml(self) -> None:
+    def test_json_matches_yaml(self, public_spec: dict[str, Any], public_spec_json: dict[str, Any]) -> None:
         """The JSON spec must be semantically identical to the YAML spec."""
-        if not _PUBLIC_SPEC_JSON_PATH.exists() or not _PUBLIC_SPEC_PATH.exists():
-            pytest.fail("Both specs required — run 'make api-spec-bundle-public' to regenerate.")
-        yaml_data = yaml.safe_load(_PUBLIC_SPEC_PATH.read_text(encoding="utf-8"))
-        json_data = json.loads(_PUBLIC_SPEC_JSON_PATH.read_text(encoding="utf-8"))
-        assert yaml_data == json_data, "JSON and YAML public specs are not semantically identical"
+        assert public_spec == public_spec_json, "JSON and YAML public specs are not semantically identical"

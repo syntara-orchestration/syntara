@@ -606,7 +606,7 @@ api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoint
 	@echo "📦 Bundling public OpenAPI sub-specs..."
 	uv run python tools/bundle_openapi.py --public -o $(OPENAPI_PUBLIC_SPEC)
 	@uv run pre-commit run yamlfmt --files $(OPENAPI_PUBLIC_SPEC) > /dev/null 2>&1 || true
-	@uv run python -c "import yaml, json, pathlib; pathlib.Path('$(OPENAPI_PUBLIC_SPEC_JSON)').write_text(json.dumps(yaml.safe_load(pathlib.Path('$(OPENAPI_PUBLIC_SPEC)').read_text()), indent=2) + '\n')"
+	uv run python tools/bundle_openapi.py --public --format json -o $(OPENAPI_PUBLIC_SPEC_JSON)
 	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC) and $(OPENAPI_PUBLIC_SPEC_JSON)"
 
 .PHONY: api-spec-drift-public
