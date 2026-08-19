@@ -28,7 +28,6 @@ from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import (
     Group,
     GroupCreate,
-    GroupListParams,
     GroupListResponse,
     GroupMemberAdd,
     GroupMemberAddResponse,
@@ -113,7 +112,7 @@ async def create_group(
 async def list_groups(
     request: Request,
     service: Annotated[GroupsService, Depends(get_group_service)],
-    params: Annotated[GroupListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("group", "read"))],
 ) -> GroupListResponse:
     """Retrieve list of groups with visibility filtering.

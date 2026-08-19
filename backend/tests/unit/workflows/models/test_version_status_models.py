@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from syntara.workflows.models.execution import ExecutionCreate, ExecutionRead
-from syntara.workflows.models.query_params import WorkflowVersionListParams
 from syntara.workflows.models.workflow import WorkflowRead
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.models.workflow_version import (
@@ -31,22 +30,6 @@ class TestExecutionReadFields:
     def test_workflow_version_name_can_be_set(self) -> None:
         read = ExecutionRead.model_construct(workflow_version_name="Release v1.0")
         assert read.workflow_version_name == "Release v1.0"
-
-
-class TestWorkflowVersionListParams:
-    """WorkflowVersionListParams instantiation tests."""
-
-    def test_instantiates_with_defaults(self) -> None:
-        params = WorkflowVersionListParams()
-        assert params.limit == 20
-        assert params.cursor is None
-        assert params.sort is None
-        assert params.include_total is False
-
-    def test_accepts_custom_values(self) -> None:
-        params = WorkflowVersionListParams(limit=5, cursor="abc", sort="-version", include_total=True)
-        assert params.limit == 5
-        assert params.cursor == "abc"
 
 
 class TestWorkflowReadFields:

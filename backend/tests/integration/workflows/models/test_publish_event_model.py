@@ -6,7 +6,7 @@ schema fields) through the real database to ensure coverage on model files:
 - workflow_version.py (name field, filterable/sortable, WorkflowVersionRead)
 - workflow.py (published_version_id, published_version_number)
 - execution.py (use_published)
-- query_params.py (WorkflowVersionListParams)
+- query_params.py (ExecutionIncludeParams)
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ import pytest
 
 from syntara.workflows.models import Workflow, WorkflowVersion, WorkflowVersionRead
 from syntara.workflows.models.execution import ExecutionCreate
-from syntara.workflows.models.query_params import WorkflowVersionListParams
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from tests.helpers.workflow import create_minimal_workflow_definition
 
@@ -283,20 +282,3 @@ class TestExecutionCreateUsePublished:
         """Instantiate ExecutionCreate with use_published=True."""
         create = ExecutionCreate(workflow_id=uuid4(), trigger_node_id="trigger_1", use_published=True)
         assert create.use_published is True
-
-
-# ---------------------------------------------------------------------------
-# TestWorkflowVersionListParams
-# ---------------------------------------------------------------------------
-
-
-class TestWorkflowVersionListParams:
-    """Tests for WorkflowVersionListParams instantiation."""
-
-    def test_instantiation(self) -> None:
-        """Instantiate with defaults and verify inherited BaseListParams fields."""
-        params = WorkflowVersionListParams()
-        assert params.limit == 20
-        assert params.cursor is None
-        assert params.sort is None
-        assert params.include_total is False

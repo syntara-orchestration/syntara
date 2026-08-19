@@ -20,6 +20,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
@@ -34,14 +35,12 @@ from syntara.workflows.models import (
     ValidationSeverity,
     Workflow,
     WorkflowCreate,
-    WorkflowListParams,
     WorkflowListResponse,
     WorkflowRead,
     WorkflowReadWithVersion,
     WorkflowUpdate,
     WorkflowValidateRequest,
     WorkflowVersion,
-    WorkflowVersionListParams,
     WorkflowVersionListResponse,
     WorkflowVersionRead,
     WorkflowVersionUpdate,
@@ -305,7 +304,7 @@ async def create_workflow(
 async def list_workflows(
     request: Request,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-    params: Annotated[WorkflowListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
 ) -> WorkflowListResponse:
     """List workflows the current user has read access to.
@@ -442,7 +441,7 @@ async def list_workflow_versions(
     workflow_id: UUID,
     request: Request,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-    params: Annotated[WorkflowVersionListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
 ) -> WorkflowVersionListResponse:
     """List versions for a workflow with cursor-based pagination."""
     return await service.list_workflow_versions_cursor(
