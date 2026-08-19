@@ -373,11 +373,15 @@ jobs:
             core.setFailed(`Timed out waiting for shared checks: ${required.join(', ')}`);
 
   test-compose-e2e:
-    name: (Frontend) Test Podman Compose E2E
+    name: (Frontend) Test Podman Compose E2E (${{ matrix.worker }})
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [1, 2]
     steps:
       - name: Free disk space
         run: |
@@ -524,7 +528,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend/packages/syntara-ui
-        run: npm run e2e -- --timeout 120000
+        run: npx pwc-p run --key="${CURRENTS_RECORD_KEY}" --project-id="${CURRENTS_PROJECT_ID}" --ci-build-id="${CURRENTS_CI_BUILD_ID}" --pwc-batch-size 3 --reporter blob --timeout 120000
         env:
           SYNTARA_E2E_SKIP_WEB_SERVER: '1'
           SYNTARA_E2E_BASE_URL: http://localhost:8080
@@ -533,24 +537,18 @@ jobs:
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          CURRENTS_CI_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PWTEST_BLOB_DO_NOT_REMOVE: '1'
+          PLAYWRIGHT_BLOB_OUTPUT_FILE: blob-report/report-${{ matrix.worker }}.zip
 
-      - name: Upload Playwright report
+      - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-report-compose
-          path: frontend/packages/syntara-ui/playwright-report
+          name: blob-report-compose-${{ matrix.worker }}
+          path: frontend/packages/syntara-ui/blob-report
           if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload E2E test results
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: e2e-compose-results
-          path: frontend/packages/syntara-ui/test-results/results.json
-          if-no-files-found: warn
-          retention-days: 7
+          retention-days: 1
 
       - name: Show service logs on failure
         if: failure()
@@ -562,6 +560,55 @@ jobs:
         if: always()
         run: |
           uvx podman-compose -p syntara-ci --profile telemetry-e2e down -v || true
+
+  aggregate-compose-e2e:
+    name: (Frontend) Aggregate Compose E2E Results
+    runs-on: ubuntu-latest
+    if: always()
+    needs: test-compose-e2e
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Check shard results
+        run: |
+          RESULT="${{ needs.test-compose-e2e.result }}"
+          echo "Shards completed with result: $RESULT"
+
+      - name: Download all blob reports
+        if: always()
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v7
+        with:
+          pattern: blob-report-compose-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge blob reports
+        if: always()
+        run: npx --yes @playwright/test@1.62.1 merge-reports --reporter=json ./all-blob-reports > merged-results.json
+
+      - name: Post E2E results to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: daun/playwright-report-summary@8bb85779022480a59ed8d33d9a4b8bda1c67666b # v4
+        with:
+          report-file: merged-results.json
+          comment-title: 'Compose E2E Test Results'
+          job-summary: true
+          report-tag: compose-e2e-tests
+
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-compose
+          path: merged-results.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail if shards failed
+        if: needs.test-compose-e2e.result != 'success' && needs.test-compose-e2e.result != 'skipped'
+        run: |
+          echo "::error::E2E shards result: ${{ needs.test-compose-e2e.result }}"
+          exit 1
 
   konflux-frontend-gate:
     name: (Frontend) Konflux Gate
@@ -675,7 +722,7 @@ jobs:
       - test-build
       - konflux-frontend-gate
       - shared-checks-gate
-      - test-compose-e2e
+      - aggregate-compose-e2e
     steps:
       - name: Check required jobs passed
         run: |
@@ -685,17 +732,17 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build test-compose-e2e konflux-frontend-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build aggregate-compose-e2e konflux-frontend-gate shared-checks-gate; do
             case "$job" in
-              gen-contracts)          result="${{ needs.gen-contracts.result }}" ;;
-              checks)                 result="${{ needs.checks.result }}" ;;
-              unit-tests)             result="${{ needs.unit-tests.result }}" ;;
-              coverage-report)        result="${{ needs.coverage-report.result }}" ;;
-              storybook-build)        result="${{ needs.storybook-build.result }}" ;;
-              test-build)             result="${{ needs.test-build.result }}" ;;
-              test-compose-e2e)       result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-frontend-gate)  result="${{ needs.konflux-frontend-gate.result }}" ;;
-              shared-checks-gate)     result="${{ needs.shared-checks-gate.result }}" ;;
+              gen-contracts)            result="${{ needs.gen-contracts.result }}" ;;
+              checks)                   result="${{ needs.checks.result }}" ;;
+              unit-tests)               result="${{ needs.unit-tests.result }}" ;;
+              coverage-report)          result="${{ needs.coverage-report.result }}" ;;
+              storybook-build)          result="${{ needs.storybook-build.result }}" ;;
+              test-build)               result="${{ needs.test-build.result }}" ;;
+              aggregate-compose-e2e)    result="${{ needs.aggregate-compose-e2e.result }}" ;;
+              konflux-frontend-gate)    result="${{ needs.konflux-frontend-gate.result }}" ;;
+              shared-checks-gate)       result="${{ needs.shared-checks-gate.result }}" ;;
             esac
             echo "$job: $result"
             if [[ ! "$result" =~ ^($ok)$ ]]; then
