@@ -57,7 +57,7 @@ If the numbers don't match the GitHub PR page (e.g., GitHub shows 3 files but gi
 
 Before reviewing the PR, read:
 
-- `frontend/CLAUDE.md` (global instructions)
+- `frontend/AGENTS.md` (global instructions)
 - Any relevant project guidelines: architecture, naming, lint, testing
 - Any domain-specific instructions (e.g., Django, React, PatternFly, SOLID)
 
@@ -87,47 +87,47 @@ Check whether the changes follow:
 
 ### 3a. Recurring Issues Checklist (MANDATORY)
 
-**Run through every item in frontend/CLAUDE.md's "Common PR Mistakes -- Quick Checklist" (items 1-35).** That checklist is the single source of truth. Items enforced by ESLint at error level are omitted from this table -- ESLint is the source of truth for those. Below are review-specific verification tips for patterns ESLint cannot catch:
+**Run through every item in frontend/AGENTS.md's "Common PR Mistakes -- Quick Checklist".** That checklist is the single source of truth. Items enforced by ESLint at error level are omitted from this table -- ESLint is the source of truth for those. Below are review-specific verification tips for patterns ESLint cannot catch:
 
-| Search for...                                               | Flags violation of checklist item...                                            |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `as` casts on API responses                                 | #1 -- unsafe casts (flag for contract fix, not more casts)                      |
-| New component without `toHaveNoViolations()`                | #2 -- missing vitest-axe test                                                   |
-| Raw error JSX (`<span>Error`, `<p>Error`, `<div>Error`)     | #3 -- should use `NxErrorState` component                                       |
-| Manual `useState` per form field                            | #4 -- should use Zod + react-hook-form                                          |
-| `useForm` with `defaultValues` in modals                    | #5 -- verify `reset()` in `useEffect([isOpen, item])`                           |
-| Copy-pasted dialogs or action handlers                      | #6 -- extract to shared component/hook                                          |
-| String literals for type discriminators                     | #9 -- use enum constants from `@syntara/contracts`                        |
-| Display strings in conditionals                             | #10 -- compare API values, not translatable labels                              |
-| New route in `AppRoute.tsx` without registry entry          | Add to `e2e/visual-regression/page-registry.ts` (see `frontend/packages/syntara-ui/VISUAL_REGRESSION.md`)    |
-| Title Case in alert titles                                  | Use sentence case: "Workflow created", not "Created"                            |
-| Derived data without `useMemo` in custom hooks              | #13 -- wrap computed maps/arrays in `useMemo`                                   |
-| New `use*.ts` hook without `use*.test.ts(x)`                | #14 -- every new hook needs a dedicated test file                               |
-| `useEffect` + `setState` for derived/computed values        | #15 -- compute during render or use `useMemo`                                   |
-| `useEffect` + `setValue` watching form fields               | #16 -- move cascading resets to field's `onChange` handler                      |
-| `formState.isSubmitting` for loading state                  | #18 -- use `isPending` from mutation hooks                                      |
-| `PlusCircleIcon` or non-`RhUi*` icons                       | #19 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                 |
-| Inline style objects (`style={{ ... }}`)                    | #20 -- refactor to CSS module classes                                           |
-| `let` counter inside `.map()`                               | #21 -- pre-compute indices immutably                                            |
-| `aria-label` on `<span>` / `<div>`                          | #22 -- only use on interactive elements, widgets, landmarks, images             |
-| Any `eslint-disable` or `eslint-disable-next-line`          | #23 -- never suppress rules; fix the code so it passes                          |
-| Hook called unconditionally but used conditionally          | #24 -- extract to a conditionally-rendered wrapper component                    |
-| `useEffect` + `useState` for API calls                      | #25 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)               |
-| Manual `Promise.all` + cancellation for parallel fetches    | #25 -- use `useQueries` from TanStack Query                                     |
-| `// TODO` / `// FIXME` / `// HACK` / `// XXX`               | #26 -- track deferred work in an issue, not code comments                           |
-| Hardcoded documentation URLs      | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`              |
-| `NxPageHeader` without `docLink` prop                       | #30 -- every page header should pass `docLink={useDocLink('key')}`              |
-| Hardcoded colors in CSS modules                             | ESLint can't catch these; review CSS module files manually                      |
-| `new Date()` in `syntara-mock-api/src/resources/` or `utils/` | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression |
-| `Button` with `onClick={() => navigate(...)}`               | §34 -- use `<Link>` for navigation, `<Button>` for actions                      |
-| Same `aria-label` on repeated checkboxes/buttons            | §35 -- each instance needs a unique label (e.g., row index or resource name)    |
-| Raw text for invalid ID or not-found states                 | §36 -- use `NxEmptyState` or `Nx*` empty state components                       |
-| New page test without `expectPageTitle(...)` assertion      | testing guidelines -- add at least one `expectPageTitle` call per page component |
-| Empty-state CTA without permission check                    | UX §15 -- gate `addData` with permission flag (pass `undefined` if denied)      |
-| New `forwardRef(` usage                                     | #33 -- accept `ref` as a prop (React 19); do not add `forwardRef`               |
-| New `useRef` + `useEffect` only to attach/detach DOM listeners | #34 -- prefer ref callback cleanup functions (coding standards §38)          |
-| New `useContext(` usage                                     | #35 -- use `use(Context)` instead (React 19); see coding standards §39          |
-| Hand-rolled pending mirror state for simple toggle mutations | #36 -- prefer `useOptimistic` + Action/`mutateAsync` (coding standards §40) |
+| Search for...                                                  | Flags violation of checklist item...                                                                      |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `as` casts on API responses                                    | #1 -- unsafe casts (flag for contract fix, not more casts)                                                |
+| New component without `toHaveNoViolations()`                   | #2 -- missing vitest-axe test                                                                             |
+| Raw error JSX (`<span>Error`, `<p>Error`, `<div>Error`)        | #3 -- should use `NxErrorState` component                                                                 |
+| Manual `useState` per form field                               | #4 -- should use Zod + react-hook-form                                                                    |
+| `useForm` with `defaultValues` in modals                       | #5 -- verify `reset()` in `useEffect([isOpen, item])`                                                     |
+| Copy-pasted dialogs or action handlers                         | #6 -- extract to shared component/hook                                                                    |
+| String literals for type discriminators                        | #9 -- use enum constants from `@syntara/contracts`                                                        |
+| Display strings in conditionals                                | #10 -- compare API values, not translatable labels                                                        |
+| New route in `AppRoute.tsx` without registry entry             | Add to `e2e/visual-regression/page-registry.ts` (see `frontend/packages/syntara-ui/VISUAL_REGRESSION.md`) |
+| Title Case in alert titles                                     | Use sentence case: "Workflow created", not "Created"                                                      |
+| Derived data without `useMemo` in custom hooks                 | #13 -- wrap computed maps/arrays in `useMemo`                                                             |
+| New `use*.ts` hook without `use*.test.ts(x)`                   | #14 -- every new hook needs a dedicated test file                                                         |
+| `useEffect` + `setState` for derived/computed values           | #15 -- compute during render or use `useMemo`                                                             |
+| `useEffect` + `setValue` watching form fields                  | #16 -- move cascading resets to field's `onChange` handler                                                |
+| `formState.isSubmitting` for loading state                     | #18 -- use `isPending` from mutation hooks                                                                |
+| `PlusCircleIcon` or non-`RhUi*` icons                          | #19 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
+| Inline style objects (`style={{ ... }}`)                       | #20 -- refactor to CSS module classes                                                                     |
+| `let` counter inside `.map()`                                  | #21 -- pre-compute indices immutably                                                                      |
+| `aria-label` on `<span>` / `<div>`                             | #22 -- only use on interactive elements, widgets, landmarks, images                                       |
+| Any `eslint-disable` or `eslint-disable-next-line`             | #23 -- never suppress rules; fix the code so it passes                                                    |
+| Hook called unconditionally but used conditionally             | #24 -- extract to a conditionally-rendered wrapper component                                              |
+| `useEffect` + `useState` for API calls                         | #25 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)                                         |
+| Manual `Promise.all` + cancellation for parallel fetches       | #25 -- use `useQueries` from TanStack Query                                                               |
+| `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #26 -- track deferred work in an issue, not code comments                                                 |
+| Hardcoded documentation URLs                                   | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`           |
+| `NxPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
+| Hardcoded colors in CSS modules                                | ESLint can't catch these; review CSS module files manually                                                |
+| `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
+| `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |
+| Same `aria-label` on repeated checkboxes/buttons               | §35 -- each instance needs a unique label (e.g., row index or resource name)                              |
+| Raw text for invalid ID or not-found states                    | §36 -- use `NxEmptyState` or `Nx*` empty state components                                                 |
+| New page test without `expectPageTitle(...)` assertion         | testing guidelines -- add at least one `expectPageTitle` call per page component                          |
+| Empty-state CTA without permission check                       | UX §15 -- gate `addData` with permission flag (pass `undefined` if denied)                                |
+| New `forwardRef(` usage                                        | #33 -- accept `ref` as a prop (React 19); do not add `forwardRef`                                         |
+| New `useRef` + `useEffect` only to attach/detach DOM listeners | #34 -- prefer ref callback cleanup functions (coding standards §38)                                       |
+| New `useContext(` usage                                        | #35 -- use `use(Context)` instead (React 19); see coding standards §39                                    |
+| Hand-rolled pending mirror state for simple toggle mutations   | #36 -- prefer `useOptimistic` + Action/`mutateAsync` (coding standards §40)                               |
 
 ### 3b. Rule Bypass Checks (BLOCKING -- do not approve if any are found)
 
@@ -140,14 +140,14 @@ AI agents and contributors sometimes bypass rules instead of fixing the underlyi
 git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE 'eslint-disable|@ts-ignore|@ts-expect-error|TODO|FIXME|HACK|XXX|enabled:\s*false'
 ```
 
-| Pattern in diff                                               | Why it blocks                                                                                          | What to do instead                                                                                                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `eslint-disable` / `eslint-disable-next-line`                 | Suppresses a rule instead of fixing the code. The rule catches a real problem.                         | Fix the code so the rule passes. If genuinely unfixable, the reviewer (not the author) decides whether a suppression is warranted. |
-| `@ts-ignore` / `@ts-expect-error`                             | Suppresses a TypeScript error instead of fixing the type. Hides real bugs.                             | Fix the type, add a type guard, or update the contract.                                                                            |
-| `// TODO` / `// FIXME` / `// HACK` / `// XXX`                 | Deferred work buried in source. Invisible to sprint planning and never addressed.                      | Create an issue and reference it inline: `// Workaround until #12345 adds the endpoint`.                                   |
-| `rules: { 'rule-name': { enabled: false } }` in axe config    | Disables an accessibility rule to make a test pass instead of fixing the a11y bug.                     | Fix the component so it passes the axe rule. Only disable with a linked upstream PatternFly issue proving a false positive.        |
-| `useEffect` + `useState` for data that TanStack Query handles | Re-implements caching, dedup, retry, and error handling that `useQuery`/`useMutation` already provide. | Use the library API. See .claude/skills/frontend-coding-standards/SKILL.md "Prefer Library and Native Browser APIs Over Custom Code".                            |
-| Custom deep copy, URL parsing, UUID generation                | Re-implements what `structuredClone`, `URLSearchParams`, `generateUUID` already provide.               | Use the native API or existing project utility.                                                                                    |
+| Pattern in diff                                               | Why it blocks                                                                                          | What to do instead                                                                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `eslint-disable` / `eslint-disable-next-line`                 | Suppresses a rule instead of fixing the code. The rule catches a real problem.                         | Fix the code so the rule passes. If genuinely unfixable, the reviewer (not the author) decides whether a suppression is warranted.    |
+| `@ts-ignore` / `@ts-expect-error`                             | Suppresses a TypeScript error instead of fixing the type. Hides real bugs.                             | Fix the type, add a type guard, or update the contract.                                                                               |
+| `// TODO` / `// FIXME` / `// HACK` / `// XXX`                 | Deferred work buried in source. Invisible to sprint planning and never addressed.                      | Create an issue and reference it inline: `// Workaround until #12345 adds the endpoint`.                                              |
+| `rules: { 'rule-name': { enabled: false } }` in axe config    | Disables an accessibility rule to make a test pass instead of fixing the a11y bug.                     | Fix the component so it passes the axe rule. Only disable with a linked upstream PatternFly issue proving a false positive.           |
+| `useEffect` + `useState` for data that TanStack Query handles | Re-implements caching, dedup, retry, and error handling that `useQuery`/`useMutation` already provide. | Use the library API. See .claude/skills/frontend-coding-standards/SKILL.md "Prefer Library and Native Browser APIs Over Custom Code". |
+| Custom deep copy, URL parsing, UUID generation                | Re-implements what `structuredClone`, `URLSearchParams`, `generateUUID` already provide.               | Use the native API or existing project utility.                                                                                       |
 
 **Pre-existing suppressions:** If a suppression appears in the diff context but was not added by the PR (no `+` prefix), ignore it. Only flag new additions.
 
@@ -156,8 +156,8 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 | Check                                           | How to verify                                                                                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **UI PRs include screenshots**                  | PRs changing visible UI must include screenshots or recordings of key states                                                                                       |
-| **New API endpoints have mock handlers**        | Check `frontend/packages/syntara-mock-api/src/handlers.ts`; note exception if backend not yet merged                                                                          |
-| **`useQueryState` object form**                 | Verify `useQueryState(query, { title, onRetry })` -- not bare string form (see .claude/skills/frontend-coding-standards/SKILL.md §2)                                                             |
+| **New API endpoints have mock handlers**        | Check `frontend/packages/syntara-mock-api/src/handlers.ts`; note exception if backend not yet merged                                                               |
+| **`useQueryState` object form**                 | Verify `useQueryState(query, { title, onRetry })` -- not bare string form (see .claude/skills/frontend-coding-standards/SKILL.md §2)                               |
 | **Error handling consistency**                  | Verify `useQueryState` / `useMutationErrorHandler` -- no ad-hoc try/catch with custom error display                                                                |
 | **userEvent regressions**                       | Check if PR replaces existing `userEvent` calls with `fireEvent` -- that is a regression                                                                           |
 | **Unreachable dead code in tests**              | Look for nested `it()` blocks inside other `it()` blocks (after `return` statements)                                                                               |
@@ -166,10 +166,10 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 | **Zero new ESLint warnings**                    | New code must not introduce warnings, even for rules currently set to `warn` -- they will become `error`                                                           |
 | **New routes have `requiredPermissions`**       | Every route with access requirements must set `requiredPermissions` in `navigationItems.tsx`; create/edit routes need `routePermission` for `ProtectedRoute` guard |
 | **New write actions use `DisabledWithTooltip`** | Create/edit/delete buttons must be wrapped with `DisabledWithTooltip` + domain permission hook; use `permissionTooltip()` for copy                                 |
-| **New resources have mock `can_i` handlers**    | `frontend/packages/syntara-mock-api/src/handlers.ts` must include role-aware responses for all 4 roles (admin, viewer, auditor, user)                                         |
+| **New resources have mock `can_i` handlers**    | `frontend/packages/syntara-mock-api/src/handlers.ts` must include role-aware responses for all 4 roles (admin, viewer, auditor, user)                              |
 | **Permission hooks include `isError`**          | Any `useCanI` mock must include `isError: false`; real hook returns `{ allowed, isChecking, isError }`                                                             |
 | **Permission cache invalidation**               | After role/assignment mutations, verify `queryClient.invalidateQueries({ queryKey: ['authz', 'can_i'] })` is called                                                |
-| **New shared components have stories**          | Components in `frontend/packages/syntara-ui/src/components/` (especially `Nx*`) should have Storybook stories for documentation                                                                 |
+| **New shared components have stories**          | Components in `frontend/packages/syntara-ui/src/components/` (especially `Nx*`) should have Storybook stories for documentation                                    |
 | **Unrelated snapshot changes explained**        | If visual regression screenshots changed for pages not related to the PR, ask why                                                                                  |
 | **Visual regression uses stable data**          | Screenshot baselines must use deterministic mock data -- no timestamps, random IDs, or flaky API state                                                             |
 | **Gated content hidden during loading**         | Permission-dependent UI (tabs, buttons) should hide until permission check resolves, not flash then disappear                                                      |
@@ -305,16 +305,16 @@ When reviewing your own implementation before committing, verify these gates pas
 
 1. `npm run check` passes (tsc, lint, format, knip)
 2. All tests pass (`npm test`), new tests written for new features
-5. WCAG 2.1 AA accessibility standards met
-6. UI verified in browser for all states (loaded, empty, error, success)
-7. Zero `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, or `// TODO` in new code
-8. Zero disabled axe rules in test files
-9. No re-implemented library functionality (TanStack Query, react-hook-form, Zod, PatternFly)
-10. New routes have `requiredPermissions` / `routePermission` set; new CRUD actions use `DisabledWithTooltip`
+3. WCAG 2.1 AA accessibility standards met
+4. UI verified in browser for all states (loaded, empty, error, success)
+5. Zero `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, or `// TODO` in new code
+6. Zero disabled axe rules in test files
+7. No re-implemented library functionality (TanStack Query, react-hook-form, Zod, PatternFly)
+8. New routes have `requiredPermissions` / `routePermission` set; new CRUD actions use `DisabledWithTooltip`
 
 ### Independent Review (High-Risk Changes)
 
-For high-risk UI changes (new pages, auth flows, complex state management), run `/review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
+For high-risk UI changes (new pages, auth flows, complex state management), run `/frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
 
 ---
 

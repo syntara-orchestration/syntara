@@ -1,4 +1,5 @@
 import { ActionGroup, Alert, Button, Stack, StackItem, Tab } from '@patternfly/react-core'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -24,6 +25,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorCode, isForbiddenError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
+import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
 import { SettingsCategoryTab } from './SettingsCategoryTab'
 import { useAllSettings } from './useAllSettings'
@@ -54,6 +56,7 @@ function FileStorageAlert() {
 
 export default function Settings() {
   const settingsDocLink = useDocLink('settings')
+  const queryClient = useQueryClient()
   const [edits, setEdits] = useState<Map<string, unknown>>(new Map())
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
   const { showError } = useAlerts()
@@ -160,6 +163,7 @@ export default function Settings() {
         onSuccess: () => {
           setEdits(new Map())
           detachPromise(refetchSettings())
+          detachPromise(queryClient.invalidateQueries({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY }))
         },
         onError: (err) => {
           if (getErrorCode(err) === 'SETTING_VERSION_CONFLICT') {
@@ -168,6 +172,7 @@ export default function Settings() {
               description: 'Settings were modified by another user. The page has been refreshed.',
             })
             detachPromise(refetchSettings())
+            detachPromise(queryClient.invalidateQueries({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY }))
             setEdits(new Map())
           } else {
             handleMutationError({ title: 'Save failed' })(err)
@@ -175,7 +180,7 @@ export default function Settings() {
         },
       }
     )
-  }, [edits, allSettings, bulkUpdate, showError, handleMutationError, refetchSettings])
+  }, [edits, allSettings, bulkUpdate, showError, handleMutationError, refetchSettings, queryClient])
 
   const hasChanges = edits.size > 0
   const hasValidationErrors = validationErrors.size > 0

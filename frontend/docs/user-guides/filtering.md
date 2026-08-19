@@ -154,6 +154,6 @@ Live filter toolbar examples also appear in Storybook under list panel stories (
 ## For developers
 
 - Architecture and component APIs: [API Filtering Architecture](../architecture.md#api-filtering-architecture)
-- Adding filters to a new list page: [CLAUDE.md — How do I add filters to a list page?](../../CLAUDE.md#how-do-i-add-filters-to-a-list-page)
+- Adding filters to a new list page: [AGENTS.md — How do I add filters to a list page?](../../AGENTS.md#how-do-i-add-filters-to-a-list-page)
 - Coding standards: `.claude/skills/frontend-coding-standards/SKILL.md` (`useCursorPagination`)
 - Unit tests: [Filter test helpers](../TEST_HELPERS_FILTER_TESTING.md)

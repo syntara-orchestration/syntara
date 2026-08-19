@@ -12,7 +12,7 @@ function dateRangeValidator(minDate: Date, maxDate: Date | null) {
 }
 
 export function useCredentialExpirationDate(maxLifetimeDays = 180) {
-  const isUnlimited = maxLifetimeDays === -1
+  const isUnlimited = maxLifetimeDays === 0
   const today = useMemo(() => startOfDay(new Date()), [])
   const tomorrow = useMemo(() => addDays(today, 1), [today])
   const maxDate = useMemo(

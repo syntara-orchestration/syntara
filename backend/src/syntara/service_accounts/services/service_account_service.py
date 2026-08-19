@@ -13,7 +13,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
-from syntara.core.config.base import get_settings
 from syntara.core.exceptions import assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
@@ -22,6 +21,7 @@ from syntara.service_accounts.exceptions import ServiceAccountNameConflictError,
 from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
 from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential
 from syntara.service_accounts.schemas import ServiceAccountListResponse, ServiceAccountRead
+from syntara.settings.cache.settings_cache import get_runtime_settings
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -169,8 +169,9 @@ class ServiceAccountService(BaseService):
             if info:
                 resource.project_name = info[0]
                 resource.is_project_deleted = info[1]
-        settings = get_settings()
-        response.max_lifetime_days = settings.sa_credential_max_lifetime_days
+        response.max_lifetime_days = await get_runtime_settings().get_int(
+            "service_accounts.credential_max_lifetime_days"
+        )
         return response
 
     async def update_service_account(

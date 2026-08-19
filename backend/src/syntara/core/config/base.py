@@ -1917,29 +1917,6 @@ class AuthzSettings(BaseSettings):
     )
 
 
-_SA_CREDENTIAL_MAX_LIFETIME_UPPER = 730
-
-
-class ServiceAccountSettings(BaseSettings):
-    """Service account credential configuration."""
-
-    sa_credential_max_lifetime_days: int = Field(
-        default=180,
-        description=(
-            "Maximum lifetime for service account credentials in days. "
-            f"-1 = unlimited (no automatic expiry), 1-{_SA_CREDENTIAL_MAX_LIFETIME_UPPER} = enforced limit."
-        ),
-    )
-
-    @field_validator("sa_credential_max_lifetime_days")
-    @classmethod
-    def _validate_sa_credential_max_lifetime(cls, v: int) -> int:
-        if v != -1 and not (1 <= v <= _SA_CREDENTIAL_MAX_LIFETIME_UPPER):
-            msg = f"Must be -1 (unlimited) or between 1 and {_SA_CREDENTIAL_MAX_LIFETIME_UPPER}"
-            raise ValueError(msg)
-        return v
-
-
 # =============================================================================
 # Main Settings
 # =============================================================================
@@ -1951,7 +1928,6 @@ def _get_env_file() -> str:
 
 
 class Settings(
-    ServiceAccountSettings,
     CredentialEncryptionSettings,
     OpenRouterSettings,
     FileUploadSettings,
