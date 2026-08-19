@@ -75,23 +75,23 @@ describe('ExpressionCondition', () => {
   })
 
   it('displays variable with ${} wrapper when not focused', () => {
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ExpressionCondition {...defaultProps} condition={condition} />)
 
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('keeps ${} wrapper when focused and on blur', async () => {
     const user = userEvent.setup()
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ExpressionCondition {...defaultProps} condition={condition} />)
 
-    const fieldInput = screen.getByDisplayValue('${input.age}')
+    const fieldInput = screen.getByDisplayValue('${trigger.age}')
     await user.click(fieldInput)
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
 
     await user.tab()
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('strips ${} wrapper on blur when user pastes wrapped variable', async () => {
@@ -114,11 +114,11 @@ describe('ExpressionCondition', () => {
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
     const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
-    await user.type(fieldInput, 'input.age')
+    await user.type(fieldInput, 'trigger.age')
 
-    expect(screen.getByDisplayValue('input.age')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('trigger.age')).toBeInTheDocument()
     await user.tab()
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('does not strip ${ during typing', async () => {
@@ -136,20 +136,20 @@ describe('ExpressionCondition', () => {
     render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
     const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
-    const data: Record<string, string> = { 'text/plain': '${input.name}' }
+    const data: Record<string, string> = { 'text/plain': '${trigger.name}' }
     fireEvent.drop(fieldInput, {
       dataTransfer: { getData: (key: string) => data[key] ?? '' },
     })
 
-    expect(onChange).toHaveBeenCalledWith({ variable: 'input.name' })
+    expect(onChange).toHaveBeenCalledWith({ variable: 'trigger.name' })
   })
 
   it('accepts drag-and-drop onto a field that previously had a value', async () => {
     const user = userEvent.setup()
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
-    const fieldInput = screen.getByDisplayValue('${input.age}')
+    const fieldInput = screen.getByDisplayValue('${trigger.age}')
     await user.click(fieldInput)
     await user.clear(fieldInput)
     await user.tab()
@@ -169,10 +169,10 @@ describe('ExpressionCondition', () => {
     render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
     const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
-    await user.type(fieldInput, 'input.age')
+    await user.type(fieldInput, 'trigger.age')
     await user.tab()
 
-    expect(onChange).toHaveBeenCalledWith({ variable: 'input.age' })
+    expect(onChange).toHaveBeenCalledWith({ variable: 'trigger.age' })
   })
 
   it('updates operator field', async () => {
@@ -312,7 +312,7 @@ describe('ExpressionCondition', () => {
     expect(fieldInput).toHaveAttribute('aria-invalid', 'true')
 
     await user.click(fieldInput)
-    await user.type(fieldInput, 'input.age')
+    await user.type(fieldInput, 'trigger.age')
     expect(fieldInput).not.toHaveAttribute('aria-invalid', 'true')
   })
 

@@ -10,11 +10,9 @@ inputs:
   lastName:
     type: string
     default: Doe
-
-variables:
-  config:
-    timeout: 30
-    retries: 3
+  timeout:
+    type: integer
+    default: 30
 
 triggers:
   - id: trigger_manual
@@ -34,14 +32,14 @@ nodes:
       result: $.stdout
 
   - id: test_variable_reference
-    name: Test Variable Reference
+    name: Test Trigger Field Reference
     type: script
     parameters:
       language: bash
       code: |
         echo "Timeout: $INPUT_TIMEOUT_VALUE seconds"
     inputs:
-      timeout_value: ${variables.config.timeout}
+      timeout_value: ${trigger.timeout}
     outputs:
       result: $.stdout
 
