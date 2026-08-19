@@ -1,13 +1,14 @@
 name: Merge Queue Dequeue Alert
 
 on:
-  merge_group:
-    types: [checks_requested]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   dequeue-burst-detection:
     runs-on: ubuntu-latest
-    if: github.event.merge_group.head_sha != ''
+    if: vars.SLACK_CI_MONITORING_WEBHOOK_URL != '' || secrets.SLACK_CI_MONITORING_WEBHOOK_URL != ''
     permissions:
       contents: read
       actions: read
@@ -35,4 +36,3 @@ jobs:
           SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_HEAD_REF: ${{ github.event.merge_group.head_ref }}

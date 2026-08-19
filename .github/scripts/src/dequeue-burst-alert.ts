@@ -8,7 +8,10 @@ const TIME_WINDOW_MINUTES = 30;
 
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
- * Triggers on the 3rd dequeue within a 30-minute window.
+ * Runs on a schedule. Uses recently merged PRs as a proxy for queue activity.
+ * Alerts when 3+ PRs were merged within a 30-minute window (indicating
+ * successful dequeues), but only if current queue is non-empty (suggesting
+ * more PRs are waiting that might also fail).
  */
 async function main() {
   const env = getEnvironment();
@@ -16,47 +19,49 @@ async function main() {
   const github = new GitHubClient(env.githubToken, env.repository);
   const slack = new SlackNotifier(env.slackWebhookUrl);
 
-  console.log('Checking for dequeue burst...');
+  console.log('Checking for recent merge activity...');
 
   // Fetch default branch dynamically
   const defaultBranch = await github.getDefaultBranch();
-  console.log(`Monitoring dequeues for branch: ${defaultBranch}`);
+  console.log(`Monitoring merge activity for branch: ${defaultBranch}`);
 
-  // Get workflow runs from the last 30 minutes
+  // Get current queue state
+  const currentEntries = await github.getMergeQueueEntries(defaultBranch);
+  const currentPrNumbers = currentEntries.map(e => e.pullRequest.number).sort((a, b) => a - b);
+  console.log(`Current queue has ${currentPrNumbers.length} PRs: ${currentPrNumbers.join(', ') || 'none'}`);
+
+  // Get recently merged PRs (successful dequeues)
   const thirtyMinsAgo = new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000);
-  let recentRuns = [];
-  try {
-    recentRuns = await github.getWorkflowRuns(
-      'merge-queue-dequeue-alert.yml',
-      thirtyMinsAgo,
-      env.runId
-    );
-  } catch (error) {
-    console.log('Could not fetch workflow runs (workflow may not exist yet)');
+  const recentMerges = await github.getRecentMerges(defaultBranch, thirtyMinsAgo);
+
+  console.log(`Found ${recentMerges.length} merged PRs in the last ${TIME_WINDOW_MINUTES} minutes`);
+
+  if (recentMerges.length > 0) {
+    console.log('Recent merges:');
+    recentMerges.forEach(m => console.log(`  - PR #${m.number}: ${m.title} (merged ${m.mergedAt})`));
   }
 
-  const completedCount = recentRuns.length;
-  console.log(`Found ${completedCount} completed runs in the last ${TIME_WINDOW_MINUTES} minutes`);
+  // Alert if we see rapid merge activity (potential dequeue burst)
+  // This is a simplified heuristic: rapid merges + non-empty queue might indicate
+  // that multiple PRs are being processed quickly, which could mean CI instability
+  // or other issues affecting the queue.
+  if (recentMerges.length >= DEQUEUE_THRESHOLD && currentEntries.length > 0) {
+    console.log(`⚠️  ${recentMerges.length} merges detected with ${currentEntries.length} PRs still queued - potential dequeue burst`);
 
-  // Alert only on exactly the 3rd dequeue (2 prior runs + current = 3 total)
-  if (completedCount === DEQUEUE_THRESHOLD - 1) {
-    console.log(`⚠️  This is the ${DEQUEUE_THRESHOLD}rd dequeue - sending alert`);
-
-    // Extract PR number from merge group ref
-    const prNumber = env.headRef?.match(/pr-(\d+)/)?.[1] ?? 'unknown';
-    const prUrl = github.getPrUrl(parseInt(prNumber, 10));
+    const prNumbers = recentMerges.map(m => `#${m.number}`).join(', ');
+    const prUrls = recentMerges.map(m => github.getPrUrl(m.number)).join('\n');
     const queueUrl = github.getQueueUrl(defaultBranch);
 
     await slack.sendDequeueBurstAlert(
-      DEQUEUE_THRESHOLD,
-      prNumber,
-      prUrl,
+      recentMerges.length,
+      prNumbers,
+      prUrls,
       queueUrl
     );
 
     console.log('✅ Alert sent to Slack');
   } else {
-    console.log(`No alert needed (${completedCount} prior runs, threshold is ${DEQUEUE_THRESHOLD - 1})`);
+    console.log(`No alert needed (${recentMerges.length} merges, ${currentEntries.length} queued, threshold is ${DEQUEUE_THRESHOLD})`);
   }
 }
 

@@ -2,12 +2,13 @@ name: Merge Queue Health Poll
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   queue-health-check:
     runs-on: ubuntu-latest
+    if: vars.SLACK_CI_MONITORING_WEBHOOK_URL != '' || secrets.SLACK_CI_MONITORING_WEBHOOK_URL != ''
     permissions:
       contents: read
       actions: read
