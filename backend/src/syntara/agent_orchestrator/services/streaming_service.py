@@ -165,6 +165,28 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         """
         return str(session_state["invocation_id"])
 
+    def check_before_streaming(self, session_state: dict[str, Any]) -> None:
+        """Raise if the invocation is already CANCELLED before reading events.
+
+        The stream may still exist (24h TTL) while the cancel key has
+        expired (1h TTL).  ``wait_for_stream_ready`` is skipped when the
+        stream exists, and ``get_stop_condition`` treats ``completion``
+        as terminal — so the accepted end-of-stream race can close the
+        socket as "completed" for a CANCELLED invocation.  This check
+        ensures the CANCELLED snapshot from ``create_session_state``
+        is honoured before any events are read.
+        """
+        invocation_id = session_state["invocation_id"]
+        if session_state.get("invocation_status") == InvocationStatus.CANCELLED:
+            logger.info(
+                "Invocation already cancelled, aborting before streaming",
+                invocation_id=invocation_id,
+            )
+            raise InvocationCancelledStreamError(
+                resource_id=str(invocation_id),
+                resource_type="invocation",
+            )
+
     def get_on_idle(
         self,
         session_state: dict[str, Any],

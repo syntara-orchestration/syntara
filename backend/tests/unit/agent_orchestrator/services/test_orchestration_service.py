@@ -1385,3 +1385,48 @@ class TestOrchestrationServiceCancellation:
                     client=mock_client,
                     trace_accumulator=_TraceAccumulator(),
                 )
+
+    @pytest.mark.asyncio
+    async def test_watcher_teardown_failure_does_not_replace_real_exception(self) -> None:
+        """A failed watcher must not mask InvocationCancelledError from the stream loop."""
+        import asyncio
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        async def failing_watcher(
+            _key: str,
+            _inv_id: object,
+            cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            cancel_event.set()
+            msg = "StreamClient connect failed"
+            raise ConnectionError(msg)
+
+        async def stream_with_yields() -> AsyncGenerator[dict[str, Any], None]:
+            await asyncio.sleep(0)
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yields()
+
+        with patch.object(service, "_cancellation_watcher", side_effect=failing_watcher):
+            with pytest.raises(InvocationCancelledError):
+                await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )

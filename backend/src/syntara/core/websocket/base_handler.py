@@ -116,6 +116,20 @@ class BaseWebSocketStreamingHandler(ABC):
 
     # ============ Optional Hooks (Can Override) ============
 
+    def check_before_streaming(self, session_state: dict[str, Any]) -> None:  # noqa: B027
+        """Run a pre-stream check after the stream exists but before reading.
+
+        Override to raise when the resource is already in a terminal state
+        that the replay may not surface (e.g. cancelled invocation whose
+        stream contains a ``completion`` event from the accepted race).
+
+        The default implementation is a no-op.
+
+        Args:
+            session_state: Session state dict from create_session_state
+
+        """
+
     def get_on_idle(
         self,
         session_state: dict[str, Any],  # noqa: ARG002
@@ -314,7 +328,11 @@ class BaseWebSocketStreamingHandler(ABC):
             # Step 3: Determine streaming replay parameters
             start_id, replay = self.get_replay_parameters(replay_count, last_event_id, session_state)
 
-            # Step 4: Stream events to client
+            # Step 4: Pre-stream status check (e.g. already-cancelled invocation
+            # whose stream still exists but the cancel key has expired)
+            self.check_before_streaming(session_state)
+
+            # Step 5: Stream events to client
             stop_condition = self.get_stop_condition(session_state)
             async with StreamClient() as client:
                 on_idle = self.get_on_idle(session_state, client)

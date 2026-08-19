@@ -483,6 +483,25 @@ class TestGetOnIdle:
         mock_client.key_exists.assert_not_called()
 
 
+class TestCheckBeforeStreaming:
+    """Tests for check_before_streaming pre-stream CANCELLED guard."""
+
+    def test_raises_when_status_is_cancelled(self, handler: WebSocketStreamingHandler) -> None:
+        """check_before_streaming must raise when invocation_status is CANCELLED."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
+
+        with pytest.raises(InvocationCancelledStreamError):
+            handler.check_before_streaming(session_state)
+
+    def test_does_not_raise_when_status_is_running(self, handler: WebSocketStreamingHandler) -> None:
+        """check_before_streaming must not raise for non-cancelled statuses."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+
+        handler.check_before_streaming(session_state)  # should not raise
+
+
 class TestStreamEventsOnIdleWiring:
     """Test that stream_events_to_websocket passes on_idle through to client.events()."""
 

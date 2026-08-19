@@ -726,8 +726,10 @@ class OrchestrationService:
             raise
         finally:
             watcher.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            try:
                 await watcher
+            except BaseException:  # noqa: BLE001
+                logger.debug("Cancellation watcher raised on teardown", invocation_id=invocation_id, exc_info=True)
 
         # No post-loop cancellation check: if cancellation lands after the last
         # stream event, _complete_invocation_if_not_cancelled in the executor uses
