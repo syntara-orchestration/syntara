@@ -21,7 +21,6 @@ from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
-from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -51,19 +50,13 @@ from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreat
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
 from syntara.workflows.utils.serialization import deserialize_workflow_version
-from syntara.workflows.validators import workflow_validator
+from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _has_validation_issues(result: ValidationResult) -> bool:
     """Return True when the validation result has errors or warnings."""
     return result.error_count > 0 or result.warning_count > 0
-
-
-async def _get_system_continue_on_failure() -> bool:
-    """Fetch the admin-level continue_on_failure default from settings cache."""
-    cache = get_runtime_settings()
-    return await cache.get_bool("workflow_engine.continue_on_failure", default=False)
 
 
 class _ValidationRoute(APIRoute):
@@ -259,10 +252,11 @@ async def validate_workflow_definition(
     """Validate a workflow definition without saving it.
 
     Requires authentication but no specific workflow/project permission:
-    validation is a stateless, side-effect-free check of caller-supplied
-    data with no workflow_id or project_id in scope to authorize against.
+    no workflow_id or project_id is in scope to authorize against.
+    Reads the admin-level continue_on_failure default from the settings
+    cache to resolve approval fallback_decision warnings accurately.
     """
-    system_cof = await _get_system_continue_on_failure()
+    system_cof = await get_system_continue_on_failure()
     result = workflow_validator.collect_findings(
         request.workflow_definition,
         system_continue_on_failure=system_cof,
