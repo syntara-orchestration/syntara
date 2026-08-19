@@ -621,7 +621,6 @@ class OrchestrationService:
 
     async def _cancellation_watcher(
         self,
-        client: StreamClient,
         cancel_key: str,
         invocation_id: UUID,
         cancel_event: asyncio.Event,
@@ -634,6 +633,9 @@ class OrchestrationService:
         Sets *cancel_event* when cancellation is found; the stream loop
         checks the event between iterations and raises.
 
+        Uses its own ``StreamClient`` so that cancelling the task cannot
+        corrupt the connection pool used by the stream publisher.
+
         Known limitation: this watcher only improves *detection* latency.
         The actual raise happens inside the ``async for`` body in the
         stream loop, so an in-flight tool that blocks ``astream_events``
@@ -642,15 +644,16 @@ class OrchestrationService:
         """
         if interval is None:
             interval = _CANCELLATION_POLL_INTERVAL
-        while not cancel_event.is_set():
-            try:
-                await self._check_cancellation_signal(client, cancel_key, invocation_id)
-            except InvocationCancelledError:
-                cancel_event.set()
-                return
-            except Exception:  # noqa: BLE001
-                logger.debug("Cancellation check failed, will retry", invocation_id=invocation_id, exc_info=True)
-            await asyncio.sleep(interval)
+        async with StreamClient() as watcher_client:
+            while not cancel_event.is_set():
+                try:
+                    await self._check_cancellation_signal(watcher_client, cancel_key, invocation_id)
+                except InvocationCancelledError:
+                    cancel_event.set()
+                    return
+                except Exception:  # noqa: BLE001
+                    logger.debug("Cancellation check failed, will retry", invocation_id=invocation_id, exc_info=True)
+                await asyncio.sleep(interval)
 
     async def _execute_graph_streaming(
         self,
@@ -687,7 +690,7 @@ class OrchestrationService:
         cancel_event = asyncio.Event()
 
         watcher = asyncio.create_task(
-            self._cancellation_watcher(client, cancel_key, invocation_id, cancel_event),
+            self._cancellation_watcher(cancel_key, invocation_id, cancel_event),
             name="cancellation_watcher",
         )
         try:

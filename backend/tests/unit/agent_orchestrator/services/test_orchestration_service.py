@@ -1145,13 +1145,15 @@ class TestOrchestrationServiceCancellation:
         invocation_id = uuid4()
         cancel_event = asyncio.Event()
 
-        await service._cancellation_watcher(
-            mock_client,
-            f"invocation:{invocation_id}:cancelled",
-            invocation_id,
-            cancel_event,
-            interval=0.0,
-        )
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+            await service._cancellation_watcher(
+                f"invocation:{invocation_id}:cancelled",
+                invocation_id,
+                cancel_event,
+                interval=0.0,
+            )
 
         assert cancel_event.is_set()
 
@@ -1170,13 +1172,15 @@ class TestOrchestrationServiceCancellation:
         invocation_id = uuid4()
         cancel_event = asyncio.Event()
 
-        await service._cancellation_watcher(
-            mock_client,
-            f"invocation:{invocation_id}:cancelled",
-            invocation_id,
-            cancel_event,
-            interval=0.0,
-        )
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+            await service._cancellation_watcher(
+                f"invocation:{invocation_id}:cancelled",
+                invocation_id,
+                cancel_event,
+                interval=0.0,
+            )
 
         assert cancel_event.is_set()
         assert mock_client.key_exists.call_count == 3
@@ -1202,7 +1206,6 @@ class TestOrchestrationServiceCancellation:
         cancel_trigger = asyncio.Event()
 
         async def fake_watcher(
-            _client: object,
             _key: str,
             _inv_id: object,
             cancel_event: asyncio.Event,
@@ -1288,7 +1291,6 @@ class TestOrchestrationServiceCancellation:
         cancel_trigger = asyncio.Event()
 
         async def fake_watcher(
-            _client: object,
             _key: str,
             _inv_id: object,
             cancel_event: asyncio.Event,
@@ -1358,7 +1360,6 @@ class TestOrchestrationServiceCancellation:
         mock_graph.astream_events = lambda *_a, **_kw: stream_one_event()
 
         async def noop_watcher(
-            _client: object,
             _key: str,
             _inv_id: object,
             _cancel_event: asyncio.Event,
