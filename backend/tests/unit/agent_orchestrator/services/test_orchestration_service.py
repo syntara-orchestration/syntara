@@ -1239,7 +1239,13 @@ class TestOrchestrationServiceCancellation:
     async def test_execute_graph_streaming_returns_final_state_when_not_cancelled(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test that _execute_graph_streaming returns final_state when no cancellation occurs."""
+        """Test that _execute_graph_streaming returns final_state when no cancellation occurs.
+
+        Patches StreamClient so the watcher's own connection uses a mock,
+        and yields control mid-stream so the watcher can poll at least once.
+        """
+        import asyncio
+
         import syntara.agent_orchestrator.services.orchestration_service as orch_mod
         from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
 
@@ -1252,23 +1258,34 @@ class TestOrchestrationServiceCancellation:
 
         invocation_id = uuid4()
         mock_client = AsyncMock()
-        mock_client.key_exists.return_value = False
+
+        watcher_client = AsyncMock()
+        watcher_client.key_exists.return_value = False
+
+        async def stream_with_yield() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Done")
+            await asyncio.sleep(0)
+            yield {"event": "on_chain_end", "data": {}}
 
         mock_graph = AsyncMock()
-        mock_graph.astream_events = lambda *_a, **_kw: mock_astream_events_generator("Done")
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yield()
 
-        result = await service._execute_graph_streaming(
-            graph=mock_graph,
-            initial_state={},  # type: ignore[typeddict-item]
-            config={"configurable": {"thread_id": "test"}},
-            invocation_id=invocation_id,
-            stream_id="stream-1",
-            client=mock_client,
-            trace_accumulator=_TraceAccumulator(),
-        )
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = watcher_client
+            mock_sc.return_value.__aexit__.return_value = None
 
-        # Should return without raising — final_state may be None for these mock events
+            result = await service._execute_graph_streaming(
+                graph=mock_graph,
+                initial_state={},  # type: ignore[typeddict-item]
+                config={"configurable": {"thread_id": "test"}},
+                invocation_id=invocation_id,
+                stream_id="stream-1",
+                client=mock_client,
+                trace_accumulator=_TraceAccumulator(),
+            )
+
         assert result is None
+        watcher_client.key_exists.assert_called()
 
     @pytest.mark.asyncio
     async def test_execute_graph_streaming_cleans_up_watcher_on_cancellation(

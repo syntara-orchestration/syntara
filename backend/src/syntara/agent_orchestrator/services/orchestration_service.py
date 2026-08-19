@@ -655,7 +655,7 @@ class OrchestrationService:
                     logger.debug("Cancellation check failed, will retry", invocation_id=invocation_id, exc_info=True)
                 await asyncio.sleep(interval)
 
-    async def _execute_graph_streaming(
+    async def _execute_graph_streaming(  # noqa: C901
         self,
         graph: CompiledStateGraph[AgentState, None, Any, Any],
         initial_state: AgentState,
@@ -728,7 +728,11 @@ class OrchestrationService:
             watcher.cancel()
             try:
                 await watcher
-            except (Exception, asyncio.CancelledError):  # noqa: BLE001
+            except asyncio.CancelledError:
+                task = asyncio.current_task()
+                if task is not None and task.cancelling():
+                    raise
+            except Exception:  # noqa: BLE001
                 logger.debug("Cancellation watcher raised on teardown", invocation_id=invocation_id, exc_info=True)
 
         # No post-loop cancellation check: if cancellation lands after the last
