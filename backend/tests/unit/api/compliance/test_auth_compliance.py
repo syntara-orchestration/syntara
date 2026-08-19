@@ -69,7 +69,7 @@ def _has_authn(route: object) -> bool:
 # ---------------------------------------------------------------------------
 
 _INFRA_PATH_PREFIXES = (
-    "/health",
+    "/healthz/",
     "/metrics",
     "/_internal/",
     "/api_docs/",
