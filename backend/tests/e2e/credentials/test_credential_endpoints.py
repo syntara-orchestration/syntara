@@ -212,7 +212,12 @@ class TestWorkflowWithValidCredential:
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
-        assert body.get("authenticated") is True
+        # httpbin.org reports success as "authenticated", go-httpbin (used in CI)
+        # as "authorized". Accept either — what matters is that the Basic Auth
+        # credential was resolved and the server accepted it.
+        assert body.get("authenticated") is True or body.get("authorized") is True, (
+            f"Basic Auth credential was not accepted: {body}"
+        )
         assert body.get("user") == "admin"
 
     def test_no_credential_returns_401(

@@ -330,11 +330,19 @@ def poll_execution_until_complete(
 
 _HTTPBIN_ALLOWED_HOSTS = {"httpbin.org", "httpbin"}
 
+# URL the *workflow worker* uses. In CI this is the in-cluster httpbin Service;
+# locally it defaults to the public instance.
 HTTPBIN_URL: str = os.environ.get("HTTPBIN_URL", "https://httpbin.org")
 
 _parsed = urllib.parse.urlparse(HTTPBIN_URL)
 if _parsed.scheme not in ("http", "https") or not any(h in (_parsed.hostname or "") for h in _HTTPBIN_ALLOWED_HOSTS):
     HTTPBIN_URL = "https://httpbin.org"
+
+# URL the *test runner* probes for availability. When httpbin runs inside the
+# cluster its Service name does not resolve from the runner, so CI points this
+# at a port-forward. Defaults to HTTPBIN_URL for local runs, where both the
+# runner and the worker reach httpbin the same way.
+HTTPBIN_PROBE_URL: str = os.environ.get("HTTPBIN_PROBE_URL", HTTPBIN_URL)
 
 
 _httpbin_cached: bool | None = None
@@ -345,7 +353,7 @@ def httpbin_available() -> bool:
     global _httpbin_cached  # noqa: PLW0603
     if _httpbin_cached is None:
         try:
-            urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
+            urllib.request.urlopen(f"{HTTPBIN_PROBE_URL}/status/200", timeout=5)  # noqa: S310
             _httpbin_cached = True
         except Exception:
             _httpbin_cached = False
@@ -354,5 +362,5 @@ def httpbin_available() -> bool:
 
 requires_httpbin = pytest.mark.skipif(
     not httpbin_available(),
-    reason=f"httpbin not reachable at {HTTPBIN_URL}. Set HTTPBIN_URL to override.",
+    reason=f"httpbin not reachable at {HTTPBIN_PROBE_URL}. Set HTTPBIN_URL/HTTPBIN_PROBE_URL to override.",
 )
