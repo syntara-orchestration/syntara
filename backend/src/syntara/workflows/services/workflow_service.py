@@ -29,6 +29,7 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
 from syntara.workflows.audit.workflow_version import (
     WorkflowVersionCreatedEvent,
@@ -84,6 +85,12 @@ def reset_workflow_creation_counters() -> None:
 def _has_validation_issues(result: ValidationResult) -> bool:
     """Return True when the validation result has errors or warnings."""
     return result.error_count > 0 or result.warning_count > 0
+
+
+async def _get_system_continue_on_failure() -> bool:
+    """Fetch the admin-level continue_on_failure default from settings cache."""
+    cache = get_runtime_settings()
+    return await cache.get_bool("workflow_engine.continue_on_failure", default=False)
 
 
 class WorkflowConvertResourceMixin(ConvertResourceMixin):
@@ -482,12 +489,16 @@ class WorkflowService(BaseService):
         """
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
+        system_cof = await _get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": component.value, "operation": "create"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         has_validation_issues = _has_validation_issues(result)
         if has_validation_issues:
@@ -1031,12 +1042,16 @@ class WorkflowService(BaseService):
 
         """
         recorder = get_metrics_recorder()
+        system_cof = await _get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": ComponentLabel.WORKFLOW_ENGINE.value, "operation": "version_update"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         workflow.has_validation_issues = _has_validation_issues(result)
         if workflow.has_validation_issues:
@@ -1222,7 +1237,11 @@ class WorkflowService(BaseService):
             )
 
         definition = target_version.workflow_definition
-        result = workflow_validator.collect_findings(definition)
+        system_cof = await _get_system_continue_on_failure()
+        result = workflow_validator.collect_findings(
+            definition,
+            system_continue_on_failure=system_cof,
+        )
         if len(definition.get("nodes", [])) == 0:
             result = ValidationResult.from_findings(
                 [
