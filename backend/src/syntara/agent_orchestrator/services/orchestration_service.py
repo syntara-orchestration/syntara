@@ -728,7 +728,7 @@ class OrchestrationService:
             watcher.cancel()
             try:
                 await watcher
-            except BaseException:  # noqa: BLE001
+            except (Exception, asyncio.CancelledError):  # noqa: BLE001
                 logger.debug("Cancellation watcher raised on teardown", invocation_id=invocation_id, exc_info=True)
 
         # No post-loop cancellation check: if cancellation lands after the last

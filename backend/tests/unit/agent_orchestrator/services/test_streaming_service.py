@@ -502,6 +502,41 @@ class TestCheckBeforeStreaming:
         handler.check_before_streaming(session_state)  # should not raise
 
 
+class TestCheckBeforeStreamingWiring:
+    """Test that stream_events_to_websocket calls check_before_streaming."""
+
+    @pytest.mark.asyncio
+    async def test_cancelled_status_aborts_before_events(self, mock_session_factory: MagicMock) -> None:
+        """stream_events_to_websocket must raise InvocationCancelledStreamError
+        for a CANCELLED invocation with an existing stream, without calling client.events()."""
+        handler = WebSocketStreamingHandler(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
+
+        mock_client = AsyncMock()
+        mock_client.info.return_value = {"exists": True, "length": 5, "last_event_id": "1-0"}
+
+        mock_websocket = AsyncMock()
+
+        with (
+            patch.object(handler, "create_session_state", new_callable=AsyncMock, return_value=session_state),
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_sc_cls,
+        ):
+            # First StreamClient for info() check
+            mock_sc_cls.return_value.__aenter__.return_value = mock_client
+            mock_sc_cls.return_value.__aexit__.return_value = None
+
+            with pytest.raises(InvocationCancelledStreamError):
+                await handler.stream_events_to_websocket(
+                    websocket=mock_websocket,
+                    stream_id=f"invocation:{invocation_id}:events",
+                    replay_count="0",
+                    invocation_id=invocation_id,
+                )
+
+        mock_client.events.assert_not_called()
+
+
 class TestStreamEventsOnIdleWiring:
     """Test that stream_events_to_websocket passes on_idle through to client.events()."""
 
