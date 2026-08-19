@@ -60,13 +60,13 @@ class EventsExpiredError(StreamingValidationError):
 
 
 class InvocationCancelledStreamError(StreamingValidationError):
-    """Invocation was cancelled before streaming started."""
+    """Invocation was cancelled — raised during wait or mid-stream idle check."""
 
     def __init__(self, resource_id: str, resource_type: str = "resource") -> None:  # noqa: D107
         error_data = ErrorData(
             type="https://api.example.com/errors/invocation-cancelled",
             title="Invocation Cancelled",
-            detail="The invocation was cancelled before streaming started.",
+            detail="The invocation was cancelled.",
             code="INVOCATION_CANCELLED",
             retryable=False,
             instance=f"/{resource_type}s/{resource_id}",

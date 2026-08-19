@@ -466,6 +466,64 @@ class TestGetOnIdle:
         ):
             await on_idle()  # should not raise
 
+    @pytest.mark.asyncio
+    async def test_on_idle_raises_when_session_status_is_cancelled(self, handler: WebSocketStreamingHandler) -> None:
+        """on_idle must raise immediately when session_state already says CANCELLED, even if key_exists returns False."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+
+        on_idle = handler.get_on_idle(session_state, mock_client)
+        assert on_idle is not None
+
+        with pytest.raises(InvocationCancelledStreamError):
+            await on_idle()
+
+        mock_client.key_exists.assert_not_called()
+
+
+class TestStreamEventsOnIdleWiring:
+    """Test that stream_events_to_websocket passes on_idle through to client.events()."""
+
+    @pytest.mark.asyncio
+    async def test_on_idle_passed_to_client_events(self, mock_session_factory: MagicMock) -> None:
+        """stream_events_to_websocket must pass a non-None on_idle to client.events()."""
+        handler = WebSocketStreamingHandler(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+
+        captured_kwargs: dict[str, Any] = {}
+
+        async def fake_events(**kwargs: Any) -> Any:  # noqa: ANN401
+            captured_kwargs.update(kwargs)
+            # Yield one terminal event so the stream stops
+            yield {"event_type": "completion", "data": {}}
+
+        mock_client = AsyncMock()
+        mock_client.events = fake_events
+
+        mock_websocket = AsyncMock()
+
+        with (
+            patch.object(handler, "create_session_state", new_callable=AsyncMock, return_value=session_state),
+            patch.object(handler, "wait_for_stream_ready", new_callable=AsyncMock),
+            patch("syntara.core.websocket.base_handler.StreamClient") as mock_sc_cls,
+        ):
+            mock_sc_cls.return_value.__aenter__.return_value = mock_client
+            mock_sc_cls.return_value.__aexit__.return_value = None
+
+            await handler.stream_events_to_websocket(
+                websocket=mock_websocket,
+                stream_id=f"invocation:{invocation_id}:events",
+                replay_count="0",
+                invocation_id=invocation_id,
+            )
+
+        assert "on_idle" in captured_kwargs
+        assert captured_kwargs["on_idle"] is not None
+        assert callable(captured_kwargs["on_idle"])
+
 
 class TestStreamingService:
     """Test StreamingService class."""

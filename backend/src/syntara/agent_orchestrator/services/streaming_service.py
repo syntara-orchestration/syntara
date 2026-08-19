@@ -173,14 +173,24 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         """Return cancel-key checker invoked when XREAD returns no events.
 
         Uses the same Redis-first + DB-fallback pattern as the pre-stream
-        wait.  Raises ``InvocationCancelledStreamError`` if the invocation
+        wait.  Also short-circuits on the ``invocation_status`` snapshot
+        from ``create_session_state`` so that a late connect after the
+        cancel key has expired still raises immediately.
+
+        Raises ``InvocationCancelledStreamError`` if the invocation
         has been cancelled, which aborts the event stream.
 
         """
         invocation_id: UUID = session_state["invocation_id"]
+        invocation_status = session_state.get("invocation_status")
         cancel_key = get_invocation_cancel_key(invocation_id)
 
         async def _check_cancel_on_idle() -> None:
+            if invocation_status == InvocationStatus.CANCELLED:
+                raise InvocationCancelledStreamError(
+                    resource_id=str(invocation_id),
+                    resource_type="invocation",
+                )
             try:
                 cancelled = await client.key_exists(cancel_key)
             except Exception:  # noqa: BLE001
