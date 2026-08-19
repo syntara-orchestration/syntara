@@ -409,9 +409,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                     {group.name === BUILTIN_AUTHENTICATED_GROUP_NAME && (
                       <>
                         {' '}
-                        <NxLabel isCompact color="grey">
-                          All users
-                        </NxLabel>
+                        <NxLabel color="grey">All users</NxLabel>
                       </>
                     )}
                   </Td>

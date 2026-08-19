@@ -9,7 +9,7 @@ import { WorkflowName } from '../WorkflowName'
 /** User-applied filter values use outlined compact labels. */
 function ActiveFilterValueLabel({ children, onClose }: Readonly<{ children: ReactNode; onClose: () => void }>) {
   return (
-    <NxLabel variant="outline" isCompact onClose={onClose}>
+    <NxLabel variant="outline" onClose={onClose}>
       {children}
     </NxLabel>
   )

@@ -98,7 +98,7 @@ function WorkflowsTable({
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <NxLabel key={nodeName} variant="outline" isCompact>
+                      <NxLabel key={nodeName} variant="outline">
                         {nodeName}
                       </NxLabel>
                     ))}

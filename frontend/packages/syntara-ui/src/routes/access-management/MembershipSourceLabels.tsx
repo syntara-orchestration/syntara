@@ -10,7 +10,7 @@ export function MembershipSourceLabels({ sources }: Readonly<{ sources?: Members
     <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
       {sources.map((s, idx) => (
         <FlexItem key={`${s.type}-${s.provider_name ?? idx}`}>
-          <NxLabel isCompact color={s.type === 'idp' ? 'blue' : 'grey'}>
+          <NxLabel color={s.type === 'idp' ? 'blue' : 'grey'}>
             {s.type === 'idp' ? (s.provider_name ?? 'IdP') : 'Manual'}
           </NxLabel>
         </FlexItem>

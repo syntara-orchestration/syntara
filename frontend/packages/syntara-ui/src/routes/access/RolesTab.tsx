@@ -169,13 +169,11 @@ function RolesTable({
               </Td>
               <Td dataLabel="Type">
                 {role.is_builtin ? (
-                  <NxLabel color="grey" icon={<RhUiLockIcon />} isCompact>
+                  <NxLabel color="grey" icon={<RhUiLockIcon />}>
                     Built-in
                   </NxLabel>
                 ) : (
-                  <NxLabel color="blue" isCompact>
-                    Custom
-                  </NxLabel>
+                  <NxLabel color="blue">Custom</NxLabel>
                 )}
               </Td>
               <Td isActionCell>
@@ -187,7 +185,7 @@ function RolesTable({
                 <ExpandableRowContent>
                   <LabelGroup isCompact numLabels={Infinity}>
                     {(role.policies ?? []).map((policy) => (
-                      <NxLabel key={policy} color="grey" isCompact>
+                      <NxLabel key={policy} color="grey">
                         {policy}
                       </NxLabel>
                     ))}

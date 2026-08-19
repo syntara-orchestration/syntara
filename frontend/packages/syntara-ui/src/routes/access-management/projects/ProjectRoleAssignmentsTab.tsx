@@ -112,9 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <NxLabel key={name} isCompact>
-                        {name}
-                      </NxLabel>
+                      <NxLabel key={name}>{name}</NxLabel>
                     ))}
                   </LabelGroup>
                 ) : (

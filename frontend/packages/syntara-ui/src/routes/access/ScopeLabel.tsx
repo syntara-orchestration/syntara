@@ -22,11 +22,7 @@ type ScopeLabelProps = {
 export function ScopeLabel({ scope }: Readonly<ScopeLabelProps>) {
   const display = SCOPE_DISPLAY[scope ?? ''] ?? SCOPE_DISPLAY.system
 
-  return (
-    <NxLabel color={display.color} isCompact>
-      {display.label}
-    </NxLabel>
-  )
+  return <NxLabel color={display.color}>{display.label}</NxLabel>
 }
 
 type PolicyTypeLabelProps = {
@@ -36,16 +32,12 @@ type PolicyTypeLabelProps = {
 export function PolicyTypeLabel({ isBuiltin }: Readonly<PolicyTypeLabelProps>) {
   if (isBuiltin) {
     return (
-      <NxLabel color="grey" icon={<RhUiLockIcon />} isCompact>
+      <NxLabel color="grey" icon={<RhUiLockIcon />}>
         Built-in
       </NxLabel>
     )
   }
-  return (
-    <NxLabel color="blue" isCompact>
-      Custom
-    </NxLabel>
-  )
+  return <NxLabel color="blue">Custom</NxLabel>
 }
 
 type ProjectLabelProps = {
@@ -90,19 +82,17 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
         <StackItem key={`${stmt.effect}-${stmt.scope}-${stmt.actions.join('-')}`}>
           <Flex gap={{ default: 'gapXs' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'wrap' }}>
             <FlexItem>
-              <NxLabel color={stmt.effect === 'allow' ? 'green' : 'red'} isCompact>
+              <NxLabel color={stmt.effect === 'allow' ? 'green' : 'red'}>
                 {stmt.effect === 'allow' ? 'Allow' : 'Deny'}
               </NxLabel>
             </FlexItem>
             <FlexItem>
-              <NxLabel color="grey" isCompact>
-                scope: {stmt.scope}
-              </NxLabel>
+              <NxLabel color="grey">scope: {stmt.scope}</NxLabel>
             </FlexItem>
             <FlexItem>
               <LabelGroup isCompact numLabels={2}>
                 {stmt.actions.map((action) => (
-                  <NxLabel key={action} color="grey" isCompact>
+                  <NxLabel key={action} color="grey">
                     {action}
                   </NxLabel>
                 ))}

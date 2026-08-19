@@ -107,7 +107,6 @@ function PermissionsTableContent({
               <NxLabel
                 color={perm.effect === 'allow' ? 'green' : 'red'}
                 icon={perm.effect === 'allow' ? <RhUiCheckCircleIcon /> : <RhUiCloseCircleIcon />}
-                isCompact
               >
                 {perm.effect}
               </NxLabel>
@@ -115,7 +114,7 @@ function PermissionsTableContent({
             <Td dataLabel="Actions">
               <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
                 {perm.actions.map((a) => (
-                  <NxLabel key={a} color="blue" isCompact>
+                  <NxLabel key={a} color="blue">
                     {a}
                   </NxLabel>
                 ))}

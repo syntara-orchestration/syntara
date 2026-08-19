@@ -148,7 +148,7 @@ export function SelectUserStep({
                   <Td dataLabel="Email">{user.email}</Td>
                   <Td dataLabel="Authentication">
                     {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
-                      <NxLabel key={source} isCompact color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
+                      <NxLabel key={source} color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
                         {source}
                       </NxLabel>
                     ))}
