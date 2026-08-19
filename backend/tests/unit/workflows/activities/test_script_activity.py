@@ -3,6 +3,7 @@
 import asyncio
 import sys
 from collections.abc import Generator
+from pathlib import Path
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -332,9 +333,9 @@ echo "Result: $result"
 
     @pytest.mark.asyncio
     async def test_script_with_file_operations(self) -> None:
-        """Test script that creates and reads temporary file."""
+        """Test script that creates and reads temporary file in the sandbox CWD."""
         script = """
-tmpfile=$(mktemp)
+tmpfile=$(mktemp ./tmp.XXXXXXXXXX)
 echo "test content" > "$tmpfile"
 cat "$tmpfile"
 rm "$tmpfile"
@@ -707,7 +708,7 @@ class TestSysExecutableForPython:
 
     @pytest.mark.asyncio
     async def test_python_script_uses_sys_executable(self) -> None:
-        """Python script subprocess should use the same interpreter as the host process."""
+        """Python script subprocess should use the resolved interpreter path."""
         script = """
 import sys
 print(sys.executable)
@@ -717,8 +718,10 @@ print(sys.executable)
 
         output = result["output"]
         assert output["return_code"] == 0
-        # The subprocess should report the same executable as the host
-        assert sys.executable in output["stdout"]
+        # The subprocess uses the resolved real path (not venv symlink)
+        import os
+
+        assert os.path.realpath(sys.executable) in output["stdout"]
 
     @pytest.mark.asyncio
     async def test_bash_script_does_not_use_sys_executable(self) -> None:
@@ -937,9 +940,12 @@ class TestScriptEnvironmentSanitization:
         assert "leaked_master_key" not in output["stdout"]
         assert "KEY=empty" in output["stdout"]
 
+    @pytest.mark.skipif(sys.platform != "linux", reason="PATH sanitization requires Linux sandbox")
     @pytest.mark.asyncio
     async def test_script_can_read_path(self) -> None:
-        """A bash script must still be able to read PATH."""
+        """A bash script must still be able to read PATH (sanitized)."""
+        from syntara.workflows.workflow_engine.activities.script_sandbox import SANDBOX_PATH
+
         input_config = {
             "language": "bash",
             "code": 'echo "PATH=$PATH"',
@@ -948,7 +954,7 @@ class TestScriptEnvironmentSanitization:
 
         output = result["output"]
         assert output["return_code"] == 0
-        assert "PATH=/" in output["stdout"]
+        assert f"PATH={SANDBOX_PATH}" in output["stdout"]
 
     @pytest.mark.asyncio
     async def test_python_env_dump_has_no_app_secrets(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1215,3 +1221,368 @@ class TestScriptNodesGate:
         result = await execute_script_activity({"language": "bash", "code": "echo gate-open"}, None)
         assert result["output"]["return_code"] == 0
         assert "gate-open" in result["output"]["stdout"]
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Sandbox requires Linux")
+class TestScriptSandboxIntegration:
+    """Regression tests for AAP-87783: script nodes must not access host secrets.
+
+    These tests verify that the sandbox correctly isolates script execution,
+    preventing access to sensitive filesystem paths and environment variables.
+    """
+
+    @pytest.mark.asyncio
+    async def test_script_runs_in_temp_directory(self) -> None:
+        """Script CWD must be an ephemeral sandbox directory, not the worker dir."""
+        input_config = {"language": "bash", "code": "pwd"}
+        result = await execute_script_activity(input_config, None)
+
+        output = result["output"]
+        assert output["return_code"] == 0
+        cwd = output["stdout"].strip()
+        assert "script-sandbox-" in cwd
+        assert cwd.startswith("/tmp")  # noqa: S108
+
+    @pytest.mark.asyncio
+    async def test_python_script_runs_in_temp_directory(self) -> None:
+        """Python script CWD must be an ephemeral sandbox directory."""
+        script = "import os; print(os.getcwd())"
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+
+        output = result["output"]
+        assert output["return_code"] == 0
+        cwd = output["stdout"].strip()
+        assert "script-sandbox-" in cwd
+
+    @pytest.mark.asyncio
+    async def test_sandbox_dir_cleaned_up_after_execution(self) -> None:
+        """The ephemeral sandbox directory must be removed after script completes."""
+        from pathlib import Path
+
+        input_config = {"language": "bash", "code": "pwd"}
+        result = await execute_script_activity(input_config, None)
+        sandbox_dir = result["output"]["stdout"].strip()
+        assert not Path(sandbox_dir).exists(), "Sandbox directory was not cleaned up"
+
+    @pytest.mark.asyncio
+    async def test_sandbox_dir_cleaned_up_after_failure(self) -> None:
+        """Sandbox directory must be cleaned up even when the script fails."""
+        from pathlib import Path
+
+        from temporalio.exceptions import ApplicationError
+
+        input_config = {"language": "bash", "code": "pwd; exit 1"}
+        with pytest.raises(ApplicationError) as exc_info:
+            await execute_script_activity(input_config, None)
+
+        detail = exc_info.value.details[0]
+        sandbox_dir = detail["output"]["stdout"].strip()
+        assert not Path(sandbox_dir).exists(), "Sandbox directory was not cleaned up after failure"
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_read_proc_environ(self) -> None:
+        """Script must not be able to read worker env vars via /proc/self/environ."""
+        script = """
+import os
+env_dump = open('/proc/self/environ', 'rb').read().decode(errors='replace')
+app_vars = [v for v in env_dump.split('\\0') if v.startswith('APP_')]
+print(len(app_vars))
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert output["stdout"].strip() == "0"
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_read_parent_environ(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Script must not be able to read the parent process APP_* env vars."""
+        monkeypatch.setenv("APP_SECRET_ENCRYPTION_KEY", "test-secret-key-12345")
+        script = """
+import os
+env_keys = [k for k in os.environ if k.startswith('APP_')]
+print(f"APP_KEYS={len(env_keys)}")
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "APP_KEYS=0" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_creates_files_in_sandbox_not_worker_dir(self) -> None:
+        """Files created by scripts must land in the sandbox, not the worker CWD."""
+        worker_cwd = str(Path.cwd())
+        input_config = {
+            "language": "bash",
+            "code": "echo test > sandbox_test_file.txt && pwd",
+        }
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert not Path(worker_cwd, "sandbox_test_file.txt").exists()
+
+    @pytest.mark.asyncio
+    async def test_preexec_no_new_privs_applied(self) -> None:
+        """Script subprocess must have PR_SET_NO_NEW_PRIVS set."""
+        script = """
+with open('/proc/self/status') as f:
+    for line in f:
+        if line.startswith('NoNewPrivs:'):
+            print(line.strip())
+            break
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "NoNewPrivs:\t1" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_path_is_sanitized(self) -> None:
+        """Script subprocess PATH must only contain standard system directories."""
+        input_config = {"language": "bash", "code": 'echo "$PATH"'}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        path = output["stdout"].strip()
+        for entry in path.split(":"):
+            assert entry.startswith(("/usr", "/bin", "/sbin")), f"Non-system directory in PATH: {entry}"
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_read_file_outside_allowlist(self) -> None:
+        """Key regression test for AAP-87783: scripts must not read host secrets."""
+        import shutil
+        import tempfile
+
+        secret_dir = tempfile.mkdtemp(prefix="test-secret-")
+        secret_file = str(Path(secret_dir) / "jwt-key.pem")
+        try:
+            Path(secret_file).write_text("FAKE_SECRET")
+
+            # The worker CWD (/sandbox/syntara/backend) is NOT on the
+            # Landlock allowlist. A file created there must be unreadable
+            # from inside the sandboxed script.
+            # Place the secret outside /tmp to test this.
+            worker_secret = str(Path.cwd() / "_test_secret_aap87783.pem")
+            Path(worker_secret).write_text("WORKER_SECRET")
+
+            script = f"""
+results = []
+for path in ['{worker_secret}']:
+    try:
+        data = open(path).read()
+        results.append(f'LEAKED:{{data}}')
+    except PermissionError:
+        results.append('BLOCKED')
+    except FileNotFoundError:
+        results.append('BLOCKED')
+print(' '.join(results))
+"""
+            input_config = {"language": "python", "code": script}
+            result = await execute_script_activity(input_config, None)
+            output = result["output"]
+            assert output["return_code"] == 0
+            assert "BLOCKED" in output["stdout"]
+            assert "LEAKED" not in output["stdout"]
+        finally:
+            shutil.rmtree(secret_dir, ignore_errors=True)
+            if Path(worker_secret).exists():
+                Path(worker_secret).unlink()
+
+    @pytest.mark.asyncio
+    async def test_script_can_read_allowed_system_files(self) -> None:
+        """Scripts must be able to read files on the allowlist (/usr hierarchy)."""
+        input_config = {"language": "bash", "code": "ls /usr/bin > /dev/null && echo OK"}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "OK" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_can_execute_basic_commands(self) -> None:
+        """Standard utilities under /usr/bin must work inside the sandbox."""
+        input_config = {"language": "bash", "code": "date > /dev/null && echo CMD_OK"}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "CMD_OK" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_write_outside_sandbox(self) -> None:
+        """Scripts must not be able to create files outside /tmp."""
+        input_config = {
+            "language": "bash",
+            "code": "echo test > /var/test_file.txt 2>&1; echo exit_code=$?",
+        }
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert "Permission denied" in output["stdout"] or "exit_code=1" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_read_worker_proc_environ(self) -> None:
+        """Scripts must not read the worker's /proc/<pid>/environ (F1 regression)."""
+        import os
+
+        worker_pid = os.getpid()
+        script = f"""
+import os
+try:
+    data = open('/proc/{worker_pid}/environ', 'rb').read()
+    print(f'LEAKED:{{len(data)}} bytes')
+except PermissionError:
+    print('BLOCKED')
+except FileNotFoundError:
+    print('BLOCKED')
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "BLOCKED" in output["stdout"]
+        assert "LEAKED" not in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_can_read_proc_self(self) -> None:
+        """Scripts must be able to read /proc/self for introspection."""
+        script = """
+with open('/proc/self/status') as f:
+    line = f.readline().strip()
+    print(f'STATUS:{line}')
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "STATUS:Name:" in output["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_script_cannot_read_etc_secrets(self) -> None:
+        """Scripts must not be able to read arbitrary /etc files (F4 regression)."""
+        script = """
+try:
+    open('/etc/shadow').read()
+    print('LEAKED')
+except PermissionError:
+    print('BLOCKED')
+except FileNotFoundError:
+    print('BLOCKED')
+"""
+        input_config = {"language": "python", "code": script}
+        result = await execute_script_activity(input_config, None)
+        output = result["output"]
+        assert output["return_code"] == 0
+        assert "BLOCKED" in output["stdout"]
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Sandbox requires Linux")
+class TestScriptSandboxUnshare:
+    """Regression tests that force execution through the unshare tier.
+
+    These patch Landlock ABI to -1 so create_sandbox_context falls
+    through to unshare. Skipped if unshare is not available.
+    """
+
+    @staticmethod
+    def _unshare_works() -> bool:
+        import shutil
+        import subprocess
+
+        if not shutil.which("unshare"):
+            return False
+        try:
+            r = subprocess.run(
+                [  # noqa: S607
+                    "unshare",
+                    "--user",
+                    "--map-root-user",
+                    "--mount",
+                    "--pid",
+                    "--fork",
+                    "--kill-child",
+                    "bash",
+                    "-c",
+                    "mount --make-rprivate /",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=5,
+            )
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    @pytest.mark.asyncio
+    async def test_unshare_script_cannot_read_file_outside_allowlist(self) -> None:
+        """Key AAP-87783 regression test on the unshare tier."""
+        if not self._unshare_works():
+            pytest.skip("unshare --user --map-root-user not available")
+
+        import syntara.workflows.workflow_engine.activities.script_sandbox as smod
+
+        worker_secret = str(Path.cwd() / "_test_secret_unshare.pem")
+        Path(worker_secret).write_text("WORKER_SECRET")
+
+        saved_abi = smod._cached_landlock_abi
+        saved_unshare = smod._cached_unshare_userns
+        smod._cached_landlock_abi = -1
+        smod._cached_unshare_userns = None
+        try:
+            script = f"""
+try:
+    data = open('{worker_secret}').read()
+    print(f'LEAKED:{{data}}')
+except PermissionError:
+    print('BLOCKED')
+except FileNotFoundError:
+    print('BLOCKED')
+"""
+            input_config = {"language": "python", "code": script}
+            result = await execute_script_activity(input_config, None)
+            output = result["output"]
+            assert output["return_code"] == 0
+            assert "BLOCKED" in output["stdout"]
+            assert "LEAKED" not in output["stdout"]
+        finally:
+            smod._cached_landlock_abi = saved_abi
+            smod._cached_unshare_userns = saved_unshare
+            if Path(worker_secret).exists():
+                Path(worker_secret).unlink()
+
+    @pytest.mark.asyncio
+    async def test_unshare_script_cannot_umount_old(self) -> None:
+        """Script must not be able to umount /old to reveal the original root."""
+        if not self._unshare_works():
+            pytest.skip("unshare --user --map-root-user not available")
+
+        import syntara.workflows.workflow_engine.activities.script_sandbox as smod
+
+        saved_abi = smod._cached_landlock_abi
+        saved_unshare = smod._cached_unshare_userns
+        smod._cached_landlock_abi = -1
+        smod._cached_unshare_userns = None
+        try:
+            script = """
+import subprocess, os
+# Try to umount /old (should fail — unprivileged in nested userns)
+r = subprocess.run(['umount', '/old'], capture_output=True)
+# Check if /old has host content
+try:
+    entries = os.listdir('/old')
+    if entries:
+        print(f'LEAKED:{entries[:3]}')
+    else:
+        print('BLOCKED')
+except (PermissionError, FileNotFoundError, OSError):
+    print('BLOCKED')
+"""
+            input_config = {"language": "python", "code": script}
+            result = await execute_script_activity(input_config, None)
+            output = result["output"]
+            assert output["return_code"] == 0
+            assert "BLOCKED" in output["stdout"]
+            assert "LEAKED" not in output["stdout"]
+        finally:
+            smod._cached_landlock_abi = saved_abi
+            smod._cached_unshare_userns = saved_unshare

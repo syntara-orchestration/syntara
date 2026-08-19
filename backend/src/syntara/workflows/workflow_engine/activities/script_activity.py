@@ -1,7 +1,7 @@
 """Script activity executors for bash and Python.
 
 This module provides functionality to execute bash and Python scripts as workflow activities.
-Scripts run in isolated subprocesses with timeout and error handling.
+Scripts run in sandboxed subprocesses with filesystem isolation, timeout, and error handling.
 """
 
 import asyncio
@@ -9,7 +9,6 @@ import contextlib
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +25,13 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 )
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
+from .script_sandbox import (
+    build_pivot_root_command,
+    cleanup_sandbox,
+    create_sandbox_context,
+    resolve_python_executable,
+    sanitize_env_for_sandbox,
+)
 
 SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
     {
@@ -386,13 +392,38 @@ async def _execute_script_common(
     env = _prepare_script_env(environment)
     process = None
 
+    settings = get_settings()
     try:
-        # Execute script asynchronously with custom environment
+        sandbox_ctx = create_sandbox_context(
+            sandbox_enabled=settings.script_sandbox_enabled,
+            extra_allowed_paths=settings.script_sandbox_allowed_paths,
+        )
+    except (RuntimeError, ValueError) as e:
+        msg = f"Sandbox setup failed: {e}"
+        raise ApplicationError(msg, type="SandboxUnavailable", non_retryable=True) from e
+    sandbox_dir = sandbox_ctx["sandbox_dir"]
+    tier = sandbox_ctx["tier"]
+    activity.logger.info("Script sandbox tier: %s", tier)
+
+    try:
+        exec_command = command
+        exec_env = env
+        if tier == "unshare":
+            exec_command = build_pivot_root_command(
+                command,
+                sandbox_dir,
+                sandbox_ctx.get("extra_allowed_paths"),
+            )
+        if tier in ("landlock", "unshare"):
+            exec_env = sanitize_env_for_sandbox(env, sandbox_dir)
+
         process = await asyncio.create_subprocess_exec(
-            *command,
+            *exec_command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env,
+            env=exec_env,
+            cwd=sandbox_dir,
+            preexec_fn=sandbox_ctx["preexec_fn"],
         )
 
         # Read stdout/stderr with size limits to prevent worker OOM,
@@ -436,9 +467,9 @@ async def _execute_script_common(
         ) from e
 
     finally:
-        # Ensure process cleanup to avoid event loop warnings
         if process:
             await _cleanup_process(process)
+        cleanup_sandbox(sandbox_dir)
 
 
 @activity.defn(name=ActivityName.SCRIPT)
@@ -448,12 +479,17 @@ async def execute_script_activity(  # noqa: C901
 ) -> dict[str, Any]:
     """Execute a script for V2 workflows (unified bash/python activity).
 
-    SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    directly in the Temporal worker process without additional sandboxing. Enabling this
-    grants any user with workflow:create + execution:run permissions the ability
-    to run arbitrary commands on the worker infrastructure, with access to all
-    environment variables.
-    Enabling Script Node is not recommended for production deployments.
+    SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python).
+    When APP_SCRIPT_SANDBOX_ENABLED is True (default), scripts run with
+    allowlist-based filesystem isolation (filesystem-only, no network):
+    - Tier 1 (Landlock LSM): kernel-enforced per-process allowlist
+    - Tier 2 (unshare): bind-mount allowlist + pivot_root + nested
+      unshare --user to drop CAP_SYS_ADMIN before exec
+    If neither tier is available, execution is refused (fail-closed,
+    raises SandboxUnavailable). Scripts are stdlib-only — venv
+    site-packages are not on the allowlist. Baseline hardening
+    (PR_SET_NO_NEW_PRIVS, dropped groups, restricted CWD) is always
+    applied regardless of tier.
 
     This activity handles both bash and python scripts based on the 'language'
     field in config, delegating to the appropriate helper function.
@@ -509,8 +545,10 @@ async def execute_script_activity(  # noqa: C901
         if cgroup_limit:
             code = _prepend_memory_limit(code, language, int(cgroup_limit * 0.75))
 
-        # Build command based on language
-        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
+        # Build command based on language — use resolved path so venv
+        # symlinks don't point outside the Landlock allowlist
+        python_exe = resolve_python_executable()
+        command = ["bash", "-c", code] if language == "bash" else [python_exe, "-c", code]
 
         # Execute script
         result = await _execute_script_common(command, environment, timeout, max_output_bytes)

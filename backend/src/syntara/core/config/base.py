@@ -1481,15 +1481,37 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
-    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    # directly in the Temporal worker process without additional sandboxing. Enabling this
-    # grants any user with workflow:create + execution:run permissions the ability
-    # to run arbitrary commands on the worker infrastructure, with access to all
-    # environment variables.
-    # Enabling Script Node is not recommended for production deployments.
+    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python).
+    # When sandbox is enabled (default), scripts run with allowlist-based
+    # filesystem isolation via Landlock LSM (RHEL 10+) or user namespace +
+    # mount namespace with pivot_root (RHEL 9). If neither is available,
+    # execution is refused (fail-closed). Baseline preexec hardening
+    # (PR_SET_NO_NEW_PRIVS, dropped supplementary groups, restricted CWD) is
+    # always applied regardless of which tier is active.
     script_nodes_enabled: bool = Field(
         default=False,
         description="Enable Script node execution in workflows (Developer Preview)",
+    )
+
+    script_sandbox_enabled: bool = Field(
+        default=True,
+        description=(
+            "Enable filesystem sandbox for script node execution. "
+            "Uses Landlock LSM when available, falls back to "
+            "unshare with user/mount/PID namespace and pivot_root. "
+            "If neither tier is available, script execution is refused."
+        ),
+    )
+
+    script_sandbox_allowed_paths: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional filesystem paths to make accessible to script "
+            "subprocesses (read-only). Built-in allowed paths "
+            "(Python/bash interpreters, shared libraries, /proc/self) "
+            "are always accessible. Denied prefixes: /proc, /etc, /run, "
+            "/dev, /sys, /tmp, /home, /root, /opt, /var."
+        ),
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
