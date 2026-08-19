@@ -218,7 +218,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <NxScrollableTableContainer caption="Group mappings">
+    <NxScrollableTableContainer caption="Group mappings" variant="compact">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
       <Tbody>
         {rows.map((row) => {
@@ -430,6 +430,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
       ) : (
         <NxScrollableTableContainer
           caption="Group mappings"
+          variant="compact"
           footer={{
             page,
             perPage,

@@ -285,7 +285,7 @@ describe('MappingTable', () => {
 
     expect(screen.getByText('IdP group value')).toBeInTheDocument()
     expect(screen.getByText(`${APP_TITLE} group`)).toBeInTheDocument()
-    expect(screen.getByRole('grid', { name: 'Group mappings' })).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Group mappings' })).toHaveClass('pf-m-compact')
   })
 
   it('renders mapping entries with input values', () => {
@@ -394,6 +394,7 @@ describe('ReadOnlyView', () => {
     expect(screen.getByText('idp-users')).toBeInTheDocument()
     expect(screen.getByText('admin')).toBeInTheDocument()
     expect(screen.getByText('users')).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Group mappings' })).toHaveClass('pf-m-compact')
   })
 
   it('has no accessibility violations', async () => {

@@ -46,6 +46,13 @@ describe('DataTableView', () => {
     expect(screen.getByRole('grid', { name: 'Custom label' })).toBeInTheDocument()
   })
 
+  it('renders a compact table', () => {
+    const data = { result: 'ok' }
+    render(<DataTableView data={data} ariaLabel="Test data" />)
+
+    expect(screen.getByRole('grid', { name: 'Test data' })).toHaveClass('pf-m-compact')
+  })
+
   it('has no accessibility violations', async () => {
     const data = { hostname: 'server1', port: 8080 }
     const { container } = render(<DataTableView data={data} ariaLabel="Test data" />)

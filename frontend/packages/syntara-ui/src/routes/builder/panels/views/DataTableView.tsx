@@ -37,7 +37,7 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
 
   return (
     <NxPanelContentStack>
-      <NxScrollableTableContainer caption={ariaLabel} useFixedLayout={false}>
+      <NxScrollableTableContainer caption={ariaLabel} useFixedLayout={false} variant="compact">
         <Thead>
           <Tr>
             {columns.map((col) => (
