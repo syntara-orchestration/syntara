@@ -11,7 +11,7 @@ List pages (Workflows, Credentials, Executions, Approvals, Integrations, Users, 
 
 Typical list filter toolbar (Workflows list with the Name attribute search ready):
 
-![Workflows list filter toolbar](./images/workflows-list-filters.png)
+<!-- TODO: add screenshot from visual regression baselines -->
 
 1. **Attribute search** — Choose a field (for example Name, Keyword, Status), enter or select a value, then apply (press **Enter** or use the apply control).
 2. **Active filter chips** — Each applied filter appears as a removable chip under the inputs.
@@ -21,11 +21,11 @@ Some pages also show standalone controls (toggles, multi-selects, or label edito
 
 When filters match nothing, the list shows a filtered empty state (not the “create first resource” empty state):
 
-![Workflows empty filtered results](./images/workflows-list-empty-filter.png)
+<!-- TODO: add screenshot from visual regression baselines -->
 
 Credentials and other list pages use the same pattern (keyword/name text filter + chips + clear all):
 
-![Credentials empty filtered results](./images/credentials-list-empty-filter.png)
+<!-- TODO: add screenshot from visual regression baselines -->
 
 ```mermaid
 sequenceDiagram
@@ -154,6 +154,6 @@ Live filter toolbar examples also appear in Storybook under list panel stories (
 ## For developers
 
 - Architecture and component APIs: [API Filtering Architecture](../architecture.md#api-filtering-architecture)
-- Adding filters to a new list page: [AGENTS.md — How do I add filters to a list page?](../../AGENTS.md#how-do-i-add-filters-to-a-list-page)
+- Adding filters to a new list page: [AGENTS.md — How do I add filters to a list page?](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md#how-do-i-add-filters-to-a-list-page)
 - Coding standards: `.claude/skills/frontend-coding-standards/SKILL.md` (`useCursorPagination`)
 - Unit tests: [Filter test helpers](../TEST_HELPERS_FILTER_TESTING.md)

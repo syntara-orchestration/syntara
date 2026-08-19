@@ -271,7 +271,7 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 - Import ordering (Ruff isort rules via `make format` and `make lint`)
 - Unused imports in non-`__init__.py` files (Ruff F401)
 - Import style (Ruff I rules)
-- Import cycle detection (`make check-cycles` — see [Static Analysis](/docs/standards/static-analysis.md))
+- Import cycle detection (`make check-cycles` — see [Static Analysis](static-analysis.md))
 - Orphan module detection (`make check-orphans`)
 
 **Enforced by convention (code review):**
