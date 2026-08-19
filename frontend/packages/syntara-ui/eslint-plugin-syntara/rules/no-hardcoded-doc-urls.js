@@ -1,6 +1,6 @@
 /**
- * Enforce checklist item #30: Use `useDocLink` for documentation URLs — never
- * hardcode doc URLs.
+ * Enforce frontend/AGENTS.md checklist item #27: Use `useDocLink` for
+ * documentation URLs — never hardcode doc URLs.
  *
  * Detects string/template literals that match the allowlisted registry prefixes
  * unless the file is the canonical definition site (docsUrls.json, useDocLink.ts)
@@ -52,7 +52,7 @@ export default {
       description:
         "Disallow hardcoded documentation URLs. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and pass the result to `NxPageHeader`'s `docLink` prop. Add new keys to `docsUrls.json` when adding new pages.",
       recommended: true,
-      url: 'See frontend/CLAUDE.md checklist item #30 and `.claude/skills/frontend-coding-standards/SKILL.md` section 33.',
+      url: 'See frontend/AGENTS.md checklist item #27 and `.claude/skills/frontend-coding-standards/SKILL.md` section 33.',
     },
     messages: {
       noHardcodedDocUrl:

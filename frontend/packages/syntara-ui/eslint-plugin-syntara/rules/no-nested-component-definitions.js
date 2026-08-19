@@ -1,7 +1,7 @@
 /**
  * ESLint rule: no-nested-component-definitions
  *
- * Enforces CLAUDE.md checklist item #11 (Sonar S6478):
+ * Enforces frontend/AGENTS.md + coding standards §18 (Sonar S6478):
  * "No nested React components — do not declare components inside another component."
  *
  * React identifies a component by its function reference. When a component is
