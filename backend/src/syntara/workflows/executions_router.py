@@ -19,7 +19,7 @@ from syntara.core.models import User
 from syntara.core.models.base import BaseListParams
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.models import ActivitySignalPayload, SignalResponse
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     Execution,
     ExecutionCreate,

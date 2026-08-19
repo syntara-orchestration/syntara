@@ -42,6 +42,7 @@ from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
 from syntara.credentials.models import (
@@ -64,7 +65,6 @@ from syntara.projects.schemas import (
     ProjectUpdate,
 )
 from syntara.projects.service import ProjectService
-from syntara.workflows.models import WorkflowListParams
 from syntara.workflows.models.workflow import WorkflowListResponse
 from syntara.workflows.services import WorkflowService
 
@@ -289,7 +289,7 @@ async def list_project_workflows(
     project_id: UUID,
     request: Request,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-    params: Annotated[WorkflowListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
 ) -> WorkflowListResponse:
     """List workflows belonging to a specific project.
 

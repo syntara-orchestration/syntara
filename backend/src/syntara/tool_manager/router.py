@@ -26,7 +26,6 @@ from syntara.integrations.router import integration_read_visibility
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.tool_manager.exceptions import ToolNotFoundError
 from syntara.tool_manager.models.tool import (
-    Tool,
     ToolListResponse,
     ToolUpdate,
     ToolWithParameters,
