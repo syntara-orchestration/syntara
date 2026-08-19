@@ -33,6 +33,7 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.now.return_value = datetime(2026, 4, 10, 12, 0, 0, tzinfo=UTC)
+        mock_wf.patched.return_value = True
         yield mock_wf
 
 
@@ -186,7 +187,7 @@ class TestPrepareApprovalArgs:
 
     @pytest.mark.asyncio
     async def test_basic_approval_args(self) -> None:
-        """Returns 9-element arg list with correct structure (added approver_user_ids and approver_group_ids)."""
+        """Returns 11-element arg list with correct structure including prompt."""
         resolver = NamespaceResolver()
         resolver.set_namespace("trigger", {"env": "production"})
         wf = _make_workflow(execution_id="exec-456", resolver=resolver)
@@ -199,12 +200,13 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
-        assert len(args) == 10
+        assert len(args) == 11
         assert args[0] == "exec-456"  # execution_id
         assert args[1] == "approval"  # approval_node_id
         assert args[2] == "Review Deployment"  # name
         assert args[7] is None  # approver_user_ids (None when no approvers configured)
         assert args[8] is None  # approver_group_ids (None when no approvers configured)
+        assert args[10] is None  # prompt (absent from node parameters)
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -230,7 +232,7 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, config)
 
-        assert len(args) == 10
+        assert len(args) == 11
         assert args[7] == [alice_id, bob_id]  # approver_user_ids
         assert args[8] == [security_team_id, admins_id]  # approver_group_ids
 
@@ -450,6 +452,52 @@ class TestPrepareApprovalArgs:
         ctx = args[4]
         assert ctx["workflow_name"] == "Unknown"
 
+    @pytest.mark.asyncio
+    async def test_prompt_passed_from_resolved_parameters(self) -> None:
+        """Resolved prompt is the 11th activity argument."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": "  Please review this $15,000 request.  "})
+
+        assert args[10] == "Please review this $15,000 request."
+
+    @pytest.mark.asyncio
+    async def test_blank_or_non_string_prompt_is_none(self) -> None:
+        """Whitespace, empty, and non-string prompts are stored as None."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            empty_args = await wf._prepare_approval_args(node, graph, {"prompt": "   "})
+            missing_args = await wf._prepare_approval_args(node, graph, {})
+            number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
+
+        assert empty_args[10] is None
+        assert missing_args[10] is None
+        assert number_args[10] is None
+
+    @pytest.mark.asyncio
+    async def test_prompt_omitted_when_patch_inactive(self) -> None:
+        """In-flight workflows keep the 10-arg payload when the prompt patch is off."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute),
+        ):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": "Please review"})
+
+        assert len(args) == 10
+
 
 class TestDispatchApprovalNode:
     """Tests for approval node dispatch integration."""
@@ -477,7 +525,7 @@ class TestDispatchApprovalNode:
         approval_call = mock_activity.call_args_list[0]
         assert approval_call.args[0] == ActivityName.APPROVAL
         activity_args = approval_call.kwargs["args"]
-        assert len(activity_args) == 10
+        assert len(activity_args) == 11
         assert activity_args[0] == "exec-789"  # execution_id
         assert activity_args[1] == "approval"  # approval_node_id
         assert activity_args[2] == "Review Deployment"  # name (from node.name)

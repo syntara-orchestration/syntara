@@ -44,6 +44,7 @@ async def create_approval_request_activity(
     approver_user_ids: list[str] | None = None,
     approver_group_ids: list[str] | None = None,
     project_id: str = "",
+    prompt: str | None = None,
 ) -> NoReturn:
     """Create an approval request via the Approvals API.
 
@@ -62,6 +63,7 @@ async def create_approval_request_activity(
         approver_user_ids: List of user UUIDs who can approve (None = any user with permission).
         approver_group_ids: List of group UUIDs whose members can approve.
         project_id: Project ID for the approval request (from parent execution).
+        prompt: Resolved guidance message from the approval node, or None.
 
     Raises:
         ApprovalActivityError: If approval request creation fails.
@@ -92,6 +94,7 @@ async def create_approval_request_activity(
         "next_step_rejected": next_step_rejected,
         "approver_user_ids": approver_user_ids,
         "approver_group_ids": approver_group_ids,
+        "prompt": prompt,
     }
 
     try:

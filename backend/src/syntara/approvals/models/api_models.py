@@ -162,6 +162,10 @@ class ApprovalCreateRequest(SQLModel):
     project_id: UUID = Field(..., description="Project ID (denormalized from execution)")
     approval_node_id: str = Field(..., description="Activity ID from workflow definition")
     name: str = Field(..., min_length=1, max_length=255, description="Display name for the approval request")
+    prompt: str | None = Field(
+        default=None,
+        description="Resolved guidance message from the approval node, shown to approvers",
+    )
     timeout_at: datetime | None = Field(None, description="When this request expires (null = no timeout)")
     next_step_approved: ActivitySummary = Field(..., description="First activity that executes if approved")
     next_step_rejected: ActivitySummary | None = Field(None, description="First activity that executes if rejected")

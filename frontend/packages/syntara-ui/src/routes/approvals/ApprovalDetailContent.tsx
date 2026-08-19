@@ -29,6 +29,7 @@ import { useAlerts } from '../../providers/alerts'
 
 import styles from './ApprovalDetailContent.module.css'
 import { getNotesLabel } from './approvalNotes'
+import { getApprovalPromptFromRecord } from './approvalPrompt'
 import { ApprovalStatusBadges } from './approvalUtils'
 import { buildWorkflowBuilderLink } from './buildWorkflowBuilderLink'
 import { canDecideOnApproval } from './canDecideOnApproval'
@@ -37,17 +38,14 @@ import { useCanDecideApproval } from './useCanDecideApproval'
 
 /**
  * Fallback extraction for description/prompt text from the approval object.
- * Neither field is in the ApprovalRequestRead contract yet; the mock API includes
- * `description` as an extra field. The primary source is the `message` prop
- * (populated from the workflow activity parameters). This function is the secondary
- * source for approvals fetched via deep-link where the workflow definition isn't available.
+ * `prompt` is persisted on the approval record. `description` is a mock-API
+ * extra field kept as a last resort for fixtures that still use it.
  */
 function getApprovalMessage(approval: Approval): string | undefined {
+  const fromPrompt = getApprovalPromptFromRecord(approval)
+  if (fromPrompt) return fromPrompt
   if ('description' in approval && typeof approval.description === 'string' && approval.description.trim()) {
     return approval.description.trim()
-  }
-  if ('prompt' in approval && typeof approval.prompt === 'string' && approval.prompt.trim()) {
-    return approval.prompt.trim()
   }
   return undefined
 }

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import Column, String, UniqueConstraint, text
+from sqlalchemy import Column, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, Relationship
 
@@ -51,6 +51,12 @@ class BaseApprovalRequest(BaseResource, table=False):
         sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
         description="Human-readable name for the approval request",
         index=True,
+    )
+
+    prompt: str | None = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Resolved guidance message from the approval node, shown to approvers",
     )
 
     # Soft reference to parent execution (no foreign key constraint)

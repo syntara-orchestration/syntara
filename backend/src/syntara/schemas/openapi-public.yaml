@@ -27294,6 +27294,12 @@ components:
           minLength: 1
           description: Human-readable name for the approval request
           title: Name
+        prompt:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: Resolved guidance message from the approval node, shown to approvers
+          title: Prompt
         status:
           $ref: '#/components/schemas/ApprovalRequestStatus'
           default: pending
@@ -27440,6 +27446,12 @@ components:
           minLength: 1
           title: Name
           description: Display name for the approval request
+        prompt:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prompt
+          description: Resolved guidance message from the approval node, shown to approvers
         timeout_at:
           anyOf:
             - type: string

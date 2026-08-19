@@ -453,11 +453,11 @@ describe('ApprovalDetailContent', () => {
     expect(screen.queryByText('Message')).not.toBeInTheDocument()
   })
 
-  it('prefers description over prompt when both exist', () => {
+  it('prefers prompt over description when both exist', () => {
     const both = {
       ...mockApproval,
-      description: 'Preferred message',
-      prompt: 'Fallback message',
+      description: 'Fallback message',
+      prompt: 'Preferred message',
     } as Approval
     render(<ApprovalDetailContent approval={both} />, { wrapper })
 

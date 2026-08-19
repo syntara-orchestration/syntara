@@ -33,6 +33,16 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
+_APPROVAL_PROMPT_PATCH = "aap-87735-approval-prompt"
+
+
+def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None:
+    """Return the resolved approval-node prompt, or None if absent/blank."""
+    prompt = resolved_parameters.get("prompt")
+    if not isinstance(prompt, str):
+        return None
+    stripped = prompt.strip()
+    return stripped or None
 
 
 class WorkflowApprovalMixin:
@@ -189,7 +199,7 @@ class WorkflowApprovalMixin:
     ) -> list[Any]:
         """Build the positional argument list for create_approval_request_activity.
 
-        Returns a 9-element list matching the activity signature in
+        Returns a list matching the activity signature in
         ``approval_activity.create_approval_request_activity``::
 
             [0] execution_id:       str            — parent workflow execution ID
@@ -202,6 +212,10 @@ class WorkflowApprovalMixin:
             [7] approver_user_ids:  list[str] | None — user UUIDs who can approve
             [8] approver_group_ids: list[str] | None — group UUIDs whose members can approve
             [9] project_id:         str | None      — project ID for the approval request
+            [10] prompt:            str | None     — resolved guidance message (new executions only)
+
+        ``prompt`` is appended only when ``workflow.patched`` is true so in-flight
+        approvals scheduled with the 10-arg payload still replay.
 
         """
         name = node.name or f"Approval for {node.id}"
@@ -270,7 +284,7 @@ class WorkflowApprovalMixin:
             approver_user_ids = None
             approver_group_ids = None
 
-        return [
+        args: list[Any] = [
             self.execution_id,
             node.id,
             name,
@@ -282,6 +296,9 @@ class WorkflowApprovalMixin:
             approver_group_ids,
             self._project_id,
         ]
+        if workflow.patched(_APPROVAL_PROMPT_PATCH):
+            args.append(_resolved_approval_prompt(resolved_parameters))
+        return args
 
     async def _execute_approval_node(
         self,
