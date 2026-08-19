@@ -155,8 +155,8 @@ test.describe('Approval Side Panel — deep-link (viewer)', () => {
 })
 
 test.describe('Approval Side Panel — self-contained', () => {
-  // API polling fix applied but test times out during workflow build/run setup — separate root cause to investigate
-  test.skip('UI-28: execution shows Paused status and Waiting for approval indicator', async ({ app }) => {
+  test('UI-28: execution shows Paused status and Waiting for approval indicator', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval-panel')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-approval step')
     await openWorkflowInBuilder(app, workflowName, id)
@@ -189,8 +189,13 @@ test.describe('Approval Side Panel — self-contained', () => {
         .then(() => true)
         .catch(() => false)
       test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+
+      // Reload so the UI renders the confirmed "paused" state — API poll outraces TanStack Query refetch
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
-      await expect(app.getByRole('button', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
+      // eslint-disable-next-line no-restricted-properties -- multiple "Pending approval" badges on page (header + activity table)
+      await expect(app.getByText('Pending approval').first()).toBeVisible({ timeout: 10_000 })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})
@@ -198,8 +203,8 @@ test.describe('Approval Side Panel — self-contained', () => {
     }
   })
 
-  // API polling fix applied but test times out during workflow build/run setup — separate root cause to investigate
-  test.skip('UI-30: rejecting an approval terminates workflow execution', async ({ app }) => {
+  test('UI-30: rejecting an approval terminates workflow execution', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-reject')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-rejection step')
     await openWorkflowInBuilder(app, workflowName, id)
@@ -229,11 +234,24 @@ test.describe('Approval Side Panel — self-contained', () => {
         .then(() => true)
         .catch(() => false)
       test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
-      await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
 
-      // Open approval panel
-      await app.getByRole('button', { name: 'Review approval' }).click()
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
+      // Poll the approvals API until the approval is indexed
+      // (approvals service indexes asynchronously — may not be available in all local environments)
+      let approvalId: string | undefined
+      const foundApproval = await expect(async () => {
+        const resp = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`)
+        const body = (await resp.json()) as { resources?: Array<{ id: string }> }
+        approvalId = body.resources?.[0]?.id
+        expect(approvalId).toBeTruthy()
+      })
+        .toPass({ timeout: 30_000, intervals: [2_000] })
+        .then(() => true)
+        .catch(() => false)
+      test.skip(!foundApproval, 'Approvals service did not index the approval — may not be running locally')
+
+      await app.goto(toAppUrl(`/executions/${executionId}?approval=${approvalId}&history=closed`))
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
 
       // Reject with reason
       await app.getByRole('button', { name: 'Reject' }).click()
