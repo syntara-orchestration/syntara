@@ -119,7 +119,9 @@ const meta: Meta<typeof NxScrollableTableContainer> = {
           '(disables `table-layout: fixed`).\n' +
           '- `useFixedLayout` — opt out of fixed layout for non-expandable tables (rarely needed).\n' +
           '- `variant` — pass `compact` for dense tables in tight panels (PatternFly table density).\n' +
-          '- `footer` — pass `PaginationFooterProps` to render a `PaginationFooter` below the table.',
+          '- `isStriped` — alternating row colors (PatternFly `Table` striping).\n' +
+          '- `footer` — pass `PaginationFooterProps` to render a `PaginationFooter` below the table.\n' +
+          '- `footerContent` — custom footer in the same pinned slot when standard pagination does not fit.',
       },
     },
   },

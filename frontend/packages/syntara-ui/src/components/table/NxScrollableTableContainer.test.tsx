@@ -65,6 +65,41 @@ describe('NxScrollableTableContainer', () => {
     expect(screen.getByRole('grid')).toHaveClass('pf-m-compact')
   })
 
+  it('does not stripe rows when isStriped is omitted', () => {
+    render(
+      <Stack style={{ height: '240px' }}>
+        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+      </Stack>
+    )
+
+    expect(screen.getByRole('grid')).not.toHaveClass('pf-m-striped')
+  })
+
+  it('applies striped rows when isStriped is set', () => {
+    render(
+      <Stack style={{ height: '240px' }}>
+        <NxScrollableTableContainer caption="Demo table" isStriped>
+          {minimalTable}
+        </NxScrollableTableContainer>
+      </Stack>
+    )
+
+    expect(screen.getByRole('grid')).toHaveClass('pf-m-striped')
+  })
+
+  it('pins custom footerContent inside the container root', () => {
+    render(
+      <Stack style={{ height: '240px' }}>
+        <NxScrollableTableContainer caption="Demo table" footerContent={<p>Custom footer</p>}>
+          {minimalTable}
+        </NxScrollableTableContainer>
+      </Stack>
+    )
+
+    const stcRoot = screen.getByTestId('scrollable-table-container-root')
+    expect(within(stcRoot).getByText('Custom footer')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations in the supported Stack layout', async () => {
     const { container } = render(
       <Stack style={{ height: '240px' }}>

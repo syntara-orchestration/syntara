@@ -82,30 +82,13 @@ function WhoCanResults({
         />
       </StackItem>
       {users.length > 0 && (
-        <>
-          <NxScrollableTableContainer caption="Users with access">
-            <Thead>
-              <Tr>
-                <Th>Username</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {users.map((u) => (
-                <Tr key={u.id}>
-                  <Td dataLabel="Username">
-                    <LinkCell href={getUserDetailPath(u.id)}>
-                      <Truncate content={u.username} />
-                    </LinkCell>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </NxScrollableTableContainer>
-          <StackItem>
+        <NxScrollableTableContainer
+          caption="Users with access"
+          isStriped
+          footerContent={
             <Flex
               justifyContent={{ default: 'justifyContentSpaceBetween' }}
               alignItems={{ default: 'alignItemsCenter' }}
-              style={{ padding: 'var(--pf-t--global--spacer--md) 0' }}
             >
               <FlexItem>
                 <Content component={ContentVariants.p}>
@@ -133,8 +116,25 @@ function WhoCanResults({
                 </Flex>
               )}
             </Flex>
-          </StackItem>
-        </>
+          }
+        >
+          <Thead>
+            <Tr>
+              <Th>Username</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {users.map((u) => (
+              <Tr key={u.id}>
+                <Td dataLabel="Username">
+                  <LinkCell href={getUserDetailPath(u.id)}>
+                    <Truncate content={u.username} />
+                  </LinkCell>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </NxScrollableTableContainer>
       )}
     </>
   )
