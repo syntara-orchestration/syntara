@@ -17,7 +17,11 @@ from syntara.agent_orchestrator.audit.invocation_lifecycle import (
     InvocationLifecycleEvent,
     InvocationLifecycleHandler,
 )
-from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+from syntara.agent_orchestrator.exceptions import (
+    InvocationCancelledError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
+)
 from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
 from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -450,6 +454,77 @@ class TestInvocationExecutorLifecycleEvents:
         assert lifecycle_events[1].actor_id == user.id
         assert lifecycle_events[1].actor_username == user.username
         assert lifecycle_events[1].actor_type == PrincipalType.USER
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("error", "leaked_fragment", "safe_fragment"),
+        [
+            (
+                ToolDiscoveryError("ConnectionError contacting http://tool-manager.internal/v1/tools"),
+                "tool-manager.internal",
+                "Required tools could not be discovered or provisioned.",
+            ),
+            (
+                ToolSelectionUnavailableError("unavailable tool IDs: ['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']"),
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "None of the requested tools could be provisioned.",
+            ),
+        ],
+    )
+    async def test_fail_invocation_error_message_uses_classified_detail_for_tool_errors(
+        self,
+        error: Exception,
+        leaked_fragment: str,
+        safe_fragment: str,
+    ) -> None:
+        """Discovery/selection failures must not write raw exception text to invocation.error_message."""
+        user = _make_user()
+        invocation = _make_invocation(created_by=user.id)
+
+        mock_orchestration_service = AsyncMock()
+        mock_orchestration_service.execute = AsyncMock(side_effect=error)
+
+        mock_session = AsyncMock()
+
+        def session_get_side_effect(model_class: type, _: object) -> object:
+            if model_class == Invocation:
+                return invocation
+            if model_class == User:
+                return user
+            return None
+
+        mock_session.get.side_effect = session_get_side_effect
+        mock_exec_result = Mock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec = AsyncMock(return_value=mock_exec_result)
+        mock_session.commit = AsyncMock()
+
+        @asynccontextmanager
+        async def mock_session_context() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor()
+        fail_invocation = AsyncMock(return_value=True)
+
+        with (
+            patch("syntara.audit.emitter._do_emit_audit_event"),
+            patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
+            patch.object(executor, "_init_orchestration", return_value=(mock_orchestration_service, None)),
+            patch.object(executor, "_fail_invocation_if_not_cancelled", fail_invocation),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await executor.execute_invocation(invocation_id=invocation.id)
+
+        fail_invocation.assert_awaited_once()
+        await_args = fail_invocation.await_args
+        assert await_args is not None
+        error_message = await_args.kwargs["error_message"]
+        assert safe_fragment in error_message
+        assert leaked_fragment not in error_message
+        assert str(error) not in error_message
 
     @pytest.mark.asyncio
     async def test_handle_execution_error_no_failed_event_when_cancelled(self) -> None:

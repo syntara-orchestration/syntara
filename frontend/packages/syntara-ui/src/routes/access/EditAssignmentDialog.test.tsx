@@ -426,6 +426,33 @@ describe('EditAssignmentDialog', () => {
         expect(onClose).toHaveBeenCalled()
       })
     })
+
+    it('invalidates role-assignments and authz caches on successful update', async () => {
+      const mutateAsyncSpy = vi.fn().mockResolvedValue({ id: 'new-assignment' })
+      vi.mocked(accessClient.useMutation).mockReturnValue({
+        ...mockMutationReturn,
+        mutateAsync: mutateAsyncSpy,
+      } as never)
+
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      render(<EditAssignmentDialog row={projectRow} displayName="alice" onClose={vi.fn()} onSuccess={vi.fn()} />, {
+        wrapper,
+      })
+
+      const roleToggle = screen.getByPlaceholderText('Select a role...')
+      await user.click(roleToggle)
+      await user.click(await screen.findByRole('option', { name: 'Viewer' }))
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() => {
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['role-assignments'] })
+      })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['authz', 'can_i'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['all-permissions'] })
+
+      invalidateSpy.mockRestore()
+    })
   })
 
   describe('Different Source Endpoints', () => {

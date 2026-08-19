@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from .identity_providers import IdentityProvidersApi
     from .integrations import IntegrationsApi
     from .internal_metrics import InternalMetricsApi
-    from .invocation import InvocationApi
     from .policies import PoliciesApi
     from .projects import ProjectsApi
     from .role_assignments import RoleAssignmentsApi
@@ -119,12 +118,6 @@ class SyntaraApiRegistry:
         from .internal_metrics import InternalMetricsApi
 
         return InternalMetricsApi(client=self._client)
-
-    @cached_property
-    def invocation(self) -> InvocationApi:
-        from .invocation import InvocationApi
-
-        return InvocationApi(client=self._client)
 
     @cached_property
     def projects(self) -> ProjectsApi:

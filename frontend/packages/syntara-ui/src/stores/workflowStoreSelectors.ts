@@ -217,6 +217,9 @@ export function wrappedUndo(steps?: number) {
   } else {
     useWorkflowStore.setState((s) => ({ _positionUndoVersion: s._positionUndoVersion + 1 }))
   }
+  const state = useWorkflowStore.getState()
+  const atCleanBaseline = temporal.pastStates.length === 0 && state._undoBaselineMatchesSave && !state._nonTemporalDirty
+  useWorkflowStore.setState({ isDirty: !atCleanBaseline })
   setTimeout(() => temporal.resume(), 0)
 }
 
@@ -235,6 +238,7 @@ export function wrappedRedo(steps?: number) {
   } else {
     useWorkflowStore.setState((s) => ({ _positionUndoVersion: s._positionUndoVersion + 1 }))
   }
+  useWorkflowStore.setState({ isDirty: true })
   setTimeout(() => temporal.resume(), 0)
 }
 

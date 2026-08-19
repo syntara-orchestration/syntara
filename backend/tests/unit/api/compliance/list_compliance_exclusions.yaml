@@ -71,9 +71,6 @@ exclusions:
   - operation_id: list_integrations
     reason: "Uses simple value filters instead of operator-based pattern - integration_type/status/enabled/scope need allOf schema with {eq}"
 
-  - operation_id: list_invocations
-    reason: "Uses simple value filters instead of operator-based pattern - session_id/prompt need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, status/created_by need {eq}"
-
   - operation_id: list_projects
     reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_default/is_builtin need {eq}"
 

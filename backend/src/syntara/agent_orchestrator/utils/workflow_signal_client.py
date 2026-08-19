@@ -12,6 +12,7 @@ from uuid import UUID
 import httpx
 import structlog
 
+from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.core.tls.http_client import build_internal_http_client
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -200,13 +201,16 @@ class WorkflowSignalClient:
         # propagate instead of being silently swallowed.
         validate_signal_url(callback_url)
 
+        classified = classify_streaming_error(error)
+
         signal_payload = {
             "signal_data": {
                 "id": str(invocation_id),
                 "status": "failed",
                 "error": {
-                    "message": str(error),
+                    "message": classified.detail,
                     "error_type": type(error).__name__,
+                    "code": classified.code,
                 },
                 "timestamp": datetime.now(UTC).isoformat(),
                 "agent_type": "GenericAgent",
@@ -218,6 +222,7 @@ class WorkflowSignalClient:
             callback_url=callback_url,
             invocation_id=invocation_id,
             error_type=type(error).__name__,
+            raw_error=str(error),
         )
 
         try:

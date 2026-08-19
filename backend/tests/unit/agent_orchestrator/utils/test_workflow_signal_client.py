@@ -1,5 +1,6 @@
 """Unit tests for WorkflowSignalClient."""
 
+import json
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -225,7 +226,7 @@ class TestWorkflowSignalClientSendFailureSignal:
     @pytest.mark.asyncio
     @respx.mock
     async def test_send_failure_signal_with_exception(self) -> None:
-        """Test sending failure signal with exception details."""
+        """Test sending failure signal with classified (client-safe) message."""
         invocation_id = UUID(_EXEC_UUID)
         error = ValueError("Invalid input parameter")
 
@@ -235,11 +236,14 @@ class TestWorkflowSignalClientSendFailureSignal:
 
         assert route.called
         request = route.calls[0].request
-        payload = request.content.decode("utf-8")
-        assert '"status":"failed"' in payload
-        assert '"message":"Invalid input parameter"' in payload
-        assert '"error_type":"ValueError"' in payload
-        assert "GenericAgent" in payload
+        payload = json.loads(request.content.decode("utf-8"))
+        error_data = payload["signal_data"]["error"]
+        assert payload["signal_data"]["status"] == "failed"
+        assert error_data["error_type"] == "ValueError"
+        assert error_data["code"] == "UNKNOWN_ERROR"
+        # Client-safe detail — raw "Invalid input parameter" must NOT appear
+        assert "Invalid input parameter" not in error_data["message"]
+        assert "GenericAgent" in request.content.decode("utf-8")
 
     @pytest.mark.asyncio
     @respx.mock
@@ -291,8 +295,6 @@ class TestWorkflowSignalClientSendFailureSignal:
         payload = request.content.decode("utf-8")
         assert '"timestamp":' in payload
 
-        import json
-
         data = json.loads(payload)
         timestamp_str = data["signal_data"]["timestamp"]
         timestamp = datetime.fromisoformat(timestamp_str)
@@ -301,22 +303,50 @@ class TestWorkflowSignalClientSendFailureSignal:
     @pytest.mark.asyncio
     @respx.mock
     async def test_send_failure_signal_with_custom_exception(self) -> None:
-        """Test sending failure signal with custom exception type."""
+        """Test sending failure signal with custom exception type uses classified message."""
         invocation_id = UUID(_EXEC_UUID)
 
         class CustomError(Exception):
             """Custom error for testing."""
 
-        error = CustomError("Custom error message")
+        error = CustomError("Custom error message with http://internal:8000/secret")
 
         route = respx.post(_SIGNAL_URL).mock(return_value=httpx.Response(200))
 
         await WorkflowSignalClient.send_failure_signal(_SIGNAL_URL, invocation_id, error)
 
         request = route.calls[0].request
-        payload = request.content.decode("utf-8")
-        assert '"error_type":"CustomError"' in payload
-        assert '"message":"Custom error message"' in payload
+        payload = json.loads(request.content.decode("utf-8"))
+        error_data = payload["signal_data"]["error"]
+        assert error_data["error_type"] == "CustomError"
+        assert error_data["code"] == "UNKNOWN_ERROR"
+        # Raw exception text with internal URLs must NOT leak into signal payload
+        assert "internal:8000" not in error_data["message"]
+        assert "Custom error message" not in error_data["message"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_failure_signal_tool_discovery_error_uses_client_safe_message(self) -> None:
+        """ToolDiscoveryError must use classified detail, not raw exception text with URLs."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        invocation_id = UUID(_EXEC_UUID)
+        error = ToolDiscoveryError(
+            "Enabled tools could not be provisioned: ConnectionError: "
+            "http://tool-manager.internal:8000/api/v1/tools failed"
+        )
+
+        route = respx.post(_SIGNAL_URL).mock(return_value=httpx.Response(200))
+
+        await WorkflowSignalClient.send_failure_signal(_SIGNAL_URL, invocation_id, error)
+
+        payload = json.loads(route.calls[0].request.content.decode("utf-8"))
+        error_data = payload["signal_data"]["error"]
+        assert error_data["code"] == "TOOL_DISCOVERY_FAILED"
+        assert error_data["error_type"] == "ToolDiscoveryError"
+        # Internal hostname must NOT leak
+        assert "tool-manager.internal" not in error_data["message"]
+        assert "ConnectionError" not in error_data["message"]
 
     @pytest.mark.asyncio
     async def test_send_failure_signal_raises_on_invalid_url(self) -> None:
