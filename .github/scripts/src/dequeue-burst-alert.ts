@@ -4,12 +4,12 @@ import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
 
 const DEQUEUE_THRESHOLD = 3;
-const TIME_WINDOW_MINUTES = 30;
+const TIME_WINDOW_MINUTES = 45;
 
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
  * Runs on a schedule. Uses recently merged PRs as a proxy for queue activity.
- * Alerts when 3+ PRs were merged within a 30-minute window (indicating
+ * Alerts when 3+ PRs were merged within a 45-minute window (indicating
  * successful dequeues), but only if current queue is non-empty (suggesting
  * more PRs are waiting that might also fail).
  */

@@ -4,11 +4,11 @@ import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
 import type { HealthState } from './lib/types.js';
 
-const MERGE_TIMEOUT_MINUTES = 60;
+const MERGE_TIMEOUT_MINUTES = 90;
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
- * Returns unhealthy if the queue has entries but no merges in 60+ minutes.
+ * Returns unhealthy if the queue has entries but no merges in 90+ minutes.
  */
 async function assessHealth(github: GitHubClient, branch: string): Promise<HealthState> {
   console.log('Querying merge queue status...');
@@ -28,12 +28,12 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
   }
 
   // Check for recent merges
-  const sixtyMinsAgo = new Date(Date.now() - MERGE_TIMEOUT_MINUTES * 60 * 1000);
-  const recentMerges = await github.getRecentMerges(branch, sixtyMinsAgo);
+  const ninetyMinsAgo = new Date(Date.now() - MERGE_TIMEOUT_MINUTES * 60 * 1000);
+  const recentMerges = await github.getRecentMerges(branch, ninetyMinsAgo);
 
   console.log(`Recent merges to ${branch}: ${recentMerges.length}`);
 
-  // If queue has entries but no merges in 60 min, unhealthy
+  // If queue has entries but no merges in 90 min, unhealthy
   if (recentMerges.length === 0) {
     // Calculate time since last merge
     const allMerges = await github.getRecentMerges(
