@@ -152,9 +152,16 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(batchId)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Step 1: Select both approvals using row-scoped checkboxes
+      // Wait for the filter chip to confirm the filter was applied and the table to refresh
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox').check()
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
       // Step 2: Verify batch toolbar appears with count
@@ -329,39 +336,44 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
+      // Wait for filter chip to confirm filter was applied and table to refresh
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+
       // Step 1: Click on the pending approval to open side panel
       const approvalBtn = table.getByRole('button', { name: approval.approvalName })
-      await approvalBtn.waitFor({ state: 'visible', timeout: 10_000 })
+      await approvalBtn.waitFor({ state: 'visible', timeout: 15_000 })
       await approvalBtn.click()
 
       // Step 2: Verify navigation to execution detail with side panel
-      await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
+      await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/, { timeout: 15_000 })
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
       // Step 3: Click "Approve" button
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
-      await expect(approveButton).toBeVisible()
+      await expect(approveButton).toBeVisible({ timeout: 15_000 })
       await approveButton.click()
 
       // Step 4: Verify approval notes field appears
       const approvalNotesInput = app.getByPlaceholder(/explain.*reason.*approving|optional.*note/i)
-      await expect(approvalNotesInput).toBeVisible()
+      await expect(approvalNotesInput).toBeVisible({ timeout: 10_000 })
 
       // Step 5: Click "Reject" to undo the approve decision
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
-      await expect(rejectButton).toBeVisible()
+      await expect(rejectButton).toBeVisible({ timeout: 10_000 })
       await rejectButton.click()
 
       // Step 6: Verify rejection notes field appears (approval notes replaced)
       const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting|optional.*note/i)
-      await expect(rejectionNotesInput).toBeVisible()
+      await expect(rejectionNotesInput).toBeVisible({ timeout: 10_000 })
 
       // Step 7: Verify approval notes field is no longer visible
       await expect(approvalNotesInput).not.toBeVisible()
 
       // Step 8: Verify "Submit decision" button is available for rejection
       const submitButton = app.getByRole('button', { name: 'Submit decision' })
-      await expect(submitButton).toBeVisible()
+      await expect(submitButton).toBeVisible({ timeout: 10_000 })
 
       // NOTE: This test verifies undo behavior (switching between approve/reject)
       // without actually submitting to avoid mutating approval state
@@ -445,6 +457,17 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(batchId)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
+      // Wait for filter chip to confirm filter was applied and both rows to appear
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+      await expect(table.getByRole('row').filter({ hasText: approval1.approvalName })).toBeVisible({
+        timeout: 15_000,
+      })
+      await expect(table.getByRole('row').filter({ hasText: approval2.approvalName })).toBeVisible({
+        timeout: 15_000,
+      })
+
       // Step 1: Click header row checkbox to select all
       const headerRow = table.getByRole('row').nth(0)
       const selectAllCheckbox = headerRow.getByRole('checkbox')
@@ -452,7 +475,7 @@ test.describe('Approval Workflow Operations', () => {
 
       // Step 2: Verify all approvals are selected (2 in this case)
       const selectedText = app.getByText('2 selected')
-      await expect(selectedText).toBeVisible()
+      await expect(selectedText).toBeVisible({ timeout: 10_000 })
 
       // Step 3: Verify batch toolbar is visible
       const batchToolbar = app.getByRole('toolbar', { name: /selected/i })

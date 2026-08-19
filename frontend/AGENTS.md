@@ -141,6 +141,12 @@ npm run e2e:ui              # Run e2e playwright tests in the playwright UI
 npm run e2e:visual-regression        # Page screenshot visual regression (mock API + UI via Playwright webServer)
 npm run e2e:visual-regression:update # Same, with --update-snapshots (see packages/syntara-ui/VISUAL_REGRESSION.md)
 
+# E2E test suite tags — Playwright tags that control where each test runs:
+#   @pr-check      Fast critical-path tests; select with --grep @pr-check
+#   @konflux-skip  Tests excluded from Konflux pipelines via playwright-grep-invert (flaky in that env only)
+#   @local-only    Visual regression tests; excluded from all CI automatically
+# Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
+
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
 npm run test:coverage

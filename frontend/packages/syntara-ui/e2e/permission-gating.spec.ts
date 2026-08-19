@@ -788,7 +788,8 @@ test.describe('Permission gating — Access Management actions', () => {
 
     const createButton = userApp.getByRole('button', { name: /Create group/i })
     await expect(createButton).toBeVisible()
-    await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+    // aria-disabled is set after the permissions API resolves — give it extra time
+    await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
   })
 
   test('user: Create user button is disabled with tooltip', async ({ userApp }) => {
@@ -797,7 +798,8 @@ test.describe('Permission gating — Access Management actions', () => {
 
     const createButton = userApp.getByRole('button', { name: /Create user/i })
     await expect(createButton).toBeVisible()
-    await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+    // aria-disabled is set after the permissions API resolves — give it extra time
+    await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
 
     await createButton.hover()
     await expect(userApp.getByRole('tooltip').filter({ hasText: 'user:create' })).toBeVisible()
@@ -818,11 +820,20 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AM_URL}/users/${user.id}`))
       await expect(auditorApp.getByRole('heading', { level: 1, name: username })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 20_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'User actions' }).click()
-      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute('aria-disabled', 'true')
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete user' })).toHaveAttribute('aria-disabled', 'true')
+      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 15_000 }
+      )
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete user' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 15_000,
+      })
     } finally {
       await deleteUserViaApi(app, user.id)
     }
