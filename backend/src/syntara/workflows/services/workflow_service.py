@@ -4,6 +4,7 @@ This service encapsulates workflow-related business logic, separating it from
 HTTP/API concerns in the FastAPI endpoints.
 """
 
+import asyncio
 import threading
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -67,6 +68,11 @@ if TYPE_CHECKING:
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Post-commit Temporal schedule deletion is best-effort. Bound it so unpublish
+# and delete cannot sit on the HTTP request until nginx returns 504 (AAP-87692).
+# The schedule reconciliation worker removes any leftover orphans.
+_SCHEDULE_DELETE_TIMEOUT_SECONDS = 3.0
 
 # Running counters for workflow creation success rate (FR-010).
 _workflow_creation_counts: list[int] = [0, 0]  # [successes, total]
@@ -252,14 +258,25 @@ class WorkflowService(BaseService):
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
         """Best-effort deletion of Temporal Schedules for a workflow.
 
-        Swallows errors so the caller (unpublish / delete) always succeeds.
+        Swallows errors and timeouts so the caller (unpublish / delete)
+        always succeeds after the database commit. Do not use Starlette
+        ``BackgroundTasks`` for this: those still hold the HTTP connection
+        until they finish, which is what produces the gateway 504.
+
         The schedule reconciliation worker will clean up any orphans that
-        remain when Temporal is unreachable.
+        remain when Temporal is unreachable or slow.
         """
         try:
-            scheduled_service = ScheduledTriggerService()
-            await scheduled_service.delete_triggers_for_workflow(
+            async with asyncio.timeout(_SCHEDULE_DELETE_TIMEOUT_SECONDS):
+                scheduled_service = ScheduledTriggerService()
+                await scheduled_service.delete_triggers_for_workflow(
+                    workflow_id=str(workflow_id),
+                )
+        except TimeoutError:
+            logger.warning(
+                "Best-effort scheduled trigger deletion timed out — reconciliation worker will clean up orphans",
                 workflow_id=str(workflow_id),
+                timeout_seconds=_SCHEDULE_DELETE_TIMEOUT_SECONDS,
             )
         except ScheduledTriggerSyncError:
             logger.warning(
