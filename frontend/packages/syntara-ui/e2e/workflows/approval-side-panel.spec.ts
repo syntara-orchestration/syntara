@@ -1,95 +1,144 @@
 /**
- * E2E Tests: Approval Side Panel (UI-28, UI-30)
+ * E2E Tests: Approval Side Panel
  *
  * Critical paths covered:
- * - Deep-link from approvals list navigates to execution detail with side panel
- * - Side panel displays approval details (step name, workflow, designer message, approve/reject buttons)
- * - Approve and reject flows with notes and undo
+ * - List navigation: clicking approval name navigates to execution detail with side panel
+ * - Deep-link: side panel displays approval details, approve/reject flows with undo
  * - Panel and run history card are mutually exclusive
  * - Viewer role cannot approve or reject (permission gating)
- * - UI-28: Self-contained — create workflow with approval node, run, verify execution shows
- *   "Paused" status and "Waiting for approval" activity indicator
- * - UI-30: Self-contained — reject a pending approval and verify execution terminates
+ * - UI-28: execution shows Paused status and Waiting for approval indicator
+ * - UI-30: rejecting a pending approval terminates workflow execution
  *
- * Seed data:
- * - Approval "Production Deployment Approval" (550e8400-...-446655440050) linked to exec-approval
+ * Setup: beforeAll creates a workflow with an approval node via API, runs it,
+ * and waits for the approval to be indexed. All deep-link tests share this data.
+ * Self-contained tests (UI-28, UI-30) create their own workflows.
  */
-import { createUnavailableGuard, test, expect, toAppUrl } from '../fixtures'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
-import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest, pollExecutionStatus } from '../utils/api'
+import { test, expect, toAppUrl } from '../fixtures'
+import { buildUniqueName } from '../helpers/workflows'
+import {
+  apiRequest,
+  createWorkflowViaApi,
+  deleteWorkflowViaApi,
+  getAuthToken,
+  pollExecutionStatus,
+  publishWorkflowViaApi,
+} from '../utils/api'
 
-const MOCK_APPROVAL_ID = '550e8400-e29b-41d4-a716-446655440050'
-const MOCK_EXECUTION_ID = 'exec-approval'
-const DEEP_LINK = `/executions/${MOCK_EXECUTION_ID}?approval=${MOCK_APPROVAL_ID}&history=closed`
-
-/**
- * Navigate directly to the execution detail with the approval side panel via deep-link.
- * Returns false if the panel didn't load (missing seed data / API unavailable).
- */
-async function navigateToApprovalPanel(app: import('@playwright/test').Page) {
-  await app.goto(toAppUrl(DEEP_LINK))
-  await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-
-  return app
-    .getByRole('heading', { name: 'Review Approval' })
-    .waitFor({ state: 'visible', timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false)
+async function dismissConnectionBanner(app: import('@playwright/test').Page): Promise<void> {
+  const banner = app.locator('.pf-v6-c-alert').filter({ hasText: 'Live updates paused' })
+  if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await banner.getByRole('button', { name: /close/i }).click()
+  }
 }
 
-test.describe('Approval Side Panel — list navigation', () => {
-  test('clicking approval name navigates to execution detail with side panel', async ({ app }) => {
-    await app.goto(toAppUrl('/approvals'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+test.describe('Approval Side Panel', () => {
+  test.describe.configure({ mode: 'serial' })
 
-    const table = app.getByRole('grid', { name: 'Approvals table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No approval data available')
+  let sharedWorkflowId: string | undefined
+  let sharedExecutionId: string | undefined
+  let sharedApprovalId: string | undefined
+  let sharedApprovalName = ''
+  let sharedWorkflowName = ''
+  let sharedSetupSucceeded = false
 
-    const approvalBtn = table.getByRole('button', { name: 'Production Deployment Approval' })
-    const hasBtn = await approvalBtn
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasBtn, 'Production Deployment Approval not found in table')
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage()
+    try {
+      sharedApprovalName = buildUniqueName('panel-gate')
+      sharedWorkflowName = buildUniqueName('e2e-side-panel')
 
-    await approvalBtn.click()
+      const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
+      const nodes = [
+        { id: 'approval_1', type: 'approval', name: sharedApprovalName, parameters: {} },
+        {
+          id: 'post_1',
+          type: 'script',
+          name: 'Post Approval',
+          parameters: { language: 'python', code: 'pass' },
+        },
+      ]
+      const edges = [
+        { from: 'trigger_1', to: 'approval_1' },
+        { from: 'approval_1', to: 'post_1', from_port: 'approved' },
+      ]
 
-    await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=.*&history=closed/)
-    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+      const result = await createWorkflowViaApi(page, sharedWorkflowName, triggers, nodes, edges)
+      sharedWorkflowId = result.id
+
+      await publishWorkflowViaApi(page, sharedWorkflowId, result.versionNumber)
+
+      const token = await getAuthToken(page)
+      if (!token) throw new Error('Could not obtain auth token')
+
+      const resp = await apiRequest(page, 'post', '/executions', {
+        token,
+        data: { workflow_id: sharedWorkflowId, trigger_node_id: 'trigger_1' },
+      })
+      if (!resp.ok()) throw new Error(`POST /executions returned ${resp.status()}`)
+      const body = (await resp.json()) as { id: string }
+      sharedExecutionId = body.id
+
+      await pollExecutionStatus(page, sharedExecutionId, ['paused'], { token, timeout: 60_000 })
+
+      await expect(async () => {
+        const r = await apiRequest(page, 'get', `/approvals?execution_id=${sharedExecutionId}&status=pending`, {
+          token,
+        })
+        const approvals = (await r.json()) as { resources?: Array<{ id: string }> }
+        const id = approvals.resources?.[0]?.id
+        expect(id).toBeTruthy()
+        sharedApprovalId = id!
+      }).toPass({ timeout: 60_000, intervals: [2_000] })
+
+      sharedSetupSucceeded = true
+    } catch {
+      // Shared setup failed (Temporal/approvals unavailable) — deep-link tests will skip individually
+    } finally {
+      await page.close()
+    }
   })
-})
 
-test.describe('Approval Side Panel — deep-link', () => {
-  const guard = createUnavailableGuard('Approval side panel not available')
-
-  test.beforeEach(async ({ app }) => {
-    const hasPanel = await navigateToApprovalPanel(app)
-    if (!hasPanel) guard.markUnavailable()
-    test.skip(!hasPanel, 'Approval side panel not available')
+  test.afterAll(async ({ browser }) => {
+    if (!sharedWorkflowId) return
+    const page = await browser.newPage()
+    try {
+      await deleteWorkflowViaApi(page, sharedWorkflowId)
+    } finally {
+      await page.close()
+    }
   })
+
+  // ---------------------------------------------------------------------------
+  // Deep-link tests (read-only — none submit a decision)
+  // ---------------------------------------------------------------------------
 
   test('side panel displays approval details and action buttons', async ({ app }) => {
-    // Decision buttons
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
+    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+    await dismissConnectionBanner(app)
+
     await expect(app.getByRole('button', { name: 'Approve' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Reject' })).toBeVisible()
 
-    // Summary fields (use exact matching to avoid code block collisions)
     await expect(app.getByText('Approval step', { exact: true })).toBeVisible()
-    await expect(app.locator('dd').getByText('Production Deployment Approval', { exact: true })).toBeVisible()
+    await expect(app.locator('dd').getByText(sharedApprovalName, { exact: true })).toBeVisible()
     await expect(app.getByText('Workflow', { exact: true })).toBeVisible()
-    await expect(app.locator('dd').getByText('deployment-approval', { exact: true })).toBeVisible()
+    await expect(app.locator('dd').getByText(sharedWorkflowName, { exact: true })).toBeVisible()
     await expect(app.getByText('Approval initiated', { exact: true })).toBeVisible()
     await expect(app.getByText('Message', { exact: true })).toBeVisible()
     await expect(app.getByText(/Review the staging test results/)).toBeVisible()
   })
 
   test('clicking approve shows notes input and submit button', async ({ app }) => {
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
+    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+    await dismissConnectionBanner(app)
+
     const approveBtn = app.getByRole('button', { name: 'Approve' })
     await expect(approveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
@@ -98,13 +147,18 @@ test.describe('Approval Side Panel — deep-link', () => {
     await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible()
     await expect(app.getByRole('button', { name: 'Submit decision' })).toBeVisible()
 
-    // Undo returns to initial button state
     await app.getByRole('button', { name: 'Undo decision' }).click()
     await expect(app.getByRole('button', { name: 'Approve' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Reject' })).toBeVisible()
   })
 
   test('clicking reject shows notes input and submit button', async ({ app }) => {
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
+    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+    await dismissConnectionBanner(app)
+
     const rejectBtn = app.getByRole('button', { name: 'Reject' })
     await expect(rejectBtn).not.toHaveAttribute('aria-disabled', 'true')
 
@@ -118,26 +172,60 @@ test.describe('Approval Side Panel — deep-link', () => {
   })
 
   test('run history and approval panel are mutually exclusive', async ({ app }) => {
-    // History should be closed (deep-link sets history=closed)
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
+    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+    await dismissConnectionBanner(app)
+
     const historyHeading = app.getByRole('heading', { name: 'Run history' })
     await expect(historyHeading).not.toBeVisible()
 
-    // Open run history — should close approval panel
     await app.getByRole('button', { name: /Run history/i }).click()
     await expect(historyHeading).toBeVisible()
     await expect(app.getByRole('heading', { name: 'Review Approval' })).not.toBeVisible()
 
-    // Re-open approval panel via the Review button — should close history
     const reviewBtn = app.getByRole('button', { name: 'Review approval' })
     await reviewBtn.click()
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible()
     await expect(historyHeading).not.toBeVisible()
   })
-})
 
-test.describe('Approval Side Panel — deep-link (viewer)', () => {
+  // ---------------------------------------------------------------------------
+  // List navigation
+  // ---------------------------------------------------------------------------
+
+  test('clicking approval name navigates to execution detail with side panel', async ({ app }) => {
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await app.goto(toAppUrl('/approvals'))
+    await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+
+    const table = app.getByRole('grid', { name: 'Approvals table' })
+    await expect(table).toBeVisible({ timeout: 15_000 })
+
+    // Filter by name to find our specific approval among potentially many
+    await app.getByPlaceholder('Filter by name').fill(sharedApprovalName)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+
+    // Wait for the filtered results to render
+    const approvalLink = table.getByText(sharedApprovalName)
+    await expect(approvalLink).toBeVisible({ timeout: 15_000 })
+    await approvalLink.click()
+
+    await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=.*&history=closed/)
+    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+    await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Viewer role — verify permission gating
+  // ---------------------------------------------------------------------------
+
   test('viewer: approve and reject buttons are disabled', async ({ viewerApp }) => {
-    await viewerApp.goto(toAppUrl(DEEP_LINK))
+    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+
+    await viewerApp.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(viewerApp.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
 
     const hasPanel = await viewerApp
@@ -145,127 +233,126 @@ test.describe('Approval Side Panel — deep-link (viewer)', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasPanel, 'Approval side panel not available')
+    test.skip(!hasPanel, 'Viewer cannot access approval panel — project permission issue')
 
     const approveBtn = viewerApp.getByRole('button', { name: 'Approve' })
     const rejectBtn = viewerApp.getByRole('button', { name: 'Reject' })
     await expect(approveBtn).toHaveAttribute('aria-disabled', 'true')
     await expect(rejectBtn).toHaveAttribute('aria-disabled', 'true')
   })
-})
 
-test.describe('Approval Side Panel — self-contained', () => {
+  // ---------------------------------------------------------------------------
+  // Self-contained tests (create their own workflows — no shared data needed)
+  // ---------------------------------------------------------------------------
+
   test('UI-28: execution shows Paused status and Waiting for approval indicator', async ({ app }) => {
     test.slow()
+    const approvalNodeName = buildUniqueName('review-gate')
     const workflowName = buildUniqueName('e2e-approval-panel')
-    const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-approval step')
-    await openWorkflowInBuilder(app, workflowName, id)
 
-    const builderUrl = app.url()
-    const workflowId = builderUrl.match(/workflow-builder\/([a-f0-9-]{36})/)?.[1]
+    const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
+    const nodes = [
+      { id: 'approval_1', type: 'approval', name: approvalNodeName, parameters: {} },
+      { id: 'post_1', type: 'script', name: 'Post Approval', parameters: { language: 'python', code: 'pass' } },
+    ]
+    const edges = [
+      { from: 'trigger_1', to: 'approval_1' },
+      { from: 'approval_1', to: 'post_1', from_port: 'approved' },
+    ]
+
+    const { id: workflowId, versionNumber } = await createWorkflowViaApi(app, workflowName, triggers, nodes, edges)
 
     try {
-      await addApprovalNodeWithBranch(app, 'Review Gate')
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
-      await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
+      await publishWorkflowViaApi(app, workflowId, versionNumber)
 
-      await app.getByRole('button', { name: 'Run', exact: true }).click()
-      await app.getByRole('button', { name: /Run now|Save and run/ }).click()
+      const token = await getAuthToken(app)
+      if (!token) throw new Error('Could not obtain auth token')
 
-      const didNavigate = await app
-        .waitForURL(/\/executions\//, { timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      const resp = await apiRequest(app, 'post', '/executions', {
+        token,
+        data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
+      })
+      if (!resp.ok()) throw new Error(`POST /executions returned ${resp.status()}`)
+      const { id: executionId } = (await resp.json()) as { id: string }
 
-      await expect(app.getByRole('heading', { level: 1 })).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
-
-      // Poll API for "paused" status instead of relying on UI updates
-      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
-      test.skip(!executionId, 'Could not extract execution ID from URL')
-
-      const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
+      const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
         .then(() => true)
         .catch(() => false)
       test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
-      // Reload so the UI renders the confirmed "paused" state — API poll outraces TanStack Query refetch
-      await app.reload()
-      await expect(app.getByRole('heading', { level: 1 })).toBeVisible()
+      await app.goto(toAppUrl(`/executions/${executionId}`))
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await dismissConnectionBanner(app)
       await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
       // eslint-disable-next-line no-restricted-properties -- multiple "Pending approval" badges on page (header + activity table)
       await expect(app.getByText('Pending approval').first()).toBeVisible({ timeout: 10_000 })
     } finally {
-      if (workflowId) {
-        await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})
-      }
+      await deleteWorkflowViaApi(app, workflowId)
     }
   })
 
   test('UI-30: rejecting an approval terminates workflow execution', async ({ app }) => {
     test.slow()
+    const approvalNodeName = buildUniqueName('rejection-gate')
     const workflowName = buildUniqueName('e2e-reject')
-    const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-rejection step')
-    await openWorkflowInBuilder(app, workflowName, id)
 
-    const builderUrl = app.url()
-    const workflowId = builderUrl.match(/workflow-builder\/([a-f0-9-]{36})/)?.[1]
+    const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
+    const nodes = [
+      { id: 'approval_1', type: 'approval', name: approvalNodeName, parameters: {} },
+      { id: 'post_1', type: 'script', name: 'Post Approval', parameters: { language: 'python', code: 'pass' } },
+    ]
+    const edges = [
+      { from: 'trigger_1', to: 'approval_1' },
+      { from: 'approval_1', to: 'post_1', from_port: 'approved' },
+    ]
+
+    const { id: workflowId, versionNumber } = await createWorkflowViaApi(app, workflowName, triggers, nodes, edges)
 
     try {
-      await addApprovalNodeWithBranch(app, 'Rejection Gate')
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
-      await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
+      await publishWorkflowViaApi(app, workflowId, versionNumber)
 
-      await app.getByRole('button', { name: 'Run', exact: true }).click()
-      await app.getByRole('button', { name: /Run now|Save and run/ }).click()
+      const token = await getAuthToken(app)
+      if (!token) throw new Error('Could not obtain auth token')
 
-      const didNavigate = await app
-        .waitForURL(/\/executions\//, { timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      const resp = await apiRequest(app, 'post', '/executions', {
+        token,
+        data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
+      })
+      if (!resp.ok()) throw new Error(`POST /executions returned ${resp.status()}`)
+      const { id: executionId } = (await resp.json()) as { id: string }
 
-      // Poll API for "paused" status instead of relying on UI updates
-      const executionId = app.url().match(/\/executions\/([a-f0-9-]+)/)?.[1]
-      test.skip(!executionId, 'Could not extract execution ID from URL')
-
-      const reachedApproval = await pollExecutionStatus(app, executionId!, ['paused'])
+      const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
         .then(() => true)
         .catch(() => false)
       test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
 
-      // Poll the approvals API until the approval is indexed
-      // (approvals service indexes asynchronously — may not be available in all local environments)
       let approvalId: string | undefined
       const foundApproval = await expect(async () => {
-        const resp = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`)
-        const body = (await resp.json()) as { resources?: Array<{ id: string }> }
+        const r = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
+        const body = (await r.json()) as { resources?: Array<{ id: string }> }
         approvalId = body.resources?.[0]?.id
         expect(approvalId).toBeTruthy()
       })
         .toPass({ timeout: 30_000, intervals: [2_000] })
         .then(() => true)
         .catch(() => false)
-      test.skip(!foundApproval, 'Approvals service did not index the approval — may not be running locally')
+      test.skip(!foundApproval, 'Approvals service did not index the approval')
 
       await app.goto(toAppUrl(`/executions/${executionId}?approval=${approvalId}&history=closed`))
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+      await dismissConnectionBanner(app)
 
-      // Reject with reason
-      await app.getByRole('button', { name: 'Reject' }).click()
+      await app.getByRole('button', { name: 'Reject', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for rejecting/i).fill('Rejected in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
       await expect(app.getByText('Rejection submitted')).toBeVisible({ timeout: 15_000 })
 
-      // Verify execution terminates — status transitions to a terminal state
-      await expect(app.getByText(/Failed|Rejected/i)).toBeVisible({ timeout: 30_000 })
+      // eslint-disable-next-line no-restricted-properties -- multiple elements match "Rejected" (status badge + canvas branch label)
+      await expect(app.getByText(/Failed|Rejected/i).first()).toBeVisible({ timeout: 30_000 })
     } finally {
-      if (workflowId) {
-        await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})
-      }
+      await deleteWorkflowViaApi(app, workflowId)
     }
   })
 })
