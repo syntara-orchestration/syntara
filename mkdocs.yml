@@ -11,10 +11,18 @@ extra_css:
 
 theme:
   name: material
+  logo: syntara-icon.png
+  favicon: syntara-icon.png
   features:
+    - navigation.tabs
     - navigation.sections
     - navigation.expand
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.indexes
+    - navigation.tracking
     - navigation.top
+    - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
