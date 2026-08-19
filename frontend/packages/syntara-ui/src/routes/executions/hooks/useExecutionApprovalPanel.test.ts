@@ -222,6 +222,18 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
+  it('returns approvalMessage when approval_node_id has a loop-iteration suffix', () => {
+    const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_0' }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+    const wfDef = {
+      nodes: [{ id: 'node-1', config: { prompt: 'Approve this server?' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('Approve this server?')
+  })
+
   it('returns approvalMessage from v2 parameters.prompt', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {

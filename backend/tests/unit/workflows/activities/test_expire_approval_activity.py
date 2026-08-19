@@ -5,7 +5,7 @@ Tests expiring pending approval requests when a decision window times out.
 
 from typing import Any
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -105,6 +105,31 @@ async def test_expire_filters_by_node_id(execution_id: str, node_id: str) -> Non
     assert result["expired_count"] == 1
     expired_ids = mock_client.batch_expire.call_args[0][0]
     assert len(expired_ids) == 1
+
+
+@pytest.mark.asyncio
+async def test_expire_matches_loop_iteration_suffix(execution_id: str, node_id: str) -> None:
+    """Loop-iteration approval_node_id values are expired for the canvas node."""
+    loop_approval = {"id": str(uuid4()), "approval_node_id": f"{node_id}_iter_1", "status": "pending"}
+    other_approval = {"id": str(uuid4()), "approval_node_id": "other_node_iter_1", "status": "pending"}
+
+    mock_client = AsyncMock()
+    mock_client.list_approvals_by_execution = AsyncMock(return_value=[loop_approval, other_approval])
+    mock_client.batch_expire = AsyncMock(return_value={"total_success": 1, "total_failed": 0})
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            return_value=mock_client,
+        ),
+    ):
+        result = await expire_approval_requests_activity(execution_id, node_id)
+
+    assert result["expired_count"] == 1
+    expired_ids = mock_client.batch_expire.call_args[0][0]
+    assert expired_ids == [UUID(loop_approval["id"])]
 
 
 @pytest.mark.asyncio

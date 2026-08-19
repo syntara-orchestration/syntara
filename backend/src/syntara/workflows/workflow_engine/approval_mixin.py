@@ -50,8 +50,25 @@ class WorkflowApprovalMixin:
     resolver: NamespaceResolver
     _runtime_settings: dict[str, Any]
     skipped_nodes: set[str]
+    loop_body_map: dict[str, str]
+    node_control_data: dict[str, dict[str, Any]]
     _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
+
+    def _approval_request_id(self, node_id: str) -> str:
+        """Return the approval request / Temporal activity ID for this node.
+
+        Outside a loop this is the canvas node ID. Inside a loop body it is
+        ``{node_id}_iter_{index}`` so each iteration can create a distinct
+        approval request (unique on ``(execution_id, approval_node_id)``) and
+        Temporal async-complete signals target the in-flight activity.
+        """
+        parent_loop_id = self.loop_body_map.get(node_id)
+        if parent_loop_id is None:
+            return node_id
+        control = self.node_control_data.get(parent_loop_id, {})
+        current_index = control.get("current_index", 0)
+        return f"{node_id}_iter_{current_index}"
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.
@@ -75,7 +92,8 @@ class WorkflowApprovalMixin:
 
     async def _expire_approval_requests(self, node_id: str) -> None:
         """Expire pending approval requests for a timed-out approval node."""
-        await self._expire_approvals(node_id, activity_id=f"__internal__expire_approval_{node_id}")
+        request_id = self._approval_request_id(node_id)
+        await self._expire_approvals(request_id, activity_id=f"__internal__expire_approval_{request_id}")
 
     async def _maybe_expire_approval(
         self,
@@ -117,11 +135,12 @@ class WorkflowApprovalMixin:
 
     async def _fail_detached_approval_activity(self, node_id: str) -> None:
         """Best-effort fail the async APPROVAL activity for a single detached node."""
+        request_id = self._approval_request_id(node_id)
         try:
             await workflow.execute_local_activity(
                 fail_detached_approval_activity,
-                args=[workflow.info().workflow_id, workflow.info().run_id, node_id],
-                activity_id=f"__internal__fail_detached_approval_{node_id}",
+                args=[workflow.info().workflow_id, workflow.info().run_id, request_id],
+                activity_id=f"__internal__fail_detached_approval_{request_id}",
                 start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
@@ -193,7 +212,7 @@ class WorkflowApprovalMixin:
         ``approval_activity.create_approval_request_activity``::
 
             [0] execution_id:       str            — parent workflow execution ID
-            [1] approval_node_id:   str            — activity ID from workflow definition
+            [1] approval_node_id:   str            — activity ID; ``{node}_iter_{n}`` inside a loop
             [2] name:               str            — display name for the approval request
             [3] next_step_approved: dict[str, Any] | None — first activity if approved
             [4] workflow_context:   dict[str, Any]  — workflow name, inputs, previous step
@@ -272,7 +291,7 @@ class WorkflowApprovalMixin:
 
         return [
             self.execution_id,
-            node.id,
+            self._approval_request_id(node.id),
             name,
             next_step_approved,
             workflow_context,
@@ -295,6 +314,7 @@ class WorkflowApprovalMixin:
         received.
         """
         node_id = node.id
+        request_id = self._approval_request_id(node_id)
         approval_args = await self._prepare_approval_args(node, graph, resolved_parameters)
         # Approval uses async completion: start_to_close_timeout must cover the full
         # human decision window, not just the API call to create the request.
@@ -308,7 +328,7 @@ class WorkflowApprovalMixin:
             await workflow.execute_activity(
                 ActivityName.APPROVAL,
                 args=approval_args,
-                activity_id=node_id,
+                activity_id=request_id,
                 start_to_close_timeout=timedelta(seconds=approval_start_to_close),
                 retry_policy=retry_policy,
             ),
