@@ -118,8 +118,8 @@ class BaseWebSocketStreamingHandler(ABC):
 
     def get_on_idle(
         self,
-        session_state: dict[str, Any],
-        client: StreamClient,
+        session_state: dict[str, Any],  # noqa: ARG002
+        client: StreamClient,  # noqa: ARG002
     ) -> Callable[[], Awaitable[None]] | None:
         """Return an async callback invoked when XREAD returns no events.
 
