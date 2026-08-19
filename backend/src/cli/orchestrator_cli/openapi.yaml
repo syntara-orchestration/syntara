@@ -32263,6 +32263,7 @@ components:
         - workflow_serialization_duration_ms
         - workflow_validation_duration_ms
         - temporal_queue_depth
+        - active_workflows
         - activity_execution_success_rate
         - workflow_start_latency_ms
         - workflow_completion_rate
@@ -32766,7 +32767,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources
@@ -33191,7 +33192,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources
