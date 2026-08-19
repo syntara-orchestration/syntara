@@ -17,6 +17,7 @@ Syntara follows a **domain sub-spec → bundled spec** model:
 src/syntara/schemas/
 ├── openapi.yaml               # Bundled spec — all endpoints (generated — do not edit)
 ├── openapi-public.yaml        # Bundled spec — public endpoints only (generated — do not edit)
+├── openapi-public.json        # Same as above, JSON format (generated — do not edit)
 ├── base/                      # Shared base schemas (skipped during bundling)
 ├── {domain}/
 │   ├── openapi.yaml           # Domain sub-spec (edit this)

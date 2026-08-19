@@ -122,7 +122,7 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml backend/src/syntara/schemas/openapi-public.yaml 2>/dev/null; then
+          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml backend/src/syntara/schemas/openapi-public.yaml backend/src/syntara/schemas/openapi-public.json 2>/dev/null; then
             echo "::error::Bundled OpenAPI specs have uncommitted changes. Run 'make -C backend api-spec-bundle-all' locally and commit the changes."
             exit 1
           fi
