@@ -15,7 +15,6 @@ from sqlmodel import Field, Index, SQLModel, text
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
-from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.base.soft_deletable import SoftDeletableResource
 from syntara.core.models.pagination import ResourcesResponse
 
@@ -210,10 +209,6 @@ class GroupListResponse(ResourcesResponse[GroupRead]):
 
 class UserGroupListResponse(ResourcesResponse[UserGroupRead]):
     """Paginated list response for user groups."""
-
-
-class GroupListParams(BaseListParams):
-    """Query parameters for listing groups."""
 
 
 # ============================================================================

@@ -8,7 +8,6 @@ from uuid import uuid4
 from sqlalchemy import Index
 
 from syntara.workflows.models.execution import Execution, ExecutionRead
-from syntara.workflows.models.query_params import WorkflowVersionListParams
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -137,21 +136,3 @@ class TestExecutionFields:
         eid = uuid4()
         exc = Execution.model_construct(retried_from_execution_id=eid)
         assert exc.__dict__["retried_from_execution_id"] == eid
-
-
-class TestWorkflowVersionListParamsFields:
-    """Exercise WorkflowVersionListParams inheritance and structure."""
-
-    def test_inherits_base_list_params_fields(self) -> None:
-        from syntara.core.models.base import BaseListParams
-
-        assert issubclass(WorkflowVersionListParams, BaseListParams)
-
-    def test_model_fields_include_limit(self) -> None:
-        assert "limit" in WorkflowVersionListParams.model_fields
-
-    def test_model_fields_include_cursor(self) -> None:
-        assert "cursor" in WorkflowVersionListParams.model_fields
-
-    def test_model_fields_include_sort(self) -> None:
-        assert "sort" in WorkflowVersionListParams.model_fields

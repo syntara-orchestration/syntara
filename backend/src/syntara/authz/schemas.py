@@ -10,7 +10,6 @@ from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import NAME_PATTERN
 from syntara.core.exceptions import SafeValueError
-from syntara.core.models.base import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 
 NameField = Annotated[str, PydanticField(min_length=1, max_length=255, pattern=NAME_PATTERN)]
@@ -103,10 +102,6 @@ class PolicyListResponse(ResourcesResponse[PolicyRead]):
     """Paginated list response for policies."""
 
 
-class PolicyListParams(BaseListParams):
-    """Query parameters for listing policies."""
-
-
 # ---------------------------------------------------------------------------
 # Role schemas
 # ---------------------------------------------------------------------------
@@ -154,7 +149,3 @@ class RoleRead(SQLModel):
 
 class RoleListResponse(ResourcesResponse[RoleRead]):
     """Paginated list response for roles."""
-
-
-class RoleListParams(BaseListParams):
-    """Query parameters for listing roles."""

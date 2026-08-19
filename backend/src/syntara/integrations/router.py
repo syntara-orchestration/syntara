@@ -19,6 +19,7 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
 from syntara.core.models.group import user_groups
 from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.secret_service import create_secret_service
@@ -52,7 +53,6 @@ from syntara.integrations.models.llm_model import (
 )
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.integrations.services.llm_model_service import LLMModelService
-from syntara.tool_manager.models import ToolListParams
 from syntara.tool_manager.models.tool import (
     Tool,
     ToolListResponse,
@@ -574,7 +574,7 @@ async def list_integration_tools(
     integration_id: UUID,
     request: Request,
     service: Annotated[ToolService, Depends(get_tool_service)],
-    params: Annotated[ToolListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     _filterable: Annotated[None, Depends(FilterableModel(Tool))],
 ) -> ToolListResponse:
     """List tools for an integration with filtering, sorting, and pagination."""

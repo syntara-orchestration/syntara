@@ -9,7 +9,6 @@ from .api_models import (
     SettingsListResponse,
     SettingUpdate,
 )
-from .query_params import SettingsListParams
 from .runtime_setting import RuntimeSetting, SettingCategory, SettingValueType
 from .setting_category import SettingCategoryModel
 
@@ -24,6 +23,5 @@ __all__ = [
     "SettingCategoryRead",
     "SettingUpdate",
     "SettingValueType",
-    "SettingsListParams",
     "SettingsListResponse",
 ]

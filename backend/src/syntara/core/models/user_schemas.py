@@ -14,7 +14,6 @@ from sqlmodel import Field, SQLModel
 
 from syntara.auth.passwords import validate_password_complexity
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import MembershipSource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import AuthType
@@ -118,7 +117,3 @@ class UserListResponse(ResourcesResponse[UserRead]):
 
 class GroupMemberListResponse(ResourcesResponse[GroupMemberRead]):
     """Paginated list response for group members."""
-
-
-class UserListParams(BaseListParams):
-    """Query parameters for listing users."""

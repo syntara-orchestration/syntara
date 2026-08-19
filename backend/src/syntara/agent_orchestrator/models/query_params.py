@@ -6,11 +6,6 @@ from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 from syntara.core.exceptions import SafeValueError
-from syntara.core.models.base import BaseListParams
-
-
-class InvocationListParams(BaseListParams):
-    """Query parameters for invocation list endpoint."""
 
 
 class StreamingQueryParams(SQLModel):

@@ -12,12 +12,12 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.models.base import BaseListParams
 from syntara.core.openapi.filterable import FilterableModel
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialCreate,
     ServiceAccountCredentialCreateResponse,
-    ServiceAccountCredentialListParams,
     ServiceAccountCredentialListResponse,
     ServiceAccountCredentialRead,
     ServiceAccountCredentialRotateRequest,
@@ -114,9 +114,9 @@ async def list_credentials(
     service_account_id: UUID,
     request: Request,
     service: Annotated[ServiceAccountCredentialService, Depends(get_credential_service)],
-    params: Annotated[ServiceAccountCredentialListParams, Query()],
-) -> ServiceAccountCredentialListResponse:
+    params: Annotated[BaseListParams, Query()],
     _filterable: Annotated[None, Depends(FilterableModel(ServiceAccountCredential))],
+) -> ServiceAccountCredentialListResponse:
     """List credentials for a service account with pagination."""
     return await service.list_credentials(
         service_account_id=service_account_id,

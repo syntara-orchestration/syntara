@@ -6,32 +6,7 @@ from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 from syntara.core.exceptions import SafeValueError
-from syntara.core.models.base import BaseListParams
 from syntara.workflows.models.execution import ExecutionInclude
-
-
-class WorkflowListParams(BaseListParams):
-    """Query parameters for workflow list endpoint."""
-
-    # Allow filtering by workflow-specific fields
-    # Note: Additional query parameters are handled by the service layer
-    # for complex filtering operations like created_by, is_enabled, etc.
-
-
-class WorkflowVersionListParams(BaseListParams):
-    """Query parameters for workflow version list endpoint."""
-
-
-class ExecutionListParams(BaseListParams):
-    """Query parameters for execution list endpoint."""
-
-    # Allow filtering by execution-specific fields
-    # Note: Additional query parameters are handled by the service layer
-    # for complex filtering operations like workflow_id, status, etc.
-
-
-class ActivityListParams(BaseListParams):
-    """Query parameters for activity execution list endpoint."""
 
 
 class ExecutionIncludeParams(SQLModel):

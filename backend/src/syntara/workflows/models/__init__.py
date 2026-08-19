@@ -33,12 +33,8 @@ from .execution import (
     ExecutionStatus,
 )
 from .query_params import (
-    ActivityListParams,
     ExecutionIncludeParams,
-    ExecutionListParams,
     ExecutionStreamingQueryParams,
-    WorkflowListParams,
-    WorkflowVersionListParams,
 )
 from .signal import ActivitySignalPayload, SignalResponse
 from .validation_finding import (
@@ -82,7 +78,6 @@ __all__ = [
     "ActivityData",
     "ActivityExecution",
     "ActivityExecutionListResponse",
-    "ActivityListParams",
     "ActivityPatchMessage",
     "ActivitySignalPayload",
     "ActivityStatus",
@@ -90,7 +85,6 @@ __all__ = [
     "Execution",
     "ExecutionInclude",
     "ExecutionIncludeParams",
-    "ExecutionListParams",
     "ExecutionListResponse",
     "ExecutionSnapshotMessage",
     "ExecutionStatus",
@@ -110,7 +104,6 @@ __all__ = [
     "Workflow",
     "WorkflowCreate",
     "WorkflowDefinition",
-    "WorkflowListParams",
     "WorkflowListResponse",
     "WorkflowPublishEvent",
     "WorkflowRead",
@@ -118,7 +111,6 @@ __all__ = [
     "WorkflowUpdate",
     "WorkflowValidateRequest",
     "WorkflowVersion",
-    "WorkflowVersionListParams",
     "WorkflowVersionListResponse",
     "WorkflowVersionRead",
     "WorkflowVersionUpdate",

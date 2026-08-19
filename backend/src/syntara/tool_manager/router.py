@@ -20,12 +20,12 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.models.base import BaseListParams
 from syntara.core.openapi.filterable import FilterableModel
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.router import integration_read_visibility
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.tool_manager.exceptions import ToolNotFoundError
-from syntara.tool_manager.models import ToolListParams
 from syntara.tool_manager.models.tool import (
     Tool,
     ToolListResponse,
@@ -70,7 +70,7 @@ def _get_tool_service(
 async def list_tools(
     request: Request,
     service: Annotated[ToolService, Depends(_get_tool_service)],
-    params: Annotated[ToolListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     db: Annotated[AsyncSession, Depends(get_db)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_tool_read_visibility)],
     _filterable: Annotated[None, Depends(FilterableModel(Tool))],

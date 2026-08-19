@@ -238,7 +238,7 @@ WebSocketTicketResponse  # Action result — ephemeral ticket
 | API update input | `{Resource}Update` | `WorkflowUpdate` |
 | API read response | `{Resource}Read` | `WorkflowRead`, `ApprovalRequestRead` |
 | List response alias | `{Resource}ListResponse` | `WorkflowListResponse = ResourcesResponse[WorkflowRead]` |
-| Query parameters | `{Resource}ListParams` | `WorkflowListParams(BaseListParams)` |
+| Query parameters | `BaseListParams` or `{Resource}ListParams` | Use `BaseListParams` directly; subclass only when adding endpoint-specific fields (e.g., `CredentialListParams` adds `for_action`) |
 | Action/RPC response | `{Action}Response` | `CsrfTokenResponse`, `CanIResponse` |
 
 Schema names must use readable, unabbreviated resource names matching the parent resource (e.g., `ServiceAccountCredentialCreate`, not `SACredentialCreate`).
@@ -584,7 +584,7 @@ no stripping is needed — pass `request.query_params.items()` directly:
 async def list_approvals(
     request: Request,
     service: Annotated[ApprovalService, Depends(get_approval_service)],
-    params: Annotated[ApprovalListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
 ) -> ApprovalListResponse:
     return await service.list(
         limit=params.limit,

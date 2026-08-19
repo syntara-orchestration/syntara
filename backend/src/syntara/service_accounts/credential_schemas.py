@@ -7,7 +7,6 @@ from uuid import UUID
 from pydantic import AwareDatetime, ConfigDict
 from sqlmodel import Field, SQLModel
 
-from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.models.service_account_credential import (
@@ -79,10 +78,6 @@ class ServiceAccountCredentialRotateRequest(SQLModel):
 
 class ServiceAccountCredentialRotateResponse(ServiceAccountCredentialCreateResponse):
     """Schema for the rotate response — same shape as create response."""
-
-
-class ServiceAccountCredentialListParams(BaseListParams):
-    """Query parameters for listing service account credentials."""
 
 
 class ServiceAccountCredentialListResponse(ResourcesResponse[ServiceAccountCredentialRead]):

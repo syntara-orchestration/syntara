@@ -17,15 +17,15 @@ from syntara.approvals.models.api_models import (
 )
 from syntara.approvals.models.approval_request import ApprovalListResponse, ApprovalRequest
 from syntara.approvals.models.batch_response import BatchApprovalResponse
-from syntara.approvals.models.query_params import ApprovalListParams
 from syntara.approvals.services.approval_service import ApprovalService
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.syntara_router import SyntaraRouter
+from syntara.core.models.base import BaseListParams
 from syntara.core.openapi.filterable import FilterableModel
+from syntara.core.syntara_router import SyntaraRouter
 
 router = SyntaraRouter(prefix="/approvals", tags=["Approvals"])
 
@@ -95,7 +95,7 @@ def get_approval_service(
 async def list_approvals(
     request: Request,
     service: Annotated[ApprovalService, Depends(get_approval_service)],
-    params: Annotated[ApprovalListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("approval", "read"))],
     _filterable: Annotated[None, Depends(FilterableModel(ApprovalRequest))],
 ) -> ApprovalListResponse:

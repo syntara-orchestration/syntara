@@ -33,10 +33,6 @@ class GroupDirectoryEntry(SQLModel):
 GroupDirectoryListResponse = ResourcesResponse[GroupDirectoryEntry]
 
 
-class GroupDirectoryListParams(BaseListParams):
-    """Query parameters for the group directory listing."""
-
-
 class _GroupDirectoryService(BaseService):
     """Thin service wrapping BaseService.list_resources for directory queries."""
 
@@ -78,7 +74,7 @@ def _get_service(
 async def list_groups_directory(
     request: Request,
     service: Annotated[_GroupDirectoryService, Depends(_get_service)],
-    params: Annotated[GroupDirectoryListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     _filterable: Annotated[None, Depends(FilterableModel(Group))],
 ) -> GroupDirectoryListResponse:
     """Return a lightweight directory of groups (id + name only)."""

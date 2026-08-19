@@ -17,7 +17,6 @@ from syntara.agent_orchestrator.models.invocation import (
     InvocationTraceRead,
 )
 from syntara.agent_orchestrator.models.llm_credential_config import LLMCredentialConfig
-from syntara.agent_orchestrator.models.query_params import InvocationListParams
 from syntara.agent_orchestrator.models.request import (
     InvocationCancelRequest,
     InvocationCancelResponse,
@@ -36,7 +35,6 @@ __all__ = [
     "InvocationCancelResponse",
     "InvocationContextData",
     "InvocationCreateRequest",
-    "InvocationListParams",
     "InvocationListResponse",
     "InvocationMetadata",
     "InvocationRequestWithFile",

@@ -28,7 +28,6 @@ from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import (
     Group,
     GroupCreate,
-    GroupListParams,
     GroupListResponse,
     GroupMemberAdd,
     GroupMemberAddResponse,
@@ -36,8 +35,8 @@ from syntara.core.models.group import (
     GroupUpdate,
 )
 from syntara.core.models.user_schemas import GroupMemberListResponse
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.core.openapi.filterable import FilterableModel
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.users.services.group_service import GroupsService
 
 router = SyntaraRouter(prefix="/groups", tags=["Groups"])
@@ -114,7 +113,7 @@ async def create_group(
 async def list_groups(
     request: Request,
     service: Annotated[GroupsService, Depends(get_group_service)],
-    params: Annotated[GroupListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("group", "read"))],
     _filterable: Annotated[None, Depends(FilterableModel(Group))],
 ) -> GroupListResponse:

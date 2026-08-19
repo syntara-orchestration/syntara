@@ -32,10 +32,6 @@ class UserDirectoryEntry(SQLModel):
 UserDirectoryListResponse = ResourcesResponse[UserDirectoryEntry]
 
 
-class UserDirectoryListParams(BaseListParams):
-    """Query parameters for the user directory listing."""
-
-
 class _UserDirectoryService(BaseService):
     """Thin service wrapping BaseService.list_resources for directory queries."""
 
@@ -77,7 +73,7 @@ def _get_service(
 async def list_users_directory(
     request: Request,
     service: Annotated[_UserDirectoryService, Depends(_get_service)],
-    params: Annotated[UserDirectoryListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     _filterable: Annotated[None, Depends(FilterableModel(User))],
 ) -> UserDirectoryListResponse:
     """Return a lightweight directory of users (id + username only)."""

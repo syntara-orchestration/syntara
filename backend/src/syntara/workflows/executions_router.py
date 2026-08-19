@@ -16,9 +16,10 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.core.models.base import BaseListParams
 from syntara.core.openapi.filterable import FilterableModel
-from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
+from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.workflows.models import ActivitySignalPayload, SignalResponse
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     Execution,
@@ -26,7 +27,7 @@ from syntara.workflows.models.execution import (
     ExecutionListResponse,
     ExecutionRead,
 )
-from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
+from syntara.workflows.models.query_params import ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
 from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
@@ -107,7 +108,7 @@ def get_execution_service(
 async def list_executions(
     request: Request,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
-    params: Annotated[ExecutionListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("execution", "read"))],
     _filterable: Annotated[None, Depends(FilterableModel(Execution))],
 ) -> ExecutionListResponse:
@@ -316,7 +317,7 @@ async def list_execution_activities(
     request: Request,
     execution_id: UUID,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
-    params: Annotated[ActivityListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     _filterable: Annotated[None, Depends(FilterableModel(ActivityExecution))],
 ) -> ActivityExecutionListResponse:
     """List activities for a workflow execution with cursor-based pagination.
