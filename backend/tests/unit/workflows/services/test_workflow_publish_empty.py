@@ -1,8 +1,9 @@
 """Unit tests for publish_workflow_version validation and no-copy publish behavior."""
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -615,6 +616,24 @@ class TestPublishImplicitUnpublishEvent:
         )
 
 
+async def _never_returns(*_args: object, **_kwargs: object) -> int:
+    """Temporal hang: never answers, matching the nginx 504 unpublish path."""
+    await asyncio.Event().wait()
+    return 0
+
+
+def _published_workflow_mock() -> tuple[UUID, MagicMock]:
+    workflow_id = uuid4()
+    mock_workflow = MagicMock()
+    mock_workflow.id = workflow_id
+    mock_workflow.is_builtin = False
+    mock_workflow.published_version_id = uuid4()
+    mock_workflow.is_enabled = True
+    mock_workflow.name = "test-wf"
+    mock_workflow.project_id = uuid4()
+    return workflow_id, mock_workflow
+
+
 class TestScheduledTriggerSyncGracefulDegradation:
     """Unpublish and delete succeed even when scheduled trigger cleanup fails."""
 
@@ -667,23 +686,43 @@ class TestScheduledTriggerSyncGracefulDegradation:
             await mock_service.delete_workflow(workflow_id)
 
     @pytest.mark.asyncio
+    async def test_unbounded_temporal_hang_does_not_return(self, mock_service: WorkflowService) -> None:
+        """Control: without a short bound, hung Temporal never lets unpublish return.
+
+        This is the nginx 504 path (AAP-87692): commit already happened, then
+        the handler waits forever on schedule delete.
+        """
+        workflow_id, mock_workflow = _published_workflow_mock()
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch("syntara.workflows.services.workflow_service._SCHEDULE_DELETE_TIMEOUT_SECONDS", 30.0),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            mock_sched_cls.return_value.delete_triggers_for_workflow = _never_returns
+            started = time.monotonic()
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=0.25)
+            elapsed = time.monotonic() - started
+            mock_commit.assert_awaited()
+
+        assert elapsed < 1.0
+        assert mock_workflow.published_version_id is None
+        assert mock_workflow.is_enabled is False
+
+    @pytest.mark.asyncio
     async def test_unpublish_returns_when_trigger_delete_hangs(self, mock_service: WorkflowService) -> None:
         """HTTP unpublish must return after commit even if Temporal never answers.
 
         Without a timeout this would sit on the request until nginx 504s
         (AAP-87692), even though the workflow is already Draft in the DB.
         """
-        workflow_id = uuid4()
-        mock_workflow = MagicMock()
-        mock_workflow.id = workflow_id
-        mock_workflow.is_builtin = False
-        mock_workflow.published_version_id = uuid4()
-        mock_workflow.name = "test-wf"
-        mock_workflow.project_id = uuid4()
-
-        async def _hang(*_args: object, **_kwargs: object) -> int:
-            await asyncio.Event().wait()
-            return 0
+        workflow_id, mock_workflow = _published_workflow_mock()
 
         with (
             patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
@@ -695,11 +734,16 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service._SCHEDULE_DELETE_TIMEOUT_SECONDS", 0.05),
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = _hang
+            mock_sched_cls.return_value.delete_triggers_for_workflow = _never_returns
+            started = time.monotonic()
             result = await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=1.0)
+            elapsed = time.monotonic() - started
             mock_commit.assert_awaited()
 
         assert result == mock_workflow
+        assert mock_workflow.published_version_id is None
+        assert mock_workflow.is_enabled is False
+        assert elapsed < 0.5
 
     @pytest.mark.asyncio
     async def test_delete_returns_when_trigger_delete_hangs(self, mock_service: WorkflowService) -> None:
@@ -710,10 +754,6 @@ class TestScheduledTriggerSyncGracefulDegradation:
         mock_workflow.name = "test-wf"
         mock_workflow.project_id = uuid4()
 
-        async def _hang(*_args: object, **_kwargs: object) -> int:
-            await asyncio.Event().wait()
-            return 0
-
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
@@ -723,9 +763,68 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service._SCHEDULE_DELETE_TIMEOUT_SECONDS", 0.05),
         ):
             mock_wh_cls.return_value.delete_triggers_for_workflow = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = _hang
+            mock_sched_cls.return_value.delete_triggers_for_workflow = _never_returns
+            started = time.monotonic()
             await asyncio.wait_for(mock_service.delete_workflow(workflow_id), timeout=1.0)
+            elapsed = time.monotonic() - started
             mock_commit.assert_awaited()
+
+        assert elapsed < 0.5
+
+    @pytest.mark.asyncio
+    async def test_unpublish_returns_when_temporal_client_connect_hangs(self, mock_service: WorkflowService) -> None:
+        """Hung Temporal Client.connect (not an RPC error) must not 504 unpublish."""
+        workflow_id, mock_workflow = _published_workflow_mock()
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch(
+                "syntara.workflows.services.workflow_service.ScheduledTriggerService.get_client",
+                new=AsyncMock(side_effect=_never_returns),
+            ),
+            patch("syntara.workflows.services.workflow_service._SCHEDULE_DELETE_TIMEOUT_SECONDS", 0.05),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            started = time.monotonic()
+            result = await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=1.0)
+            elapsed = time.monotonic() - started
+            mock_commit.assert_awaited()
+
+        assert result == mock_workflow
+        assert mock_workflow.published_version_id is None
+        assert elapsed < 0.5
+
+    @pytest.mark.asyncio
+    async def test_unpublish_still_deletes_schedules_when_temporal_is_slow(self, mock_service: WorkflowService) -> None:
+        """Healthy-but-slow Temporal still deletes if it finishes inside the bound."""
+        workflow_id, mock_workflow = _published_workflow_mock()
+        deleted: list[str] = []
+
+        async def _slow(*_args: object, **kwargs: object) -> int:
+            await asyncio.sleep(0.02)
+            deleted.append(str(kwargs["workflow_id"]))
+            return 1
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch("syntara.workflows.services.workflow_service._SCHEDULE_DELETE_TIMEOUT_SECONDS", 0.5),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            mock_sched_cls.return_value.delete_triggers_for_workflow = _slow
+            result = await mock_service.unpublish_workflow(workflow_id)
+            mock_commit.assert_awaited()
+
+        assert result == mock_workflow
+        assert deleted == [str(workflow_id)]
 
 
 class TestPublishRejectsInvalidScheduledTriggerConfig:
