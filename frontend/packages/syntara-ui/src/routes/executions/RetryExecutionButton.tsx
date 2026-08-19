@@ -16,16 +16,22 @@ type RetryExecutionButtonProps = Readonly<{
   executionId: string
   workflowId: string
   workflowVersionId: string
+  resourceProject?: string
 }>
 
 const retryTooltip = permissionTooltip('retry this execution', 'execution:run')
 
-export function RetryExecutionButton({ executionId, workflowId, workflowVersionId }: RetryExecutionButtonProps) {
+export function RetryExecutionButton({
+  executionId,
+  workflowId,
+  workflowVersionId,
+  resourceProject,
+}: RetryExecutionButtonProps) {
   const retryDialog = useDialogState<void>()
   const navigate = useNavigate()
 
   /* v8 ignore start -- v8 emits phantom branches from compiled hook destructuring */
-  const { allowed: canRun, isChecking } = useCanI('run', 'execution')
+  const { allowed: canRun, isChecking } = useCanI('run', 'execution', resourceProject ? { resourceProject } : undefined)
   const permissionDenied = !isChecking && !canRun
   const isDisabled = !canRun || isChecking
 

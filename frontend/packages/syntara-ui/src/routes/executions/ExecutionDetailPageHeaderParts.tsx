@@ -78,12 +78,13 @@ export function ExecutionDetailHeaderToolbar({
           onReviewClick={onReviewClick}
         />
       )}
-      {isCancellable && <CancelExecutionButton executionId={executionId} />}
+      {isCancellable && <CancelExecutionButton executionId={executionId} resourceProject={execution?.project_id} />}
       {isRetryable && execution && (
         <RetryExecutionButton
           executionId={executionId}
           workflowId={execution.workflow_id}
           workflowVersionId={execution.workflow_version_id}
+          resourceProject={execution.project_id}
         />
       )}
       <Button variant="secondary" onClick={onCopyToEditor}>

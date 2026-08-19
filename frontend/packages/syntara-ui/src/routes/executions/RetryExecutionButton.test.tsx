@@ -127,4 +127,16 @@ describe('RetryExecutionButton', () => {
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
+
+  it('scopes the permission check to the given project', () => {
+    renderButton({ resourceProject: 'proj-123' })
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-123' })
+  })
+
+  it('checks system-scoped permission when no project is given', () => {
+    renderButton()
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', undefined)
+  })
 })

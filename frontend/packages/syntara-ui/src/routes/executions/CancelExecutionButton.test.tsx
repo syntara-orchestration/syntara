@@ -34,11 +34,11 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
   }),
 }))
 
-function renderButton(executionId = 'exec-123') {
+function renderButton(executionId = 'exec-123', resourceProject?: string) {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <CancelExecutionButton executionId={executionId} />
+      <CancelExecutionButton executionId={executionId} resourceProject={resourceProject} />
     </QueryClientProvider>
   )
 }
@@ -112,5 +112,17 @@ describe('CancelExecutionButton', () => {
     const { container } = renderButton()
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('scopes the permission check to the given project', () => {
+    renderButton('exec-123', 'proj-123')
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-123' })
+  })
+
+  it('checks system-scoped permission when no project is given', () => {
+    renderButton()
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', undefined)
   })
 })
