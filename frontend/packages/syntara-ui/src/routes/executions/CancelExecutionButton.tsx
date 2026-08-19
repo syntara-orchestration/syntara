@@ -8,7 +8,7 @@ import { useCancelExecution } from './useCancelExecution'
 
 type CancelExecutionButtonProps = Readonly<{
   executionId: string
-  projectId?: string
+  projectId: string
 }>
 
 const cancelTooltip = permissionTooltip('cancel this execution', 'execution:run')

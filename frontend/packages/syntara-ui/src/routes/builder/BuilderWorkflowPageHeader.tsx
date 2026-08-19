@@ -163,7 +163,9 @@ function BuilderToolbarContent({
             Review approval
           </Button>
         )}
-        {isCancellable && executionId && <CancelExecutionButton executionId={executionId} projectId={projectId} />}
+        {isCancellable && executionId && projectId && (
+          <CancelExecutionButton executionId={executionId} projectId={projectId} />
+        )}
         <Button variant="primary" onClick={onBackToEditor}>
           Back to editor
         </Button>

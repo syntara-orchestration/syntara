@@ -47,6 +47,7 @@ function renderButton(props?: Partial<React.ComponentProps<typeof RetryExecution
     executionId: 'exec-123',
     workflowId: 'wf-1',
     workflowVersionId: 'wfv-1',
+    projectId: 'project-1',
     ...props,
   }
   return render(

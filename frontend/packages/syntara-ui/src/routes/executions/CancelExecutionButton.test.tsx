@@ -34,7 +34,7 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
   }),
 }))
 
-function renderButton(executionId = 'exec-123', projectId?: string) {
+function renderButton(executionId = 'exec-123', projectId = 'project-1') {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>

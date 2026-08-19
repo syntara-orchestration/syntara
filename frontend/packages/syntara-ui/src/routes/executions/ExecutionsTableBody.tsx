@@ -46,7 +46,7 @@ type Execution = {
   completed_at?: string | null
   created_at?: string
   updated_at?: string
-  project_id?: string
+  project_id: string
 }
 
 type ExecutionRowProps = {

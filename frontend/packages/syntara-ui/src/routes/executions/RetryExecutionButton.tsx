@@ -16,7 +16,7 @@ type RetryExecutionButtonProps = Readonly<{
   executionId: string
   workflowId: string
   workflowVersionId: string
-  projectId?: string
+  projectId: string
 }>
 
 const retryTooltip = permissionTooltip('retry this execution', 'execution:run')

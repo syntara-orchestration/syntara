@@ -78,7 +78,9 @@ export function ExecutionDetailHeaderToolbar({
           onReviewClick={onReviewClick}
         />
       )}
-      {isCancellable && <CancelExecutionButton executionId={executionId} projectId={execution?.project_id} />}
+      {isCancellable && execution && (
+        <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
+      )}
       {isRetryable && execution && (
         <RetryExecutionButton
           executionId={executionId}

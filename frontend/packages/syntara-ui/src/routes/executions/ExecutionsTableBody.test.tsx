@@ -81,6 +81,7 @@ describe('ExecutionsTableBody - Run ID column', () => {
         workflow_id: 'wf-1',
         status: 'completed',
         completed_at: '2025-01-01T10:00:00Z',
+        project_id: 'project-1',
       },
     ])
 
@@ -99,6 +100,7 @@ describe('ExecutionsTableBody - Run ID column', () => {
         workflow_id: 'wf-2',
         status: 'running',
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -112,6 +114,7 @@ describe('ExecutionsTableBody - Run ID column', () => {
         id: executionId,
         status: 'pending',
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -140,6 +143,7 @@ describe('ExecutionsTableBody - Run ID column', () => {
                         workflow_id: 'wf-3',
                         status: 'completed',
                         completed_at: '2025-01-01T10:00:00Z',
+                        project_id: 'project-1',
                       },
                     ],
                   },
@@ -172,6 +176,7 @@ describe('ExecutionsTableBody - Pending Approval Badge', () => {
         status: 'paused',
         approval_pending: true,
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -186,6 +191,7 @@ describe('ExecutionsTableBody - Pending Approval Badge', () => {
         status: 'paused',
         approval_pending: false,
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -199,6 +205,7 @@ describe('ExecutionsTableBody - Pending Approval Badge', () => {
         workflow_id: 'wf-1',
         status: 'running',
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -213,6 +220,7 @@ describe('ExecutionsTableBody - Pending Approval Badge', () => {
         status: 'running',
         approval_pending: true,
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -228,6 +236,7 @@ describe('ExecutionsTableBody - Pending Approval Badge', () => {
         status: 'running',
         approval_pending: true,
         completed_at: null,
+        project_id: 'project-1',
       },
     ])
 
@@ -243,11 +252,17 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
     vi.mocked(useCancelExecution).mockReturnValue({ handleCancel: mockHandleCancel, isPending: false })
   })
 
+  it('passes resourceProject to useCanI for execution row actions', () => {
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'proj-99' }])
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-99' })
+  })
+
   it.each(['running', 'pending', 'paused'] as const)(
     'shows kebab with "Cancel run" for %s executions',
     async (status) => {
       const user = userEvent.setup()
-      renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status, completed_at: null }])
+      renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status, completed_at: null, project_id: 'project-1' }])
 
       const kebab = screen.getByRole('button', { name: /actions for execution/i })
       await user.click(kebab)
@@ -260,7 +275,9 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
     'does not show "Cancel run" for %s executions',
     async (status) => {
       const user = userEvent.setup()
-      renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status, completed_at: '2026-01-01T00:00:00Z' }])
+      renderTable([
+        { id: 'exec-1', workflow_id: 'wf-1', status, completed_at: '2026-01-01T00:00:00Z', project_id: 'project-1' },
+      ])
 
       const kebab = screen.getByRole('button', { name: /actions for execution/i })
       await user.click(kebab)
@@ -271,7 +288,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('calls handleCancel when "Cancel run" is clicked', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -281,7 +298,9 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   })
 
   it('passes the execution id to useCancelExecution', () => {
-    renderTable([{ id: 'exec-abc', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([
+      { id: 'exec-abc', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' },
+    ])
 
     expect(useCancelExecution).toHaveBeenCalledWith('exec-abc')
   })
@@ -289,7 +308,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   it('disables "Cancel run" when user lacks execution:run permission', async () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -300,7 +319,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   it('disables "Cancel run" while cancel mutation is pending', async () => {
     vi.mocked(useCancelExecution).mockReturnValue({ handleCancel: mockHandleCancel, isPending: true })
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -311,7 +330,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   it('shows "Cancellation in progress" tooltip while cancel mutation is pending', async () => {
     vi.mocked(useCancelExecution).mockReturnValue({ handleCancel: mockHandleCancel, isPending: true })
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -322,7 +341,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('stays disabled after cancel is clicked to prevent duplicate requests', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -334,7 +353,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('does not show a confirmation dialog when "Cancel run" is clicked', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -345,7 +364,15 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('shows "Retry run" for retryable statuses (not cancel)', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'failed', completed_at: '2026-01-01T00:00:00Z' }])
+    renderTable([
+      {
+        id: 'exec-1',
+        workflow_id: 'wf-1',
+        status: 'failed',
+        completed_at: '2026-01-01T00:00:00Z',
+        project_id: 'project-1',
+      },
+    ])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -356,7 +383,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('enables WebSocket streaming after cancel to detect status change', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     expect(useExecutionWebSocket).toHaveBeenLastCalledWith('exec-1', expect.objectContaining({ enabled: false }))
 
@@ -389,7 +416,9 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
       <QueryClientProvider client={queryClient}>
         <table>
           <FlatExecutionsTableBody
-            executions={[{ id: 'exec-ws', workflow_id: 'wf-1', status: 'running', completed_at: null }]}
+            executions={[
+              { id: 'exec-ws', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' },
+            ]}
           />
         </table>
       </QueryClientProvider>
@@ -409,7 +438,7 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   it('shows permission tooltip when user lacks execution:run and hovers cancel', async () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' }])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -420,7 +449,15 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
 
   it('opens retry dialog when "Retry run" is clicked and closes on cancel', async () => {
     const user = userEvent.setup()
-    renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'failed', completed_at: '2026-01-01T00:00:00Z' }])
+    renderTable([
+      {
+        id: 'exec-1',
+        workflow_id: 'wf-1',
+        status: 'failed',
+        completed_at: '2026-01-01T00:00:00Z',
+        project_id: 'project-1',
+      },
+    ])
 
     const kebab = screen.getByRole('button', { name: /actions for execution/i })
     await user.click(kebab)
@@ -434,7 +471,9 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   })
 
   it('has no accessibility violations for a running execution with kebab', async () => {
-    const { container } = renderTable([{ id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null }])
+    const { container } = renderTable([
+      { id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' },
+    ])
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
