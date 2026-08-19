@@ -72,6 +72,35 @@ describe('validateVariableReferences', () => {
       expect(errors[0].message).toContain('not a defined input field')
     })
 
+    it('accepts inputs alias when the field exists on the trigger schema', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'task-1',
+          type: 'script',
+          parameters: { code: 'echo ${inputs.username}' },
+        }),
+      ]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
+
+      expect(validateVariableReferences(activities, [], context)).toEqual([])
+    })
+
+    it('errors on inputs alias when the field is not on the trigger schema', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'task-1',
+          type: 'script',
+          parameters: { code: 'echo ${inputs.missing}' },
+        }),
+      ]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
+
+      const errors = validateVariableReferences(activities, [], context)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].message).toContain('missing')
+      expect(errors[0].message).toContain('not a defined inputs field')
+    })
+
     it('errors on input reference when triggers have no input schema', () => {
       const activities: Activity[] = [
         makeActivity({

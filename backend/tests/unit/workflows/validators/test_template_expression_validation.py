@@ -182,6 +182,17 @@ class TestInvalidNamespaceScope:
         assert len(errors) == 1
         assert "iteration_index" in errors[0].message
 
+    def test_variables_scope_is_rejected(self) -> None:
+        defn = _base_definition(
+            nodes=[_script_node("n1", environment={"X": "${variables.count}"})],
+            edges=[{"from": "t1", "to": "n1"}],
+        )
+        node_ids = {"t1", "n1"}
+        errors = check_template_expressions(defn, node_ids)
+        assert len(errors) == 1
+        assert errors[0].category == ValidationCategory.invalid_reference
+        assert "variables" in errors[0].message
+
 
 # ---------------------------------------------------------------------------
 # AC3: All valid expressions produce no findings
@@ -194,7 +205,6 @@ class TestAllValidExpressions:
         [
             "${input.name}",
             "${inputs.name}",
-            "${variables.count}",
             "${trigger.data}",
             "${workflow_context.execution.id}",
             "${workflow_context.now}",

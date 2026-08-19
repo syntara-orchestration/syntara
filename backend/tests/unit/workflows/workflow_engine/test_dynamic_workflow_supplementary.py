@@ -399,6 +399,32 @@ class TestUnselectedTriggerSkipping:
 
         assert len(wf.skipped_nodes) == 0
 
+    @pytest.mark.asyncio
+    async def test_trigger_payload_registered_as_input_aliases(self) -> None:
+        """${input.*} and ${inputs.*} resolve the same payload as ${trigger.*}."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "node_a", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
+            return_value={"output": {"env": "prod"}},
+        ):
+            await wf._execute_trigger(
+                trigger_node_id="trigger",
+                trigger_inputs={"env": "prod"},
+                graph=graph,
+                pending_tasks={},
+            )
+
+        assert wf.resolver.resolve_value("${trigger.env}") == "prod"
+        assert wf.resolver.resolve_value("${input.env}") == "prod"
+        assert wf.resolver.resolve_value("${inputs.env}") == "prod"
+
 
 class TestAllowedTriggerTypes:
     """Tests for trigger type allowlist security control."""

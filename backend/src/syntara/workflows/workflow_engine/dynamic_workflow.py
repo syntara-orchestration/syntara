@@ -253,6 +253,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         trigger_output = trigger_result.get("output", trigger_result)
         self.resolver.set_namespace("trigger", trigger_output)
         self.resolver.set_namespace(trigger_node.id, trigger_output)
+        # input / inputs are aliases of the trigger payload so ${input.field}
+        # and ${inputs.field} resolve the same data as ${trigger.field}.
+        self.resolver.set_namespace("input", trigger_output)
+        self.resolver.set_namespace("inputs", trigger_output)
 
         await self._schedule_successors(
             completed_node_id=trigger_node.id,
