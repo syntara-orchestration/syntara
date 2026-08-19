@@ -463,6 +463,8 @@ class WorkflowService(BaseService):
         labels: dict[str, Any],
         workflow_definition: dict[str, Any],
         project_id: UUID,
+        *,
+        is_import: bool = False,
     ) -> tuple[Workflow, WorkflowVersion, ValidationResult]:
         """Create a new V2 workflow with initial version.
 
@@ -472,6 +474,8 @@ class WorkflowService(BaseService):
             labels: Optional key-value labels
             workflow_definition: V2 workflow definition as dict (triggers + nodes + edges)
             project_id: Project to assign workflow to
+            is_import: When True, missing LLM models are cleared with warnings
+                instead of raising errors (allows import of workflows from other instances)
 
         Returns:
             Tuple of (created workflow, initial version, validation result)
@@ -512,7 +516,9 @@ class WorkflowService(BaseService):
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
-        ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
+        ref_findings = await validate_workflow_references(
+            self.session, workflow_definition, project_id, is_import=is_import
+        )
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
             has_validation_issues = True

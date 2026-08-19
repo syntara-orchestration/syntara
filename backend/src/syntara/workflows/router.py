@@ -284,6 +284,7 @@ async def create_workflow(
         labels=request.labels,
         workflow_definition=_definition_to_dict(request.workflow_definition),
         project_id=request.project_id,
+        is_import=request.is_import,
     )
     read = WorkflowRead.model_validate(workflow, from_attributes=True)
     if _has_validation_issues(result):

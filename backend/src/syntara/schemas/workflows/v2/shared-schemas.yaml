@@ -803,6 +803,11 @@ components:
           format: uuid
           title: Project Id
           description: Project to assign workflow to
+        is_import:
+          type: boolean
+          title: Is Import
+          description: When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+          default: false
 
     WorkflowUpdate:
       type: object
