@@ -384,6 +384,89 @@ class TestWebSocketStreamingHandlerCheckInvocationExists:
         assert str(invocation_id) in exc_info.value.error_data.detail
 
 
+class TestGetOnIdle:
+    """Tests for get_on_idle cancel-key check during event streaming."""
+
+    def test_get_on_idle_returns_callable(self, handler: WebSocketStreamingHandler) -> None:
+        """get_on_idle must return an async callable."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+        mock_client = AsyncMock()
+
+        result = handler.get_on_idle(session_state, mock_client)
+        assert callable(result)
+
+    @pytest.mark.asyncio
+    async def test_on_idle_raises_when_cancel_key_exists(self, handler: WebSocketStreamingHandler) -> None:
+        """on_idle must raise InvocationCancelledStreamError when the cancel key is set."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        on_idle = handler.get_on_idle(session_state, mock_client)
+        assert on_idle is not None
+
+        with pytest.raises(InvocationCancelledStreamError):
+            await on_idle()
+
+    @pytest.mark.asyncio
+    async def test_on_idle_does_not_raise_when_not_cancelled(self, handler: WebSocketStreamingHandler) -> None:
+        """on_idle must not raise when the cancel key is absent."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+
+        on_idle = handler.get_on_idle(session_state, mock_client)
+        assert on_idle is not None
+
+        await on_idle()  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_on_idle_falls_back_to_db_when_redis_fails(self, handler: WebSocketStreamingHandler) -> None:
+        """on_idle must fall back to DB when Redis key_exists raises."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = ConnectionError("Redis down")
+
+        on_idle = handler.get_on_idle(session_state, mock_client)
+        assert on_idle is not None
+
+        with (
+            patch.object(
+                handler,
+                "_check_invocation_exists",
+                new_callable=AsyncMock,
+                return_value=InvocationStatus.CANCELLED,
+            ),
+            pytest.raises(InvocationCancelledStreamError),
+        ):
+            await on_idle()
+
+    @pytest.mark.asyncio
+    async def test_on_idle_continues_when_both_redis_and_db_fail(self, handler: WebSocketStreamingHandler) -> None:
+        """on_idle must not raise when both Redis and DB checks fail."""
+        from sqlalchemy.exc import SQLAlchemyError
+
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = ConnectionError("Redis down")
+
+        on_idle = handler.get_on_idle(session_state, mock_client)
+        assert on_idle is not None
+
+        with patch.object(
+            handler,
+            "_check_invocation_exists",
+            new_callable=AsyncMock,
+            side_effect=SQLAlchemyError("DB down"),
+        ):
+            await on_idle()  # should not raise
+
+
 class TestStreamingService:
     """Test StreamingService class."""
 

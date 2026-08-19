@@ -36,7 +36,7 @@ Usage:
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any
 
 import structlog
@@ -332,6 +332,7 @@ class StreamClient(BaseRedisClient):
         should_stop: Callable[[dict[str, Any]], bool] | None,
         block_ms: int,
         count: int,
+        on_idle: Callable[[], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Read events from stream in a loop.
 
@@ -341,6 +342,10 @@ class StreamClient(BaseRedisClient):
             should_stop: Optional callback to determine when to stop
             block_ms: Milliseconds to block waiting for new events
             count: Maximum number of events to read per batch
+            on_idle: Optional async callback invoked when XREAD returns no
+                events (i.e. the block timeout expired with nothing new).
+                Useful for external checks such as cancellation detection.
+                May raise to abort the stream.
 
         Yields:
             Deserialized event data dictionaries
@@ -358,8 +363,10 @@ class StreamClient(BaseRedisClient):
                 # Read batch of events from stream
                 result = await client.xread({stream_id: current_id}, count=count, block=block_ms)
 
-                # If no events returned, continue waiting
+                # If no events returned, run idle callback and continue waiting
                 if not result:
+                    if on_idle is not None:
+                        await on_idle()
                     await asyncio.sleep(0)
                     continue
 
@@ -397,6 +404,7 @@ class StreamClient(BaseRedisClient):
         should_stop: Callable[[dict[str, Any]], bool] | None = None,
         block_ms: int = 1000,
         count: int = 100,
+        on_idle: Callable[[], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Read events from a stream as an async generator.
 
@@ -405,6 +413,7 @@ class StreamClient(BaseRedisClient):
         - Manual: caller can break from loop at any time
         - Conditional: provide should_stop function for automatic termination
         - External: use asyncio.Event or other signaling mechanisms
+        - Idle check: provide on_idle callback for checks between empty reads
 
         Position can be specified in two mutually exclusive ways:
         - start_id: Explicit stream position (honored first)
@@ -424,6 +433,8 @@ class StreamClient(BaseRedisClient):
                         Called with each event dict, stops when returns True.
             block_ms: Milliseconds to block waiting for new events (default 1000)
             count: Maximum number of events to read per batch (default 100)
+            on_idle: Optional async callback invoked each time XREAD returns no
+                events. May raise to abort the stream.
 
         Yields:
             Dict[str, Any]: Deserialized event data dictionaries
@@ -471,7 +482,7 @@ class StreamClient(BaseRedisClient):
         current_id = await self._determine_start_position(stream_id, start_id, replay)
 
         # Read and yield events from stream
-        async for event in self._read_event_stream(stream_id, current_id, should_stop, block_ms, count):
+        async for event in self._read_event_stream(stream_id, current_id, should_stop, block_ms, count, on_idle):
             yield event
 
     async def info(self, stream_id: str) -> dict[str, Any]:

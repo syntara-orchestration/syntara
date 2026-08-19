@@ -5,7 +5,7 @@ Provides a template method pattern for implementing WebSocket streaming handlers
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -115,6 +115,27 @@ class BaseWebSocketStreamingHandler(ABC):
         """
 
     # ============ Optional Hooks (Can Override) ============
+
+    def get_on_idle(
+        self,
+        session_state: dict[str, Any],
+        client: StreamClient,
+    ) -> Callable[[], Awaitable[None]] | None:
+        """Return an async callback invoked when XREAD returns no events.
+
+        Override to perform periodic checks (e.g. cancellation detection)
+        during idle periods of the event stream.  The callback may raise
+        to abort streaming.
+
+        Args:
+            session_state: Session state dict from create_session_state
+            client: The StreamClient used for the event stream
+
+        Returns:
+            Async callable or None (default)
+
+        """
+        return None
 
     async def wait_for_stream_ready(
         self, stream_id: str, session_state: dict[str, Any]
@@ -296,6 +317,7 @@ class BaseWebSocketStreamingHandler(ABC):
             # Step 4: Stream events to client
             stop_condition = self.get_stop_condition(session_state)
             async with StreamClient() as client:
+                on_idle = self.get_on_idle(session_state, client)
                 logger.info("Starting event stream", connection_id=conn_id)
                 async for event in client.events(
                     stream_id=stream_id,
@@ -304,6 +326,7 @@ class BaseWebSocketStreamingHandler(ABC):
                     should_stop=stop_condition,
                     block_ms=1000,
                     count=10,
+                    on_idle=on_idle,
                 ):
                     # Send event to WebSocket client
                     await websocket.send_json(event)

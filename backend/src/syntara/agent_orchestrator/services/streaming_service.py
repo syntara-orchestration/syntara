@@ -3,7 +3,7 @@
 Provides WebSocket event streaming from Redis streams.
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Any, cast
 from uuid import UUID
@@ -164,6 +164,43 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
 
         """
         return str(session_state["invocation_id"])
+
+    def get_on_idle(
+        self,
+        session_state: dict[str, Any],
+        client: StreamClient,
+    ) -> Callable[[], Awaitable[None]] | None:
+        """Return cancel-key checker invoked when XREAD returns no events.
+
+        Uses the same Redis-first + DB-fallback pattern as the pre-stream
+        wait.  Raises ``InvocationCancelledStreamError`` if the invocation
+        has been cancelled, which aborts the event stream.
+
+        """
+        invocation_id: UUID = session_state["invocation_id"]
+        cancel_key = get_invocation_cancel_key(invocation_id)
+
+        async def _check_cancel_on_idle() -> None:
+            try:
+                cancelled = await client.key_exists(cancel_key)
+            except Exception:  # noqa: BLE001
+                logger.debug("Idle cancel key check failed, falling back to DB", invocation_id=invocation_id)
+                try:
+                    status = await self._check_invocation_exists(invocation_id)
+                    cancelled = status == InvocationStatus.CANCELLED
+                except StreamingValidationError:
+                    raise
+                except Exception:  # noqa: BLE001
+                    logger.debug("DB fallback also failed, will retry next idle", invocation_id=invocation_id)
+                    return
+            if cancelled:
+                logger.info("Invocation cancelled during event streaming (idle check)", invocation_id=invocation_id)
+                raise InvocationCancelledStreamError(
+                    resource_id=str(invocation_id),
+                    resource_type="invocation",
+                )
+
+        return _check_cancel_on_idle
 
     async def wait_for_stream_ready(self, stream_id: str, session_state: dict[str, Any]) -> None:
         """Wait for invocation stream to be created.
