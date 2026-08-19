@@ -45,6 +45,12 @@ from tests.unit.api.compliance.endpoint_discovery import (
 if TYPE_CHECKING:
     from tests.unit.api.compliance.endpoint_discovery import EndpointInfo
 
+_OPTIONAL_OPS = {FilterOperator.IN.value, FilterOperator.ISNULL.value}
+_STRING_OPS = {op.value for op in FilterOperator} - _OPTIONAL_OPS
+_COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS.value, FilterOperator.STARTS_WITH.value}
+_EQ_ONLY = {FilterOperator.EQ.value}
+_TYPE_MAP: dict[str, set[str]] = {"datetime": _COMPARISON_OPS, "eq_only": _EQ_ONLY, "string": _STRING_OPS}
+
 
 @pytest.mark.unit
 @pytest.mark.compliance
@@ -193,26 +199,22 @@ class TestListEndpointCompliance:
 
     @staticmethod
     def _infer_required_operators(schema: dict[str, Any]) -> set[str]:
-        """Infer minimum required filter operators from a parameter's schema type."""
-        all_ops = {op.value for op in FilterOperator}
-        comparison_ops = all_ops - {
-            FilterOperator.CONTAINS.value,
-            FilterOperator.STARTS_WITH.value,
-        }
-        eq_only = {FilterOperator.EQ.value}
-        type_map = {"datetime": comparison_ops, "eq_only": eq_only, "string": all_ops}
+        """Infer minimum required filter operators from a parameter's schema type.
 
+        Optional operators (in, isnull) are not included in the minimum set —
+        endpoints may declare them but are not required to.
+        """
         classification = TestListEndpointCompliance._classify_schema(schema)
         if classification is not None:
-            return type_map[classification]
+            return _TYPE_MAP[classification]
 
         for variant in schema.get("anyOf", []):
             if isinstance(variant, dict):
                 classification = TestListEndpointCompliance._classify_schema(variant)
                 if classification is not None:
-                    return type_map[classification]
+                    return _TYPE_MAP[classification]
 
-        return eq_only
+        return _EQ_ONLY
 
     def _check_filter_operators(
         self,

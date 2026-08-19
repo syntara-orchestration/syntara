@@ -32,6 +32,7 @@
     "syntara/core/tls/certs.py": "Imported by scripts/generate_local_certs.py and tests/helpers/tls.py — both outside src/",
     "syntara/files/health.py": "File storage health check — imported by files/router.py for GET /files/storage_status and by api/main.py for startup validation; pyan3 does not trace either edge",
     "syntara/files/workers/file_cleanup.py": "Background worker — invoked via scheduled task, not direct import",
-    "syntara/authz/_rego_runtime.py": "Isolated regopy runtime — imported by evaluator.py; kept separate to avoid C extension memory leak"
+    "syntara/authz/_rego_runtime.py": "Isolated regopy runtime — imported by evaluator.py; kept separate to avoid C extension memory leak",
+    "syntara/core/openapi/filterable.py": "FilterableModel factory — wired into routers via Depends() in stacked PR 3/3"
   }
 }
