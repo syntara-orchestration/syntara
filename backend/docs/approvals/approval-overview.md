@@ -279,7 +279,7 @@ The `ApprovalRequest` model stores all data for an approval gate:
 | `project_id` | UUID | Project this approval belongs to (denormalized from execution) |
 | `name` | str | Human-readable name for the approval request |
 | `execution_id` | UUID | Parent workflow execution ID (soft reference) |
-| `approval_node_id` | str | Activity ID from workflow definition |
+| `approval_node_id` | str | Activity ID from workflow definition. Inside a loop this is `{node_id}_iter_{n}` so each iteration is unique. |
 | `status` | ApprovalRequestStatus | Current approval status (pending/approved/rejected/expired/cancelled) |
 | `timeout_at` | datetime or None | When this request expires |
 | `next_step_approved` | dict | First activity that executes if approved (ActivitySummary JSON) |
@@ -301,7 +301,7 @@ The `ApprovalRequest` model stores all data for an approval gate:
 
 When a workflow execution reaches an approval node, the workflow engine creates an `ApprovalRequest`:
 
-1. **Validate uniqueness**: Ensures no approval already exists for this `(execution_id, approval_node_id)` pair
+1. **Validate uniqueness**: Ensures no approval already exists for this `(execution_id, approval_node_id)` pair. When the approval node is inside a loop body, `approval_node_id` is `{canvas_node_id}_iter_{index}` so each iteration can create its own request.
 2. **Insert approval record**: Creates the `ApprovalRequest` with status=`pending`
 3. **Populate approver lists**: Links authorized users and groups via junction tables
 4. **Commit transaction**: All inserts succeed or fail atomically

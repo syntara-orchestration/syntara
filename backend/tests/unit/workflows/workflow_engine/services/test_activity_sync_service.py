@@ -525,6 +525,39 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
 
+    def test_process_activity_scheduled_approval_iter_suffix_is_not_loop_control(self) -> None:
+        """Approval body nodes with _iter_N suffix are iterations, not loop control."""
+        self.metadata.activity_definitions_map["approval-node"] = {"id": "approval-node", "type": NodeType.APPROVAL}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=6,
+            activity_id="approval-node_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[6]
+        assert update["activity_id"] == "approval-node"
+        assert update["_is_loop_iteration"] is True
+        assert update["_is_loop_control"] is False
+        assert update["iteration"] == 1
+
+    def test_process_activity_scheduled_loop_type_iter_suffix_is_loop_control(self) -> None:
+        """A LOOP-typed node with _iter_N suffix is still classified as loop control."""
+        self.metadata.activity_definitions_map["loop-node"] = {"id": "loop-node", "type": NodeType.LOOP}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=7,
+            activity_id="loop-node_iter_2",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[7]
+        assert update["activity_id"] == "loop-node"
+        assert update["_is_loop_control"] is True
+        assert update["iteration"] == 2
+
     @pytest.mark.parametrize(
         ("attempt", "expected_retry_count", "expected_status"),
         [

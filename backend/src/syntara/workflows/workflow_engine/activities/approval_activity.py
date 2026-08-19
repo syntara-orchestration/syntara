@@ -28,6 +28,16 @@ from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
 logger = structlog.stdlib.get_logger(__name__)
 
 
+def _is_approval_for_node(stored_node_id: str, node_id: str) -> bool:
+    """Return True if ``stored_node_id`` is this canvas node, including loop iterations.
+
+    Loop-body approvals store ``{node_id}_iter_{n}`` as ``approval_node_id``.
+    Exact match covers a specific iteration; the ``_iter_`` prefix match covers
+    expire-by-canvas-id.
+    """
+    return stored_node_id == node_id or stored_node_id.startswith(f"{node_id}_iter_")
+
+
 class ApprovalActivityError(ActivityExecutionError):
     """Base exception for approval activity errors."""
 
@@ -148,7 +158,7 @@ async def _batch_update_approvals(
         ) as client:
             pending = await client.list_approvals_by_execution(UUID(execution_id), status="pending")
             if node_id:
-                pending = [a for a in pending if a.get("approval_node_id") == node_id]
+                pending = [a for a in pending if _is_approval_for_node(str(a.get("approval_node_id", "")), node_id)]
 
             if not pending:
                 logger.info("No pending approvals to %s", operation, execution_id=execution_id, node_id=node_id)

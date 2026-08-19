@@ -472,6 +472,14 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByText('Production Deployment Approval')).toBeInTheDocument()
   })
 
+  it('resolves approval name from activityNameMap using a loop-iteration suffix', () => {
+    const activityNameMap = new Map([['node-1', 'Production Deployment Approval']])
+    const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_2' }
+    render(<ApprovalDetailContent approval={loopApproval} activityNameMap={activityNameMap} />, { wrapper })
+
+    expect(screen.getByText('Production Deployment Approval')).toBeInTheDocument()
+  })
+
   it('uses approval.name when activityNameMap has no match', () => {
     const activityNameMap = new Map([['other-node', 'Something Else']])
     render(<ApprovalDetailContent approval={mockApproval} activityNameMap={activityNameMap} />, { wrapper })

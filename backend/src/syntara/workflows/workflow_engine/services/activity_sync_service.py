@@ -1174,6 +1174,13 @@ class ActivitySyncService:
             iteration_number = None
             has_iter_suffix = False
         is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
+        # Loop *control* nodes use `{loop_id}_iter_{n}`. Body nodes inside a loop
+        # (e.g. approval) reuse that suffix for Temporal uniqueness; they must not
+        # be classified as control or their status is held at RUNNING between
+        # iterations. Unknown type keeps the historical control heuristic so
+        # tests without a definitions map still pass.
+        activity_type = metadata.activity_definitions_map.get(base_activity_id, {}).get("type")
+        is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
         configured_timeout_seconds: float | None = None
         if attrs.start_to_close_timeout and attrs.start_to_close_timeout.seconds > 0:
             configured_timeout_seconds = attrs.start_to_close_timeout.seconds + (
@@ -1184,7 +1191,7 @@ class ActivitySyncService:
             "activity_id": base_activity_id,
             "activity_name": base_activity_id,
             "_is_loop_iteration": is_loop_iteration,
-            "_is_loop_control": has_iter_suffix,
+            "_is_loop_control": is_loop_control,
             "status": ActivityStatus.PENDING,
             "started_at": None,
             "completed_at": None,
