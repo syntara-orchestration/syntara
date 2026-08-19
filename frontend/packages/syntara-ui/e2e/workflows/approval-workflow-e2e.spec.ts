@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures'
 import { navigateToApprovalAndOpen } from '../helpers/approvals'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest, pollExecutionStatus } from '../utils/api'
+import { apiRequest, pollApprovalVisible, pollExecutionStatus } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -42,6 +42,8 @@ async function createPendingApproval(app: Page): Promise<{ workflowId: string; a
     .then(() => true)
     .catch(() => false)
   test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+
+  await pollApprovalVisible(app, approvalName)
 
   return { workflowId, approvalName }
 }

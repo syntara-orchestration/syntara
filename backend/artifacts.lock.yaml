@@ -7,8 +7,8 @@ artifacts:
   - download_url: https://github.com/microsoft/rego-cpp/archive/refs/tags/1.5.1.tar.gz
     checksum: sha256:6cc3e573e5ce7bef4c3af917dace755c515fc26428f42752750684201ee2b726
     filename: rego-cpp-1.5.1.tar.gz
-  # FetchContent dependencies pulled by rego-cpp's cmake build (and transitively by trieste)
   - download_url: https://github.com/mjp41/cmake_utils/archive/2bf98b5773ea7282197c823e205547d8c2e323c0.tar.gz
+    # FetchContent dependencies pulled by rego-cpp's cmake build (and transitively by trieste)
     checksum: sha256:c1174ac4ff41d3b68ea7b2d13b5464a61c8ea6869b7a003d07da67ac462c4032
     filename: cmake_utils.tar.gz
   - download_url: https://github.com/microsoft/trieste/archive/0920efeecaa0c56c558f5a5c7a0da865595a43b8.tar.gz

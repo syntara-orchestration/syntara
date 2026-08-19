@@ -49,14 +49,14 @@ jobs:
             exit 1
           fi
 
-      # Checks out GitHub's own precomputed test-merge-commit (this branch merged into its
-      # base) rather than the raw branch head. Baselines should match the UI as it will look
-      # after merge: if we generated them from the raw branch only, pages also touched on
-      # the base would drift the next time weekly cron or a follow-up /update-screenshots
-      # ran against the merged tree. If the PR has a real merge conflict, this ref won't
-      # exist and the checkout step below fails with a clear error instead of silently
-      # testing stale code.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        # Checks out GitHub's own precomputed test-merge-commit (this branch merged into its
+        # testing stale code.
+        # exist and the checkout step below fails with a clear error instead of silently
+        # ran against the merged tree. If the PR has a real merge conflict, this ref won't
+        # the base would drift the next time weekly cron or a follow-up /update-screenshots
+        # after merge: if we generated them from the raw branch only, pages also touched on
+        # base) rather than the raw branch head. Baselines should match the UI as it will look
         id: checkout
         continue-on-error: true
         with:

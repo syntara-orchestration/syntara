@@ -241,6 +241,7 @@ def auditor_client(syntara_base_url: str, syntara_api: SyntaraApiRegistry) -> Au
             email="e2e-auditor@example.com",
             first_name="E2E Auditor",
             password=password,
+            group_names=[],
         ),
     )
     if resp.status_code not in (HTTPStatus.CREATED, HTTPStatus.CONFLICT):

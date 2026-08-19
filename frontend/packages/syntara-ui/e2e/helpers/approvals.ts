@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, toAppUrl } from '../fixtures'
+import { pollApprovalVisible } from '../utils/api'
 
 /**
  * Waits for the approval review panel to be visible.
@@ -28,6 +29,10 @@ export async function waitForApprovalPanel(app: Page, timeout = 15_000): Promise
  * // Now in execution detail with approval panel open
  */
 export async function navigateToApprovalAndOpen(app: Page, approvalName: string): Promise<void> {
+  // Guard against the race between execution reaching "paused" and the approval record
+  // becoming queryable in the listing API (the two are slightly asynchronous on the backend).
+  await pollApprovalVisible(app, approvalName)
+
   await app.goto(toAppUrl('/approvals'))
   await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
 
