@@ -23,13 +23,18 @@ const useWebServer = !isSkipWebServerForPlaywrightTests()
  */
 export const VISUAL_REGRESSION_CLOCK = '2026-06-15T10:00:00Z'
 
+// Disable retries on PR runs to cut Currents.dev recording costs in half.
+// Merge queue still retries (safety net before merge).
+const isPullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request'
+const shouldRetry = process.env.CI && !isPullRequest
+
 export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
   testIgnore: [...(useWebServer ? [] : ['**/visual-regression/**']), '**/credential-types.spec.ts'],
   fullyParallel: true,
   workers: process.env.CI ? 3 : undefined,
-  retries: process.env.CI ? 1 : 0,
+  retries: shouldRetry ? 1 : 0,
   timeout: 60_000,
   expect: {
     timeout: 10_000,
