@@ -5,16 +5,18 @@ Tests approval request creation via the Approvals API client.
 
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
 from syntara.workflows.workflow_engine.activities.approval_activity import (
     ApprovalActivityError,
     create_approval_request_activity,
+    fail_detached_approval_activity,
 )
 from tests.fixtures.temporal import CompleteAsyncError
 
@@ -290,3 +292,65 @@ async def test_create_approval_request_missing_project_id(
             project_id="",
         )
     assert exc_info.value.type == "ConfigError"
+
+
+SYNC_SERVICE_PATH = "syntara.workflows.workflow_engine.activities.approval_activity.get_activity_sync_service"
+
+
+@pytest.mark.asyncio
+async def test_fail_detached_approval_activity_fails_via_handle() -> None:
+    """Fails the async APPROVAL activity via the async activity handle."""
+    mock_handle = AsyncMock()
+    mock_client = MagicMock()
+    mock_client.get_async_activity_handle.return_value = mock_handle
+
+    mock_service = MagicMock()
+    mock_service.temporal_client = mock_client
+
+    with patch(SYNC_SERVICE_PATH, return_value=mock_service):
+        await fail_detached_approval_activity("wf-123", "run-456", "approval_node")
+
+    mock_client.get_async_activity_handle.assert_called_once_with(
+        workflow_id="wf-123",
+        run_id="run-456",
+        activity_id="approval_node",
+    )
+    mock_handle.fail.assert_called_once()
+    assert mock_handle.fail.call_args.args[0].type == "ApprovalExpired"
+
+
+@pytest.mark.asyncio
+async def test_fail_detached_approval_activity_already_resolved_is_swallowed() -> None:
+    """Already-completed/not-found activities are treated as an idempotent no-op."""
+    mock_handle = AsyncMock()
+    mock_handle.fail.side_effect = RPCError("activity not found", RPCStatusCode.NOT_FOUND, b"")
+    mock_client = MagicMock()
+    mock_client.get_async_activity_handle.return_value = mock_handle
+
+    mock_service = MagicMock()
+    mock_service.temporal_client = mock_client
+
+    with patch(SYNC_SERVICE_PATH, return_value=mock_service):
+        await fail_detached_approval_activity("wf-123", "run-456", "approval_node")
+
+
+@pytest.mark.asyncio
+async def test_fail_detached_approval_activity_unexpected_error_propagates() -> None:
+    """Unexpected RPC errors are re-raised rather than swallowed."""
+    mock_handle = AsyncMock()
+    mock_handle.fail.side_effect = RPCError("internal server error", RPCStatusCode.INTERNAL, b"")
+    mock_client = MagicMock()
+    mock_client.get_async_activity_handle.return_value = mock_handle
+
+    mock_service = MagicMock()
+    mock_service.temporal_client = mock_client
+
+    with patch(SYNC_SERVICE_PATH, return_value=mock_service), pytest.raises(RPCError, match="internal server error"):
+        await fail_detached_approval_activity("wf-123", "run-456", "approval_node")
+
+
+@pytest.mark.asyncio
+async def test_fail_detached_approval_activity_no_sync_service_is_noop() -> None:
+    """No-op (does not raise) when the activity sync service is unavailable."""
+    with patch(SYNC_SERVICE_PATH, return_value=None):
+        await fail_detached_approval_activity("wf-123", "run-456", "approval_node")
