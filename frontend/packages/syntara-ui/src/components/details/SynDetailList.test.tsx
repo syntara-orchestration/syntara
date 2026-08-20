@@ -1,14 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { NxDetailList } from './NxDetailList'
+import { SynDetailList } from './SynDetailList'
 
-describe('NxDetailList', () => {
+describe('SynDetailList', () => {
   it('renders children', () => {
     render(
-      <NxDetailList>
+      <SynDetailList>
         <div data-testid="child">Child content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('child')).toBeInTheDocument()
@@ -17,9 +17,9 @@ describe('NxDetailList', () => {
 
   it('renders as a PatternFly DescriptionList', () => {
     render(
-      <NxDetailList>
+      <SynDetailList>
         <div>Content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('description-list')).toBeInTheDocument()
@@ -27,9 +27,9 @@ describe('NxDetailList', () => {
 
   it('applies compact modifier', () => {
     render(
-      <NxDetailList>
+      <SynDetailList>
         <div>Content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('description-list')).toHaveClass('pf-m-compact')
@@ -37,9 +37,9 @@ describe('NxDetailList', () => {
 
   it('applies details class', () => {
     render(
-      <NxDetailList>
+      <SynDetailList>
         <div>Content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('description-list')).toHaveClass('details')
@@ -47,11 +47,11 @@ describe('NxDetailList', () => {
 
   it('renders multiple children', () => {
     render(
-      <NxDetailList>
+      <SynDetailList>
         <div data-testid="child-1">First</div>
         <div data-testid="child-2">Second</div>
         <div data-testid="child-3">Third</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('child-1')).toBeInTheDocument()
@@ -61,9 +61,9 @@ describe('NxDetailList', () => {
 
   it('forwards data-testid to the description list', () => {
     render(
-      <NxDetailList data-testid="my-details">
+      <SynDetailList data-testid="my-details">
         <div>Content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('my-details')).toBeInTheDocument()
@@ -73,18 +73,18 @@ describe('NxDetailList', () => {
     // Stable reference for children ensures React Compiler's memoization cache hits
     // on the second render, exercising the cache-check branch conditions.
     const child = <div>Stable content</div>
-    const { rerender } = render(<NxDetailList data-testid="stable">{child}</NxDetailList>)
+    const { rerender } = render(<SynDetailList data-testid="stable">{child}</SynDetailList>)
 
-    rerender(<NxDetailList data-testid="stable">{child}</NxDetailList>)
+    rerender(<SynDetailList data-testid="stable">{child}</SynDetailList>)
 
     expect(screen.getByTestId('stable')).toBeInTheDocument()
   })
 
   it('applies horizontal layout when isHorizontal is true', () => {
     render(
-      <NxDetailList isHorizontal data-testid="horizontal-details">
+      <SynDetailList isHorizontal data-testid="horizontal-details">
         <div>Content</div>
-      </NxDetailList>
+      </SynDetailList>
     )
 
     expect(screen.getByTestId('horizontal-details')).toHaveClass('pf-m-horizontal')

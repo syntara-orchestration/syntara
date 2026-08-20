@@ -39,7 +39,7 @@ When MCP servers are available in the session, use them so you do not invent pro
 4. Before creating or editing any `.stories.*` file, call `get-storybook-story-instructions` for current conventions.
 5. After any component or story change, call `preview-stories` and **always include every returned preview URL in your response**.
 6. If `get-documentation` doesn't show the variant you need, call `get-documentation-for-story` for that specific story.
-7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-nxconfirmationdialog"` — the `NxConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
+7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-nxconfirmationdialog"` — the `SynConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
 
 ### Shell Command Rules
 
@@ -98,7 +98,7 @@ The items below cover patterns ESLint **cannot** catch:
 3. **`SynErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
 4. **Zod + react-hook-form** -- never manual `useState` per field; use `zodResolver`
 5. **Reset `defaultValues` in edit modals** -- `reset()` in `useEffect` keyed on `[isOpen, item]`
-6. **Extract shared patterns** -- use `NxConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
+6. **Extract shared patterns** -- use `SynConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
 7. **UI PRs must include screenshots** or screen recordings showing key states
 8. **New API endpoints need mock handlers** in `packages/syntara-mock-api/src/handlers.ts`
 9. **Use enum constants** from `@syntara/contracts` -- never string literals for discriminators
@@ -236,7 +236,7 @@ For how the UI is structured, see these comprehensive guides:
 | **PR sizing / stacking**            | [`.github/pull_request_template.md`](../.github/pull_request_template.md) -- PR template and guidelines                                                                                                                                                                                                 |
 | **List page with pagination**       | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useCursorPagination` pattern                                                                                                                                                            |
 | **Full list (dropdowns, settings)** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- section 22: `fetchAllPages` + `useAll*` hooks (not `limit: 100` single queries)                                                                                                          |
-| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `NxConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-nxconfirmationdialog"` |
+| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `SynConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-nxconfirmationdialog"` |
 | **Sonar S6478 / PF `toggle` props** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- nested components and PatternFly render props                                                                                                                                            |
 | **Dialog state management**         | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDialogState` hook                                                                                                                                                                    |
 | **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                          |
@@ -277,7 +277,7 @@ Use **`FilterBar` + `useCursorPagination`** (not a hand-rolled cursor/`useFilter
 
 1. **Define fields** in a colocated `*Filters.ts` / `*FilterDefinitions.ts` using `FilterFieldDefinition` + `FilterTypeEnum` / `FilterOperatorEnum` from `src/types/filters.ts`.
 2. **Wire pagination + filters + sort** with `useCursorPagination` — it owns URL-synced filters, sort (`defaultSort` / `columns`), cursor reset, and `queryParams`.
-3. **Render** `FilterBar` (or `NxListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
+3. **Render** `FilterBar` (or `SynListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
 4. **Query** with the typed client: `client.useQuery('get', '/resource', { params: { query: queryParams } })`.
 5. **Empty filtered results** → `SynEmptyStateFilter` with clear-all; unfiltered empty → `SynEmptyStateNoData`.
 

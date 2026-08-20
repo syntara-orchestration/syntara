@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxCodeBlock } from './NxCodeBlock'
+import { SynCodeBlock } from './SynCodeBlock'
 
 const SCRIPT = `#!/bin/bash
 set -euo pipefail
@@ -36,8 +36,8 @@ const LARGE_LOG = Array.from(
     `[2024-11-15 14:32:${String(i).padStart(2, '0')}] INFO  step-${String(i + 1).padStart(2, '0')}: ${LOG_LINES[i % LOG_LINES.length]}`
 ).join('\n')
 
-const meta: Meta<typeof NxCodeBlock> = {
-  component: NxCodeBlock,
+const meta: Meta<typeof SynCodeBlock> = {
+  component: SynCodeBlock,
 }
 export default meta
 

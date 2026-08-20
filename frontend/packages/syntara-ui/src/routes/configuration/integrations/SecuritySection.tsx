@@ -2,7 +2,7 @@ import { DescriptionList, StackItem, Title } from '@patternfly/react-core'
 import { RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
 
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { SynLabel } from '../../../components/labels/SynLabel'
 
 import styles from './IntegrationDetail.module.css'
@@ -20,7 +20,7 @@ export function SecuritySection({ configuration }: Readonly<{ configuration: Int
         Security
       </Title>
       <DescriptionList isHorizontal className={styles.securityDetails}>
-        <NxDetail label="HTTP connections">
+        <SynDetail label="HTTP connections">
           {configuration.allow_http ? (
             <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
               HTTP allowed
@@ -28,8 +28,8 @@ export function SecuritySection({ configuration }: Readonly<{ configuration: Int
           ) : (
             'HTTPS only'
           )}
-        </NxDetail>
-        <NxDetail label="TLS certificate verification">
+        </SynDetail>
+        <SynDetail label="TLS certificate verification">
           {configuration.insecure_skip_tls_verify ? (
             <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
               TLS verification disabled
@@ -37,7 +37,7 @@ export function SecuritySection({ configuration }: Readonly<{ configuration: Int
           ) : (
             'Enabled'
           )}
-        </NxDetail>
+        </SynDetail>
       </DescriptionList>
     </StackItem>
   )

@@ -9,7 +9,7 @@ import { detachPromise } from '../../utils/detachPromise'
 type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children'> & {
   /**
    * Tab children (`<Tab>` elements). Typed as `ReactNode` to accept pre-cloned Tab arrays from
-   * callers like `NxListPanelTabs`; cast to PF's `TabsChild` when forwarded to `<Tabs>`.
+   * callers like `SynListPanelTabs`; cast to PF's `TabsChild` when forwarded to `<Tabs>`.
    */
   children?: React.ReactNode
   /** Base path used to derive the active tab from the URL (e.g. `/system-administration/settings`). */
@@ -41,12 +41,12 @@ type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children
    * **TanStack Router migration:** pass `renderPanel={() => <Outlet />}` once routes are nested.
    *
    * Note: stubs are also skipped for Tabs whose `tabContentId` was pre-set by the caller (e.g.
-   * `NxListPanelTabs` which wires panels to `NxListPanelView` via context).
+   * `SynListPanelTabs` which wires panels to `SynListPanelView` via context).
    */
   renderPanel?: (activeTab: string) => React.ReactNode
 }
 
-export function NxUrlTabs({
+export function SynUrlTabs({
   basePath,
   defaultTab = 'details',
   validTabs,
@@ -97,7 +97,7 @@ export function NxUrlTabs({
   // Classify each Tab child. Tabs that already have their own panel content (children prop set) let
   // PF manage panel rendering naturally — no injection needed. Tabs that don't have own content
   // (URL-routing pattern) need external panel stubs, UNLESS they already have tabContentId set by
-  // the caller (e.g. NxListPanelTabs wiring panels via context).
+  // the caller (e.g. SynListPanelTabs wiring panels via context).
   type TabEntry = { key: string; needsStub: boolean }
   const tabEntries: TabEntry[] = React.Children.toArray(children)
     .filter(React.isValidElement)
@@ -139,8 +139,8 @@ export function NxUrlTabs({
       {stubKeys.map((key) => (
         // Standalone panel element satisfying PF's generated aria-controls for childless Tabs.
         // aria-label uses the eventKey as a fallback accessible name; callers needing richer labels
-        // should pass renderPanel (which provides the full panel) or use NxListPanelView with
-        // tabKey/tabLabel for NxListPanel compound usage.
+        // should pass renderPanel (which provides the full panel) or use SynListPanelView with
+        // tabKey/tabLabel for SynListPanel compound usage.
         <section
           key={key}
           id={`${uid}-panel-${key}`}

@@ -19,7 +19,7 @@ import { breadcrumbsUserDetail } from '../../../app/breadcrumbBuilders'
 import { authClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
@@ -234,7 +234,7 @@ function UserDetailTabBar({
   roleAssignmentCount: number
 }>) {
   return (
-    <NxListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="User details">
+    <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="User details">
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
       {validTabs.includes('groups') && (
         <Tab
@@ -272,7 +272,7 @@ function UserDetailTabBar({
       {validTabs.includes('check-access') && (
         <Tab eventKey="check-access" title={<TabTitleText>Check my access</TabTitleText>} />
       )}
-    </NxListPanelTabs>
+    </SynListPanelTabs>
   )
 }
 
@@ -427,7 +427,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
         }
       />
       <SynPageBody>
-        <NxListPanel>
+        <SynListPanel>
           <UserDetailTabBar
             basePath={basePath}
             validTabs={validTabs}
@@ -444,7 +444,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
             identitiesData={identitiesData}
             isOwnProfile={isOwnProfile}
           />
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
 
       <UserDetailConfirmationDialogs

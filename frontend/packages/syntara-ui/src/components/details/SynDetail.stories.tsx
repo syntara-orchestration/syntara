@@ -1,10 +1,10 @@
 import { Label } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxDetail } from './NxDetail'
+import { SynDetail } from './SynDetail'
 
-const meta: Meta<typeof NxDetail> = {
-  component: NxDetail,
+const meta: Meta<typeof SynDetail> = {
+  component: SynDetail,
 }
 export default meta
 
