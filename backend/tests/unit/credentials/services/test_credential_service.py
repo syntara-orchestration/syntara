@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from syntara.authz.exceptions import BuiltinProtectionError
 from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
 from syntara.credentials.exceptions import (
+    CredentialInUseError,
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
@@ -624,6 +625,49 @@ class TestDeleteCredential:
             assert "still referenced by workflows" in mock_logger.warning.call_args[0][0]
 
         mock_session.delete.assert_awaited_once_with(credential)
+
+    @pytest.mark.asyncio
+    async def test_raises_credential_in_use_when_integrations_reference_it(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+    ) -> None:
+        """AAP-87778: delete must be blocked (not silently nulled) while integrations reference it."""
+        credential = Credential(
+            id=uuid4(),
+            name="In-Use Cred",
+            credential_type_id=uuid4(),
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        with (
+            patch.object(service, "get_integration_counts", new_callable=AsyncMock, return_value={credential.id: 2}),
+            patch.object(
+                service,
+                "_get_referencing_integration_names",
+                new_callable=AsyncMock,
+                return_value=["Integration A", "Integration B"],
+            ),
+        ):
+            with pytest.raises(CredentialInUseError) as exc_info:
+                await service.delete_credential(credential.id)
+
+            assert exc_info.value.total_count == 2
+            assert exc_info.value.integration_names == ["Integration A", "Integration B"]
+            assert "Integration A" in exc_info.value.message
+
+        mock_secret_service.delete_secret.assert_not_called()
+        mock_session.delete.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_raises_when_project_is_builtin(
