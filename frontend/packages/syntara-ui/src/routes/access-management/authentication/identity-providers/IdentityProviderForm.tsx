@@ -1,12 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  EmptyState,
-  EmptyStateActions,
-  EmptyStateBody,
-  EmptyStateFooter,
-  StackItem,
-} from '@patternfly/react-core'
+import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { type IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
@@ -80,7 +73,7 @@ function groupMappingFields(formData: IdentityProviderFormData) {
     group_jmespath_expression: formData.groupMapping.jmespathExpression,
     group_mapping_entries: (formData.groupMapping.entries ?? []).map((e) => ({
       idp_group_value: e.idpGroupValue,
-      mapped_group_id: e.nexusGroupId,
+      mapped_group_id: e.mappedGroupId,
     })),
   }
 }
@@ -156,7 +149,7 @@ function toGroupMappingValues(config?: ProviderConfig): IdentityProviderFormData
     jmespathExpression: config?.group_jmespath_expression ?? 'groups[*]',
     entries: (entries ?? []).map((e) => ({
       idpGroupValue: e.idp_group_value ?? '',
-      nexusGroupId: e.mapped_group_id ?? '',
+      mappedGroupId: e.mapped_group_id ?? '',
     })),
   }
 }
@@ -238,7 +231,7 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
         title="Edit OIDC provider"
         breadcrumbs={breadcrumbsIdentityProviderFormLoading('Edit OIDC provider')}
       />
-      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+      <NxPageBody>
         <NxPanel isFullHeight>
           <EmptyState headingLevel="h2" titleText="Identity provider not found" icon={RhUiSearchIcon} isFullHeight>
             <EmptyStateBody>
@@ -256,7 +249,7 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
             </EmptyStateFooter>
           </EmptyState>
         </NxPanel>
-      </StackItem>
+      </NxPageBody>
     </NxPage>
   )
 }

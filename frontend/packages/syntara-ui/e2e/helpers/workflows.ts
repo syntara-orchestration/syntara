@@ -170,6 +170,16 @@ export async function fillCodeEditor(
 ) {
   const typeInto = async (target: ReturnType<Page['locator']>) => {
     const textbox = target.getByRole('textbox', { name: label }).first()
+    const monacoSurface = target.locator('.monaco-editor').first()
+
+    // Wait for Monaco to finish async initialization — either the accessible
+    // textbox or the .monaco-editor wrapper must be present before interacting.
+    await expect(async () => {
+      const hasTextbox = await textbox.isVisible()
+      const hasMonaco = await monacoSurface.isVisible()
+      if (!hasTextbox && !hasMonaco) throw new Error('Monaco editor not ready')
+    }).toPass({ timeout: 15000, intervals: [500, 1000] })
+
     if (await textbox.isVisible()) {
       await textbox.click({ force: true })
       await page.keyboard.press('ControlOrMeta+A')
@@ -178,8 +188,6 @@ export async function fillCodeEditor(
       return
     }
 
-    const monacoSurface = target.locator('.monaco-editor').first()
-    await expect(monacoSurface).toBeVisible()
     await monacoSurface.click({ force: true })
     const usedMonacoApi = await page.evaluate((text) => {
       const w = window as unknown as Record<string, unknown>
@@ -520,6 +528,10 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
+  // Wait for the editor panel to finish closing before returning — the panel auto-closes
+  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // against the closing animation and not find the edge "Add connected step" buttons.
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
 /** Save the workflow with the given name. Waits for URL to confirm persistence. */

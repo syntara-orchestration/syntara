@@ -138,6 +138,7 @@ export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSe
         email: `${prefix}@e2e.example.com`,
         first_name: `E2E ${role}`,
         password,
+        group_names: [],
       })
       cleanupStack.push(async () => {
         await request.delete(api(`/users/${user.id}`), { headers }).catch(() => {})

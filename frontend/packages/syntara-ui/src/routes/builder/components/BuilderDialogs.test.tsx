@@ -291,7 +291,7 @@ describe('BuilderDialogs', () => {
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
 
     // Verify the preference was stored
-    expect(store['nexus-run-workflow-confirm-dismissed']).toBe('true')
+    expect(store['syntara-run-workflow-confirm-dismissed']).toBe('true')
 
     vi.unstubAllGlobals()
   })

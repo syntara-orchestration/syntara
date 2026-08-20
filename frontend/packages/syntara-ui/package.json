@@ -27,7 +27,6 @@
     "storybook:build": "storybook build --disable-telemetry"
   },
   "dependencies": {
-    "@syntara/contracts": "file:../syntara-contracts",
     "@dagrejs/dagre": "^2.0.4",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
@@ -37,6 +36,7 @@
     "@patternfly/react-code-editor": "^6.6.0",
     "@patternfly/react-core": "^6.6.0",
     "@patternfly/react-table": "^6.6.0",
+    "@syntara/contracts": "file:../syntara-contracts",
     "@tanstack/react-query": "^5.100.11",
     "@tanstack/react-router": "^1.170.15",
     "@xyflow/react": "^12.10.2",
@@ -69,6 +69,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/jmespath": "^0.15.2",
     "@types/node": "^25.9.5",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
@@ -93,6 +94,7 @@
     "jsdom": "^29.1.1",
     "knip": "^6.14.2",
     "nyc": "^18.0.0",
+    "pngjs": "^7.0.0",
     "prettier": "3.8.4",
     "storybook": "^10.4.6",
     "tsx": "^4.22.3",

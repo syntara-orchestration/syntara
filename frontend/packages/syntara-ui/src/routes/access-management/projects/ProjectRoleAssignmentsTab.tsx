@@ -1,4 +1,4 @@
-import { Button, Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
@@ -112,9 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <Label key={name} isCompact>
-                        {name}
-                      </Label>
+                      <NxLabel key={name}>{name}</NxLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -170,8 +168,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
     },
   })
 
-  const data = query.data
-  const assignments = useMemo(() => data?.resources ?? [], [data])
+  const assignments = useMemo(() => query.data?.resources ?? [], [query.data])
 
   useCursorReset(assignments.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
 
@@ -179,6 +176,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
     refetch()
+    detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
   }, [queryClient, refetch])
 
   const assignedRolesByPrincipal = useMemo(() => {
@@ -305,7 +303,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(data)}>
+          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
             <RoleAssignmentsTable
               assignments={assignments}
               getSortParams={getSortParams}

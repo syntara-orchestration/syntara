@@ -101,5 +101,5 @@ class ServiceAccountCredentialListResponse(ResourcesResponse[ServiceAccountCrede
     )
     max_lifetime_days: int = Field(
         default=180,
-        description="Maximum credential lifetime in days (-1 for unlimited)",
+        description="Maximum credential lifetime in days (0 for unlimited)",
     )

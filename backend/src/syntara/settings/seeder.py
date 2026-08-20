@@ -26,6 +26,7 @@ import sqlalchemy as sa
 import structlog
 from sqlalchemy.dialects.postgresql import insert
 
+from syntara.core.config.base import get_settings
 from syntara.settings.catalog import CATEGORY_CATALOG, SETTINGS_CATALOG
 from syntara.settings.models.runtime_setting import RuntimeSetting, SettingValueType
 from syntara.settings.models.setting_category import SettingCategoryModel
@@ -164,6 +165,13 @@ def _validate_catalog() -> None:
     _check_depends_on_cycles(catalog_by_key)
 
 
+def _resolve_default(value: object) -> object:
+    """Resolve ``{product_name}`` placeholders in string defaults."""
+    if isinstance(value, str) and "{product_name}" in value:
+        return value.replace("{product_name}", get_settings().product_name)
+    return value
+
+
 async def _upsert_settings(session: AsyncSession) -> tuple[int, int]:
     """Upsert settings catalog entries. Returns ``(inserts, updates)``."""
     if not SETTINGS_CATALOG:
@@ -182,7 +190,7 @@ async def _upsert_settings(session: AsyncSession) -> tuple[int, int]:
             "key": defn.key,
             "category": defn.category,
             "value_type": defn.value_type,
-            "default_value": defn.default_value,
+            "default_value": _resolve_default(defn.default_value),
             "value": None,
             "group": defn.group,
             "requires_restart": defn.requires_restart,

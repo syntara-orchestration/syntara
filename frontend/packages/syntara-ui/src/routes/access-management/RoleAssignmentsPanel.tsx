@@ -26,6 +26,7 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
+import { roleAssignmentsQueryKey } from '../access/useAlreadyAssignedRoles'
 import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
 import { getProjectDetailPath } from './accessManagementPaths'
@@ -39,6 +40,7 @@ import {
   getVisibleColumns,
   sortRoleAssignmentRows,
 } from './roleAssignmentColumns'
+import styles from './RoleAssignmentsPanel.module.css'
 import { principalTypeLabel, RolePrincipalType } from './RoleAssignmentTypes'
 import type { RoleAssignmentRow } from './useRoleAssignmentData'
 import { useRoleAssignmentData } from './useRoleAssignmentData'
@@ -295,6 +297,18 @@ function TableContent({
   )
 }
 
+function ForbiddenAlert({ visible }: Readonly<{ visible: boolean }>) {
+  if (!visible) return null
+  return (
+    <StackItem>
+      <Alert variant="info" isInline title="Showing project-scoped roles only" className={styles.forbiddenAlert}>
+        System-level role assignments require administrator access. Only roles within your accessible projects are
+        shown.
+      </Alert>
+    </StackItem>
+  )
+}
+
 export function RoleAssignmentsPanel({
   principalType,
   principalId,
@@ -325,8 +339,9 @@ export function RoleAssignmentsPanel({
 
   const refetchAndInvalidateAuthz = useCallback(() => {
     invalidateAuthzCaches(queryClient)
+    detachPromise(queryClient.invalidateQueries({ queryKey: roleAssignmentsQueryKey(principalType, principalId) }))
     refetch()
-  }, [queryClient, refetch])
+  }, [queryClient, principalType, principalId, refetch])
 
   const handleFilterChange = (newFilters: FilterConfig[]) => {
     setAllFilters(newFilters)
@@ -413,19 +428,7 @@ export function RoleAssignmentsPanel({
   return (
     <>
       <NxPanelContentStack>
-        {queryForbidden && (
-          <StackItem>
-            <Alert
-              variant="info"
-              isInline
-              title="Showing project-scoped roles only"
-              style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}
-            >
-              System-level role assignments require administrator access. Only roles within your accessible projects are
-              shown.
-            </Alert>
-          </StackItem>
-        )}
+        <ForbiddenAlert visible={queryForbidden} />
 
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>

@@ -19,7 +19,7 @@ import type { RunStepDialogData, RunStepExecutionCreatedOptions } from './RunSte
 import { RunStepDialog } from './RunStepDialog'
 import { RunWorkflowModal } from './RunWorkflowModal'
 
-const RUN_CONFIRM_DISMISSED_KEY = 'nexus-run-workflow-confirm-dismissed'
+const RUN_CONFIRM_DISMISSED_KEY = 'syntara-run-workflow-confirm-dismissed'
 
 function getRunConfirmDismissed(): boolean {
   try {
@@ -50,7 +50,10 @@ type BuilderDialogsProps = Readonly<{
   triggerInputSchema?: Record<string, unknown>
   pendingImport: PendingImportData | null
   setPendingImport: (data: PendingImportData | null) => void
-  importDeps: Omit<UseBuilderImportHandlersParams, 'dispatch' | 'markDirty' | 'showSuccess' | 'showError' | 'showInfo'>
+  importDeps: Omit<
+    UseBuilderImportHandlersParams,
+    'dispatch' | 'markDirty' | 'showAlert' | 'showSuccess' | 'showError' | 'showInfo'
+  >
   runStepDialog: DialogState<RunStepDialogData>
   runStepTriggerNodeId?: string
   onRunStepExecutionCreated?: (executionId: string, options: RunStepExecutionCreatedOptions) => void
@@ -154,9 +157,9 @@ export function BuilderDialogs({
 }: BuilderDialogsProps) {
   const isDirty = useWorkflowStore((state) => state.isDirty)
   const markDirty = useWorkflowStore((state) => state.markDirty)
-  const { showSuccess, showError: showImportError, showInfo } = useAlerts()
+  const { showAlert, showSuccess, showError: showImportError, showInfo } = useAlerts()
   const { handleImportCurrent, handleImportNew, clearPendingImport } = useBuilderImportHandlers(
-    { ...importDeps, dispatch, markDirty, showSuccess, showError: showImportError, showInfo },
+    { ...importDeps, dispatch, markDirty, showAlert, showSuccess, showError: showImportError, showInfo },
     pendingImport,
     setPendingImport
   )

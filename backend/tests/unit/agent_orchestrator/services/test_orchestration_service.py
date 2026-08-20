@@ -313,6 +313,109 @@ class TestOrchestrationServiceErrorHandling:
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
 
+    @pytest.mark.asyncio
+    async def test_tool_discovery_failure_publishes_stream_error_and_failure_signal(self) -> None:
+        """Discovery/selection failures during setup must use the stream failure path.
+
+        `_setup_graph()` (and thus `_get_tools()`) runs inside the StreamClient try so
+        WebSocket clients get a terminal error and workflow failure signals fire.
+        Connection-like cause names must not be classified as retryable LLM network errors.
+        """
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+        callback_url = "http://localhost/signal/activity/1"
+        ctx = InvocationContextData.model_validate({"callback_url": callback_url})
+        discovery_error = ToolDiscoveryError("Failed to discover MCP integrations: ConnectionError")
+
+        with (
+            patch.object(
+                service,
+                "_setup_graph",
+                side_effect=discovery_error,
+            ),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(ToolDiscoveryError, match="ConnectionError"):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=ctx,
+                )
+
+            error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
+            assert len(error_calls) == 1
+            error_event = error_calls[0].args[1]
+            assert error_event["event_type"] == "error"
+            assert error_event["data"]["code"] == "TOOL_DISCOVERY_FAILED"
+            assert error_event["data"]["retryable"] is False
+            assert "LLM" not in error_event["data"]["title"]
+            mock_failure_signal.assert_awaited_once()
+            assert mock_failure_signal.await_args is not None
+            assert mock_failure_signal.await_args.args[0] == callback_url
+            assert mock_failure_signal.await_args.args[1] == invocation_id
+            assert isinstance(mock_failure_signal.await_args.args[2], ToolDiscoveryError)
+
+    @pytest.mark.asyncio
+    async def test_tool_selection_unavailable_publishes_stream_error_and_failure_signal(self) -> None:
+        """SELECTED zero-provision errors must also hit stream error + failure signal."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+        callback_url = "http://localhost/signal/activity/2"
+        ctx = InvocationContextData.model_validate({"callback_url": callback_url})
+
+        with (
+            patch.object(
+                service,
+                "_setup_graph",
+                side_effect=ToolSelectionUnavailableError("None of the requested tools"),
+            ),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(ToolSelectionUnavailableError, match="None of the requested tools"):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=ctx,
+                )
+
+            error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
+            assert len(error_calls) == 1
+            error_event = error_calls[0].args[1]
+            assert error_event["event_type"] == "error"
+            assert error_event["data"]["code"] == "TOOL_SELECTION_UNAVAILABLE"
+            assert error_event["data"]["retryable"] is False
+            mock_failure_signal.assert_awaited_once()
+            assert mock_failure_signal.await_args is not None
+            assert mock_failure_signal.await_args.args[0] == callback_url
+
 
 class TestOrchestrationServiceSessionManagement:
     """Test OrchestrationService session management for multi-turn conversations."""
@@ -682,10 +785,22 @@ class TestApplyToolSelection:
         result = service._apply_tool_selection([tool_a, tool_b, tool_c])
         assert result == [tool_a, tool_c]
 
-    def test_selected_strategy_with_no_matching_tools_returns_empty(self) -> None:
-        service = self._make_service(strategy="SELECTED", selections=["uuid-x"])
+    def test_selected_strategy_with_no_matching_tools_raises(self) -> None:
+        """SELECTED with zero provisionable tools must fail and include unavailable IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        service = self._make_service(strategy="SELECTED", selections=["uuid-z", "uuid-x"])
         tools = [self._make_tool("uuid-a"), self._make_tool("uuid-b")]
-        assert service._apply_tool_selection(tools) == []
+        with pytest.raises(ToolSelectionUnavailableError, match=r"unavailable tool IDs: \['uuid-x', 'uuid-z'\]"):
+            service._apply_tool_selection(tools)
+
+    def test_selected_strategy_empty_catalog_raises_with_all_selection_ids(self) -> None:
+        """SELECTED against an empty provisioned catalog must still surface requested IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        service = self._make_service(strategy="SELECTED", selections=["uuid-b", "uuid-a"])
+        with pytest.raises(ToolSelectionUnavailableError, match=r"unavailable tool IDs: \['uuid-a', 'uuid-b'\]"):
+            service._apply_tool_selection([])
 
     def test_selected_strategy_with_empty_selections_returns_empty(self) -> None:
         service = self._make_service(strategy="SELECTED", selections=[])
@@ -701,13 +816,18 @@ class TestApplyToolSelection:
         assert service._apply_tool_selection(tools) == [tool_with_id]
 
     def test_selected_strategy_logs_invalid_ids_and_keeps_valid_tools(self, caplog: pytest.LogCaptureFixture) -> None:
-        """T088: invalid selections are reported; valid tools still returned."""
+        """T088: invalid selections are reported via structured log; valid tools still returned."""
         tool_a = self._make_tool("uuid-a")
         service = self._make_service(strategy="SELECTED", selections=["uuid-a", "uuid-missing"])
         with caplog.at_level(logging.WARNING):
             result = service._apply_tool_selection([tool_a])
         assert result == [tool_a]
         assert any("Invalid or unavailable tool selections" in msg for msg in caplog.messages)
+        # Structured context carries the unavailable IDs (no raise on partial match)
+        assert any(
+            getattr(record, "invalid_tool_ids", None) == ["uuid-missing"] or "uuid-missing" in record.getMessage()
+            for record in caplog.records
+        )
 
     def test_selected_strategy_filters_large_tool_set_quickly(self) -> None:
         """T074: SELECTED filtering stays fast for large synchronized tool sets."""
@@ -722,3 +842,77 @@ class TestApplyToolSelection:
 
         assert len(result) == 100  # every 50th of 5000
         assert elapsed_ms < 50, f"Tool filtering took {elapsed_ms:.1f}ms; expected < 50ms"
+
+
+class TestGetToolsStrategy:
+    """Tests for OrchestrationService._get_tools strategy short-circuit and failure signaling."""
+
+    @pytest.mark.asyncio
+    async def test_none_strategy_skips_tool_retrieval(self) -> None:
+        """NONE strategy must not call ToolRetriever (avoids silent toolless runs after failure)."""
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="NONE",
+        )
+        with patch("syntara.agent_orchestrator.services.orchestration_service.ToolRetriever") as mock_retriever_cls:
+            result = await service._get_tools("session", uuid4())
+        assert result == []
+        mock_retriever_cls.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_all_strategy_propagates_discovery_failure(self) -> None:
+        """ALL strategy must surface discovery failures to fail the invocation."""
+        from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
+
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="ALL",
+        )
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve_tools = AsyncMock(side_effect=ToolDiscoveryError("discovery failed"))
+        with patch(
+            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever",
+            return_value=mock_retriever,
+        ):
+            with pytest.raises(ToolDiscoveryError, match="discovery failed"):
+                await service._get_tools("session", uuid4())
+        mock_retriever.retrieve_tools.assert_awaited_once_with(
+            tool_selection_strategy="ALL",
+            tool_selections=set(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_selected_strategy_total_soft_skip_raises_selection_unavailable(self) -> None:
+        """SELECTED total soft-skip must raise ToolSelectionUnavailableError with IDs."""
+        from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+
+        selections = ["uuid-b", "uuid-a"]
+        service = OrchestrationService(
+            MagicMock(),
+            MagicMock(),
+            tool_selection_strategy="SELECTED",
+            tool_selections=selections,
+        )
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve_tools = AsyncMock(
+            side_effect=ToolSelectionUnavailableError(
+                "None of the requested tools could be provisioned "
+                "(unavailable tool IDs: ['uuid-a', 'uuid-b']); "
+                "refusing to continue the invocation without tools"
+            )
+        )
+        with patch(
+            "syntara.agent_orchestrator.services.orchestration_service.ToolRetriever",
+            return_value=mock_retriever,
+        ):
+            with pytest.raises(
+                ToolSelectionUnavailableError,
+                match=r"unavailable tool IDs: \['uuid-a', 'uuid-b'\]",
+            ):
+                await service._get_tools("session", uuid4())
+        mock_retriever.retrieve_tools.assert_awaited_once_with(
+            tool_selection_strategy="SELECTED",
+            tool_selections={"uuid-a", "uuid-b"},
+        )

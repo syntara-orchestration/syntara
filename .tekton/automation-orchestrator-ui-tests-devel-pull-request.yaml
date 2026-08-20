@@ -39,20 +39,15 @@ spec:
   pipelineRef:
     resolver: git
     params:
-      - name: org
-        value: ansible-automation-platform
-      - name: repo
-        value: aap-konflux-pipelines
-      - name: revision
-        value: fix/ao-e2e-script-nodes-ssrf-config
-      - name: pathInRepo
-        value: pipelines/test/ao-ui-tests/0.1/pipeline.yaml
-      - name: token
-        value: github-aap-org-secret
-      - name: tokenKey
-        value: password
-      - name: scmType
-        value: github
+      - name: name
+        value: ao-ui-tests
+      - name: bundle
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:e286f96d605b9f817f19eefc75910fe8eb419b3d5073ff8810ee3cc8455ea21e
+      - name: kind
+        value: pipeline
+      - name: secret
+        value: quay-aap-ci-viewer
+    resolver: bundles
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner

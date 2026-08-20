@@ -129,7 +129,7 @@ class AuditMiddleware:
             A normalized, sanitized, and length-capped path string.
 
         """
-        # Decode percent-encoded characters so that e.g. /%68ealth → /health
+        # Decode percent-encoded characters so that e.g. /%68ealthz/live → /healthz/live
         decoded = unquote(path)
         # Normalize path traversals and redundant separators
         normalized = normpath(decoded)

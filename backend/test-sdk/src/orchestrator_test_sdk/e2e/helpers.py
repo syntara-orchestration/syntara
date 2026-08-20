@@ -21,6 +21,7 @@ from syntara_api_client.models import (
 from syntara_api_client.models.approval_request_status import ApprovalRequestStatus
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
+from syntara_api_client.types import UnexpectedResponseException
 
 if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
@@ -125,7 +126,13 @@ def wait_for_agentic_activity(
     max_polls: int = 30,
     poll_interval: int = 1,
 ) -> None:
-    """Poll until the agentic activity appears in a non-complete state."""
+    """Poll until the agentic activity is running and ready for a signal.
+
+    Agentic nodes stay in ``running`` while blocked on the completion
+    callback — they never reach ``waiting`` (that status is only for
+    approval and wait nodes).  ``pending`` is too early: the Temporal
+    workflow may not have started yet.
+    """
     for _ in range(max_polls):
         exec_state = _retry_api_call(lambda: api.executions.get(execution_id=execution_id, include="activities"))
         execution: ExecutionRead = exec_state.assert_and_get()
@@ -138,12 +145,12 @@ def wait_for_agentic_activity(
 
         activities_by_id = {a.activity_id: a for a in (execution.activities or [])}
         activity = activities_by_id.get(activity_id)
-        if activity and activity.status in {"pending", "running", "waiting"}:
+        if activity and activity.status in {"running", "waiting"}:
             return
 
         time.sleep(poll_interval)
 
-    pytest.fail(f"Agentic activity '{activity_id}' did not enter waiting state within {max_polls * poll_interval}s")
+    pytest.fail(f"Agentic activity '{activity_id}' did not reach running state within {max_polls * poll_interval}s")
 
 
 def create_and_run_workflow(
@@ -299,10 +306,17 @@ def poll_execution_until_complete(
 
     """
     for _ in range(max_polls):
-        execution = syntara_api.executions.get(
-            execution_id=execution_id,
-            include="activities",
-        ).assert_and_get()
+        try:
+            execution = syntara_api.executions.get(
+                execution_id=execution_id,
+                include="activities",
+            ).assert_and_get()
+        except UnexpectedResponseException as exc:
+            # Transient gateway/server errors — treat as "not done yet" and keep polling
+            if exc.status_code in (502, 503, 504):
+                time.sleep(poll_interval)
+                continue
+            raise
 
         status = str(execution.status)
         if status in TERMINAL_EXECUTION_STATUSES:

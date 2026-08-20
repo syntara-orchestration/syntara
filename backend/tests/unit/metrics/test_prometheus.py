@@ -97,15 +97,20 @@ class TestMetricOperations:
 
     def test_gauge_set(self, prom: OrchestratorPrometheusMetrics) -> None:
         """Gauges can be set to a value."""
-        prom.active_workflows.set(5)
-        assert prom.active_workflows._value.get() == pytest.approx(5.0)
+        prom.active_llm_requests.set(5)
+        assert prom.active_llm_requests._value.get() == pytest.approx(5.0)
 
     def test_gauge_inc_dec(self, prom: OrchestratorPrometheusMetrics) -> None:
         """Gauges can be incremented and decremented."""
-        prom.active_workflows.inc()
-        prom.active_workflows.inc()
-        prom.active_workflows.dec()
-        assert prom.active_workflows._value.get() == pytest.approx(1.0)
+        prom.active_llm_requests.inc()
+        prom.active_llm_requests.inc()
+        prom.active_llm_requests.dec()
+        assert prom.active_llm_requests._value.get() == pytest.approx(1.0)
+
+    def test_labeled_gauge_set(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """Labeled gauges (active_workflows) require .labels() before .set()."""
+        prom.active_workflows.labels(component="temporal_worker").set(12)
+        assert prom.active_workflows.labels(component="temporal_worker")._value.get() == pytest.approx(12.0)
 
 
 # =============================================================================
@@ -120,7 +125,7 @@ class TestPrometheusOutput:
         """generate_latest produces valid Prometheus text format."""
         prom.requests_total.labels(status="success", endpoint="/api", interface="api").inc(10)
         prom.cache_hits_total.inc(5)
-        prom.active_workflows.set(3)
+        prom.active_workflows.labels(component="temporal_worker").set(3)
 
         output = generate_latest(prom.registry).decode("utf-8")
 

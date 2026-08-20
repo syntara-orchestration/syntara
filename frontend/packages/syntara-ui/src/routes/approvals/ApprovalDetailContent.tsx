@@ -39,12 +39,16 @@ import { useCanDecideApproval } from './useCanDecideApproval'
  * Fallback extraction for description/prompt text from the approval object.
  * Neither field is in the ApprovalRequestRead contract yet; the mock API includes
  * `description` as an extra field. The primary source is the `message` prop
- * (populated from the workflow activity config). This function is the secondary
- * source for approvals fetched via deep-link where the workflow config isn't available.
+ * (populated from the workflow activity parameters). This function is the secondary
+ * source for approvals fetched via deep-link where the workflow definition isn't available.
  */
 function getApprovalMessage(approval: Approval): string | undefined {
-  if ('description' in approval && typeof approval.description === 'string') return approval.description
-  if ('prompt' in approval && typeof approval.prompt === 'string') return approval.prompt
+  if ('description' in approval && typeof approval.description === 'string' && approval.description.trim()) {
+    return approval.description.trim()
+  }
+  if ('prompt' in approval && typeof approval.prompt === 'string' && approval.prompt.trim()) {
+    return approval.prompt.trim()
+  }
   return undefined
 }
 
@@ -230,7 +234,7 @@ function ApprovalSummary({
       {approvalMessage && (
         <DescriptionListGroup>
           <DescriptionListTerm>Message</DescriptionListTerm>
-          <DescriptionListDescription>{approvalMessage}</DescriptionListDescription>
+          <DescriptionListDescription className={styles.message}>{approvalMessage}</DescriptionListDescription>
         </DescriptionListGroup>
       )}
     </DescriptionList>

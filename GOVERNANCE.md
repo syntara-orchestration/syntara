@@ -36,17 +36,17 @@ or **new custom agents**. See
 Every external pull request is reviewed against the same bar as internal work,
 plus community-specific clarity:
 
-| Area | Expectation |
-| --- | --- |
-| **Code quality** | Matches existing patterns in the touched area. Passes `make format`, `make lint`, and `make typecheck` (or the frontend equivalents). No drive-by refactors unrelated to the change. |
-| **Tests** | Behavior changes include automated tests at the appropriate layer (unit / integration / E2E). Bug fixes must include a regression test. |
-| **Docs** | User- or contributor-facing behavior changes update the relevant docs in the same PR. |
-| **Security & secrets** | No credentials, internal hostnames, or private content. Follow [`.github/SECURITY.md`](.github/SECURITY.md) for vulnerability reports. |
-| **Contracts** | API schema changes regenerate contracts (`make gen-contracts`) in the same PR. Breaking OpenAPI changes must be called out in the PR description with a rationale for the break. |
-| **Scope fit** | Change fits [Scope of welcome contributions](#scope-of-welcome-contributions). Out-of-scope proposals are closed with a pointer to this document. |
+| Area                   | Expectation                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Code quality**       | Matches existing patterns in the touched area. Passes `make format`, `make lint`, and `make typecheck` (or the frontend equivalents). No drive-by refactors unrelated to the change. |
+| **Tests**              | Behavior changes include automated tests at the appropriate layer (unit / integration / E2E). Bug fixes must include a regression test.                                              |
+| **Docs**               | User- or contributor-facing behavior changes update the relevant docs in the same PR.                                                                                                |
+| **Security & secrets** | No credentials, internal hostnames, or private content. Follow [`.github/SECURITY.md`](.github/SECURITY.md) for vulnerability reports.                                               |
+| **Contracts**          | API schema changes regenerate contracts (`make gen-contracts`) in the same PR. Breaking OpenAPI changes must be called out in the PR description with a rationale for the break.     |
+| **Scope fit**          | Change fits [Scope of welcome contributions](#scope-of-welcome-contributions). Out-of-scope proposals are closed with a pointer to this document.                                    |
 
 Reviewers use the PR template checklists and the area coding standards under
-`backend/docs/standards/` and `frontend/CLAUDE.md` / `.claude/skills/`.
+`backend/docs/standards/` and `frontend/AGENTS.md` / `.claude/skills/`.
 
 ## Acceptance process
 
@@ -77,12 +77,12 @@ until a plugin / marketplace model exists.
 
 ## Maintenance model
 
-| Situation | Owner | Action |
-| --- | --- | --- |
-| Regression in merged external code on `devel` or a release branch | Area maintainers (CODEOWNERS) | Fix or revert; prefer fixing forward when safe. |
-| Contributor unreachable after merge | Area maintainers | Proceed without waiting; optional courtesy ping. |
-| Change proves architecturally incompatible | `@syntara-orchestration/syntara-leads` + area owners | Revert or redesign; document decision if it sets policy. |
-| Security issue in contributed code | Follow [`.github/SECURITY.md`](.github/SECURITY.md); area maintainers + leads | Treat as any other vulnerability. |
+| Situation                                                         | Owner                                                                         | Action                                                   |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Regression in merged external code on `devel` or a release branch | Area maintainers (CODEOWNERS)                                                 | Fix or revert; prefer fixing forward when safe.          |
+| Contributor unreachable after merge                               | Area maintainers                                                              | Proceed without waiting; optional courtesy ping.         |
+| Change proves architecturally incompatible                        | `@syntara-orchestration/syntara-leads` + area owners                          | Revert or redesign; document decision if it sets policy. |
+| Security issue in contributed code                                | Follow [`.github/SECURITY.md`](.github/SECURITY.md); area maintainers + leads | Treat as any other vulnerability.                        |
 
 Red Hat staff and community contributors are held to the same technical bar.
 Staff PRs are not exempt from CODEOWNERS or CI.

@@ -340,7 +340,8 @@ class TestAuditMiddlewareExclusions:
         assert mock_emit.call_count == 0
 
     @pytest.mark.asyncio
-    async def test_excluded_paths_still_pass_to_app(self) -> None:
+    @pytest.mark.parametrize("path", sorted(EXCLUDED_PATHS))
+    async def test_excluded_paths_still_pass_to_app(self, path: str) -> None:
         """Excluded paths are still forwarded to the underlying app."""
         call_count = 0
 
@@ -349,7 +350,7 @@ class TestAuditMiddlewareExclusions:
             call_count += 1
 
         middleware = AuditMiddleware(counting_app, _make_fastapi_app())
-        await middleware(_make_scope(path="/health"), AsyncMock(), AsyncMock())
+        await middleware(_make_scope(path=path), AsyncMock(), AsyncMock())
 
         assert call_count == 1
 
@@ -1236,9 +1237,11 @@ class TestAuditMiddlewareSanitization:
     @pytest.mark.parametrize(
         "encoded_path",
         [
-            "/%68ealth",  # /health
-            "/%68%65alth",  # /health (multiple encoded chars)
-            "/hea%6Cth",  # /health
+            "/%68ealthz/live",  # /healthz/live
+            "/%68%65althz/live",  # /healthz/live (multiple encoded chars)
+            "/hea%6Cthz/live",  # /healthz/live
+            "/%68ealthz/ready",  # /healthz/ready
+            "/healthz/%72eady",  # /healthz/ready
         ],
     )
     async def test_percent_encoded_excluded_path_still_excluded(self, encoded_path: str) -> None:

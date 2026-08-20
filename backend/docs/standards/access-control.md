@@ -43,7 +43,7 @@ async def list_credentials(
 ### How it works
 
 1. Creates a lightweight FastAPI app with router discovery (no DB or Docker needed)
-2. Iterates all `APIRoute` instances, skipping infrastructure paths (`/health`, `/metrics`, etc.)
+2. Iterates all `APIRoute` instances, skipping infrastructure paths (`/healthz/*`, `/metrics`, etc.)
 3. Inspects each route's dependency tree for RBAC types
 4. Routes without RBAC must be in one of two exclusion lists:
    - `AUTHENTICATED_EXCLUSIONS` — requires JWT, no RBAC (e.g. reference data catalogs, AAP proxy)

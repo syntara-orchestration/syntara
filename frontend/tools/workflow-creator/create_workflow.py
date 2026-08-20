@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create a workflow from JSON using the Nexus API.
+Create a workflow from JSON using the Syntara API.
 
 This tool is designed for PR reviews - paste JSON directly or use a file.
 
@@ -58,7 +58,7 @@ def load_json(source: str) -> dict:
 def check_api_health(api_url: str) -> bool:
     """Check if the API is healthy."""
     try:
-        req = urllib.request.Request(f"{api_url}/health", method="GET")
+        req = urllib.request.Request(f"{api_url}/healthz/ready", method="GET")
         with urllib.request.urlopen(req, timeout=5) as response:
             return response.status == 200
     except (urllib.error.URLError, urllib.error.HTTPError) as e:
@@ -151,7 +151,7 @@ DEFAULT_EXAMPLE = "tools/workflow-creator/examples/hello-world.json"
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create a workflow from JSON using the Nexus API.",
+        description="Create a workflow from JSON using the Syntara API.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

@@ -55,9 +55,13 @@ def _create_test_app() -> FastAPI:
     async def get_workflow(workflow_id: str) -> dict[str, str]:
         return {"id": workflow_id}
 
-    @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "healthy"}
+    @app.get("/healthz/live")
+    async def liveness() -> dict[str, str]:
+        return {"status": "alive"}
+
+    @app.get("/healthz/ready")
+    async def readiness() -> dict[str, str]:
+        return {"status": "ready"}
 
     @app.get("/api")
     async def api_discovery() -> dict[str, str]:
@@ -163,14 +167,15 @@ class TestEndToEndMiddleware:
 class TestExcludedPathsIntegration:
     """Test that excluded paths produce no events end-to-end."""
 
-    async def test_health_check_no_event(self, test_app: FastAPI, mock_registry: MagicMock) -> None:
+    @pytest.mark.parametrize("path", ["/healthz/live", "/healthz/ready"])
+    async def test_health_check_no_event(self, path: str, test_app: FastAPI, mock_registry: MagicMock) -> None:
         transport = ASGITransport(app=test_app)
         with (
             patch(_SETTINGS_PATH, return_value=_make_settings_mock(enabled=True)),
             patch(_REGISTRY_PATH, return_value=mock_registry),
         ):
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.get("/health")
+                response = await client.get(path)
 
         assert response.status_code == 200
         mock_registry.send_event.assert_not_called()
