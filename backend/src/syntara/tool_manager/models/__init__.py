@@ -1,6 +1,5 @@
 """Database models for syntara.tool_manager."""
 
-from syntara.tool_manager.models.query_params import ToolListParams
 from syntara.tool_manager.models.rate_limit_config import RateLimit, TargetType
 from syntara.tool_manager.models.tool import (
     Tool,
@@ -27,7 +26,6 @@ __all__ = [
     "ToolBulkUpdate",
     "ToolExecution",
     "ToolExecutionStatus",
-    "ToolListParams",
     "ToolListResponse",
     "ToolParameter",
     "ToolParameterType",
