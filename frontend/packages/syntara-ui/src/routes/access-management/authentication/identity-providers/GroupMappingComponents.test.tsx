@@ -348,6 +348,25 @@ describe('MappingTable', () => {
     expect(input).toHaveFocus()
   })
 
+  it('evaluates read-only entry field errors when entryErrors are provided', () => {
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
+        isReadOnly
+        entryErrors={[
+          {
+            idpGroupValue: { type: 'manual', message: 'IdP group is required' },
+            mappedGroupId: { type: 'manual', message: 'Group is required' },
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+    expect(screen.getByText('admin')).toBeInTheDocument()
+  })
+
   it('hides remove buttons, Add mapping, and form controls in read-only mode', () => {
     render(<MappingTable {...defaultProps} rows={mockRows} isReadOnly />)
 

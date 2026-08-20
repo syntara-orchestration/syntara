@@ -616,6 +616,18 @@ describe('RolesTab', () => {
       expect(screen.getByText('admin-policy')).toBeVisible()
       expect(screen.queryByText('workflow-edit')).not.toBeVisible()
     })
+
+    it('collapses an expanded row when the details button is clicked again', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+      expect(screen.getByText('admin-policy')).toBeVisible()
+
+      await user.click(expandButtons[0])
+      expect(screen.queryByText('admin-policy')).not.toBeVisible()
+    })
   })
 
   describe('Delete dialog acknowledgement checkbox', () => {
@@ -689,6 +701,9 @@ describe('RolesTab', () => {
       await waitFor(() => {
         expect(screen.getByText('No results found')).toBeInTheDocument()
       })
+
+      const iconPath = document.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+      expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
     })
   })
 })

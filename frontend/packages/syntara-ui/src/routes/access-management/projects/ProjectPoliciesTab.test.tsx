@@ -168,6 +168,21 @@ describe('ProjectPoliciesTab', () => {
     expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
   })
 
+  it('opens edit dialog when edit action is clicked on a custom policy', async () => {
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+    await user.click(kebabButtons[0])
+
+    const editItem = await screen.findByText('Edit policy')
+    await user.click(editItem)
+
+    await waitFor(() => {
+      expect(screen.queryByText('Delete policy?')).not.toBeInTheDocument()
+    })
+  })
+
   it('shows policy name and acknowledgement in delete dialog', async () => {
     const user = userEvent.setup()
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
