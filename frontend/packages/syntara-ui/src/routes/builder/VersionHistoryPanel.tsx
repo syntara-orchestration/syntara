@@ -39,7 +39,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { MultiSelectFilter } from '../../components/filters/MultiSelectFilter'
 import pageMainSlotStyles from '../../components/layout/SynPage.module.css'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { NxLink } from '../../components/NxLink'
+import { SynLink } from '../../components/SynLink'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
@@ -275,13 +275,13 @@ function VersionRow({
               {version.created_by_username ? (
                 <>
                   {showSecondaryDatetime && version.created_at ? ' by ' : null}
-                  <NxLink
+                  <SynLink
                     to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
                     className={styles.usernameLink}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {version.created_by_username}
-                  </NxLink>
+                  </SynLink>
                 </>
               ) : null}
             </Content>

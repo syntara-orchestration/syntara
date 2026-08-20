@@ -3,7 +3,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
-import type { TableFooterProps } from '../../components/table/NxScrollableTableContainer'
+import type { TableFooterProps } from '../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 

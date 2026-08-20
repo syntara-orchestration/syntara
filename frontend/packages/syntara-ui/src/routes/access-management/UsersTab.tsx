@@ -10,8 +10,8 @@ import { AppRoute } from '../../app/AppRoute'
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxLink } from '../../components/NxLink'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynLink } from '../../components/SynLink'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../components/table/DateCell'
@@ -222,9 +222,9 @@ function UserTableRow({
   return (
     <Tr>
       <Td dataLabel="Username">
-        <NxLink to={getUserDetailPath(user.id)}>
+        <SynLink to={getUserDetailPath(user.id)}>
           <Truncate content={user.username} />
-        </NxLink>
+        </SynLink>
       </Td>
       <Td dataLabel="Name">
         <Truncate content={userDisplayName(user)} />
@@ -236,7 +236,7 @@ function UserTableRow({
         <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
           {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
             <FlexItem key={source}>
-              <NxLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</NxLabel>
+              <SynLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</SynLabel>
             </FlexItem>
           ))}
         </Flex>

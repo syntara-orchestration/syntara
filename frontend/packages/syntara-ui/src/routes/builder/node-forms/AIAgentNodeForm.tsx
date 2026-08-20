@@ -16,7 +16,7 @@ import type { Control, UseFormSetValue } from 'react-hook-form'
 import { Controller, FormProvider, useForm, useFormContext, useFormState, useWatch } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
-import { NxLink } from '../../../components/NxLink'
+import { SynLink } from '../../../components/SynLink'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useIntegrationPermissions } from '../../configuration/integrations/useIntegrationPermissions'
 import { ExpandableCodeEditor } from '../components/ExpandableCodeEditor'
@@ -241,9 +241,9 @@ function AIAgentFormFields({
                   {canCreateIntegration ? (
                     <>
                       An administrator must{' '}
-                      <NxLink to={AppRoute.Configuration.Integrations.Configure}>
+                      <SynLink to={AppRoute.Configuration.Integrations.Configure}>
                         configure an MCP server integration
-                      </NxLink>{' '}
+                      </SynLink>{' '}
                       before tools can be selected.
                     </>
                   ) : (

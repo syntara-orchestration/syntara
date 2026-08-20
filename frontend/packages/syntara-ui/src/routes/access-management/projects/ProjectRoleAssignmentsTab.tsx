@@ -8,7 +8,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
@@ -103,7 +103,7 @@ function RoleAssignmentsTable({
                 />
               </Td>
               <Td dataLabel="Principal type">
-                <NxLabel color={color}>{text}</NxLabel>
+                <SynLabel color={color}>{text}</SynLabel>
               </Td>
               <Td dataLabel="Role name">
                 <Truncate content={assignment.role_name} />
@@ -112,7 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <NxLabel key={name}>{name}</NxLabel>
+                      <SynLabel key={name}>{name}</SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (

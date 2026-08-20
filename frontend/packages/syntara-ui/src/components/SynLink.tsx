@@ -19,7 +19,7 @@ function RouterLink({ href, children, ...rest }: RouterLinkProps) {
   )
 }
 
-type NxLinkProps = {
+type SynLinkProps = {
   /** Route path to navigate to on click. */
   to: string
   children: ReactNode
@@ -31,7 +31,7 @@ type NxLinkProps = {
  * Application-level link that renders a PatternFly inline link button
  * wired to TanStack Router for client-side navigation.
  */
-export function NxLink({ to, children, className, onClick }: Readonly<NxLinkProps>) {
+export function SynLink({ to, children, className, onClick }: Readonly<SynLinkProps>) {
   return (
     <Button variant="link" isInline component={RouterLink} href={to} className={className} onClick={onClick}>
       {children}

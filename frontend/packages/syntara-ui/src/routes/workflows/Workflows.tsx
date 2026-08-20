@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { NxListPanel } from '../../components/panels/list/NxListPanel'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
@@ -73,7 +73,7 @@ function WorkflowsPageToolbar({
           </Button>
         </DisabledWithTooltip>
       )}
-      {headerProjectActions.length > 0 && <NxKebabMenu actions={headerProjectActions} aria-label="Project actions" />}
+      {headerProjectActions.length > 0 && <SynKebabMenu actions={headerProjectActions} aria-label="Project actions" />}
     </>
   )
 }

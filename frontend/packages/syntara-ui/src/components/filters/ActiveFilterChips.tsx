@@ -3,15 +3,15 @@ import type { ReactNode } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition, FilterOperator } from '../../types/filters'
 import { formatDateChipValue } from '../../utils/dateUtils'
-import { NxLabel } from '../labels/NxLabel'
+import { SynLabel } from '../labels/SynLabel'
 import { WorkflowName } from '../WorkflowName'
 
 /** User-applied filter values use outlined compact labels. */
 function ActiveFilterValueLabel({ children, onClose }: Readonly<{ children: ReactNode; onClose: () => void }>) {
   return (
-    <NxLabel variant="outline" onClose={onClose}>
+    <SynLabel variant="outline" onClose={onClose}>
       {children}
-    </NxLabel>
+    </SynLabel>
   )
 }
 
