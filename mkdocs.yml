@@ -1,6 +1,7 @@
 ---
 site_name: Syntara Documentation
 site_description: Documentation for the Syntara distributed multi-agent automation system
+site_url: https://syntara-orchestration.readthedocs.io/
 repo_url: https://github.com/syntara-orchestration/syntara
 edit_uri: edit/devel/docs/
 
@@ -9,6 +10,24 @@ hooks:
 
 extra_css:
   - stylesheets/extra.css
+
+plugins:
+  - search
+  - llmstxt:
+      markdown_description: >-
+        Developer documentation for Syntara, a distributed multi-agent
+        automation system. Covers the Python/FastAPI backend, React/TypeScript
+        frontend, workflow engine, and development standards.
+      full_output: llms-full.txt
+      sections:
+        Backend:
+          - backend/*.md
+          - backend/**/*.md
+        Frontend:
+          - frontend/*.md
+          - frontend/**/*.md
+        CI:
+          - ci/*.md
 
 theme:
   name: material
