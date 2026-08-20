@@ -67,40 +67,35 @@ These hooks run automatically on commit (and in CI via the `pre-commit` job):
 | `backend-api-spec-drift` | Runs when backend `.py` files change; invokes `make api-spec-drift` to compare the committed spec to the live FastAPI schema; **blocking** |
 | `backend-check-openapi-breaking` | Runs when `openapi.yaml` changes; compares against `devel` and blocks on breaking changes |
 
+### Mandatory version bump
+
+**Every OpenAPI spec change must bump `info.version`** (major, minor, or patch). The bump is how the engineer signals their interpretation of the change to reviewers and how API consumers become aware of spec updates. A spec change with no `info.version` bump is **blocked** (`gate_code: version_bump_required`). The gate treats any difference in the spec file as a change (not only diffs that oasdiff reports), so description and metadata edits still require a bump.
+
+CI does not enforce a specific bump *type* for non-breaking changes — choosing minor vs. patch is the engineer's signal and the reviewer's judgment call. Use a **minor** bump for additive changes (new endpoints/fields) and a **patch** bump for fixes and metadata-only edits.
+
 ### Breaking Change Policy
 
-Breaking changes on the current major API version are **always blocked**. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place — v1 and v2 are separate specs served from different URL paths.
+Breaking changes are **always blocked in place** — full stop. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place: v1 and v2 are separate specs served from different URL paths. A genuinely new major version is a new spec at a new path, so it does not register as a breaking change to the current spec.
 
-Two override paths exist:
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label (a formal override restricted to engineering leadership). An approved breaking change must still bump `info.version`.
 
-1. **New major version** — bump `info.version` to the next major (e.g., 1.0.0 → 2.0.0) and add `breaking-change-ack: <justification>` (≥ 20 characters) to the PR description. The new major version must be served from a separate URL path.
-2. **CVE escape hatch** — for CVE fixes that cannot avoid a breaking change, request the `cve-breaking-change-approved` GitHub label from engineering leadership (Senior Director or above). This label is protected and restricted to authorized personnel.
+| Change type | Gate |
+|-------------|------|
+| No spec change | Allowed |
+| Non-breaking change, with version bump | Allowed |
+| Non-breaking change, no version bump | Blocked (`version_bump_required`) |
+| Breaking change, no approval label | Blocked (`breaking_blocked`) |
+| Breaking change, with `breaking-change-approved` label + version bump | Allowed (`breaking_approved`) |
 
-A `breaking-change-ack` annotation alone (without a major version bump) is **not sufficient** to bypass the breaking change gate.
+### Privileged approval label (repo configuration)
 
-### Non-breaking version bumps
+CI accepts the override when the PR has the label `breaking-change-approved`. That check is not a substitute for restricting *who can apply* the label. Repo admins must create this label and restrict it so only authorized personnel (engineering leadership) can add it:
 
-Non-breaking PRs always pass when `info.version` is unchanged. Voluntary **minor** and **patch** bumps are allowed. If a bump *is* present, it must match the change type:
-
-| Change type | Required bump if version is changed | Unchanged version |
-|-------------|-------------------------------------|-------------------|
-| Additive (new endpoints, properties, parameters, enum values) | **minor** (patch is blocked) | Allowed |
-| Other non-breaking (descriptions, examples, metadata) | **patch** or **minor** | Allowed |
-| Breaking | **major** + `breaking-change-ack`, or CVE label | Blocked |
-
-A **major** bump without a breaking change is blocked — major increments are reserved for a new API version.
-
-### Privileged CVE label (repo configuration)
-
-CI accepts the hatch when the PR has the label `cve-breaking-change-approved`. That check is not a substitute for restricting *who can apply* the label. Repo admins must create this label and restrict it so only engineering / BU leadership (Senior Director or above) can add it:
-
-1. Create the label named exactly `cve-breaking-change-approved`.
+1. Create the label named exactly `breaking-change-approved`.
 2. On GitHub Enterprise Cloud, configure it as a [restricted label](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-peoples-access-to-your-organization-with-roles/managing-custom-repository-roles-for-an-organization) (or equivalent org role) so typical contributors cannot apply it.
 3. After the label is applied to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
 
-Python cannot enforce Senior Director approval by itself; the protected label is the enforcement point.
-
-For non-breaking changes that pass the bump rules, version information (`base_version`, `head_version`, `version_bump_type`) is included in the output.
+Python cannot enforce leadership approval by itself; the restricted label is the enforcement point.
 
 ## CI Checks
 

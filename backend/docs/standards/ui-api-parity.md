@@ -104,23 +104,13 @@ Use when a spec change has no impact on generated types — for example, updatin
 
 ### Breaking changes
 
-Breaking changes on the current major API version are **always blocked**. Two override paths exist:
+Breaking changes are **always blocked in place** — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec.
 
-1. **New major version** — bump `info.version` to the next major (e.g., 1.0.0 → 2.0.0) and add to the PR description:
-   ```
-   breaking-change-ack: <justification>
-   ```
-   Minimum 20 characters. The new major version must be served from a separate URL path.
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, requested from engineering leadership. The label must be restricted in GitHub so typical contributors cannot apply it. An approved breaking change must still bump `info.version`.
 
-2. **CVE escape hatch** — request the `cve-breaking-change-approved` protected GitHub label from engineering leadership (Senior Director or above). The label must be restricted in GitHub so typical contributors cannot apply it.
-
-A `breaking-change-ack` alone (without a major version bump) is **not sufficient** to bypass the gate.
-
-Non-breaking PRs pass with no version bump. If `info.version` is bumped, additive changes require a minor bump (not patch); a major bump without breaking changes is blocked.
+**Every spec change must bump `info.version`** (major/minor/patch). A spec change with no bump is blocked. CI does not enforce a specific bump type — it is the engineer's signal to reviewers and consumers.
 
 **Severity:** Blocking via the pre-commit hook `backend-check-openapi-breaking` and the `openapi-breaking-changes` CI job.
-
-Both markers are case-insensitive and checked by scripts in `backend/scripts/openapi/`.
 
 ## WebSocket Scope
 
@@ -153,7 +143,8 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 |------|-------------|-----------|
 | Use typed API clients only | ESLint `syntara/no-raw-http-calls` | `eslint-disable-next-line` with justification |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
-| Breaking changes blocked on current major | Pre-commit + `openapi-breaking-changes` CI job | Major version bump + ack, or `cve-breaking-change-approved` label |
+| Breaking changes blocked in place | Pre-commit + `openapi-breaking-changes` CI job | `breaking-change-approved` label (privileged), or route to a new major version at a new path |
+| Every spec change bumps `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a bump is always required |
 | WebSocket is read-only streaming | Convention (see [WebSocket Standards](websocket.md)) | N/A — REST is the complete CRUD interface |
 | Backend + frontend changes in one PR | CI warning if contracts stale | `no-contract-regen: <justification>` for spec-only changes |
 

@@ -22,7 +22,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    if: ${{ !contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.label.name == 'cve-breaking-change-approved' }}
+    if: ${{ !contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.label.name == 'breaking-change-approved' }}
     permissions:
       contents: read
     steps:
@@ -79,13 +79,11 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         id: breaking
         run: |
-          PR_BODY=$(cat "$GITHUB_WORKSPACE/pr-body.txt")
           ./scripts/openapi/check-breaking-changes.py \
             --base origin/${{ github.base_ref }} \
             --head HEAD \
             --output breaking-results.json \
             --fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-            --pr-body "$PR_BODY" \
             --pr-labels "${{ steps.labels.outputs.labels }}"
         working-directory: backend
 

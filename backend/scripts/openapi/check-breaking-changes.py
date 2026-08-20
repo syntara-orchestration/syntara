@@ -4,15 +4,21 @@
 This script compares two OpenAPI specs and detects breaking changes,
 returning structured JSON output for consumption by CI or local tooling.
 
-Breaking changes on the current major version are always blocked.
-Two override paths exist:
-  1. Major version bump + breaking-change-ack in PR body (new API version)
-  2. CVE escape hatch via a protected GitHub label (emergency override)
+The gate enforces two rules:
+
+  1. Every OpenAPI spec change MUST bump ``info.version`` (major/minor/patch).
+     The bump is how the engineer signals their interpretation of the change to
+     reviewers and how API consumers become aware of spec updates.
+  2. Breaking changes are never allowed in place. A breaking change is only
+     permitted when the privileged ``breaking-change-approved`` label is present
+     (a formal override restricted to engineering leadership). Otherwise it is
+     blocked, full stop. A genuinely new major version is a new spec served from
+     a separate URL path, so it would not register as a breaking change here.
 
 Usage:
     ./check-breaking-changes.py --base devel --head HEAD
     ./check-breaking-changes.py --base-spec baseline.yaml --head-spec current.yaml
-    ./check-breaking-changes.py --pr-body "breaking-change-ack: <justification>" --pr-labels "cve-breaking-change-approved"
+    ./check-breaking-changes.py --base devel --head HEAD --pr-labels "breaking-change-approved"
 
 Returns:
     JSON with structure:
@@ -20,22 +26,21 @@ Returns:
         "has_breaking_changes": bool,
         "breaking_changes": str,
         "all_changes": str,
-        "acknowledged": bool,
-        "justification": str,
-        "ack_insufficient": bool,
+        "has_changes": bool,
         "version_bumped": bool,
         "base_version": str,
         "head_version": str,
         "version_bump_type": str | null,
-        "cve_approved": bool,
+        "breaking_approved": bool,
         "spec_path": str,
-        "change_kind": "none" | "additive" | "other",
         "gate_code": str
     }
 
 Exit codes:
-    0 - No breaking changes, or breaking changes with valid override
-    1 - Breaking changes or incorrect version bump without valid override
+    0 - Change is allowed (no changes, non-breaking change with a version bump,
+        or an approved breaking change with a version bump)
+    1 - Change is blocked (breaking without approval, or any spec change with no
+        version bump)
     2 - Error running oasdiff or processing specs
 """
 
@@ -51,29 +56,9 @@ from pathlib import Path
 
 
 DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
-CVE_ESCAPE_LABEL = "cve-breaking-change-approved"
-
-# oasdiff changelog IDs that indicate additive (non-breaking) API surface.
-_ADDITIVE_CHANGE_IDS = (
-    "endpoint-added",
-    "request-property-added",
-    "response-property-added",
-    "request-parameter-added",
-    "request-body-added",
-    "response-added",
-    "response-media-type-added",
-    "request-media-type-added",
-    "request-property-enum-value-added",
-    "response-property-enum-value-added",
-)
-_ADDITIVE_CHANGE_TEXT = re.compile(
-    r"\badded the (?:path|endpoint|operations?|optional |required )|"
-    r"\b(?:endpoint|path) added\b|"
-    r"\badded .+ (?:request|response) propert|"
-    r"\badded the .+ parameter\b|"
-    r"\badded .+ enum value",
-    re.IGNORECASE,
-)
+# Privileged override label for breaking changes. Restricted to engineering
+# leadership at the repo level; CI only checks for its presence.
+BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
 
 
 @dataclass(frozen=True)
@@ -144,7 +129,7 @@ def parse_semver(version: str) -> tuple[int, int, int] | None:
 def get_version_bump_type(base_version: str, head_version: str) -> str | None:
     """Determine the version bump type between base and head.
 
-    Returns "major", "minor", "patch", or None (no bump / unparseable).
+    Returns "major", "minor", "patch", or None (no bump / downgrade / unparseable).
     """
     base = parse_semver(base_version)
     head = parse_semver(head_version)
@@ -221,145 +206,105 @@ def get_all_changes(base_spec: str, head_spec: str) -> str:
     return (result.stdout + result.stderr).strip()
 
 
-def check_acknowledgment(pr_body: str) -> dict:
-    """Check if breaking changes are acknowledged in PR body.
-
-    Args:
-        pr_body: PR description text
-
-    Returns:
-        Dict with keys: acknowledged, justification, ack_insufficient
-    """
-    if not pr_body:
-        return {
-            "acknowledged": False,
-            "justification": "",
-            "ack_insufficient": False,
-        }
-
-    # Pattern: breaking-change-ack: <justification>
-    ack_pattern = re.compile(r"breaking-change-ack\s*:\s*(.+)", re.IGNORECASE)
-    match = ack_pattern.search(pr_body)
-
-    if not match:
-        return {
-            "acknowledged": False,
-            "justification": "",
-            "ack_insufficient": False,
-        }
-
-    justification = match.group(1).strip()
-
-    # Validate justification is substantial (minimum 20 chars)
-    if len(justification) < 20:
-        return {
-            "acknowledged": False,
-            "justification": justification,
-            "ack_insufficient": True,
-        }
-
-    return {
-        "acknowledged": True,
-        "justification": justification,
-        "ack_insufficient": False,
-    }
-
-
-def check_cve_label(pr_labels: str) -> bool:
-    """Check if the CVE escape hatch label is present on the PR.
+def check_approval_label(pr_labels: str) -> bool:
+    """Check if the breaking-change approval label is present on the PR.
 
     Args:
         pr_labels: Comma-separated list of PR label names
 
     Returns:
-        True if the CVE escape label is present
+        True if the ``breaking-change-approved`` label is present
     """
     if not pr_labels:
         return False
     labels = [label.strip().lower() for label in pr_labels.split(",")]
-    return CVE_ESCAPE_LABEL.lower() in labels
+    return BREAKING_CHANGE_APPROVED_LABEL.lower() in labels
 
 
-def classify_non_breaking_changes(all_changes: str) -> str:
-    """Classify non-breaking changelog output as none, additive, or other.
+def spec_has_changes(
+    base_content: str,
+    head_content: str,
+    *,
+    has_breaking: bool,
+    all_changes: str,
+) -> bool:
+    """True if the spec changed, including edits oasdiff does not report.
 
-    Additive means new endpoints, properties, parameters, or enum values.
-    ``other`` covers documentation, description, and similar non-surface changes.
+    File content is the source of truth so whitespace, description, and other
+    metadata edits still require an info.version bump. Changelog/breaking
+    output is a fallback when the files cannot be compared.
     """
+    if has_breaking:
+        return True
+    if (base_content or "") != (head_content or ""):
+        return True
     text = (all_changes or "").strip()
-    if not text or re.match(r"^no changes\b", text, re.IGNORECASE):
-        return "none"
-    lowered = text.lower()
-    if any(change_id in lowered for change_id in _ADDITIVE_CHANGE_IDS):
-        return "additive"
-    if _ADDITIVE_CHANGE_TEXT.search(text):
-        return "additive"
-    return "other"
+    return bool(text) and not re.match(r"^no changes\b", text, re.IGNORECASE)
 
 
 def evaluate_gate(
     *,
     has_breaking: bool,
-    version_bump_type: str | None,
-    acknowledged: bool,
-    ack_insufficient: bool,
-    justification: str,
-    cve_approved: bool,
-    change_kind: str,
+    has_changes: bool,
+    version_bumped: bool,
+    breaking_approved: bool,
 ) -> GateDecision:
-    """Apply the OpenAPI versioning gate. Returns whether the PR is allowed."""
-    allowed = True
-    code = "ok"
-    message = "No breaking changes detected"
+    """Apply the OpenAPI versioning gate. Returns whether the PR is allowed.
+
+    Rules:
+      * No spec changes -> allowed.
+      * Breaking changes without the approval label -> blocked, full stop.
+      * Any spec change without an info.version bump -> blocked.
+      * Approved breaking change (with bump) or non-breaking change (with bump)
+        -> allowed.
+    """
+    if not has_breaking and not has_changes:
+        return GateDecision(
+            allowed=True,
+            code="ok",
+            message="No OpenAPI spec changes detected",
+        )
+
+    if has_breaking and not breaking_approved:
+        return GateDecision(
+            allowed=False,
+            code="breaking_blocked",
+            message=(
+                "BLOCKED: This PR introduces breaking changes to the current API version. "
+                "Breaking changes are never allowed in place.\n"
+                "  - A new major version must be a new spec served from a separate URL path "
+                "(it would not register as a breaking change here).\n"
+                f"  - For an approved emergency override, request the '{BREAKING_CHANGE_APPROVED_LABEL}' "
+                "label from engineering leadership."
+            ),
+        )
+
+    if not version_bumped:
+        return GateDecision(
+            allowed=False,
+            code="version_bump_required",
+            message=(
+                "BLOCKED: The OpenAPI spec changed but info.version was not bumped. "
+                "Every spec change must bump info.version (major/minor/patch) to signal "
+                "the change to reviewers and API consumers."
+            ),
+        )
 
     if has_breaking:
-        if cve_approved:
-            allowed = True
-            code = "cve_override"
-            message = "ALLOWED: CVE escape hatch label present"
-        elif version_bump_type == "major" and acknowledged:
-            allowed = True
-            code = "major_ack"
-            message = f"ALLOWED: Major version bump with acknowledgment: {justification}"
-        elif acknowledged:
-            allowed = False
-            code = "ack_without_major"
-            message = (
-                "BLOCKED: Breaking changes require a major version bump. "
-                "An acknowledgment alone is not sufficient."
-            )
-        elif ack_insufficient:
-            allowed = False
-            code = "ack_insufficient"
-            message = f"BLOCKED: Insufficient acknowledgment: {justification}"
-        else:
-            allowed = False
-            code = "breaking_blocked"
-            message = (
-                "BLOCKED: Breaking changes on the current major version are not allowed. "
-                "Options:\n"
-                "  1. Bump info.version to the next major version and add "
-                "'breaking-change-ack: <justification>' to the PR body\n"
-                "  2. For CVE fixes only: request the 'cve-breaking-change-approved' label "
-                "from engineering leadership (Senior Director or above)"
-            )
-    elif version_bump_type == "major":
-        allowed = False
-        code = "incorrect_bump"
-        message = (
-            "BLOCKED: Major version bumps are reserved for breaking changes. "
-            "Use a minor bump for additive features or a patch bump for fixes, "
-            "or omit the bump."
-        )
-    elif change_kind == "additive" and version_bump_type == "patch":
-        allowed = False
-        code = "incorrect_bump"
-        message = (
-            "BLOCKED: Additive API changes require a minor version bump, not patch. "
-            "Bump info.version minor (for example 1.0.0 -> 1.1.0), or omit the bump."
+        return GateDecision(
+            allowed=True,
+            code="breaking_approved",
+            message=(
+                f"ALLOWED: Breaking change permitted via the '{BREAKING_CHANGE_APPROVED_LABEL}' "
+                "label (privileged override)."
+            ),
         )
 
-    return GateDecision(allowed=allowed, code=code, message=message)
+    return GateDecision(
+        allowed=True,
+        code="ok",
+        message="Non-breaking spec change with a version bump",
+    )
 
 
 def read_spec_content(spec_path: str) -> str:
@@ -401,14 +346,7 @@ def main():
         default=None,
     )
 
-    # PR body for acknowledgment check
-    parser.add_argument(
-        "--pr-body",
-        help="PR description text to check for acknowledgment",
-        default="",
-    )
-
-    # PR labels for CVE escape hatch
+    # PR labels for the breaking-change approval override
     parser.add_argument(
         "--pr-labels",
         help="Comma-separated list of PR label names",
@@ -442,8 +380,7 @@ def main():
         base_spec_content = get_spec_from_git(args.base, args.spec_path)
         if base_spec_content is None and args.fallback_spec_path:
             print(
-                f"Spec not found at '{args.spec_path}' on '{args.base}'; "
-                f"trying fallback '{args.fallback_spec_path}'",
+                f"Spec not found at '{args.spec_path}' on '{args.base}'; trying fallback '{args.fallback_spec_path}'",
                 file=sys.stderr,
             )
             base_spec_content = get_spec_from_git(args.base, args.fallback_spec_path)
@@ -489,18 +426,21 @@ def main():
     # Get all changes
     all_changes = get_all_changes(base_spec_path, head_spec_path)
 
-    # Check acknowledgment and CVE label
-    ack_result = check_acknowledgment(args.pr_body)
-    cve_approved = check_cve_label(args.pr_labels)
-    change_kind = classify_non_breaking_changes(all_changes) if not has_breaking else "none"
+    has_changes = spec_has_changes(
+        base_spec_content or "",
+        head_spec_content or "",
+        has_breaking=has_breaking,
+        all_changes=all_changes,
+    )
+
+    # Check the breaking-change approval label
+    breaking_approved = check_approval_label(args.pr_labels)
+
     decision = evaluate_gate(
         has_breaking=has_breaking,
-        version_bump_type=version_bump_type,
-        acknowledged=ack_result["acknowledged"],
-        ack_insufficient=ack_result["ack_insufficient"],
-        justification=ack_result["justification"],
-        cve_approved=cve_approved,
-        change_kind=change_kind,
+        has_changes=has_changes,
+        version_bumped=version_bumped,
+        breaking_approved=breaking_approved,
     )
 
     # Build result
@@ -508,14 +448,13 @@ def main():
         "has_breaking_changes": has_breaking,
         "breaking_changes": breaking_output,
         "all_changes": all_changes,
-        **ack_result,
+        "has_changes": has_changes,
         "version_bumped": version_bumped,
         "base_version": base_version or "",
         "head_version": head_version or "",
         "version_bump_type": version_bump_type,
-        "cve_approved": cve_approved,
+        "breaking_approved": breaking_approved,
         "spec_path": args.spec_path,
-        "change_kind": change_kind,
         "gate_code": decision.code,
     }
 

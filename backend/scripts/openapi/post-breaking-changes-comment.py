@@ -33,20 +33,19 @@ def escape_markdown(text: str) -> str:
     )
 
 
-def _incorrect_bump_lines(
+def _version_bump_required_lines(
     *,
     spec_path: str,
     base_version: str,
     head_version: str,
-    version_bump_type: str | None,
-    change_kind: str,
 ) -> list[str]:
-    """Format the blocked incorrect-bump PR comment section."""
+    """Format the blocked missing-version-bump PR comment section."""
     lines = [
-        "### Incorrect Version Bump (Blocked)\n",
+        "### Version Bump Required (Blocked)\n",
         (
-            "This PR does **not** introduce breaking changes, but `info.version` "
-            "was bumped in a way that does not match the change type.\n"
+            "This PR changes the OpenAPI spec but does **not** bump `info.version`. "
+            "Every spec change must include an `info.version` bump so reviewers can see "
+            "your interpretation of the change and API consumers are aware of the update.\n"
         ),
     ]
     if spec_path:
@@ -54,27 +53,12 @@ def _incorrect_bump_lines(
     if base_version or head_version:
         lines.append(
             f"**Version:** {escape_markdown(base_version or 'unknown')} → "
-            f"{escape_markdown(head_version or 'unknown')}"
+            f"{escape_markdown(head_version or 'unknown')} (no bump)\n"
         )
-        if version_bump_type:
-            lines.append(f" ({escape_markdown(version_bump_type)} bump)")
-        lines.append("")
-    if change_kind:
-        lines.append(f"**Change kind:** {escape_markdown(change_kind)}\n")
-    if version_bump_type == "major":
-        lines.append(
-            "Major bumps are reserved for breaking changes. "
-            "Use a **minor** bump for additive features/new endpoints, "
-            "or a **patch** bump for fixes — or omit the bump.\n"
-        )
-    elif change_kind == "additive":
-        lines.append(
-            "Additive API changes require a **minor** version bump "
-            "(for example `1.0.0` → `1.1.0`). A patch bump is not sufficient. "
-            "You may also omit the bump.\n"
-        )
-    else:
-        lines.append("See the OpenAPI versioning policy for the required bump type.\n")
+    lines.append(
+        "Bump `info.version` (major/minor/patch) to reflect the change — "
+        "for example `1.0.0` → `1.1.0` for additive changes, or `1.0.1` for fixes.\n"
+    )
     return lines
 
 
@@ -92,55 +76,34 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
     has_breaking = results["has_breaking_changes"]
     breaking_changes = results["breaking_changes"]
     all_changes = results["all_changes"]
-    acknowledged = results["acknowledged"]
-    ack_insufficient = results["ack_insufficient"]
-    justification = results["justification"]
     base_version = results.get("base_version", "")
     head_version = results.get("head_version", "")
     version_bump_type = results.get("version_bump_type")
-    cve_approved = results.get("cve_approved", False)
+    breaking_approved = results.get("breaking_approved", False)
     spec_path = results.get("spec_path", "")
     gate_code = results.get("gate_code", "")
-    change_kind = results.get("change_kind", "")
 
     escaped_breaking = escape_markdown(breaking_changes)
     escaped_all = escape_markdown(all_changes)
-    escaped_justification = escape_markdown(justification)
 
     lines = [COMMENT_MARKER, ""]
 
     if has_breaking:
-        # Determine which override path (if any) was used
-        major_bump_ack = version_bump_type == "major" and acknowledged
-
-        if cve_approved:
-            lines.append("### Breaking Changes Detected (CVE Override)\n")
+        if breaking_approved:
+            lines.append("### Breaking Changes Detected (Approved Override)\n")
             lines.append(
-                "The `cve-breaking-change-approved` label is present. "
-                "This breaking change is permitted under the CVE escape hatch.\n"
+                "The `breaking-change-approved` label is present. "
+                "This breaking change is permitted via a privileged override.\n"
             )
             lines.append("**Reviewer:** Please verify:")
-            lines.append("1. This override was authorized by engineering leadership (Senior Director or above)")
-            lines.append("2. The breaking change is necessary to address a CVE")
+            lines.append("1. This override was authorized by engineering leadership")
+            lines.append("2. The breaking change is genuinely necessary")
             lines.append("3. Frontend contracts are regenerated in this PR (`make gen-contracts`)")
             lines.append("4. Migration path is documented for API consumers\n")
-        elif major_bump_ack:
-            lines.append("### Breaking Changes Detected (New Major Version)\n")
-            lines.append(
-                f"The API version has been bumped from **{escape_markdown(base_version)}** to "
-                f"**{escape_markdown(head_version)}** (major) with acknowledgment:\n"
-            )
-            lines.append(f"```\n{escaped_justification}\n```\n")
-            lines.append("**Reviewer:** Please verify:")
-            lines.append("1. The justification is valid and necessary")
-            lines.append("2. The new major version is served from a separate URL path (e.g., `/api/v2/`)")
-            lines.append("3. Frontend contracts are regenerated in this PR (`make gen-contracts`)")
-            lines.append("4. Migration path is clear for API consumers\n")
         else:
             lines.append("### Breaking Changes Detected (Blocked)\n")
             lines.append(
-                "This PR introduces **breaking changes** that are **not allowed** "
-                "on the current major API version.\n"
+                "This PR introduces **breaking changes** that are **not allowed** on the current API version.\n"
             )
 
             if spec_path:
@@ -149,29 +112,15 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
                 lines.append(f"**Current version:** {escape_markdown(base_version or 'unknown')}")
                 lines.append(f"**PR version:** {escape_markdown(head_version or 'unknown')}\n")
 
-            if acknowledged and version_bump_type != "major":
-                lines.append(
-                    "A `breaking-change-ack` is present, but breaking changes require "
-                    "a **major version bump** (not just an acknowledgment).\n"
-                )
-            elif ack_insufficient:
-                lines.append(
-                    f"**Insufficient acknowledgment:**\n```\n{escaped_justification}\n```\n"
-                    "Acknowledgments must be at least 20 characters.\n"
-                )
-
             lines.append("**To resolve, choose one of:**\n")
             lines.append(
-                "1. **Route to a new major version** — bump `info.version` to the next major "
-                "(e.g., 2.0.0) and add to your PR description:\n"
-                "   ```\n"
-                "   breaking-change-ack: <detailed justification>\n"
-                "   ```"
+                "1. **Route to a new major version** — a new major version is a new spec served "
+                "from a separate URL path (e.g., `/api/v2/`), so it is not a breaking change to "
+                "the current spec."
             )
             lines.append(
-                "2. **CVE escape hatch** — if this is a CVE fix that cannot avoid a breaking change, "
-                "request the `cve-breaking-change-approved` label from engineering leadership "
-                "(Senior Director or above)\n"
+                "2. **Approved override** — if this breaking change is unavoidable, request the "
+                "`breaking-change-approved` label from engineering leadership.\n"
             )
 
         lines.append("---\n")
@@ -184,7 +133,7 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
             lines.append(f"```\n{escaped_all}\n```")
             lines.append("</details>\n")
 
-        if not (cve_approved or major_bump_ack):
+        if not breaking_approved:
             lines.append("---\n")
             lines.append("### What This Means\n")
             lines.append(
@@ -195,14 +144,12 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
             lines.append("- Changed field types (e.g., string → number)")
             lines.append("- Changed required/optional status")
             lines.append("- Removed enum values\n")
-    elif gate_code == "incorrect_bump":
+    elif gate_code == "version_bump_required":
         lines.extend(
-            _incorrect_bump_lines(
+            _version_bump_required_lines(
                 spec_path=spec_path,
                 base_version=base_version,
                 head_version=head_version,
-                version_bump_type=version_bump_type,
-                change_kind=change_kind,
             )
         )
     else:

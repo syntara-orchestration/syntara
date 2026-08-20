@@ -800,16 +800,12 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 		echo "Installing oasdiff..."; \
 		./scripts/openapi/install-oasdiff.sh; \
 	fi
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	CMD="./scripts/openapi/check-breaking-changes.py \
 		--base $(OPENAPI_BASE_REF) \
 		--head HEAD \
 		--format text \
 		--fallback-spec-path backend/src/syntara/schemas/openapi.yaml"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
-		CMD="$$CMD --pr-body \"$$PR_BODY_TEXT\""; \
-	fi; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
 	fi; \

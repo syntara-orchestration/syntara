@@ -1,7 +1,12 @@
 """Tests for backend/scripts/openapi/check-breaking-changes.py.
 
-Covers version helpers, acknowledgment, CVE labels, bump-type matching,
-and the full main() gate (oasdiff is mocked).
+Covers version helpers, the breaking-change approval label, spec-change
+detection, and the full main() gate (oasdiff is mocked).
+
+Gate policy under test:
+  * Every OpenAPI spec change must bump info.version (major/minor/patch).
+  * Breaking changes are blocked in place unless the privileged
+    ``breaking-change-approved`` label is present.
 """
 
 from __future__ import annotations
@@ -25,32 +30,24 @@ REQUIRED_JSON_FIELDS = (
     "has_breaking_changes",
     "breaking_changes",
     "all_changes",
-    "acknowledged",
-    "justification",
-    "ack_insufficient",
+    "has_changes",
     "version_bumped",
     "base_version",
     "head_version",
     "version_bump_type",
-    "cve_approved",
+    "breaking_approved",
     "spec_path",
-    "change_kind",
     "gate_code",
 )
 
 
-def _spec_yaml(version: str) -> str:
-    return textwrap.dedent(f"""\
-        openapi: "3.1.0"
-        info:
-          title: Syntara API
-          version: {version}
-        paths: {{}}
-    """)
+def _spec_yaml(version: str, *, description: str | None = None) -> str:
+    extra = f"  description: {description}\n" if description else ""
+    return f'openapi: "3.1.0"\ninfo:\n  title: Syntara API\n{extra}  version: {version}\npaths: {{}}\n'
 
 
-def _write_spec(path: Path, version: str) -> None:
-    path.write_text(_spec_yaml(version))
+def _write_spec(path: Path, version: str, *, description: str | None = None) -> None:
+    path.write_text(_spec_yaml(version, description=description))
 
 
 def _run_main(
@@ -61,16 +58,16 @@ def _run_main(
     head_version: str,
     has_breaking: bool,
     changelog: str,
-    pr_body: str = "",
     pr_labels: str = "",
     extra_args: list[str] | None = None,
+    head_description: str | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Invoke main() with mocked oasdiff and return (exit_code, json_result)."""
     base_spec = tmp_path / "base.yaml"
     head_spec = tmp_path / "head.yaml"
     output = tmp_path / "breaking-results.json"
     _write_spec(base_spec, base_version)
-    _write_spec(head_spec, head_version)
+    _write_spec(head_spec, head_version, description=head_description)
 
     monkeypatch.setattr(
         check_breaking,
@@ -93,8 +90,6 @@ def _run_main(
         "backend/src/syntara/schemas/openapi.yaml",
         "--output",
         str(output),
-        "--pr-body",
-        pr_body,
         "--pr-labels",
         pr_labels,
     ]
@@ -259,100 +254,56 @@ class TestGetVersionBumpType:
         assert check_breaking.get_version_bump_type("0.1.0", "1.0.0") == "major"
 
 
-class TestCheckAcknowledgment:
-    """Tests for check_acknowledgment()."""
-
-    def test_no_pr_body(self):
-        result = check_breaking.check_acknowledgment("")
-        assert result["acknowledged"] is False
-        assert result["justification"] == ""
-        assert result["ack_insufficient"] is False
-
-    def test_no_ack_in_body(self):
-        result = check_breaking.check_acknowledgment("This is a normal PR description")
-        assert result["acknowledged"] is False
-
-    def test_valid_ack(self):
-        body = "Some text\nbreaking-change-ack: This change is necessary for the v2 field rename migration\nMore text"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is True
-        assert "v2 field rename" in result["justification"]
-        assert result["ack_insufficient"] is False
-
-    def test_insufficient_ack(self):
-        body = "breaking-change-ack: too short"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is False
-        assert result["ack_insufficient"] is True
-        assert result["justification"] == "too short"
-
-    def test_case_insensitive(self):
-        body = "Breaking-Change-Ack: This is a sufficiently long justification for the change"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is True
-
-    def test_colon_with_spaces(self):
-        body = "breaking-change-ack :   This is a sufficiently long justification text here"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is True
-
-    def test_exactly_20_chars(self):
-        body = "breaking-change-ack: 12345678901234567890"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is True
-
-    def test_19_chars_insufficient(self):
-        body = "breaking-change-ack: 1234567890123456789"
-        result = check_breaking.check_acknowledgment(body)
-        assert result["acknowledged"] is False
-        assert result["ack_insufficient"] is True
-
-
-class TestCheckCveLabel:
-    """Tests for check_cve_label()."""
+class TestCheckApprovalLabel:
+    """Tests for check_approval_label()."""
 
     def test_empty_labels(self):
-        assert check_breaking.check_cve_label("") is False
+        assert check_breaking.check_approval_label("") is False
 
-    def test_no_cve_label(self):
-        assert check_breaking.check_cve_label("bug,enhancement") is False
+    def test_no_approval_label(self):
+        assert check_breaking.check_approval_label("bug,enhancement") is False
 
-    def test_cve_label_present(self):
-        assert check_breaking.check_cve_label("bug,cve-breaking-change-approved,enhancement") is True
+    def test_approval_label_present(self):
+        assert check_breaking.check_approval_label("bug,breaking-change-approved,enhancement") is True
 
-    def test_cve_label_only(self):
-        assert check_breaking.check_cve_label("cve-breaking-change-approved") is True
+    def test_approval_label_only(self):
+        assert check_breaking.check_approval_label("breaking-change-approved") is True
 
     def test_case_insensitive(self):
-        assert check_breaking.check_cve_label("CVE-BREAKING-CHANGE-APPROVED") is True
+        assert check_breaking.check_approval_label("BREAKING-CHANGE-APPROVED") is True
 
     def test_whitespace_handling(self):
-        assert check_breaking.check_cve_label("bug, cve-breaking-change-approved , fix") is True
+        assert check_breaking.check_approval_label("bug, breaking-change-approved , fix") is True
 
     def test_partial_match_rejected(self):
-        assert check_breaking.check_cve_label("not-cve-breaking-change-approved-extra") is False
+        assert check_breaking.check_approval_label("not-breaking-change-approved-extra") is False
 
 
-class TestClassifyNonBreakingChanges:
-    """Tests for classify_non_breaking_changes()."""
+class TestSpecHasChanges:
+    """Tests for spec_has_changes()."""
 
-    def test_empty_is_none(self):
-        assert check_breaking.classify_non_breaking_changes("") == "none"
+    def test_identical_content_no_changelog(self):
+        spec = _spec_yaml("1.0.0")
+        assert check_breaking.spec_has_changes(spec, spec, has_breaking=False, all_changes="") is False
 
-    def test_no_changes_text_is_none(self):
-        assert check_breaking.classify_non_breaking_changes("No changes") == "none"
+    def test_identical_content_no_changes_text(self):
+        spec = _spec_yaml("1.0.0")
+        assert check_breaking.spec_has_changes(spec, spec, has_breaking=False, all_changes="No changes") is False
 
-    def test_endpoint_added_id_is_additive(self):
-        changelog = "info\t[endpoint-added] at paths/widgets.yaml\n\tin API added GET /widgets"
-        assert check_breaking.classify_non_breaking_changes(changelog) == "additive"
+    def test_content_diff_without_oasdiff_output(self):
+        base = _spec_yaml("1.0.0")
+        head = _spec_yaml("1.0.0", description="tweaked")
+        assert check_breaking.spec_has_changes(base, head, has_breaking=False, all_changes="") is True
 
-    def test_request_property_added_is_additive(self):
-        changelog = "info [request-property-added] added the optional request property 'nickname'"
-        assert check_breaking.classify_non_breaking_changes(changelog) == "additive"
+    def test_breaking_always_counts(self):
+        spec = _spec_yaml("1.0.0")
+        assert check_breaking.spec_has_changes(spec, spec, has_breaking=True, all_changes="") is True
 
-    def test_description_change_is_other(self):
-        changelog = "info [endpoint-description-changed] updated description of GET /widgets"
-        assert check_breaking.classify_non_breaking_changes(changelog) == "other"
+    def test_changelog_fallback_when_content_matches(self):
+        spec = _spec_yaml("1.0.0")
+        assert (
+            check_breaking.spec_has_changes(spec, spec, has_breaking=False, all_changes="info [endpoint-added]") is True
+        )
 
 
 class TestEvaluateGate:
@@ -362,21 +313,15 @@ class TestEvaluateGate:
         self,
         *,
         has_breaking: bool = False,
-        version_bump_type: str | None = None,
-        acknowledged: bool = False,
-        ack_insufficient: bool = False,
-        justification: str = "",
-        cve_approved: bool = False,
-        change_kind: str = "none",
-    ) -> Any:
+        has_changes: bool = False,
+        version_bumped: bool = False,
+        breaking_approved: bool = False,
+    ) -> Any:  # noqa: ANN401 - GateDecision comes from a dynamically imported (hyphenated) module
         return check_breaking.evaluate_gate(
             has_breaking=has_breaking,
-            version_bump_type=version_bump_type,
-            acknowledged=acknowledged,
-            ack_insufficient=ack_insufficient,
-            justification=justification,
-            cve_approved=cve_approved,
-            change_kind=change_kind,
+            has_changes=has_changes,
+            version_bumped=version_bumped,
+            breaking_approved=breaking_approved,
         )
 
     def test_no_changes_allowed(self):
@@ -384,99 +329,53 @@ class TestEvaluateGate:
         assert decision.allowed is True
         assert decision.code == "ok"
 
-    def test_breaking_blocked(self):
-        decision = self._decide(has_breaking=True)
+    def test_breaking_no_label_blocked(self):
+        decision = self._decide(has_breaking=True, has_changes=True, version_bumped=True)
         assert decision.allowed is False
         assert decision.code == "breaking_blocked"
 
-    def test_breaking_ack_without_major_blocked(self):
-        decision = self._decide(has_breaking=True, acknowledged=True, version_bump_type=None)
+    def test_breaking_no_label_blocked_even_without_bump(self):
+        # Breaking-without-approval is the dominant reason regardless of bump state.
+        decision = self._decide(has_breaking=True, has_changes=True, version_bumped=False)
         assert decision.allowed is False
-        assert decision.code == "ack_without_major"
+        assert decision.code == "breaking_blocked"
 
-    def test_breaking_minor_bump_ack_blocked(self):
-        decision = self._decide(has_breaking=True, acknowledged=True, version_bump_type="minor")
-        assert decision.allowed is False
-        assert decision.code == "ack_without_major"
-
-    def test_breaking_major_bump_with_ack_allowed(self):
+    def test_breaking_approved_with_bump_allowed(self):
         decision = self._decide(
             has_breaking=True,
-            acknowledged=True,
-            version_bump_type="major",
-            justification="Routing the field rename to /api/v2/",
+            has_changes=True,
+            version_bumped=True,
+            breaking_approved=True,
         )
         assert decision.allowed is True
-        assert decision.code == "major_ack"
+        assert decision.code == "breaking_approved"
 
-    def test_breaking_cve_escape_hatch_allowed(self):
-        decision = self._decide(has_breaking=True, cve_approved=True)
-        assert decision.allowed is True
-        assert decision.code == "cve_override"
-
-    def test_additive_minor_bump_allowed(self):
-        decision = self._decide(change_kind="additive", version_bump_type="minor")
-        assert decision.allowed is True
-
-    def test_additive_patch_bump_blocked(self):
-        decision = self._decide(change_kind="additive", version_bump_type="patch")
+    def test_breaking_approved_without_bump_blocked(self):
+        # Even an approved breaking change must bump info.version.
+        decision = self._decide(
+            has_breaking=True,
+            has_changes=True,
+            version_bumped=False,
+            breaking_approved=True,
+        )
         assert decision.allowed is False
-        assert decision.code == "incorrect_bump"
+        assert decision.code == "version_bump_required"
 
-    def test_additive_no_bump_allowed(self):
-        decision = self._decide(change_kind="additive", version_bump_type=None)
+    def test_non_breaking_with_bump_allowed(self):
+        decision = self._decide(has_changes=True, version_bumped=True)
         assert decision.allowed is True
+        assert decision.code == "ok"
 
-    def test_other_patch_bump_allowed(self):
-        decision = self._decide(change_kind="other", version_bump_type="patch")
-        assert decision.allowed is True
-
-    def test_major_bump_without_breaking_blocked(self):
-        decision = self._decide(change_kind="other", version_bump_type="major")
+    def test_non_breaking_without_bump_blocked(self):
+        decision = self._decide(has_changes=True, version_bumped=False)
         assert decision.allowed is False
-        assert decision.code == "incorrect_bump"
+        assert decision.code == "version_bump_required"
 
 
 class TestMainGate:
     """End-to-end main() tests with mocked oasdiff."""
 
-    def test_breaking_change_blocked_even_with_ack(self, monkeypatch, tmp_path):
-        code, result = _run_main(
-            monkeypatch,
-            tmp_path,
-            base_version="1.0.0",
-            head_version="1.0.0",
-            has_breaking=True,
-            changelog="removed GET /legacy",
-            pr_body="breaking-change-ack: This is a sufficiently long justification text",
-        )
-        assert code == 1
-        assert result["has_breaking_changes"] is True
-        assert result["acknowledged"] is True
-        assert result["version_bumped"] is False
-        assert result["base_version"] == "1.0.0"
-        assert result["head_version"] == "1.0.0"
-        assert result["gate_code"] == "ack_without_major"
-        assert result["spec_path"] == "backend/src/syntara/schemas/openapi.yaml"
-        for field in REQUIRED_JSON_FIELDS:
-            assert field in result, f"Missing required field: {field}"
-
-    def test_breaking_change_with_cve_escape_hatch(self, monkeypatch, tmp_path):
-        code, result = _run_main(
-            monkeypatch,
-            tmp_path,
-            base_version="1.0.0",
-            head_version="1.0.0",
-            has_breaking=True,
-            changelog="removed GET /legacy",
-            pr_labels="cve-breaking-change-approved",
-        )
-        assert code == 0
-        assert result["cve_approved"] is True
-        assert result["gate_code"] == "cve_override"
-        assert result["version_bumped"] is False
-
-    def test_breaking_change_major_bump_and_ack(self, monkeypatch, tmp_path):
+    def test_breaking_change_blocked_without_label(self, monkeypatch, tmp_path):
         code, result = _run_main(
             monkeypatch,
             tmp_path,
@@ -484,13 +383,46 @@ class TestMainGate:
             head_version="2.0.0",
             has_breaking=True,
             changelog="removed GET /legacy",
-            pr_body="breaking-change-ack: Routing the rename to a new /api/v2/ spec",
+        )
+        assert code == 1
+        assert result["has_breaking_changes"] is True
+        assert result["breaking_approved"] is False
+        assert result["gate_code"] == "breaking_blocked"
+        assert result["spec_path"] == "backend/src/syntara/schemas/openapi.yaml"
+        for field in REQUIRED_JSON_FIELDS:
+            assert field in result, f"Missing required field: {field}"
+
+    def test_breaking_change_with_approval_label(self, monkeypatch, tmp_path):
+        code, result = _run_main(
+            monkeypatch,
+            tmp_path,
+            base_version="1.0.0",
+            head_version="1.0.1",
+            has_breaking=True,
+            changelog="removed GET /legacy",
+            pr_labels="breaking-change-approved",
         )
         assert code == 0
-        assert result["version_bump_type"] == "major"
-        assert result["gate_code"] == "major_ack"
+        assert result["breaking_approved"] is True
+        assert result["version_bumped"] is True
+        assert result["gate_code"] == "breaking_approved"
 
-    def test_non_breaking_correct_minor_bump(self, monkeypatch, tmp_path):
+    def test_breaking_change_approved_but_no_bump_blocked(self, monkeypatch, tmp_path):
+        code, result = _run_main(
+            monkeypatch,
+            tmp_path,
+            base_version="1.0.0",
+            head_version="1.0.0",
+            has_breaking=True,
+            changelog="removed GET /legacy",
+            pr_labels="breaking-change-approved",
+        )
+        assert code == 1
+        assert result["breaking_approved"] is True
+        assert result["version_bumped"] is False
+        assert result["gate_code"] == "version_bump_required"
+
+    def test_non_breaking_minor_bump_allowed(self, monkeypatch, tmp_path):
         code, result = _run_main(
             monkeypatch,
             tmp_path,
@@ -498,14 +430,16 @@ class TestMainGate:
             head_version="1.1.0",
             has_breaking=False,
             changelog="info [endpoint-added] in API added GET /widgets",
+            head_description="new endpoint",
         )
         assert code == 0
-        assert result["change_kind"] == "additive"
+        assert result["has_changes"] is True
         assert result["version_bump_type"] == "minor"
         assert result["version_bumped"] is True
         assert result["gate_code"] == "ok"
 
-    def test_non_breaking_incorrect_patch_bump_for_additive(self, monkeypatch, tmp_path):
+    def test_non_breaking_patch_bump_allowed(self, monkeypatch, tmp_path):
+        # Bump *type* is not enforced — any bump satisfies the gate for non-breaking changes.
         code, result = _run_main(
             monkeypatch,
             tmp_path,
@@ -513,14 +447,14 @@ class TestMainGate:
             head_version="1.0.1",
             has_breaking=False,
             changelog="info [endpoint-added] in API added GET /widgets",
+            head_description="new endpoint",
         )
-        assert code == 1
-        assert result["change_kind"] == "additive"
+        assert code == 0
+        assert result["has_changes"] is True
         assert result["version_bump_type"] == "patch"
-        assert result["gate_code"] == "incorrect_bump"
-        assert result["has_breaking_changes"] is False
+        assert result["gate_code"] == "ok"
 
-    def test_non_breaking_no_bump_allowed(self, monkeypatch, tmp_path):
+    def test_non_breaking_no_bump_blocked(self, monkeypatch, tmp_path):
         code, result = _run_main(
             monkeypatch,
             tmp_path,
@@ -528,10 +462,26 @@ class TestMainGate:
             head_version="1.0.0",
             has_breaking=False,
             changelog="info [endpoint-added] in API added GET /widgets",
+            head_description="new endpoint",
         )
-        assert code == 0
+        assert code == 1
+        assert result["has_changes"] is True
         assert result["version_bumped"] is False
-        assert result["gate_code"] == "ok"
+        assert result["gate_code"] == "version_bump_required"
+
+    def test_oasdiff_silent_content_change_requires_bump(self, monkeypatch, tmp_path):
+        code, result = _run_main(
+            monkeypatch,
+            tmp_path,
+            base_version="1.0.0",
+            head_version="1.0.0",
+            has_breaking=False,
+            changelog="",
+            head_description="metadata only",
+        )
+        assert code == 1
+        assert result["has_changes"] is True
+        assert result["gate_code"] == "version_bump_required"
 
     def test_no_changes(self, monkeypatch, tmp_path):
         code, result = _run_main(
@@ -544,7 +494,7 @@ class TestMainGate:
         )
         assert code == 0
         assert result["has_breaking_changes"] is False
-        assert result["change_kind"] == "none"
+        assert result["has_changes"] is False
         assert result["version_bumped"] is False
         assert result["base_version"] == "1.0.0"
         assert result["head_version"] == "1.0.0"
@@ -573,8 +523,10 @@ class TestMainGate:
 class TestFormatTextOutput:
     """Tests for _format_text_output()."""
 
-    def test_no_breaking_changes(self):
-        decision = check_breaking.GateDecision(allowed=True, code="ok", message="No breaking changes detected")
+    def test_non_breaking_with_bump(self):
+        decision = check_breaking.GateDecision(
+            allowed=True, code="ok", message="Non-breaking spec change with a version bump"
+        )
         lines = check_breaking._format_text_output(
             has_breaking=False,
             breaking_output="",
@@ -586,19 +538,16 @@ class TestFormatTextOutput:
             spec_path="backend/src/syntara/schemas/openapi.yaml",
         )
         text = "\n".join(lines)
-        assert "No breaking changes detected" in text
+        assert "version bump" in text
         assert "1.0.0 -> 1.0.1" in text
         assert "backend/src/syntara/schemas/openapi.yaml" in text
 
     def test_breaking_blocked(self):
         decision = check_breaking.evaluate_gate(
             has_breaking=True,
-            version_bump_type=None,
-            acknowledged=False,
-            ack_insufficient=False,
-            justification="",
-            cve_approved=False,
-            change_kind="none",
+            has_changes=True,
+            version_bumped=True,
+            breaking_approved=False,
         )
         lines = check_breaking._format_text_output(
             has_breaking=True,
@@ -606,24 +555,21 @@ class TestFormatTextOutput:
             all_changes="endpoint removed",
             decision=decision,
             base_version="1.0.0",
-            head_version="1.0.0",
-            version_bump_type=None,
+            head_version="1.1.0",
+            version_bump_type="minor",
             spec_path="backend/src/syntara/schemas/openapi.yaml",
         )
         text = "\n".join(lines)
         assert "BREAKING CHANGES DETECTED" in text
         assert "BLOCKED" in text
-        assert "cve-breaking-change-approved" in text
+        assert "breaking-change-approved" in text
 
-    def test_breaking_cve_approved(self):
+    def test_breaking_approved(self):
         decision = check_breaking.evaluate_gate(
             has_breaking=True,
-            version_bump_type=None,
-            acknowledged=False,
-            ack_insufficient=False,
-            justification="",
-            cve_approved=True,
-            change_kind="none",
+            has_changes=True,
+            version_bumped=True,
+            breaking_approved=True,
         )
         lines = check_breaking._format_text_output(
             has_breaking=True,
@@ -631,45 +577,20 @@ class TestFormatTextOutput:
             all_changes="field removed",
             decision=decision,
             base_version="1.0.0",
-            head_version="1.0.0",
-            version_bump_type=None,
+            head_version="1.0.1",
+            version_bump_type="patch",
             spec_path="backend/src/syntara/schemas/openapi.yaml",
         )
         text = "\n".join(lines)
-        assert "ALLOWED: CVE escape hatch" in text
+        assert "ALLOWED" in text
+        assert "breaking-change-approved" in text
 
-    def test_breaking_major_bump_ack(self):
-        decision = check_breaking.evaluate_gate(
-            has_breaking=True,
-            version_bump_type="major",
-            acknowledged=True,
-            ack_insufficient=False,
-            justification="Routing to v2 for the field rename",
-            cve_approved=False,
-            change_kind="none",
-        )
-        lines = check_breaking._format_text_output(
-            has_breaking=True,
-            breaking_output="endpoint renamed",
-            all_changes="endpoint renamed",
-            decision=decision,
-            base_version="1.0.0",
-            head_version="2.0.0",
-            version_bump_type="major",
-            spec_path="backend/src/syntara/schemas/openapi.yaml",
-        )
-        text = "\n".join(lines)
-        assert "ALLOWED: Major version bump" in text
-
-    def test_incorrect_bump_message(self):
+    def test_version_bump_required_message(self):
         decision = check_breaking.evaluate_gate(
             has_breaking=False,
-            version_bump_type="patch",
-            acknowledged=False,
-            ack_insufficient=False,
-            justification="",
-            cve_approved=False,
-            change_kind="additive",
+            has_changes=True,
+            version_bumped=False,
+            breaking_approved=False,
         )
         lines = check_breaking._format_text_output(
             has_breaking=False,
@@ -677,17 +598,17 @@ class TestFormatTextOutput:
             all_changes="info [endpoint-added]",
             decision=decision,
             base_version="1.0.0",
-            head_version="1.0.1",
-            version_bump_type="patch",
+            head_version="1.0.0",
+            version_bump_type=None,
             spec_path="backend/src/syntara/schemas/openapi.yaml",
         )
         text = "\n".join(lines)
         assert "BLOCKED" in text
-        assert "minor version bump" in text
+        assert "info.version" in text
 
 
 class TestPostBreakingChangesComment:
-    """Tests for PR comment formatting of the new gate outcomes."""
+    """Tests for PR comment formatting of the gate outcomes."""
 
     def test_blocked_breaking_includes_spec_and_versions(self):
         comment = post_comment.format_breaking_changes_comment(
@@ -695,13 +616,10 @@ class TestPostBreakingChangesComment:
                 "has_breaking_changes": True,
                 "breaking_changes": "removed GET /legacy",
                 "all_changes": "removed GET /legacy",
-                "acknowledged": False,
-                "ack_insufficient": False,
-                "justification": "",
                 "base_version": "1.0.0",
-                "head_version": "1.0.0",
-                "version_bump_type": None,
-                "cve_approved": False,
+                "head_version": "1.1.0",
+                "version_bump_type": "minor",
+                "breaking_approved": False,
                 "spec_path": "backend/src/syntara/schemas/openapi.yaml",
                 "gate_code": "breaking_blocked",
             },
@@ -712,26 +630,42 @@ class TestPostBreakingChangesComment:
         assert "1.0.0" in comment
         assert "removed GET /legacy" in comment
         assert "Blocked" in comment
+        assert "breaking-change-approved" in comment
 
-    def test_incorrect_bump_comment(self):
+    def test_approved_breaking_comment(self):
+        comment = post_comment.format_breaking_changes_comment(
+            {
+                "has_breaking_changes": True,
+                "breaking_changes": "removed GET /legacy",
+                "all_changes": "removed GET /legacy",
+                "base_version": "1.0.0",
+                "head_version": "1.0.1",
+                "version_bump_type": "patch",
+                "breaking_approved": True,
+                "spec_path": "backend/src/syntara/schemas/openapi.yaml",
+                "gate_code": "breaking_approved",
+            },
+            "syntara-orchestration",
+            "syntara",
+        )
+        assert "Approved Override" in comment
+        assert "breaking-change-approved" in comment
+
+    def test_version_bump_required_comment(self):
         comment = post_comment.format_breaking_changes_comment(
             {
                 "has_breaking_changes": False,
                 "breaking_changes": "",
                 "all_changes": "info [endpoint-added]",
-                "acknowledged": False,
-                "ack_insufficient": False,
-                "justification": "",
                 "base_version": "1.0.0",
-                "head_version": "1.0.1",
-                "version_bump_type": "patch",
-                "cve_approved": False,
+                "head_version": "1.0.0",
+                "version_bump_type": None,
+                "breaking_approved": False,
                 "spec_path": "backend/src/syntara/schemas/openapi.yaml",
-                "gate_code": "incorrect_bump",
-                "change_kind": "additive",
+                "gate_code": "version_bump_required",
             },
             "syntara-orchestration",
             "syntara",
         )
-        assert "Incorrect Version Bump" in comment
-        assert "minor" in comment.lower()
+        assert "Version Bump Required" in comment
+        assert "info.version" in comment
