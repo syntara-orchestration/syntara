@@ -204,7 +204,10 @@ class TestReconcileScheduledTriggers:
 
         with (
             patch(_PATCH_SVC) as mock_svc_cls,
-            patch("syntara.workflows.workers.schedule_reconciliation._RECONCILE_CLIENT_TIMEOUT_SECONDS", 0.05),
+            patch(
+                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                0.05,
+            ),
         ):
             mock_svc = mock_svc_cls.return_value
             mock_svc.get_client = _hang
@@ -213,6 +216,60 @@ class TestReconcileScheduledTriggers:
             await reconcile_scheduled_triggers(session_factory)
 
             mock_svc.list_all_schedules.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_list_timeout_skips_without_waiting_on_hang(self) -> None:
+        """A hung schedule list must not stall the reconciliation cycle."""
+        wf_id = str(uuid4())
+        triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
+        session_factory = _make_session_factory([(wf_id, triggers)])
+
+        async def _hang_list(_client: MagicMock) -> set[str]:
+            await asyncio.Event().wait()
+            return set()
+
+        with (
+            patch(_PATCH_SVC) as mock_svc_cls,
+            patch(
+                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                0.05,
+            ),
+        ):
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_client = AsyncMock(return_value=MagicMock())
+            mock_svc.list_all_schedules = _hang_list
+            mock_svc.create_schedule = AsyncMock()
+            mock_svc_cls.delete_schedule = AsyncMock()
+
+            await asyncio.wait_for(reconcile_scheduled_triggers(session_factory), timeout=1.0)
+
+            mock_svc.create_schedule.assert_not_called()
+            mock_svc_cls.delete_schedule.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mutate_timeout_skips_without_waiting_on_hang(self) -> None:
+        """A hung create/delete gather must not stall the reconciliation cycle."""
+        session_factory = _make_session_factory([])
+        orphan_id = "orchestrator-sched-dead-workflow-trigger_1"
+
+        async def _hang_delete(_client: MagicMock, _schedule_id: str) -> bool:
+            await asyncio.Event().wait()
+            return True
+
+        with (
+            patch(_PATCH_SVC) as mock_svc_cls,
+            patch(
+                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                0.05,
+            ),
+        ):
+            mock_client = MagicMock()
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_client = AsyncMock(return_value=mock_client)
+            mock_svc.list_all_schedules = AsyncMock(return_value={orphan_id})
+            mock_svc_cls.delete_schedule = _hang_delete
+
+            await asyncio.wait_for(reconcile_scheduled_triggers(session_factory), timeout=1.0)
 
     @pytest.mark.asyncio
     async def test_no_published_workflows_checks_orphans_only(self) -> None:

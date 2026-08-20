@@ -891,6 +891,34 @@ class TestScheduledTriggerSyncGracefulDegradation:
         assert result == mock_workflow
 
     @pytest.mark.asyncio
+    async def test_unpublish_passes_republish_abort_into_delete(self, mock_service: WorkflowService) -> None:
+        """List/delete must keep re-checking publish state after connect."""
+        workflow_id, mock_workflow = _published_workflow_mock()
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch.object(
+                WorkflowService,
+                "_workflow_is_published",
+                new=AsyncMock(return_value=False),
+            ),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            _configure_scheduled_service(mock_sched_cls, delete=AsyncMock())
+            result = await mock_service.unpublish_workflow(workflow_id)
+            await _finish_background_deletes()
+            kwargs = mock_sched_cls.return_value.delete_triggers_for_workflow.await_args.kwargs
+            assert callable(kwargs.get("should_abort"))
+            assert await kwargs["should_abort"]() is False
+
+        assert result == mock_workflow
+
+    @pytest.mark.asyncio
     async def test_unpublish_returns_when_connect_hangs_without_holding_lock(
         self, mock_service: WorkflowService
     ) -> None:
@@ -1061,12 +1089,12 @@ class TestWorkflowIsPublished:
             assert await WorkflowService._workflow_is_published(uuid4()) is False
 
     @pytest.mark.asyncio
-    async def test_false_when_db_read_fails(self) -> None:
+    async def test_true_when_db_read_fails(self) -> None:
         with patch(
             "syntara.workflows.services.workflow_service.AsyncSessionLocal",
             return_value=_workflow_session_ctx(None, error=RuntimeError("db down")),
         ):
-            assert await WorkflowService._workflow_is_published(uuid4()) is False
+            assert await WorkflowService._workflow_is_published(uuid4()) is True
 
 
 class TestPublishRejectsInvalidScheduledTriggerConfig:

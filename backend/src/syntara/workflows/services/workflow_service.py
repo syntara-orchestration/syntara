@@ -306,18 +306,19 @@ class WorkflowService(BaseService):
 
         Opens a new session so this can run after the request session is
         closed. If the workflow was republished before cleanup ran, schedules
-        must be kept. DB errors fail open (proceed with delete).
+        must be kept. DB errors fail closed (skip delete) so a transient read
+        failure cannot wipe a republish; the reconciler removes orphans.
         """
         try:
             async with AsyncSessionLocal() as session:
                 workflow = await session.get(Workflow, workflow_id)
         except Exception:  # noqa: BLE001
             logger.warning(
-                "Could not read workflow state before schedule deletion — proceeding with cleanup",
+                "Could not read workflow state before schedule deletion — skipping cleanup",
                 workflow_id=str(workflow_id),
                 exc_info=True,
             )
-            return False
+            return True
         return workflow is not None and workflow.deleted_at is None and workflow.published_version_id is not None
 
     @staticmethod
@@ -326,9 +327,11 @@ class WorkflowService(BaseService):
 
         Swallows errors so a detached unpublish/delete task cannot fail
         the already-committed database change. Skips deletion when a later
-        publish won the race. The schedule reconciliation worker will
-        clean up any orphans that remain when Temporal is unreachable or
-        the process dies before this task finishes.
+        publish won the race. Re-checks after connect; list/delete re-check
+        via ``should_abort`` so a republish during those calls keeps the
+        new schedules. The schedule reconciliation worker will clean up
+        any orphans that remain when Temporal is unreachable or the
+        process dies before this task finishes.
         """
         try:
             if await WorkflowService._workflow_is_published(workflow_id):
@@ -347,8 +350,13 @@ class WorkflowService(BaseService):
                     workflow_id=str(workflow_id),
                 )
                 return
+
+            async def _abort_if_republished() -> bool:
+                return await WorkflowService._workflow_is_published(workflow_id)
+
             await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
+                should_abort=_abort_if_republished,
             )
         except Exception:  # noqa: BLE001
             logger.warning(

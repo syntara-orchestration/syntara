@@ -499,6 +499,69 @@ class TestDeleteTriggersForWorkflow:
         assert isinstance(exc_info.value.__cause__, RPCError)
         assert exc_info.value.__cause__.status == RPCStatusCode.INTERNAL
 
+    async def test_aborts_after_connect_without_listing(self) -> None:
+        """A republish found after connect must not list or delete schedules."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")],
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(return_value=True),
+        )
+
+        assert deleted == 0
+        client.list_schedules.assert_not_called()
+        handle.delete.assert_not_called()
+
+    async def test_aborts_after_list_without_deleting(self) -> None:
+        """A republish found after listing must not delete the listed IDs."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")],
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(side_effect=[False, True]),
+        )
+
+        assert deleted == 0
+        client.list_schedules.assert_called()
+        handle.delete.assert_not_called()
+
+    async def test_aborts_before_remaining_deletes(self) -> None:
+        """A republish mid-batch must keep schedules that have not been deleted yet."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [
+                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1"),
+                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_2"),
+                ]
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        handle.delete = AsyncMock()
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(side_effect=[False, False, False, True]),
+        )
+
+        assert deleted == 1
+        assert handle.delete.call_count == 1
+
 
 class TestGracefulTemporalUnavailability:
     """Tests for graceful handling of Temporal unavailability."""
@@ -1067,6 +1130,32 @@ class TestGetSharedClient:
             assert _mod._cached_client is None
             assert await _mod._get_shared_client() is second_client
             assert mock_connect.await_count == 2
+
+    async def test_timed_out_connect_is_replaced(self) -> None:
+        """A hung Client.connect must finish so the next caller starts a new one."""
+        connect_calls = 0
+        second_client = MagicMock()
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                await asyncio.Event().wait()
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            first = await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0)
+            assert first is None
+            assert _mod._connect_task is not None
+            assert _mod._connect_task.done()
+            assert await _mod._get_shared_client() is second_client
+            assert connect_calls == 2
 
 
 class TestCreateSchedule:

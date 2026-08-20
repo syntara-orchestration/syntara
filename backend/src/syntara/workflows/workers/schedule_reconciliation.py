@@ -39,9 +39,10 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Skip this cycle if Temporal connect/list hangs. Do not cancel the shared
-# connect task — waiters use shield, and the next interval can use the cache.
-_RECONCILE_CLIENT_TIMEOUT_SECONDS = 10.0
+# Skip this cycle if Temporal connect, list, or mutate hangs. Do not cancel
+# the shared connect task — waiters use shield. The connect task has its own
+# bound so a hang is replaced on the next caller.
+_RECONCILE_TEMPORAL_TIMEOUT_SECONDS = 10.0
 
 
 def _extract_expected_schedules(
@@ -109,7 +110,7 @@ async def reconcile_scheduled_triggers(
     # available, falling back to client-side prefix scan otherwise.
     service = ScheduledTriggerService()
     try:
-        async with asyncio.timeout(_RECONCILE_CLIENT_TIMEOUT_SECONDS):
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
             client = await service.get_client()
     except TimeoutError:
         logger.warning("schedule_reconciliation_skipped", reason="Temporal client timed out")
@@ -119,7 +120,12 @@ async def reconcile_scheduled_triggers(
         logger.warning("schedule_reconciliation_skipped", reason="Temporal unavailable")
         return
 
-    actual_ids = await service.list_all_schedules(client)
+    try:
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
+            actual_ids = await service.list_all_schedules(client)
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal list timed out")
+        return
 
     # -- Step 3: Compute delta --
     missing = expected_ids - actual_ids
@@ -136,11 +142,16 @@ async def reconcile_scheduled_triggers(
     # -- Step 4: Apply delta (concurrent) --
     missing_list = sorted(missing)
     orphan_list = sorted(orphans)
-    all_results = await asyncio.gather(
-        *(service.create_schedule(*lookup[sid]) for sid in missing_list),
-        *(ScheduledTriggerService.delete_schedule(client, sid) for sid in orphan_list),
-        return_exceptions=True,
-    )
+    try:
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
+            all_results = await asyncio.gather(
+                *(service.create_schedule(*lookup[sid]) for sid in missing_list),
+                *(ScheduledTriggerService.delete_schedule(client, sid) for sid in orphan_list),
+                return_exceptions=True,
+            )
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal mutate timed out")
+        return
     create_results = all_results[: len(missing_list)]
     delete_results = all_results[len(missing_list) :]
 

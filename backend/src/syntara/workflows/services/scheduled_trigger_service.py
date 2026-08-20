@@ -9,6 +9,7 @@ updated, published, unpublished, or deleted.
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import structlog
@@ -51,9 +52,39 @@ _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
 _connect_task: asyncio.Task[Client | None] | None = None
 
+# Bound the shared connect itself so a hang is cancelled and the next caller
+# can start a new attempt. Waiters still shield this task so a timed-out
+# reconciler cycle cannot cancel an in-flight connect.
+_CONNECT_TIMEOUT_SECONDS = 10.0
+
 _search_attr_available: bool | None = None
 
 _CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
+
+
+async def _abort_schedule_delete(
+    should_abort: Callable[[], Awaitable[bool]] | None,
+    *,
+    workflow_id: str,
+    deleted: int | None = None,
+    remaining: int | None = None,
+) -> bool:
+    """Return True when a republish guard says to stop deleting schedules."""
+    if should_abort is None or not await should_abort():
+        return False
+    if deleted is None:
+        logger.info(
+            "Skipping scheduled trigger deletion because the workflow is published",
+            workflow_id=workflow_id,
+        )
+    else:
+        logger.info(
+            "Skipping remaining scheduled trigger deletion because the workflow is published",
+            workflow_id=workflow_id,
+            deleted=deleted,
+            remaining=remaining,
+        )
+    return True
 
 
 async def _update_schedule_with_retry(
@@ -154,15 +185,21 @@ async def _connect_shared_client() -> Client | None:
 
     Waiters share this task via ``_get_shared_client``. Cancellation of a
     waiter must not cancel this connect (see ``asyncio.shield`` there).
+    This task is itself bounded: a hung ``Client.connect`` is cancelled so
+    the next ``_get_shared_client`` can start a replacement.
     """
     global _cached_client  # noqa: PLW0603
     try:
         settings = get_settings()
-        client = await Client.connect(
-            settings.temporal_address,
-            namespace=settings.temporal_namespace,
-            tls=build_temporal_tls_config(),
-        )
+        async with asyncio.timeout(_CONNECT_TIMEOUT_SECONDS):
+            client = await Client.connect(
+                settings.temporal_address,
+                namespace=settings.temporal_namespace,
+                tls=build_temporal_tls_config(),
+            )
+    except TimeoutError:
+        logger.warning("Temporal connect timed out")
+        return None
     except (OSError, RuntimeError, RPCError) as e:
         logger.warning("Temporal unavailable for schedule management", error=str(e))
         return None
@@ -181,6 +218,8 @@ async def _get_shared_client() -> Client | None:
     starting the in-flight connect task, so a hung connect cannot block the
     schedule reconciler from taking the lock. Waiters use ``asyncio.shield``
     so a timed-out reconciler cycle does not cancel an in-flight connect.
+    ``_connect_shared_client`` is bounded so a hang completes, and the next
+    caller starts a new connect instead of joining the same stuck task.
     """
     global _connect_task  # noqa: PLW0603
     async with _client_lock:
@@ -332,6 +371,8 @@ class ScheduledTriggerService:
     async def delete_triggers_for_workflow(
         self,
         workflow_id: str,
+        *,
+        should_abort: Callable[[], Awaitable[bool]] | None = None,
     ) -> int:
         """Delete all Temporal Schedules for a workflow.
 
@@ -340,8 +381,15 @@ class ScheduledTriggerService:
         iterate the workflow definition, so schedules created by any
         version are cleaned up — not just those in the current draft.
 
+        ``should_abort`` is re-checked after connect, after listing, and
+        before each delete so a republish that lands during cleanup keeps
+        the new schedules. Fail closed in that callback; the reconciler
+        removes orphans.
+
         Args:
             workflow_id: The workflow UUID (as string).
+            should_abort: Optional callback; when it returns True, remaining
+                deletes are skipped.
 
         Returns:
             Number of schedules deleted.
@@ -356,10 +404,23 @@ class ScheduledTriggerService:
             return 0
 
         try:
+            if await _abort_schedule_delete(should_abort, workflow_id=workflow_id):
+                return 0
+
             all_schedule_ids = await self._list_workflow_schedules(client, workflow_id)
+            if await _abort_schedule_delete(should_abort, workflow_id=workflow_id):
+                return 0
+
             deleted = 0
 
             for schedule_id in all_schedule_ids:
+                if await _abort_schedule_delete(
+                    should_abort,
+                    workflow_id=workflow_id,
+                    deleted=deleted,
+                    remaining=len(all_schedule_ids) - deleted,
+                ):
+                    break
                 if await self.delete_schedule(client, schedule_id):
                     deleted += 1
         except (OSError, RuntimeError, RPCError) as exc:
