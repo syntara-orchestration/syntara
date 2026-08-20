@@ -19,7 +19,8 @@
         "/^\\.tekton/.*\\.yaml$/"
       ],
       "matchStrings": [
-        "value: (?<depName>quay\\.io/aap-ci/tekton-catalog/pipeline/[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+        "value: (?<depName>quay\\.io/aap-ci/tekton-catalog/pipeline/[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)",
+        "DOWNSTREAM_OVERRIDE=(?<depName>quay\\.io/redhat-user-workloads/[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
@@ -73,6 +74,19 @@
     {
       "matchPackageNames": ["quay.io/aap-ci/*"],
       "automerge": true
+    },
+    {
+      "description": "Group DOWNSTREAM_OVERRIDE digest updates across Tekton pipelines and use a sanitized PR body",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": [
+        "quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override"
+      ],
+      "matchFileNames": [".tekton/**"],
+      "matchUpdateTypes": ["digest"],
+      "groupName": "downstream-override digest",
+      "commitMessageTopic": "DOWNSTREAM_OVERRIDE digest",
+      "commitMessageExtra": "in Tekton pipelines",
+      "prBodyTemplate": "{{{header}}}## Summary\n\nUpdates the pinned `DOWNSTREAM_OVERRIDE` container digest in Tekton pipeline manifests.\n\nImage coordinates and digest values are intentionally omitted from this description. Review the file diff.\n\n## Test plan\n\n- [ ] UI and backend Konflux PipelineRuns succeed after merge\n- [ ] Downstream branding still applies in built images\n{{{controls}}}"
     },
     {
       "description": "Disable all renovate updates on the early-access branch",
