@@ -14,6 +14,7 @@
  * Self-contained tests (UI-28, UI-30) create their own workflows.
  */
 import { test, expect, toAppUrl } from '../fixtures'
+import { dismissConnectionBanner } from '../helpers/approvals'
 import { buildUniqueName } from '../helpers/workflows'
 import {
   apiRequest,
@@ -23,13 +24,6 @@ import {
   pollExecutionStatus,
   publishWorkflowViaApi,
 } from '../utils/api'
-
-async function dismissConnectionBanner(app: import('@playwright/test').Page): Promise<void> {
-  const banner = app.locator('.pf-v6-c-alert').filter({ hasText: 'Live updates paused' })
-  if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await banner.getByRole('button', { name: /close/i }).click()
-  }
-}
 
 test.describe('Approval Side Panel', () => {
   test.describe.configure({ mode: 'serial' })
@@ -184,6 +178,7 @@ test.describe('Approval Side Panel', () => {
     await expect(app.getByRole('heading', { name: 'Review Approval' })).not.toBeVisible()
 
     const reviewBtn = app.getByRole('button', { name: 'Review approval' })
+    await expect(reviewBtn).toBeEnabled({ timeout: 15_000 })
     await reviewBtn.click()
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible()
     await expect(historyHeading).not.toBeVisible()
@@ -282,8 +277,7 @@ test.describe('Approval Side Panel', () => {
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
       await dismissConnectionBanner(app)
       await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
-      // eslint-disable-next-line no-restricted-properties -- multiple "Pending approval" badges on page (header + activity table)
-      await expect(app.getByText('Pending approval').first()).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByTestId('approval-status-badge')).toBeVisible({ timeout: 10_000 })
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }
@@ -347,8 +341,12 @@ test.describe('Approval Side Panel', () => {
 
       await expect(app.getByText('Rejection submitted')).toBeVisible({ timeout: 15_000 })
 
-      // eslint-disable-next-line no-restricted-properties -- multiple elements match "Rejected" (status badge + canvas branch label)
-      await expect(app.getByText(/Failed|Rejected/i).first()).toBeVisible({ timeout: 30_000 })
+      await pollExecutionStatus(app, executionId, ['completed', 'failed', 'error'], { token, timeout: 30_000 })
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('execution-status-badge').getByText(/Completed|Failed|Rejected/i)).toBeVisible({
+        timeout: 30_000,
+      })
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

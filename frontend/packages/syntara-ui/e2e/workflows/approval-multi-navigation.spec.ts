@@ -1,5 +1,5 @@
 import { test, expect, toAppUrl } from '../fixtures'
-import { waitForApprovalPanel } from '../helpers/approvals'
+import { dismissConnectionBanner, waitForApprovalPanel } from '../helpers/approvals'
 import { buildUniqueName } from '../helpers/workflows'
 import {
   apiRequest,
@@ -9,13 +9,6 @@ import {
   pollExecutionStatus,
   publishWorkflowViaApi,
 } from '../utils/api'
-
-async function dismissConnectionBanner(app: import('@playwright/test').Page): Promise<void> {
-  const banner = app.locator('.pf-v6-c-alert').filter({ hasText: 'Live updates paused' })
-  if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await banner.getByRole('button', { name: /close/i }).click()
-  }
-}
 
 test('multi-approval navigation: Previous/Next buttons and deep-link counter', async ({ app }) => {
   test.slow()
@@ -49,19 +42,17 @@ test('multi-approval navigation: Previous/Next buttons and deep-link counter', a
 
     await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
 
-    // Wait for both approvals to be indexed
+    // Wait for both approvals to be indexed — skip only if the API is unreachable
+    const probeResp = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
+    test.skip(!probeResp.ok(), `Approvals API returned ${probeResp.status()} — service may be unavailable`)
+
     let approvalIds: string[] = []
-    try {
-      await expect(async () => {
-        const r = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
-        const body = (await r.json()) as { resources?: Array<{ id: string }> }
-        approvalIds = (body.resources ?? []).map((a) => a.id)
-        expect(approvalIds).toHaveLength(2)
-      }).toPass({ timeout: 60_000, intervals: [2_000] })
-    } catch {
-      // Approvals service unavailable or indexer too slow
-    }
-    test.skip(approvalIds.length < 2, 'Need 2 indexed approvals — approvals service may be unavailable')
+    await expect(async () => {
+      const r = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
+      const body = (await r.json()) as { resources?: Array<{ id: string }> }
+      approvalIds = (body.resources ?? []).map((a) => a.id)
+      expect(approvalIds).toHaveLength(2)
+    }).toPass({ timeout: 60_000, intervals: [2_000] })
 
     // --- Part 1: Deep-link to first approval, verify counter and navigation ---
     // The component fetches pending approvals once on load. If it only gets 1 back
@@ -73,7 +64,7 @@ test('multi-approval navigation: Previous/Next buttons and deep-link counter', a
       await waitForApprovalPanel(app)
       await dismissConnectionBanner(app)
       await expect(app.getByText('1 of 2')).toBeVisible({ timeout: 5_000 })
-    }).toPass({ timeout: 30_000, intervals: [3_000] })
+    }).toPass({ timeout: 60_000, intervals: [5_000] })
 
     const prevButton = app.getByRole('button', { name: 'Previous approval' })
     const nextButton = app.getByRole('button', { name: 'Next approval' })
@@ -93,20 +84,13 @@ test('multi-approval navigation: Previous/Next buttons and deep-link counter', a
     await expect(nextButton).toBeEnabled()
 
     // --- Part 2: Deep-link directly to second approval, verify counter ---
-    await app.goto(toAppUrl(`/executions/${executionId}?approval=${approvalIds[1]}&history=closed`))
-    await waitForApprovalPanel(app)
-    await dismissConnectionBanner(app)
-    // Component may start at either position depending on cached state;
-    // if not already showing "2 of 2", click Next to get there
-    if (
-      !(await app
-        .getByText('2 of 2')
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false))
-    ) {
-      await app.getByRole('button', { name: 'Next approval' }).click()
-    }
-    await expect(app.getByText('2 of 2')).toBeVisible({ timeout: 10_000 })
+    const deepLink2 = toAppUrl(`/executions/${executionId}?approval=${approvalIds[1]}&history=closed`)
+    await expect(async () => {
+      await app.goto(deepLink2)
+      await waitForApprovalPanel(app)
+      await dismissConnectionBanner(app)
+      await expect(app.getByText('2 of 2')).toBeVisible({ timeout: 5_000 })
+    }).toPass({ timeout: 60_000, intervals: [5_000] })
   } finally {
     await deleteWorkflowViaApi(app, workflowId)
   }

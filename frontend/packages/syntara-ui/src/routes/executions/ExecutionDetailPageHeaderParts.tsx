@@ -21,12 +21,12 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
   return (
     <>
       {execution.status ? (
-        <FlexItem>
+        <FlexItem data-testid="execution-status-badge">
           <StatusLabel status={execution.status} />
         </FlexItem>
       ) : null}
       {execution.approval_pending ? (
-        <FlexItem>
+        <FlexItem data-testid="approval-status-badge">
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
         </FlexItem>
       ) : null}
