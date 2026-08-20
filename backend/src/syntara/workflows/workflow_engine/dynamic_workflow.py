@@ -120,7 +120,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # This keeps the workflow logic independent of infrastructure concerns.
         try:
             graph = WorkflowGraph.from_dict(workflow_definition)
-            has_approval_nodes = any(node.type == NodeType.APPROVAL for node in graph.get_all_nodes())
             self._initialize_state(
                 execution_id,
                 request_id=request_id,
@@ -147,7 +146,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._cleanup_timeout_tasks()
             self._mark_remaining_unreachable_nodes(graph)
 
-            if has_approval_nodes:
+            if self._detached_nodes:
                 await self._expire_remaining_approvals(graph)
 
             return self._build_result(execution_id, include_node_results)

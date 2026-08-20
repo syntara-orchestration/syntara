@@ -520,10 +520,18 @@ class TestExpireRemainingApprovals:
     async def test_expires_all_pending_approvals_for_execution(self) -> None:
         """Calls EXPIRE_APPROVAL with no node_id filter, scoped to the execution."""
         wf = _make_workflow(execution_id="exec-789")
-        graph = WorkflowGraph(InMemoryGraphBackend())
+        graph = _build_approval_graph(with_predecessor=False, with_successor=False)
+        wf._detached_nodes = {"approval"}
         mock_activity = AsyncMock(return_value={"expired_count": 1})
+        mock_local_activity = AsyncMock(return_value=None)
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch(
+                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                mock_local_activity,
+            ),
+        ):
             await wf._expire_remaining_approvals(graph)
 
         mock_activity.assert_called_once()
@@ -531,13 +539,38 @@ class TestExpireRemainingApprovals:
         assert mock_activity.call_args.kwargs["args"] == ["exec-789", None]
 
     @pytest.mark.asyncio
+    async def test_no_op_when_nothing_detached(self) -> None:
+        """No EXPIRE_APPROVAL call at all when no node was detached.
+
+        This is the case for an approval that already resolved via its own
+        timeout or a normal decision — it must not trigger a redundant
+        execution-wide expire sweep.
+        """
+        wf = _make_workflow(execution_id="exec-789")
+        graph = _build_approval_graph(with_predecessor=False, with_successor=False)
+        mock_activity = AsyncMock(return_value={"expired_count": 0})
+
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+            await wf._expire_remaining_approvals(graph)
+
+        mock_activity.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_swallows_activity_failure(self) -> None:
         """Failures are best-effort and must not propagate to the caller."""
         wf = _make_workflow()
-        graph = WorkflowGraph(InMemoryGraphBackend())
+        graph = _build_approval_graph(with_predecessor=False, with_successor=False)
+        wf._detached_nodes = {"approval"}
         mock_activity = AsyncMock(side_effect=RuntimeError("boom"))
+        mock_local_activity = AsyncMock(return_value=None)
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch(
+                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                mock_local_activity,
+            ),
+        ):
             await wf._expire_remaining_approvals(graph)
 
     @pytest.mark.asyncio
@@ -580,6 +613,7 @@ class TestExpireRemainingApprovals:
             await wf._expire_remaining_approvals(graph)
 
         mock_execute_local_activity.assert_not_called()
+        mock_execute_activity.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_dispatch_raises_on_unexpected_decision(self) -> None:

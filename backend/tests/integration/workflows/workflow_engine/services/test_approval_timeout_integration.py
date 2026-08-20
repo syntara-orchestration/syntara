@@ -19,12 +19,13 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
-_expire_calls: list[tuple[str, str]] = []
+_expire_calls: list[tuple[str, str | None]] = []
 
 
 @activity.defn(name=ActivityName.APPROVAL)
@@ -358,6 +359,7 @@ class TestApprovalTimeoutIntegration:
                     _test_script_activity,
                     fetch_workflow_runtime_settings,
                     fail_detached_approval_activity,
+                    converge,
                 ],
             ):
                 execution_service = TemporalExecutionService(

@@ -92,19 +92,26 @@ class WorkflowApprovalMixin:
             await self._expire_approval_requests(node_id)
 
     async def _expire_remaining_approvals(self, graph: "WorkflowGraph") -> None:
-        """Expire any approvals still pending once the workflow ends.
+        """Expire any approvals left pending by a detached approval node.
 
         Covers approval nodes left pending because a converge/failure path detached
         them before a decision was recorded (e.g. two approval branches where the
         workflow reaches its terminal state after only one is decided). Also fails
         the underlying Temporal activity for each detached approval node so it
         resolves immediately instead of lingering until its own start_to_close_timeout.
-        """
-        await self._expire_approvals(None, activity_id="__internal__expire_remaining_approvals")
 
+        No-ops if nothing was detached: an approval that already resolved via its
+        own timeout (``_maybe_expire_approval``) or a normal decision needs no
+        further cleanup here.
+        """
         detached_approval_ids = [
             node_id for node_id in self._detached_nodes if graph.get_node(node_id).type == NodeType.APPROVAL
         ]
+        if not detached_approval_ids:
+            return
+
+        await self._expire_approvals(None, activity_id="__internal__expire_remaining_approvals")
+
         for node_id in detached_approval_ids:
             await self._fail_detached_approval_activity(node_id)
 
