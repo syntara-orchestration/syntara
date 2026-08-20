@@ -1815,7 +1815,7 @@ class ActivitySyncService:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
             if queried_output is not None:
-                output_data = queried_output
+                output_data = {**initial_output_data, **queried_output} if initial_output_data else queried_output
 
             # Race condition mitigation: If activity is completed but output is None,
             # retry the query. This handles the case where Temporal emits the
@@ -1837,7 +1837,9 @@ class ActivitySyncService:
                     await asyncio.sleep(delay_ms / 1000.0)
                     queried_output = await handle.query("get_activity_output", activity_id)
                     if queried_output is not None:
-                        output_data = queried_output
+                        output_data = (
+                            {**initial_output_data, **queried_output} if initial_output_data else queried_output
+                        )
                         logger.debug(
                             "Successfully retrieved output on retry",
                             activity_id=activity_id,
