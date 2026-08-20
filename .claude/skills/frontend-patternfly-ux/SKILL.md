@@ -1138,7 +1138,7 @@ Principal type and scope are **different dimensions** — use colors from their 
 | -------------------- | ----------- |
 | Single-value callout | Filled grey |
 
-Do **not** show per-group item count badges on project group headers in All projects views — row counts are misleading when groups are paginated or filtered (see AAP-85112).
+Do **not** show per-group item count badges on project group headers in All projects views — row counts are misleading when groups are paginated or filtered.
 
 ### Grace-Period / Time-Remaining Indicator
 

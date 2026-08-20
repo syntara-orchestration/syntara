@@ -14,6 +14,8 @@ When this skill is invoked, follow the wizard below. Use `AskUserQuestion` to ga
 
 ## CRITICAL: Password Security
 
+This block stays in the public tree on purpose: it teaches agents how to **use** a secret without **displaying** it. Never put the password value in this file.
+
 The admin password (`SYNTARA_E2E_PASSWORD`) is a secret. It must never appear in logs, tool output, or conversation text.
 
 **Rules:**
