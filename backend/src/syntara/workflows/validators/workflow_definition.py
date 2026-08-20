@@ -226,6 +226,8 @@ def _check_converge_node_findings(
 
 def _check_approval_node_findings(
     workflow_definition: dict[str, Any],
+    *,
+    system_continue_on_failure: bool = False,
 ) -> list[ValidationFinding]:
     """Warn when fallback_decision is set without continue_on_failure."""
     findings: list[ValidationFinding] = []
@@ -237,7 +239,9 @@ def _check_approval_node_findings(
             continue
         params = node.get("parameters", {})
         settings = node.get("settings") or {}
-        if params.get("fallback_decision") == "approve" and not settings.get("continue_on_failure"):
+        node_cof = settings.get("continue_on_failure")
+        effective_cof = node_cof if node_cof is not None else system_continue_on_failure
+        if params.get("fallback_decision") == "approve" and not effective_cof:
             node_name = node.get("name") or node_id
             findings.append(
                 ValidationFinding(
@@ -247,7 +251,7 @@ def _check_approval_node_findings(
                         f"Approval step '{node_name}' has fallback_decision set to 'approve' "
                         f"but continue_on_failure is not enabled. "
                         f"The fallback will have no effect unless "
-                        f"continue_on_failure is enabled in the step settings."
+                        f"continue_on_failure is enabled in the step or system settings."
                     ),
                     node_id=node_id,
                     field_path="parameters.fallback_decision",
@@ -528,11 +532,19 @@ class WorkflowValidator:
         msg = f"Workflow definition schema validation failed: {'; '.join(details)}"
         raise SafeValueError(msg)
 
-    def _collect_findings(self, workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
+    def _collect_findings(
+        self,
+        workflow_definition: dict[str, Any],
+        *,
+        system_continue_on_failure: bool = False,
+    ) -> list[ValidationFinding]:
         """Run all validators and return individual findings.
 
         Args:
             workflow_definition: Workflow definition dictionary to validate
+            system_continue_on_failure: Admin-level default for continue_on_failure,
+                used to resolve approval fallback_decision warnings when a node
+                inherits the system default.
 
         Returns:
             List of ValidationFinding objects, one per issue
@@ -574,7 +586,12 @@ class WorkflowValidator:
             findings.extend(_check_cycles_findings(workflow_definition, node_ids))
             findings.extend(_check_orphaned_nodes_findings(workflow_definition, node_ids))
             findings.extend(_check_converge_node_findings(workflow_definition))
-            findings.extend(_check_approval_node_findings(workflow_definition))
+            findings.extend(
+                _check_approval_node_findings(
+                    workflow_definition,
+                    system_continue_on_failure=system_continue_on_failure,
+                )
+            )
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
@@ -613,17 +630,30 @@ class WorkflowValidator:
                 )
         return findings
 
-    def collect_findings(self, workflow_definition: dict[str, Any]) -> ValidationResult:
+    def collect_findings(
+        self,
+        workflow_definition: dict[str, Any],
+        *,
+        system_continue_on_failure: bool = False,
+    ) -> ValidationResult:
         """Run all validation checks and return a structured ValidationResult.
 
         Args:
             workflow_definition: Workflow definition dictionary to validate
+            system_continue_on_failure: Admin-level default for continue_on_failure,
+                used to resolve approval fallback_decision warnings when a node
+                inherits the system default.
 
         Returns:
             ValidationResult with individual findings, counts, and validity
 
         """
-        return ValidationResult.from_findings(self._collect_findings(workflow_definition))
+        return ValidationResult.from_findings(
+            self._collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_continue_on_failure,
+            )
+        )
 
     def _validate_graph_structure(self, workflow_definition: dict[str, Any], node_ids: set[str]) -> None:
         edge_findings = _check_edge_references_findings(workflow_definition, node_ids)

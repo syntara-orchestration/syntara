@@ -135,11 +135,22 @@ async def _validate_integration_types(
 async def _validate_llm_model_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
-) -> set[UUID]:
-    """Validate that all LLM model references exist and are enabled. Returns their parent integration IDs."""
+    *,
+    allow_cleanup: bool = False,
+) -> tuple[set[UUID], list[ValidationFinding]]:
+    """Validate LLM model references in a workflow definition.
+
+    When allow_cleanup is False (default, used for save/publish), missing or
+    disabled models raise SafeValueError.
+
+    When allow_cleanup is True (used for import), unavailable models are cleared
+    from node parameters in-place and returned as warning findings.
+
+    Returns (parent_integration_ids_of_valid_models, warning_findings).
+    """
     model_ids = _extract_llm_model_ids(workflow_definition)
     if not model_ids:
-        return set()
+        return set(), []
     parsed = [UUID(mid) for mid in model_ids]
     result = await session.execute(
         select(LLMModel.id, LLMModel.integration_id, LLMModel.enabled, LLMModel.name).where(
@@ -149,14 +160,39 @@ async def _validate_llm_model_references(
     rows = result.all()
     found_ids = {row.id for row in rows}
     missing = {UUID(mid) for mid in model_ids} - found_ids
-    if missing:
-        msg = "The previously selected LLM model is no longer available"
-        raise SafeValueError(msg)
-    for row in rows:
-        if not row.enabled:
-            msg = f"LLM model '{row.name}' is disabled"
+
+    if not allow_cleanup:
+        if missing:
+            msg = "The previously selected LLM model is no longer available"
             raise SafeValueError(msg)
-    return {row.integration_id for row in rows}
+        for row in rows:
+            if not row.enabled:
+                msg = f"LLM model '{row.name}' is disabled"
+                raise SafeValueError(msg)
+        return {row.integration_id for row in rows}, []
+
+    available = {str(row.id) for row in rows if row.enabled}
+    unavailable_ids = model_ids - available
+    if not unavailable_ids:
+        return {row.integration_id for row in rows}, []
+
+    findings: list[ValidationFinding] = []
+    for node in workflow_definition.get("nodes", []):
+        params = node.get("parameters", {})
+        mid = params.get("llm_model_id")
+        if mid and mid in unavailable_ids:
+            params.pop("llm_model_id", None)
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.warning,
+                    category=ValidationCategory.invalid_reference,
+                    message="The previously selected LLM model is no longer available and was removed",
+                    node_id=node.get("id"),
+                )
+            )
+
+    remaining_integration_ids = {row.integration_id for row in rows if str(row.id) in available}
+    return remaining_integration_ids, findings
 
 
 async def _validate_integration_scope(
@@ -269,20 +305,28 @@ async def validate_workflow_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
     project_id: UUID,
+    *,
+    is_import: bool = False,
 ) -> list[ValidationFinding]:
     """Validate all external references in a workflow definition.
 
-    Integrations and LLM models produce hard errors (required for node execution).
-    Unavailable tools are auto-cleared with warnings (optional, node still functions).
-    Parent integrations of selected tools are also checked — a disabled or out-of-scope
-    integration produces a hard error even though individual tools are auto-cleared.
+    Integrations produce hard errors (required for node execution).
+    Unavailable tools are always auto-cleared with warnings.
 
-    Returns warning findings for any tools that were auto-cleared.
+    LLM model handling depends on context:
+    - Normal save/publish (is_import=False): missing/disabled models raise hard errors.
+    - Import (is_import=True): missing/disabled models are auto-cleared with warnings,
+      allowing the workflow to be imported in a draft state.
+
+    Returns warning findings for any resources that were auto-cleared.
     """
-    model_integration_ids = await _validate_llm_model_references(session, workflow_definition)
+    model_integration_ids, model_findings = await _validate_llm_model_references(
+        session, workflow_definition, allow_cleanup=is_import
+    )
     tool_integration_ids = await _extract_tool_parent_integration_ids(session, workflow_definition)
     await _validate_integration_scope(
         session, workflow_definition, project_id, model_integration_ids | tool_integration_ids
     )
     await _validate_integration_types(session, workflow_definition)
-    return await _clean_unavailable_tool_selections(session, workflow_definition)
+    tool_findings = await _clean_unavailable_tool_selections(session, workflow_definition)
+    return model_findings + tool_findings

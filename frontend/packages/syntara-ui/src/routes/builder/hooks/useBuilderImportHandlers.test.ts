@@ -37,6 +37,7 @@ function createParams(overrides: Partial<UseBuilderImportHandlersParams> = {}): 
     selectedProject: { id: 'proj-1' },
     createWorkflow: vi.fn(),
     setLocation: vi.fn(),
+    showAlert: vi.fn(),
     showSuccess: vi.fn(),
     showError: vi.fn(),
     showInfo: vi.fn(),
@@ -95,7 +96,7 @@ describe('useBuilderImportHandlers', () => {
       expect(params.createWorkflow).not.toHaveBeenCalled()
     })
 
-    it('calls createWorkflow with correct payload', () => {
+    it('calls createWorkflow with correct payload including is_import', () => {
       const params = createParams()
       const { result } = renderHook(() => useBuilderImportHandlers(params, mockPendingImport, vi.fn()))
 
@@ -107,6 +108,7 @@ describe('useBuilderImportHandlers', () => {
         name: 'Imported Workflow',
         description: 'A test workflow',
         project_id: 'proj-1',
+        is_import: true,
       })
     })
 
@@ -130,15 +132,45 @@ describe('useBuilderImportHandlers', () => {
       act(() => result.current.handleImportNew())
 
       const createCall = vi.mocked(params.createWorkflow).mock.calls[0]
-      const onSuccess = createCall[1]?.onSuccess as (data: { id?: string }) => void
-      act(() => onSuccess({ id: 'new-wf-1' }))
+      const onSuccess = createCall[1]?.onSuccess as (data: { id: string }) => void
+      act(() => onSuccess({ id: 'new-wf-1' } as never))
 
       expect(setPendingImport).toHaveBeenCalledWith(null)
       expect(params.showSuccess).toHaveBeenCalledWith({
         title: 'Workflow imported',
         description: 'Created "Imported Workflow"',
       })
+      expect(params.showAlert).not.toHaveBeenCalled()
       expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-wf-1')
+    })
+
+    it('shows persistent warning alert when import has validation warnings', () => {
+      const params = createParams()
+      const setPendingImport = vi.fn()
+      const { result } = renderHook(() => useBuilderImportHandlers(params, mockPendingImport, setPendingImport))
+
+      act(() => result.current.handleImportNew())
+
+      const createCall = vi.mocked(params.createWorkflow).mock.calls[0]
+      const onSuccess = createCall[1]?.onSuccess as (data: Record<string, unknown>) => void
+      act(() =>
+        onSuccess({
+          id: 'new-wf-2',
+          validation_result: {
+            warning_count: 1,
+            findings: [{ severity: 'warning', category: 'invalid_reference', message: 'LLM model was removed' }],
+          },
+        } as never)
+      )
+
+      expect(params.showAlert).toHaveBeenCalledWith({
+        variant: 'warning',
+        autoDismiss: false,
+        title: 'Workflow imported with warnings',
+        description: 'LLM model was removed',
+      })
+      expect(params.showSuccess).not.toHaveBeenCalled()
+      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-wf-2')
     })
 
     it('shows error on create failure', () => {

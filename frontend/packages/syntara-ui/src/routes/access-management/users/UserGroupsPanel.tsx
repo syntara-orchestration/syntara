@@ -8,7 +8,6 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  Label,
   Modal,
   ModalBody,
   ModalFooter,
@@ -28,6 +27,7 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
+import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxPageBody } from '../../../components/layout/NxPage'
 import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
@@ -409,9 +409,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                     {group.name === BUILTIN_AUTHENTICATED_GROUP_NAME && (
                       <>
                         {' '}
-                        <Label isCompact color="grey">
-                          All users
-                        </Label>
+                        <NxLabel color="grey">All users</NxLabel>
                       </>
                     )}
                   </Td>

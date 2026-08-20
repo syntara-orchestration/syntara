@@ -95,6 +95,10 @@ async function configureApprovalNode(
   }
 
   if (config.fallbackDecision) {
+    const enableLink = page.getByRole('button', { name: 'Enable continue on failure' })
+    if ((await enableLink.count()) > 0) {
+      await enableLink.click()
+    }
     const fallbackToggle = page.getByRole('button', { name: 'Fallback decision', exact: true })
     await expect(fallbackToggle).toBeVisible()
     await fallbackToggle.click()
@@ -301,6 +305,13 @@ test.describe('Approval Node Configuration', () => {
 
     const fallbackToggle = app.getByRole('button', { name: 'Fallback decision', exact: true })
     await expect(fallbackToggle).toBeVisible()
+    await expect(fallbackToggle).toBeDisabled()
+    await expect(
+      app.getByText('On failure behavior is System default (stop on failure), so this fallback will not be used.')
+    ).toBeVisible()
+
+    await app.getByRole('button', { name: 'Enable continue on failure' }).click()
+    await expect(fallbackToggle).toBeEnabled()
 
     // Verify the fallback decision dropdown has both options
     await fallbackToggle.click()

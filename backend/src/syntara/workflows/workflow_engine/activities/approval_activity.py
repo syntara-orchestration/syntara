@@ -10,6 +10,7 @@ from uuid import UUID
 import structlog
 from temporalio import activity, workflow
 from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError
 
 with workflow.unsafe.imports_passed_through():
     from syntara.approvals.audit.approval import ApprovalExpiredEvent
@@ -19,6 +20,7 @@ with workflow.unsafe.imports_passed_through():
         ApprovalsApiClientError,
     )
     from syntara.workflows.workflow_engine import constants
+    from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
@@ -153,6 +155,10 @@ async def _batch_update_approvals(
                 return {result_key: 0}
 
             approval_ids = [UUID(a["id"]) for a in pending]
+            # Built before the mutating call: if a record is ever missing a required
+            # field, fail before anything is changed rather than after (which would
+            # otherwise misreport a successful mutation as "0 expired, error").
+            approval_records = [{"id": a["id"], "approval_node_id": a["approval_node_id"]} for a in pending]
             batch_fn = getattr(client, batch_method_name)
             result = await batch_fn(approval_ids)
 
@@ -165,7 +171,7 @@ async def _batch_update_approvals(
                 success_count=count,
                 failed_count=result.get("total_failed", 0),
             )
-            return {result_key: count, "_approval_ids": approval_ids}
+            return {result_key: count, "_approval_records": approval_records}
 
     except ApprovalsApiClientError as e:
         logger.warning("Failed to %s approval requests", operation, execution_id=execution_id, error=str(e))
@@ -178,17 +184,23 @@ async def _batch_update_approvals(
 @activity.defn(name=ActivityName.EXPIRE_APPROVAL)
 async def expire_approval_requests_activity(
     execution_id: str,
-    node_id: str,
+    node_id: str | None = None,
 ) -> dict[str, Any]:
-    """Expire pending approval requests for a specific node after its decision window."""
+    """Expire pending approval requests.
+
+    When node_id is given, only that node's pending requests are expired (its own
+    decision window timed out). When node_id is None, all pending requests for the
+    execution are expired (the workflow reached a terminal state while other approval
+    nodes were still awaiting a decision).
+    """
     result = await _batch_update_approvals(execution_id, "expire", "batch_expire", "expired_count", node_id=node_id)
 
-    for approval_id in result.pop("_approval_ids", []):
+    for record in result.pop("_approval_records", []):
         AuditEventDispatcher.dispatch(
             ApprovalExpiredEvent(
-                approval_id=approval_id,
+                approval_id=UUID(record["id"]),
                 execution_id=UUID(execution_id),
-                approval_node_id=node_id,
+                approval_node_id=record["approval_node_id"],
             )
         )
 
@@ -201,5 +213,57 @@ async def cancel_approval_requests_activity(
 ) -> dict[str, Any]:
     """Cancel all pending approval requests when a workflow is cancelled."""
     result = await _batch_update_approvals(execution_id, "cancel", "batch_cancel", "cancelled_count")
-    result.pop("_approval_ids", None)
+    result.pop("_approval_records", None)
     return result
+
+
+@activity.defn(name=ActivityName.FAIL_DETACHED_APPROVAL)
+async def fail_detached_approval_activity(
+    workflow_id: str,
+    run_id: str | None,
+    activity_id: str,
+) -> None:
+    """Fail the async-completion APPROVAL activity for a detached approval node.
+
+    Called as a local activity from the workflow when it completes while an
+    approval branch was detached (e.g. an ANY-strategy converge already
+    satisfied by another branch). Without this, the underlying Temporal
+    activity would stay STARTED until its own start_to_close_timeout even
+    though the workflow, and the approval's DB record, have already moved on.
+    """
+    sync_service = get_activity_sync_service()
+    if sync_service is None:
+        logger.warning(
+            "Activity sync service not available; cannot fail detached approval activity",
+            activity_id=activity_id,
+            workflow_id=workflow_id,
+        )
+        return
+
+    error = ApplicationError(
+        "Approval expired: workflow completed while awaiting a decision",
+        type="ApprovalExpired",
+        non_retryable=True,
+    )
+    try:
+        handle = sync_service.temporal_client.get_async_activity_handle(
+            workflow_id=workflow_id,
+            run_id=run_id,
+            activity_id=activity_id,
+        )
+        await handle.fail(error)
+        logger.info(
+            "Detached approval activity failed via async handle",
+            activity_id=activity_id,
+            workflow_id=workflow_id,
+        )
+    except RPCError as e:
+        err_msg = str(e).lower()
+        if "not found" in err_msg or "already completed" in err_msg or "cannot find" in err_msg:
+            logger.info(
+                "Detached approval activity already resolved (idempotent)",
+                activity_id=activity_id,
+                workflow_id=workflow_id,
+            )
+        else:
+            raise

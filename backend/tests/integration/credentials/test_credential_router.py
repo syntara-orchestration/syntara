@@ -500,6 +500,7 @@ class TestCredentialWorkflows:
         assert workflows[0]["id"] == str(workflow.id)
         assert workflows[0]["name"] == workflow.name
         assert workflows[0]["node_names"] == ["Fetch Data"]
+        assert workflows[0]["created_at"] is not None
 
     @pytest.mark.asyncio
     async def test_workflows_returns_multiple_node_names(

@@ -1,4 +1,4 @@
-import { Content, ContentVariants, EmptyState, EmptyStateBody, Label, StackItem, Title } from '@patternfly/react-core'
+import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
 import { RhUiCubesFillIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useState } from 'react'
@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
 import { FilterBar } from '../../../components/filters/FilterBar'
+import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
@@ -147,9 +148,9 @@ export function SelectUserStep({
                   <Td dataLabel="Email">{user.email}</Td>
                   <Td dataLabel="Authentication">
                     {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
-                      <Label key={source} isCompact color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
+                      <NxLabel key={source} color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
                         {source}
-                      </Label>
+                      </NxLabel>
                     ))}
                   </Td>
                 </Tr>

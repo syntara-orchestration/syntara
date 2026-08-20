@@ -42,7 +42,7 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
-if ! curl -sf "${APP_CLI_URL:-http://localhost:8000}/health" > /dev/null 2>&1; then
+if ! curl -sf "${APP_CLI_URL:-http://localhost:8000}/healthz/ready" > /dev/null 2>&1; then
     echo "ERROR: Backend not reachable at ${APP_CLI_URL:-http://localhost:8000}"
     echo "Start it with: make run"
     exit 1

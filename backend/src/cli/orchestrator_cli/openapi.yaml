@@ -29815,6 +29815,13 @@ components:
             - type: 'null'
           description: Username or UUID of the workflow creator
           title: Created By
+        created_at:
+          anyOf:
+            - format: date-time
+              type: string
+            - type: 'null'
+          description: Timestamp when the workflow was created
+          title: Created At
         description:
           anyOf:
             - type: string
@@ -35525,6 +35532,11 @@ components:
           format: uuid
           title: Project Id
           description: Project to assign workflow to
+        is_import:
+          type: boolean
+          title: Is Import
+          description: When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+          default: false
     WorkflowUpdate:
       type: object
       title: WorkflowUpdate

@@ -1,6 +1,8 @@
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table'
+import { Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table'
 import { type ReactNode, useCallback, useMemo } from 'react'
 
+import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
+import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 import { buildRowKey, toSafeString } from '../utils/tableHelpers'
 
 export type DataTableViewProps = {
@@ -34,28 +36,30 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
   )
 
   return (
-    <Table aria-label={ariaLabel} variant="compact">
-      <Thead>
-        <Tr>
-          {columns.map((col) => (
-            <Th key={col}>{renderHeader ? renderHeader(col) : col}</Th>
-          ))}
-        </Tr>
-      </Thead>
-      <Tbody>
-        {rows.map((row, rowIndex) => (
-          <Tr key={getRowKey(row, rowIndex)}>
-            {columns.map((col) => {
-              const text = toSafeString(row[col])
-              return (
-                <Td key={col} dataLabel={col}>
-                  {renderCell ? renderCell(text) : text}
-                </Td>
-              )
-            })}
+    <NxPanelContentStack>
+      <NxScrollableTableContainer caption={ariaLabel} useFixedLayout={false} variant="compact">
+        <Thead>
+          <Tr>
+            {columns.map((col) => (
+              <Th key={col}>{renderHeader ? renderHeader(col) : col}</Th>
+            ))}
           </Tr>
-        ))}
-      </Tbody>
-    </Table>
+        </Thead>
+        <Tbody>
+          {rows.map((row, rowIndex) => (
+            <Tr key={getRowKey(row, rowIndex)}>
+              {columns.map((col) => {
+                const text = toSafeString(row[col])
+                return (
+                  <Td key={col} dataLabel={col}>
+                    {renderCell ? renderCell(text) : text}
+                  </Td>
+                )
+              })}
+            </Tr>
+          ))}
+        </Tbody>
+      </NxScrollableTableContainer>
+    </NxPanelContentStack>
   )
 }

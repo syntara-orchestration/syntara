@@ -775,6 +775,7 @@ class CredentialService(BaseService):
                     name=row[1],
                     description=row[3],
                     created_by=row[4],
+                    created_at=row[5],
                     node_names=node_names,
                     last_execution_at=exec_info[0] if exec_info else None,
                     last_execution_status=exec_info[1] if exec_info else None,
@@ -884,7 +885,7 @@ class CredentialService(BaseService):
             project_id: If provided, only query workflows in this project.
 
         Returns:
-            Sequence of (workflow_id, workflow_name, workflow_definition, description, created_by) rows.
+            Sequence of (workflow_id, workflow_name, workflow_definition, description, created_by, created_at) rows.
 
         """
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
@@ -899,6 +900,7 @@ class CredentialService(BaseService):
                 WorkflowVersion.workflow_definition,
                 Workflow.description,
                 Workflow.created_by,
+                Workflow.created_at,
             )
             .join(latest_version, Workflow.id == latest_version.c.workflow_id)
             .join(

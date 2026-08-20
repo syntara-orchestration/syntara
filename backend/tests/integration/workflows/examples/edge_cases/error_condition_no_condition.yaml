@@ -12,8 +12,8 @@ nodes:
     name: Condition Without Condition Field
     type: condition
     # Missing 'condition' field - should raise ValueError
-
   - id: then_task
+
     type: script
     parameters:
       language: bash

@@ -183,7 +183,7 @@ def syntara_client(syntara_base_url: str) -> AuthenticatedClient:
     last_exc: Exception | None = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            response = httpx.get(f"{syntara_base_url}/health", timeout=5, verify=ssl_ctx)
+            response = httpx.get(f"{syntara_base_url}/healthz/ready", timeout=5, verify=ssl_ctx)
             print(f"[syntara_client] health check attempt {attempt + 1}: {response.status_code}", flush=True)  # noqa: T201
             response.raise_for_status()
             last_exc = None

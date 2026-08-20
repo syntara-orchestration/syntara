@@ -528,6 +528,10 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
+  // Wait for the editor panel to finish closing before returning — the panel auto-closes
+  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // against the closing animation and not find the edge "Add connected step" buttons.
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
 /** Save the workflow with the given name. Waits for URL to confirm persistence. */
