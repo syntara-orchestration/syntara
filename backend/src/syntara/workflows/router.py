@@ -50,7 +50,7 @@ from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreat
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
 from syntara.workflows.utils.serialization import deserialize_workflow_version
-from syntara.workflows.validators import workflow_validator
+from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
@@ -255,7 +255,11 @@ async def validate_workflow_definition(
     validation is a stateless, side-effect-free check of caller-supplied
     data with no workflow_id or project_id in scope to authorize against.
     """
-    result = workflow_validator.collect_findings(request.workflow_definition)
+    system_cof = await get_system_continue_on_failure()
+    result = workflow_validator.collect_findings(
+        request.workflow_definition,
+        system_continue_on_failure=system_cof,
+    )
     if not result.is_valid:
         raise WorkflowDefinitionInvalidError(result)
     return result
@@ -284,6 +288,7 @@ async def create_workflow(
         labels=request.labels,
         workflow_definition=_definition_to_dict(request.workflow_definition),
         project_id=request.project_id,
+        is_import=request.is_import,
     )
     read = WorkflowRead.model_validate(workflow, from_attributes=True)
     if _has_validation_issues(result):

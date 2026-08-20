@@ -16,6 +16,7 @@ from syntara.workflows.workflow_engine.activities.approval_activity import (
     cancel_approval_requests_activity,
     create_approval_request_activity,
     expire_approval_requests_activity,
+    fail_detached_approval_activity,
 )
 from syntara.workflows.workflow_engine.activities.approver_resolution_activity import resolve_approvers_activity
 from syntara.workflows.workflow_engine.activities.condition import condition
@@ -49,6 +50,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     cancel_approval_requests_activity,
     create_approval_request_activity,
     expire_approval_requests_activity,
+    fail_detached_approval_activity,
     resolve_approvers_activity,
     condition,
     converge,

@@ -136,9 +136,11 @@ function ThreePanelLayout({
               />
             </section>
           )}
-          <div className={styles.activityListScrollWrapper}>
+          <Stack className={styles.activityListScrollWrapper}>
             {activityOrder.length === 0 && hasFilteredOutActivities ? (
-              <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+              <StackItem isFilled>
+                <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+              </StackItem>
             ) : (
               <CompactActivityList
                 activityStates={activityStates}
@@ -147,7 +149,7 @@ function ThreePanelLayout({
                 selectedNodeId={selectedNodeId}
               />
             )}
-          </div>
+          </Stack>
         </FlexItem>
 
         <Divider orientation={{ default: 'vertical' }} />
@@ -273,20 +275,20 @@ function SinglePanelLayout({
           </StackItem>
         )}
 
-        <StackItem isFilled style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-          {activityOrder.length === 0 && hasFilteredOutActivities ? (
+        {activityOrder.length === 0 && hasFilteredOutActivities ? (
+          <StackItem isFilled style={{ minHeight: 0 }}>
             <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
-          ) : (
-            <ExecutionActivityTable
-              activityStates={activityStates}
-              activityOrder={activityOrder}
-              now={now}
-              executionError={resolvedError}
-              onRowClick={onRowClick}
-              selectedNodeId={selectedNodeId}
-            />
-          )}
-        </StackItem>
+          </StackItem>
+        ) : (
+          <ExecutionActivityTable
+            activityStates={activityStates}
+            activityOrder={activityOrder}
+            now={now}
+            executionError={resolvedError}
+            onRowClick={onRowClick}
+            selectedNodeId={selectedNodeId}
+          />
+        )}
       </Stack>
     </NxPanel>
   )

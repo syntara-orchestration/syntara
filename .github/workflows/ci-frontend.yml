@@ -378,6 +378,11 @@ jobs:
     if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
+    # Job-level concurrency ensures only the latest commit runs this expensive test.
+    # When a new commit is pushed, any in-progress E2E run from the prior commit is cancelled.
+    concurrency:
+      group: e2e-frontend-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Free disk space
         run: |

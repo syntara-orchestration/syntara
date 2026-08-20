@@ -898,6 +898,58 @@ class TestApprovalNodeValidation:
         assert len(warnings) == 1
         assert warnings[0].node_id == "approval_1"
 
+    def test_fallback_approve_with_system_cof_enabled_no_warning(self, validator: WorkflowValidator) -> None:
+        """Node inherits system default (continue_on_failure=True) — no warning."""
+        result = validator.collect_findings(
+            _approval_definition(params={"fallback_decision": "approve"}),
+            system_continue_on_failure=True,
+        )
+        approval_findings = [f for f in result.findings if f.category == ValidationCategory.approval_configuration]
+        assert approval_findings == []
+
+    def test_fallback_approve_with_system_cof_disabled_produces_warning(self, validator: WorkflowValidator) -> None:
+        """Node inherits system default (continue_on_failure=False) — warning fires."""
+        result = validator.collect_findings(
+            _approval_definition(params={"fallback_decision": "approve"}),
+            system_continue_on_failure=False,
+        )
+        warnings = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.warning
+        ]
+        assert len(warnings) == 1
+        assert warnings[0].node_id == "approval_1"
+
+    def test_node_explicit_cof_false_overrides_system_cof_true(self, validator: WorkflowValidator) -> None:
+        """Node explicitly disables CoF — warning fires even if system default is True."""
+        result = validator.collect_findings(
+            _approval_definition(
+                params={"fallback_decision": "approve"},
+                settings={"continue_on_failure": False},
+            ),
+            system_continue_on_failure=True,
+        )
+        warnings = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.warning
+        ]
+        assert len(warnings) == 1
+        assert warnings[0].node_id == "approval_1"
+
+    def test_node_explicit_cof_true_overrides_system_cof_false(self, validator: WorkflowValidator) -> None:
+        """Node explicitly enables CoF — no warning even if system default is False."""
+        result = validator.collect_findings(
+            _approval_definition(
+                params={"fallback_decision": "approve"},
+                settings={"continue_on_failure": True},
+            ),
+            system_continue_on_failure=False,
+        )
+        approval_findings = [f for f in result.findings if f.category == ValidationCategory.approval_configuration]
+        assert approval_findings == []
+
 
 class TestScheduledTriggerConfigFindings:
     """collect_findings enforces ScheduledTriggerConfig (IANA timezone) beyond JSON Schema."""
