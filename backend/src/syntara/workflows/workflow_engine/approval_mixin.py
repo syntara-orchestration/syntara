@@ -31,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import join_loop_iteration_id, loop_index_chain
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
 
@@ -58,17 +59,16 @@ class WorkflowApprovalMixin:
     def _approval_request_id(self, node_id: str) -> str:
         """Return the approval request / Temporal activity ID for this node.
 
-        Outside a loop this is the canvas node ID. Inside a loop body it is
-        ``{node_id}_iter_{index}`` so each iteration can create a distinct
-        approval request (unique on ``(execution_id, approval_node_id)``) and
-        Temporal async-complete signals target the in-flight activity.
+        Outside a loop this is the canvas node ID. Inside one or more loops it
+        is ``{node_id}_iter_{outer}_iter_{inner}...`` so each combination of
+        enclosing-loop indices can create a distinct approval request (unique
+        on ``(execution_id, approval_node_id)``) and Temporal async-complete
+        signals target the in-flight activity.
         """
-        parent_loop_id = self.loop_body_map.get(node_id)
-        if parent_loop_id is None:
-            return node_id
-        control = self.node_control_data.get(parent_loop_id, {})
-        current_index = control.get("current_index", 0)
-        return f"{node_id}_iter_{current_index}"
+        return join_loop_iteration_id(
+            node_id,
+            loop_index_chain(node_id, self.loop_body_map, self.node_control_data),
+        )
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.
@@ -208,11 +208,11 @@ class WorkflowApprovalMixin:
     ) -> list[Any]:
         """Build the positional argument list for create_approval_request_activity.
 
-        Returns a 9-element list matching the activity signature in
+        Returns a 10-element list matching the activity signature in
         ``approval_activity.create_approval_request_activity``::
 
             [0] execution_id:       str            — parent workflow execution ID
-            [1] approval_node_id:   str            — activity ID; ``{node}_iter_{n}`` inside a loop
+            [1] approval_node_id:   str            — activity ID; ``{node}_iter_{n}`` per enclosing loop
             [2] name:               str            — display name for the approval request
             [3] next_step_approved: dict[str, Any] | None — first activity if approved
             [4] workflow_context:   dict[str, Any]  — workflow name, inputs, previous step

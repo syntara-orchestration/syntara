@@ -892,7 +892,7 @@ class TestHandleNodeFailureBareApplicationError:
 
 
 class TestApprovalRequestId:
-    """Tests for per-iteration approval request IDs (AAP-87702)."""
+    """Tests for per-iteration approval request IDs."""
 
     def test_outside_loop_returns_canvas_node_id(self) -> None:
         """Approvals not in a loop body keep the canvas node ID."""
@@ -911,6 +911,29 @@ class TestApprovalRequestId:
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         assert wf._approval_request_id("approval") == "approval_iter_0"
+
+    def test_nested_loop_encodes_outer_then_inner_index(self) -> None:
+        """Nested loops include every enclosing index so inner resets stay unique."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "inner_loop"
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.node_control_data["inner_loop"] = {"current_index": 0}
+        wf.node_control_data["outer_loop"] = {"current_index": 2}
+        assert wf._approval_request_id("approval") == "approval_iter_2_iter_0"
+
+    def test_nested_loop_second_outer_iteration_is_distinct(self) -> None:
+        """The same inner index under a new outer index does not reuse the ID."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "inner_loop"
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.node_control_data["inner_loop"] = {"current_index": 0}
+        wf.node_control_data["outer_loop"] = {"current_index": 0}
+        first = wf._approval_request_id("approval")
+        wf.node_control_data["outer_loop"] = {"current_index": 1}
+        second = wf._approval_request_id("approval")
+        assert first == "approval_iter_0_iter_0"
+        assert second == "approval_iter_1_iter_0"
+        assert first != second
 
     @pytest.mark.asyncio
     async def test_expire_uses_per_iteration_id(self) -> None:

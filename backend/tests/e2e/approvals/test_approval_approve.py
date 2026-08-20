@@ -291,7 +291,7 @@ def _approval_in_loop_workflow(name: str) -> WorkflowDefinition:
 
 
 class TestApproveInLoop:
-    """AAP-87702: Each loop iteration creates a distinct approval request."""
+    """Each loop iteration creates a distinct approval request."""
 
     def test_each_iteration_creates_unique_approval(
         self,
