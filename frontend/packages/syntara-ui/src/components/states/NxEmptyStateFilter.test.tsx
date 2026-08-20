@@ -32,6 +32,7 @@ describe('NxEmptyStateFilter', () => {
   it('renders SearchIcon as the default icon', () => {
     const { container } = render(<NxEmptyStateFilter />)
 
+    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
     const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
     expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
   })

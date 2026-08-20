@@ -391,7 +391,7 @@ describe('Approvals Component', () => {
       mockSearchParams.set('name[contains]', 'zzz-no-match-zzz')
       mockApprovalsQuery([])
 
-      render(<Approvals />)
+      const { container } = render(<Approvals />)
 
       expect(screen.getByText('No results found')).toBeInTheDocument()
       expect(screen.queryByText('No approvals yet')).not.toBeInTheDocument()
@@ -399,17 +399,19 @@ describe('Approvals Component', () => {
       expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument()
 
-      const iconPath = document.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
+      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
       expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
     })
 
     it('shows PlusCircleIcon in no-data empty state', () => {
       mockApprovalsQuery([])
 
-      render(<Approvals />)
+      const { container } = render(<Approvals />)
 
       expect(screen.getByText('No approvals yet')).toBeInTheDocument()
-      const iconPath = document.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
+      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
       expect(iconPath).toMatch(/^M256 8C119 8/)
     })
   })

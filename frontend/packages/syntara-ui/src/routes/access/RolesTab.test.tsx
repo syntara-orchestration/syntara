@@ -691,7 +691,7 @@ describe('RolesTab', () => {
       })
 
       const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
+      const { container } = render(<RolesTab />, { wrapper: createWrapper() })
 
       // Apply a filter by typing in the name filter input and pressing Enter
       const textInput = screen.getByRole('textbox', { name: /name filter/i })
@@ -702,7 +702,8 @@ describe('RolesTab', () => {
         expect(screen.getByText('No results found')).toBeInTheDocument()
       })
 
-      const iconPath = document.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
+      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
       expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
     })
   })

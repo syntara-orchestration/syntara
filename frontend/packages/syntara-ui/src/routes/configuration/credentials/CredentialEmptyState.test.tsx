@@ -14,6 +14,7 @@ describe('CredentialEmptyState', () => {
   it('renders PlusCircleIcon as the default icon', () => {
     const { container } = render(<CredentialEmptyState onCreateCredential={vi.fn()} />)
 
+    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
     const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
     expect(iconPath).toMatch(/^M256 8C119 8/)
   })

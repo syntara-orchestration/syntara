@@ -291,10 +291,11 @@ describe('TransferIdentityWizard', () => {
           total: 1,
         },
       })
-      render(<TransferIdentityWizard />, { wrapper })
+      const { container } = render(<TransferIdentityWizard />, { wrapper })
 
       expect(screen.getByText('No users yet')).toBeInTheDocument()
-      const iconPath = document.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
+      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
       expect(iconPath).toMatch(/^M256 8C119 8/)
       expect(
         screen.getByText('There must be at least one other user before you can transfer a federated identity.')
