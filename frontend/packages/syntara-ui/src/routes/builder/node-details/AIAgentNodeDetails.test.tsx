@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import type { CreateAgenticActivityOptions } from '../../../stores/workflowFactories'
 import { createAgenticActivity } from '../../../stores/useWorkflowStore'
+import type { CreateAgenticActivityOptions } from '../../../stores/workflowFactories'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
 
@@ -20,20 +20,18 @@ vi.mock('../../../stores/useWorkflowStore', async (importOriginal) => ({
   useWorkflowStoreActions: vi.fn(() => ({
     updateActivity: mockUpdateActivity,
   })),
-  createAgenticActivity: vi.fn(
-    (options: CreateAgenticActivityOptions) => ({
-      type: 'agentic',
-      id: options.id,
-      name: options.name,
-      parameters: {
-        ...(options.toolSelections && options.toolSelections.length > 0 && { tool_selections: options.toolSelections }),
-        ...(options.toolSelections?.length === 0 && { tool_selection_strategy: 'NONE' }),
-        ...(options.prompt && { prompt: options.prompt }),
-        ...(options.llmModelId && { llm_model_id: options.llmModelId }),
-        ...(options.fileIds && options.fileIds.length > 0 && { file_ids: options.fileIds }),
-      },
-    })
-  ),
+  createAgenticActivity: vi.fn((options: CreateAgenticActivityOptions) => ({
+    type: 'agentic',
+    id: options.id,
+    name: options.name,
+    parameters: {
+      ...(options.toolSelections && options.toolSelections.length > 0 && { tool_selections: options.toolSelections }),
+      ...(options.toolSelections?.length === 0 && { tool_selection_strategy: 'NONE' }),
+      ...(options.prompt && { prompt: options.prompt }),
+      ...(options.llmModelId && { llm_model_id: options.llmModelId }),
+      ...(options.fileIds && options.fileIds.length > 0 && { file_ids: options.fileIds }),
+    },
+  })),
 }))
 
 // Mock the alerts hook
