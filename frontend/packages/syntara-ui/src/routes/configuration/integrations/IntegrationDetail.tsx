@@ -115,7 +115,9 @@ function IntegrationDetailsTab({
               errorMessage={integration.validation_error}
             />
           </NxDetail>
-          <NxDetail label="Last checked">{<DateCell dateString={integration.last_validated_at} />}</NxDetail>
+          <NxDetail label="Last checked">
+            <DateCell dateString={integration.last_validated_at} />
+          </NxDetail>
           <NxDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</NxDetail>
           {integration.scope === 'project' && integration.id && (
             <NxDetail label="Assigned projects">
