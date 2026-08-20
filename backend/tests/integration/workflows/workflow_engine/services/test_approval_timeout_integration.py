@@ -73,6 +73,7 @@ async def _test_multi_approval_activity(
     approver_user_ids: list[str] | None = None,
     approver_group_ids: list[str] | None = None,
     project_id: str | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Approval activity where only one of two approval nodes ever gets a decision.
 
