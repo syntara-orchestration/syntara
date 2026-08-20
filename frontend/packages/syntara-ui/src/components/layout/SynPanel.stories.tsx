@@ -1,7 +1,7 @@
 import { Content } from '@patternfly/react-core'
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxPanel } from './NxPanel'
+import { SynPanel } from './SynPanel'
 
 const PANEL_CONTENT = (
   <Content component="p">
@@ -15,8 +15,8 @@ const heightConstraintDecorator: Decorator = (Story) => (
   </div>
 )
 
-const meta: Meta<typeof NxPanel> = {
-  component: NxPanel,
+const meta: Meta<typeof SynPanel> = {
+  component: SynPanel,
   tags: ['autodocs'],
   args: {
     children: PANEL_CONTENT,

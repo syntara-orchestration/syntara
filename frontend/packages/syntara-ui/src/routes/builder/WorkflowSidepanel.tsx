@@ -18,7 +18,7 @@ import { RhUiCodeIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import type { WorkflowAPI } from '@syntara/contracts'
 
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 
@@ -33,7 +33,7 @@ type WorkflowSidepanelProps = {
 
 export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
   return (
-    <NxPanel style={{ width: '32rem' }} isFullHeight isScrollable>
+    <SynPanel style={{ width: '32rem' }} isFullHeight isScrollable>
       <Stack hasGutter>
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} justifyContent={{ default: 'justifyContentSpaceBetween' }}>
@@ -92,6 +92,6 @@ export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
           </DescriptionList>
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

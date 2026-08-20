@@ -161,10 +161,10 @@ import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -175,9 +175,9 @@ export default function Workflows() {
 // ✗ Missing <title> — tab will show the previous page's title on navigation
 export default function Workflows() {
   return (
-    <NxPage>
-      <NxPageHeader title="Workflows" />
-    </NxPage>
+    <SynPage>
+      <SynPageHeader title="Workflows" />
+    </SynPage>
   )
 }
 ```

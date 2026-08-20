@@ -3,16 +3,16 @@ import { expect } from 'storybook/test'
 
 import { toPageTitle } from '../utils/toPageTitle'
 
-import { NxPageTitle } from './NxPageTitle'
+import { SynPageTitle } from './SynPageTitle'
 
-const meta: Meta<typeof NxPageTitle> = {
-  component: NxPageTitle,
+const meta: Meta<typeof SynPageTitle> = {
+  component: SynPageTitle,
   tags: ['autodocs'],
   parameters: {
     docs: {
       description: {
         component:
-          'Sets the browser `<title>` for the current page. Segments are joined with `" | "` and the app name is appended automatically. Null, undefined, and blank segments are filtered out. Place as the first child of `<NxPage>`.',
+          'Sets the browser `<title>` for the current page. Segments are joined with `" | "` and the app name is appended automatically. Null, undefined, and blank segments are filtered out. Place as the first child of `<SynPage>`.',
       },
     },
   },

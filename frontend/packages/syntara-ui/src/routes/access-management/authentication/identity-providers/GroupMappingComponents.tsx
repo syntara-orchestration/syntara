@@ -24,7 +24,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Controller, type Control } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
@@ -416,7 +416,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   }
 
   return (
-    <NxPanelContentStack hasGutter>
+    <SynPanelContentStack hasGutter>
       <GroupMappingReadOnlyToolbar
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -461,6 +461,6 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

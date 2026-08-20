@@ -68,7 +68,7 @@ Get familiar with the hot reload workflow:
 1. **Open the UI** in your browser: <http://localhost:5173>
 2. **Navigate to** the Workflows page
 3. **Open the code** in your editor: `packages/syntara-ui/src/routes/workflows/Workflows.tsx`
-4. **Find the `NxPageHeader`** component and change the title text
+4. **Find the `SynPageHeader`** component and change the title text
 5. **Watch it reload** automatically in your browser - no refresh needed!
 6. **Revert the change** - you're ready to start real development
 

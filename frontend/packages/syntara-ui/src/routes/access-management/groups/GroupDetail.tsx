@@ -21,10 +21,10 @@ import { breadcrumbsGroupDetail, breadcrumbsGroupDetailEarlyShell } from '../../
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { DateCell } from '../../../components/table/DateCell'
@@ -284,9 +284,9 @@ export function GroupDetail() {
   const groupCrumbs = breadcrumbsGroupDetail(groupData.name, basePath, activeTab)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[groupData.name, 'Groups']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[groupData.name, 'Groups']} />
+      <SynPageHeader
         title={groupData.name}
         docLink={groupsDocLink}
         breadcrumbs={groupCrumbs}
@@ -300,7 +300,7 @@ export function GroupDetail() {
           ) : undefined
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <GroupTabBar
             basePath={basePath}
@@ -320,7 +320,7 @@ export function GroupDetail() {
             }}
           />
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <GroupFormModal
         group={groupData as Group}
@@ -348,6 +348,6 @@ export function GroupDetail() {
           The group <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
         </NxConfirmationDialog>
       )}
-    </NxPage>
+    </SynPage>
   )
 }

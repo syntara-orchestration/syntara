@@ -34,7 +34,7 @@ How the UI is anchored:
 - **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper
 - **Accessibility** — Must achieve [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG2AA-Conformance) and [Section 508](https://www.section508.gov/) compliance
 - **PatternFly gaps** — Check PF docs first → Raise with UX team → Engage PatternFly → Document with `patternfly-override` label → Resolve upstream
-- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `NxPage`, `NxPanel`, `NxConfirmationDialog`, `NxDetailList`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. Use the `Nx*` wrapper, not the raw PF component.
+- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `SynPage`, `SynPanel`, `NxConfirmationDialog`, `NxDetailList`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. Use the `Nx*` wrapper, not the raw PF component.
 
 ## Page Layout (MANDATORY)
 
@@ -44,9 +44,9 @@ Every page must follow this structural hierarchy:
 | --------------- | --------------------------- | --------------------------------------- |
 | App Shell       | `Compass`                   | Overall application frame               |
 | Navigation      | `AppDockedNav`              | Left sidebar with icons                 |
-| Page Content    | `CompassContent` + `NxPage` | Main content area wrapper               |
-| Page Header     | `NxPageHeader`              | Page title and actions                  |
-| Content Frame   | `NxPanel`                   | `Panel` → `PanelMain` → `PanelMainBody` |
+| Page Content    | `CompassContent` + `SynPage` | Main content area wrapper               |
+| Page Header     | `SynPageHeader`              | Page title and actions                  |
+| Content Frame   | `SynPanel`                   | `Panel` → `PanelMain` → `PanelMainBody` |
 | Main Content    | Table / Canvas / Form       | Primary page content                    |
 | Footer (tables) | Pagination component        | Navigation between table pages          |
 
@@ -54,30 +54,30 @@ Every page must follow this structural hierarchy:
 
 | Archetype          | Structure                                                                                                     |
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
-| **List page**      | `NxPageHeader` (Create CTA) → `NxPanel isFullHeight` → `NxPanelContentStack variant="inset"` → filter + table |
-| **Detail page**    | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight` → `NxPanelContentStack` (default) → tabs        |
-| **Form page**      | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight footer={<ActionGroup>…}` → form body              |
-| **Error in panel** | Same shell → `NxPageBody isCentered` + `ErrorState` inside `NxPanel`                                          |
+| **List page**      | `SynPageHeader` (Create CTA) → `SynPanel isFullHeight` → `SynPanelContentStack variant="inset"` → filter + table |
+| **Detail page**    | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight` → `SynPanelContentStack` (default) → tabs        |
+| **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…}` → form body              |
+| **Error in panel** | Same shell → `SynPageBody isCentered` + `ErrorState` inside `SynPanel`                                          |
 
-**`NxListPanel`** — canonical list page implementation. Compound API: `NxListPanelView` (handles loading/error/empty/filter states), `NxListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `NxListPanelTable`. Use instead of manual `NxPanelContentStack` + `useQueryState` + three-state branching.
+**`NxListPanel`** — canonical list page implementation. Compound API: `NxListPanelView` (handles loading/error/empty/filter states), `NxListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `NxListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
 
-**Sticky form footer** — Form Save/Cancel buttons live in `NxPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder node editor panels or modals.
+**Sticky form footer** — Form Save/Cancel buttons live in `SynPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder node editor panels or modals.
 
 ### Page Header Types
 
 - **Main page header** — Left-aligned title, right-aligned actions
-- **Details page header** — Left-aligned breadcrumbs (`NxPageBreadcrumbs`) + title; toolbar left→right: Switch → Edit (primary) → kebab
-- **Form page header** — Left-aligned breadcrumbs + title; no action buttons in the header — Save and Cancel live in the `NxPanel` sticky footer
+- **Details page header** — Left-aligned breadcrumbs (`SynPageBreadcrumbs`) + title; toolbar left→right: Switch → Edit (primary) → kebab
+- **Form page header** — Left-aligned breadcrumbs + title; no action buttons in the header — Save and Cancel live in the `SynPanel` sticky footer
 
 ### Breadcrumbs
 
-- Use `NxPageBreadcrumbs`; renders nothing when < 2 items; last item = current page (non-link); middle segments collapse at ≤768px. No CSS overrides.
+- Use `SynPageBreadcrumbs`; renders nothing when < 2 items; last item = current page (non-link); middle segments collapse at ≤768px. No CSS overrides.
 
 ### Structure Checklist
 
-- Use `NxPage` as outer wrapper
-- Use `NxPageHeader` for title and actions
-- Use `StackItem isFilled` + `NxPanel isFullHeight` for content
+- Use `SynPage` as outer wrapper
+- Use `SynPageHeader` for title and actions
+- Use `StackItem isFilled` + `SynPanel isFullHeight` for content
 - Primary action is the rightmost button
 - Canvas views use `hasNoPadding`
 
@@ -131,7 +131,7 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 - Use PatternFly's Basic Form component
 - Left-aligned, one column, max-width of 600px
-- Submit buttons in `NxPanel` sticky footer (not in the page header)
+- Submit buttons in `SynPanel` sticky footer (not in the page header)
 - Use typeahead for lists with 10+ options
 - Use Read-only Clipboard Copy for system-pre-populated values
 - Use Validated component for form validation
@@ -263,7 +263,7 @@ All delete variants share: Small modal, warning icon title, `confirmVariant="dan
 - Page-level loading errors: use `useQueryState(query, { title: '...', onRetry: ... })` — hooks up `ErrorState` with retry automatically
 - Mutation errors: use `useMutationErrorHandler` — wires up `ErrorState` and toast alerts automatically
 - Form validation errors: use inline field-level errors via PatternFly's Validated component
-- **Error state placement:** `ErrorState` renders inside `NxPanel` via `NxPageBody isCentered` — page header and shell remain visible.
+- **Error state placement:** `ErrorState` renders inside `SynPanel` via `SynPageBody isCentered` — page header and shell remain visible.
 
 ### Loading States
 
@@ -280,7 +280,7 @@ Button alignment differs by context (follows PatternFly convention):
 | ----------------- | -------------------------------------- |
 | Page headers      | **Rightmost**                                         |
 | Modals            | **Leftmost** (Cancel link on right)                   |
-| Forms (full page) | **Leftmost** in NxPanel sticky footer (Cancel = link) |
+| Forms (full page) | **Leftmost** in SynPanel sticky footer (Cancel = link) |
 | Toolbars          | **Leftmost** (kebab menu on far right)                |
 
 ## Modals
@@ -338,15 +338,15 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Schedule triggers:** Interval (`DurationInput`) and Cron (`TextInput` with 5-field validation). "Continuous" type removed. Both show "Next run" preview when valid.
 - Test step (Run step): from step kebab menu → choice dialog ("Run all previous steps" or mock data) → mock data editor (CodeEditor with JSON); upstream steps mocked as "skipped"; results in execution visualizer
 - **Cancel run:** secondary destructive button (`variant="secondary"` + `isDanger`), no confirmation dialog. Visible only when status is `pending`/`running`.
-- **Canvas controls:** anchored to bottom-left corner; canvas overlays (controls, step legend, undo/redo) use `NxPanel` with `variant="raised"` for opaque + shadow
+- **Canvas controls:** anchored to bottom-left corner; canvas overlays (controls, step legend, undo/redo) use `SynPanel` with `variant="raised"` for opaque + shadow
 - Legend toggle: accessible labels **Show step legend** / **Hide step legend**
 - **Canvas step styling:** workflow steps use `variant="raised"` with border-radius override to match `Card` / canvas chrome; fixed 240px width — use `overflow-wrap: anywhere` on all dynamic text (`Title`, `Content`) to prevent overflow (prefer `anywhere` over `break-word`)
-- **Floating canvas panels:** prefer `NxPanel` with `variant="raised"` for compact controls or `opaqueFloatingFill` for large flat shells without raised chrome (see `NxPanel.tsx` JSDoc)
-- Execution view panels: use `NxPanel isFullHeight` for proper scroll — don't hand-roll flex column inline styles
+- **Floating canvas panels:** prefer `SynPanel` with `variant="raised"` for compact controls or `opaqueFloatingFill` for large flat shells without raised chrome (see `SynPanel.tsx` JSDoc)
+- Execution view panels: use `SynPanel isFullHeight` for proper scroll — don't hand-roll flex column inline styles
 - View-only views: Run view, Run history, Version history
 - **Verify workflow:** Kebab action → `POST /workflows/validate` → expandable `Alert` (`ValidationBanner`) above canvas + per-node error badges. Node names are clickable links to the node editor; errors grouped via compact horizontal `DescriptionList`.
 - **Two-tier validation:** Errors (`severity: 'error'`) block publish; warnings (`severity: 'warning'`) allow save via `force_save=true` retry. Banner variant: any error → `danger`; all warnings → `warning`. Verify-then-publish gate: Publish always verifies first; `isAriaDisabled` when errors exist or verifying.
-- **Version history panel:** Right-side `NxPanel isFullHeight` with `SimpleList` grouped by date. Each version shows name + timestamp + status badge (Published/Draft). Kebab per version: Restore, Export, Publish. Viewing a version sets canvas to read-only mode. Mutually exclusive with approval panel.
+- **Version history panel:** Right-side `SynPanel isFullHeight` with `SimpleList` grouped by date. Each version shows name + timestamp + status badge (Published/Draft). Kebab per version: Restore, Export, Publish. Viewing a version sets canvas to read-only mode. Mutually exclusive with approval panel.
 - **Three-column node editor:** Input (flat) | Parameters (`variant="raised"`) | Output (flat). Branching nodes add branch-handle dropdown in center column header. Columns use `ResizableDivider`.
 - **Node settings:** `NodeFormTabsLayout` splits node forms into Parameters + Settings tabs. Settings tab: continue-on-failure (three-way select), timeout, retry via shared `NodeSettingsForm`. System defaults as live placeholders from `/settings`. Hidden for Condition/Switch/triggers.
 - **Node panel navigation:** Previous/Next arrow controls on panel edges for navigating connected steps. Single target = icon button + tooltip; multiple = dropdown menu. Uses `useAdjacentNodes`.
@@ -396,7 +396,7 @@ Use when flow has 2+ steps with tables/filters (too large for modal). Dedicated 
 
 ## Dedicated Edit Page
 
-Use when editing is too complex for inline (many rows, nested modals, external actions). Parent tab stays read-only with "Edit" button navigating to edit route. Edit page: `NxPageHeader` with breadcrumbs + `NxPanel` with Save/Cancel in sticky footer. Permission-gated with `EmptyStateAccessDenied` fallback.
+Use when editing is too complex for inline (many rows, nested modals, external actions). Parent tab stays read-only with "Edit" button navigating to edit route. Edit page: `SynPageHeader` with breadcrumbs + `SynPanel` with Save/Cancel in sticky footer. Permission-gated with `EmptyStateAccessDenied` fallback.
 
 ## Accessibility Guidelines
 
@@ -479,4 +479,4 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 - `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
-- `Nx*` components with `autodocs`: `NxPage`, `NxPageHeader`, `NxPageBreadcrumbs`, `NxPanel`, `NxPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.
+- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.

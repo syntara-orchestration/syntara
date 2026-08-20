@@ -17,15 +17,15 @@ const ruleTester = new RuleTester({
 
 ruleTester.run('syntara/require-page-title', rule, {
   valid: [
-    // Page component using NxPageTitle — preferred pattern
+    // Page component using SynPageTitle — preferred pattern
     {
       code: `
         export default function MyPage() {
           return (
-            <NxPage>
-              <NxPageTitle segments={['My Page']} />
-              <NxPageHeader title="My Page" />
-            </NxPage>
+            <SynPage>
+              <SynPageTitle segments={['My Page']} />
+              <SynPageHeader title="My Page" />
+            </SynPage>
           )
         }
       `,
@@ -48,10 +48,10 @@ ruleTester.run('syntara/require-page-title', rule, {
       code: `
         export default function MyPage() {
           return (
-            <NxPage>
+            <SynPage>
               <title>{toPageTitle(['My Page'])}</title>
-              <NxPageHeader title="My Page" />
-            </NxPage>
+              <SynPageHeader title="My Page" />
+            </SynPage>
           )
         }
       `,
@@ -74,7 +74,7 @@ ruleTester.run('syntara/require-page-title', rule, {
     },
   ],
   invalid: [
-    // Default-exported page component missing NxPageTitle or <title>
+    // Default-exported page component missing SynPageTitle or <title>
     {
       code: `
         export default function MyPage() {
@@ -87,12 +87,12 @@ ruleTester.run('syntara/require-page-title', rule, {
       `,
       errors: [{ messageId: 'missingTitle' }],
     },
-    // Arrow function default export without NxPageTitle or <title>
+    // Arrow function default export without SynPageTitle or <title>
     {
       code: `
         const MyPage = () => (
           <div>
-            <NxPageHeader title="My Page" />
+            <SynPageHeader title="My Page" />
           </div>
         )
         export default MyPage

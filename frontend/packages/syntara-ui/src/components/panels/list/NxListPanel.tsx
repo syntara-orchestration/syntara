@@ -6,8 +6,8 @@ import type { ReactNode } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { FilterBar } from '../../filters/FilterBar'
-import { NxPanel } from '../../layout/NxPanel'
-import { NxPanelContentStack } from '../../layout/NxPanelContentStack'
+import { SynPanel } from '../../layout/SynPanel'
+import { SynPanelContentStack } from '../../layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../states/NxEmptyStateNoData'
 import { NxErrorState } from '../../states/NxErrorState'
@@ -46,9 +46,9 @@ export function NxListPanel({ children }: NxListPanelProps) {
   )
   return (
     <NxListPanelTabContext.Provider value={tabContextValue}>
-      <NxPanel isFullHeight>
-        <NxPanelContentStack hasGutter>{children}</NxPanelContentStack>
-      </NxPanel>
+      <SynPanel isFullHeight>
+        <SynPanelContentStack hasGutter>{children}</SynPanelContentStack>
+      </SynPanel>
     </NxListPanelTabContext.Provider>
   )
 }
@@ -188,7 +188,7 @@ export function NxListPanelView({
 
     return (
       // CSS `display: contents` makes this wrapper invisible to flex layout — inner StackItems remain
-      // direct flex children of NxPanelContentStack despite the extra DOM node.
+      // direct flex children of SynPanelContentStack despite the extra DOM node.
       <div id={panelId} role="tabpanel" aria-label={tabLabel} className={styles.tabPanelContents}>
         {content}
       </div>

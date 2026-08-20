@@ -2,14 +2,14 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxPanelContentStack } from './NxPanelContentStack'
+import { SynPanelContentStack } from './SynPanelContentStack'
 
-describe('NxPanelContentStack', () => {
+describe('SynPanelContentStack', () => {
   it('renders children with default panel stack styles', () => {
     render(
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <div>Main</div>
-      </NxPanelContentStack>
+      </SynPanelContentStack>
     )
 
     const child = screen.getByText('Main')
@@ -24,9 +24,9 @@ describe('NxPanelContentStack', () => {
 
   it('renders inset variant with horizontal padding token', () => {
     render(
-      <NxPanelContentStack variant="inset">
+      <SynPanelContentStack variant="inset">
         <span>List</span>
-      </NxPanelContentStack>
+      </SynPanelContentStack>
     )
 
     const child = screen.getByText('List')
@@ -38,9 +38,9 @@ describe('NxPanelContentStack', () => {
 
   it('does not apply gutter by default', () => {
     const { container } = render(
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <div>Item</div>
-      </NxPanelContentStack>
+      </SynPanelContentStack>
     )
     /* eslint-disable testing-library/no-node-access -- Stack root has no accessible role; class checked via container. */
     expect(container.firstElementChild).not.toHaveClass('pf-m-gutter')
@@ -49,9 +49,9 @@ describe('NxPanelContentStack', () => {
 
   it('applies gutter when hasGutter is passed', () => {
     const { container } = render(
-      <NxPanelContentStack hasGutter>
+      <SynPanelContentStack hasGutter>
         <div>Item</div>
-      </NxPanelContentStack>
+      </SynPanelContentStack>
     )
     /* eslint-disable testing-library/no-node-access -- Stack root has no accessible role; class checked via container. */
     expect(container.firstElementChild).toHaveClass('pf-m-gutter')
@@ -61,11 +61,11 @@ describe('NxPanelContentStack', () => {
   describe('Accessibility', () => {
     it('has no accessibility violations with minimal content', async () => {
       const { container } = render(
-        <NxPanelContentStack>
+        <SynPanelContentStack>
           <main>
             <h1>Title</h1>
           </main>
-        </NxPanelContentStack>
+        </SynPanelContentStack>
       )
       expect(await axe(container)).toHaveNoViolations()
     })

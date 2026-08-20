@@ -4,8 +4,8 @@ import type { ExecutionStatus } from '@syntara/contracts'
 import { type Dispatch, type ReactNode } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPageTitle } from '../../components/NxPageTitle'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useDocLink } from '../../utils/docs/useDocLink'
@@ -420,9 +420,9 @@ export function BuilderWorkflowPageHeader({
 
   return (
     <>
-      <NxPageTitle segments={[dirtyTitle, 'Workflows']} />
+      <SynPageTitle segments={[dirtyTitle, 'Workflows']} />
       {isViewingVersion ? (
-        <NxPageHeader
+        <SynPageHeader
           title={workflowName}
           docLink={builderDocLink}
           titleProps={{ size: TitleSizes['2xl'] }}
@@ -437,7 +437,7 @@ export function BuilderWorkflowPageHeader({
           toolbar={toolbar}
         />
       ) : (
-        <NxPageHeader
+        <SynPageHeader
           title={workflowName}
           docLink={builderDocLink}
           titleSlot={

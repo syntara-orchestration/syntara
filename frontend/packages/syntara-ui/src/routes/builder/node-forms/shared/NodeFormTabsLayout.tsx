@@ -2,7 +2,7 @@ import { Flex, FlexItem, Stack, StackItem, Tab, Tabs } from '@patternfly/react-c
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 
-import { NxPageBody } from '../../../../components/layout/NxPage'
+import { SynPageBody } from '../../../../components/layout/SynPage'
 
 import { useNodeFormTabBar } from './useNodeFormTabBar'
 
@@ -30,11 +30,11 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
           {tabBarAction && <FlexItem>{tabBarAction}</FlexItem>}
         </Flex>
       </StackItem>
-      <NxPageBody>
+      <SynPageBody>
         <Stack hasGutter>
           <StackItem>{activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}</StackItem>
         </Stack>
-      </NxPageBody>
+      </SynPageBody>
     </Stack>
   )
 }

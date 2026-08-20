@@ -16,7 +16,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
@@ -184,7 +184,7 @@ function EnableModelsStep({
   }
 
   return (
-    <NxPanelContentStack className={styles.stepContainerMinWidth}>
+    <SynPanelContentStack className={styles.stepContainerMinWidth}>
       <StackItem>
         <FilterBar
           fieldDefinitions={modelFilterFieldDefinitions}
@@ -238,7 +238,7 @@ function EnableModelsStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 

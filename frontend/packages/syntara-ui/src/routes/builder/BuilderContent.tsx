@@ -7,9 +7,9 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
-import { NxPage } from '../../components/layout/NxPage'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxReactFlowViewportGuard } from '../../components/layout/NxReactFlowViewportGuard'
+import { SynPage } from '../../components/layout/SynPage'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -499,8 +499,8 @@ export function BuilderContent(props: BuilderContentProps) {
     <NodeActionsContext.Provider value={nodeActionsValue}>
       <NodeExpandedAllContext.Provider value={nodeExpandedAllContextValue}>
         <VersionViewProvider value={versionPanel.isViewingVersion}>
-          <NxPage>
-            <NxReactFlowViewportGuard>
+          <SynPage>
+            <SynReactFlowViewportGuard>
               <Stack hasGutter>
                 <StackItem>
                   <BuilderWorkflowPageHeader
@@ -572,7 +572,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     >
                       <Stack className={styles.canvasStack}>
                         <StackItem isFilled className={styles.filledMinHeight}>
-                          <NxPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
+                          <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
                             <VersionInfoCard
                               title={versionPanel.viewedVersionName}
                               date={versionPanel.viewedVersionDate}
@@ -599,7 +599,7 @@ export function BuilderContent(props: BuilderContentProps) {
                               onClearDesiredPosition={handleClearDesiredPosition}
                               validationErrors={state.validationErrors}
                             />
-                          </NxPanel>
+                          </SynPanel>
                         </StackItem>
                         {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                           <ExecutionDetailsPanelWrapper
@@ -686,14 +686,14 @@ export function BuilderContent(props: BuilderContentProps) {
                   </Flex>
                 </StackItem>
               </Stack>
-            </NxReactFlowViewportGuard>
+            </SynReactFlowViewportGuard>
 
             <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}
             />
-          </NxPage>
+          </SynPage>
         </VersionViewProvider>
       </NodeExpandedAllContext.Provider>
     </NodeActionsContext.Provider>

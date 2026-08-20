@@ -6,9 +6,9 @@ import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
 import { DetailPageShell } from './DetailPageShell'
 
-vi.mock('../../components/layout/NxPageHeader', () => ({
-  NxPageHeader: ({ title, breadcrumbs }: { title: React.ReactNode; breadcrumbs?: readonly AppBreadcrumbItem[] }) => (
-    <div data-testid="nx-page-header">
+vi.mock('../../components/layout/SynPageHeader', () => ({
+  SynPageHeader: ({ title, breadcrumbs }: { title: React.ReactNode; breadcrumbs?: readonly AppBreadcrumbItem[] }) => (
+    <div data-testid="syn-page-header">
       <h1>{title}</h1>
       {breadcrumbs && breadcrumbs.length >= 2 && (
         <nav aria-label="Breadcrumb">
@@ -117,7 +117,7 @@ describe('DetailPageShell', () => {
       </DetailPageShell>
     )
 
-    // With only 1 breadcrumb item, NxPageHeader doesn't show breadcrumbs (requires ≥2)
+    // With only 1 breadcrumb item, SynPageHeader doesn't show breadcrumbs (requires ≥2)
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
     expect(screen.getByText('Only Title')).toBeInTheDocument()
   })

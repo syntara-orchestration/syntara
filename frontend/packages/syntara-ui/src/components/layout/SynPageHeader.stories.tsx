@@ -4,12 +4,12 @@ import { useState } from 'react'
 
 import { NxKebabMenu } from '../NxKebabMenu'
 
-import { NxPageHeader } from './NxPageHeader'
+import { SynPageHeader } from './SynPageHeader'
 
 function SwitchToggleHeader() {
   const [enabled, setEnabled] = useState(true)
   return (
-    <NxPageHeader
+    <SynPageHeader
       title="Page title"
       toolbar={
         <Switch
@@ -33,7 +33,7 @@ const kebabActions = [
 function DetailPageToolbarHeader() {
   const [enabled, setEnabled] = useState(true)
   return (
-    <NxPageHeader
+    <SynPageHeader
       title="my-credential"
       breadcrumbs={[{ label: 'Credentials', href: '/credentials' }, { label: 'my-credential' }]}
       toolbar={
@@ -52,8 +52,8 @@ function DetailPageToolbarHeader() {
   )
 }
 
-const meta: Meta<typeof NxPageHeader> = {
-  component: NxPageHeader,
+const meta: Meta<typeof SynPageHeader> = {
+  component: SynPageHeader,
   tags: ['autodocs'],
   args: {
     title: 'Page title',
@@ -216,7 +216,7 @@ export const SingleBreadcrumbHidden: Story = {
     docs: {
       description: {
         story:
-          'A single breadcrumb item is below the two-item threshold — `NxPageBreadcrumbs` renders nothing and only the title shows.',
+          'A single breadcrumb item is below the two-item threshold — `SynPageBreadcrumbs` renders nothing and only the title shows.',
       },
     },
   },

@@ -17,20 +17,20 @@ const VARIANT_STYLE = {
   inset: panelContentStackInsetStyle,
 } as const satisfies Record<string, CSSProperties>
 
-export type NxPanelContentStackVariant = keyof typeof VARIANT_STYLE
+export type SynPanelContentStackVariant = keyof typeof VARIANT_STYLE
 
-export type NxPanelContentStackProps = StackProps & {
+export type SynPanelContentStackProps = StackProps & {
   /** Layout preset; merged before any `style` override. Defaults to `"default"`. */
-  variant?: NxPanelContentStackVariant
+  variant?: SynPanelContentStackVariant
 }
 
 /**
- * `Stack` preconfigured with full-height flex sizing for use inside `NxPanel isFullHeight`.
+ * `Stack` preconfigured with full-height flex sizing for use inside `SynPanel isFullHeight`.
  *
  * Sets `flex: 1`, `minHeight: 0`, and `height: 100%` so that nested `NxScrollableTableContainer`
  * regions get a real bounded height — `height: 100%` alone fails inside a flex parent.
  */
-export function NxPanelContentStack({ variant = 'default', style, ...props }: NxPanelContentStackProps) {
+export function SynPanelContentStack({ variant = 'default', style, ...props }: SynPanelContentStackProps) {
   const mergedStyle: CSSProperties = { ...VARIANT_STYLE[variant], ...style }
 
   return <Stack style={mergedStyle} {...props} />
