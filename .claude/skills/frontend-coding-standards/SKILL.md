@@ -1954,48 +1954,10 @@ Reference implementation: `useOptimisticCredentialEnabled` (credentials list ena
 
 ## 41. Derive Named Booleans for Repeated Conditions
 
-**When a boolean check is used more than once, extract it into a named constant at the top of the function or component.**
-
-```typescript
-// ❌ BAD: CREDENTIAL_REQUIRED_TYPES.has(integrationType) repeated 4× inline
-const isDisabled = CREDENTIAL_REQUIRED_TYPES.has(integrationType) ? !credentialId : false
-const label = CREDENTIAL_REQUIRED_TYPES.has(integrationType) ? 'Required' : 'Optional'
-const showWarning = CREDENTIAL_REQUIRED_TYPES.has(integrationType) && !credentialId
-
-// ✅ GOOD: derived once, used everywhere
-const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationType)
-const isDisabled = isCredentialRequired && !credentialId
-const label = isCredentialRequired ? 'Required' : 'Optional'
-const showWarning = isCredentialRequired && !credentialId
-```
-
-Named booleans also communicate intent — `isCredentialRequired` is self-documenting; `CREDENTIAL_REQUIRED_TYPES.has(integrationType)` is not. Apply the same rule in hooks and utility functions, not just components.
+**When a boolean check is used more than once, extract it into a named constant.** That also names the intent (`isCredentialRequired` vs repeating `CREDENTIAL_REQUIRED_TYPES.has(...)`). Same rule in hooks and utilities, not just components.
 
 ---
 
 ## 42. Use `ReactNode` Lists for Multi-Item Toast/Alert Content — Not `join('\n')`
 
-**When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse whitespace including `\n` in HTML, so two warnings joined with a newline appear merged on one line.
-
-```typescript
-// ❌ BAD: \n is collapsed in HTML — two warnings appear on one line
-description: data.warnings.join('\n')
-
-// ✅ GOOD: module-scoped helper so the toast call stays readable
-function WarningDescription({ warnings = [] }: { warnings?: string[] }) {
-  if (warnings.length === 0) return null
-  if (warnings.length === 1) return warnings[0]
-
-  return (
-    <List>
-      {warnings.map((warning) => (
-        <ListItem key={warning}>{warning}</ListItem>
-      ))}
-    </List>
-  )
-}
-
-description: <WarningDescription warnings={data.warnings} />
-```
-
-The `description` prop of `showAlert` / `showWarning` accepts `ReactNode`, so structured markup is always valid. Keep `WarningDescription` at **module scope** (not inside another component). Use PatternFly `List` / `ListItem`, not a raw `<ul>` or inline `style`.
+**When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse `\n` in HTML, so joined warnings appear on one line. `showAlert` / `showWarning` `description` already accepts `ReactNode`. Use a **module-scoped** helper (not nested in the caller) that renders PatternFly `List` / `ListItem` — not a raw `<ul>` or inline `style`.
