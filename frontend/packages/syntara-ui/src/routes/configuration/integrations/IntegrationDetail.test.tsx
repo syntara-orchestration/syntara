@@ -348,9 +348,13 @@ describe('IntegrationDetail', () => {
       setupDefaultMocks({ integration: { last_validated_at: null } })
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByText('Last checked')).toBeInTheDocument()
-      const dashes = screen.getAllByText(formatDateTime(null))
-      expect(dashes.length).toBeGreaterThanOrEqual(1)
+      // Term and description elements pair up positionally in the description list,
+      // so scope the dash assertion to the definition aligned with "Last checked".
+      const terms = screen.getAllByRole('term')
+      const definitions = screen.getAllByRole('definition')
+      const index = terms.findIndex((term) => term.textContent === 'Last checked')
+      expect(index).toBeGreaterThanOrEqual(0)
+      expect(within(definitions[index]).getByText(formatDateTime(null))).toBeInTheDocument()
     })
 
     it('shows scope as Global for global integrations', () => {

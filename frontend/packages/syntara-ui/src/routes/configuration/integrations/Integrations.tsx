@@ -21,7 +21,7 @@ import {
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { DateCell } from '../../../components/table/DateCell.tsx'
+import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
