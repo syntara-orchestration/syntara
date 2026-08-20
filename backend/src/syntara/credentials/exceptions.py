@@ -42,3 +42,31 @@ class CredentialDisabledError(CredentialError):
         """Initialize with credential name."""
         self.name = name
         super().__init__(f"Credential '{name}' is disabled. Re-enable it to continue.")
+
+
+@fastapi_exception(handler="syntara.credentials.error_handlers.credential_in_use_error_handler")
+class CredentialInUseError(CredentialError):
+    """Exception raised when deleting a credential still used as an integration's management credential.
+
+    See AAP-87778: previously the delete silently nulled the integration's
+    management_credential_id, leaving validation_status stale (e.g. still
+    "available") with no indication the integration could no longer
+    authenticate. Blocking the delete forces the caller to detach the
+    credential from all referencing integrations first.
+    """
+
+    def __init__(self, name: str, integration_names: list[str], total_count: int) -> None:
+        """Initialize with credential name and a sample of referencing integration names."""
+        self.name = name
+        self.integration_names = integration_names
+        self.total_count = total_count
+
+        shown = ", ".join(f"'{n}'" for n in integration_names)
+        remaining = total_count - len(integration_names)
+        suffix = f" and {remaining} more" if remaining > 0 else ""
+        plural = "s" if total_count != 1 else ""
+        super().__init__(
+            f"Cannot delete credential '{name}': still in use by {total_count} "
+            f"integration{plural} ({shown}{suffix}). Remove the credential from "
+            "these integrations before deleting it."
+        )
