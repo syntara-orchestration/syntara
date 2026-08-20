@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from collections.abc import AsyncGenerator
 from typing import NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -671,7 +672,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
     """
 
     @pytest.fixture(autouse=True)
-    async def _cleanup_detached_schedule_deletes(self) -> None:
+    async def _cleanup_detached_schedule_deletes(self) -> AsyncGenerator[None, None]:
         yield
         await _cancel_background_deletes()
 
