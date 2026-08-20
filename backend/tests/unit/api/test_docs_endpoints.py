@@ -380,7 +380,7 @@ class TestProductionAppWiring:
 
     @pytest.mark.parametrize(
         "path",
-        ["/health", "/healthz/live", "/healthz/ready"],
+        ["/healthz/live", "/healthz/ready"],
     )
     def test_infra_endpoints_excluded_from_schema(self, path: str) -> None:
         """Infrastructure probe endpoints must never appear in the public OpenAPI spec."""

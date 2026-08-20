@@ -1,7 +1,8 @@
-import { Button, FlexItem, Label } from '@patternfly/react-core'
+import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
+import { NxLabel } from '../../components/labels/NxLabel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
@@ -31,9 +32,9 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       ) : null}
       {execution.created_at ? (
         <FlexItem>
-          <Label>
+          <NxLabel isCompact={false}>
             Viewing run: <ExecutionTimestamp dateString={execution.created_at} />
-          </Label>
+          </NxLabel>
         </FlexItem>
       ) : null}
     </>

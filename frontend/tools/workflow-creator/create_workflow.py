@@ -58,7 +58,7 @@ def load_json(source: str) -> dict:
 def check_api_health(api_url: str) -> bool:
     """Check if the API is healthy."""
     try:
-        req = urllib.request.Request(f"{api_url}/health", method="GET")
+        req = urllib.request.Request(f"{api_url}/healthz/ready", method="GET")
         with urllib.request.urlopen(req, timeout=5) as response:
             return response.status == 200
     except (urllib.error.URLError, urllib.error.HTTPError) as e:

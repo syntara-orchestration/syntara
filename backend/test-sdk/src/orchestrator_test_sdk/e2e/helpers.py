@@ -21,6 +21,7 @@ from syntara_api_client.models import (
 from syntara_api_client.models.approval_request_status import ApprovalRequestStatus
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
+from syntara_api_client.types import UnexpectedResponseException
 
 if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
@@ -305,10 +306,17 @@ def poll_execution_until_complete(
 
     """
     for _ in range(max_polls):
-        execution = syntara_api.executions.get(
-            execution_id=execution_id,
-            include="activities",
-        ).assert_and_get()
+        try:
+            execution = syntara_api.executions.get(
+                execution_id=execution_id,
+                include="activities",
+            ).assert_and_get()
+        except UnexpectedResponseException as exc:
+            # Transient gateway/server errors — treat as "not done yet" and keep polling
+            if exc.status_code in (502, 503, 504):
+                time.sleep(poll_interval)
+                continue
+            raise
 
         status = str(execution.status)
         if status in TERMINAL_EXECUTION_STATUSES:

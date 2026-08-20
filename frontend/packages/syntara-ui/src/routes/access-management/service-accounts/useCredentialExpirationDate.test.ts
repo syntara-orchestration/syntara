@@ -42,21 +42,21 @@ describe('useCredentialExpirationDate', () => {
     })
 
     it('enforces minimum of 1 day for maxDate', () => {
-      const { result } = renderHook(() => useCredentialExpirationDate(0))
+      const { result } = renderHook(() => useCredentialExpirationDate(1))
       const expectedMax = addDays(today, 1)
       expect(result.current.value).toBe(formatDateYMD(expectedMax))
     })
   })
 
-  describe('unlimited mode (maxLifetimeDays = -1)', () => {
+  describe('unlimited mode (maxLifetimeDays = 0)', () => {
     it('defaults to 365 days in the future', () => {
-      const { result } = renderHook(() => useCredentialExpirationDate(-1))
+      const { result } = renderHook(() => useCredentialExpirationDate(0))
       const expected365 = addDays(today, 365)
       expect(result.current.value).toBe(formatDateYMD(expected365))
     })
 
     it('shows unlimited helper text', () => {
-      const { result } = renderHook(() => useCredentialExpirationDate(-1))
+      const { result } = renderHook(() => useCredentialExpirationDate(0))
       expect(result.current.helperText).toBe('No maximum lifetime configured')
     })
   })
@@ -91,7 +91,7 @@ describe('useCredentialExpirationDate', () => {
     })
 
     it('allows any future date in unlimited mode', () => {
-      const { result } = renderHook(() => useCredentialExpirationDate(-1))
+      const { result } = renderHook(() => useCredentialExpirationDate(0))
       const farFuture = addDays(today, 1000)
       expect(result.current.validator(farFuture)).toBe('')
     })

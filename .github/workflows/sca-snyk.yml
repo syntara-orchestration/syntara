@@ -93,8 +93,8 @@ jobs:
           # Exit 0=clean, 1=vulnerabilities found (both valid). Exit 2+=scan failure — abort.
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
 
-      # Only scan base branch for pull requests and merge queue (not for push/schedule)
       - name: Checkout base branch
+        # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -123,8 +123,8 @@ jobs:
           # Exit 0=clean, 1=vulnerabilities found (both valid). Exit 2+=scan failure — abort.
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
 
-      # Compare results and fail only on NEW HIGH/CRITICAL vulnerabilities
       - name: Compare and filter vulnerabilities
+        # Compare results and fail only on NEW HIGH/CRITICAL vulnerabilities
         if: github.event.pull_request != null || github.event.merge_group != null
         run: |
           # Compare Snyk SCA results between base and scan branches
@@ -173,8 +173,8 @@ jobs:
             fi
           fi
 
-      # For push/schedule events, use traditional blocking behavior
       - name: Block on any HIGH/CRITICAL (non-PR events)
+        # For push/schedule events, use traditional blocking behavior
         if: github.event.pull_request == null && github.event.merge_group == null
         working-directory: scan/backend
         env:
@@ -247,8 +247,8 @@ jobs:
           # Exit 0=clean, 1=vulnerabilities found (both valid). Exit 2+=scan failure — abort.
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
 
-      # Only scan base branch for pull requests and merge queue (not for push/schedule)
       - name: Checkout base branch
+        # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -273,8 +273,8 @@ jobs:
             --file=package.json || rc=$?
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
 
-      # Compare results and fail only on NEW HIGH/CRITICAL vulnerabilities
       - name: Compare and filter vulnerabilities
+        # Compare results and fail only on NEW HIGH/CRITICAL vulnerabilities
         if: github.event.pull_request != null || github.event.merge_group != null
         run: |
           # Compare Snyk SCA results between base and scan branches
@@ -323,8 +323,8 @@ jobs:
             fi
           fi
 
-      # For push/schedule events, use traditional blocking behavior
       - name: Block on any HIGH/CRITICAL (non-PR events)
+        # For push/schedule events, use traditional blocking behavior
         if: github.event.pull_request == null && github.event.merge_group == null
         working-directory: scan/frontend
         env:

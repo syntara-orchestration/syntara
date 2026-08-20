@@ -31,7 +31,7 @@ Read the component docs when working in that area — they contain detailed stan
 | Working on... | Read |
 |---|---|
 | Backend Python code | [backend/AGENTS.md](backend/AGENTS.md) — SQLModel patterns, Alembic migrations, testing standards, 12+ domain-specific standards docs |
-| Frontend React/TypeScript | [frontend/CLAUDE.md](frontend/CLAUDE.md) — PatternFly patterns, 31-item PR checklist, architecture guides |
+| Frontend React/TypeScript | [frontend/AGENTS.md](frontend/AGENTS.md) — PatternFly patterns, 36-item PR checklist, architecture guides |
 | Both (E2E, contracts, infra) | This file |
 
 ### Skills

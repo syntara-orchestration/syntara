@@ -32,11 +32,6 @@ export default defineConfig(({ mode }) => {
       changeOrigin: true,
       secure: false,
     },
-    '/health': {
-      target: backendTarget,
-      changeOrigin: true,
-      secure: false,
-    },
     '/ws': {
       target: env.VITE_WS_URL || backendTarget,
       changeOrigin: true,

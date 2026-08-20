@@ -30,6 +30,16 @@ import { parseWorkflowFile, validateFileSize } from '../../utils/downloadWorkflo
 import { importWorkflowSchema } from './importWorkflowSchema'
 import type { ImportWorkflowFormData } from './importWorkflowSchema'
 
+type ImportFinding = { message?: string }
+
+function importAlertDescription(wfName: string, findings?: ImportFinding[] | null): string {
+  const warnings = (findings ?? [])
+    .map((finding) => finding.message)
+    .filter((message): message is string => Boolean(message))
+    .join('; ')
+  return warnings || `Created "${wfName}"`
+}
+
 /**
  * Builds a full V2WorkflowDefinition from a parsed file and the user-supplied name.
  */
@@ -105,10 +115,15 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     setFileError(null)
   }
 
-  const onImportSuccess = (wfName: string, hasValidationIssues: boolean, createdId?: string) => {
+  const onImportSuccess = (
+    wfName: string,
+    hasValidationIssues: boolean,
+    createdId?: string,
+    findings?: ImportFinding[] | null
+  ) => {
     const variant = hasValidationIssues ? 'warning' : 'success'
     const title = hasValidationIssues ? 'Workflow imported with warnings' : 'Workflow imported'
-    const description = `Created "${wfName}"`
+    const description = importAlertDescription(wfName, findings)
     const openInEditor = createdId
       ? () => detachPromise(navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: createdId } }))
       : undefined
@@ -140,6 +155,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
           name: data.name,
           workflow_definition: fullDefinition,
           project_id: selectedProjectId,
+          is_import: true,
         },
       })
 
@@ -148,7 +164,12 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
         return
       }
 
-      onImportSuccess(data.name, result?.has_validation_issues === true, result?.id)
+      onImportSuccess(
+        data.name,
+        result?.has_validation_issues === true,
+        result?.id,
+        result?.validation_result?.findings
+      )
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to parse file'
       setFileError(message)

@@ -39,7 +39,7 @@ spec:
       - REDHAT_COMPONENT=ansible-automation-orchestrator-ui-container
       - IMAGE_NAME=ansible-automation-platform/ansible-automation-orchestrator-ui-rhel9
       - MAINTAINER=Ansible Automation Platform Productization Team
-      - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override@sha256:2c388549b6eb79f56a83468f60f821319ed48602fbd5b609f3af1508cb7e918c
+      - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override@sha256:9d6097e35e62519fd0907df4f034477b83c7e8df97f01b934558206f0d252b6c
       - BRANDING=true
   - name: build-platforms
     value:

@@ -12,7 +12,7 @@ import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest, pollExecutionStatus } from '../utils/api'
+import { apiRequest, pollApprovalVisible, pollExecutionStatus } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -56,6 +56,11 @@ async function createPendingApproval(
     .then(() => true)
     .catch(() => false)
   test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+
+  // Wait for the approval record to be queryable in the listing API before returning.
+  // There is a brief async gap between the execution reaching "paused" and the approval
+  // appearing in the approvals index — polling here prevents the race in the test setup.
+  await pollApprovalVisible(app, approvalName)
 
   return { workflowId, approvalName }
 }

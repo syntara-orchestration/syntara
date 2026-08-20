@@ -77,7 +77,7 @@ The `ServiceAccountCredential` model (`src/syntara/service_accounts/models/servi
 | `old_secret_valid_until` | TIMESTAMPTZ, nullable | When the old secret stops being accepted |
 | `grace_period_seconds` | INT, default 3600 (0–86400) | How long the old secret remains valid after rotation |
 | `status` | CHECK constraint (`active`, `disabled`) | Operational status |
-| `expires_at` | TIMESTAMPTZ, nullable | Optional expiry timestamp (capped by `sa_credential_max_lifetime_days`) |
+| `expires_at` | TIMESTAMPTZ, nullable | Optional expiry timestamp (capped by `service_accounts.credential_max_lifetime_days` runtime setting) |
 | `last_used_at` | TIMESTAMPTZ, nullable | Timestamp of last use |
 | `created_by` | UUID (FK → `principals`) | User who created the credential |
 | `updated_by` | UUID (FK → `principals`, nullable) | User who last modified the credential |
@@ -508,7 +508,7 @@ The API usage accumulator (`src/syntara/telemetry/api_usage_accumulator.py`) tra
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `jwt_sa_access_token_lifetime_minutes` | int | 15 | SA access token lifetime (range: 1–60 minutes) |
-| `sa_credential_max_lifetime_days` | int | 180 | Maximum credential expiration (-1 for unlimited) |
+| `service_accounts.credential_max_lifetime_days` | int | 180 | Caps how long credentials stay valid (0 = never expire, 1–730 days). Lives under the **Authentication** tab in the Settings UI — no restart required. |
 
 ## Error Handling
 
