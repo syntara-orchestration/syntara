@@ -150,7 +150,7 @@ export async function ensureAapIntegration(page: Page): Promise<{ name: string; 
       integration_type: 'ansible_automation_platform',
       configuration: {
         integration_type: 'ansible_automation_platform',
-        base_url: 'https://aap-e2e.example.com',
+        base_url: 'https://example.com',
       },
       management_credential_id: cred.id,
       scope: 'global',
