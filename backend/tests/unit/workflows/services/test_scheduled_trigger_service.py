@@ -9,6 +9,7 @@ Covers:
 - Search attribute registration and server-side filtering
 """
 
+import asyncio
 from collections.abc import AsyncIterator, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -29,11 +30,18 @@ from syntara.workflows.services.scheduled_trigger_service import (
 @pytest.fixture(autouse=True)
 def _reset_module_caches() -> Generator[None]:
     """Reset module-level caches between tests."""
-    _mod._search_attr_available = None
-    _mod._cached_client = None
+
+    def _clear() -> None:
+        task = _mod._connect_task
+        if task is not None and not task.done():
+            task.cancel()
+        _mod._search_attr_available = None
+        _mod._cached_client = None
+        _mod._connect_task = None
+
+    _clear()
     yield
-    _mod._search_attr_available = None
-    _mod._cached_client = None
+    _clear()
 
 
 def _make_workflow_definition(
@@ -989,6 +997,31 @@ class TestGetSharedClient:
         ):
             result = await _mod._get_shared_client()
         assert result is None
+
+    async def test_hung_connect_does_not_hold_client_lock(self) -> None:
+        """Client.connect must not hold ``_client_lock`` while it is in flight."""
+        connect_started = asyncio.Event()
+
+        async def _hang(*_args: object, **_kwargs: object) -> MagicMock:
+            connect_started.set()
+            await asyncio.Event().wait()
+            return MagicMock()
+
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new=_hang,
+        ):
+            waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+            assert not _mod._client_lock.locked()
+            with pytest.raises(TimeoutError):
+                async with asyncio.timeout(0.05):
+                    await _mod._get_shared_client()
+            assert _mod._connect_task is not None
+            assert not _mod._connect_task.done()
+            assert not waiter.done()
+            waiter.cancel()
+            await asyncio.gather(waiter, return_exceptions=True)
 
 
 class TestCreateSchedule:

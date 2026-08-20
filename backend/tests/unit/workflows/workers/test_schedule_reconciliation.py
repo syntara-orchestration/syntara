@@ -4,6 +4,7 @@ Tests the diff-based reconciliation callback that creates missing
 Temporal Schedules and deletes orphans.
 """
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -189,6 +190,29 @@ class TestReconcileScheduledTriggers:
             await reconcile_scheduled_triggers(session_factory)
 
             mock_svc.get_client.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_client_timeout_skips_without_waiting_on_hang(self) -> None:
+        """A hung Temporal client must not stall the reconciliation cycle."""
+        wf_id = str(uuid4())
+        triggers = _make_triggers(scheduled_triggers=[{"id": "t1"}])
+        session_factory = _make_session_factory([(wf_id, triggers)])
+
+        async def _hang() -> MagicMock:
+            await asyncio.Event().wait()
+            return MagicMock()
+
+        with (
+            patch(_PATCH_SVC) as mock_svc_cls,
+            patch("syntara.workflows.workers.schedule_reconciliation._RECONCILE_CLIENT_TIMEOUT_SECONDS", 0.05),
+        ):
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_client = _hang
+            mock_svc.list_all_schedules = AsyncMock()
+
+            await reconcile_scheduled_triggers(session_factory)
+
+            mock_svc.list_all_schedules.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_published_workflows_checks_orphans_only(self) -> None:

@@ -49,6 +49,7 @@ SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkfl
 
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
+_connect_task: asyncio.Task[Client | None] | None = None
 
 _search_attr_available: bool | None = None
 
@@ -80,9 +81,10 @@ async def _update_schedule_with_retry(
 
 def _invalidate_client_cache() -> None:
     """Clear the cached Temporal client so the next call reconnects."""
-    global _cached_client, _search_attr_available  # noqa: PLW0603
+    global _cached_client, _search_attr_available, _connect_task  # noqa: PLW0603
     _cached_client = None
     _search_attr_available = None
+    _connect_task = None
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
@@ -143,29 +145,48 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return False
 
 
+async def _connect_shared_client() -> Client | None:
+    """Open a Temporal client without holding ``_client_lock``.
+
+    Waiters share this task via ``_get_shared_client``. Cancellation of a
+    waiter must not cancel this connect (see ``asyncio.shield`` there).
+    """
+    global _cached_client  # noqa: PLW0603
+    try:
+        settings = get_settings()
+        client = await Client.connect(
+            settings.temporal_address,
+            namespace=settings.temporal_namespace,
+            tls=build_temporal_tls_config(),
+        )
+    except (OSError, RuntimeError, RPCError) as e:
+        logger.warning("Temporal unavailable for schedule management", error=str(e))
+        return None
+    _cached_client = client
+    return client
+
+
 async def _get_shared_client() -> Client | None:
     """Return a module-level cached Temporal client.
 
     Connects once and reuses across all ``ScheduledTriggerService`` instances
     so that lifecycle hooks share a single gRPC connection.  The cache is
     invalidated on connection-level errors so the next call reconnects.
+
+    ``Client.connect`` runs outside ``_client_lock``. The lock only serializes
+    starting the in-flight connect task, so a hung connect cannot block the
+    schedule reconciler from taking the lock. Waiters use ``asyncio.shield``
+    so a timed-out reconciler cycle does not cancel an in-flight connect.
     """
-    global _cached_client  # noqa: PLW0603
+    global _connect_task  # noqa: PLW0603
     async with _client_lock:
         if _cached_client is not None:
             return _cached_client
+        if _connect_task is None or _connect_task.done():
+            _connect_task = asyncio.create_task(_connect_shared_client())
+        connect_task = _connect_task
 
-        try:
-            settings = get_settings()
-            _cached_client = await Client.connect(
-                settings.temporal_address,
-                namespace=settings.temporal_namespace,
-                tls=build_temporal_tls_config(),
-            )
-            return _cached_client
-        except (OSError, RuntimeError, RPCError) as e:
-            logger.warning("Temporal unavailable for schedule management", error=str(e))
-            return None
+    return await asyncio.shield(connect_task)
 
 
 class ScheduledTriggerService:

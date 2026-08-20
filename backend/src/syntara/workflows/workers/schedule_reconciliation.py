@@ -39,6 +39,10 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 
 logger = structlog.stdlib.get_logger(__name__)
 
+# Skip this cycle if Temporal connect/list hangs. Do not cancel the shared
+# connect task — waiters use shield, and the next interval can use the cache.
+_RECONCILE_CLIENT_TIMEOUT_SECONDS = 10.0
+
 
 def _extract_expected_schedules(
     rows: list[tuple[str, list[dict[str, Any]]]],
@@ -104,7 +108,12 @@ async def reconcile_scheduled_triggers(
     # Use OrchestratorWorkflowId search attribute for server-side filtering when
     # available, falling back to client-side prefix scan otherwise.
     service = ScheduledTriggerService()
-    client = await service.get_client()
+    try:
+        async with asyncio.timeout(_RECONCILE_CLIENT_TIMEOUT_SECONDS):
+            client = await service.get_client()
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal client timed out")
+        return
 
     if client is None:
         logger.warning("schedule_reconciliation_skipped", reason="Temporal unavailable")

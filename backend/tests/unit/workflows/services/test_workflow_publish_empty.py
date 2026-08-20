@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from typing import NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -223,6 +223,11 @@ class TestPublishEmptyWorkflow:
 
 class TestUnpublishWorkflow:
     """Tests for unpublish_workflow missing version warning."""
+
+    @pytest.fixture(autouse=True)
+    def _unpublished_background_delete(self) -> Generator[None]:
+        with patch.object(WorkflowService, "_workflow_is_published", new=AsyncMock(return_value=False)):
+            yield
 
     @pytest.mark.asyncio
     async def test_unpublish_logs_warning_when_version_missing(self, mock_service: WorkflowService) -> None:
@@ -673,8 +678,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
     @pytest.fixture(autouse=True)
     async def _cleanup_detached_schedule_deletes(self) -> AsyncGenerator[None, None]:
-        yield
-        await _cancel_background_deletes()
+        with patch.object(WorkflowService, "_workflow_is_published", new=AsyncMock(return_value=False)):
+            yield
+            await _cancel_background_deletes()
 
     @pytest.mark.asyncio
     async def test_unpublish_succeeds_when_trigger_delete_fails(self, mock_service: WorkflowService) -> None:
@@ -825,16 +831,36 @@ class TestScheduledTriggerSyncGracefulDegradation:
         assert not was_cancelled
 
     @pytest.mark.asyncio
-    async def test_unpublish_does_not_cancel_delete_holding_client_lock(self, mock_service: WorkflowService) -> None:
-        """Hung connect under ``_client_lock`` must not be cancelled by unpublish."""
+    async def test_unpublish_skips_delete_when_workflow_was_republished(self, mock_service: WorkflowService) -> None:
         workflow_id, mock_workflow = _published_workflow_mock()
-        holding_lock = asyncio.Event()
 
-        async def _hang_connect_under_lock() -> object:
-            async with scheduled_trigger_service_mod._client_lock:
-                holding_lock.set()
-                await asyncio.Event().wait()
-                return None
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch.object(WorkflowService, "_workflow_is_published", new=AsyncMock(return_value=True)),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            result = await mock_service.unpublish_workflow(workflow_id)
+            await _finish_background_deletes()
+            mock_sched_cls.assert_not_called()
+
+        assert result == mock_workflow
+
+    @pytest.mark.asyncio
+    async def test_unpublish_returns_when_connect_hangs_without_holding_lock(
+        self, mock_service: WorkflowService
+    ) -> None:
+        workflow_id, mock_workflow = _published_workflow_mock()
+        connect_started = asyncio.Event()
+
+        async def _hang_connect(*_args: object, **_kwargs: object) -> NoReturn:
+            connect_started.set()
+            await asyncio.Event().wait()
+            raise AssertionError
 
         with (
             patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
@@ -842,23 +868,30 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
-            patch.object(scheduled_trigger_service_mod, "_get_shared_client", new=_hang_connect_under_lock),
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_hang_connect,
+            ),
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
             try:
                 result = await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=1.0)
-                await asyncio.wait_for(holding_lock.wait(), timeout=1.0)
-                pending = _pending_delete_tasks()
+                await asyncio.wait_for(connect_started.wait(), timeout=1.0)
                 mock_commit.assert_awaited()
-                assert scheduled_trigger_service_mod._client_lock.locked()
+                assert not scheduled_trigger_service_mod._client_lock.locked()
+                pending = _pending_delete_tasks()
                 assert len(pending) == 1
                 assert not pending[0].done()
             finally:
                 await _cancel_background_deletes()
+                connect_task = scheduled_trigger_service_mod._connect_task
+                if connect_task is not None:
+                    connect_task.cancel()
+                    await asyncio.gather(connect_task, return_exceptions=True)
+                    scheduled_trigger_service_mod._connect_task = None
 
         assert result == mock_workflow
         assert mock_workflow.published_version_id is None
-        assert not scheduled_trigger_service_mod._client_lock.locked()
 
     @pytest.mark.asyncio
     async def test_slow_delete_still_completes_after_unpublish_returns(self, mock_service: WorkflowService) -> None:
@@ -932,6 +965,68 @@ class TestScheduledTriggerSyncGracefulDegradation:
             mock_sched_cls.assert_not_called()
 
         assert _pending_delete_tasks() == []
+
+
+def _workflow_session_ctx(workflow: MagicMock | None, *, error: Exception | None = None) -> MagicMock:
+    session = AsyncMock()
+    session.get = AsyncMock(side_effect=error) if error is not None else AsyncMock(return_value=workflow)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=session)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return ctx
+
+
+class TestWorkflowIsPublished:
+    """Detached cleanup must keep schedules if a later publish won the race."""
+
+    @pytest.mark.asyncio
+    async def test_true_when_live_and_published(self) -> None:
+        workflow = MagicMock()
+        workflow.deleted_at = None
+        workflow.published_version_id = uuid4()
+        with patch(
+            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
+            return_value=_workflow_session_ctx(workflow),
+        ):
+            assert await WorkflowService._workflow_is_published(uuid4()) is True
+
+    @pytest.mark.asyncio
+    async def test_false_when_unpublished(self) -> None:
+        workflow = MagicMock()
+        workflow.deleted_at = None
+        workflow.published_version_id = None
+        with patch(
+            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
+            return_value=_workflow_session_ctx(workflow),
+        ):
+            assert await WorkflowService._workflow_is_published(uuid4()) is False
+
+    @pytest.mark.asyncio
+    async def test_false_when_soft_deleted(self) -> None:
+        workflow = MagicMock()
+        workflow.deleted_at = MagicMock()
+        workflow.published_version_id = uuid4()
+        with patch(
+            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
+            return_value=_workflow_session_ctx(workflow),
+        ):
+            assert await WorkflowService._workflow_is_published(uuid4()) is False
+
+    @pytest.mark.asyncio
+    async def test_false_when_missing(self) -> None:
+        with patch(
+            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
+            return_value=_workflow_session_ctx(None),
+        ):
+            assert await WorkflowService._workflow_is_published(uuid4()) is False
+
+    @pytest.mark.asyncio
+    async def test_false_when_db_read_fails(self) -> None:
+        with patch(
+            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
+            return_value=_workflow_session_ctx(None, error=RuntimeError("db down")),
+        ):
+            assert await WorkflowService._workflow_is_published(uuid4()) is False
 
 
 class TestPublishRejectsInvalidScheduledTriggerConfig:

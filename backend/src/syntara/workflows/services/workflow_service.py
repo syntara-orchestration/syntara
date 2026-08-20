@@ -21,6 +21,7 @@ from syntara.authz.engine import AllowedProjectsResult, AuthzRequest, authorize
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models import Project
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
@@ -273,12 +274,12 @@ class WorkflowService(BaseService):
     def _schedule_trigger_deletion(workflow_id: UUID) -> asyncio.Task[None] | None:
         """Start Temporal schedule deletion without holding the HTTP request.
 
-        Must not use ``asyncio.timeout`` on this work: cancelling
-        ``Client.connect`` under the process-wide ``_client_lock`` can
-        block the schedule reconciler and manufacture orphans. Must not
-        use Starlette ``BackgroundTasks`` either: those keep the ASGI
-        connection open until they finish, which is the nginx 504
-        (AAP-87692).
+        Must not use ``asyncio.timeout`` on this work: cancelling an
+        in-flight ``Client.connect`` can still interrupt cleanup.
+        Connect no longer holds ``_client_lock``, but the HTTP handler
+        must not wait on or cancel the task. Must not use Starlette
+        ``BackgroundTasks`` either: those keep the ASGI connection open
+        until they finish, which is the nginx 504 (AAP-87692).
 
         The task is allowed to outlive the request. The schedule
         reconciliation worker is the backstop if the process dies first.
@@ -300,15 +301,42 @@ class WorkflowService(BaseService):
         return task
 
     @staticmethod
+    async def _workflow_is_published(workflow_id: UUID) -> bool:
+        """Return True when detached cleanup must not delete Temporal schedules.
+
+        Opens a new session so this can run after the request session is
+        closed. If the workflow was republished before cleanup ran, schedules
+        must be kept. DB errors fail open (proceed with delete).
+        """
+        try:
+            async with AsyncSessionLocal() as session:
+                workflow = await session.get(Workflow, workflow_id)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Could not read workflow state before schedule deletion — proceeding with cleanup",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return False
+        return workflow is not None and workflow.deleted_at is None and workflow.published_version_id is not None
+
+    @staticmethod
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
         """Best-effort deletion of Temporal Schedules for a workflow.
 
         Swallows errors so a detached unpublish/delete task cannot fail
-        the already-committed database change. The schedule
-        reconciliation worker will clean up any orphans that remain when
-        Temporal is unreachable.
+        the already-committed database change. Skips deletion when a later
+        publish won the race. The schedule reconciliation worker will
+        clean up any orphans that remain when Temporal is unreachable or
+        the process dies before this task finishes.
         """
         try:
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
             scheduled_service = ScheduledTriggerService()
             await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
