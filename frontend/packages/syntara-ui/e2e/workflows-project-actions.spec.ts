@@ -8,71 +8,29 @@
  * - Delete project shows confirmation dialog with cascade warnings
  * - Permission gating for project actions
  */
-import { test, expect, toAppUrl, type Page } from './fixtures'
+import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
-import { apiRequest, getAuthToken, deleteWorkflowViaApi } from './utils/api'
-
-async function deleteProjectViaApi(app: Page, projectName: string): Promise<void> {
-  if (app.isClosed()) return
-  try {
-    const token = await getAuthToken(app)
-    if (!token) return
-    const listResp = await apiRequest(app, 'get', '/projects', { token })
-    if (!listResp.ok()) return
-    const body = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-    const project = body.resources.find((p) => p.name === projectName)
-    if (project) {
-      await apiRequest(app, 'delete', `/projects/${project.id}`, { token })
-    }
-  } catch {
-    // Best-effort cleanup
-  }
-}
-
-async function createProjectAndWorkflowViaApi(
-  app: Page,
-  projectName: string,
-  workflowName: string
-): Promise<{ projectId: string; workflowId: string }> {
-  const token = await getAuthToken(app)
-  if (!token) throw new Error('Could not obtain auth token')
-
-  const projResp = await apiRequest(app, 'post', '/projects', {
-    token,
-    data: { name: projectName, description: `E2E test project: ${projectName}` },
-  })
-  if (!projResp.ok()) throw new Error(`Failed to create project: ${projResp.status()}`)
-  const project = (await projResp.json()) as { id: string }
-
-  const wfResp = await apiRequest(app, 'post', '/workflows', {
-    token,
-    data: {
-      name: workflowName,
-      project_id: project.id,
-      workflow_definition: {
-        schema_version: '2.0.0',
-        name: workflowName,
-        triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        nodes: [],
-        edges: [],
-      },
-    },
-  })
-  if (!wfResp.ok()) throw new Error(`Failed to create workflow: ${wfResp.status()}`)
-  const workflow = (await wfResp.json()) as { id: string }
-
-  return { projectId: project.id, workflowId: workflow.id }
-}
+import { createProjectViaApi, createWorkflowViaApi, deleteProjectViaApi, deleteWorkflowViaApi } from './utils/api'
 
 test.describe('Workflows Page - Project Actions in All Projects View', () => {
   test('project group header shows kebab menu with edit and delete actions', async ({ app }) => {
     const projectName = buildUniqueName('e2e-project')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
     let workflowId: string | undefined
 
     try {
-      const result = await createProjectAndWorkflowViaApi(app, projectName, workflowName)
-      workflowId = result.workflowId
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
       // Navigate to All projects view
       await app.goto(toAppUrl('/workflows'))
@@ -94,7 +52,7 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(app.getByRole('menuitem', { name: /Delete project/i })).toBeVisible()
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
-      await deleteProjectViaApi(app, projectName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
@@ -102,11 +60,21 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
     const originalName = buildUniqueName('e2e-project-original')
     const updatedName = buildUniqueName('e2e-project-updated')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
     let workflowId: string | undefined
 
     try {
-      const result = await createProjectAndWorkflowViaApi(app, originalName, workflowName)
-      workflowId = result.workflowId
+      const project = await createProjectViaApi(app, originalName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
       // Navigate to All projects view
       await app.goto(toAppUrl('/workflows'))
@@ -135,18 +103,28 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(app.getByRole('row').filter({ hasText: originalName })).not.toBeVisible()
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
-      await deleteProjectViaApi(app, updatedName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
   test('delete project shows confirmation dialog with cascade warnings', async ({ app }) => {
     const projectName = buildUniqueName('e2e-project-delete')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
     let workflowId: string | undefined
 
     try {
-      const result = await createProjectAndWorkflowViaApi(app, projectName, workflowName)
-      workflowId = result.workflowId
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
       // Navigate to All projects view
       await app.goto(toAppUrl('/workflows'))
@@ -181,7 +159,7 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(deleteDialog).not.toBeVisible()
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
-      await deleteProjectViaApi(app, projectName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 })
@@ -189,17 +167,16 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
 test.describe('Workflows Page - Project Actions in Selected Project View', () => {
   test('page header shows project kebab menu when specific project selected', async ({ app }) => {
     const projectName = buildUniqueName('e2e-project-header')
+    let projectId: string | undefined
 
     try {
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(projectName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
+      await app.getByRole('option', { name: projectName }).click()
 
       // Project is now selected — kebab should be visible in header
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
@@ -209,25 +186,23 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       await expect(app.getByRole('menuitem', { name: /Edit project/i })).toBeVisible()
       await expect(app.getByRole('menuitem', { name: /Delete project/i })).toBeVisible()
     } finally {
-      await deleteProjectViaApi(app, projectName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
   test('edit project from header updates name in project selector', async ({ app }) => {
     const originalName = buildUniqueName('e2e-project-orig')
     const updatedName = buildUniqueName('e2e-project-upd')
+    let projectId: string | undefined
 
     try {
-      // Create project via UI — it becomes the selected project
+      const project = await createProjectViaApi(app, originalName)
+      projectId = project.id
+
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(originalName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
+      await app.getByRole('option', { name: originalName }).click()
 
       // Edit via header kebab
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
@@ -245,7 +220,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       // Verify the project selector shows the updated name
       await expect(projectSelector).toHaveValue(updatedName)
     } finally {
-      await deleteProjectViaApi(app, updatedName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 })
