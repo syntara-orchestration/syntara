@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxEmptyStateServiceUnavailable } from './NxEmptyStateServiceUnavailable'
+import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
 import { pageDecorator } from './storyDecorators'
 
-const meta: Meta<typeof NxEmptyStateServiceUnavailable> = {
-  component: NxEmptyStateServiceUnavailable,
+const meta: Meta<typeof SynEmptyStateServiceUnavailable> = {
+  component: SynEmptyStateServiceUnavailable,
   decorators: [pageDecorator],
   tags: ['autodocs'],
 }

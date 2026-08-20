@@ -30,7 +30,7 @@ import { NxDetail } from '../../../components/details/NxDetail'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
@@ -432,7 +432,7 @@ export function EditIntegrationForm() {
         <SynPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
         <SynPageBody>
           <SynPanel isFullHeight>
-            {queryState ?? <NxErrorState message="Missing integration ID" title="Error" />}
+            {queryState ?? <SynErrorState message="Missing integration ID" title="Error" />}
           </SynPanel>
         </SynPageBody>
       </SynPage>

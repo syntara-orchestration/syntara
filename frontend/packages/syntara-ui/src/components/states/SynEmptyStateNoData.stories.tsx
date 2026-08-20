@@ -2,11 +2,11 @@ import { Button } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxEmptyStateNoData } from './NxEmptyStateNoData'
+import { SynEmptyStateNoData } from './SynEmptyStateNoData'
 import { pageDecorator } from './storyDecorators'
 
-const meta: Meta<typeof NxEmptyStateNoData> = {
-  component: NxEmptyStateNoData,
+const meta: Meta<typeof SynEmptyStateNoData> = {
+  component: SynEmptyStateNoData,
   decorators: [pageDecorator],
   tags: ['autodocs'],
 }

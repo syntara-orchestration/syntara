@@ -1131,7 +1131,7 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 2. Use `useCursorPagination` for filters + cursor + `queryParams`
 3. Render `FilterBar` (or `NxListPanelToolbar`) with those definitions
 4. Pass `queryParams` into the typed client's `useQuery`
-5. Use `NxEmptyStateFilter` when filters are active and the list is empty
+5. Use `SynEmptyStateFilter` when filters are active and the list is empty
 
 See [API Filtering Architecture](#api-filtering-architecture) and [`docs/user-guides/filtering.md`](./user-guides/filtering.md).
 
@@ -1312,7 +1312,7 @@ const query = workflowClient.useQuery('get', '/workflows', {
 // <Th sort={getSortParams('name')}>Name</Th>
 ```
 
-Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `NxListPanelToolbar`. Use `NxEmptyStateFilter` when filters are active but the list is empty.
+Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `NxListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
 
 ### Keyword search default behavior
 

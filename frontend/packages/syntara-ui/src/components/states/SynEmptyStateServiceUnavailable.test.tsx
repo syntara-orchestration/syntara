@@ -2,16 +2,16 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxEmptyStateServiceUnavailable } from './NxEmptyStateServiceUnavailable'
+import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
 
-describe('NxEmptyStateServiceUnavailable', () => {
+describe('SynEmptyStateServiceUnavailable', () => {
   it('has no accessibility violations', async () => {
-    const { container } = render(<NxEmptyStateServiceUnavailable />)
+    const { container } = render(<SynEmptyStateServiceUnavailable />)
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('renders with default title and description', () => {
-    render(<NxEmptyStateServiceUnavailable />)
+    render(<SynEmptyStateServiceUnavailable />)
 
     expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
     expect(
@@ -20,19 +20,19 @@ describe('NxEmptyStateServiceUnavailable', () => {
   })
 
   it('renders with custom title', () => {
-    render(<NxEmptyStateServiceUnavailable title="Custom Title" />)
+    render(<SynEmptyStateServiceUnavailable title="Custom Title" />)
 
     expect(screen.getByText('Custom Title')).toBeInTheDocument()
   })
 
   it('renders with custom description', () => {
-    render(<NxEmptyStateServiceUnavailable description="Custom error message" />)
+    render(<SynEmptyStateServiceUnavailable description="Custom error message" />)
 
     expect(screen.getByText(/Custom error message.*If this persists/)).toBeInTheDocument()
   })
 
   it('hides admin hint when showAdminHint is false', () => {
-    render(<NxEmptyStateServiceUnavailable showAdminHint={false} />)
+    render(<SynEmptyStateServiceUnavailable showAdminHint={false} />)
 
     expect(
       screen.getByText('The AI service is currently unavailable. This may be a configuration issue.')
@@ -41,14 +41,14 @@ describe('NxEmptyStateServiceUnavailable', () => {
   })
 
   it('shows admin hint with custom description when showAdminHint is true', () => {
-    render(<NxEmptyStateServiceUnavailable description="API key missing" showAdminHint={true} />)
+    render(<SynEmptyStateServiceUnavailable description="API key missing" showAdminHint={true} />)
 
     expect(screen.getByText('API key missing If this persists, contact your system administrator.')).toBeInTheDocument()
   })
 
   it('renders with all custom props', () => {
     render(
-      <NxEmptyStateServiceUnavailable title="Backend Error" description="The backend is down" showAdminHint={false} />
+      <SynEmptyStateServiceUnavailable title="Backend Error" description="The backend is down" showAdminHint={false} />
     )
 
     expect(screen.getByText('Backend Error')).toBeInTheDocument()

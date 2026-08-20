@@ -389,7 +389,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           refreshPromise = null
         }
         // Stale-invocation early returns (epoch mismatch) skip applyTokenResponse / INITIAL_STATE — still
-        // clear the spinner or AppLogin stays on NxLoadingState forever after sign-out or parallel logout.
+        // clear the spinner or AppLogin stays on SynLoadingState forever after sign-out or parallel logout.
         set({ isRefreshing: false })
       }
     })()

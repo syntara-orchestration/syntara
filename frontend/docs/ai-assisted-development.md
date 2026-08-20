@@ -205,7 +205,7 @@ Always check in a browser before opening a PR. Run `npm start` (UI at http://loc
 | **Loaded**             | Page loads normally                  | Layout matches mockup                      |
 | **Empty (no data)**    | Return empty array from mock handler | "No [resources] yet" empty state           |
 | **Empty (no results)** | Filter with no matches               | "No results found" + "Clear all filters"   |
-| **Error**              | Stop mock API, reload                | `NxErrorState` with working "Retry" button |
+| **Error**              | Stop mock API, reload                | `SynErrorState` with working "Retry" button |
 | **Success toast**      | Create or delete an item             | Sentence-case title, bottom position       |
 | **Error toast**        | Return 500 from mock handler         | Error message with retry                   |
 
@@ -302,7 +302,7 @@ When `/frontend-review-pr` or a reviewer flags violations, here are the most com
 | **Missing `toHaveNoViolations()`**  | Add accessibility test: `expect(await axe(container)).toHaveNoViolations()`                |
 | **`fireEvent` in tests**            | Replace with `const user = userEvent.setup()` then `await user.click(...)`                 |
 | **`getByTestId` / `querySelector`** | Use `getByRole('button', { name: 'Delete' })` or `getByLabelText('Name')`                  |
-| **Raw error markup**                | Use `<NxErrorState error={error} onRetry={...} />`                                         |
+| **Raw error markup**                | Use `<SynErrorState error={error} onRetry={...} />`                                         |
 | **Manual `useState` per field**     | Use Zod schema + `useForm({ resolver: zodResolver(schema) })`                              |
 | **Missing `reset()` in modal**      | Add `useEffect(() => { reset(item); }, [isOpen, item, reset])`                             |
 | **Hardcoded `px`**                  | Use `var(--pf-t--global--spacer--md)` — ask the agent which token to use                   |
@@ -417,7 +417,7 @@ Include these screenshots in the PR description so reviewers can verify without 
 | **Loaded**             | Page with data, matching the mockup                      |
 | **Empty (no data)**    | "No [resources] yet" empty state                         |
 | **Empty (no results)** | Filtered with no matches, "Clear all filters" link       |
-| **Error**              | API error with `NxErrorState` and working "Retry" button |
+| **Error**              | API error with `SynErrorState` and working "Retry" button |
 | **Success toast**      | After creating or deleting an item                       |
 | **Mobile/responsive**  | If applicable, narrow viewport                           |
 
