@@ -29,6 +29,13 @@ describe('NxEmptyStateFilter', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders SearchIcon as the default icon', () => {
+    const { container } = render(<NxEmptyStateFilter />)
+
+    const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+    expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
+  })
+
   it('renders with custom title', () => {
     render(<NxEmptyStateFilter title="Custom Title" />)
 

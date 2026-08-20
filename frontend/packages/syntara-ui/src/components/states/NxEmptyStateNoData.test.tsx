@@ -20,6 +20,13 @@ describe('NxEmptyStateNoData', () => {
     expect(screen.getByText('There is no data to display at this time.')).toBeInTheDocument()
   })
 
+  it('renders PlusCircleIcon as the default icon', () => {
+    const { container } = render(<NxEmptyStateNoData />)
+
+    const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+    expect(iconPath).toMatch(/^M256 8C119 8/)
+  })
+
   it('renders with custom title', () => {
     render(<NxEmptyStateNoData title="No workflows yet" />)
 

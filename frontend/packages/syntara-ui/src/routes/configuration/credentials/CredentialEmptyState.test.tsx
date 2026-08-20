@@ -11,6 +11,13 @@ describe('CredentialEmptyState', () => {
     expect(screen.getByText('No credentials yet')).toBeInTheDocument()
   })
 
+  it('renders PlusCircleIcon as the default icon', () => {
+    const { container } = render(<CredentialEmptyState onCreateCredential={vi.fn()} />)
+
+    const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
+    expect(iconPath).toMatch(/^M256 8C119 8/)
+  })
+
   it('renders description text', () => {
     render(<CredentialEmptyState onCreateCredential={vi.fn()} />)
 
