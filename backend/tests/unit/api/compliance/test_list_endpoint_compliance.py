@@ -45,6 +45,7 @@ from tests.unit.api.compliance.endpoint_discovery import (
 if TYPE_CHECKING:
     from tests.unit.api.compliance.endpoint_discovery import EndpointInfo
 
+
 _OPTIONAL_OPS = {FilterOperator.IN.value, FilterOperator.ISNULL.value}
 _STRING_OPS = {op.value for op in FilterOperator} - _OPTIONAL_OPS
 _COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS.value, FilterOperator.STARTS_WITH.value}
@@ -198,6 +199,13 @@ class TestListEndpointCompliance:
         return None
 
     @staticmethod
+    def _is_const_param(schema: dict[str, Any]) -> bool:
+        """Return True if the schema represents a fixed-value param (not a filter)."""
+        if "const" in schema:
+            return True
+        return any(isinstance(v, dict) and "const" in v for v in schema.get("anyOf", []))
+
+    @staticmethod
     def _infer_required_operators(schema: dict[str, Any]) -> set[str]:
         """Infer minimum required filter operators from a parameter's schema type.
 
@@ -223,25 +231,29 @@ class TestListEndpointCompliance:
         schema: dict[str, Any],
         required_operators: set[str],
     ) -> None:
-        """Validate that a filter field schema declares required operators via allOf."""
-        if "allOf" not in schema:
-            pytest.fail(
-                f"{endpoint.operation_id} parameter '{field_name}' should use allOf schema "
-                f"with filter operators {required_operators}"
-            )
+        """Validate that a filter field schema declares required operators.
 
-        all_of = schema.get("allOf", [])
-        operator_schemas = [item for item in all_of if item.get("type") == "object"]
-
-        if not operator_schemas:
-            pytest.fail(
-                f"{endpoint.operation_id} parameter '{field_name}' allOf schema missing "
-                f"object type with filter operators"
-            )
-
+        Operators may be declared via allOf (sub-spec authoring pattern) or
+        directly in top-level properties (after bundler flattening).
+        """
         declared_operators: set[str] = set()
-        for obj_schema in operator_schemas:
-            declared_operators.update(obj_schema.get("properties", {}).keys())
+
+        # allOf path: when the bundler preserves allOf (e.g. items contain $ref),
+        # operators are in the type: object item's properties.
+        all_of = schema.get("allOf", [])
+        for item in all_of:
+            if isinstance(item, dict) and item.get("type") == "object":
+                declared_operators.update(item.get("properties", {}).keys())
+
+        # Flat path: when the bundler merges a plain allOf into a single schema,
+        # operator properties end up at the top level.
+        declared_operators.update(schema.get("properties", {}).keys())
+
+        if not declared_operators:
+            pytest.fail(
+                f"{endpoint.operation_id} parameter '{field_name}' missing filter operator "
+                f"properties. Expected: {required_operators}"
+            )
 
         missing_operators = required_operators - declared_operators
         if missing_operators:
@@ -269,7 +281,7 @@ class TestListEndpointCompliance:
         filter_fields = {
             name: schema
             for name, schema in all_fields.items()
-            if name not in pagination_fields and not schema.get("x-query-param")
+            if name not in pagination_fields and not schema.get("x-query-param") and not self._is_const_param(schema)
         }
 
         if not filter_fields:

@@ -7,6 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.group_list_response import GroupListResponse
+from ...models.list_groups_created_at import ListGroupsCreatedAt
+from ...models.list_groups_created_by import ListGroupsCreatedBy
+from ...models.list_groups_description import ListGroupsDescription
+from ...models.list_groups_id import ListGroupsId
+from ...models.list_groups_name import ListGroupsName
+from ...models.list_groups_source import ListGroupsSource
+from ...models.list_groups_updated_at import ListGroupsUpdatedAt
 from ...types import UNSET, Response, Unset
 
 
@@ -16,6 +23,13 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListGroupsId | Unset = UNSET,
+    created_at: ListGroupsCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsUpdatedAt | Unset = UNSET,
+    name: ListGroupsName | Unset = UNSET,
+    description: ListGroupsDescription | Unset = UNSET,
+    created_by: ListGroupsCreatedBy | Unset = UNSET,
+    source: ListGroupsSource | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -39,6 +53,48 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_source: dict[str, Any] | Unset = UNSET
+    if not isinstance(source, Unset):
+        json_source = source.to_dict()
+    if not isinstance(json_source, Unset):
+        params.update(json_source)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -125,6 +181,13 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListGroupsId | Unset = UNSET,
+    created_at: ListGroupsCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsUpdatedAt | Unset = UNSET,
+    name: ListGroupsName | Unset = UNSET,
+    description: ListGroupsDescription | Unset = UNSET,
+    created_by: ListGroupsCreatedBy | Unset = UNSET,
+    source: ListGroupsSource | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | GroupListResponse]:
     """List groups
@@ -139,6 +202,13 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListGroupsId | Unset):
+        created_at (ListGroupsCreatedAt | Unset):
+        updated_at (ListGroupsUpdatedAt | Unset):
+        name (ListGroupsName | Unset):
+        description (ListGroupsDescription | Unset):
+        created_by (ListGroupsCreatedBy | Unset):
+        source (ListGroupsSource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -149,7 +219,18 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        limit=limit, cursor=cursor, sort=sort, include_total=include_total, additional_params=additional_params
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
+        additional_params=additional_params,
     )
 
     response = client.get_httpx_client().request(
@@ -166,6 +247,13 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListGroupsId | Unset = UNSET,
+    created_at: ListGroupsCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsUpdatedAt | Unset = UNSET,
+    name: ListGroupsName | Unset = UNSET,
+    description: ListGroupsDescription | Unset = UNSET,
+    created_by: ListGroupsCreatedBy | Unset = UNSET,
+    source: ListGroupsSource | Unset = UNSET,
 ) -> ErrorData | GroupListResponse | None:
     """List groups
 
@@ -179,6 +267,13 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListGroupsId | Unset):
+        created_at (ListGroupsCreatedAt | Unset):
+        updated_at (ListGroupsUpdatedAt | Unset):
+        name (ListGroupsName | Unset):
+        description (ListGroupsDescription | Unset):
+        created_by (ListGroupsCreatedBy | Unset):
+        source (ListGroupsSource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -194,6 +289,13 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
     ).parsed
 
 
@@ -204,6 +306,13 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListGroupsId | Unset = UNSET,
+    created_at: ListGroupsCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsUpdatedAt | Unset = UNSET,
+    name: ListGroupsName | Unset = UNSET,
+    description: ListGroupsDescription | Unset = UNSET,
+    created_by: ListGroupsCreatedBy | Unset = UNSET,
+    source: ListGroupsSource | Unset = UNSET,
 ) -> Response[ErrorData | GroupListResponse]:
     """List groups
 
@@ -217,6 +326,13 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListGroupsId | Unset):
+        created_at (ListGroupsCreatedAt | Unset):
+        updated_at (ListGroupsUpdatedAt | Unset):
+        name (ListGroupsName | Unset):
+        description (ListGroupsDescription | Unset):
+        created_by (ListGroupsCreatedBy | Unset):
+        source (ListGroupsSource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -231,6 +347,13 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        created_by=created_by,
+        source=source,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -245,6 +368,13 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListGroupsId | Unset = UNSET,
+    created_at: ListGroupsCreatedAt | Unset = UNSET,
+    updated_at: ListGroupsUpdatedAt | Unset = UNSET,
+    name: ListGroupsName | Unset = UNSET,
+    description: ListGroupsDescription | Unset = UNSET,
+    created_by: ListGroupsCreatedBy | Unset = UNSET,
+    source: ListGroupsSource | Unset = UNSET,
 ) -> ErrorData | GroupListResponse | None:
     """List groups
 
@@ -258,6 +388,13 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListGroupsId | Unset):
+        created_at (ListGroupsCreatedAt | Unset):
+        updated_at (ListGroupsUpdatedAt | Unset):
+        name (ListGroupsName | Unset):
+        description (ListGroupsDescription | Unset):
+        created_by (ListGroupsCreatedBy | Unset):
+        source (ListGroupsSource | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -274,5 +411,12 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            name=name,
+            description=description,
+            created_by=created_by,
+            source=source,
         )
     ).parsed

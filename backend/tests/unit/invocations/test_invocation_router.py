@@ -37,6 +37,7 @@ class TestListInvocationsVisibility:
             service=mock_service,
             params=mock_params,
             visibility=mock_visibility,
+            _filterable=None,
         )
 
         mock_visibility.to_allowed_projects.assert_called_once()
@@ -72,6 +73,7 @@ class TestListInvocationsVisibility:
             service=mock_service,
             params=mock_params,
             visibility=mock_visibility,
+            _filterable=None,
         )
 
         mock_service.list_invocations.assert_awaited_once_with(

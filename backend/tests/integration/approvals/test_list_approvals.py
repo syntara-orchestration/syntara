@@ -368,33 +368,33 @@ class TestListApprovalsContract:
         - Invalid limit values return 422 Unprocessable Entity
         - Error responses match RFC 9457 format
         """
-        # Act & Assert - Invalid status value
+        # Act & Assert - Invalid status value (validated by _validate_query_params)
         response = await auth_client.get("/api/v1/approvals?status=invalid")
         assert response.status_code == 422
         assert_error_data(
             response,
             error_type="https://api.example.com/errors/validation-error",
-            title="Request Validation Error",
+            title="Validation Error",
             detail=(
-                "Validation failed: query -> status: "
-                "Input should be 'pending', 'approved', 'rejected', 'expired' or 'cancelled'"
+                "Invalid value for field 'status': Input should be "
+                "'pending', 'approved', 'rejected', 'expired' or 'cancelled'"
             ),
-            code="REQUEST_VALIDATION_ERROR",
+            code="VALIDATION_ERROR",
             retryable=False,
         )
 
-        # Act & Assert - Invalid execution_id format
+        # Act & Assert - Invalid execution_id format (validated by parse_filters → _convert_uuid_value)
         response = await auth_client.get("/api/v1/approvals?execution_id=not-a-uuid")
         assert response.status_code == 422
         assert_error_data(
             response,
             error_type="https://api.example.com/errors/validation-error",
-            title="Request Validation Error",
+            title="Validation Error",
             detail=(
-                "Validation failed: query -> execution_id: Input should be a valid UUID, "
-                "invalid character: found `n` at 1"
+                "Invalid value for field 'execution_id': "
+                "Input should be a valid UUID, invalid character: found `n` at 1"
             ),
-            code="REQUEST_VALIDATION_ERROR",
+            code="VALIDATION_ERROR",
             retryable=False,
         )
 

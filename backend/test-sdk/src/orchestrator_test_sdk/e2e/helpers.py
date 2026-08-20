@@ -104,9 +104,11 @@ def poll_for_pending_approval(
         elapsed += interval
         response = _retry_api_call(
             lambda: api.approvals.list(
-                execution_id=execution_id,
-                status=ApprovalRequestStatus.PENDING,
                 limit=5,
+                additional_params={
+                    "execution_id": str(execution_id),
+                    "status": ApprovalRequestStatus.PENDING.value,
+                },
             )
         )
         result = response.assert_and_get()

@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query, Request
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
@@ -13,6 +13,7 @@ from syntara.core.database.session import get_db
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.base import BaseService
 from syntara.core.syntara_router import SyntaraRouter
 
@@ -29,12 +30,6 @@ class UserDirectoryEntry(SQLModel):
 
 
 UserDirectoryListResponse = ResourcesResponse[UserDirectoryEntry]
-
-
-class UserDirectoryListParams(BaseListParams):
-    """Query parameters for the user directory listing."""
-
-    username: str | None = Field(default=None, description="Filter by username")
 
 
 class _UserDirectoryService(BaseService):
@@ -78,7 +73,8 @@ def _get_service(
 async def list_users_directory(
     request: Request,
     service: Annotated[_UserDirectoryService, Depends(_get_service)],
-    params: Annotated[UserDirectoryListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(User))],
 ) -> UserDirectoryListResponse:
     """Return a lightweight directory of users (id + username only)."""
     return await service.list_directory(

@@ -112,6 +112,14 @@ class ProjectsApi:
         endpoint_module = self._load_endpoint_module("delete_project_role_assignment")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
+    def list_roles(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_project_roles")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_roles(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_project_roles")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def create_role(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("create_project_role")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
@@ -150,6 +158,14 @@ class ProjectsApi:
 
     async def async_update_role(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("update_project_role")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def list_policies(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_project_policies")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_policies(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_project_policies")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
     def create_policy(self, **kwargs: Any) -> Response[Any]:

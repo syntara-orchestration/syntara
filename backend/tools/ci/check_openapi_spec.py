@@ -41,23 +41,26 @@ def _is_parameter_object(obj: dict) -> bool:
     return "name" in obj and obj.get("in") in _PARAM_IN_VALUES
 
 
+def _strip_descriptions_recursive(obj: object) -> object:
+    """Recursively remove all 'description' keys from a schema tree."""
+    if isinstance(obj, dict):
+        return {k: _strip_descriptions_recursive(v) for k, v in obj.items() if k != "description"}
+    if isinstance(obj, list):
+        return [_strip_descriptions_recursive(item) for item in obj]
+    return obj
+
+
 def _strip_schema_description(param: dict) -> dict:
     """Remove descriptions from a parameter object before comparison.
 
-    Two cases are handled:
-
-    1. Schema-level description (``parameters[i].schema.description``):
-       FastAPI copies the parameter description into the schema sub-object as a
-       redundant duplicate; our sub-specs only store it at the parameter level.
-
-    2. Query and path parameter top-level description (``parameters[i].description``):
-       descriptions are authored in sub-specs but FastAPI does not generate them,
-       causing widespread false-positive drift.
+    Strips descriptions at all levels: top-level parameter description,
+    schema-level description, and descriptions nested inside allOf/properties
+    (e.g., in deepObject filter params where sub-specs have hand-authored
+    descriptions that the generated spec omits).
     """
     schema = param.get("schema")
-    if isinstance(schema, dict) and "description" in schema:
-        stripped_schema = {k: v for k, v in schema.items() if k != "description"}
-        param = {**param, "schema": stripped_schema}
+    if isinstance(schema, dict):
+        param = {**param, "schema": _strip_descriptions_recursive(schema)}
     if param.get("in") in ("query", "path") and "description" in param:
         param = {k: v for k, v in param.items() if k != "description"}
     return param

@@ -17,19 +17,19 @@ T = TypeVar("T", bound="ListIdentityProvidersCreatedAt")
 class ListIdentityProvidersCreatedAt:
     """
     Attributes:
-        eq (datetime.datetime | Unset):
-        gt (datetime.datetime | Unset):
-        gte (datetime.datetime | Unset):
+        eq (datetime.datetime | Unset): Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+        gt (datetime.datetime | Unset): Greater than comparison. ?created_at[gt]=<timestamp>
+        gte (datetime.datetime | Unset): Greater than or equal comparison. ?created_at[gte]=<timestamp>
+        lt (datetime.datetime | Unset): Less than comparison. ?created_at[lt]=<timestamp>
         in_ (str | Unset):
-        lt (datetime.datetime | Unset):
-        lte (datetime.datetime | Unset):
+        lte (datetime.datetime | Unset): Less than or equal comparison. ?created_at[lte]=<timestamp>
     """
 
     eq: datetime.datetime | Unset = UNSET
     gt: datetime.datetime | Unset = UNSET
     gte: datetime.datetime | Unset = UNSET
-    in_: str | Unset = UNSET
     lt: datetime.datetime | Unset = UNSET
+    in_: str | Unset = UNSET
     lte: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -46,11 +46,11 @@ class ListIdentityProvidersCreatedAt:
         if not isinstance(self.gte, Unset):
             gte = self.gte.isoformat()
 
-        in_ = self.in_
-
         lt: str | Unset = UNSET
         if not isinstance(self.lt, Unset):
             lt = self.lt.isoformat()
+
+        in_ = self.in_
 
         lte: str | Unset = UNSET
         if not isinstance(self.lte, Unset):
@@ -65,10 +65,10 @@ class ListIdentityProvidersCreatedAt:
             field_dict["gt"] = gt
         if gte is not UNSET:
             field_dict["gte"] = gte
-        if in_ is not UNSET:
-            field_dict["in"] = in_
         if lt is not UNSET:
             field_dict["lt"] = lt
+        if in_ is not UNSET:
+            field_dict["in"] = in_
         if lte is not UNSET:
             field_dict["lte"] = lte
 
@@ -98,14 +98,14 @@ class ListIdentityProvidersCreatedAt:
         else:
             gte = isoparse(_gte)
 
-        in_ = d.pop("in", UNSET)
-
         _lt = d.pop("lt", UNSET)
         lt: datetime.datetime | Unset
         if isinstance(_lt, Unset):
             lt = UNSET
         else:
             lt = isoparse(_lt)
+
+        in_ = d.pop("in", UNSET)
 
         _lte = d.pop("lte", UNSET)
         lte: datetime.datetime | Unset
@@ -118,8 +118,8 @@ class ListIdentityProvidersCreatedAt:
             eq=eq,
             gt=gt,
             gte=gte,
-            in_=in_,
             lt=lt,
+            in_=in_,
             lte=lte,
         )
 

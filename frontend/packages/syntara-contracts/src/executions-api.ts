@@ -1960,6 +1960,74 @@ export interface components {
     sortParam: string | null
     /** @description Include total count in response (expensive) */
     includeTotalParam: boolean
+    createdAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of creation timestamp. ?created_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?created_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?created_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?created_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?created_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
+    updatedAtFilterParam: string & {
+      /**
+       * Equals
+       * Format: date-time
+       * @description Exact match of last update timestamp. ?updated_at[eq]=<timestamp>
+       */
+      eq?: string
+      /**
+       * Greater Than
+       * Format: date-time
+       * @description Greater than comparison. ?updated_at[gt]=<timestamp>
+       */
+      gt?: string
+      /**
+       * Greater Than or Equal
+       * Format: date-time
+       * @description Greater than or equal comparison. ?updated_at[gte]=<timestamp>
+       */
+      gte?: string
+      /**
+       * Less Than
+       * Format: date-time
+       * @description Less than comparison. ?updated_at[lt]=<timestamp>
+       */
+      lt?: string
+      /** In */
+      in?: string
+      /**
+       * Less Than or Equal
+       * Format: date-time
+       * @description Less than or equal comparison. ?updated_at[lte]=<timestamp>
+       */
+      lte?: string
+    }
   }
   requestBodies: never
   headers: never
@@ -1978,6 +2046,155 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        created_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        updated_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        deleted_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        deleted_by?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+        }
+        workflow_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        workflow_version_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        project_id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        status?: components['schemas']['ExecutionStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        mode?: components['schemas']['ExecutionMode'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        completed_at?: string & {
+          /**
+           * Equals
+           * Format: date-time
+           */
+          eq?: string
+          /**
+           * Greater Than
+           * Format: date-time
+           */
+          gt?: string
+          /**
+           * Greater Than or Equal
+           * Format: date-time
+           */
+          gte?: string
+          /** In */
+          in?: string
+          /** Is Null */
+          isnull?: boolean
+          /**
+           * Less Than
+           * Format: date-time
+           */
+          lt?: string
+          /**
+           * Less Than or Equal
+           * Format: date-time
+           */
+          lte?: string
+        }
+        approval_pending?: boolean & {
+          /** Equals */
+          eq?: boolean
+          /** In */
+          in?: string
+        }
       }
       header?: never
       path?: never
@@ -2137,6 +2354,47 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        id?: string & {
+          /**
+           * Equals
+           * Format: uuid
+           */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        created_at?: components['parameters']['createdAtFilterParam']
+        updated_at?: components['parameters']['updatedAtFilterParam']
+        activity_name?: string & {
+          /** Contains */
+          contains?: string
+          /** Equals */
+          eq?: string
+          /** Greater Than */
+          gt?: string
+          /** Greater Than or Equal */
+          gte?: string
+          /** In */
+          in?: string
+          /** Less Than */
+          lt?: string
+          /** Less Than or Equal */
+          lte?: string
+          /** Starts With */
+          starts_with?: string
+        }
+        node_type?: components['schemas']['NodeType'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
+        status?: components['schemas']['ActivityStatus'] & {
+          /** Equals */
+          eq?: string
+          /** In */
+          in?: string
+        }
       }
       header?: never
       path: {

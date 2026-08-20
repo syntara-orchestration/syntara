@@ -56,7 +56,7 @@ class TestListUsersDirectory:
         params.sort = None
         params.include_total = False
 
-        result = await list_users_directory(request, service, params)
+        result = await list_users_directory(request, service, params, _filterable=None)
 
         assert len(result.resources) == 2
         assert result.resources[0].username == "alice"
@@ -78,7 +78,7 @@ class TestListUsersDirectory:
         params.sort = "-username"
         params.include_total = True
 
-        result = await list_users_directory(request, service, params)
+        result = await list_users_directory(request, service, params, _filterable=None)
 
         service.list_directory.assert_called_once_with(
             limit=10,
@@ -104,7 +104,7 @@ class TestListUsersDirectory:
         params.sort = None
         params.include_total = True
 
-        result = await list_users_directory(request, service, params)
+        result = await list_users_directory(request, service, params, _filterable=None)
 
         assert result.resources == []
         assert result.total == 0

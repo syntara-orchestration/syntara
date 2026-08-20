@@ -6,6 +6,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_projects_created_at import ListProjectsCreatedAt
+from ...models.list_projects_deleted_at import ListProjectsDeletedAt
+from ...models.list_projects_deleted_by import ListProjectsDeletedBy
+from ...models.list_projects_description import ListProjectsDescription
+from ...models.list_projects_id import ListProjectsId
+from ...models.list_projects_is_builtin import ListProjectsIsBuiltin
+from ...models.list_projects_is_default import ListProjectsIsDefault
+from ...models.list_projects_name import ListProjectsName
+from ...models.list_projects_updated_at import ListProjectsUpdatedAt
 from ...models.project_list_response import ProjectListResponse
 from ...types import UNSET, Response, Unset
 
@@ -16,9 +25,15 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_default: bool | None | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
+    id: ListProjectsId | Unset = UNSET,
+    created_at: ListProjectsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectsUpdatedAt | Unset = UNSET,
+    name: ListProjectsName | Unset = UNSET,
+    description: ListProjectsDescription | Unset = UNSET,
+    deleted_at: ListProjectsDeletedAt | Unset = UNSET,
+    deleted_by: ListProjectsDeletedBy | Unset = UNSET,
+    is_default: ListProjectsIsDefault | Unset = UNSET,
+    is_builtin: ListProjectsIsBuiltin | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -43,26 +58,59 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_name: None | str | Unset
-    if isinstance(name, Unset):
-        json_name = UNSET
-    else:
-        json_name = name
-    params["name"] = json_name
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
 
-    json_is_default: bool | None | Unset
-    if isinstance(is_default, Unset):
-        json_is_default = UNSET
-    else:
-        json_is_default = is_default
-    params["is_default"] = json_is_default
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
 
-    json_is_builtin: bool | None | Unset
-    if isinstance(is_builtin, Unset):
-        json_is_builtin = UNSET
-    else:
-        json_is_builtin = is_builtin
-    params["is_builtin"] = json_is_builtin
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_deleted_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(deleted_at, Unset):
+        json_deleted_at = deleted_at.to_dict()
+    if not isinstance(json_deleted_at, Unset):
+        params.update(json_deleted_at)
+
+    json_deleted_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(deleted_by, Unset):
+        json_deleted_by = deleted_by.to_dict()
+    if not isinstance(json_deleted_by, Unset):
+        params.update(json_deleted_by)
+
+    json_is_default: dict[str, Any] | Unset = UNSET
+    if not isinstance(is_default, Unset):
+        json_is_default = is_default.to_dict()
+    if not isinstance(json_is_default, Unset):
+        params.update(json_is_default)
+
+    json_is_builtin: dict[str, Any] | Unset = UNSET
+    if not isinstance(is_builtin, Unset):
+        json_is_builtin = is_builtin.to_dict()
+    if not isinstance(json_is_builtin, Unset):
+        params.update(json_is_builtin)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -149,9 +197,15 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_default: bool | None | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
+    id: ListProjectsId | Unset = UNSET,
+    created_at: ListProjectsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectsUpdatedAt | Unset = UNSET,
+    name: ListProjectsName | Unset = UNSET,
+    description: ListProjectsDescription | Unset = UNSET,
+    deleted_at: ListProjectsDeletedAt | Unset = UNSET,
+    deleted_by: ListProjectsDeletedBy | Unset = UNSET,
+    is_default: ListProjectsIsDefault | Unset = UNSET,
+    is_builtin: ListProjectsIsBuiltin | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | ProjectListResponse]:
     """List projects
@@ -163,9 +217,15 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_default (bool | None | Unset):
-        is_builtin (bool | None | Unset):
+        id (ListProjectsId | Unset):
+        created_at (ListProjectsCreatedAt | Unset):
+        updated_at (ListProjectsUpdatedAt | Unset):
+        name (ListProjectsName | Unset):
+        description (ListProjectsDescription | Unset):
+        deleted_at (ListProjectsDeletedAt | Unset):
+        deleted_by (ListProjectsDeletedBy | Unset):
+        is_default (ListProjectsIsDefault | Unset):
+        is_builtin (ListProjectsIsBuiltin | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -180,7 +240,13 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
         is_default=is_default,
         is_builtin=is_builtin,
         additional_params=additional_params,
@@ -200,9 +266,15 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_default: bool | None | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
+    id: ListProjectsId | Unset = UNSET,
+    created_at: ListProjectsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectsUpdatedAt | Unset = UNSET,
+    name: ListProjectsName | Unset = UNSET,
+    description: ListProjectsDescription | Unset = UNSET,
+    deleted_at: ListProjectsDeletedAt | Unset = UNSET,
+    deleted_by: ListProjectsDeletedBy | Unset = UNSET,
+    is_default: ListProjectsIsDefault | Unset = UNSET,
+    is_builtin: ListProjectsIsBuiltin | Unset = UNSET,
 ) -> ErrorData | ProjectListResponse | None:
     """List projects
 
@@ -213,9 +285,15 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_default (bool | None | Unset):
-        is_builtin (bool | None | Unset):
+        id (ListProjectsId | Unset):
+        created_at (ListProjectsCreatedAt | Unset):
+        updated_at (ListProjectsUpdatedAt | Unset):
+        name (ListProjectsName | Unset):
+        description (ListProjectsDescription | Unset):
+        deleted_at (ListProjectsDeletedAt | Unset):
+        deleted_by (ListProjectsDeletedBy | Unset):
+        is_default (ListProjectsIsDefault | Unset):
+        is_builtin (ListProjectsIsBuiltin | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -231,7 +309,13 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
         is_default=is_default,
         is_builtin=is_builtin,
     ).parsed
@@ -244,9 +328,15 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_default: bool | None | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
+    id: ListProjectsId | Unset = UNSET,
+    created_at: ListProjectsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectsUpdatedAt | Unset = UNSET,
+    name: ListProjectsName | Unset = UNSET,
+    description: ListProjectsDescription | Unset = UNSET,
+    deleted_at: ListProjectsDeletedAt | Unset = UNSET,
+    deleted_by: ListProjectsDeletedBy | Unset = UNSET,
+    is_default: ListProjectsIsDefault | Unset = UNSET,
+    is_builtin: ListProjectsIsBuiltin | Unset = UNSET,
 ) -> Response[ErrorData | ProjectListResponse]:
     """List projects
 
@@ -257,9 +347,15 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_default (bool | None | Unset):
-        is_builtin (bool | None | Unset):
+        id (ListProjectsId | Unset):
+        created_at (ListProjectsCreatedAt | Unset):
+        updated_at (ListProjectsUpdatedAt | Unset):
+        name (ListProjectsName | Unset):
+        description (ListProjectsDescription | Unset):
+        deleted_at (ListProjectsDeletedAt | Unset):
+        deleted_by (ListProjectsDeletedBy | Unset):
+        is_default (ListProjectsIsDefault | Unset):
+        is_builtin (ListProjectsIsBuiltin | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -274,7 +370,13 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
         is_default=is_default,
         is_builtin=is_builtin,
     )
@@ -291,9 +393,15 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_default: bool | None | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
+    id: ListProjectsId | Unset = UNSET,
+    created_at: ListProjectsCreatedAt | Unset = UNSET,
+    updated_at: ListProjectsUpdatedAt | Unset = UNSET,
+    name: ListProjectsName | Unset = UNSET,
+    description: ListProjectsDescription | Unset = UNSET,
+    deleted_at: ListProjectsDeletedAt | Unset = UNSET,
+    deleted_by: ListProjectsDeletedBy | Unset = UNSET,
+    is_default: ListProjectsIsDefault | Unset = UNSET,
+    is_builtin: ListProjectsIsBuiltin | Unset = UNSET,
 ) -> ErrorData | ProjectListResponse | None:
     """List projects
 
@@ -304,9 +412,15 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_default (bool | None | Unset):
-        is_builtin (bool | None | Unset):
+        id (ListProjectsId | Unset):
+        created_at (ListProjectsCreatedAt | Unset):
+        updated_at (ListProjectsUpdatedAt | Unset):
+        name (ListProjectsName | Unset):
+        description (ListProjectsDescription | Unset):
+        deleted_at (ListProjectsDeletedAt | Unset):
+        deleted_by (ListProjectsDeletedBy | Unset):
+        is_default (ListProjectsIsDefault | Unset):
+        is_builtin (ListProjectsIsBuiltin | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -323,7 +437,13 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
             name=name,
+            description=description,
+            deleted_at=deleted_at,
+            deleted_by=deleted_by,
             is_default=is_default,
             is_builtin=is_builtin,
         )

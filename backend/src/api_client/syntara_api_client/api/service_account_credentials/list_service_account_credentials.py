@@ -7,9 +7,17 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_service_account_credentials_created_at import ListServiceAccountCredentialsCreatedAt
+from ...models.list_service_account_credentials_created_by import ListServiceAccountCredentialsCreatedBy
+from ...models.list_service_account_credentials_credential_type import ListServiceAccountCredentialsCredentialType
+from ...models.list_service_account_credentials_expires_at import ListServiceAccountCredentialsExpiresAt
+from ...models.list_service_account_credentials_id import ListServiceAccountCredentialsId
+from ...models.list_service_account_credentials_identifier import ListServiceAccountCredentialsIdentifier
+from ...models.list_service_account_credentials_last_used_at import ListServiceAccountCredentialsLastUsedAt
+from ...models.list_service_account_credentials_status import ListServiceAccountCredentialsStatus
+from ...models.list_service_account_credentials_updated_at import ListServiceAccountCredentialsUpdatedAt
+from ...models.list_service_account_credentials_updated_by import ListServiceAccountCredentialsUpdatedBy
 from ...models.service_account_credential_list_response import ServiceAccountCredentialListResponse
-from ...models.service_account_credential_status import ServiceAccountCredentialStatus
-from ...models.service_account_credential_type import ServiceAccountCredentialType
 from ...types import UNSET, Response, Unset
 
 
@@ -20,8 +28,16 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
-    status: None | ServiceAccountCredentialStatus | Unset = UNSET,
+    id: ListServiceAccountCredentialsId | Unset = UNSET,
+    created_at: ListServiceAccountCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListServiceAccountCredentialsUpdatedAt | Unset = UNSET,
+    created_by: ListServiceAccountCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListServiceAccountCredentialsUpdatedBy | Unset = UNSET,
+    credential_type: ListServiceAccountCredentialsCredentialType | Unset = UNSET,
+    identifier: ListServiceAccountCredentialsIdentifier | Unset = UNSET,
+    status: ListServiceAccountCredentialsStatus | Unset = UNSET,
+    expires_at: ListServiceAccountCredentialsExpiresAt | Unset = UNSET,
+    last_used_at: ListServiceAccountCredentialsLastUsedAt | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -46,23 +62,65 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_credential_type: None | str | Unset
-    if isinstance(credential_type, Unset):
-        json_credential_type = UNSET
-    elif isinstance(credential_type, ServiceAccountCredentialType):
-        json_credential_type = credential_type.value
-    else:
-        json_credential_type = credential_type
-    params["credential_type"] = json_credential_type
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
 
-    json_status: None | str | Unset
-    if isinstance(status, Unset):
-        json_status = UNSET
-    elif isinstance(status, ServiceAccountCredentialStatus):
-        json_status = status.value
-    else:
-        json_status = status
-    params["status"] = json_status
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_updated_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_by, Unset):
+        json_updated_by = updated_by.to_dict()
+    if not isinstance(json_updated_by, Unset):
+        params.update(json_updated_by)
+
+    json_credential_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(credential_type, Unset):
+        json_credential_type = credential_type.to_dict()
+    if not isinstance(json_credential_type, Unset):
+        params.update(json_credential_type)
+
+    json_identifier: dict[str, Any] | Unset = UNSET
+    if not isinstance(identifier, Unset):
+        json_identifier = identifier.to_dict()
+    if not isinstance(json_identifier, Unset):
+        params.update(json_identifier)
+
+    json_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(status, Unset):
+        json_status = status.to_dict()
+    if not isinstance(json_status, Unset):
+        params.update(json_status)
+
+    json_expires_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(expires_at, Unset):
+        json_expires_at = expires_at.to_dict()
+    if not isinstance(json_expires_at, Unset):
+        params.update(json_expires_at)
+
+    json_last_used_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(last_used_at, Unset):
+        json_last_used_at = last_used_at.to_dict()
+    if not isinstance(json_last_used_at, Unset):
+        params.update(json_last_used_at)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -150,8 +208,16 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
-    status: None | ServiceAccountCredentialStatus | Unset = UNSET,
+    id: ListServiceAccountCredentialsId | Unset = UNSET,
+    created_at: ListServiceAccountCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListServiceAccountCredentialsUpdatedAt | Unset = UNSET,
+    created_by: ListServiceAccountCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListServiceAccountCredentialsUpdatedBy | Unset = UNSET,
+    credential_type: ListServiceAccountCredentialsCredentialType | Unset = UNSET,
+    identifier: ListServiceAccountCredentialsIdentifier | Unset = UNSET,
+    status: ListServiceAccountCredentialsStatus | Unset = UNSET,
+    expires_at: ListServiceAccountCredentialsExpiresAt | Unset = UNSET,
+    last_used_at: ListServiceAccountCredentialsLastUsedAt | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | ServiceAccountCredentialListResponse]:
     """List service account credentials
@@ -164,8 +230,16 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type (None | ServiceAccountCredentialType | Unset): Filter by credential type
-        status (None | ServiceAccountCredentialStatus | Unset): Filter by status
+        id (ListServiceAccountCredentialsId | Unset):
+        created_at (ListServiceAccountCredentialsCreatedAt | Unset):
+        updated_at (ListServiceAccountCredentialsUpdatedAt | Unset):
+        created_by (ListServiceAccountCredentialsCreatedBy | Unset):
+        updated_by (ListServiceAccountCredentialsUpdatedBy | Unset):
+        credential_type (ListServiceAccountCredentialsCredentialType | Unset):
+        identifier (ListServiceAccountCredentialsIdentifier | Unset):
+        status (ListServiceAccountCredentialsStatus | Unset):
+        expires_at (ListServiceAccountCredentialsExpiresAt | Unset):
+        last_used_at (ListServiceAccountCredentialsLastUsedAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -181,8 +255,16 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
         credential_type=credential_type,
+        identifier=identifier,
         status=status,
+        expires_at=expires_at,
+        last_used_at=last_used_at,
         additional_params=additional_params,
     )
 
@@ -201,8 +283,16 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
-    status: None | ServiceAccountCredentialStatus | Unset = UNSET,
+    id: ListServiceAccountCredentialsId | Unset = UNSET,
+    created_at: ListServiceAccountCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListServiceAccountCredentialsUpdatedAt | Unset = UNSET,
+    created_by: ListServiceAccountCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListServiceAccountCredentialsUpdatedBy | Unset = UNSET,
+    credential_type: ListServiceAccountCredentialsCredentialType | Unset = UNSET,
+    identifier: ListServiceAccountCredentialsIdentifier | Unset = UNSET,
+    status: ListServiceAccountCredentialsStatus | Unset = UNSET,
+    expires_at: ListServiceAccountCredentialsExpiresAt | Unset = UNSET,
+    last_used_at: ListServiceAccountCredentialsLastUsedAt | Unset = UNSET,
 ) -> ErrorData | ServiceAccountCredentialListResponse | None:
     """List service account credentials
 
@@ -214,8 +304,16 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type (None | ServiceAccountCredentialType | Unset): Filter by credential type
-        status (None | ServiceAccountCredentialStatus | Unset): Filter by status
+        id (ListServiceAccountCredentialsId | Unset):
+        created_at (ListServiceAccountCredentialsCreatedAt | Unset):
+        updated_at (ListServiceAccountCredentialsUpdatedAt | Unset):
+        created_by (ListServiceAccountCredentialsCreatedBy | Unset):
+        updated_by (ListServiceAccountCredentialsUpdatedBy | Unset):
+        credential_type (ListServiceAccountCredentialsCredentialType | Unset):
+        identifier (ListServiceAccountCredentialsIdentifier | Unset):
+        status (ListServiceAccountCredentialsStatus | Unset):
+        expires_at (ListServiceAccountCredentialsExpiresAt | Unset):
+        last_used_at (ListServiceAccountCredentialsLastUsedAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -232,8 +330,16 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
         credential_type=credential_type,
+        identifier=identifier,
         status=status,
+        expires_at=expires_at,
+        last_used_at=last_used_at,
     ).parsed
 
 
@@ -245,8 +351,16 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
-    status: None | ServiceAccountCredentialStatus | Unset = UNSET,
+    id: ListServiceAccountCredentialsId | Unset = UNSET,
+    created_at: ListServiceAccountCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListServiceAccountCredentialsUpdatedAt | Unset = UNSET,
+    created_by: ListServiceAccountCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListServiceAccountCredentialsUpdatedBy | Unset = UNSET,
+    credential_type: ListServiceAccountCredentialsCredentialType | Unset = UNSET,
+    identifier: ListServiceAccountCredentialsIdentifier | Unset = UNSET,
+    status: ListServiceAccountCredentialsStatus | Unset = UNSET,
+    expires_at: ListServiceAccountCredentialsExpiresAt | Unset = UNSET,
+    last_used_at: ListServiceAccountCredentialsLastUsedAt | Unset = UNSET,
 ) -> Response[ErrorData | ServiceAccountCredentialListResponse]:
     """List service account credentials
 
@@ -258,8 +372,16 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type (None | ServiceAccountCredentialType | Unset): Filter by credential type
-        status (None | ServiceAccountCredentialStatus | Unset): Filter by status
+        id (ListServiceAccountCredentialsId | Unset):
+        created_at (ListServiceAccountCredentialsCreatedAt | Unset):
+        updated_at (ListServiceAccountCredentialsUpdatedAt | Unset):
+        created_by (ListServiceAccountCredentialsCreatedBy | Unset):
+        updated_by (ListServiceAccountCredentialsUpdatedBy | Unset):
+        credential_type (ListServiceAccountCredentialsCredentialType | Unset):
+        identifier (ListServiceAccountCredentialsIdentifier | Unset):
+        status (ListServiceAccountCredentialsStatus | Unset):
+        expires_at (ListServiceAccountCredentialsExpiresAt | Unset):
+        last_used_at (ListServiceAccountCredentialsLastUsedAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -275,8 +397,16 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
         credential_type=credential_type,
+        identifier=identifier,
         status=status,
+        expires_at=expires_at,
+        last_used_at=last_used_at,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -292,8 +422,16 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    credential_type: None | ServiceAccountCredentialType | Unset = UNSET,
-    status: None | ServiceAccountCredentialStatus | Unset = UNSET,
+    id: ListServiceAccountCredentialsId | Unset = UNSET,
+    created_at: ListServiceAccountCredentialsCreatedAt | Unset = UNSET,
+    updated_at: ListServiceAccountCredentialsUpdatedAt | Unset = UNSET,
+    created_by: ListServiceAccountCredentialsCreatedBy | Unset = UNSET,
+    updated_by: ListServiceAccountCredentialsUpdatedBy | Unset = UNSET,
+    credential_type: ListServiceAccountCredentialsCredentialType | Unset = UNSET,
+    identifier: ListServiceAccountCredentialsIdentifier | Unset = UNSET,
+    status: ListServiceAccountCredentialsStatus | Unset = UNSET,
+    expires_at: ListServiceAccountCredentialsExpiresAt | Unset = UNSET,
+    last_used_at: ListServiceAccountCredentialsLastUsedAt | Unset = UNSET,
 ) -> ErrorData | ServiceAccountCredentialListResponse | None:
     """List service account credentials
 
@@ -305,8 +443,16 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        credential_type (None | ServiceAccountCredentialType | Unset): Filter by credential type
-        status (None | ServiceAccountCredentialStatus | Unset): Filter by status
+        id (ListServiceAccountCredentialsId | Unset):
+        created_at (ListServiceAccountCredentialsCreatedAt | Unset):
+        updated_at (ListServiceAccountCredentialsUpdatedAt | Unset):
+        created_by (ListServiceAccountCredentialsCreatedBy | Unset):
+        updated_by (ListServiceAccountCredentialsUpdatedBy | Unset):
+        credential_type (ListServiceAccountCredentialsCredentialType | Unset):
+        identifier (ListServiceAccountCredentialsIdentifier | Unset):
+        status (ListServiceAccountCredentialsStatus | Unset):
+        expires_at (ListServiceAccountCredentialsExpiresAt | Unset):
+        last_used_at (ListServiceAccountCredentialsLastUsedAt | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -324,7 +470,15 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            created_by=created_by,
+            updated_by=updated_by,
             credential_type=credential_type,
+            identifier=identifier,
             status=status,
+            expires_at=expires_at,
+            last_used_at=last_used_at,
         )
     ).parsed

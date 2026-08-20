@@ -345,22 +345,24 @@ components:
                 description: Greater than comparison (lexicographical). ?name[gt]=<name>
                 type: string
               gte:
-                title: Greater Than Or Equal
+                title: Greater Than or Equal
                 description: Greater than or equal comparison (lexicographical). ?name[gte]=<name>
                 type: string
               lt:
                 title: Less Than
                 description: Less than comparison (lexicographical). ?name[lt]=<name>
                 type: string
+              in:
+                title: In
+                type: string
               lte:
-                title: Less Than Or Equal
+                title: Less Than or Equal
                 description: Less than or equal comparison (lexicographical). ?name[lte]=<name>
                 type: string
       description: |
         Filter resources by name.
         - Exact match: `name=value`
         - Contains: `name[contains]=value`
-      example: auth
 
     createdAtFilterParam:
       name: created_at
@@ -386,7 +388,7 @@ components:
                 type: string
                 format: date-time
               gte:
-                title: Greater Than Or Equal
+                title: Greater Than or Equal
                 description: Greater than or equal comparison. ?created_at[gte]=<timestamp>
                 type: string
                 format: date-time
@@ -395,8 +397,11 @@ components:
                 description: Less than comparison. ?created_at[lt]=<timestamp>
                 type: string
                 format: date-time
+              in:
+                title: In
+                type: string
               lte:
-                title: Less Than Or Equal
+                title: Less Than or Equal
                 description: Less than or equal comparison. ?created_at[lte]=<timestamp>
                 type: string
                 format: date-time
@@ -425,7 +430,7 @@ components:
                 type: string
                 format: date-time
               gte:
-                title: Greater Than Or Equal
+                title: Greater Than or Equal
                 description: Greater than or equal comparison. ?updated_at[gte]=<timestamp>
                 type: string
                 format: date-time
@@ -434,8 +439,11 @@ components:
                 description: Less than comparison. ?updated_at[lt]=<timestamp>
                 type: string
                 format: date-time
+              in:
+                title: In
+                type: string
               lte:
-                title: Less Than Or Equal
+                title: Less Than or Equal
                 description: Less than or equal comparison. ?updated_at[lte]=<timestamp>
                 type: string
                 format: date-time

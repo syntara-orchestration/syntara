@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query, Request
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
@@ -14,6 +14,7 @@ from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import Group
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user import User
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.base import BaseService
 from syntara.core.syntara_router import SyntaraRouter
 
@@ -30,12 +31,6 @@ class GroupDirectoryEntry(SQLModel):
 
 
 GroupDirectoryListResponse = ResourcesResponse[GroupDirectoryEntry]
-
-
-class GroupDirectoryListParams(BaseListParams):
-    """Query parameters for the group directory listing."""
-
-    name: str | None = Field(default=None, description="Filter by group name")
 
 
 class _GroupDirectoryService(BaseService):
@@ -79,7 +74,8 @@ def _get_service(
 async def list_groups_directory(
     request: Request,
     service: Annotated[_GroupDirectoryService, Depends(_get_service)],
-    params: Annotated[GroupDirectoryListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(Group))],
 ) -> GroupDirectoryListResponse:
     """Return a lightweight directory of groups (id + name only)."""
     return await service.list_directory(

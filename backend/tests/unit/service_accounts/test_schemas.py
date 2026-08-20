@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from syntara.service_accounts.models.service_account import ServiceAccountStatus
 from syntara.service_accounts.schemas import (
     ServiceAccountCreate,
-    ServiceAccountListParams,
     ServiceAccountListResponse,
     ServiceAccountRead,
     ServiceAccountUpdate,
@@ -107,23 +106,6 @@ class TestServiceAccountRead:
 
     def test_no_client_id_field(self) -> None:
         assert "client_id" not in ServiceAccountRead.model_fields
-
-
-class TestServiceAccountListParams:
-    """Tests for list query parameters."""
-
-    def test_defaults(self) -> None:
-        params = ServiceAccountListParams()
-        assert params.limit == 20
-        assert params.cursor is None
-        assert params.sort is None
-        assert params.include_total is False
-        assert params.status is None
-        assert params.name is None
-
-    def test_status_filter(self) -> None:
-        params = ServiceAccountListParams(status=ServiceAccountStatus.DISABLED)
-        assert params.status == ServiceAccountStatus.DISABLED
 
 
 class TestServiceAccountListResponse:

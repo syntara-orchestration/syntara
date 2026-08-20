@@ -17,6 +17,7 @@ from syntara.authz.engine import VisibilityResult, resolve_credential_use_visibi
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.secret_service import create_secret_service
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
@@ -32,6 +33,8 @@ from syntara.credentials.models import (
 )
 from syntara.credentials.models.credential import Credential, CredentialWorkflowListResponse
 from syntara.credentials.services.credential_service import CredentialService
+
+_CREDENTIAL_LIST_PARAM_KEYS = frozenset(CredentialListParams.model_fields)
 
 router = SyntaraRouter(tags=["Credentials"])
 
@@ -151,14 +154,14 @@ async def list_credentials(
     service: Annotated[CredentialService, Depends(get_credential_service)],
     params: Annotated[CredentialListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(_CredentialVisibility())],
+    _filterable: Annotated[None, Depends(FilterableModel(Credential))],
 ) -> CredentialListResponse:
     """List Credentials with filtering and pagination. Metadata only, no secrets.
 
     When for_action=use, returns only credentials the user has credential:use
     permission on (for workflow builder credential selection).
     """
-    # Strip for_action from query params before passing to service (not a filterable field)
-    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k != "for_action"]
+    filtered_query_params = [(k, v) for k, v in request.query_params.items() if k not in _CREDENTIAL_LIST_PARAM_KEYS]
     return await service.list_credentials(
         limit=params.limit,
         cursor=params.cursor,

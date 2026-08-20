@@ -5,18 +5,15 @@ This directory contains workflow examples that use real public APIs for manual v
 ## Available Workflows
 
 ### 1. **blog-analytics.yaml** - Multi-Step Blog Analytics
-
 Analyzes user activity from JSONPlaceholder API by fetching user profile, posts, and todos, then generating a comprehensive activity report.
 
 **Features:**
-
 - Multiple sequential API calls
 - Parallel data analysis (posts and todos)
 - Data aggregation and reporting
 - Complex data processing with Python
 
 **Usage:**
-
 ```bash
 # Analyze default user (ID: 1)
 uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real-world/blog-analytics.yaml
@@ -27,7 +24,6 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ```
 
 **Expected Output:**
-
 - User profile information
 - Post content analysis (total posts, word counts, longest/shortest posts)
 - Todo completion rate and productivity metrics
@@ -36,18 +32,15 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ---
 
 ### 2. **github-repo-info.yaml** - GitHub Repository Analysis
-
 Fetches repository information from GitHub API and analyzes popularity, activity, and language usage.
 
 **Features:**
-
 - Multiple GitHub API endpoints
 - JSON data processing
 - Popularity scoring algorithm
 - Multi-language repository analysis
 
 **Usage:**
-
 ```bash
 # Analyze default repository (anthropics/anthropic-sdk-python)
 uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real-world/github-repo-info.yaml
@@ -62,7 +55,6 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ```
 
 **Expected Output:**
-
 - Repository name, description, and primary language
 - Star count, fork count, and open issues
 - Popularity score calculation
@@ -72,17 +64,14 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ---
 
 ### 3. **ip-geolocation.yaml** - IP Address Geolocation
-
 Looks up IP address geolocation data and generates a location report using the ip-api.com free API.
 
 **Features:**
-
 - IP geolocation lookup
 - Bash script for report generation
 - Location and network information
 
 **Usage:**
-
 ```bash
 # Lookup default IP (8.8.8.8 - Google DNS)
 uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real-world/ip-geolocation.yaml
@@ -97,7 +86,6 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ```
 
 **Expected Output:**
-
 - Country, region, and city
 - Latitude and longitude coordinates
 - ISP and timezone information
@@ -106,18 +94,15 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ---
 
 ### 4. **random-users.yaml** - Random User Profile Generator
-
 Fetches random user profiles from randomuser.me API and generates a user directory with demographics analysis.
 
 **Features:**
-
 - Configurable user count
 - User profile processing
 - Statistical analysis (average age, gender distribution)
 - Array data handling
 
 **Usage:**
-
 ```bash
 # Generate default (5 users)
 uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real-world/random-users.yaml
@@ -132,7 +117,6 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ```
 
 **Expected Output:**
-
 - List of generated user profiles with names, emails, locations
 - Total user count
 - Average age calculation
@@ -141,11 +125,9 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ---
 
 ### 5. **country-info.yaml** - Country Information Analysis
-
 Fetches detailed country information from REST Countries API including geography, demographics, and neighboring countries.
 
 **Features:**
-
 - Country data retrieval
 - Neighboring countries lookup
 - Population density calculation
@@ -153,7 +135,6 @@ Fetches detailed country information from REST Countries API including geography
 - Multi-currency and multi-language support
 
 **Usage:**
-
 ```bash
 # Get info for default country (US)
 uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real-world/country-info.yaml
@@ -170,7 +151,6 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ```
 
 **Expected Output:**
-
 - Official country name and capital
 - Region and subregion
 - Area, population, and population density
@@ -183,9 +163,7 @@ uv run python tools/workflow_cli.py run tests/integration/workflow/examples/real
 ## Key Features Demonstrated
 
 ### 1. **Real API Integration**
-
 All workflows use real, publicly available APIs:
-
 - JSONPlaceholder (blog posts and todos)
 - GitHub API (repository information)
 - ip-api.com (IP geolocation)
@@ -193,26 +171,22 @@ All workflows use real, publicly available APIs:
 - REST Countries (country data)
 
 ### 2. **Data Processing Patterns**
-
 - **Python scripts**: Complex data analysis, JSON parsing, statistical calculations
 - **Bash scripts**: Simple report generation, text formatting
 - **Output mappings**: Extracting specific fields from API responses using JSONPath
 
 ### 3. **Expression Resolution**
-
 - URL template interpolation: `https://api.github.com/repos/${input.owner}/${input.repo}`
 - Query parameter interpolation: `userId: ${input.user_id}`
 - Activity output chaining: `${fetch_user.output.name}`
 
 ### 4. **Input Validation**
-
 - Type constraints (string, integer, array)
 - Default values for optional inputs
 - Range validation (minimum/maximum)
 - Pattern validation (regex for country codes)
 
 ### 5. **Complex Workflows**
-
 - Sequential execution (fetch user → fetch posts → analyze)
 - Parallel execution (analyze posts and todos simultaneously)
 - Multi-step data transformation pipelines
@@ -220,9 +194,7 @@ All workflows use real, publicly available APIs:
 ## Common Patterns
 
 ### API Call Output Mapping
-
 For API activities, use `$.body.field` to extract response fields:
-
 ```yaml
 outputs:
   userName: $.body.name
@@ -231,20 +203,16 @@ outputs:
 ```
 
 ### Script Output Mapping
-
 For script activities that output JSON, use `$.output.field`:
-
 ```yaml
 outputs:
-  report: $.output # Entire parsed JSON
-  summary: $.output.summary # Specific field
-  count: $.output.total_count # Nested field
+  report: $.output              # Entire parsed JSON
+  summary: $.output.summary     # Specific field
+  count: $.output.total_count   # Nested field
 ```
 
 ### Chaining Activities
-
 Reference previous activity outputs in subsequent activities:
-
 ```yaml
 inputs:
   user_name: ${fetch_user.output.userName}
@@ -252,13 +220,11 @@ inputs:
 ```
 
 ### List/Array Processing
-
 When passing arrays between activities, they're automatically serialized as JSON:
-
 ```yaml
 # API returns array
 outputs:
-  posts: $.body # Array of posts
+  posts: $.body  # Array of posts
 
 # Python script receives it as JSON string
 code: |
@@ -272,7 +238,6 @@ code: |
 ## Requirements
 
 - **Temporal dev server** running on `localhost:7233`
-
   ```bash
   temporal server start-dev
   ```
@@ -292,25 +257,19 @@ code: |
 ## Troubleshooting
 
 ### GitHub API Rate Limiting
-
 If you hit GitHub's rate limit (60 requests/hour), you can:
-
 1. Wait for the rate limit to reset
 2. Add a GitHub personal access token (increases limit to 5000/hour)
 3. Use a different repository owner/name
 
 ### API Timeouts
-
 If workflows timeout:
-
 - Check your internet connection
 - Verify the API is accessible from your network
 - Increase the timeout value in the workflow definition
 
 ### Invalid Output Mappings
-
 Ensure script output mappings use `$.output.field` pattern:
-
 ```yaml
 # ✅ Correct
 outputs:
@@ -337,7 +296,6 @@ When creating new real-world workflow examples:
 ## Related Examples
 
 For basic workflow patterns and features, see:
-
 - `../basic/` - Core workflow patterns
 - `../api/` - API-specific examples with mock endpoints
 - `../loops/` - Loop constructs

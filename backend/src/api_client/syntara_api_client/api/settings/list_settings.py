@@ -6,6 +6,15 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_settings_category import ListSettingsCategory
+from ...models.list_settings_created_at import ListSettingsCreatedAt
+from ...models.list_settings_description import ListSettingsDescription
+from ...models.list_settings_group import ListSettingsGroup
+from ...models.list_settings_id import ListSettingsId
+from ...models.list_settings_key import ListSettingsKey
+from ...models.list_settings_name import ListSettingsName
+from ...models.list_settings_requires_restart import ListSettingsRequiresRestart
+from ...models.list_settings_updated_at import ListSettingsUpdatedAt
 from ...models.settings_list_response import SettingsListResponse
 from ...types import UNSET, Response, Unset
 
@@ -16,8 +25,15 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    category: None | str | Unset = UNSET,
-    group: None | str | Unset = UNSET,
+    id: ListSettingsId | Unset = UNSET,
+    created_at: ListSettingsCreatedAt | Unset = UNSET,
+    updated_at: ListSettingsUpdatedAt | Unset = UNSET,
+    name: ListSettingsName | Unset = UNSET,
+    description: ListSettingsDescription | Unset = UNSET,
+    key: ListSettingsKey | Unset = UNSET,
+    category: ListSettingsCategory | Unset = UNSET,
+    group: ListSettingsGroup | Unset = UNSET,
+    requires_restart: ListSettingsRequiresRestart | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -42,19 +58,59 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_category: None | str | Unset
-    if isinstance(category, Unset):
-        json_category = UNSET
-    else:
-        json_category = category
-    params["category"] = json_category
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
 
-    json_group: None | str | Unset
-    if isinstance(group, Unset):
-        json_group = UNSET
-    else:
-        json_group = group
-    params["group"] = json_group
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
+
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_key: dict[str, Any] | Unset = UNSET
+    if not isinstance(key, Unset):
+        json_key = key.to_dict()
+    if not isinstance(json_key, Unset):
+        params.update(json_key)
+
+    json_category: dict[str, Any] | Unset = UNSET
+    if not isinstance(category, Unset):
+        json_category = category.to_dict()
+    if not isinstance(json_category, Unset):
+        params.update(json_category)
+
+    json_group: dict[str, Any] | Unset = UNSET
+    if not isinstance(group, Unset):
+        json_group = group.to_dict()
+    if not isinstance(json_group, Unset):
+        params.update(json_group)
+
+    json_requires_restart: dict[str, Any] | Unset = UNSET
+    if not isinstance(requires_restart, Unset):
+        json_requires_restart = requires_restart.to_dict()
+    if not isinstance(json_requires_restart, Unset):
+        params.update(json_requires_restart)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -141,8 +197,15 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    category: None | str | Unset = UNSET,
-    group: None | str | Unset = UNSET,
+    id: ListSettingsId | Unset = UNSET,
+    created_at: ListSettingsCreatedAt | Unset = UNSET,
+    updated_at: ListSettingsUpdatedAt | Unset = UNSET,
+    name: ListSettingsName | Unset = UNSET,
+    description: ListSettingsDescription | Unset = UNSET,
+    key: ListSettingsKey | Unset = UNSET,
+    category: ListSettingsCategory | Unset = UNSET,
+    group: ListSettingsGroup | Unset = UNSET,
+    requires_restart: ListSettingsRequiresRestart | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | SettingsListResponse]:
     """List settings
@@ -154,8 +217,15 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        category (None | str | Unset):
-        group (None | str | Unset):
+        id (ListSettingsId | Unset):
+        created_at (ListSettingsCreatedAt | Unset):
+        updated_at (ListSettingsUpdatedAt | Unset):
+        name (ListSettingsName | Unset):
+        description (ListSettingsDescription | Unset):
+        key (ListSettingsKey | Unset):
+        category (ListSettingsCategory | Unset):
+        group (ListSettingsGroup | Unset):
+        requires_restart (ListSettingsRequiresRestart | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -170,8 +240,15 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        key=key,
         category=category,
         group=group,
+        requires_restart=requires_restart,
         additional_params=additional_params,
     )
 
@@ -189,8 +266,15 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    category: None | str | Unset = UNSET,
-    group: None | str | Unset = UNSET,
+    id: ListSettingsId | Unset = UNSET,
+    created_at: ListSettingsCreatedAt | Unset = UNSET,
+    updated_at: ListSettingsUpdatedAt | Unset = UNSET,
+    name: ListSettingsName | Unset = UNSET,
+    description: ListSettingsDescription | Unset = UNSET,
+    key: ListSettingsKey | Unset = UNSET,
+    category: ListSettingsCategory | Unset = UNSET,
+    group: ListSettingsGroup | Unset = UNSET,
+    requires_restart: ListSettingsRequiresRestart | Unset = UNSET,
 ) -> ErrorData | SettingsListResponse | None:
     """List settings
 
@@ -201,8 +285,15 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        category (None | str | Unset):
-        group (None | str | Unset):
+        id (ListSettingsId | Unset):
+        created_at (ListSettingsCreatedAt | Unset):
+        updated_at (ListSettingsUpdatedAt | Unset):
+        name (ListSettingsName | Unset):
+        description (ListSettingsDescription | Unset):
+        key (ListSettingsKey | Unset):
+        category (ListSettingsCategory | Unset):
+        group (ListSettingsGroup | Unset):
+        requires_restart (ListSettingsRequiresRestart | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,8 +309,15 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        key=key,
         category=category,
         group=group,
+        requires_restart=requires_restart,
     ).parsed
 
 
@@ -230,8 +328,15 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    category: None | str | Unset = UNSET,
-    group: None | str | Unset = UNSET,
+    id: ListSettingsId | Unset = UNSET,
+    created_at: ListSettingsCreatedAt | Unset = UNSET,
+    updated_at: ListSettingsUpdatedAt | Unset = UNSET,
+    name: ListSettingsName | Unset = UNSET,
+    description: ListSettingsDescription | Unset = UNSET,
+    key: ListSettingsKey | Unset = UNSET,
+    category: ListSettingsCategory | Unset = UNSET,
+    group: ListSettingsGroup | Unset = UNSET,
+    requires_restart: ListSettingsRequiresRestart | Unset = UNSET,
 ) -> Response[ErrorData | SettingsListResponse]:
     """List settings
 
@@ -242,8 +347,15 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        category (None | str | Unset):
-        group (None | str | Unset):
+        id (ListSettingsId | Unset):
+        created_at (ListSettingsCreatedAt | Unset):
+        updated_at (ListSettingsUpdatedAt | Unset):
+        name (ListSettingsName | Unset):
+        description (ListSettingsDescription | Unset):
+        key (ListSettingsKey | Unset):
+        category (ListSettingsCategory | Unset):
+        group (ListSettingsGroup | Unset):
+        requires_restart (ListSettingsRequiresRestart | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -258,8 +370,15 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        name=name,
+        description=description,
+        key=key,
         category=category,
         group=group,
+        requires_restart=requires_restart,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -274,8 +393,15 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    category: None | str | Unset = UNSET,
-    group: None | str | Unset = UNSET,
+    id: ListSettingsId | Unset = UNSET,
+    created_at: ListSettingsCreatedAt | Unset = UNSET,
+    updated_at: ListSettingsUpdatedAt | Unset = UNSET,
+    name: ListSettingsName | Unset = UNSET,
+    description: ListSettingsDescription | Unset = UNSET,
+    key: ListSettingsKey | Unset = UNSET,
+    category: ListSettingsCategory | Unset = UNSET,
+    group: ListSettingsGroup | Unset = UNSET,
+    requires_restart: ListSettingsRequiresRestart | Unset = UNSET,
 ) -> ErrorData | SettingsListResponse | None:
     """List settings
 
@@ -286,8 +412,15 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        category (None | str | Unset):
-        group (None | str | Unset):
+        id (ListSettingsId | Unset):
+        created_at (ListSettingsCreatedAt | Unset):
+        updated_at (ListSettingsUpdatedAt | Unset):
+        name (ListSettingsName | Unset):
+        description (ListSettingsDescription | Unset):
+        key (ListSettingsKey | Unset):
+        category (ListSettingsCategory | Unset):
+        group (ListSettingsGroup | Unset):
+        requires_restart (ListSettingsRequiresRestart | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -304,7 +437,14 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            name=name,
+            description=description,
+            key=key,
             category=category,
             group=group,
+            requires_restart=requires_restart,
         )
     ).parsed

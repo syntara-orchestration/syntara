@@ -10,7 +10,6 @@ from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import NAME_PATTERN
 from syntara.core.exceptions import SafeValueError
-from syntara.core.models.base import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 
 NameField = Annotated[str, PydanticField(min_length=1, max_length=255, pattern=NAME_PATTERN)]
@@ -103,19 +102,6 @@ class PolicyListResponse(ResourcesResponse[PolicyRead]):
     """Paginated list response for policies."""
 
 
-class PolicyListParams(BaseListParams):
-    """Query parameters for listing policies."""
-
-    name: str | None = Field(default=None, description="Filter by name")
-    is_builtin: bool | None = Field(default=None, description="Filter by builtin status")
-    project_id: UUID | None = Field(default=None, description="Filter by project scope")
-    project_eligible: bool | None = Field(
-        default=None,
-        description="When true, return only system-scoped policies eligible for project roles",
-    )
-    scope: str | None = Field(default=None, description="Filter by policy scope (any, self, or project)")
-
-
 # ---------------------------------------------------------------------------
 # Role schemas
 # ---------------------------------------------------------------------------
@@ -163,13 +149,3 @@ class RoleRead(SQLModel):
 
 class RoleListResponse(ResourcesResponse[RoleRead]):
     """Paginated list response for roles."""
-
-
-class RoleListParams(BaseListParams):
-    """Query parameters for listing roles."""
-
-    name: str | None = Field(default=None, description="Filter by name")
-    is_builtin: bool | None = Field(default=None, description="Filter by builtin status")
-    project_id: UUID | None = Field(default=None, description="Filter by project scope")
-    scope: str | None = Field(default=None, description="Filter by role scope (system or project)")
-    policy_name: str | None = Field(default=None, description="Filter by policy name")

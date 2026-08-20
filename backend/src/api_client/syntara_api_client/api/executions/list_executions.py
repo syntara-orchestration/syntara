@@ -7,6 +7,20 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.execution_list_response import ExecutionListResponse
+from ...models.list_executions_approval_pending import ListExecutionsApprovalPending
+from ...models.list_executions_completed_at import ListExecutionsCompletedAt
+from ...models.list_executions_created_at import ListExecutionsCreatedAt
+from ...models.list_executions_created_by import ListExecutionsCreatedBy
+from ...models.list_executions_deleted_at import ListExecutionsDeletedAt
+from ...models.list_executions_deleted_by import ListExecutionsDeletedBy
+from ...models.list_executions_id import ListExecutionsId
+from ...models.list_executions_mode import ListExecutionsMode
+from ...models.list_executions_project_id import ListExecutionsProjectId
+from ...models.list_executions_status import ListExecutionsStatus
+from ...models.list_executions_updated_at import ListExecutionsUpdatedAt
+from ...models.list_executions_updated_by import ListExecutionsUpdatedBy
+from ...models.list_executions_workflow_id import ListExecutionsWorkflowId
+from ...models.list_executions_workflow_version_id import ListExecutionsWorkflowVersionId
 from ...types import UNSET, Response, Unset
 
 
@@ -16,6 +30,20 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionsId | Unset = UNSET,
+    created_at: ListExecutionsCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionsUpdatedAt | Unset = UNSET,
+    created_by: ListExecutionsCreatedBy | Unset = UNSET,
+    updated_by: ListExecutionsUpdatedBy | Unset = UNSET,
+    deleted_at: ListExecutionsDeletedAt | Unset = UNSET,
+    deleted_by: ListExecutionsDeletedBy | Unset = UNSET,
+    workflow_id: ListExecutionsWorkflowId | Unset = UNSET,
+    workflow_version_id: ListExecutionsWorkflowVersionId | Unset = UNSET,
+    project_id: ListExecutionsProjectId | Unset = UNSET,
+    status: ListExecutionsStatus | Unset = UNSET,
+    mode: ListExecutionsMode | Unset = UNSET,
+    completed_at: ListExecutionsCompletedAt | Unset = UNSET,
+    approval_pending: ListExecutionsApprovalPending | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -39,6 +67,90 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
+
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
+
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
+
+    json_created_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_by, Unset):
+        json_created_by = created_by.to_dict()
+    if not isinstance(json_created_by, Unset):
+        params.update(json_created_by)
+
+    json_updated_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_by, Unset):
+        json_updated_by = updated_by.to_dict()
+    if not isinstance(json_updated_by, Unset):
+        params.update(json_updated_by)
+
+    json_deleted_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(deleted_at, Unset):
+        json_deleted_at = deleted_at.to_dict()
+    if not isinstance(json_deleted_at, Unset):
+        params.update(json_deleted_at)
+
+    json_deleted_by: dict[str, Any] | Unset = UNSET
+    if not isinstance(deleted_by, Unset):
+        json_deleted_by = deleted_by.to_dict()
+    if not isinstance(json_deleted_by, Unset):
+        params.update(json_deleted_by)
+
+    json_workflow_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(workflow_id, Unset):
+        json_workflow_id = workflow_id.to_dict()
+    if not isinstance(json_workflow_id, Unset):
+        params.update(json_workflow_id)
+
+    json_workflow_version_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(workflow_version_id, Unset):
+        json_workflow_version_id = workflow_version_id.to_dict()
+    if not isinstance(json_workflow_version_id, Unset):
+        params.update(json_workflow_version_id)
+
+    json_project_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(project_id, Unset):
+        json_project_id = project_id.to_dict()
+    if not isinstance(json_project_id, Unset):
+        params.update(json_project_id)
+
+    json_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(status, Unset):
+        json_status = status.to_dict()
+    if not isinstance(json_status, Unset):
+        params.update(json_status)
+
+    json_mode: dict[str, Any] | Unset = UNSET
+    if not isinstance(mode, Unset):
+        json_mode = mode.to_dict()
+    if not isinstance(json_mode, Unset):
+        params.update(json_mode)
+
+    json_completed_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(completed_at, Unset):
+        json_completed_at = completed_at.to_dict()
+    if not isinstance(json_completed_at, Unset):
+        params.update(json_completed_at)
+
+    json_approval_pending: dict[str, Any] | Unset = UNSET
+    if not isinstance(approval_pending, Unset):
+        json_approval_pending = approval_pending.to_dict()
+    if not isinstance(json_approval_pending, Unset):
+        params.update(json_approval_pending)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -125,6 +237,20 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionsId | Unset = UNSET,
+    created_at: ListExecutionsCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionsUpdatedAt | Unset = UNSET,
+    created_by: ListExecutionsCreatedBy | Unset = UNSET,
+    updated_by: ListExecutionsUpdatedBy | Unset = UNSET,
+    deleted_at: ListExecutionsDeletedAt | Unset = UNSET,
+    deleted_by: ListExecutionsDeletedBy | Unset = UNSET,
+    workflow_id: ListExecutionsWorkflowId | Unset = UNSET,
+    workflow_version_id: ListExecutionsWorkflowVersionId | Unset = UNSET,
+    project_id: ListExecutionsProjectId | Unset = UNSET,
+    status: ListExecutionsStatus | Unset = UNSET,
+    mode: ListExecutionsMode | Unset = UNSET,
+    completed_at: ListExecutionsCompletedAt | Unset = UNSET,
+    approval_pending: ListExecutionsApprovalPending | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | ExecutionListResponse]:
     """List executions
@@ -136,6 +262,20 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionsId | Unset):
+        created_at (ListExecutionsCreatedAt | Unset):
+        updated_at (ListExecutionsUpdatedAt | Unset):
+        created_by (ListExecutionsCreatedBy | Unset):
+        updated_by (ListExecutionsUpdatedBy | Unset):
+        deleted_at (ListExecutionsDeletedAt | Unset):
+        deleted_by (ListExecutionsDeletedBy | Unset):
+        workflow_id (ListExecutionsWorkflowId | Unset):
+        workflow_version_id (ListExecutionsWorkflowVersionId | Unset):
+        project_id (ListExecutionsProjectId | Unset):
+        status (ListExecutionsStatus | Unset):
+        mode (ListExecutionsMode | Unset):
+        completed_at (ListExecutionsCompletedAt | Unset):
+        approval_pending (ListExecutionsApprovalPending | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -146,7 +286,25 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        limit=limit, cursor=cursor, sort=sort, include_total=include_total, additional_params=additional_params
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
+        workflow_id=workflow_id,
+        workflow_version_id=workflow_version_id,
+        project_id=project_id,
+        status=status,
+        mode=mode,
+        completed_at=completed_at,
+        approval_pending=approval_pending,
+        additional_params=additional_params,
     )
 
     response = client.get_httpx_client().request(
@@ -163,6 +321,20 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionsId | Unset = UNSET,
+    created_at: ListExecutionsCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionsUpdatedAt | Unset = UNSET,
+    created_by: ListExecutionsCreatedBy | Unset = UNSET,
+    updated_by: ListExecutionsUpdatedBy | Unset = UNSET,
+    deleted_at: ListExecutionsDeletedAt | Unset = UNSET,
+    deleted_by: ListExecutionsDeletedBy | Unset = UNSET,
+    workflow_id: ListExecutionsWorkflowId | Unset = UNSET,
+    workflow_version_id: ListExecutionsWorkflowVersionId | Unset = UNSET,
+    project_id: ListExecutionsProjectId | Unset = UNSET,
+    status: ListExecutionsStatus | Unset = UNSET,
+    mode: ListExecutionsMode | Unset = UNSET,
+    completed_at: ListExecutionsCompletedAt | Unset = UNSET,
+    approval_pending: ListExecutionsApprovalPending | Unset = UNSET,
 ) -> ErrorData | ExecutionListResponse | None:
     """List executions
 
@@ -173,6 +345,20 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionsId | Unset):
+        created_at (ListExecutionsCreatedAt | Unset):
+        updated_at (ListExecutionsUpdatedAt | Unset):
+        created_by (ListExecutionsCreatedBy | Unset):
+        updated_by (ListExecutionsUpdatedBy | Unset):
+        deleted_at (ListExecutionsDeletedAt | Unset):
+        deleted_by (ListExecutionsDeletedBy | Unset):
+        workflow_id (ListExecutionsWorkflowId | Unset):
+        workflow_version_id (ListExecutionsWorkflowVersionId | Unset):
+        project_id (ListExecutionsProjectId | Unset):
+        status (ListExecutionsStatus | Unset):
+        mode (ListExecutionsMode | Unset):
+        completed_at (ListExecutionsCompletedAt | Unset):
+        approval_pending (ListExecutionsApprovalPending | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -188,6 +374,20 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
+        workflow_id=workflow_id,
+        workflow_version_id=workflow_version_id,
+        project_id=project_id,
+        status=status,
+        mode=mode,
+        completed_at=completed_at,
+        approval_pending=approval_pending,
     ).parsed
 
 
@@ -198,6 +398,20 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionsId | Unset = UNSET,
+    created_at: ListExecutionsCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionsUpdatedAt | Unset = UNSET,
+    created_by: ListExecutionsCreatedBy | Unset = UNSET,
+    updated_by: ListExecutionsUpdatedBy | Unset = UNSET,
+    deleted_at: ListExecutionsDeletedAt | Unset = UNSET,
+    deleted_by: ListExecutionsDeletedBy | Unset = UNSET,
+    workflow_id: ListExecutionsWorkflowId | Unset = UNSET,
+    workflow_version_id: ListExecutionsWorkflowVersionId | Unset = UNSET,
+    project_id: ListExecutionsProjectId | Unset = UNSET,
+    status: ListExecutionsStatus | Unset = UNSET,
+    mode: ListExecutionsMode | Unset = UNSET,
+    completed_at: ListExecutionsCompletedAt | Unset = UNSET,
+    approval_pending: ListExecutionsApprovalPending | Unset = UNSET,
 ) -> Response[ErrorData | ExecutionListResponse]:
     """List executions
 
@@ -208,6 +422,20 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionsId | Unset):
+        created_at (ListExecutionsCreatedAt | Unset):
+        updated_at (ListExecutionsUpdatedAt | Unset):
+        created_by (ListExecutionsCreatedBy | Unset):
+        updated_by (ListExecutionsUpdatedBy | Unset):
+        deleted_at (ListExecutionsDeletedAt | Unset):
+        deleted_by (ListExecutionsDeletedBy | Unset):
+        workflow_id (ListExecutionsWorkflowId | Unset):
+        workflow_version_id (ListExecutionsWorkflowVersionId | Unset):
+        project_id (ListExecutionsProjectId | Unset):
+        status (ListExecutionsStatus | Unset):
+        mode (ListExecutionsMode | Unset):
+        completed_at (ListExecutionsCompletedAt | Unset):
+        approval_pending (ListExecutionsApprovalPending | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -222,6 +450,20 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
+        created_by=created_by,
+        updated_by=updated_by,
+        deleted_at=deleted_at,
+        deleted_by=deleted_by,
+        workflow_id=workflow_id,
+        workflow_version_id=workflow_version_id,
+        project_id=project_id,
+        status=status,
+        mode=mode,
+        completed_at=completed_at,
+        approval_pending=approval_pending,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -236,6 +478,20 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    id: ListExecutionsId | Unset = UNSET,
+    created_at: ListExecutionsCreatedAt | Unset = UNSET,
+    updated_at: ListExecutionsUpdatedAt | Unset = UNSET,
+    created_by: ListExecutionsCreatedBy | Unset = UNSET,
+    updated_by: ListExecutionsUpdatedBy | Unset = UNSET,
+    deleted_at: ListExecutionsDeletedAt | Unset = UNSET,
+    deleted_by: ListExecutionsDeletedBy | Unset = UNSET,
+    workflow_id: ListExecutionsWorkflowId | Unset = UNSET,
+    workflow_version_id: ListExecutionsWorkflowVersionId | Unset = UNSET,
+    project_id: ListExecutionsProjectId | Unset = UNSET,
+    status: ListExecutionsStatus | Unset = UNSET,
+    mode: ListExecutionsMode | Unset = UNSET,
+    completed_at: ListExecutionsCompletedAt | Unset = UNSET,
+    approval_pending: ListExecutionsApprovalPending | Unset = UNSET,
 ) -> ErrorData | ExecutionListResponse | None:
     """List executions
 
@@ -246,6 +502,20 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        id (ListExecutionsId | Unset):
+        created_at (ListExecutionsCreatedAt | Unset):
+        updated_at (ListExecutionsUpdatedAt | Unset):
+        created_by (ListExecutionsCreatedBy | Unset):
+        updated_by (ListExecutionsUpdatedBy | Unset):
+        deleted_at (ListExecutionsDeletedAt | Unset):
+        deleted_by (ListExecutionsDeletedBy | Unset):
+        workflow_id (ListExecutionsWorkflowId | Unset):
+        workflow_version_id (ListExecutionsWorkflowVersionId | Unset):
+        project_id (ListExecutionsProjectId | Unset):
+        status (ListExecutionsStatus | Unset):
+        mode (ListExecutionsMode | Unset):
+        completed_at (ListExecutionsCompletedAt | Unset):
+        approval_pending (ListExecutionsApprovalPending | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -262,5 +532,19 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
+            created_by=created_by,
+            updated_by=updated_by,
+            deleted_at=deleted_at,
+            deleted_by=deleted_by,
+            workflow_id=workflow_id,
+            workflow_version_id=workflow_version_id,
+            project_id=project_id,
+            status=status,
+            mode=mode,
+            completed_at=completed_at,
+            approval_pending=approval_pending,
         )
     ).parsed

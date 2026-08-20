@@ -10,6 +10,8 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.base import BaseListParams
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.settings.models.api_models import (
     CategoriesListResponse,
@@ -18,7 +20,7 @@ from syntara.settings.models.api_models import (
     SettingsListResponse,
     SettingUpdate,
 )
-from syntara.settings.models.query_params import SettingsListParams
+from syntara.settings.models.runtime_setting import RuntimeSetting
 from syntara.settings.services.settings_service import SettingsService
 
 router = SyntaraRouter(prefix="/settings", tags=["Settings"])
@@ -68,7 +70,8 @@ def _validate_key(key: str) -> None:
 async def list_settings(
     request: Request,
     service: Annotated[SettingsService, Depends(get_settings_service)],
-    params: Annotated[SettingsListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
+    _filterable: Annotated[None, Depends(FilterableModel(RuntimeSetting))],
 ) -> SettingsListResponse:
     """List all runtime settings with pagination, filtering, and sorting."""
     return await service.list_settings(

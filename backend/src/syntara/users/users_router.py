@@ -29,11 +29,11 @@ from syntara.core.models.group import UserGroupListResponse, UserGroupsSet
 from syntara.core.models.user_identity_schemas import UserIdentityAttach, UserIdentityListResponse, UserIdentityRead
 from syntara.core.models.user_schemas import (
     UserCreate,
-    UserListParams,
     UserListResponse,
     UserRead,
     UserUpdate,
 )
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.users.services.group_service import GroupsService
 from syntara.users.services.user_identity_service import UserIdentityService
@@ -129,8 +129,9 @@ async def create_user(
 async def list_users(
     request: Request,
     service: Annotated[UsersService, Depends(get_user_service)],
-    params: Annotated[UserListParams, Query()],
+    params: Annotated[BaseListParams, Query()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("user", "read"))],
+    _filterable: Annotated[None, Depends(FilterableModel(User))],
 ) -> UserListResponse:
     """List users with visibility filtering and pagination.
 

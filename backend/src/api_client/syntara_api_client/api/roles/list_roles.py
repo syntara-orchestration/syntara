@@ -1,12 +1,19 @@
 from http import HTTPStatus
 from typing import Any
-from uuid import UUID
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.list_roles_created_at import ListRolesCreatedAt
+from ...models.list_roles_description import ListRolesDescription
+from ...models.list_roles_id import ListRolesId
+from ...models.list_roles_is_builtin import ListRolesIsBuiltin
+from ...models.list_roles_name import ListRolesName
+from ...models.list_roles_project_id import ListRolesProjectId
+from ...models.list_roles_scope import ListRolesScope
+from ...models.list_roles_updated_at import ListRolesUpdatedAt
 from ...models.role_list_response import RoleListResponse
 from ...types import UNSET, Response, Unset
 
@@ -17,11 +24,14 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
-    project_id: None | Unset | UUID = UNSET,
-    scope: None | str | Unset = UNSET,
-    policy_name: None | str | Unset = UNSET,
+    id: ListRolesId | Unset = UNSET,
+    created_at: ListRolesCreatedAt | Unset = UNSET,
+    updated_at: ListRolesUpdatedAt | Unset = UNSET,
+    name: ListRolesName | Unset = UNSET,
+    description: ListRolesDescription | Unset = UNSET,
+    is_builtin: ListRolesIsBuiltin | Unset = UNSET,
+    project_id: ListRolesProjectId | Unset = UNSET,
+    scope: ListRolesScope | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -46,42 +56,53 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_name: None | str | Unset
-    if isinstance(name, Unset):
-        json_name = UNSET
-    else:
-        json_name = name
-    params["name"] = json_name
+    json_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(id, Unset):
+        json_id = id.to_dict()
+    if not isinstance(json_id, Unset):
+        params.update(json_id)
 
-    json_is_builtin: bool | None | Unset
-    if isinstance(is_builtin, Unset):
-        json_is_builtin = UNSET
-    else:
-        json_is_builtin = is_builtin
-    params["is_builtin"] = json_is_builtin
+    json_created_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(created_at, Unset):
+        json_created_at = created_at.to_dict()
+    if not isinstance(json_created_at, Unset):
+        params.update(json_created_at)
 
-    json_project_id: None | str | Unset
-    if isinstance(project_id, Unset):
-        json_project_id = UNSET
-    elif isinstance(project_id, UUID):
-        json_project_id = str(project_id)
-    else:
-        json_project_id = project_id
-    params["project_id"] = json_project_id
+    json_updated_at: dict[str, Any] | Unset = UNSET
+    if not isinstance(updated_at, Unset):
+        json_updated_at = updated_at.to_dict()
+    if not isinstance(json_updated_at, Unset):
+        params.update(json_updated_at)
 
-    json_scope: None | str | Unset
-    if isinstance(scope, Unset):
-        json_scope = UNSET
-    else:
-        json_scope = scope
-    params["scope"] = json_scope
+    json_name: dict[str, Any] | Unset = UNSET
+    if not isinstance(name, Unset):
+        json_name = name.to_dict()
+    if not isinstance(json_name, Unset):
+        params.update(json_name)
 
-    json_policy_name: None | str | Unset
-    if isinstance(policy_name, Unset):
-        json_policy_name = UNSET
-    else:
-        json_policy_name = policy_name
-    params["policy_name"] = json_policy_name
+    json_description: dict[str, Any] | Unset = UNSET
+    if not isinstance(description, Unset):
+        json_description = description.to_dict()
+    if not isinstance(json_description, Unset):
+        params.update(json_description)
+
+    json_is_builtin: dict[str, Any] | Unset = UNSET
+    if not isinstance(is_builtin, Unset):
+        json_is_builtin = is_builtin.to_dict()
+    if not isinstance(json_is_builtin, Unset):
+        params.update(json_is_builtin)
+
+    json_project_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(project_id, Unset):
+        json_project_id = project_id.to_dict()
+    if not isinstance(json_project_id, Unset):
+        params.update(json_project_id)
+
+    json_scope: dict[str, Any] | Unset = UNSET
+    if not isinstance(scope, Unset):
+        json_scope = scope.to_dict()
+    if not isinstance(json_scope, Unset):
+        params.update(json_scope)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -168,11 +189,14 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
-    project_id: None | Unset | UUID = UNSET,
-    scope: None | str | Unset = UNSET,
-    policy_name: None | str | Unset = UNSET,
+    id: ListRolesId | Unset = UNSET,
+    created_at: ListRolesCreatedAt | Unset = UNSET,
+    updated_at: ListRolesUpdatedAt | Unset = UNSET,
+    name: ListRolesName | Unset = UNSET,
+    description: ListRolesDescription | Unset = UNSET,
+    is_builtin: ListRolesIsBuiltin | Unset = UNSET,
+    project_id: ListRolesProjectId | Unset = UNSET,
+    scope: ListRolesScope | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | RoleListResponse]:
     """List roles
@@ -184,11 +208,14 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_builtin (bool | None | Unset):
-        project_id (None | Unset | UUID):
-        scope (None | str | Unset):
-        policy_name (None | str | Unset):
+        id (ListRolesId | Unset):
+        created_at (ListRolesCreatedAt | Unset):
+        updated_at (ListRolesUpdatedAt | Unset):
+        name (ListRolesName | Unset):
+        description (ListRolesDescription | Unset):
+        is_builtin (ListRolesIsBuiltin | Unset):
+        project_id (ListRolesProjectId | Unset):
+        scope (ListRolesScope | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -203,11 +230,14 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
         is_builtin=is_builtin,
         project_id=project_id,
         scope=scope,
-        policy_name=policy_name,
         additional_params=additional_params,
     )
 
@@ -225,11 +255,14 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
-    project_id: None | Unset | UUID = UNSET,
-    scope: None | str | Unset = UNSET,
-    policy_name: None | str | Unset = UNSET,
+    id: ListRolesId | Unset = UNSET,
+    created_at: ListRolesCreatedAt | Unset = UNSET,
+    updated_at: ListRolesUpdatedAt | Unset = UNSET,
+    name: ListRolesName | Unset = UNSET,
+    description: ListRolesDescription | Unset = UNSET,
+    is_builtin: ListRolesIsBuiltin | Unset = UNSET,
+    project_id: ListRolesProjectId | Unset = UNSET,
+    scope: ListRolesScope | Unset = UNSET,
 ) -> ErrorData | RoleListResponse | None:
     """List roles
 
@@ -240,11 +273,14 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_builtin (bool | None | Unset):
-        project_id (None | Unset | UUID):
-        scope (None | str | Unset):
-        policy_name (None | str | Unset):
+        id (ListRolesId | Unset):
+        created_at (ListRolesCreatedAt | Unset):
+        updated_at (ListRolesUpdatedAt | Unset):
+        name (ListRolesName | Unset):
+        description (ListRolesDescription | Unset):
+        is_builtin (ListRolesIsBuiltin | Unset):
+        project_id (ListRolesProjectId | Unset):
+        scope (ListRolesScope | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -260,11 +296,14 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
         is_builtin=is_builtin,
         project_id=project_id,
         scope=scope,
-        policy_name=policy_name,
     ).parsed
 
 
@@ -275,11 +314,14 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
-    project_id: None | Unset | UUID = UNSET,
-    scope: None | str | Unset = UNSET,
-    policy_name: None | str | Unset = UNSET,
+    id: ListRolesId | Unset = UNSET,
+    created_at: ListRolesCreatedAt | Unset = UNSET,
+    updated_at: ListRolesUpdatedAt | Unset = UNSET,
+    name: ListRolesName | Unset = UNSET,
+    description: ListRolesDescription | Unset = UNSET,
+    is_builtin: ListRolesIsBuiltin | Unset = UNSET,
+    project_id: ListRolesProjectId | Unset = UNSET,
+    scope: ListRolesScope | Unset = UNSET,
 ) -> Response[ErrorData | RoleListResponse]:
     """List roles
 
@@ -290,11 +332,14 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_builtin (bool | None | Unset):
-        project_id (None | Unset | UUID):
-        scope (None | str | Unset):
-        policy_name (None | str | Unset):
+        id (ListRolesId | Unset):
+        created_at (ListRolesCreatedAt | Unset):
+        updated_at (ListRolesUpdatedAt | Unset):
+        name (ListRolesName | Unset):
+        description (ListRolesDescription | Unset):
+        is_builtin (ListRolesIsBuiltin | Unset):
+        project_id (ListRolesProjectId | Unset):
+        scope (ListRolesScope | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -309,11 +354,14 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        id=id,
+        created_at=created_at,
+        updated_at=updated_at,
         name=name,
+        description=description,
         is_builtin=is_builtin,
         project_id=project_id,
         scope=scope,
-        policy_name=policy_name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -328,11 +376,14 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    name: None | str | Unset = UNSET,
-    is_builtin: bool | None | Unset = UNSET,
-    project_id: None | Unset | UUID = UNSET,
-    scope: None | str | Unset = UNSET,
-    policy_name: None | str | Unset = UNSET,
+    id: ListRolesId | Unset = UNSET,
+    created_at: ListRolesCreatedAt | Unset = UNSET,
+    updated_at: ListRolesUpdatedAt | Unset = UNSET,
+    name: ListRolesName | Unset = UNSET,
+    description: ListRolesDescription | Unset = UNSET,
+    is_builtin: ListRolesIsBuiltin | Unset = UNSET,
+    project_id: ListRolesProjectId | Unset = UNSET,
+    scope: ListRolesScope | Unset = UNSET,
 ) -> ErrorData | RoleListResponse | None:
     """List roles
 
@@ -343,11 +394,14 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        name (None | str | Unset):
-        is_builtin (bool | None | Unset):
-        project_id (None | Unset | UUID):
-        scope (None | str | Unset):
-        policy_name (None | str | Unset):
+        id (ListRolesId | Unset):
+        created_at (ListRolesCreatedAt | Unset):
+        updated_at (ListRolesUpdatedAt | Unset):
+        name (ListRolesName | Unset):
+        description (ListRolesDescription | Unset):
+        is_builtin (ListRolesIsBuiltin | Unset):
+        project_id (ListRolesProjectId | Unset):
+        scope (ListRolesScope | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -364,10 +418,13 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            id=id,
+            created_at=created_at,
+            updated_at=updated_at,
             name=name,
+            description=description,
             is_builtin=is_builtin,
             project_id=project_id,
             scope=scope,
-            policy_name=policy_name,
         )
     ).parsed
