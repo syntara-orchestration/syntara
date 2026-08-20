@@ -374,6 +374,21 @@ class TestCreateTemporalExecutionService:
             assert call_args[1]["tls"] is None
             assert len(call_args[1]["interceptors"]) == 2
 
+    @pytest.mark.asyncio
+    async def test_create_temporal_execution_service_fallback_timeout_raises_oserror(self) -> None:
+        """TimeoutError from fallback Client.connect is re-raised as OSError."""
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_execution_service.get_shared_client",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class,
+        ):
+            mock_client_class.connect = AsyncMock(side_effect=TimeoutError)
+            with pytest.raises(OSError, match="timed out"):
+                await create_temporal_execution_service()
+
 
 class TestBuiltinWorkflowRouting:
     """Test queue routing for built-in vs user workflows."""

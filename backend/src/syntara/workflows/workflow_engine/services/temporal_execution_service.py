@@ -360,15 +360,19 @@ async def create_temporal_execution_service(
             return TemporalExecutionService(shared, task_queue, background_task_queue=settings.background_task_queue)
         logger.warning("shared_temporal_client_unavailable", fallback="per-request connect")
 
-    client = await asyncio.wait_for(
-        Client.connect(
-            temporal_address or settings.temporal_address,
-            namespace=namespace or settings.temporal_namespace,
-            tls=build_temporal_tls_config(),
-            interceptors=build_default_interceptors(),
-        ),
-        timeout=CONNECT_TIMEOUT_SECONDS,
-    )
+    try:
+        client = await asyncio.wait_for(
+            Client.connect(
+                temporal_address or settings.temporal_address,
+                namespace=namespace or settings.temporal_namespace,
+                tls=build_temporal_tls_config(),
+                interceptors=build_default_interceptors(),
+            ),
+            timeout=CONNECT_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        msg = "Temporal connect timed out (fallback path)"
+        raise OSError(msg) from None
     # TODO: Handle how TemporalExecutionService is dispatched/deployed  # noqa: TD002, TD003
     # via containerization. This will be addressed in a future Containerization & Deployment ticket.
     return TemporalExecutionService(client, task_queue, background_task_queue=settings.background_task_queue)
