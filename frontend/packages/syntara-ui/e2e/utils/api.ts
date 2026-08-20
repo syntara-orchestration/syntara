@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- shared E2E test utilities; splitting would scatter related helpers across files */
 /**
  * API-based resource utilities for E2E test setup/teardown.
  *
@@ -449,12 +450,14 @@ type WorkflowStepDef = { id: string; type: string; name?: string; parameters: Re
 type WorkflowEdgeDef = { from: string; to: string; from_port?: string }
 
 /** Create a workflow via the API. Returns the new workflow ID. */
+// eslint-disable-next-line max-params -- nodes, edges, and options all have defaults; collapsing into a single object would break all callers
 export async function createWorkflowViaApi(
   app: Page,
   name: string,
   triggers: WorkflowStepDef[],
   nodes: WorkflowStepDef[] = [],
-  edges: WorkflowEdgeDef[] = []
+  edges: WorkflowEdgeDef[] = [],
+  options?: { projectId?: string }
 ): Promise<{
   /** UUID of the created workflow. */
   id: string
@@ -463,13 +466,17 @@ export async function createWorkflowViaApi(
 }> {
   const token = await getAuthToken(app)
   if (!token) throw new Error('createWorkflowViaApi: could not obtain auth token')
-  const project = await ensureProject(app)
-  if (!project) throw new Error('createWorkflowViaApi: could not ensure project')
+  let resolvedProjectId = options?.projectId
+  if (!resolvedProjectId) {
+    const project = await ensureProject(app)
+    if (!project) throw new Error('createWorkflowViaApi: could not ensure project')
+    resolvedProjectId = project.id
+  }
   const resp = await apiRequest(app, 'post', '/workflows', {
     token,
     data: {
       name,
-      project_id: project.id,
+      project_id: resolvedProjectId,
       workflow_definition: {
         schema_version: '2.0.0',
         name,
@@ -566,6 +573,32 @@ export async function deleteWorkflowViaApi(app: Page, workflowId: string): Promi
   try {
     const token = await getAuthToken(app)
     if (token) await apiRequest(app, 'delete', `/workflows/${workflowId}`, { token })
+  } catch {
+    // Best-effort cleanup
+  }
+}
+
+/** Create a project via the API. Returns the project ID. */
+export async function createProjectViaApi(app: Page, name: string, description?: string): Promise<{ id: string }> {
+  const token = await getAuthToken(app)
+  if (!token) throw new Error('createProjectViaApi: could not obtain auth token')
+  const resp = await apiRequest(app, 'post', '/projects', {
+    token,
+    data: { name, description: description ?? `E2E test project: ${name}` },
+  })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '(unreadable)')
+    throw new Error(`POST /projects returned ${resp.status()}: ${body}`)
+  }
+  return (await resp.json()) as { id: string }
+}
+
+/** Delete a project by ID via the API (best-effort cleanup). */
+export async function deleteProjectViaApi(app: Page, projectId: string): Promise<void> {
+  if (app.isClosed()) return
+  try {
+    const token = await getAuthToken(app)
+    if (token) await apiRequest(app, 'delete', `/projects/${projectId}`, { token })
   } catch {
     // Best-effort cleanup
   }
