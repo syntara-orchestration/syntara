@@ -29,8 +29,15 @@ export function matchesApprovalNodeId(approvalNodeId: string, canvasOrActivityId
 }
 
 function iterationSortKey(approvalNodeId: string): number[] {
-  const chain = approvalNodeId.match(LOOP_ITER_CHAIN)?.[0] ?? ''
-  return [...chain.matchAll(/_iter_(\d+)/g)].map((match) => Number(match[1]))
+  const chain = LOOP_ITER_CHAIN.exec(approvalNodeId)?.[0] ?? ''
+  const indices: number[] = []
+  const iterNum = /_iter_(\d+)/g
+  let match = iterNum.exec(chain)
+  while (match !== null) {
+    indices.push(Number(match[1]))
+    match = iterNum.exec(chain)
+  }
+  return indices
 }
 
 function compareIterationKeys(left: number[], right: number[]): number {
@@ -46,10 +53,14 @@ function pickLatestLoopApproval<T extends ApprovalNodeRef>(matches: T[]): T | un
   if (matches.length === 0) return undefined
   const pending = matches.filter((approval) => approval.status === 'pending')
   const pool = pending.length > 0 ? pending : matches
-  return pool.reduce((best, current) =>
-    compareIterationKeys(iterationSortKey(current.approval_node_id), iterationSortKey(best.approval_node_id)) >= 0
-      ? current
-      : best
+  const [latest, ...rest] = pool
+  if (latest === undefined) return undefined
+  return rest.reduce(
+    (best, current) =>
+      compareIterationKeys(iterationSortKey(current.approval_node_id), iterationSortKey(best.approval_node_id)) >= 0
+        ? current
+        : best,
+    latest
   )
 }
 
