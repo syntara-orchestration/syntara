@@ -64,6 +64,12 @@
       "enabled": false
     },
     {
+      "description": "Do not let the bot bump the CI Python version.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["actions/python-versions", "python"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["npm"],
       "groupName": "npm dependencies",
       "matchFileNames": ["frontend/**"],
