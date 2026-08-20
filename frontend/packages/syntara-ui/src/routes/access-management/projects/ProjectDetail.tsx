@@ -24,10 +24,10 @@ import { breadcrumbsProjectDetail, breadcrumbsProjectDetailEarlyShell } from '..
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
@@ -70,7 +70,7 @@ function ProjectDetailToolbar({
           Edit project
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu
+      <SynKebabMenu
         actions={[
           {
             key: 'delete',
@@ -97,7 +97,7 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
         <DescriptionListDescription>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
             <FlexItem>{project.name}</FlexItem>
-            {project.is_default && <NxLabel color="grey">Default</NxLabel>}
+            {project.is_default && <SynLabel color="grey">Default</SynLabel>}
           </Flex>
         </DescriptionListDescription>
       </DescriptionListGroup>

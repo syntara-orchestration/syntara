@@ -23,7 +23,7 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
@@ -98,7 +98,7 @@ function GroupDetailToolbar({
           Edit group
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu
+      <SynKebabMenu
         actions={[
           {
             key: 'delete',

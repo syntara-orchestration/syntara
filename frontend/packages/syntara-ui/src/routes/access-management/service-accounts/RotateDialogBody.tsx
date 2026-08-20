@@ -11,7 +11,7 @@ import {
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { type Ref, useCallback, useState } from 'react'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 
 import { computeRemainingGracePeriod, DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { serviceAccountHelp } from './serviceAccountFieldHelp'
@@ -69,7 +69,7 @@ export function RotateDialogBody({
           fieldId="rotate-grace-period"
           labelHelp={serviceAccountHelp.gracePeriod}
         >
-          <NxSelect
+          <SynSelect
             id="rotate-grace-period"
             aria-label="Current secret grace period"
             isOpen={isSelectOpen}
@@ -90,7 +90,7 @@ export function RotateDialogBody({
                 </SelectOption>
               ))}
             </SelectList>
-          </NxSelect>
+          </SynSelect>
         </FormGroup>
       </StackItem>
     </Stack>

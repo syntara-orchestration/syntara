@@ -24,7 +24,7 @@ import { Controller, useWatch, type Control, type UseFormSetValue, type UseFormT
 
 import { OIDC_REDIRECT_URI } from '../../../../client'
 import { TagInput } from '../../../../components/forms/TagInput'
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { detachPromise } from '../../../../utils/detachPromise'
 
@@ -126,7 +126,7 @@ function IdpTypeField({
 
         return (
           <FormGroup label="Provider template" fieldId="idp-type" isRequired labelHelp={idpHelp.providerTemplate}>
-            <NxSelect
+            <SynSelect
               id="idp-type"
               isOpen={isOpen}
               selected={field.value || undefined}
@@ -155,7 +155,7 @@ function IdpTypeField({
                   </SelectOption>
                 ))}
               </SelectList>
-            </NxSelect>
+            </SynSelect>
 
             <FieldErrorMessage error={fieldState.error} />
           </FormGroup>

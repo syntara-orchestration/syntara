@@ -9,8 +9,8 @@ import { useState } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
-import type { KebabAction } from '../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { ProjectGroupHeaderRow } from '../../components/ProjectGroupHeaderRow'
 import { DateCell } from '../../components/table/DateCell'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
@@ -131,7 +131,7 @@ function ExecutionRowActions({
 
   return (
     <>
-      <NxKebabMenu aria-label={`Actions for execution ${execution.id}`} actions={kebabActions} />
+      <SynKebabMenu aria-label={`Actions for execution ${execution.id}`} actions={kebabActions} />
       {retryDialogOpen && (
         <RetryExecutionDialog
           isOpen={retryDialogOpen}
