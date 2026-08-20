@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { useQueryState } from '../../components/states/useQueryState'
+import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { AlertProvider } from '../../providers/alerts'
 import { routerTestState } from '../../test/setup'
 
@@ -37,6 +38,10 @@ vi.mock('./useProjectNameMap', () => ({
 
 vi.mock('../../components/states/useQueryState', () => ({
   useQueryState: vi.fn(),
+}))
+
+vi.mock('../../hooks/invalidateAuthzCaches', () => ({
+  invalidateAuthzCaches: vi.fn(),
 }))
 
 vi.mock('./useRolePermissions', () => ({
@@ -305,6 +310,35 @@ describe('RolesTab', () => {
 
       expect(screen.getByTestId('error-state')).toBeInTheDocument()
     })
+
+    it('calls refetch when Retry is clicked on a retryable query error', async () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((_method: string, path: string) => {
+        if (path === '/projects') {
+          return {
+            data: [],
+            isPending: false,
+            isError: false,
+            error: null,
+            isFetching: false,
+            refetch: mockRefetch,
+          } as never
+        }
+        return {
+          data: undefined,
+          isPending: false,
+          isError: true,
+          error: { message: 'Failed to load roles', retryable: true },
+          isFetching: false,
+          refetch: mockRefetch,
+        } as never
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(mockRefetch).toHaveBeenCalledOnce()
+    })
   })
 
   describe('Row actions', () => {
@@ -398,6 +432,7 @@ describe('RolesTab', () => {
         callbacks.onSettled()
       })
 
+      expect(invalidateAuthzCaches).toHaveBeenCalledWith(queryClient)
       expect(mockRefetch).toHaveBeenCalled()
       await waitFor(() => {
         expect(screen.queryByText('Delete role?')).not.toBeInTheDocument()
@@ -600,7 +635,7 @@ describe('RolesTab', () => {
       expect(screen.getByText('admin-policy')).toBeVisible()
       expect(screen.getByText('workflow-edit')).toBeVisible()
 
-      await user.click(screen.getByRole('button', { name: /expand all/i }))
+      await user.click(screen.getByRole('button', { name: /expand all|collapse all/i }))
 
       expect(screen.queryByText('admin-policy')).not.toBeVisible()
       expect(screen.queryByText('workflow-edit')).not.toBeVisible()

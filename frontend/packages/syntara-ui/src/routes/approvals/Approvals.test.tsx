@@ -1,5 +1,5 @@
 import type { Approval } from '@syntara/contracts'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { act, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -11,6 +11,7 @@ import { assertUrlParam, assertUrlParamIsNull } from '../../test/filter-test-hel
 import { accessClient } from '../access/accessClient'
 
 import Approvals from './Approvals'
+import { useApprovalDecideProjects } from './useApprovalDecideProjects'
 import { useApprovalPermissions } from './useApprovalPermissions'
 
 // Mock the approvalsClient
@@ -76,6 +77,13 @@ vi.mock('./useApprovalDecideProjects', () => ({
     canReadProjectNames: EMPTY_PROJECT_NAMES,
     isLoading: false,
     error: null,
+  })),
+}))
+
+vi.mock('./useCanDecideApproval', () => ({
+  useCanDecideApproval: vi.fn(() => ({
+    canDecide: true,
+    isLoading: false,
   })),
 }))
 
@@ -325,6 +333,23 @@ describe('Approvals Component', () => {
     render(<Approvals />)
 
     expect(screen.getByText('Error loading approvals')).toBeInTheDocument()
+  })
+
+  it('calls refetch when Retry is clicked on a retryable query error', async () => {
+    const mockRefetch = vi.fn()
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: { message: 'Failed to load', retryable: true },
+      refetch: mockRefetch,
+    } as never)
+
+    const user = userEvent.setup()
+    render(<Approvals />)
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(mockRefetch).toHaveBeenCalledOnce()
   })
 
   it('displays approval rows (type column removed for RH1)', () => {
@@ -1086,9 +1111,94 @@ describe('Approvals Component', () => {
     })
   })
 
+  describe('Bulk actions', () => {
+    const mockBulkMutate = vi.fn()
+
+    beforeEach(() => {
+      vi.mocked(useApprovalDecideProjects).mockReturnValue({
+        canDecideAllProjects: true,
+        canDecideProjectNames: EMPTY_PROJECT_NAMES,
+        canReadProjectNames: EMPTY_PROJECT_NAMES,
+        isLoading: false,
+        error: null,
+      })
+      mockApprovalsQuery(mockApprovals)
+      vi.mocked(approvalsClient.useMutation).mockReturnValue({
+        mutate: mockBulkMutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never)
+    })
+
+    async function selectFirstPendingApproval(user: ReturnType<typeof userEvent.setup>) {
+      const rowCheckbox = screen.getAllByRole('checkbox', { name: /select row/i })[0]
+      await user.click(rowCheckbox)
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+    }
+
+    it('opens bulk approve dialog when Approve is clicked with a selection', async () => {
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      await selectFirstPendingApproval(user)
+      await user.click(screen.getByRole('button', { name: 'Approve' }))
+
+      expect(await screen.findByRole('heading', { name: /approve 1 approval step/i })).toBeInTheDocument()
+    })
+
+    it('opens bulk reject dialog when Reject is clicked with a selection', async () => {
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      await selectFirstPendingApproval(user)
+      await user.click(screen.getByRole('button', { name: 'Reject' }))
+
+      expect(await screen.findByRole('heading', { name: /reject 1 approval step/i })).toBeInTheDocument()
+    })
+
+    it('refetches approvals after a successful bulk approve', async () => {
+      const mockRefetch = vi.fn()
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: mockRefetch,
+      } as never)
+
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      await selectFirstPendingApproval(user)
+      await user.click(screen.getByRole('button', { name: 'Approve' }))
+
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Approve' }))
+
+      expect(mockBulkMutate).toHaveBeenCalledOnce()
+      const callbacks = mockBulkMutate.mock.calls[0][1] as {
+        onSuccess: (response: { total_success: number; total_failed: number; results: unknown[] }) => void
+      }
+      act(() => {
+        callbacks.onSuccess({ total_success: 1, total_failed: 0, results: [] })
+      })
+
+      expect(mockRefetch).toHaveBeenCalled()
+      expect(screen.queryByText('1 selected')).not.toBeInTheDocument()
+    })
+  })
+
   describe('Permission gating', () => {
     beforeEach(() => {
       mockApprovalsQuery(mockApprovals)
+      vi.mocked(useApprovalDecideProjects).mockReturnValue({
+        canDecideAllProjects: false,
+        canDecideProjectNames: EMPTY_PROJECT_NAMES,
+        canReadProjectNames: EMPTY_PROJECT_NAMES,
+        isLoading: false,
+        error: null,
+      })
       mockUseProjectSelector.mockReturnValue({
         selectedProject: null,
         isAllProjects: true,
