@@ -69,10 +69,25 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Post-commit Temporal schedule deletion is best-effort. Bound it so unpublish
-# and delete cannot sit on the HTTP request until nginx returns 504 (AAP-87692).
-# The schedule reconciliation worker removes any leftover orphans.
-_SCHEDULE_DELETE_TIMEOUT_SECONDS = 3.0
+# Strong refs so the event loop does not GC detached schedule-delete tasks.
+_pending_schedule_delete_tasks: set[asyncio.Task[None]] = set()
+_SCHEDULE_DELETE_TASK_PREFIX = "delete-scheduled-triggers-"
+
+
+def _on_schedule_delete_done(task: asyncio.Task[None]) -> None:
+    """Drop the strong ref and log failures the coroutine did not swallow."""
+    _pending_schedule_delete_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is None:
+        return
+    logger.warning(
+        "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
+        error=str(exc),
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+
 
 # Running counters for workflow creation success rate (FR-010).
 _workflow_creation_counts: list[int] = [0, 0]  # [successes, total]
@@ -244,7 +259,7 @@ class WorkflowService(BaseService):
         """Create/update Temporal Schedules for scheduled trigger nodes.
 
         Only called on publish.  Unpublish and delete use
-        ``_delete_scheduled_triggers`` for best-effort cleanup; the
+        ``_schedule_trigger_deletion`` for best-effort cleanup; the
         schedule reconciliation worker handles any orphans that remain
         when Temporal is unreachable.
         """
@@ -255,30 +270,50 @@ class WorkflowService(BaseService):
         )
 
     @staticmethod
+    def _schedule_trigger_deletion(workflow_id: UUID) -> asyncio.Task[None] | None:
+        """Start Temporal schedule deletion without holding the HTTP request.
+
+        Must not use ``asyncio.timeout`` on this work: cancelling
+        ``Client.connect`` under the process-wide ``_client_lock`` can
+        block the schedule reconciler and manufacture orphans. Must not
+        use Starlette ``BackgroundTasks`` either: those keep the ASGI
+        connection open until they finish, which is the nginx 504
+        (AAP-87692).
+
+        The task is allowed to outlive the request. The schedule
+        reconciliation worker is the backstop if the process dies first.
+        """
+        try:
+            task = asyncio.create_task(
+                WorkflowService._delete_scheduled_triggers(workflow_id),
+                name=f"{_SCHEDULE_DELETE_TASK_PREFIX}{workflow_id}",
+            )
+        except RuntimeError:
+            logger.warning(
+                "Could not start scheduled trigger deletion — reconciliation worker will clean up orphans",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return None
+        _pending_schedule_delete_tasks.add(task)
+        task.add_done_callback(_on_schedule_delete_done)
+        return task
+
+    @staticmethod
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
         """Best-effort deletion of Temporal Schedules for a workflow.
 
-        Swallows errors and timeouts so the caller (unpublish / delete)
-        always succeeds after the database commit. Do not use Starlette
-        ``BackgroundTasks`` for this: those still hold the HTTP connection
-        until they finish, which is what produces the gateway 504.
-
-        The schedule reconciliation worker will clean up any orphans that
-        remain when Temporal is unreachable or slow.
+        Swallows errors so a detached unpublish/delete task cannot fail
+        the already-committed database change. The schedule
+        reconciliation worker will clean up any orphans that remain when
+        Temporal is unreachable.
         """
         try:
-            async with asyncio.timeout(_SCHEDULE_DELETE_TIMEOUT_SECONDS):
-                scheduled_service = ScheduledTriggerService()
-                await scheduled_service.delete_triggers_for_workflow(
-                    workflow_id=str(workflow_id),
-                )
-        except TimeoutError:
-            logger.warning(
-                "Best-effort scheduled trigger deletion timed out — reconciliation worker will clean up orphans",
+            scheduled_service = ScheduledTriggerService()
+            await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
-                timeout_seconds=_SCHEDULE_DELETE_TIMEOUT_SECONDS,
             )
-        except ScheduledTriggerSyncError:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
                 workflow_id=str(workflow_id),
@@ -1416,7 +1451,7 @@ class WorkflowService(BaseService):
             )
         )
 
-        await self._delete_scheduled_triggers(workflow.id)
+        self._schedule_trigger_deletion(workflow.id)
 
         return workflow
 
@@ -1566,4 +1601,4 @@ class WorkflowService(BaseService):
             project_id=workflow.project_id,
         )
 
-        await self._delete_scheduled_triggers(workflow_id)
+        self._schedule_trigger_deletion(workflow_id)

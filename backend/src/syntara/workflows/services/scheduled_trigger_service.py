@@ -230,7 +230,7 @@ class ScheduledTriggerService:
         Creates or updates schedules for each scheduled trigger node and
         deletes schedules for trigger nodes that were removed.  Only called
         on publish.  Unpublish and delete use
-        ``WorkflowService._delete_scheduled_triggers`` for best-effort
+        ``WorkflowService._schedule_trigger_deletion`` for best-effort
         cleanup; the schedule reconciliation worker handles any orphans.
 
         Args:
