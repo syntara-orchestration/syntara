@@ -5,6 +5,7 @@ timeout expiration, cancellation cleanup, and previous-step context building.
 """
 
 import asyncio
+import json
 from datetime import timedelta
 from typing import Any, ClassVar, cast
 
@@ -37,12 +38,26 @@ _APPROVAL_PROMPT_PATCH = "aap-87735-approval-prompt"
 
 
 def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None:
-    """Return the resolved approval-node prompt, or None if absent/blank."""
+    """Return the resolved approval-node prompt, or None if absent/blank.
+
+    ``NamespaceResolver.resolve_value`` keeps the original type when the whole
+    field is a single ``${...}``. Coerce scalars with ``str()`` and objects
+    with ``json.dumps`` so a Message of ``${trigger.amount}`` is stored.
+    """
     prompt = resolved_parameters.get("prompt")
-    if not isinstance(prompt, str):
+    if prompt is None:
         return None
-    stripped = prompt.strip()
-    return stripped or None
+    if isinstance(prompt, str):
+        text = prompt.strip()
+    elif isinstance(prompt, (dict, list)):
+        text = json.dumps(prompt)
+    else:
+        text = str(prompt).strip()
+    if not text:
+        return None
+    if len(text) > FieldLimits.DESCRIPTION_MAX_LENGTH:
+        return text[: FieldLimits.DESCRIPTION_MAX_LENGTH]
+    return text
 
 
 class WorkflowApprovalMixin:

@@ -329,6 +329,14 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByText('Custom prompt message')).toBeInTheDocument()
   })
 
+  it('prefers persisted prompt over the parent message prop', () => {
+    const withPrompt = { ...mockApproval, prompt: 'Resolved from record' } as Approval
+    render(<ApprovalDetailContent approval={withPrompt} message="Unresolved ${trigger.env} template" />, { wrapper })
+
+    expect(screen.getByText('Resolved from record')).toBeInTheDocument()
+    expect(screen.queryByText('Unresolved ${trigger.env} template')).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations in approved state', async () => {
     const approvedApproval = { ...mockApproval, status: 'approved' as const }
     const { container } = render(<ApprovalDetailContent approval={approvedApproval} />, { wrapper })

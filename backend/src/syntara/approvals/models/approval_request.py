@@ -55,6 +55,7 @@ class BaseApprovalRequest(BaseResource, table=False):
 
     prompt: str | None = Field(
         default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
         sa_column=Column(Text, nullable=True),
         description="Resolved guidance message from the approval node, shown to approvers",
     )

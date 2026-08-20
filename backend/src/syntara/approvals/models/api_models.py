@@ -164,6 +164,7 @@ class ApprovalCreateRequest(SQLModel):
     name: str = Field(..., min_length=1, max_length=255, description="Display name for the approval request")
     prompt: str | None = Field(
         default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
         description="Resolved guidance message from the approval node, shown to approvers",
     )
     timeout_at: datetime | None = Field(None, description="When this request expires (null = no timeout)")

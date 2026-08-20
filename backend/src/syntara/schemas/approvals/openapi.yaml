@@ -389,6 +389,7 @@ components:
             prompt:
               anyOf:
                 - type: string
+                  maxLength: 2000
                 - type: "null"
               description: Resolved guidance message from the approval node, shown to approvers
               title: Prompt
@@ -529,6 +530,7 @@ components:
         prompt:
           anyOf:
             - type: string
+              maxLength: 2000
             - type: "null"
           title: Prompt
           description: Resolved guidance message from the approval node, shown to approvers

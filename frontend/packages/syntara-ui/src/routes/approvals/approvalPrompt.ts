@@ -4,9 +4,7 @@
  * Runtime approvals persist the resolved prompt on the approval record.
  */
 
-export function getApprovalPromptFromRecord(
-  approval: { prompt?: string | null } | undefined
-): string | undefined {
+export function getApprovalPromptFromRecord(approval: { prompt?: string | null } | undefined): string | undefined {
   return trimPrompt(approval?.prompt)
 }
 

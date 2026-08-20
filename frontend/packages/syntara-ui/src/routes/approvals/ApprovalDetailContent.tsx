@@ -37,13 +37,10 @@ import { useApprovalDecideProjects } from './useApprovalDecideProjects'
 import { useCanDecideApproval } from './useCanDecideApproval'
 
 /**
- * Fallback extraction for description/prompt text from the approval object.
- * `prompt` is persisted on the approval record. `description` is a mock-API
- * extra field kept as a last resort for fixtures that still use it.
+ * Mock-API extra field kept as a last resort for fixtures that still use it.
+ * Runtime approvals persist the resolved prompt on the record instead.
  */
-function getApprovalMessage(approval: Approval): string | undefined {
-  const fromPrompt = getApprovalPromptFromRecord(approval)
-  if (fromPrompt) return fromPrompt
+function getDescriptionFallback(approval: Approval): string | undefined {
   if ('description' in approval && typeof approval.description === 'string' && approval.description.trim()) {
     return approval.description.trim()
   }
@@ -67,7 +64,7 @@ function resolveApprovalName(approval: Approval, activityNameMap?: Map<string, s
 
 type ApprovalDetailContentProps = Readonly<{
   approval: Approval
-  /** Optional message to display (e.g. the prompt from the approval node config). Overrides auto-detection from the approval object. */
+  /** Optional message to display when the approval record has no persisted prompt (e.g. node definition fallback). */
   message?: string
   /** Optional map of activity ID to human-readable name for resolving approval node names. */
   activityNameMap?: Map<string, string>
@@ -284,7 +281,7 @@ export function ApprovalDetailContent({
   const workflowId = approval.workflow_context?.workflow_id
   const workflowVersion = approval.workflow_context?.workflow_version
   const workflowLink = workflowId ? buildWorkflowBuilderLink(workflowId, workflowVersion) : undefined
-  const approvalMessage = message || getApprovalMessage(approval)
+  const approvalMessage = getApprovalPromptFromRecord(approval) || message || getDescriptionFallback(approval)
   const approvalDisplayName = resolveApprovalName(approval, activityNameMap)
   const decisionNotes = approval.decision_notes ?? undefined
   const notesLabel = getNotesLabel(approvalStatus)

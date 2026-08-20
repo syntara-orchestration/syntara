@@ -53,9 +53,7 @@ describe('getApprovalPromptFromNode', () => {
 
 describe('getApprovalPromptFromRecord', () => {
   it('returns the persisted prompt', () => {
-    expect(getApprovalPromptFromRecord({ prompt: 'Please review this change.' })).toBe(
-      'Please review this change.'
-    )
+    expect(getApprovalPromptFromRecord({ prompt: 'Please review this change.' })).toBe('Please review this change.')
   })
 
   it('trims whitespace', () => {

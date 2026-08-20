@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.core.constants import FieldLimits
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -466,8 +467,8 @@ class TestPrepareApprovalArgs:
         assert args[10] == "Please review this $15,000 request."
 
     @pytest.mark.asyncio
-    async def test_blank_or_non_string_prompt_is_none(self) -> None:
-        """Whitespace, empty, and non-string prompts are stored as None."""
+    async def test_blank_prompt_is_none(self) -> None:
+        """Whitespace, empty, and missing prompts are stored as None."""
         wf = _make_workflow()
         graph = _build_approval_graph()
         node = ActivityNode("approval", "approval", {}, name="Review")
@@ -476,11 +477,40 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             empty_args = await wf._prepare_approval_args(node, graph, {"prompt": "   "})
             missing_args = await wf._prepare_approval_args(node, graph, {})
-            number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
 
         assert empty_args[10] is None
         assert missing_args[10] is None
-        assert number_args[10] is None
+
+    @pytest.mark.asyncio
+    async def test_non_string_prompt_is_coerced(self) -> None:
+        """Whole-field templates can resolve to a scalar or JSON value."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
+            object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"amount": 15000}})
+            list_args = await wf._prepare_approval_args(node, graph, {"prompt": ["a", "b"]})
+
+        assert number_args[10] == "15000"
+        assert object_args[10] == '{"amount": 15000}'
+        assert list_args[10] == '["a", "b"]'
+
+    @pytest.mark.asyncio
+    async def test_oversized_prompt_is_truncated(self) -> None:
+        """Resolved prompts longer than the API max_length are truncated."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        too_long = "x" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": too_long})
+
+        assert args[10] == too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH]
 
     @pytest.mark.asyncio
     async def test_prompt_omitted_when_patch_inactive(self) -> None:
