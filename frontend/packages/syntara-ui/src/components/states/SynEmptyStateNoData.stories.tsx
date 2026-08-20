@@ -2,8 +2,8 @@ import { Button } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { SynEmptyStateNoData } from './SynEmptyStateNoData'
 import { pageDecorator } from './storyDecorators'
+import { SynEmptyStateNoData } from './SynEmptyStateNoData'
 
 const meta: Meta<typeof SynEmptyStateNoData> = {
   component: SynEmptyStateNoData,

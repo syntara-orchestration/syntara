@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
 import { pageDecorator } from './storyDecorators'
+import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
 
 const meta: Meta<typeof SynEmptyStateServiceUnavailable> = {
   component: SynEmptyStateServiceUnavailable,

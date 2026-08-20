@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { SynEmptyStateFilter } from './SynEmptyStateFilter'
 import { pageDecorator } from './storyDecorators'
+import { SynEmptyStateFilter } from './SynEmptyStateFilter'
 
 const meta: Meta<typeof SynEmptyStateFilter> = {
   component: SynEmptyStateFilter,

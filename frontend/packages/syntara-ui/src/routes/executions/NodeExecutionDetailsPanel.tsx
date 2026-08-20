@@ -327,7 +327,9 @@ function NodeContentArea({
   const [outputView, setOutputView] = useState<PanelView>('json')
 
   if (error) {
-    return <SynErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    return (
+      <SynErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    )
   }
   if (isLoading) {
     return <Spinner aria-label="Loading activity data" />

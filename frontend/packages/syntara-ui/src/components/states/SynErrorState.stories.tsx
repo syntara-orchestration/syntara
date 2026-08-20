@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { SynErrorState } from './SynErrorState'
 import { pageDecorator } from './storyDecorators'
+import { SynErrorState } from './SynErrorState'
 
 const meta: Meta<typeof SynErrorState> = {
   component: SynErrorState,

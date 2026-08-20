@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { SynLoadingState } from './SynLoadingState'
 import { pageDecorator } from './storyDecorators'
+import { SynLoadingState } from './SynLoadingState'
 
 const meta: Meta<typeof SynLoadingState> = {
   component: SynLoadingState,

@@ -33,7 +33,9 @@ export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
   const defaultButtonText = 'Add data'
 
   // Use custom image component if provided, otherwise use default icon
-  const icon = imageSrc ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} /> : RhUiCubesFillIcon
+  const icon = imageSrc
+    ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} />
+    : RhUiCubesFillIcon
 
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>

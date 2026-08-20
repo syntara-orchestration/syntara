@@ -96,12 +96,12 @@ if (isServiceUnavailableError(error)) {
 
 Automatically handles query loading, error, and 503 states.
 
-| Error Type              | Component Rendered               |
-| ----------------------- | -------------------------------- |
+| Error Type              | Component Rendered                |
+| ----------------------- | --------------------------------- |
 | 503 Service Unavailable | `SynEmptyStateServiceUnavailable` |
 | Other errors            | `SynErrorState` + alert           |
 | Loading                 | `SynLoadingState`                 |
-| Success                 | `null` (render data)             |
+| Success                 | `null` (render data)              |
 
 #### Usage
 
@@ -376,9 +376,9 @@ packages/
 
 ### Unit Tests
 
-| File                                      | Tests | Coverage                                         |
-| ----------------------------------------- | ----- | ------------------------------------------------ |
-| `apiErrors.test.ts`                       | 25    | Error parsing, 503 detection, message extraction |
+| File                                       | Tests | Coverage                                         |
+| ------------------------------------------ | ----- | ------------------------------------------------ |
+| `apiErrors.test.ts`                        | 25    | Error parsing, 503 detection, message extraction |
 | `SynEmptyStateServiceUnavailable.test.tsx` | 5     | Component rendering, props                       |
 
 ### Running Tests
