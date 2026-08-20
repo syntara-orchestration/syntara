@@ -183,7 +183,7 @@ export function PoliciesTab() {
         isEmpty={policies.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<NxEmptyStateNoData title="No policies found" description="No policies are available." />}
+        noDataState={<NxEmptyStateNoData title="No policies yet" description="No policies are available." />}
         toolbar={
           showToolbar ? (
             <NxListPanelToolbar

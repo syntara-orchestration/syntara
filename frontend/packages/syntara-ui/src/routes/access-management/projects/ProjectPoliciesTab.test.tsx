@@ -137,7 +137,7 @@ describe('ProjectPoliciesTab', () => {
     setupMocks([])
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
 
-    expect(screen.getByText('No policies found')).toBeInTheDocument()
+    expect(screen.getByText('No policies yet')).toBeInTheDocument()
   })
 
   it('renders error state when query fails', () => {

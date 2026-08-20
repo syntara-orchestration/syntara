@@ -83,7 +83,7 @@ export type EmptyMappingStateProps = {
 
 export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<EmptyMappingStateProps>) {
   return (
-    <EmptyState headingLevel="h2" titleText="No group mappings configured" variant="lg">
+    <EmptyState headingLevel="h2" titleText="No group mappings configured yet" variant="lg">
       <EmptyStateBody>
         {`Group mappings automatically assign users to ${APP_TITLE} groups based on their identity provider groups.`}
         {(onTestSignIn ?? onAddManually) && ' Discover groups from your IdP, or add mappings manually.'}
@@ -409,7 +409,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   if (entries.length === 0) {
     return (
       <NxEmptyStateNoData
-        title="No group mappings"
+        title="No group mappings yet"
         description="There are no group mappings to display for this identity provider."
       />
     )

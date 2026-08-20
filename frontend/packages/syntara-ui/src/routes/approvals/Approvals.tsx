@@ -164,10 +164,7 @@ function ApprovalsContent({
         {hasActiveFilters ? (
           <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
         ) : (
-          <NxEmptyStateNoData
-            title="No approvals found"
-            description="No approvals are currently pending or available."
-          />
+          <NxEmptyStateNoData title="No approvals yet" description="No approvals are currently pending or available." />
         )}
       </NxPageBody>
     )

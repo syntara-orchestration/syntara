@@ -155,7 +155,7 @@ describe('ProjectRolesTab', () => {
     setupMocks([])
     render(<ProjectRolesTab projectId="proj-1" />, { wrapper })
 
-    expect(screen.getByText('No roles found')).toBeInTheDocument()
+    expect(screen.getByText('No roles yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add role' })).toBeInTheDocument()
   })
 

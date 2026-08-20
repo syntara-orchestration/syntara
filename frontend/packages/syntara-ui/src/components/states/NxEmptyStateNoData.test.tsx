@@ -21,9 +21,9 @@ describe('NxEmptyStateNoData', () => {
   })
 
   it('renders with custom title', () => {
-    render(<NxEmptyStateNoData title="No workflows found" />)
+    render(<NxEmptyStateNoData title="No workflows yet" />)
 
-    expect(screen.getByText('No workflows found')).toBeInTheDocument()
+    expect(screen.getByText('No workflows yet')).toBeInTheDocument()
   })
 
   it('renders with custom description', () => {

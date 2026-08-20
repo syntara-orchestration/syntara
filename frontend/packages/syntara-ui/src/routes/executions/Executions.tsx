@@ -159,7 +159,7 @@ export default function Executions() {
         <NxPanel isFullHeight>
           {visibleExecutions.length === 0 && !hasActiveFilters ? (
             <NxPageBody isCentered>
-              <NxEmptyStateNoData title="No executions found" description="No executions found." />
+              <NxEmptyStateNoData title="No executions yet" description="No executions found." />
             </NxPageBody>
           ) : (
             <NxPanelContentStack variant="inset">

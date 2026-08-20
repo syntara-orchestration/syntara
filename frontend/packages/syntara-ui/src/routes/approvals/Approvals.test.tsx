@@ -380,7 +380,7 @@ describe('Approvals Component', () => {
 
       render(<Approvals />)
 
-      expect(screen.getByText('No approvals found')).toBeInTheDocument()
+      expect(screen.getByText('No approvals yet')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /name filter/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
@@ -394,7 +394,7 @@ describe('Approvals Component', () => {
       render(<Approvals />)
 
       expect(screen.getByText('No results found')).toBeInTheDocument()
-      expect(screen.queryByText('No approvals found')).not.toBeInTheDocument()
+      expect(screen.queryByText('No approvals yet')).not.toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: /name filter/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument()
@@ -905,7 +905,7 @@ describe('Approvals Component', () => {
       // Wait for the component to process the new mock data
       await waitFor(
         () => {
-          expect(screen.getByText('No approvals found')).toBeInTheDocument()
+          expect(screen.getByText('No approvals yet')).toBeInTheDocument()
         },
         { timeout: 3000 }
       )

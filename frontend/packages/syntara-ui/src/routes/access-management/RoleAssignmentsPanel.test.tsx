@@ -312,7 +312,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ userAssignments: [] })
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this user.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
     })
@@ -321,7 +321,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ groupAssignments: [] })
       render(<RoleAssignmentsPanel principalType="group" principalId="g1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this group.')).toBeInTheDocument()
     })
 
@@ -880,7 +880,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ serviceAccountAssignments: [] })
       render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this service account.')).toBeInTheDocument()
     })
 

@@ -164,7 +164,7 @@ describe('UserIdentitiesPanel', () => {
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
-      expect(screen.getByRole('heading', { name: 'No identity providers configured' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'No identity providers configured yet' })).toBeInTheDocument()
     })
   })
 
@@ -620,7 +620,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" currentUserId="user-1" hasPassword={false} />, { wrapper })
 
       // Should show the table, not the empty state
-      expect(screen.queryByRole('heading', { name: 'No identity providers configured' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'No identity providers configured yet' })).not.toBeInTheDocument()
       // Both providers are unlinked so there are two "Not connected" labels
       const notConnectedLabels = screen.getAllByText('Not connected')
       expect(notConnectedLabels).toHaveLength(2)

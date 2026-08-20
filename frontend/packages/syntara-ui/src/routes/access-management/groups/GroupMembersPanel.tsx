@@ -146,7 +146,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
     return (
       <>
         <NxEmptyStateNoData
-          title="No members"
+          title="No members yet"
           description="Add users to this group to manage their access."
           buttonText="Add member"
           addData={permissions.canManageMembers ? () => setAddModalOpen(true) : undefined}

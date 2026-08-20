@@ -160,7 +160,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
           hasActiveFilters={hasActiveFilters}
           onClearAllFilters={clearAllFilters}
           noDataState={
-            <NxEmptyStateNoData title="No policies found" description="No policies are available for this project." />
+            <NxEmptyStateNoData title="No policies yet" description="No policies are available for this project." />
           }
           toolbar={
             <NxListPanelToolbar

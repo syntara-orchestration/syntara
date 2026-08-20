@@ -218,7 +218,7 @@ export function MyPermissionsView() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={clearAllFilters}
         noDataState={
-          <NxEmptyStateNoData title="No permissions" description="The current user has no permissions assigned." />
+          <NxEmptyStateNoData title="No permissions yet" description="The current user has no permissions assigned." />
         }
         toolbar={
           <NxListPanelToolbar

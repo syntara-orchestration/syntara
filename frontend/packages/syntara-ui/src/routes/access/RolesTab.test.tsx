@@ -246,7 +246,7 @@ describe('RolesTab', () => {
 
       render(<RolesTab />, { wrapper: createWrapper() })
 
-      expect(screen.getByText('No roles found')).toBeInTheDocument()
+      expect(screen.getByText('No roles yet')).toBeInTheDocument()
       expect(screen.getByText('No roles are available.')).toBeInTheDocument()
     })
   })
