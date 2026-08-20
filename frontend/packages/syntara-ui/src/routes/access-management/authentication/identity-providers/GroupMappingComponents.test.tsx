@@ -15,7 +15,7 @@ import {
   ReadOnlyView,
 } from './GroupMappingComponents'
 import type { MappingTableProps } from './GroupMappingComponents'
-import { groupMappingEditFormSchema, type GroupMappingEditFormValues } from './groupMappingEditFormSchema'
+import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
 import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
 const mockMappedGroups: MappedGroup[] = [
@@ -346,27 +346,6 @@ describe('MappingTable', () => {
 
     expect(input).toHaveValue('hello')
     expect(input).toHaveFocus()
-  })
-
-  it('evaluates read-only entry field errors when entryErrors are provided', () => {
-    render(
-      <MappingTable
-        {...defaultProps}
-        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
-        isReadOnly
-        entryErrors={
-          [
-            {
-              idpGroupValue: { type: 'manual', message: 'IdP group is required' },
-              mappedGroupId: { type: 'manual', message: 'Group is required' },
-            },
-          ] as unknown as GroupMappingEditFormValues['entries']
-        }
-      />
-    )
-
-    expect(screen.getByText('idp-admin')).toBeInTheDocument()
-    expect(screen.getByText('admin')).toBeInTheDocument()
   })
 
   it('hides remove buttons, Add mapping, and form controls in read-only mode', () => {

@@ -710,7 +710,7 @@ describe('Executions Component', () => {
 
       // When there's no data and no filters, show EmptyStateNoData without the filter toolbar
       expect(screen.getByText('No executions yet')).toBeInTheDocument()
-      expect(screen.getByText('No executions found.')).toBeInTheDocument()
+      expect(screen.getByText('No workflow runs have been recorded yet.')).toBeInTheDocument()
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
     })
 

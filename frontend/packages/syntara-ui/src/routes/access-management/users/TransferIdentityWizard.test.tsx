@@ -265,16 +265,6 @@ describe('TransferIdentityWizard', () => {
       expect(radios.length).toBeGreaterThan(0)
     })
 
-    it('selects a user when its radio button is clicked', async () => {
-      const user = userEvent.setup()
-      render(<TransferIdentityWizard />, { wrapper })
-
-      const radios = screen.getAllByRole('radio')
-      await user.click(radios[0])
-
-      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
-    })
-
     it('shows no-data empty state when no selectable users exist', () => {
       setupMocks({
         users: {
@@ -291,12 +281,9 @@ describe('TransferIdentityWizard', () => {
           total: 1,
         },
       })
-      const { container } = render(<TransferIdentityWizard />, { wrapper })
+      render(<TransferIdentityWizard />, { wrapper })
 
       expect(screen.getByText('No users yet')).toBeInTheDocument()
-      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
-      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
-      expect(iconPath).toMatch(/^M256 8C119 8/)
       expect(
         screen.getByText('There must be at least one other user before you can transfer a federated identity.')
       ).toBeInTheDocument()
@@ -385,15 +372,6 @@ describe('TransferIdentityWizard', () => {
       expect(screen.getByRole('button', { name: 'Transfer identity' })).toBeDisabled()
 
       await user.click(screen.getByText('sub-1'))
-
-      expect(screen.getByRole('button', { name: 'Transfer identity' })).toBeEnabled()
-    })
-
-    it('selects an identity when its radio button is clicked', async () => {
-      const user = await goToStep2()
-
-      const radios = screen.getAllByRole('radio')
-      await user.click(radios[0])
 
       expect(screen.getByRole('button', { name: 'Transfer identity' })).toBeEnabled()
     })

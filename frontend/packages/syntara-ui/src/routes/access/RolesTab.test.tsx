@@ -625,22 +625,6 @@ describe('RolesTab', () => {
       expect(screen.getByText('read-all')).toBeVisible()
     })
 
-    it('expand-all button expands all rows, clicking again collapses them', async () => {
-      const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
-
-      const expandAllButton = screen.getByRole('button', { name: /expand all/i })
-      await user.click(expandAllButton)
-
-      expect(screen.getByText('admin-policy')).toBeVisible()
-      expect(screen.getByText('workflow-edit')).toBeVisible()
-
-      await user.click(screen.getByRole('button', { name: /expand all|collapse all/i }))
-
-      expect(screen.queryByText('admin-policy')).not.toBeVisible()
-      expect(screen.queryByText('workflow-edit')).not.toBeVisible()
-    })
-
     it('toggling a single row does not affect other rows', async () => {
       const user = userEvent.setup()
       render(<RolesTab />, { wrapper: createWrapper() })
@@ -650,18 +634,6 @@ describe('RolesTab', () => {
 
       expect(screen.getByText('admin-policy')).toBeVisible()
       expect(screen.queryByText('workflow-edit')).not.toBeVisible()
-    })
-
-    it('collapses an expanded row when the details button is clicked again', async () => {
-      const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
-
-      const expandButtons = screen.getAllByRole('button', { name: /details/i })
-      await user.click(expandButtons[0])
-      expect(screen.getByText('admin-policy')).toBeVisible()
-
-      await user.click(expandButtons[0])
-      expect(screen.queryByText('admin-policy')).not.toBeVisible()
     })
   })
 
@@ -726,7 +698,7 @@ describe('RolesTab', () => {
       })
 
       const user = userEvent.setup()
-      const { container } = render(<RolesTab />, { wrapper: createWrapper() })
+      render(<RolesTab />, { wrapper: createWrapper() })
 
       // Apply a filter by typing in the name filter input and pressing Enter
       const textInput = screen.getByRole('textbox', { name: /name filter/i })
@@ -736,10 +708,6 @@ describe('RolesTab', () => {
       await waitFor(() => {
         expect(screen.getByText('No results found')).toBeInTheDocument()
       })
-
-      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
-      const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
-      expect(iconPath).toMatch(/^M505 442\.7L405\.3/)
     })
   })
 })

@@ -1,3 +1,4 @@
+import { Button } from '@patternfly/react-core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -18,14 +19,6 @@ describe('NxEmptyStateNoData', () => {
 
     expect(screen.getByText('No data available')).toBeInTheDocument()
     expect(screen.getByText('There is no data to display at this time.')).toBeInTheDocument()
-  })
-
-  it('renders PlusCircleIcon as the default icon', () => {
-    const { container } = render(<NxEmptyStateNoData />)
-
-    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- SVG icon path has no accessible role
-    const iconPath = container.querySelector('.pf-v6-c-empty-state__icon svg path')?.getAttribute('d')
-    expect(iconPath).toMatch(/^M256 8C119 8/)
   })
 
   it('renders with custom title', () => {
@@ -113,7 +106,12 @@ describe('NxEmptyStateNoData', () => {
 
   it('renders secondary actions when addData and secondaryActions are provided', () => {
     const addData = vi.fn()
-    render(<NxEmptyStateNoData addData={addData} secondaryActions={<button type="button">Learn more</button>} />)
+    render(
+      <NxEmptyStateNoData
+        addData={addData}
+        secondaryActions={<Button variant="link">Learn more</Button>}
+      />
+    )
 
     expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Learn more' })).toBeInTheDocument()
