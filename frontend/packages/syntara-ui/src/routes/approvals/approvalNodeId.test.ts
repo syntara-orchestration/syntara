@@ -17,6 +17,11 @@ describe('canvasNodeIdFromApprovalNodeId', () => {
     expect(canvasNodeIdFromApprovalNodeId('a1_iter_12')).toBe('a1')
   })
 
+  it('strips nested loop-iteration suffixes', () => {
+    expect(canvasNodeIdFromApprovalNodeId('a1_iter_1_iter_0')).toBe('a1')
+    expect(canvasNodeIdFromApprovalNodeId('a1_iter_2_iter_4_iter_1')).toBe('a1')
+  })
+
   it('strips a composite activity key', () => {
     expect(canvasNodeIdFromApprovalNodeId('a1#iter-1')).toBe('a1')
   })
@@ -33,6 +38,10 @@ describe('matchesApprovalNodeId', () => {
 
   it('matches a loop-iteration approval to the canvas node', () => {
     expect(matchesApprovalNodeId('a1_iter_1', 'a1')).toBe(true)
+  })
+
+  it('matches a nested-loop approval to the canvas node', () => {
+    expect(matchesApprovalNodeId('a1_iter_1_iter_0', 'a1')).toBe(true)
   })
 
   it('matches a loop-iteration approval to a composite activity key', () => {
@@ -58,6 +67,38 @@ describe('findApprovalForCanvasNode', () => {
   it('returns undefined when no approval matches', () => {
     expect(findApprovalForCanvasNode(approvals, 'missing')).toBeUndefined()
   })
+
+  it('prefers an exact approval_node_id over an earlier canvas match', () => {
+    const loopApprovals = [
+      { id: 'iter0', approval_node_id: 'a1_iter_0' },
+      { id: 'iter1', approval_node_id: 'a1_iter_1' },
+    ]
+    expect(findApprovalForCanvasNode(loopApprovals, 'a1_iter_0')?.id).toBe('iter0')
+  })
+
+  it('picks the latest iteration when looking up by canvas id', () => {
+    const loopApprovals = [
+      { id: 'iter0', approval_node_id: 'a1_iter_0' },
+      { id: 'iter1', approval_node_id: 'a1_iter_1' },
+    ]
+    expect(findApprovalForCanvasNode(loopApprovals, 'a1')?.id).toBe('iter1')
+  })
+
+  it('picks the latest nested-loop iteration by outer then inner index', () => {
+    const nested = [
+      { id: 'outer0', approval_node_id: 'a1_iter_0_iter_1' },
+      { id: 'outer1', approval_node_id: 'a1_iter_1_iter_0' },
+    ]
+    expect(findApprovalForCanvasNode(nested, 'a1')?.id).toBe('outer1')
+  })
+
+  it('prefers a pending approval over a later decided one', () => {
+    const mixed = [
+      { id: 'old-pending', approval_node_id: 'a1_iter_0', status: 'pending' },
+      { id: 'decided', approval_node_id: 'a1_iter_1', status: 'approved' },
+    ]
+    expect(findApprovalForCanvasNode(mixed, 'a1')?.id).toBe('old-pending')
+  })
 })
 
 describe('findApprovalIndexForCanvasNode', () => {
@@ -69,6 +110,11 @@ describe('findApprovalIndexForCanvasNode', () => {
 
   it('returns -1 when nothing matches', () => {
     expect(findApprovalIndexForCanvasNode(approvals, 'other')).toBe(-1)
+  })
+
+  it('returns the index of the latest matching iteration', () => {
+    const loopApprovals = [{ approval_node_id: 'gate_iter_0' }, { approval_node_id: 'gate_iter_2' }]
+    expect(findApprovalIndexForCanvasNode(loopApprovals, 'gate')).toBe(1)
   })
 })
 

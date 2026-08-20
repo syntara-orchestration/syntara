@@ -816,6 +816,85 @@ class TestLoopMaxIterationsEnforcement:
         assert result["control"]["next_port"] == "complete"
 
 
+class TestNestedLoopControlActivityId:
+    """Inner loop Temporal IDs include enclosing loop indices so IDs are not reused."""
+
+    @pytest.mark.asyncio
+    async def test_top_level_loop_uses_single_iter_suffix(
+        self,
+        _mock_temporal_workflow: MagicMock,  # noqa: PT019
+    ) -> None:
+        _mock_temporal_workflow.execute_activity = AsyncMock(
+            return_value={"output": {}, "control": {"next_port": "iterate", "next_index": 1, "current_index": 0}}
+        )
+        wf = _make_workflow()
+        node = ActivityNode(
+            node_id="outer",
+            node_type="loop",
+            parameters={"type": "for_each", "items": ["a", "b"]},
+        )
+        wf.loop_state["outer"] = ForEachLoopState(items=["a", "b"], current_index=0)
+        wf.loop_iteration_results["outer"] = {}
+
+        await wf._execute_loop_node("outer", node, node.parameters)
+
+        assert _mock_temporal_workflow.execute_activity.call_args.kwargs["activity_id"] == "outer_iter_0"
+
+    @pytest.mark.asyncio
+    async def test_nested_inner_loop_includes_outer_index(
+        self,
+        _mock_temporal_workflow: MagicMock,  # noqa: PT019
+    ) -> None:
+        _mock_temporal_workflow.execute_activity = AsyncMock(
+            return_value={"output": {}, "control": {"next_port": "iterate", "next_index": 1, "current_index": 0}}
+        )
+        wf = _make_workflow()
+        wf.loop_body_map["inner"] = "outer"
+        wf.node_control_data["outer"] = {"current_index": 2}
+        node = ActivityNode(
+            node_id="inner",
+            node_type="loop",
+            parameters={"type": "for_each", "items": ["x"]},
+        )
+        wf.loop_state["inner"] = ForEachLoopState(items=["x"], current_index=0)
+        wf.loop_iteration_results["inner"] = {}
+
+        await wf._execute_loop_node("inner", node, node.parameters)
+
+        assert _mock_temporal_workflow.execute_activity.call_args.kwargs["activity_id"] == "inner_iter_2_iter_0"
+
+    @pytest.mark.asyncio
+    async def test_same_inner_index_next_outer_uses_distinct_activity_id(
+        self,
+        _mock_temporal_workflow: MagicMock,  # noqa: PT019
+    ) -> None:
+        _mock_temporal_workflow.execute_activity = AsyncMock(
+            return_value={"output": {}, "control": {"next_port": "iterate", "next_index": 1, "current_index": 0}}
+        )
+        wf = _make_workflow()
+        wf.loop_body_map["inner"] = "outer"
+        node = ActivityNode(
+            node_id="inner",
+            node_type="loop",
+            parameters={"type": "for_each", "items": ["x"]},
+        )
+        wf.loop_iteration_results["inner"] = {}
+
+        wf.node_control_data["outer"] = {"current_index": 0}
+        wf.loop_state["inner"] = ForEachLoopState(items=["x"], current_index=0)
+        await wf._execute_loop_node("inner", node, node.parameters)
+        first = _mock_temporal_workflow.execute_activity.call_args.kwargs["activity_id"]
+
+        wf.node_control_data["outer"] = {"current_index": 1}
+        wf.loop_state["inner"] = ForEachLoopState(items=["x"], current_index=0)
+        await wf._execute_loop_node("inner", node, node.parameters)
+        second = _mock_temporal_workflow.execute_activity.call_args.kwargs["activity_id"]
+
+        assert first == "inner_iter_0_iter_0"
+        assert second == "inner_iter_1_iter_0"
+        assert first != second
+
+
 class TestResolveAndInjectUniqueActivityIds:
     """Credential and integration resolution must use per-node activity IDs.
 

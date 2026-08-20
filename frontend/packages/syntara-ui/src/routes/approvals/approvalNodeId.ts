@@ -1,18 +1,24 @@
 /**
  * Helpers for matching approval_node_id to canvas / activity IDs.
  *
- * Outside a loop, approval_node_id is the canvas node ID. Inside a loop body
- * each iteration stores ``{nodeId}_iter_{n}`` so the Approvals API unique
- * constraint is not violated (AAP-87702). Activity records for later
- * iterations use the composite key ``{nodeId}#iter-{n}``.
+ * Outside a loop, approval_node_id is the canvas node ID. Inside one or more
+ * loops each combination of enclosing indices stores
+ * ``{nodeId}_iter_{outer}_iter_{inner}`` so each iteration can create its own
+ * approval request. Activity records for later iterations use the composite
+ * key ``{nodeId}#iter-{n}``.
  */
 
-const LOOP_ITER_SUFFIX = /_iter_\d+$/
+const LOOP_ITER_CHAIN = /(?:_iter_\d+)+$/
 const COMPOSITE_ITER_SEP = '#iter-'
+
+type ApprovalNodeRef = {
+  approval_node_id: string
+  status?: string
+}
 
 /** Strip loop-iteration and composite-key suffixes to the canvas node ID. */
 export function canvasNodeIdFromApprovalNodeId(id: string): string {
-  const withoutLoopIter = id.replace(LOOP_ITER_SUFFIX, '')
+  const withoutLoopIter = id.replace(LOOP_ITER_CHAIN, '')
   const hashIdx = withoutLoopIter.indexOf(COMPOSITE_ITER_SEP)
   return hashIdx === -1 ? withoutLoopIter : withoutLoopIter.slice(0, hashIdx)
 }
@@ -22,18 +28,48 @@ export function matchesApprovalNodeId(approvalNodeId: string, canvasOrActivityId
   return canvasNodeIdFromApprovalNodeId(approvalNodeId) === canvasNodeIdFromApprovalNodeId(canvasOrActivityId)
 }
 
-export function findApprovalForCanvasNode<T extends { approval_node_id: string }>(
+function iterationSortKey(approvalNodeId: string): number[] {
+  const chain = approvalNodeId.match(LOOP_ITER_CHAIN)?.[0] ?? ''
+  return [...chain.matchAll(/_iter_(\d+)/g)].map((match) => Number(match[1]))
+}
+
+function compareIterationKeys(left: number[], right: number[]): number {
+  const len = Math.max(left.length, right.length)
+  for (let i = 0; i < len; i++) {
+    const diff = (left[i] ?? -1) - (right[i] ?? -1)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+function pickLatestLoopApproval<T extends ApprovalNodeRef>(matches: T[]): T | undefined {
+  if (matches.length === 0) return undefined
+  const pending = matches.filter((approval) => approval.status === 'pending')
+  const pool = pending.length > 0 ? pending : matches
+  return pool.reduce((best, current) =>
+    compareIterationKeys(iterationSortKey(current.approval_node_id), iterationSortKey(best.approval_node_id)) >= 0
+      ? current
+      : best
+  )
+}
+
+export function findApprovalForCanvasNode<T extends ApprovalNodeRef>(
   approvals: T[],
   canvasOrActivityId: string
 ): T | undefined {
-  return approvals.find((a) => matchesApprovalNodeId(a.approval_node_id, canvasOrActivityId))
+  const exact = approvals.find((approval) => approval.approval_node_id === canvasOrActivityId)
+  if (exact) return exact
+  return pickLatestLoopApproval(
+    approvals.filter((approval) => matchesApprovalNodeId(approval.approval_node_id, canvasOrActivityId))
+  )
 }
 
-export function findApprovalIndexForCanvasNode<T extends { approval_node_id: string }>(
+export function findApprovalIndexForCanvasNode<T extends ApprovalNodeRef>(
   approvals: T[],
   canvasOrActivityId: string
 ): number {
-  return approvals.findIndex((a) => matchesApprovalNodeId(a.approval_node_id, canvasOrActivityId))
+  const match = findApprovalForCanvasNode(approvals, canvasOrActivityId)
+  return match === undefined ? -1 : approvals.indexOf(match)
 }
 
 export function findNodeByApprovalNodeId<T extends { id?: unknown }>(

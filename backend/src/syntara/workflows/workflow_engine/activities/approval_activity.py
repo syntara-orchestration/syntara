@@ -22,6 +22,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine import constants
     from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import matches_loop_iteration_id
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
 
@@ -31,11 +32,11 @@ logger = structlog.stdlib.get_logger(__name__)
 def _is_approval_for_node(stored_node_id: str, node_id: str) -> bool:
     """Return True if ``stored_node_id`` is this canvas node, including loop iterations.
 
-    Loop-body approvals store ``{node_id}_iter_{n}`` as ``approval_node_id``.
-    Exact match covers a specific iteration; the ``_iter_`` prefix match covers
-    expire-by-canvas-id.
+    Loop-body approvals store ``{node_id}_iter_{outer}_iter_{inner}...``.
+    Exact match covers a specific iteration; any depth of numeric ``_iter_N``
+    suffixes covers expire-by-canvas-id.
     """
-    return stored_node_id == node_id or stored_node_id.startswith(f"{node_id}_iter_")
+    return matches_loop_iteration_id(stored_node_id, node_id)
 
 
 class ApprovalActivityError(ActivityExecutionError):
