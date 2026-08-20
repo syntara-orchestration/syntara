@@ -116,7 +116,7 @@ class BaseWebSocketStreamingHandler(ABC):
 
     # ============ Optional Hooks (Can Override) ============
 
-    def check_before_streaming(self, session_state: dict[str, Any]) -> None:  # noqa: B027
+    async def check_before_streaming(self, session_state: dict[str, Any]) -> None:  # noqa: B027
         """Run a pre-stream check after the stream exists but before reading.
 
         Override to raise when the resource is already in a terminal state
@@ -330,7 +330,7 @@ class BaseWebSocketStreamingHandler(ABC):
 
             # Step 4: Pre-stream status check (e.g. already-cancelled invocation
             # whose stream still exists but the cancel key has expired)
-            self.check_before_streaming(session_state)
+            await self.check_before_streaming(session_state)
 
             # Step 5: Stream events to client
             stop_condition = self.get_stop_condition(session_state)

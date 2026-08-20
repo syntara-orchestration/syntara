@@ -1132,6 +1132,72 @@ class TestOrchestrationServiceCancellation:
         mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_check_cancellation_signal_force_db_checks_even_when_redis_healthy(self) -> None:
+        """Test _check_cancellation_signal queries DB when force_db_check=True despite healthy Redis."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+
+        mock_invocation = MagicMock(spec=Invocation)
+        mock_invocation.status = InvocationStatus.CANCELLED
+
+        mock_session = AsyncMock()
+        mock_session.get.return_value = mock_invocation
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session
+
+        service = OrchestrationService(mock_llm, mock_context_manager, session_factory=mock_session_factory)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+        invocation_id = uuid4()
+
+        with pytest.raises(InvocationCancelledError):
+            await service._check_cancellation_signal(
+                mock_client,
+                f"invocation:{invocation_id}:cancelled",
+                invocation_id,
+                force_db_check=True,
+            )
+
+        mock_session.get.assert_called_once_with(Invocation, invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_signal_force_db_no_cancel_in_db(self) -> None:
+        """Test force_db_check does not raise when DB shows non-cancelled status."""
+        from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+
+        mock_invocation = MagicMock(spec=Invocation)
+        mock_invocation.status = InvocationStatus.RUNNING
+
+        mock_session = AsyncMock()
+        mock_session.get.return_value = mock_invocation
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session
+
+        service = OrchestrationService(mock_llm, mock_context_manager, session_factory=mock_session_factory)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+        invocation_id = uuid4()
+
+        await service._check_cancellation_signal(
+            mock_client,
+            f"invocation:{invocation_id}:cancelled",
+            invocation_id,
+            force_db_check=True,
+        )
+
+        mock_session.get.assert_called_once_with(Invocation, invocation_id)
+
+    @pytest.mark.asyncio
     async def test_cancellation_watcher_sets_event_on_cancel(self) -> None:
         """Test that _cancellation_watcher sets the event when cancellation is detected."""
         import asyncio

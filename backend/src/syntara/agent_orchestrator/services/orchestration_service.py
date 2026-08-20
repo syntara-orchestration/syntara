@@ -68,6 +68,7 @@ logger = structlog.stdlib.get_logger(__name__)
 _MAX_TOOL_OUTPUT_LENGTH = 10_000
 _MAX_TOOL_CONTENT_LENGTH = 200
 _CANCELLATION_POLL_INTERVAL = 2.0
+_DB_FALLBACK_EVERY_N_POLLS = 15
 
 
 class _TraceAccumulator:
@@ -644,10 +645,18 @@ class OrchestrationService:
         """
         if interval is None:
             interval = _CANCELLATION_POLL_INTERVAL
+        poll_count = 0
         async with StreamClient() as watcher_client:
             while not cancel_event.is_set():
+                poll_count += 1
+                force_db = poll_count % _DB_FALLBACK_EVERY_N_POLLS == 0
                 try:
-                    await self._check_cancellation_signal(watcher_client, cancel_key, invocation_id)
+                    await self._check_cancellation_signal(
+                        watcher_client,
+                        cancel_key,
+                        invocation_id,
+                        force_db_check=force_db,
+                    )
                 except InvocationCancelledError:
                     cancel_event.set()
                     return
@@ -747,8 +756,16 @@ class OrchestrationService:
         client: StreamClient,
         cancel_key: str,
         invocation_id: UUID,
+        *,
+        force_db_check: bool = False,
     ) -> None:
-        """Check Redis for a cancellation signal; fall back to DB if Redis is unavailable."""
+        """Check Redis for a cancellation signal; fall back to DB if Redis is unavailable.
+
+        When *force_db_check* is ``True`` the DB is queried even if Redis
+        is healthy and the key is absent.  The watcher uses this
+        periodically so that cancel-key expiry or Redis data-loss cannot
+        permanently disable cancel detection.
+        """
         cancelled = False
         redis_available = True
 
@@ -758,7 +775,7 @@ class OrchestrationService:
             redis_available = False
             logger.debug("Redis cancellation check failed, falling back to DB", invocation_id=invocation_id)
 
-        if not redis_available and not cancelled:
+        if not cancelled and (not redis_available or force_db_check):
             try:
                 async with self._get_async_session_context() as session:
                     invocation = await session.get(Invocation, invocation_id)
