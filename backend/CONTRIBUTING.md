@@ -177,12 +177,11 @@ CI posts an informational warning if the spec changed but contracts were not reg
 
 The pre-commit hook (enforced in CI) compares your spec against `devel` to detect breaking changes (removed fields, type changes, deleted endpoints).
 
-**If breaking changes are detected**, they are blocked on the current major API version. Two resolution paths exist:
+**Every OpenAPI spec change must bump `info.version`** (major/minor/patch). The bump is how you signal your interpretation of the change to reviewers and how API consumers become aware of spec updates. A spec change with no version bump is blocked.
 
-1. **Route to a new major version** — bump `info.version` to the next major (e.g., 1.0.0 → 2.0.0) and add `breaking-change-ack: <detailed justification>` (≥ 20 characters) to the PR description. The new version must be served from a separate URL path.
-2. **CVE escape hatch** — for CVE fixes that cannot avoid a breaking change, request the `cve-breaking-change-approved` label from engineering leadership (Senior Director or above). This label is restricted in GitHub; a PR-body annotation is not enough.
+**If breaking changes are detected**, they are blocked in place — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec. The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, restricted to engineering leadership. A PR-body annotation is not enough.
 
-A `breaking-change-ack` alone (without a major version bump) is **not sufficient**. Additive non-breaking changes that bump `info.version` must use a minor bump (not patch). See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for the full policy.
+See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for the full policy.
 
 ### Submitting a Pull Request
 
