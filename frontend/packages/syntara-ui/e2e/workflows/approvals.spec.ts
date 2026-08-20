@@ -441,8 +441,13 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(batchId)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Step 1: Click header row checkbox to select all
-      const selectAllCheckbox = table.locator('thead').getByRole('checkbox')
+      const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible()
+
+      // PatternFly `Th select` sets aria-label="Select all rows" on the header checkbox.
+      const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
+      await expect(selectAllCheckbox).toBeEnabled()
       await selectAllCheckbox.check()
 
       // Step 2: Verify all approvals are selected (2 in this case)
@@ -461,7 +466,6 @@ test.describe('Approval Workflow Operations', () => {
       await expect(batchToolbar).not.toBeVisible()
 
       // Step 6: Verify all checkboxes are unchecked
-      const rows = table.getByRole('row')
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
       await expect(rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox')).not.toBeChecked()
     } finally {

@@ -444,14 +444,14 @@ await panel.getByRole('button', { name: 'Action', exact: true }).click()
 
 // ✅ Scoped to a row
 const row = app.getByRole('row', { name: new RegExp(workflowName) })
-await row
-  .getByRole('button', { name: /Actions|Kebab toggle/i })
-  .first()
-  .click({ force: true })
+await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click()
 
-// ✅ Scoped to toolbar (PatternFly filter chips)
-const nameChipGroup = app.locator('#filter-toolbar').getByRole('list', { name: 'Name' })
+// ✅ Filter chips via FilterBar (`helpers/patternfly.ts`)
+const nameChipGroup = filterChipGroup(app, 'Name')
 await expect(nameChipGroup.getByText('workflow')).toBeVisible()
+
+// ✅ Table header "select all" — PatternFly `Th select` sets aria-label="Select all rows"
+await table.getByRole('checkbox', { name: /select all/i }).check()
 ```
 
 **Use heading level to avoid strict mode violations in empty states:**
