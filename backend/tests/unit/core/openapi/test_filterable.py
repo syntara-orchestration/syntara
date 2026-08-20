@@ -15,6 +15,7 @@ from uuid import UUID
 import pytest
 from sqlmodel import Field, SQLModel
 
+from syntara.core.openapi.filterable import _COMPARISON_OPS, _EQ_ONLY, _STRING_OPS
 from syntara.core.utils.filters import FilterOperator
 
 
@@ -43,11 +44,6 @@ class SampleModel(SQLModel, table=False):
         "enabled",
         "created_at",
     ]
-
-
-_STRING_OPS = set(FilterOperator) - {FilterOperator.ISNULL}
-_COMPARISON_OPS = _STRING_OPS - {FilterOperator.CONTAINS, FilterOperator.STARTS_WITH}
-_EQ_ONLY = {FilterOperator.EQ, FilterOperator.IN}
 
 
 @pytest.mark.unit
