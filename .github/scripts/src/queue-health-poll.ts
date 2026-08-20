@@ -28,7 +28,8 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
   }
 
   // Check for recent merges
-  const ninetyMinsAgo = new Date(Date.now() - MERGE_TIMEOUT_MINUTES * 60 * 1000);
+  const now = Date.now();
+  const ninetyMinsAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000);
   const recentMerges = await github.getRecentMerges(branch, ninetyMinsAgo);
 
   console.log(`Recent merges to ${branch}: ${recentMerges.length}`);
@@ -38,14 +39,14 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
     // Calculate time since last merge
     const allMerges = await github.getRecentMerges(
       branch,
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last week
+      new Date(now - 7 * 24 * 60 * 60 * 1000) // Last week
     );
 
     const lastMergeDate = allMerges[0]
       ? new Date(allMerges[0].mergedAt)
       : new Date();
     const minutesSinceMerge = Math.floor(
-      (Date.now() - lastMergeDate.getTime()) / (60 * 1000)
+      (now - lastMergeDate.getTime()) / (60 * 1000)
     );
 
     return {
@@ -147,6 +148,7 @@ async function main() {
   // Detect transitions and alert
   const queueUrl = github.getQueueUrl(defaultBranch);
 
+  // Transition to unhealthy
   if (
     currentState.health === 'unhealthy' &&
     (previousHealth === 'healthy' || previousHealth === 'unknown')
@@ -158,25 +160,25 @@ async function main() {
       queueUrl
     );
     console.log('✅ Unhealthy alert sent to Slack');
-
-    // Set output for next run to read
     console.log('::set-output name=health::unhealthy');
-  } else if (
+    return;
+  }
+
+  // Transition to healthy
+  if (
     currentState.health === 'healthy' &&
     previousHealth === 'unhealthy'
   ) {
     console.log('✅ Transition to healthy detected - sending recovery notification');
     await slack.sendQueueRecoveryAlert(queueUrl);
     console.log('✅ Recovery alert sent to Slack');
-
-    // Set output for next run to read
     console.log('::set-output name=health::healthy');
-  } else {
-    console.log('No state transition - no alert needed');
-
-    // Still set output for next run
-    console.log(`::set-output name=health::${currentState.health}`);
+    return;
   }
+
+  // No transition
+  console.log('No state transition - no alert needed');
+  console.log(`::set-output name=health::${currentState.health}`);
 }
 
 main().catch((error) => {

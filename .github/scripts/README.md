@@ -35,30 +35,23 @@ npm run check-queue-health
 
 **Dequeue burst alert:**
 - Runs when PRs are dequeued from the merge queue
-- To test: lower the threshold to 1 in `dequeue-burst-alert.ts:6`, then wait for a dequeue event
+- To test: lower the threshold to 1 in `dequeue-burst-alert.ts`, then wait for a dequeue event
 
 **Queue health poll:**
-- Runs every 5 minutes
+- Runs on a scheduled interval
 - To test manually: Go to Actions → "Merge Queue Health Poll" → Run workflow
 
 ## How It Works
 
 **Dequeue Burst Alert:**
-1. Counts how many PRs were dequeued in the last 30 minutes
-2. Sends Slack alert on the 3rd dequeue within that window
-3. Stops alerting after 30 minutes
+1. Counts how many PRs were dequeued within a recent time window
+2. Sends Slack alert when the threshold is exceeded
+3. Stops alerting after the window expires
 
 **Queue Health Poll:**
 1. Fetches the repository's default branch
 2. Checks the merge queue for waiting PRs
 3. If empty, the queue is healthy
-4. If PRs are waiting, checks if anything merged to the default branch in the last 60 minutes
-5. Sends alert when the queue becomes unhealthy (PRs waiting + no merges)
+4. If PRs are waiting, checks for recent merge activity to the default branch
+5. Sends alert when the queue becomes unhealthy (PRs waiting + no recent merges)
 6. Sends recovery notification when the queue becomes healthy again
-
-## Dependencies
-
-- `@octokit/rest` — GitHub REST API client
-- `@octokit/graphql` — GitHub GraphQL API client
-- `zod` — Runtime type validation
-- `tsx` — TypeScript execution (dev only)

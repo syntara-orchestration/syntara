@@ -42,14 +42,15 @@ export const handlers = [
   }),
 
   // GitHub GraphQL API - merge queue (use operation() for anonymous queries)
-  graphql.operation(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  graphql.operation((): any => {
     return HttpResponse.json({
       data: {
         repository: {
           mergeQueue: null,
         },
       },
-    } as any);
+    });
   }),
 
   // Slack webhook (using example.com to avoid triggering security scanners)

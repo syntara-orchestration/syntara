@@ -3,13 +3,16 @@ import { GitHubClient } from './lib/github.js';
 import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
 
+/** Number of merges within the time window that triggers an alert */
 const DEQUEUE_THRESHOLD = 3;
+
+/** Time window in minutes for detecting merge bursts */
 const TIME_WINDOW_MINUTES = 45;
 
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
  * Runs on a schedule. Uses recently merged PRs as a proxy for queue activity.
- * Alerts when 3+ PRs were merged within a 45-minute window (indicating
+ * Alerts when multiple PRs are merged within a time window (indicating
  * successful dequeues), but only if current queue is non-empty (suggesting
  * more PRs are waiting that might also fail).
  */
@@ -45,24 +48,25 @@ async function main() {
   // This is a simplified heuristic: rapid merges + non-empty queue might indicate
   // that multiple PRs are being processed quickly, which could mean CI instability
   // or other issues affecting the queue.
-  if (recentMerges.length >= DEQUEUE_THRESHOLD && currentEntries.length > 0) {
-    console.log(`⚠️  ${recentMerges.length} merges detected with ${currentEntries.length} PRs still queued - potential dequeue burst`);
-
-    const prNumbers = recentMerges.map(m => `#${m.number}`).join(', ');
-    const prUrls = recentMerges.map(m => github.getPrUrl(m.number)).join('\n');
-    const queueUrl = github.getQueueUrl(defaultBranch);
-
-    await slack.sendDequeueBurstAlert(
-      recentMerges.length,
-      prNumbers,
-      prUrls,
-      queueUrl
-    );
-
-    console.log('✅ Alert sent to Slack');
-  } else {
+  if (recentMerges.length < DEQUEUE_THRESHOLD || currentEntries.length === 0) {
     console.log(`No alert needed (${recentMerges.length} merges, ${currentEntries.length} queued, threshold is ${DEQUEUE_THRESHOLD})`);
+    return;
   }
+
+  console.log(`⚠️  ${recentMerges.length} merges detected with ${currentEntries.length} PRs still queued - potential dequeue burst`);
+
+  const prNumbers = recentMerges.map(m => `#${m.number}`).join(', ');
+  const prUrls = recentMerges.map(m => github.getPrUrl(m.number)).join('\n');
+  const queueUrl = github.getQueueUrl(defaultBranch);
+
+  await slack.sendDequeueBurstAlert(
+    recentMerges.length,
+    prNumbers,
+    prUrls,
+    queueUrl
+  );
+
+  console.log('✅ Alert sent to Slack');
 }
 
 main().catch((error) => {
