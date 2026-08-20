@@ -1023,6 +1023,51 @@ class TestGetSharedClient:
             waiter.cancel()
             await asyncio.gather(waiter, return_exceptions=True)
 
+    async def test_invalidate_does_not_drop_in_flight_connect_task(self) -> None:
+        """Clearing the cache must not drop the strong ref to an in-flight connect."""
+        connect_started = asyncio.Event()
+        connect_calls = 0
+
+        async def _hang(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            connect_started.set()
+            await asyncio.Event().wait()
+            return MagicMock()
+
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new=_hang,
+        ):
+            waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+            in_flight = _mod._connect_task
+            assert in_flight is not None
+            _mod._invalidate_client_cache()
+            later_waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.sleep(0.05)
+            assert _mod._connect_task is in_flight
+            assert not in_flight.done()
+            assert connect_calls == 1
+            waiter.cancel()
+            later_waiter.cancel()
+            await asyncio.gather(waiter, later_waiter, return_exceptions=True)
+
+    async def test_invalidate_after_successful_connect_reconnects(self) -> None:
+        """A finished connect task must not block reconnect after cache invalidation."""
+        first_client = MagicMock()
+        second_client = MagicMock()
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new_callable=AsyncMock,
+            side_effect=[first_client, second_client],
+        ) as mock_connect:
+            assert await _mod._get_shared_client() is first_client
+            _mod._invalidate_client_cache()
+            assert _mod._cached_client is None
+            assert await _mod._get_shared_client() is second_client
+            assert mock_connect.await_count == 2
+
 
 class TestCreateSchedule:
     """Tests for the create_schedule reconciliation helper."""

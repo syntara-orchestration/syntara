@@ -80,11 +80,15 @@ async def _update_schedule_with_retry(
 
 
 def _invalidate_client_cache() -> None:
-    """Clear the cached Temporal client so the next call reconnects."""
-    global _cached_client, _search_attr_available, _connect_task  # noqa: PLW0603
+    """Clear the cached Temporal client so the next call reconnects.
+
+    Leaves ``_connect_task`` in place. An in-flight connect must keep a
+    strong reference; ``_get_shared_client`` starts a new task only after
+    the current one is done.
+    """
+    global _cached_client, _search_attr_available  # noqa: PLW0603
     _cached_client = None
     _search_attr_available = None
-    _connect_task = None
 
 
 async def _ensure_search_attribute(client: Client) -> bool:

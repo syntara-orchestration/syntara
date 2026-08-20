@@ -248,7 +248,10 @@ class TestUnpublishWorkflow:
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
             patch(
                 "syntara.workflows.services.workflow_service.ScheduledTriggerService",
-                return_value=MagicMock(delete_triggers_for_workflow=AsyncMock()),
+                return_value=MagicMock(
+                    get_client=AsyncMock(),
+                    delete_triggers_for_workflow=AsyncMock(),
+                ),
             ),
             patch("syntara.workflows.services.workflow_service.logger") as mock_logger,
         ):
@@ -283,7 +286,10 @@ class TestUnpublishWorkflow:
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
             patch(
                 "syntara.workflows.services.workflow_service.ScheduledTriggerService",
-                return_value=MagicMock(delete_triggers_for_workflow=AsyncMock()),
+                return_value=MagicMock(
+                    get_client=AsyncMock(),
+                    delete_triggers_for_workflow=AsyncMock(),
+                ),
             ),
         ):
             result = await mock_service.unpublish_workflow(workflow_id)
@@ -667,13 +673,17 @@ def _deleted_workflow_mock() -> tuple[UUID, MagicMock]:
     return workflow_id, mock_workflow
 
 
+def _configure_scheduled_service(mock_sched_cls: MagicMock, *, delete: object) -> None:
+    mock_sched_cls.return_value.get_client = AsyncMock(return_value=MagicMock())
+    mock_sched_cls.return_value.delete_triggers_for_workflow = delete
+
+
 class TestScheduledTriggerSyncGracefulDegradation:
     """Unpublish and delete succeed even when scheduled trigger cleanup fails.
 
     Temporal cleanup is detached after the DB commit so a hung or failing
     delete cannot 504 the HTTP request (AAP-87692). The work must not be
-    cancelled — that would interrupt ``Client.connect`` under the shared
-    client lock.
+    cancelled, and connect must not hold ``_client_lock``.
     """
 
     @pytest.fixture(autouse=True)
@@ -696,8 +706,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.logger") as mock_logger,
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = AsyncMock(
-                side_effect=ScheduledTriggerSyncError(str(workflow_id), 0)
+            _configure_scheduled_service(
+                mock_sched_cls,
+                delete=AsyncMock(side_effect=ScheduledTriggerSyncError(str(workflow_id), 0)),
             )
             result = await mock_service.unpublish_workflow(workflow_id)
             await _finish_background_deletes()
@@ -718,8 +729,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.delete_triggers_for_workflow = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = AsyncMock(
-                side_effect=ScheduledTriggerSyncError(str(workflow_id), 0)
+            _configure_scheduled_service(
+                mock_sched_cls,
+                delete=AsyncMock(side_effect=ScheduledTriggerSyncError(str(workflow_id), 0)),
             )
             await mock_service.delete_workflow(workflow_id)
             await _finish_background_deletes()
@@ -738,8 +750,9 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.logger") as mock_logger,
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = AsyncMock(
-                side_effect=RuntimeError("temporal exploded")
+            _configure_scheduled_service(
+                mock_sched_cls,
+                delete=AsyncMock(side_effect=RuntimeError("temporal exploded")),
             )
             result = await mock_service.unpublish_workflow(workflow_id)
             await _finish_background_deletes()
@@ -753,7 +766,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
         """HTTP unpublish must return after commit even if Temporal never answers.
 
         The delete task must keep running: cancelling it would interrupt
-        ``Client.connect`` under the process-wide client lock (AAP-87692).
+        in-flight Temporal cleanup.
         """
         workflow_id, mock_workflow = _published_workflow_mock()
         delete_started = asyncio.Event()
@@ -772,7 +785,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = _hang
+            _configure_scheduled_service(mock_sched_cls, delete=_hang)
             started = time.monotonic()
             try:
                 result = await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=1.0)
@@ -812,7 +825,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.delete_triggers_for_workflow = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = _hang
+            _configure_scheduled_service(mock_sched_cls, delete=_hang)
             started = time.monotonic()
             try:
                 await asyncio.wait_for(mock_service.delete_workflow(workflow_id), timeout=1.0)
@@ -847,6 +860,33 @@ class TestScheduledTriggerSyncGracefulDegradation:
             result = await mock_service.unpublish_workflow(workflow_id)
             await _finish_background_deletes()
             mock_sched_cls.assert_not_called()
+
+        assert result == mock_workflow
+
+    @pytest.mark.asyncio
+    async def test_unpublish_skips_delete_if_republished_after_connect(self, mock_service: WorkflowService) -> None:
+        """A publish that lands while Temporal is connecting must keep new schedules."""
+        workflow_id, mock_workflow = _published_workflow_mock()
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service.session, "get", new_callable=AsyncMock, return_value=MagicMock()),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
+            patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
+            patch.object(
+                WorkflowService,
+                "_workflow_is_published",
+                new=AsyncMock(side_effect=[False, True]),
+            ),
+        ):
+            mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
+            _configure_scheduled_service(mock_sched_cls, delete=AsyncMock())
+            result = await mock_service.unpublish_workflow(workflow_id)
+            await _finish_background_deletes()
+            mock_sched_cls.return_value.get_client.assert_awaited()
+            mock_sched_cls.return_value.delete_triggers_for_workflow.assert_not_called()
 
         assert result == mock_workflow
 
@@ -916,7 +956,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.ScheduledTriggerService") as mock_sched_cls,
         ):
             mock_wh_cls.return_value.sync_webhook_triggers = AsyncMock()
-            mock_sched_cls.return_value.delete_triggers_for_workflow = _gated
+            _configure_scheduled_service(mock_sched_cls, delete=_gated)
             result = await mock_service.unpublish_workflow(workflow_id)
             await asyncio.wait_for(delete_started.wait(), timeout=1.0)
             mock_commit.assert_awaited()

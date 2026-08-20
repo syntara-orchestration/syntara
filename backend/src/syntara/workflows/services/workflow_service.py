@@ -338,6 +338,15 @@ class WorkflowService(BaseService):
                 )
                 return
             scheduled_service = ScheduledTriggerService()
+            # Wait for connect first. A slow Temporal handshake is the
+            # republish window; re-check before listing/deleting schedules.
+            await scheduled_service.get_client()
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
             await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
             )
