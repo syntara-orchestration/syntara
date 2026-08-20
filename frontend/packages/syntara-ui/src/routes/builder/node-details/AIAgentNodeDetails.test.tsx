@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import type { CreateAgenticActivityOptions } from '../../../stores/workflowFactories'
 import { createAgenticActivity } from '../../../stores/useWorkflowStore'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
@@ -20,16 +21,7 @@ vi.mock('../../../stores/useWorkflowStore', async (importOriginal) => ({
     updateActivity: mockUpdateActivity,
   })),
   createAgenticActivity: vi.fn(
-    (options: {
-      id: string
-      name: string
-      toolSelections?: string[]
-      integrationConnections?: { integration_id: string; credential_id: string }[]
-      prompt?: string
-      llmModelId?: string
-      inputs?: string
-      fileIds?: string[]
-    }) => ({
+    (options: CreateAgenticActivityOptions) => ({
       type: 'agentic',
       id: options.id,
       name: options.name,
@@ -95,6 +87,7 @@ vi.mock('../node-forms/AIAgentNodeForm', () => ({
             tool_selections: ['calculator', 'web_search'],
             integration_connections: [],
             fileIds: existingFileIds ?? [],
+            settings: { timeout: 30 },
           })
         }
         data-testid="submit-button"
@@ -217,6 +210,26 @@ describe('AIAgentNodeDetails Component', () => {
       })
     )
     expect(mockUpdateActivity).toHaveBeenCalled()
+  })
+
+  it('passes settings to createAgenticActivity on submit', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'agentic' as const,
+      id: 'agent-1',
+      name: 'Test Agent',
+      parameters: {},
+    }
+
+    render(<AIAgentNodeDetails taskData={taskData} nodeId="agent-1" onClose={mockOnClose} />)
+
+    await user.click(screen.getByTestId('submit-button'))
+
+    expect(createAgenticActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: { timeout: 30 },
+      })
+    )
   })
 
   it('reads tool_selections from config', () => {
