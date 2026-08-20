@@ -501,9 +501,8 @@ export function BuilderContent(props: BuilderContentProps) {
         <VersionViewProvider value={versionPanel.isViewingVersion}>
           <SynPage>
             <SynReactFlowViewportGuard>
-              <Stack hasGutter>
-                <StackItem>
-                  <BuilderWorkflowPageHeader
+              <StackItem>
+                <BuilderWorkflowPageHeader
                     workflowName={workflowName}
                     workflowDescription={workflowDescription}
                     isNew={isNew}
@@ -686,7 +685,6 @@ export function BuilderContent(props: BuilderContentProps) {
                     </NodeEditorAutoSubmitContext.Provider>
                   </Flex>
                 </StackItem>
-              </Stack>
             </SynReactFlowViewportGuard>
 
             <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
