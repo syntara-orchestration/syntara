@@ -30,6 +30,7 @@ jobs:
       code: ${{ steps.check.outputs.code }}
       backend: ${{ steps.check.outputs.backend }}
       contracts: ${{ steps.check.outputs.contracts }}
+      scripts: ${{ steps.check.outputs.scripts }}
     steps:
       - id: check
         env:
@@ -39,13 +40,13 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           if [ -z "$PR_NUMBER" ]; then
             echo "::warning::No PR number (merge_group context), running all CI as fallback"
-            { echo "code=true"; echo "backend=true"; echo "contracts=true"; } >> "$GITHUB_OUTPUT"
+            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           FILES=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/files --paginate --jq '.[].filename')
           if [ -z "$FILES" ]; then
             echo "::warning::No files from API, running all CI as fallback"
-            { echo "code=true"; echo "backend=true"; echo "contracts=true"; } >> "$GITHUB_OUTPUT"
+            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if grep -qE '^(frontend/|backend/|\.github/)' <<< "$FILES"; then
@@ -62,6 +63,11 @@ jobs:
             echo "contracts=true" >> "$GITHUB_OUTPUT"
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE '^\\.github/scripts/' <<< "$FILES"; then
+            echo "scripts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "scripts=false" >> "$GITHUB_OUTPUT"
           fi
 
   gen-contracts:
@@ -199,6 +205,34 @@ jobs:
           name: frontend-pr_number
           path: pr_number.txt
           retention-days: 7
+
+  scripts-tests:
+    name: (Scripts) Tests
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: .github/scripts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .github/scripts
+
+      - name: Type check
+        run: npm run tsc
+        working-directory: .github/scripts
+
+      - name: Run tests
+        run: npm test
+        working-directory: .github/scripts
 
   sonarcloud:
     name: (Frontend) SonarCloud Analysis
