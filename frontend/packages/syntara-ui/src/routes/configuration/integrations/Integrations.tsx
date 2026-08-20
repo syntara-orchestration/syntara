@@ -14,13 +14,13 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { SynPageTitle } from '../../../components/SynPageTitle'
 import {
   NxListPanel,
   NxListPanelTable,
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'

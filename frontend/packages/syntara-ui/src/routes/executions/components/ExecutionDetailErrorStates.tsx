@@ -1,9 +1,9 @@
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { detachPromise } from '../../../utils/detachPromise'
 
 type ExecutionDetailErrorStatesProps = Readonly<{

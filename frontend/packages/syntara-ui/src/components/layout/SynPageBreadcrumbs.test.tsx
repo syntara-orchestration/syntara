@@ -52,7 +52,9 @@ describe('SynPageBreadcrumbs', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <SynPageBreadcrumbs items={[{ label: 'One', href: '/one' }, { label: 'Two', href: '/two' }, { label: 'Three' }]} />
+      <SynPageBreadcrumbs
+        items={[{ label: 'One', href: '/one' }, { label: 'Two', href: '/two' }, { label: 'Three' }]}
+      />
     )
 
     expect(await axe(container)).toHaveNoViolations()

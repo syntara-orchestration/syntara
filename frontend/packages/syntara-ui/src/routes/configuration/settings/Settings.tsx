@@ -10,8 +10,8 @@ import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDeni
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import {

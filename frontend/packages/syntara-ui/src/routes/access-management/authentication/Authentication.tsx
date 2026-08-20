@@ -5,8 +5,8 @@ import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDeni
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxListPanel } from '../../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
