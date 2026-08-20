@@ -33,7 +33,7 @@ test.describe('Approval Side Panel', () => {
   let sharedApprovalId: string | undefined
   let sharedApprovalName = ''
   let sharedWorkflowName = ''
-  let sharedSetupSucceeded = false
+  let sharedSetupSkipReason: string | undefined
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
@@ -74,6 +74,14 @@ test.describe('Approval Side Panel', () => {
 
       await pollExecutionStatus(page, sharedExecutionId, ['paused'], { token, timeout: 60_000 })
 
+      const probeResp = await apiRequest(page, 'get', `/approvals?execution_id=${sharedExecutionId}&status=pending`, {
+        token,
+      })
+      if (!probeResp.ok()) {
+        sharedSetupSkipReason = `Approvals API returned ${probeResp.status()} — service may be unavailable`
+        return
+      }
+
       await expect(async () => {
         const r = await apiRequest(page, 'get', `/approvals?execution_id=${sharedExecutionId}&status=pending`, {
           token,
@@ -83,10 +91,6 @@ test.describe('Approval Side Panel', () => {
         expect(id).toBeTruthy()
         sharedApprovalId = id!
       }).toPass({ timeout: 60_000, intervals: [2_000] })
-
-      sharedSetupSucceeded = true
-    } catch {
-      // Shared setup failed (Temporal/approvals unavailable) — deep-link tests will skip individually
     } finally {
       await page.close()
     }
@@ -107,7 +111,7 @@ test.describe('Approval Side Panel', () => {
   // ---------------------------------------------------------------------------
 
   test('side panel displays approval details and action buttons', async ({ app }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
@@ -125,7 +129,7 @@ test.describe('Approval Side Panel', () => {
   })
 
   test('clicking approve shows notes input and submit button', async ({ app }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
@@ -145,7 +149,7 @@ test.describe('Approval Side Panel', () => {
   })
 
   test('clicking reject shows notes input and submit button', async ({ app }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
@@ -164,7 +168,7 @@ test.describe('Approval Side Panel', () => {
   })
 
   test('run history and approval panel are mutually exclusive', async ({ app }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
@@ -189,7 +193,7 @@ test.describe('Approval Side Panel', () => {
   // ---------------------------------------------------------------------------
 
   test('clicking approval name navigates to execution detail with side panel', async ({ app }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl('/approvals'))
     await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
@@ -216,7 +220,7 @@ test.describe('Approval Side Panel', () => {
   // ---------------------------------------------------------------------------
 
   test('viewer: approve and reject buttons are disabled', async ({ viewerApp }) => {
-    test.skip(!sharedSetupSucceeded, 'Shared approval setup failed — services may be unavailable')
+    test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await viewerApp.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))
     await expect(viewerApp.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
@@ -268,10 +272,7 @@ test.describe('Approval Side Panel', () => {
       if (!resp.ok()) throw new Error(`POST /executions returned ${resp.status()}`)
       const { id: executionId } = (await resp.json()) as { id: string }
 
-      const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+      await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
 
       await app.goto(toAppUrl(`/executions/${executionId}`))
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
@@ -313,22 +314,15 @@ test.describe('Approval Side Panel', () => {
       if (!resp.ok()) throw new Error(`POST /executions returned ${resp.status()}`)
       const { id: executionId } = (await resp.json()) as { id: string }
 
-      const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+      await pollExecutionStatus(app, executionId, ['paused'], { token, timeout: 60_000 })
 
       let approvalId: string | undefined
-      const foundApproval = await expect(async () => {
+      await expect(async () => {
         const r = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
         const body = (await r.json()) as { resources?: Array<{ id: string }> }
         approvalId = body.resources?.[0]?.id
         expect(approvalId).toBeTruthy()
-      })
-        .toPass({ timeout: 30_000, intervals: [2_000] })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!foundApproval, 'Approvals service did not index the approval')
+      }).toPass({ timeout: 30_000, intervals: [2_000] })
 
       await app.goto(toAppUrl(`/executions/${executionId}?approval=${approvalId}&history=closed`))
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
@@ -341,7 +335,10 @@ test.describe('Approval Side Panel', () => {
 
       await expect(app.getByText('Rejection submitted')).toBeVisible({ timeout: 15_000 })
 
-      await pollExecutionStatus(app, executionId, ['completed', 'failed', 'error'], { token, timeout: 30_000 })
+      await pollExecutionStatus(app, executionId, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+        token,
+        timeout: 60_000,
+      })
       await app.reload()
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
       await expect(app.getByTestId('execution-status-badge').getByText(/Completed|Failed|Rejected/i)).toBeVisible({
