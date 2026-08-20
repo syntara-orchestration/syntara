@@ -23,6 +23,7 @@ theme:
     - navigation.indexes
     - navigation.tracking
     - navigation.top
+    - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
