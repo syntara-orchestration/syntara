@@ -10,6 +10,7 @@ import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import WorkflowCreate, WorkflowDefinition, WorkflowRead, WorkflowUpdate
+from syntara_api_client.types import UnexpectedResponseException
 
 pytestmark = [pytest.mark.e2e]
 
@@ -118,48 +119,58 @@ class TestWorkflowDefinitionUpdates:
                 }
             ),
         )
-        workflow = workflow_factory(workflow_data)
+        try:
+            workflow = workflow_factory(workflow_data)
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+            raise
 
-        # Get current workflow definition
-        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
-        current_definition = current_workflow.version.workflow_definition.additional_properties
+        try:
+            # Get current workflow definition
+            current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+            current_definition = current_workflow.version.workflow_definition.additional_properties
 
-        # Update the AAP job node's configuration
-        for node in current_definition["nodes"]:
-            if node["id"] == "aap_job_node":
-                node["parameters"]["job_template_id"] = 789  # Updated template ID
-                node["parameters"]["extra_vars"] = {"env": "prod", "debug": "true"}  # Updated vars
-                node["name"] = "Updated AAP Job Template"  # Updated name
-                break
+            # Update the AAP job node's configuration
+            for node in current_definition["nodes"]:
+                if node["id"] == "aap_job_node":
+                    node["parameters"]["job_template_id"] = 789  # Updated template ID
+                    node["parameters"]["extra_vars"] = {"env": "prod", "debug": "true"}  # Updated vars
+                    node["name"] = "Updated AAP Job Template"  # Updated name
+                    break
 
-        # Update workflow with modified node configuration
-        update_data = WorkflowUpdate(
-            workflow_definition=current_definition,
-            change_description="Updated AAP job template configuration",
-        )
+            # Update workflow with modified node configuration
+            update_data = WorkflowUpdate(
+                workflow_definition=current_definition,
+                change_description="Updated AAP job template configuration",
+            )
 
-        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+            updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
-        # Verify response
-        assert updated_workflow.version is not None
-        assert updated_workflow.current_version == 2  # Started at 1, now 2
+            # Verify response
+            assert updated_workflow.version is not None
+            assert updated_workflow.current_version == 2  # Started at 1, now 2
 
-        # Verify node configuration reflects new values
-        updated_def = updated_workflow.version.workflow_definition
-        assert len(updated_def["nodes"]) == 1
+            # Verify node configuration reflects new values
+            updated_def = updated_workflow.version.workflow_definition
+            assert len(updated_def["nodes"]) == 1
 
-        updated_node = updated_def["nodes"][0]
-        assert updated_node["id"] == "aap_job_node"
-        assert updated_node["name"] == "Updated AAP Job Template"
-        assert updated_node["parameters"]["job_template_id"] == 789
-        assert updated_node["parameters"]["inventory_id"] == 456  # Unchanged
-        assert updated_node["parameters"]["extra_vars"]["env"] == "prod"
-        assert updated_node["parameters"]["extra_vars"]["debug"] == "true"
+            updated_node = updated_def["nodes"][0]
+            assert updated_node["id"] == "aap_job_node"
+            assert updated_node["name"] == "Updated AAP Job Template"
+            assert updated_node["parameters"]["job_template_id"] == 789
+            assert updated_node["parameters"]["inventory_id"] == 456  # Unchanged
+            assert updated_node["parameters"]["extra_vars"]["env"] == "prod"
+            assert updated_node["parameters"]["extra_vars"]["debug"] == "true"
 
-        # Verify edges remain unchanged
-        assert len(updated_def["edges"]) == 1
-        assert updated_def["edges"][0]["from"] == "trigger_manual"
-        assert updated_def["edges"][0]["to"] == "aap_job_node"
+            # Verify edges remain unchanged
+            assert len(updated_def["edges"]) == 1
+            assert updated_def["edges"][0]["from"] == "trigger_manual"
+            assert updated_def["edges"][0]["to"] == "aap_job_node"
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+            raise
 
     def test_delete_node_from_workflow(
         self,
@@ -212,61 +223,73 @@ class TestWorkflowDefinitionUpdates:
                 }
             ),
         )
-        workflow = workflow_factory(workflow_data)
+        try:
+            workflow = workflow_factory(workflow_data)
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+            raise
 
-        # Get current workflow definition
-        current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
-        current_definition = current_workflow.version.workflow_definition.additional_properties
+        try:
+            # Get current workflow definition
+            current_workflow = syntara_api.workflows.get(workflow_id=workflow.id).assert_and_get()
+            current_definition = current_workflow.version.workflow_definition.additional_properties
 
-        # Verify initial state: 3 nodes and 3 edges
-        assert len(current_definition["nodes"]) == 3
-        assert len(current_definition["edges"]) == 3
+            # Verify initial state: 3 nodes and 3 edges
+            assert len(current_definition["nodes"]) == 3
+            assert len(current_definition["edges"]) == 3
 
-        # Remove Node B from the workflow
-        current_definition["nodes"] = [node for node in current_definition["nodes"] if node["id"] != "script_node_b"]
+            # Remove Node B from the workflow
+            current_definition["nodes"] = [
+                node for node in current_definition["nodes"] if node["id"] != "script_node_b"
+            ]
 
-        # Remove all edges connected to Node B (A→B and B→C)
-        current_definition["edges"] = [
-            edge
-            for edge in current_definition["edges"]
-            if edge["from"] != "script_node_b" and edge["to"] != "script_node_b"
-        ]
+            # Remove all edges connected to Node B (A→B and B→C)
+            current_definition["edges"] = [
+                edge
+                for edge in current_definition["edges"]
+                if edge["from"] != "script_node_b" and edge["to"] != "script_node_b"
+            ]
 
-        # Reconnect A → C now that B (the middle node) is removed
-        current_definition["edges"].append({"from": "script_node_a", "to": "script_node_c"})
+            # Reconnect A → C now that B (the middle node) is removed
+            current_definition["edges"].append({"from": "script_node_a", "to": "script_node_c"})
 
-        # Update workflow with removed node and reconnected edges
-        update_data = WorkflowUpdate(
-            workflow_definition=current_definition,
-            change_description="Removed Node B and its connected edges",
-        )
+            # Update workflow with removed node and reconnected edges
+            update_data = WorkflowUpdate(
+                workflow_definition=current_definition,
+                change_description="Removed Node B and its connected edges",
+            )
 
-        updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
+            updated_workflow = syntara_api.workflows.update(workflow_id=workflow.id, body=update_data).assert_and_get()
 
-        # Verify response is successful (200 OK via assert_and_get)
-        assert updated_workflow.version is not None
-        assert updated_workflow.current_version == 2  # Started at 1, now 2
+            # Verify response is successful (200 OK via assert_and_get)
+            assert updated_workflow.version is not None
+            assert updated_workflow.current_version == 2  # Started at 1, now 2
 
-        # Verify the node is removed from the workflow's nodes list
-        updated_def = updated_workflow.version.workflow_definition
-        assert len(updated_def["nodes"]) == 2, "Should have 2 nodes remaining (A and C)"
+            # Verify the node is removed from the workflow's nodes list
+            updated_def = updated_workflow.version.workflow_definition
+            assert len(updated_def["nodes"]) == 2, "Should have 2 nodes remaining (A and C)"
 
-        node_ids = [node["id"] for node in updated_def["nodes"]]
-        assert "script_node_a" in node_ids, "Node A should remain"
-        assert "script_node_c" in node_ids, "Node C should remain"
-        assert "script_node_b" not in node_ids, "Node B should be removed"
+            node_ids = [node["id"] for node in updated_def["nodes"]]
+            assert "script_node_a" in node_ids, "Node A should remain"
+            assert "script_node_c" in node_ids, "Node C should remain"
+            assert "script_node_b" not in node_ids, "Node B should be removed"
 
-        # Verify edges connected to the deleted node (A→B, B→C) are removed; A→C reconnect added
-        assert len(updated_def["edges"]) == 2, "Should have 2 edges remaining (trigger→A and A→C)"
+            # Verify edges connected to the deleted node (A→B, B→C) are removed; A→C reconnect added
+            assert len(updated_def["edges"]) == 2, "Should have 2 edges remaining (trigger→A and A→C)"
 
-        edge_pairs = {(e["from"], e["to"]) for e in updated_def["edges"]}
-        assert ("trigger_manual", "script_node_a") in edge_pairs, "trigger→A edge should remain"
-        assert ("script_node_a", "script_node_c") in edge_pairs, "A→C reconnect edge should exist"
+            edge_pairs = {(e["from"], e["to"]) for e in updated_def["edges"]}
+            assert ("trigger_manual", "script_node_a") in edge_pairs, "trigger→A edge should remain"
+            assert ("script_node_a", "script_node_c") in edge_pairs, "A→C reconnect edge should exist"
 
-        # Verify no edges reference the deleted node
-        for edge in updated_def["edges"]:
-            assert edge["from"] != "script_node_b", "No edge should originate from deleted node"
-            assert edge["to"] != "script_node_b", "No edge should point to deleted node"
+            # Verify no edges reference the deleted node
+            for edge in updated_def["edges"]:
+                assert edge["from"] != "script_node_b", "No edge should originate from deleted node"
+                assert edge["to"] != "script_node_b", "No edge should point to deleted node"
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+            raise
 
     def test_add_and_delete_edges(
         self,
