@@ -1,85 +1,47 @@
----
-name: Check Contract Drift
+# Collapse older Konflux Test Results PR comments, keeping the latest API
+# result and the latest UI result visible.
+#
+# orchestrator-konflux-ci[bot] posts a new comment on every Konflux test run
+# (from report-trusted-artifact-tests-as-comment-in-pr). This workflow does
+# not check out PR code; it only calls the GraphQL minimizeComment mutation.
+#
+# issue_comment workflows always run from the default branch. Use
+# workflow_dispatch to backfill a PR after this lands on devel.
+name: Hide Outdated Konflux Comments
 
 on:
-  pull_request:
-  push:
-    branches: [devel, early-access]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
-      # TEMPORARY validation input — remove before merging
-      # chore/hide-outdated-konflux-comments. Leave empty for a normal drift check.
       pr_number:
-        description: >-
-          DO NOT MERGE scaffold. PR number whose outdated Konflux Test Results
-          comments should be hidden. Empty = normal contract-drift check.
-        required: false
+        description: Pull request number to backfill
+        required: true
         type: string
 
 permissions:
-  contents: read
+  pull-requests: write
 
-env:
-  NODE_VERSION: '22.13.0'
+concurrency:
+  group: hide-konflux-comments-${{ github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: false
 
 jobs:
-  check-drift:
-    name: Check Contract Drift
-    if: github.event_name != 'workflow_dispatch' || inputs.pr_number == ''
+  hide:
+    name: Hide outdated comments
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        github.event.comment.user.login == 'orchestrator-konflux-ci[bot]' &&
+        contains(github.event.comment.body, 'Test Results')
+      )
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Regenerate contracts
-        working-directory: frontend
-        run: npm run gen
-        timeout-minutes: 10
-
-      - name: Check for drift
-        run: |
-          if git diff --quiet frontend/packages/syntara-contracts/src/; then
-            echo "No contract drift detected."
-          else
-            echo "::error::Generated contracts are out of date. Run 'make gen-contracts' and commit the result."
-            git diff --stat frontend/packages/syntara-contracts/src/
-            git diff frontend/packages/syntara-contracts/src/
-            exit 1
-          fi
-
-  # -------------------------------------------------------------------------
-  # TEMPORARY — DO NOT MERGE this job.
-  # Validation scaffold: Check Contract Drift already exists on devel with
-  # workflow_dispatch, so we can run THIS BRANCH's copy with GITHUB_TOKEN:
-  #
-  #   gh workflow run check-contract-drift.yml \
-  #     --ref chore/hide-outdated-konflux-comments \
-  #     -f pr_number=284
-  #
-  # Same GraphQL minimizeComment logic as hide-outdated-konflux-comments.yml.
-  # Delete this job and the pr_number input before merge.
-  # -------------------------------------------------------------------------
-  hide-outdated-konflux-comments:
-    name: TEMPORARY Hide outdated Konflux comments
-    if: github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
     steps:
       - name: Minimize older Konflux Test Results comments
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pr_number }}
         with:
           script: |
             const KONFLUX_BOT = 'orchestrator-konflux-ci';
