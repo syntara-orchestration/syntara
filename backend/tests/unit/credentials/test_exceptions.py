@@ -58,3 +58,17 @@ class TestCredentialExceptions:
     def test_in_use_error_truncates_and_shows_remaining_count(self) -> None:
         exc = CredentialInUseError("my-cred", ["A", "B", "C"], 5)
         assert "and 2 more" in exc.message
+
+    def test_in_use_error_falls_back_to_generic_wording_when_names_empty(self) -> None:
+        """Double-race edge case: total_count > 0 but no names could be resolved.
+
+        Must not render an empty or malformed parenthetical like "()" or
+        "( and 1 more)".
+        """
+        exc = CredentialInUseError("my-cred", [], 1)
+        assert exc.message == (
+            "Cannot delete credential 'my-cred': still in use by 1 integration. "
+            "Remove the credential from these integrations before deleting it."
+        )
+        assert "(" not in exc.message
+        assert ")" not in exc.message
