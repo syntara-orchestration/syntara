@@ -570,6 +570,30 @@ class ApprovalService(BaseService):
             deleted_by=self.user.id,
         )
 
+    def _dispatch_decided_event(
+        self,
+        approval: ApprovalRequest,
+        decision: str,
+        decided_at: datetime,
+        notes: str | None,
+    ) -> None:
+        """Dispatch the audit event for a decision (approve/reject/cancel) on an approval."""
+        decided = decided_at.replace(tzinfo=None)
+        created = approval.created_at.replace(tzinfo=None)
+        AuditEventDispatcher.dispatch(
+            ApprovalDecidedEvent(
+                approval_id=approval.id,
+                execution_id=approval.execution_id,
+                approval_node_id=approval.approval_node_id,
+                decision=decision,
+                decided_by=self.user.id,
+                decided_at=decided_at,
+                wait_time_ms=int((decided - created).total_seconds() * 1000),
+                decision_notes=notes,
+                principal_type=self.user.__dict__.get("__principal_type__"),
+            )
+        )
+
     async def decide(
         self,
         approval_id: UUID,
@@ -649,23 +673,7 @@ class ApprovalService(BaseService):
             decided_by=self.user.id,
         )
 
-        # Calculate wait time for audit event using the decided_at timestamp we set
-        decided = decided_at.replace(tzinfo=None)
-        created = approval.created_at.replace(tzinfo=None)
-        wait_time_ms = int((decided - created).total_seconds() * 1000)
-        AuditEventDispatcher.dispatch(
-            ApprovalDecidedEvent(
-                approval_id=approval_id,
-                execution_id=approval.execution_id,
-                approval_node_id=approval.approval_node_id,
-                decision=status_enum.value,
-                decided_by=self.user.id,
-                decided_at=decided_at,
-                wait_time_ms=wait_time_ms,
-                decision_notes=request.notes,
-                principal_type=self.user.__dict__.get("__principal_type__"),
-            )
-        )
+        self._dispatch_decided_event(approval, status_enum.value, decided_at, request.notes)
 
         # Send signal to workflow engine (best-effort, never blocks the response)
         signal_error: str | None = None
@@ -696,6 +704,86 @@ class ApprovalService(BaseService):
         response = cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
         response.signal_delivery_error = signal_error
         return response
+
+    async def cancel_pending_for_execution(
+        self,
+        execution_id: UUID,
+        notes: str = "Workflow execution was cancelled",
+    ) -> Sequence[ApprovalRequest]:
+        """Atomically cancel every pending approval for an execution.
+
+        Row-locks pending approvals for this execution before updating, so a
+        decision that commits first always wins instead of being silently
+        overwritten by a slower, later cancellation (the race this method
+        exists to close: previously cancellation only happened asynchronously
+        via the workflow engine's best-effort activity).
+
+        Callers that perform a further, potentially-failing step as part of the
+        same logical cancel operation (e.g. asking Temporal to cancel the
+        workflow) should pass the returned approvals to ``reopen_cancelled()``
+        if that later step fails, since this call commits immediately.
+
+        Args:
+            execution_id: Execution whose pending approvals should be cancelled
+            notes: Decision note recorded on each cancelled approval
+
+        Returns:
+            The approvals that were cancelled
+
+        """
+        query = (
+            select(ApprovalRequest)
+            .where(ApprovalRequest.execution_id == execution_id)
+            .where(ApprovalRequest.status == ApprovalRequestStatus.PENDING)
+            .with_for_update()
+        )
+        result = await self.session.exec(query)
+        approvals = list(result.all())
+
+        decided_at = datetime.now(UTC)
+        for approval in approvals:
+            approval.status = ApprovalRequestStatus.CANCELLED
+            approval.decided_by = self.user.id
+            approval.decided_at = decided_at
+            approval.decision_notes = notes
+
+        await self.session.commit()
+
+        for approval in approvals:
+            self._dispatch_decided_event(approval, ApprovalRequestStatus.CANCELLED.value, decided_at, notes)
+
+        return approvals
+
+    async def reopen_cancelled(self, approvals: Sequence[ApprovalRequest]) -> None:
+        """Revert approvals that ``cancel_pending_for_execution()`` just cancelled.
+
+        Compensation for when a later step in the same logical cancel operation
+        (the Temporal RPC) failed, so the execution was never actually
+        cancelled. Only reverts rows still exactly as that call left them; a
+        concurrent decision can't have landed in between since ``decide()``
+        requires status=PENDING, which was no longer true once cancelled.
+
+        Args:
+            approvals: Approvals previously returned by cancel_pending_for_execution()
+
+        """
+        if not approvals:
+            return
+
+        approval_ids = [approval.id for approval in approvals]
+        stmt = (
+            update(ApprovalRequest)
+            .where(ApprovalRequest.id.in_(approval_ids))  # type: ignore[attr-defined]
+            .where(ApprovalRequest.status == ApprovalRequestStatus.CANCELLED)  # type: ignore[arg-type]
+            .values(status=ApprovalRequestStatus.PENDING, decided_by=None, decided_at=None, decision_notes=None)
+        )
+        await self.session.exec(stmt)
+        await self.session.commit()
+
+        logger.warning(
+            "Reverted approval cancellation after execution cancel failed to reach Temporal",
+            approval_ids=[str(approval_id) for approval_id in approval_ids],
+        )
 
     async def _process_single_decision(
         self,
@@ -770,22 +858,7 @@ class ApprovalService(BaseService):
             decided_by=self.user.id,
         )
 
-        decided = (approval.decided_at or datetime.now(UTC)).replace(tzinfo=None)
-        created = approval.created_at.replace(tzinfo=None)
-        wait_time_ms = int((decided - created).total_seconds() * 1000)
-        AuditEventDispatcher.dispatch(
-            ApprovalDecidedEvent(
-                approval_id=approval_id,
-                execution_id=approval.execution_id,
-                approval_node_id=approval.approval_node_id,
-                decision=status.value,
-                decided_by=self.user.id,
-                decided_at=approval.decided_at,
-                wait_time_ms=wait_time_ms,
-                decision_notes=notes,
-                principal_type=self.user.__dict__.get("__principal_type__"),
-            )
-        )
+        self._dispatch_decided_event(approval, status.value, approval.decided_at, notes)
 
         return BatchApprovalResult(
             approval_id=approval_id,

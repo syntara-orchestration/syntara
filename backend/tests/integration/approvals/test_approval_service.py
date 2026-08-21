@@ -792,6 +792,96 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
             assert approval.decided_by == test_user.id
 
 
+class TestApprovalServiceCancelPendingForExecution(TestApprovalServiceBase):
+    """Test ApprovalService.cancel_pending_for_execution method.
+
+    Regression coverage for AAP bug: a workflow execution could be cancelled
+    while its approval stayed pending long enough to still be approved/rejected,
+    leaving execution=cancelled and approval=approved permanently inconsistent.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cancels_only_pending_approvals_for_the_execution(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """Only PENDING approvals for the given execution are cancelled."""
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+
+        approvals = await approvals_factory.create_approvals(
+            count=3,
+            execution_id=execution_id,
+            statuses=[ApprovalRequestStatus.PENDING, ApprovalRequestStatus.APPROVED, ApprovalRequestStatus.PENDING],
+        )
+        pending_approval, already_approved, other_pending_approval = approvals
+
+        # Unrelated execution's pending approval must not be touched.
+        other_executions = await executions_factory.create_executions(count=1)
+        other_execution_approvals = await approvals_factory.create_pending_approvals(
+            count=1, execution_id=other_executions[0].id
+        )
+        unrelated_approval = other_execution_approvals[0]
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+
+        assert len(cancelled) == 2
+
+        await test_db_session.refresh(pending_approval)
+        await test_db_session.refresh(other_pending_approval)
+        await test_db_session.refresh(already_approved)
+        await test_db_session.refresh(unrelated_approval)
+
+        assert pending_approval.status == ApprovalRequestStatus.CANCELLED
+        assert pending_approval.decided_by == test_user.id
+        assert pending_approval.decided_at is not None
+        assert pending_approval.decision_notes == "Workflow execution was cancelled"
+
+        assert other_pending_approval.status == ApprovalRequestStatus.CANCELLED
+
+        # Already-decided approval is left exactly as it was.
+        assert already_approved.status == ApprovalRequestStatus.APPROVED
+
+        # Pending approval on a different execution is untouched.
+        assert unrelated_approval.status == ApprovalRequestStatus.PENDING
+
+    @pytest.mark.asyncio
+    async def test_reopen_cancelled_reverts_to_pending(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """reopen_cancelled undoes cancel_pending_for_execution, restoring PENDING.
+
+        Used when a later step in the same logical cancel operation (the
+        Temporal RPC) fails, so the execution was never actually cancelled.
+        """
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+        approvals = await approvals_factory.create_pending_approvals(count=2, execution_id=execution_id)
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+        assert len(cancelled) == 2
+
+        await service.reopen_cancelled(cancelled)
+
+        for approval in approvals:
+            await test_db_session.refresh(approval)
+            assert approval.status == ApprovalRequestStatus.PENDING
+            assert approval.decided_by is None
+            assert approval.decided_at is None
+            assert approval.decision_notes is None
+
+
 class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
     """Test ApprovalService.batch_decide method."""
 

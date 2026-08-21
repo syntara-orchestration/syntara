@@ -112,10 +112,10 @@ def _make_user(prefix: str = "user") -> User:
     )
 
 
-def _make_approval(project_id: UUID, node_id: str = "test_node") -> ApprovalRequest:
+def _make_approval(project_id: UUID, node_id: str = "test_node", execution_id: UUID | None = None) -> ApprovalRequest:
     """Build a pending ApprovalRequest for committed setup sessions."""
     return ApprovalRequest(
-        execution_id=uuid4(),
+        execution_id=execution_id if execution_id is not None else uuid4(),
         approval_node_id=node_id,
         project_id=project_id,
         name=f"Test Approval {node_id}",
@@ -150,6 +150,7 @@ async def _concurrency_data(
     *,
     user_count: int = 2,
     approval_count: int = 1,
+    execution_id: UUID | None = None,
 ) -> AsyncIterator[tuple[list[UUID], list[UUID]]]:
     """Commit project/users/approvals visible across sessions; delete them on exit.
 
@@ -165,7 +166,9 @@ async def _concurrency_data(
         session.add_all(users)
         await session.flush()
 
-        approvals = [_make_approval(project.id, node_id=f"node_{i}") for i in range(approval_count)]
+        approvals = [
+            _make_approval(project.id, node_id=f"node_{i}", execution_id=execution_id) for i in range(approval_count)
+        ]
         session.add_all(approvals)
         await session.commit()
 
@@ -196,6 +199,19 @@ async def _decide_with_own_session(
         assert user is not None
         service = ApprovalService(session, user)
         return await service.decide(approval_id, decision)
+
+
+async def _cancel_pending_with_own_session(
+    session_factory: async_sessionmaker[AsyncSession],
+    user_id: UUID,
+    execution_id: UUID,
+) -> list[ApprovalRequest]:
+    """Run cancel_pending_for_execution() on a dedicated session."""
+    async with session_factory() as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        service = ApprovalService(session, user)
+        return await service.cancel_pending_for_execution(execution_id)
 
 
 async def _batch_decide_with_own_session(
@@ -317,6 +333,56 @@ async def test_concurrent_decision_and_list_no_deadlock(
     assert len(results) == 2
     assert not isinstance(results[0], Exception), f"Decision failed: {results[0]}"
     assert not isinstance(results[1], Exception), f"List failed: {results[1]}"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_execution_cancel_and_decide_only_one_succeeds(
+    test_session_factory: async_sessionmaker[AsyncSession],
+    mock_workflow_client: AsyncMock,
+) -> None:
+    """Test that racing execution-cancel against decide() never leaves both applied.
+
+    Regression test for the bug where a cancelled execution could still end up
+    with an approved approval: cancel_pending_for_execution() and decide() must
+    contend for the same row so exactly one of them wins, never both.
+    """
+    execution_id = uuid4()
+    async with _concurrency_data(test_session_factory, user_count=2, approval_count=1, execution_id=execution_id) as (
+        user_ids,
+        approval_ids,
+    ):
+        approval_id = approval_ids[0]
+
+        results = await asyncio.gather(
+            _cancel_pending_with_own_session(test_session_factory, user_ids[0], execution_id),
+            _decide_with_own_session(
+                test_session_factory,
+                user_ids[1],
+                approval_id,
+                ApprovalDecisionRequest(status="approved", note="Racing the cancellation"),
+            ),
+            return_exceptions=True,
+        )
+        cancel_result, decide_result = results
+
+        assert not isinstance(cancel_result, Exception), f"Cancel should never raise: {cancel_result}"
+        cancel_won = len(cancel_result) == 1
+        decide_won = not isinstance(decide_result, Exception)
+        decide_lost = isinstance(decide_result, ApprovalAlreadyDecidedError)
+
+        assert cancel_won ^ decide_won, f"Exactly one path should decide the approval; got {results!r}"
+        if decide_won:
+            assert cancel_result == []
+        else:
+            assert decide_lost, f"Losing decide() should raise AlreadyDecided; got {decide_result!r}"
+
+        async with test_session_factory() as session:
+            approval = await session.get(ApprovalRequest, approval_id)
+            assert approval is not None
+            expected_status = ApprovalRequestStatus.CANCELLED if cancel_won else ApprovalRequestStatus.APPROVED
+            assert approval.status == expected_status
+            assert approval.decided_by is not None
+            assert approval.decided_at is not None
 
 
 @pytest.mark.asyncio
