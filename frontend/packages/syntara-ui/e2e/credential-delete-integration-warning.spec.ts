@@ -85,7 +85,10 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
     }
   })
 
-  test('deleting a linked credential removes it and clears the integration credential field', async ({ app }) => {
+  test('attempting to delete a linked credential is blocked and leaves the integration intact', async ({ app }) => {
+    // AAP-87778: DELETE /credentials/{id} used to succeed silently and null out the
+    // integration's management_credential_id. The backend now rejects the delete
+    // (409 CREDENTIAL_IN_USE) while any integration still references the credential.
     const credName = buildUniqueName('e2e-cred-t37-del')
     const integrationName = buildUniqueName('e2e-int-t37-del')
     let credentialId: string | undefined
@@ -135,11 +138,20 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
       await modal.getByRole('checkbox').click()
       await modal.getByRole('button', { name: 'Delete' }).click()
 
-      await expect(app.getByText('Credential deleted')).toBeVisible({ timeout: 10_000 })
-      await expect(row).not.toBeVisible({ timeout: 10_000 })
+      // Delete is rejected (409) instead of silently succeeding; the error alert
+      // names the blocking integration.
+      await expect(app.getByText('Delete failed')).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByText(new RegExp(integrationName))).toBeVisible()
 
-      credentialId = undefined
+      // Both the credential and the integration's link to it remain intact.
+      await expect(row).toBeVisible()
+      const detailResp = await apiRequest(app, 'get', `/integrations/${integrationId}`, { token: token ?? undefined })
+      expect(detailResp.ok()).toBeTruthy()
+      const detail = (await detailResp.json()) as { management_credential_id: string | null }
+      expect(detail.management_credential_id).toBe(credentialId)
     } finally {
+      // Detach before cleanup: the credential can't be deleted while the
+      // integration still references it.
       if (integrationId) await deleteIntegrationViaApi(app, integrationId)
       if (credentialId) await deleteCredentialViaApi(app, credentialId)
     }
