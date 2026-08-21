@@ -50,7 +50,7 @@ test.describe('Webhook Trigger', () => {
       // Save workflow (select project right before save)
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       // Verify workflow appears in list
@@ -149,7 +149,7 @@ test.describe('Webhook Trigger', () => {
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       const triggerNode = app
@@ -184,7 +184,7 @@ test.describe('Webhook Trigger', () => {
       // Save workflow
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       // Verify trigger node on canvas shows webhook path detail

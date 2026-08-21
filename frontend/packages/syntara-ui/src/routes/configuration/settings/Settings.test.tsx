@@ -260,7 +260,7 @@ describe('Settings', () => {
     mockQueries()
     render(<Settings />)
 
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled()
   })
 
   it('save button is enabled after editing a setting', async () => {
@@ -269,7 +269,7 @@ describe('Settings', () => {
     render(<Settings />)
 
     await user.click(screen.getByRole('button', { name: /plus/i }))
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled()
   })
 
   it('save calls bulkUpdate with edits and clears on success', async () => {
@@ -281,7 +281,7 @@ describe('Settings', () => {
     render(<Settings />)
 
     await user.click(screen.getByRole('button', { name: /plus/i }))
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
 
     expect(mockMutate).toHaveBeenCalledWith(
       {
@@ -294,7 +294,7 @@ describe('Settings', () => {
     )
     expect(mockShowSuccess).not.toHaveBeenCalled()
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY })
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled()
   })
 
   it('save shows version conflict error and clears edits', async () => {
@@ -306,13 +306,13 @@ describe('Settings', () => {
     render(<Settings />)
 
     await user.click(screen.getByRole('button', { name: /plus/i }))
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
 
     expect(mockShowError).toHaveBeenCalledWith({
       title: 'Version conflict',
       description: 'Settings were modified by another user. The page has been refreshed.',
     })
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled()
   })
 
   it('save shows error for non-conflict failures', async () => {
@@ -324,7 +324,7 @@ describe('Settings', () => {
     render(<Settings />)
 
     await user.click(screen.getByRole('button', { name: /plus/i }))
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
 
     expect(mockMutate).toHaveBeenCalled()
   })
@@ -367,13 +367,13 @@ describe('Settings', () => {
     await user.click(screen.getByRole('button', { name: /plus/i }))
 
     // Verify the save button reflects the edit state
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled()
 
     // Click minus to change back
     await user.click(screen.getByRole('button', { name: /minus/i }))
 
     // Still has edits (value changed to 4001 then 4000)
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled()
   })
 
   it('reset all sets values to defaults locally', async () => {
@@ -383,14 +383,14 @@ describe('Settings', () => {
 
     // Edit a setting first
     await user.click(screen.getByRole('button', { name: /plus/i }))
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled()
 
     // Reset all via modal
     await user.click(screen.getByRole('button', { name: 'Reset to defaults' }))
-    await user.click(screen.getByRole('button', { name: 'Reset all' }))
+    await user.click(screen.getByRole('button', { name: 'Reset all settings' }))
 
     // Save should still be enabled (local edits to default values)
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled()
   })
 
   describe('no access', () => {
@@ -406,7 +406,7 @@ describe('Settings', () => {
       expect(screen.getByText('Access denied')).toBeInTheDocument()
       expect(screen.getByText(/You don't have permission to view settings.*auditor or admin role/)).toBeInTheDocument()
       expect(screen.queryByRole('tab')).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save settings' })).not.toBeInTheDocument()
     })
 
     it('shows access denied when categories query returns 403', () => {
@@ -429,7 +429,7 @@ describe('Settings', () => {
       mockQueries()
       render(<Settings />)
 
-      expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save settings' })).not.toBeInTheDocument()
     })
 
     it('still displays settings categories and values', () => {

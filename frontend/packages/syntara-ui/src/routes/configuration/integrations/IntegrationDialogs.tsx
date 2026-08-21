@@ -35,7 +35,7 @@ export function IntegrationDialogs({
         onClose={validateDialog.close}
         onConfirm={onValidate}
         title="Validate integration?"
-        confirmLabel="Validate"
+        confirmLabel="Validate integration"
       >
         <Content component={ContentVariants.p}>
           This will test the connection to <strong>{validateDialog.item?.name}</strong> and update its validation
@@ -48,7 +48,7 @@ export function IntegrationDialogs({
         onClose={deleteDialog.close}
         onConfirm={onDelete}
         title="Delete integration?"
-        confirmLabel="Delete"
+        confirmLabel="Delete integration"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -79,7 +79,7 @@ export function IntegrationDialogs({
         onClose={disableDialog.close}
         onConfirm={onDisable}
         title="Disable integration?"
-        confirmLabel="Disable"
+        confirmLabel="Disable integration"
         confirmVariant="primary"
       >
         <Content component={ContentVariants.p}>

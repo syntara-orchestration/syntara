@@ -181,8 +181,15 @@ function AddToGroupModal({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="add-to-group-form" isDisabled={isPending} isLoading={isPending}>
-          Add
+        <Button
+          variant="primary"
+          type="submit"
+          form="add-to-group-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Add to group
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
@@ -218,7 +225,7 @@ function getGroupActions(
   if (group.name === BUILTIN_AUTHENTICATED_GROUP_NAME) return []
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Remove from group</IconLabel>,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove({ id: group.id, name: group.name }) : undefined,
@@ -444,7 +451,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         onClose={() => setGroupToRemove(null)}
         onConfirm={handleRemove}
         title="Remove from group?"
-        confirmLabel="Remove"
+        confirmLabel="Remove from group"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

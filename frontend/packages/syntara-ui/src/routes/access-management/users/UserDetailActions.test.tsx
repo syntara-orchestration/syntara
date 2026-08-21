@@ -249,7 +249,7 @@ describe('UserDetailConfirmationDialogs', () => {
     )
 
     await user.click(screen.getByRole('checkbox', { name: 'I understand this user will be permanently deleted.' }))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete user' }))
     expect(onDelete).toHaveBeenCalledOnce()
   })
 

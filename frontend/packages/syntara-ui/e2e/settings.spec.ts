@@ -54,7 +54,7 @@ async function resetSingleSetting(app: import('@playwright/test').Page, settingN
   await expect(kebab).toBeVisible({ timeout: 5000 })
   await kebab.click()
   await app.getByRole('menuitem', { name: 'Reset to default' }).click()
-  const saveBtn = app.getByRole('button', { name: 'Save changes' })
+  const saveBtn = app.getByRole('button', { name: 'Save settings' })
   await expect(saveBtn).toBeEnabled()
   await saveBtn.click()
   await expect(saveBtn).toBeDisabled({ timeout: 5000 })
@@ -65,11 +65,11 @@ async function resetAllToDefaults(app: import('@playwright/test').Page) {
   const resetBtn = app.getByRole('button', { name: 'Reset to defaults' })
   if (await resetBtn.isEnabled()) {
     await resetBtn.click()
-    const resetAllBtn = app.getByRole('button', { name: 'Reset all' })
+    const resetAllBtn = app.getByRole('button', { name: 'Reset all settings' })
     if (await resetAllBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await resetAllBtn.click()
       // Save the reset values
-      const saveBtn = app.getByRole('button', { name: 'Save changes' })
+      const saveBtn = app.getByRole('button', { name: 'Save settings' })
       if (await saveBtn.isEnabled({ timeout: 2000 }).catch(() => false)) {
         await saveBtn.click()
         await expect(saveBtn).toBeDisabled({ timeout: 5000 })
@@ -134,7 +134,7 @@ test.describe('Settings', () => {
   })
 
   test('save changes button is disabled when no edits', async ({ app }) => {
-    const saveButton = app.getByRole('button', { name: 'Save changes' })
+    const saveButton = app.getByRole('button', { name: 'Save settings' })
     await expect(saveButton).toBeVisible()
     await expect(saveButton).toBeDisabled()
   })
@@ -159,7 +159,7 @@ test.describe('Settings', () => {
       await formGroup.getByRole('button', { name: /plus/i }).click()
 
       // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
+      const saveButton = app.getByRole('button', { name: 'Save settings' })
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
@@ -204,7 +204,7 @@ test.describe('Settings', () => {
       await expect(toggle).toBeChecked()
     }
 
-    const saveBtn = app.getByRole('button', { name: 'Save changes' })
+    const saveBtn = app.getByRole('button', { name: 'Save settings' })
     await expect(saveBtn).toBeEnabled()
     await saveBtn.click()
     await expect(saveBtn).toBeDisabled({ timeout: 5000 })
@@ -226,8 +226,8 @@ test.describe('Settings', () => {
     try {
       // Modify and save
       await formGroup.getByRole('button', { name: /plus/i }).click()
-      await app.getByRole('button', { name: 'Save changes' }).click()
-      await expect(app.getByRole('button', { name: 'Save changes' })).toBeDisabled({ timeout: 5000 })
+      await app.getByRole('button', { name: 'Save settings' }).click()
+      await expect(app.getByRole('button', { name: 'Save settings' })).toBeDisabled({ timeout: 5000 })
 
       // Reload to get fresh state
       await goToContextManager(app)
@@ -239,9 +239,9 @@ test.describe('Settings', () => {
       await app.getByRole('menuitem', { name: 'Reset to default' }).click()
 
       // Save the reset value
-      await expect(app.getByRole('button', { name: 'Save changes' })).toBeEnabled()
-      await app.getByRole('button', { name: 'Save changes' }).click()
-      await expect(app.getByRole('button', { name: 'Save changes' })).toBeDisabled({ timeout: 5000 })
+      await expect(app.getByRole('button', { name: 'Save settings' })).toBeEnabled()
+      await app.getByRole('button', { name: 'Save settings' }).click()
+      await expect(app.getByRole('button', { name: 'Save settings' })).toBeDisabled({ timeout: 5000 })
     } finally {
       // Cleanup: ensure defaults
       await goToContextManager(app)
@@ -271,7 +271,7 @@ test.describe('Settings', () => {
     // Click Cancel — modal should close, changes preserved
     await app.getByRole('button', { name: 'Cancel' }).click()
     await expect(app.getByText('This will reset all configuration values')).not.toBeVisible()
-    await expect(app.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    await expect(app.getByRole('button', { name: 'Save settings' })).toBeEnabled()
 
     // No cleanup needed — changes were local only (not saved)
   })
@@ -309,7 +309,7 @@ test.describe('Settings', () => {
     })
 
     // Save button should not be visible
-    await expect(auditorApp.getByRole('button', { name: 'Save changes' })).not.toBeVisible()
+    await expect(auditorApp.getByRole('button', { name: 'Save settings' })).not.toBeVisible()
 
     // Reset to defaults button should not be visible
     await expect(auditorApp.getByRole('button', { name: 'Reset to defaults' })).not.toBeVisible()
@@ -359,7 +359,7 @@ test.describe('Settings', () => {
       await formGroup.getByRole('button', { name: /plus/i }).click()
 
       // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
+      const saveButton = app.getByRole('button', { name: 'Save settings' })
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
@@ -390,7 +390,7 @@ test.describe('Settings', () => {
       await select.selectOption('DEBUG')
 
       // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
+      const saveButton = app.getByRole('button', { name: 'Save settings' })
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
@@ -426,7 +426,7 @@ test.describe('Settings', () => {
       await input.press('Enter')
 
       // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
+      const saveButton = app.getByRole('button', { name: 'Save settings' })
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
@@ -465,7 +465,7 @@ test.describe('Settings', () => {
     await expect(app.getByText('Value must be at most 1')).toBeVisible()
 
     // Assert save button disabled
-    await expect(app.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    await expect(app.getByRole('button', { name: 'Save settings' })).toBeDisabled()
   })
 
   test('reset all settings via confirmation modal', async ({ app }) => {
@@ -483,13 +483,13 @@ test.describe('Settings', () => {
     await expect(app.getByText('This will reset all configuration values')).toBeVisible()
 
     // Click "Reset all"
-    await app.getByRole('button', { name: 'Reset all' }).click()
+    await app.getByRole('button', { name: 'Reset all settings' }).click()
 
     // Verify setting reverted to default
     await expect(input).toHaveValue(originalValue)
 
     // Save the reset
-    const saveBtn = app.getByRole('button', { name: 'Save changes' })
+    const saveBtn = app.getByRole('button', { name: 'Save settings' })
     await expect(saveBtn).toBeEnabled()
     await saveBtn.click()
     await expect(saveBtn).toBeDisabled({ timeout: 5000 })
@@ -519,13 +519,13 @@ test.describe('Settings', () => {
       expect(patchResponse.ok()).toBe(true)
 
       // Now click Save in the UI — should trigger version conflict
-      await app.getByRole('button', { name: 'Save changes' }).click()
+      await app.getByRole('button', { name: 'Save settings' }).click()
 
       // Verify conflict alert
       await expect(app.getByText('Settings were modified by another user')).toBeVisible({ timeout: 5000 })
 
       // Save button should be disabled after auto-refetch
-      await expect(app.getByRole('button', { name: 'Save changes' })).toBeDisabled({ timeout: 5000 })
+      await expect(app.getByRole('button', { name: 'Save settings' })).toBeDisabled({ timeout: 5000 })
     } finally {
       await goToContextManager(app)
       await resetAllToDefaults(app)
@@ -547,7 +547,7 @@ test.describe('Settings', () => {
 
       // Increment and save via UI
       await formGroup.getByRole('button', { name: /plus/i }).click()
-      const saveBtn = app.getByRole('button', { name: 'Save changes' })
+      const saveBtn = app.getByRole('button', { name: 'Save settings' })
       await expect(saveBtn).toBeEnabled()
       await saveBtn.click()
       await expect(saveBtn).toBeDisabled({ timeout: 5000 })
@@ -590,7 +590,7 @@ test.describe('Settings', () => {
       }
 
       // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
+      const saveButton = app.getByRole('button', { name: 'Save settings' })
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })

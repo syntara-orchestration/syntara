@@ -206,7 +206,7 @@ export function WorkflowDialogs({
           // Dialog closes in onSettled callback passed to useWorkflowActions
         }}
         title="Unpublish workflow?"
-        confirmLabel="Unpublish"
+        confirmLabel="Unpublish workflow"
         confirmVariant="danger"
         titleIconVariant="warning"
       >
@@ -234,7 +234,7 @@ export function WorkflowDialogs({
           // Dialog closes in onSettled callback passed to useProjectActions
         }}
         title="Delete project?"
-        confirmLabel="Delete"
+        confirmLabel="Delete project"
         confirmVariant="danger"
         titleIconVariant="warning"
         confirmLoading={isDeletingProject}

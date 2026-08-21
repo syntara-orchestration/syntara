@@ -92,7 +92,7 @@ test.describe('Disconnect Flow (UI-21)', () => {
     // Open the kebab menu on the Keycloak row and click Disconnect
     const keycloakRow = app.getByRole('row').filter({ hasText: 'Keycloak' })
     await keycloakRow.getByRole('button', { name: 'Identity actions' }).click()
-    await app.getByRole('menuitem', { name: 'Disconnect' }).click()
+    await app.getByRole('menuitem', { name: 'Disconnect identity' }).click()
 
     // Confirmation dialog with identity details
     const dialog = app.getByRole('dialog', { name: 'Disconnect identity?' })
@@ -102,7 +102,7 @@ test.describe('Disconnect Flow (UI-21)', () => {
     await expect(dialog.getByText('asmith')).toBeVisible()
 
     // Confirm disconnect
-    await dialog.getByRole('button', { name: 'Disconnect' }).click()
+    await dialog.getByRole('button', { name: 'Disconnect identity' }).click()
 
     // Success alert and remaining identity unaffected
     await expect(app.getByText('Identity disconnected')).toBeVisible({ timeout: 10_000 })
@@ -130,7 +130,7 @@ test.describe('Last Identity Block (UI-22)', () => {
     // Open the kebab menu — Disconnect item is present but aria-disabled
     const kebabButton = app.getByRole('button', { name: 'Identity actions' })
     await kebabButton.click()
-    const disconnectItem = app.getByRole('menuitem', { name: 'Disconnect' })
+    const disconnectItem = app.getByRole('menuitem', { name: 'Disconnect identity' })
     await expect(disconnectItem).toBeVisible()
     await expect(disconnectItem).toHaveAttribute('aria-disabled', 'true')
 

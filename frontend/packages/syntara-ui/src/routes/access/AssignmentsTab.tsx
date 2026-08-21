@@ -367,7 +367,7 @@ export function AssignmentsTab() {
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteItem)}
           title="Remove assignment?"
-          confirmLabel="Remove"
+          confirmLabel="Remove assignment"
           confirmVariant="danger"
           titleIconVariant="warning"
         >

@@ -34,7 +34,7 @@ async function createPendingApproval(
 
   // Add approval node and save
   await addApprovalNodeWithBranch(app, approvalName)
-  await app.getByRole('button', { name: 'Save', exact: true }).click()
+  await app.getByRole('button', { name: 'Save workflow' }).click()
   await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
 
   // Run the workflow
@@ -513,7 +513,7 @@ test.describe('Approval Workflow Operations', () => {
     try {
       // Add approval node with a unique name so we can find it in the approvals list
       await addApprovalNodeWithBranch(app, approvalNodeName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
 
       // Run the workflow

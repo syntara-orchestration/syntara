@@ -1,5 +1,4 @@
-import { Button, Icon, Timestamp, Tooltip } from '@patternfly/react-core'
-import { RhUiSaveFillIcon } from '@patternfly/react-icons'
+import { Button, Timestamp, Tooltip } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
@@ -54,19 +53,8 @@ export function SaveWorkflowButton({
   const enabledTooltip = lastSavedText ?? 'Save workflow'
 
   const button = (
-    <Button
-      variant="plain"
-      onClick={!isDisabled ? onSave : undefined}
-      isLoading={isPending}
-      isAriaDisabled={isDisabled}
-      icon={
-        <Icon isInline>
-          <RhUiSaveFillIcon />
-        </Icon>
-      }
-      iconPosition="start"
-    >
-      {isPending ? 'Saving...' : 'Save'}
+    <Button variant="plain" onClick={!isDisabled ? onSave : undefined} isLoading={isPending} isAriaDisabled={isDisabled}>
+      {isPending ? 'Saving...' : 'Save workflow'}
     </Button>
   )
 

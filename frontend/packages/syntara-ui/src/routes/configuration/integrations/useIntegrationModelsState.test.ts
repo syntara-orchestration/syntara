@@ -106,7 +106,7 @@ describe('useIntegrationModelsState', () => {
     expect(mockRegisterDirtyCheck).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Save model changes?',
-        saveLabel: 'Save model changes',
+        saveLabel: 'Save models',
       })
     )
   })

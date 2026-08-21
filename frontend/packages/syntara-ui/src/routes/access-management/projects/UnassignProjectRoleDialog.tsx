@@ -18,7 +18,7 @@ export function UnassignProjectRoleDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Unassign role?"
-      confirmLabel="Unassign"
+      confirmLabel="Unassign role"
       confirmVariant="danger"
       titleIconVariant="warning"
     >

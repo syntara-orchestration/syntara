@@ -234,7 +234,7 @@ export function ProjectRolesTab({ projectId }: Readonly<{ projectId: string }>) 
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete role?"
-        confirmLabel="Delete"
+        confirmLabel="Delete role"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

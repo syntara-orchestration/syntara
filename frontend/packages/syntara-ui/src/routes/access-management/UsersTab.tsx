@@ -102,7 +102,7 @@ function getRowActions(
 ): IAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit user</IconLabel>,
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
       onClick: permissions.canUpdate
@@ -117,7 +117,7 @@ function getRowActions(
     },
     { isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete user</IconLabel>,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(user) : undefined,
@@ -136,7 +136,7 @@ function disableConfirmCopy(
   if (!user) {
     return {
       title: 'Disable user?',
-      confirmLabel: 'Disable',
+      confirmLabel: 'Disable user',
       body: null,
     }
   }
@@ -166,7 +166,7 @@ function disableConfirmCopy(
   }
   return {
     title: 'Disable user?',
-    confirmLabel: 'Disable',
+    confirmLabel: 'Disable user',
     body: (
       <>
         The user <strong>{user.username}</strong> will be disabled and will no longer be able to sign in.
@@ -413,7 +413,7 @@ export function UsersTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete user?"
-        confirmLabel="Delete"
+        confirmLabel="Delete user"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}

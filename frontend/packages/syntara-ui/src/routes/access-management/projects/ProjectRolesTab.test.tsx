@@ -200,7 +200,7 @@ describe('ProjectRolesTab', () => {
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(screen.getByRole('checkbox'))
 
-    const confirmButton = await screen.findByRole('button', { name: 'Delete' })
+    const confirmButton = await screen.findByRole('button', { name: 'Delete role' })
     await user.click(confirmButton)
 
     await waitFor(() => {
@@ -261,7 +261,7 @@ describe('ProjectRolesTab', () => {
     })
     expect(checkbox).toBeInTheDocument()
     expect(checkbox).not.toBeChecked()
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete role' })).toBeDisabled()
   })
 
   it('closes delete dialog when Cancel button is clicked', async () => {
@@ -298,7 +298,7 @@ describe('ProjectRolesTab', () => {
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(screen.getByRole('checkbox'))
 
-    const confirmButton = await screen.findByRole('button', { name: 'Delete' })
+    const confirmButton = await screen.findByRole('button', { name: 'Delete role' })
     await user.click(confirmButton)
 
     await waitFor(() => {

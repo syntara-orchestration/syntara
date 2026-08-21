@@ -116,7 +116,7 @@ async function disableCredential(app: Page, name: string): Promise<void> {
   const row = app.getByRole('row', { name: new RegExp(name) })
   await row.getByRole('switch', { name: 'Enabled' }).click({ force: true })
   const dialog = app.getByRole('dialog')
-  await dialog.getByRole('button', { name: 'Disable' }).click()
+  await dialog.getByRole('button', { name: 'Disable credential' }).click()
   await expect(row.getByRole('switch')).not.toBeChecked()
 }
 

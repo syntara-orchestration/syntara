@@ -381,7 +381,7 @@ describe('Credentials', () => {
     await user.click(switches[0])
 
     expect(screen.getByText('Disable credential?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
 
     expect(mockMutateAsync).toHaveBeenCalled()
     expect(screen.queryByText('Disable credential?')).not.toBeInTheDocument()
@@ -395,7 +395,7 @@ describe('Credentials', () => {
 
     const switches = screen.getAllByRole('switch', { name: 'Enabled' })
     await user.click(switches[0])
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
 
     expect(mockMutateAsync).toHaveBeenCalled()
   })
@@ -553,7 +553,7 @@ describe('Credentials', () => {
     const dialog = screen.getByRole('dialog')
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -577,7 +577,7 @@ describe('Credentials', () => {
     const dialog = screen.getByRole('dialog')
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 

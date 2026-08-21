@@ -142,7 +142,7 @@ export function EditProjectRoleDialog({ projectId, role, onClose, onSuccess }: R
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" form="edit-project-role-form" type="submit" isLoading={isPending}>
-          Save
+          Save role
         </Button>
         <Button variant="link" onClick={onClose}>
           Cancel

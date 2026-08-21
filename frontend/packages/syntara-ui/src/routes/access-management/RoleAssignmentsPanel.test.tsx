@@ -639,7 +639,7 @@ describe('RoleAssignmentsPanel', () => {
       await waitFor(() => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
         expect(screen.getByText(/This unassigns the role/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Unassign' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Unassign role' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
       })
     })
@@ -679,7 +679,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalledWith(
@@ -724,7 +724,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteProjectAssignment).toHaveBeenCalledWith(
@@ -752,7 +752,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -787,7 +787,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -825,7 +825,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -909,7 +909,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteProjectAssignment).toHaveBeenCalledWith(

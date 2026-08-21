@@ -42,7 +42,7 @@ describe('UnassignProjectRoleDialog', () => {
       <UnassignProjectRoleDialog assignment={mockAssignment} isOpen={true} onClose={vi.fn()} onConfirm={onConfirm} />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Unassign' }))
+    await user.click(screen.getByRole('button', { name: 'Unassign role' }))
     expect(onConfirm).toHaveBeenCalledOnce()
   })
 

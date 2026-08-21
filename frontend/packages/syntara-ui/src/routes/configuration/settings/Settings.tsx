@@ -237,7 +237,7 @@ export default function Settings() {
                   isDisabled={!hasChanges || isSaving || hasValidationErrors}
                   isLoading={isSaving}
                 >
-                  Save changes
+                  Save settings
                 </Button>
               </ActionGroup>
             ) : undefined

@@ -294,14 +294,14 @@ test.describe('Kebab Menu Delete Action', () => {
       const row = app.getByRole('row', { name: new RegExp(credName) })
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
 
-      await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await app.getByRole('menuitem', { name: 'Delete credential' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByText(new RegExp(`"${credName}"`))).toBeVisible()
       await expect(dialog.getByText(/cannot be undone/)).toBeVisible()
 
-      const deleteBtn = dialog.getByRole('button', { name: 'Delete' })
+      const deleteBtn = dialog.getByRole('button', { name: 'Delete credential' })
       await expect(deleteBtn).toBeVisible()
       await expect(deleteBtn).toBeDisabled()
 
@@ -327,7 +327,7 @@ test.describe('Kebab Menu Delete Action', () => {
 
       const row = app.getByRole('row', { name: new RegExp(credName) })
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-      await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await app.getByRole('menuitem', { name: 'Delete credential' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()

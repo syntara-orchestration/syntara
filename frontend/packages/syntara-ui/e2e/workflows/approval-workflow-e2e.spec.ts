@@ -21,7 +21,7 @@ async function createPendingApproval(app: Page): Promise<{ workflowId: string; a
 
   // Add approval node and save
   await addApprovalNodeWithBranch(app, approvalName)
-  await app.getByRole('button', { name: 'Save', exact: true }).click()
+  await app.getByRole('button', { name: 'Save workflow' }).click()
   await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
 
   // Run the workflow

@@ -35,7 +35,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -68,7 +68,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -92,7 +92,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -122,7 +122,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })

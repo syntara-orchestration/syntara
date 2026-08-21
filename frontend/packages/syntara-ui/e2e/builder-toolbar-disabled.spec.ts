@@ -49,7 +49,7 @@ test.describe('builder toolbar disabled while editing', () => {
       await app.getByPlaceholder('Workflow name').fill(`${workflowName}-dirty`)
 
       // Verify Save is initially enabled (aria-disabled=false or absent)
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
       // Click a node to open the editor panel
@@ -93,7 +93,7 @@ test.describe('builder toolbar disabled while editing', () => {
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 
       // Hover Save to trigger tooltip
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await saveBtn.hover()
 
       // Tooltip should contain "finish editing" message

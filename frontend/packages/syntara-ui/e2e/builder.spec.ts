@@ -41,7 +41,7 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     // Act - Save workflow (select project first to avoid name reset)
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    await app.getByRole('button', { name: 'Save workflow' }).click()
 
     // Assert - Workflow is persisted in workflows list
     await expect(app).toHaveURL(/workflow-builder\/.+/)
@@ -58,7 +58,7 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
       await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
       await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await app.getByRole('button', { name: 'Delete' }).click()
+      await app.getByRole('button', { name: 'Delete workflow' }).click()
     }
   }
 })
@@ -77,7 +77,7 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
     await app.getByRole('link', { name: workflowName, exact: true }).click()
 
     await app.getByPlaceholder('Workflow name').fill(updatedName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    await app.getByRole('button', { name: 'Save workflow' }).click()
 
     // Assert - Updated name persists
     await app.goto(toAppUrl('/workflows'))
@@ -94,7 +94,7 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
         await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
         await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
         await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-        await app.getByRole('button', { name: 'Delete' }).click()
+        await app.getByRole('button', { name: 'Delete workflow' }).click()
       }
     }
   }

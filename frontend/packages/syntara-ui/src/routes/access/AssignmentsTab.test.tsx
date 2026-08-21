@@ -585,7 +585,7 @@ describe('AssignmentsTab', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Remove assignment' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
       })
     })
@@ -615,7 +615,7 @@ describe('AssignmentsTab', () => {
       const deleteOption = await screen.findByRole('menuitem', { name: /Delete assignment/i })
       await user.click(deleteOption)
 
-      const removeButton = await screen.findByRole('button', { name: 'Remove' })
+      const removeButton = await screen.findByRole('button', { name: 'Remove assignment' })
       await user.click(removeButton)
 
       expect(mockDeleteMutate).toHaveBeenCalled()
@@ -826,7 +826,7 @@ describe('AssignmentsTab', () => {
     it('calls delete mutation for project-scoped assignment', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Remove assignment' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -839,7 +839,7 @@ describe('AssignmentsTab', () => {
     it('refetches assignments on successful delete', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Remove assignment' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onSuccess: () => void
@@ -859,7 +859,7 @@ describe('AssignmentsTab', () => {
     it('closes dialog on failed delete', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Remove assignment' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onError: (error: unknown) => void
@@ -892,7 +892,7 @@ describe('AssignmentsTab', () => {
         expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Remove assignment' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({ params: { path: { assignment_id: 'sur1' } } }),

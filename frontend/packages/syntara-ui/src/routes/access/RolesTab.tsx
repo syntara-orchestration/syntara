@@ -354,7 +354,7 @@ export function RolesTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete role?"
-        confirmLabel="Delete"
+        confirmLabel="Delete role"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

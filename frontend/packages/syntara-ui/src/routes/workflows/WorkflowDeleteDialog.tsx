@@ -36,7 +36,7 @@ export function WorkflowDeleteDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Delete workflow?"
-      confirmLabel="Delete"
+      confirmLabel="Delete workflow"
       confirmVariant="danger"
       titleIconVariant="warning"
       confirmLoading={confirmLoading}

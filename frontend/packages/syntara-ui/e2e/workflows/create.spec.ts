@@ -43,7 +43,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(workflowName)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
       await expect(app).not.toHaveURL(/workflow-builder\/new/)
@@ -99,7 +99,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(customName)
 
-      const saveButton = app.getByRole('button', { name: 'Save' })
+      const saveButton = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveButton).toBeVisible()
       await saveButton.click()
 
@@ -128,7 +128,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const nameInput = app.getByPlaceholder('Workflow name')
       await nameInput.clear()
       await nameInput.fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
       await expect(app).not.toHaveURL(/workflow-builder\/new/)
@@ -159,7 +159,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const name1Input = app.getByPlaceholder('Workflow name')
       await name1Input.clear()
       await name1Input.fill(workflow1Name)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
 
       // Go back and create second workflow
@@ -175,7 +175,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const name2Input = app.getByPlaceholder('Workflow name')
       await name2Input.clear()
       await name2Input.fill(workflow2Name)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
 
       // Verify both workflows exist in the table

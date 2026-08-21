@@ -376,7 +376,7 @@ describe('RolesTab', () => {
       const user = await openDeleteDialog()
 
       await user.click(screen.getByRole('checkbox'))
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete role' }))
 
       expect(mockDeleteMutate).toHaveBeenCalled()
       const callArgs = mockDeleteMutate.mock.calls[0]
@@ -387,7 +387,7 @@ describe('RolesTab', () => {
       const user = await openDeleteDialog()
 
       await user.click(screen.getByRole('checkbox'))
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete role' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onSuccess: () => void
@@ -408,7 +408,7 @@ describe('RolesTab', () => {
       const user = await openDeleteDialog()
 
       await user.click(screen.getByRole('checkbox'))
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete role' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onError: (error: unknown) => void
@@ -650,7 +650,7 @@ describe('RolesTab', () => {
     it('disables Delete button until acknowledgement checkbox is checked', async () => {
       const user = await openDeleteDialog()
 
-      expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Delete role' })).toBeDisabled()
 
       await user.click(
         screen.getByRole('checkbox', {
@@ -658,7 +658,7 @@ describe('RolesTab', () => {
         })
       )
 
-      expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Delete role' })).toBeEnabled()
     })
   })
 

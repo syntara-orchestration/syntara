@@ -45,7 +45,7 @@ export function DeleteCredentialDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Delete credential?"
-      confirmLabel="Delete"
+      confirmLabel="Delete credential"
       confirmVariant="danger"
       titleIconVariant="warning"
       confirmLoading={isLoading || isLoadingChecks}

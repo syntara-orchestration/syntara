@@ -266,7 +266,7 @@ export function ProjectDetail() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete project?"
-        confirmLabel="Delete"
+        confirmLabel="Delete project"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

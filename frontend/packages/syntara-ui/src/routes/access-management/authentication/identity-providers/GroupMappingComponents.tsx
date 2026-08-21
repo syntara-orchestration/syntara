@@ -92,7 +92,7 @@ export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<Empt
         <EmptyStateFooter>
           <EmptyStateActions>
             {onTestSignIn && (
-              <Button variant="primary" onClick={onTestSignIn}>
+              <Button variant="primary" icon={<RhUiSyncIcon />} onClick={onTestSignIn}>
                 Discover groups
               </Button>
             )}
