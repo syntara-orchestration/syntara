@@ -36,17 +36,6 @@ import { canDecideOnApproval } from './canDecideOnApproval'
 import { useApprovalDecideProjects } from './useApprovalDecideProjects'
 import { useCanDecideApproval } from './useCanDecideApproval'
 
-/**
- * Mock-API extra field kept as a last resort for fixtures that still use it.
- * Runtime approvals persist the resolved prompt on the record instead.
- */
-function getDescriptionFallback(approval: Approval): string | undefined {
-  if ('description' in approval && typeof approval.description === 'string' && approval.description.trim()) {
-    return approval.description.trim()
-  }
-  return undefined
-}
-
 const getDecisionCopy = (decision: 'approved' | 'rejected') => ({
   label: decision === 'approved' ? 'Approval notes' : 'Rejection notes',
   verb: decision === 'approved' ? 'approving' : 'rejecting',
@@ -281,7 +270,7 @@ export function ApprovalDetailContent({
   const workflowId = approval.workflow_context?.workflow_id
   const workflowVersion = approval.workflow_context?.workflow_version
   const workflowLink = workflowId ? buildWorkflowBuilderLink(workflowId, workflowVersion) : undefined
-  const approvalMessage = getApprovalPromptFromRecord(approval) || message || getDescriptionFallback(approval)
+  const approvalMessage = getApprovalPromptFromRecord(approval) || message
   const approvalDisplayName = resolveApprovalName(approval, activityNameMap)
   const decisionNotes = approval.decision_notes ?? undefined
   const notesLabel = getNotesLabel(approvalStatus)

@@ -199,15 +199,7 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByText('Approval initiated')).toBeInTheDocument()
   })
 
-  it('renders message when description is present', () => {
-    const withDescription = { ...mockApproval, description: 'Review this deployment' } as Approval
-    render(<ApprovalDetailContent approval={withDescription} />, { wrapper })
-
-    expect(screen.getByText('Message')).toBeInTheDocument()
-    expect(screen.getByText('Review this deployment')).toBeInTheDocument()
-  })
-
-  it('does not render message when no description or prompt', () => {
+  it('does not render message when no prompt or parent message', () => {
     render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
 
     expect(screen.queryByText('Message')).not.toBeInTheDocument()
@@ -323,7 +315,7 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByRole('button', { name: 'Reject' })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('renders message from prop instead of approval description', () => {
+  it('renders message from parent prop when the record has no prompt', () => {
     render(<ApprovalDetailContent approval={mockApproval} message="Custom prompt message" />, { wrapper })
 
     expect(screen.getByText('Custom prompt message')).toBeInTheDocument()
@@ -447,7 +439,7 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByText('Test Workflow')).toBeInTheDocument()
   })
 
-  it('renders message from prompt field when description is missing', () => {
+  it('renders message from prompt field', () => {
     const withPrompt = { ...mockApproval, prompt: 'Deploy to production?' } as Approval
     render(<ApprovalDetailContent approval={withPrompt} />, { wrapper })
 
@@ -459,18 +451,6 @@ describe('ApprovalDetailContent', () => {
     render(<ApprovalDetailContent approval={withPrompt} />, { wrapper })
 
     expect(screen.queryByText('Message')).not.toBeInTheDocument()
-  })
-
-  it('prefers prompt over description when both exist', () => {
-    const both = {
-      ...mockApproval,
-      description: 'Fallback message',
-      prompt: 'Preferred message',
-    } as Approval
-    render(<ApprovalDetailContent approval={both} />, { wrapper })
-
-    expect(screen.getByText('Preferred message')).toBeInTheDocument()
-    expect(screen.queryByText('Fallback message')).not.toBeInTheDocument()
   })
 
   it('resolves approval name from activityNameMap', () => {

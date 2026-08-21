@@ -41,23 +41,45 @@ def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None
     """Return the resolved approval-node prompt, or None if absent/blank.
 
     ``NamespaceResolver.resolve_value`` keeps the original type when the whole
-    field is a single ``${...}``. Coerce scalars with ``str()`` and objects
-    with ``json.dumps`` so a Message of ``${trigger.amount}`` is stored.
+    field is a single ``${...}``. Store numbers as decimal text so a Message of
+    ``${trigger.amount}`` is kept. Skip booleans and empty containers — those
+    are not human-readable guidance. Serialize objects with ``json.dumps``;
+    if that fails or the JSON exceeds the column limit, store None rather than
+    a broken fragment.
     """
     prompt = resolved_parameters.get("prompt")
-    if prompt is None:
+    if prompt is None or isinstance(prompt, bool):
         return None
+
+    text: str | None = None
+    from_json = False
     if isinstance(prompt, str):
-        text = prompt.strip()
+        text = prompt.strip() or None
     elif isinstance(prompt, (dict, list)):
-        text = json.dumps(prompt)
+        if prompt:
+            try:
+                text = json.dumps(prompt, default=str)
+                from_json = True
+            except (TypeError, ValueError):
+                workflow.logger.warning("Could not serialize approval prompt; storing no prompt")
     else:
-        text = str(prompt).strip()
+        text = str(prompt).strip() or None
+
     if not text:
         return None
-    if len(text) > FieldLimits.DESCRIPTION_MAX_LENGTH:
-        return text[: FieldLimits.DESCRIPTION_MAX_LENGTH]
-    return text
+
+    max_len = FieldLimits.DESCRIPTION_MAX_LENGTH
+    if len(text) <= max_len:
+        return text
+
+    if from_json:
+        workflow.logger.warning(
+            f"Approval prompt JSON length {len(text)} exceeds {max_len} characters; storing no prompt"
+        )
+        return None
+
+    workflow.logger.warning(f"Approval prompt length {len(text)} exceeds {max_len} characters; truncating")
+    return text[:max_len]
 
 
 class WorkflowApprovalMixin:

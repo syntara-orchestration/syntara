@@ -482,6 +482,36 @@ class TestPrepareApprovalArgs:
         assert missing_args[10] is None
 
     @pytest.mark.asyncio
+    async def test_empty_container_prompt_is_none(self) -> None:
+        """Empty dict/list templates are not stored as "{}"/"[]"."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            dict_args = await wf._prepare_approval_args(node, graph, {"prompt": {}})
+            list_args = await wf._prepare_approval_args(node, graph, {"prompt": []})
+
+        assert dict_args[10] is None
+        assert list_args[10] is None
+
+    @pytest.mark.asyncio
+    async def test_bool_prompt_is_none(self) -> None:
+        """Boolean templates are not stored as "True"/"False"."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            true_args = await wf._prepare_approval_args(node, graph, {"prompt": True})
+            false_args = await wf._prepare_approval_args(node, graph, {"prompt": False})
+
+        assert true_args[10] is None
+        assert false_args[10] is None
+
+    @pytest.mark.asyncio
     async def test_non_string_prompt_is_coerced(self) -> None:
         """Whole-field templates can resolve to a scalar or JSON value."""
         wf = _make_workflow()
@@ -491,12 +521,29 @@ class TestPrepareApprovalArgs:
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
+            zero_args = await wf._prepare_approval_args(node, graph, {"prompt": 0})
             object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"amount": 15000}})
             list_args = await wf._prepare_approval_args(node, graph, {"prompt": ["a", "b"]})
 
         assert number_args[10] == "15000"
+        assert zero_args[10] == "0"
         assert object_args[10] == '{"amount": 15000}'
         assert list_args[10] == '["a", "b"]'
+
+    @pytest.mark.asyncio
+    async def test_unserializable_prompt_is_none(self) -> None:
+        """A circular object must not crash the approval node."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
+
+        assert args[10] is None
 
     @pytest.mark.asyncio
     async def test_oversized_prompt_is_truncated(self) -> None:
@@ -511,6 +558,20 @@ class TestPrepareApprovalArgs:
             args = await wf._prepare_approval_args(node, graph, {"prompt": too_long})
 
         assert args[10] == too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH]
+
+    @pytest.mark.asyncio
+    async def test_oversized_json_prompt_is_dropped(self) -> None:
+        """Oversized JSON is not stored as a mid-key fragment."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        oversized = {"payload": "y" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)}
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        assert args[10] is None
 
     @pytest.mark.asyncio
     async def test_prompt_omitted_when_patch_inactive(self) -> None:
