@@ -872,6 +872,7 @@ class IntegrationService(BaseService):
                 integration_id=str(integration_id),
                 error_type=type(exc).__name__,
             )
+            await self.session.rollback()
             integration = await self._get_or_raise(integration_id, for_update=True)
             integration.validation_status = IntegrationStatus.ERROR
             integration.validation_error = f"Unexpected error during validation: {type(exc).__name__}"

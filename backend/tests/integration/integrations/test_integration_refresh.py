@@ -23,7 +23,7 @@ from syntara.integrations.models.integration import (
     IntegrationType,
 )
 from syntara.integrations.services.integration_service import IntegrationService
-from syntara.tool_manager.models.tool import Tool, ToolStatus
+from syntara.tool_manager.models.tool import Tool, ToolParameter, ToolStatus
 
 BASE_URL = "/api/v1/integrations"
 
@@ -227,10 +227,10 @@ class TestIntegrationRefreshContract:
     ) -> None:
         """A server advertising the same tool name twice is deduped, not 500'd.
 
-        Regression for AAP-87199: two DiscoveredTools with the same name used to
-        produce two Tool rows sharing a namespaced_name, tripping
-        uq_tools_namespaced_name at flush and returning 500. The first
-        occurrence must win and the refresh must succeed.
+        Two DiscoveredTools with the same name used to produce two Tool rows
+        sharing a namespaced_name, tripping uq_tools_namespaced_name at flush
+        and returning 500. The first occurrence must win and the refresh must
+        succeed.
         """
         integration_id = await _create_mcp_integration(test_db_session, test_user, "refresh-dup")
 
@@ -256,6 +256,13 @@ class TestIntegrationRefreshContract:
         assert {t.name for t in tools} == {"dup", "unique"}
         assert len([t for t in tools if t.name == "dup"]) == 1
 
+        dup_tool = next(t for t in tools if t.name == "dup")
+        params = (await test_db_session.exec(select(ToolParameter).where(ToolParameter.tool_id == dup_tool.id))).all()
+        assert len(params) == 1
+        assert params[0].name == "query"
+        assert params[0].type == "string"
+        assert params[0].required is True
+
         # Integration is left healthy, not wedged in REFRESHING.
         get_resp = await auth_client.get(f"{BASE_URL}/{integration_id}")
         assert get_resp.json()["refresh_status"] == IntegrationRefreshStatus.AVAILABLE.value
@@ -265,12 +272,12 @@ class TestIntegrationRefreshContract:
     ) -> None:
         """A DB failure during sync leaves a persisted ERROR, not an endless spinner.
 
-        Regression for AAP-87199: _persist_refresh_error reused the session
-        whose transaction the failure had already aborted, raising
-        PendingRollbackError so the ERROR state was never written — the
-        integration stayed refresh_status=REFRESHING with refresh_error=null.
-        Here we force a genuine UniqueViolationError at flush by pre-seeding a
-        Tool whose namespaced_name collides with a newly discovered tool.
+        _persist_refresh_error reused the session whose transaction the failure
+        had already aborted, raising PendingRollbackError so the ERROR state
+        was never written — the integration stayed refresh_status=REFRESHING
+        with refresh_error=null. Here we force a genuine UniqueViolationError
+        at flush by pre-seeding a Tool whose namespaced_name collides with a
+        newly discovered tool.
         """
         integration_id = await _create_mcp_integration(test_db_session, test_user, "refresh-wedge")
         integration = await test_db_session.get(Integration, UUID(integration_id))
