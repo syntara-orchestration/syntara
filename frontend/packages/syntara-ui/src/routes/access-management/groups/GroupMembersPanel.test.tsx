@@ -157,6 +157,33 @@ describe('GroupMembersPanel', () => {
       expect(screen.getByText('bob@example.com')).toBeInTheDocument()
     })
 
+    it('falls back to username in the name column when first_name is empty', () => {
+      vi.mocked(accessClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              id: 'u3',
+              username: 'noname',
+              first_name: '',
+              last_name: null,
+              email: 'noname@example.com',
+              membership_sources: [{ type: 'manual' }],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as never)
+
+      render(<GroupMembersPanel {...defaultProps} />, { wrapper })
+
+      expect(screen.getByRole('link', { name: 'noname' })).toBeInTheDocument()
+      expect(screen.getAllByText('noname')).toHaveLength(2)
+    })
+
     it('shows source labels for membership sources', () => {
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 

@@ -104,7 +104,6 @@ class User(SoftDeletableResource, table=True):
     )
 
     first_name: str = Field(
-        min_length=1,
         max_length=FieldLimits.NAME_MAX_LENGTH,
         sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
         description="User's first name",
@@ -120,9 +119,7 @@ class User(SoftDeletableResource, table=True):
     @property
     def display_name(self) -> str:
         """Computed display name from first and last name."""
-        if self.last_name:
-            return f"{self.first_name} {self.last_name}"
-        return self.first_name
+        return " ".join(part for part in (self.first_name, self.last_name) if part)
 
     password_hash: str | None = Field(
         default=None,

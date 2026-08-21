@@ -26,4 +26,8 @@ describe('userDisplayName', () => {
   it('handles last_name only when first_name is empty', () => {
     expect(userDisplayName({ first_name: '', last_name: 'Doe' })).toBe('Doe')
   })
+
+  it('returns empty string when first_name is null and last_name is null', () => {
+    expect(userDisplayName({ first_name: null, last_name: null })).toBe('')
+  })
 })
