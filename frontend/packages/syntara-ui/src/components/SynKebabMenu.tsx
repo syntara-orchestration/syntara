@@ -22,13 +22,13 @@ export type KebabAction = {
   tooltipProps?: TooltipProps
 }
 
-type NxKebabMenuProps = Readonly<{
+type SynKebabMenuProps = Readonly<{
   actions: KebabAction[]
   /** Accessible label for the toggle button — must be unique per context (e.g. per table row). */
   'aria-label': string
 }>
 
-/** Ensures only one NxKebabMenu is open at a time across the app. */
+/** Ensures only one SynKebabMenu is open at a time across the app. */
 const openMenuClosers = new Map<string, () => void>()
 
 function KebabToggle({
@@ -49,7 +49,7 @@ function KebabToggle({
   )
 }
 
-export function NxKebabMenu({ actions, 'aria-label': ariaLabel }: NxKebabMenuProps) {
+export function SynKebabMenu({ actions, 'aria-label': ariaLabel }: SynKebabMenuProps) {
   const menuId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const toggleRef = useRef<MenuToggleElement>(null)

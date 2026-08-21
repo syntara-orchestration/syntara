@@ -4,14 +4,14 @@ import type { ReactNode } from 'react'
 
 import { SynPanel } from '../layout/SynPanel'
 
-import styles from './NxScrollableTableContainer.module.css'
 import { PaginationFooter, type PaginationFooterProps } from './PaginationFooter'
+import styles from './SynScrollableTableContainer.module.css'
 import { useScrollOverflow } from './useScrollOverflow'
 
-/** Footer props passed to {@link NxScrollableTableContainer}. Forwarded directly to {@link PaginationFooter}. */
+/** Footer props passed to {@link SynScrollableTableContainer}. Forwarded directly to {@link PaginationFooter}. */
 export type TableFooterProps = PaginationFooterProps
 
-type NxScrollableTableContainerProps = {
+type SynScrollableTableContainerProps = {
   /** The table content (Thead, Tbody, etc.) */
   children: ReactNode
   /** Pagination footer props — always renders {@link PaginationFooter} when provided. */
@@ -41,7 +41,7 @@ type NxScrollableTableContainerProps = {
  * The root node is a PatternFly `StackItem` (`isFilled`). It must be a **direct** child of `Stack`;
  * wrapping it in another `StackItem` breaks flex layout (the table will not fill the panel height).
  */
-export function NxScrollableTableContainer({
+export function SynScrollableTableContainer({
   children,
   footer,
   footerContent,
@@ -50,7 +50,7 @@ export function NxScrollableTableContainer({
   useFixedLayout = true,
   variant,
   isStriped,
-}: NxScrollableTableContainerProps) {
+}: SynScrollableTableContainerProps) {
   const useFixed = !isExpandable && useFixedLayout
   const { scrollRef, wrapperRef } = useScrollOverflow()
   const tableClassName = useFixed ? `${styles.table} ${styles.tableFixedLayout}` : styles.table

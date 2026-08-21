@@ -12,8 +12,8 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
-import { NxLabel } from '../../../../components/labels/NxLabel'
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynLabel } from '../../../../components/labels/SynLabel'
+import { SynSelect } from '../../../../components/SynSelect'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 
 type ProjectMultiSelectProps = Readonly<{
@@ -68,7 +68,7 @@ function ProjectSelectToggle({
           {selectedLabels.length > 0 && (
             <LabelGroup>
               {selectedLabels.map((project) => (
-                <NxLabel
+                <SynLabel
                   key={project.id}
                   color="blue"
                   onClose={(e) => {
@@ -77,7 +77,7 @@ function ProjectSelectToggle({
                   }}
                 >
                   {project.name}
-                </NxLabel>
+                </SynLabel>
               ))}
             </LabelGroup>
           )}
@@ -206,7 +206,7 @@ export function ProjectMultiSelect({ selectedIds, onChange, validated }: Project
   )
 
   return (
-    <NxSelect
+    <SynSelect
       aria-label="Select projects"
       isOpen={isOpen}
       selected={selectedIds}
@@ -217,6 +217,6 @@ export function ProjectMultiSelect({ selectedIds, onChange, validated }: Project
       maxMenuHeight="200px"
     >
       <SelectList>{renderProjectOptions(filteredOptions, filterValue, isLoading, selectedIds)}</SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

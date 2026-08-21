@@ -66,7 +66,7 @@ export type UseCursorPaginationResult = {
   perPage: number
   /** Handler for changing items per page */
   handlePerPageChange: (perPage: number) => void
-  /** Build footer props for NxScrollableTableContainer from a query response */
+  /** Build footer props for SynScrollableTableContainer from a query response */
   getFooterProps: (data: PaginatedResponse | undefined) => PaginationFooterProps
   /** Current sort configuration (URL-synced) */
   sort: SortConfig | null
@@ -101,7 +101,7 @@ export type UseCursorPaginationResult = {
  * - Query params building (filters + sort + cursor + limit + extras)
  * - Cursor reset when data is empty and no filters active
  * - handleClearAllFilters (reset cursor + clear filters)
- * - Footer props for NxScrollableTableContainer
+ * - Footer props for SynScrollableTableContainer
  */
 export function useCursorPagination(options: UseCursorPaginationOptions = {}): UseCursorPaginationResult {
   const { limit = 20, defaultFilters, transformFilters, extraParams, defaultSort, columns = [] } = options

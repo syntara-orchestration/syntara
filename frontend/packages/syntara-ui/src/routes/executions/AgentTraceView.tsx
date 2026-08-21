@@ -20,7 +20,7 @@ import { useState } from 'react'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxDetail } from '../../components/details/NxDetail'
 import { NxDetailList } from '../../components/details/NxDetailList'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 
 import {
@@ -170,9 +170,9 @@ function ToolCallCard({ group }: Readonly<{ group: ToolCallGroup }>) {
                 <FlexItem>{group.toolName}</FlexItem>
                 {isFailed && (
                   <FlexItem>
-                    <NxLabel variant="outline" status="danger" icon={<RhUiCloseCircleIcon />}>
+                    <SynLabel variant="outline" status="danger" icon={<RhUiCloseCircleIcon />}>
                       Failed
-                    </NxLabel>
+                    </SynLabel>
                   </FlexItem>
                 )}
               </Flex>

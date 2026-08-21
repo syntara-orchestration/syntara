@@ -12,7 +12,7 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 
 import styles from './AssignRoleModal.module.css'
 
@@ -171,7 +171,7 @@ export function MultiRoleSelect({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id="multi-role-select"
       aria-label="Select roles"
       isOpen={isOpen}
@@ -182,6 +182,6 @@ export function MultiRoleSelect({
       <SelectList className={styles.rolesList}>
         {renderSelectOptions(filteredOptions, filterValue, hasMore, isLoading)}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
