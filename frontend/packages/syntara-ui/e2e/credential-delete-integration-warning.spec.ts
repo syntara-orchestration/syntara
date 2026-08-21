@@ -86,7 +86,7 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
   })
 
   test('attempting to delete a linked credential is blocked and leaves the integration intact', async ({ app }) => {
-    // AAP-87778: DELETE /credentials/{id} used to succeed silently and null out the
+    // DELETE /credentials/{id} used to succeed silently and null out the
     // integration's management_credential_id. The backend now rejects the delete
     // (409 CREDENTIAL_IN_USE) while any integration still references the credential.
     const credName = buildUniqueName('e2e-cred-t37-del')

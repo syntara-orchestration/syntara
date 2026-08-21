@@ -3480,7 +3480,7 @@ export const handlers = [
         { status: 404 }
       )
     }
-    // AAP-87778: block delete while any integration still references this credential
+    // Block delete while any integration still references this credential
     // as its management_credential_id, mirroring the real backend's 409 instead of
     // silently nulling the reference.
     const referencingIntegrations = integrations.filter((i) => i.management_credential_id === credential_id)

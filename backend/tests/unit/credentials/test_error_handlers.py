@@ -82,7 +82,7 @@ class TestCredentialDecryptionHandler:
 
 
 class TestCredentialInUseHandler:
-    """Tests for 409 handler (AAP-87778: block delete while integrations reference it)."""
+    """Tests for 409 handler (block delete while integrations reference it)."""
 
     def test_returns_409(self) -> None:
         request = _mock_request()

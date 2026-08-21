@@ -266,9 +266,9 @@ class TestIntegrationsPatch:
 class TestIntegrationCredentialCascade:
     """Tests for credential deletion impact on integrations (Test 37).
 
-    AAP-87778: deleting an in-use credential used to silently succeed and null
-    out the integration's management_credential_id, leaving validation_status
-    stale. The delete is now blocked with 409 while any integration still
+    Deleting an in-use credential used to silently succeed and null out the
+    integration's management_credential_id, leaving validation_status stale.
+    The delete is now blocked with 409 while any integration still
     references the credential, so the integration is never silently broken.
     """
 

@@ -19,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # CUSTOM: ondelete change not detected by autogenerate (AAP-87778 follow-up).
+    # CUSTOM: ondelete change not detected by autogenerate.
     # The app-level guard in CredentialService.delete_credential blocks deletes
     # while integrations reference the credential, but the previous
     # ON DELETE SET NULL constraint left a TOCTOU race: an integration attached

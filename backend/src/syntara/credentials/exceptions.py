@@ -48,7 +48,7 @@ class CredentialDisabledError(CredentialError):
 class CredentialInUseError(CredentialError):
     """Exception raised when deleting a credential still used as an integration's management credential.
 
-    See AAP-87778: previously the delete silently nulled the integration's
+    Previously the delete silently nulled the integration's
     management_credential_id, leaving validation_status stale (e.g. still
     "available") with no indication the integration could no longer
     authenticate. Blocking the delete forces the caller to detach the

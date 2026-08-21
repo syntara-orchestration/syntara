@@ -658,7 +658,7 @@ class CredentialService(BaseService):
                 management credential on one or more integrations. Deleting
                 it out from under those integrations would silently break
                 them — management_credential_id would be nulled with no
-                signal that validation_status is now stale (see AAP-87778).
+                signal that validation_status is now stale.
                 The caller must detach the credential from all referencing
                 integrations first.
 
