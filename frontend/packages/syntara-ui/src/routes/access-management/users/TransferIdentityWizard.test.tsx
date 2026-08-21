@@ -337,6 +337,26 @@ describe('TransferIdentityWizard', () => {
       expect(screen.getAllByText(/Bob Jones/i).length).toBeGreaterThan(0)
     })
 
+    it('shows username in step 2 description when selected user has no name', async () => {
+      setupMocks({
+        users: {
+          resources: [
+            ...mockUsers.resources,
+            { id: 'user-3', username: 'noname', email: 'noname@example.com', first_name: '', last_name: null },
+          ],
+          next: null,
+          total: 4,
+        },
+      })
+      const user = userEvent.setup()
+      render(<TransferIdentityWizard />, { wrapper })
+      await user.click(screen.getByText('noname@example.com'))
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/noname/i).length).toBeGreaterThan(0)
+    })
+
     it('shows empty state when selected user has no identities', async () => {
       setupMocks({ identities: [] })
       const user = userEvent.setup()

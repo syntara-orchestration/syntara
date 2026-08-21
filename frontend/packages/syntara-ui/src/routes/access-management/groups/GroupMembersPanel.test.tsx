@@ -423,6 +423,41 @@ describe('GroupMembersPanel', () => {
         expect(addTexts.length).toBeGreaterThanOrEqual(2)
       })
     })
+
+    it('shows a display name in the typeahead and omits it when the user has no name', async () => {
+      vi.mocked(useAllUsers).mockReturnValue({
+        users: [
+          {
+            id: 'u-named',
+            username: 'dana',
+            first_name: 'Dana',
+            last_name: 'Lee',
+            email: 'dana@example.com',
+          },
+          {
+            id: 'u-noname',
+            username: 'noname',
+            first_name: '',
+            last_name: null,
+            email: 'nn@example.com',
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      const user = userEvent.setup()
+      render(<GroupMembersPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /add member/i }))
+      await user.click(screen.getByPlaceholderText('Search for a user...'))
+
+      expect(await screen.findByText('Dana Lee')).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /dana/i })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /^noname$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /noname.*Dana Lee/i })).not.toBeInTheDocument()
+    })
   })
 
   describe('Remove member error handling', () => {
