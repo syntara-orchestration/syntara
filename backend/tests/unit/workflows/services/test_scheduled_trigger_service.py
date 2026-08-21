@@ -38,6 +38,7 @@ def _reset_module_caches() -> Generator[None]:
         _mod._search_attr_available = None
         _mod._cached_client = None
         _mod._connect_task = None
+        _mod._connect_generation = 0
 
     _clear()
     yield
@@ -1132,7 +1133,7 @@ class TestGetSharedClient:
             assert mock_connect.await_count == 2
 
     async def test_timed_out_connect_is_replaced(self) -> None:
-        """A hung Client.connect must finish so the next caller starts a new one."""
+        """A hung Client.connect must be abandoned so the next caller starts a new one."""
         connect_calls = 0
         second_client = MagicMock()
 
@@ -1152,10 +1153,76 @@ class TestGetSharedClient:
         ):
             first = await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0)
             assert first is None
-            assert _mod._connect_task is not None
-            assert _mod._connect_task.done()
             assert await _mod._get_shared_client() is second_client
             assert connect_calls == 2
+
+    async def test_hung_connect_is_replaced_even_if_connect_ignores_cancel(self) -> None:
+        """Replacement must not wait for Client.connect to honour cancellation."""
+        connect_calls = 0
+        first_hang = asyncio.Event()
+        second_client = MagicMock()
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                try:
+                    await first_hang.wait()
+                except asyncio.CancelledError:
+                    await first_hang.wait()
+                return MagicMock()
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                first = await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0)
+                assert first is None
+                assert await _mod._get_shared_client() is second_client
+                assert connect_calls == 2
+                assert _mod._cached_client is second_client
+            finally:
+                first_hang.set()
+                await asyncio.sleep(0)
+
+    async def test_stale_connect_does_not_overwrite_newer_client(self) -> None:
+        """A late success from an abandoned connect must not replace the new client."""
+        connect_calls = 0
+        allow_first = asyncio.Event()
+        first_client = MagicMock(name="stale")
+        second_client = MagicMock(name="fresh")
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                try:
+                    await allow_first.wait()
+                except asyncio.CancelledError:
+                    await allow_first.wait()
+                return first_client
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                assert await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0) is None
+                assert await _mod._get_shared_client() is second_client
+                allow_first.set()
+                await asyncio.sleep(0.05)
+                assert _mod._cached_client is second_client
+            finally:
+                allow_first.set()
 
 
 class TestCreateSchedule:

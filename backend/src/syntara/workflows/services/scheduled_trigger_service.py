@@ -51,10 +51,12 @@ SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkfl
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
 _connect_task: asyncio.Task[Client | None] | None = None
+_connect_generation = 0
 
-# Bound the shared connect itself so a hang is cancelled and the next caller
-# can start a new attempt. Waiters still shield this task so a timed-out
-# reconciler cycle cannot cancel an in-flight connect.
+# Waiters bound how long they join an in-flight connect. On timeout they
+# drop ``_connect_task`` so the next caller can start a replacement even if
+# ``Client.connect`` never honours cancellation. Shield still prevents a
+# timed-out reconciler cycle from cancelling a connect other waiters need.
 _CONNECT_TIMEOUT_SECONDS = 10.0
 
 _search_attr_available: bool | None = None
@@ -115,11 +117,39 @@ def _invalidate_client_cache() -> None:
 
     Leaves ``_connect_task`` in place. An in-flight connect must keep a
     strong reference; ``_get_shared_client`` starts a new task only after
-    the current one is done.
+    the current one is done or abandoned.
     """
     global _cached_client, _search_attr_available  # noqa: PLW0603
     _cached_client = None
     _search_attr_available = None
+
+
+async def _close_temporal_client(client: Client) -> None:
+    """Close a discarded Temporal client; ignore SDK/mock close failures."""
+    close = getattr(client, "close", None)
+    if not callable(close):
+        return
+    try:
+        result = close()
+        if asyncio.iscoroutine(result):
+            await result
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to close discarded Temporal client", exc_info=True)
+
+
+async def _abandon_in_flight_connect(connect_task: asyncio.Task[Client | None]) -> None:
+    """Drop a hung connect so the next caller can start a new one.
+
+    Does not wait for ``Client.connect`` to honour cancellation. A later
+    success from this generation is discarded and not cached.
+    """
+    global _connect_task, _connect_generation  # noqa: PLW0603
+    async with _client_lock:
+        if _connect_task is not connect_task or connect_task.done():
+            return
+        _connect_generation += 1
+        _connect_task = None
+        connect_task.cancel()
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
@@ -180,31 +210,46 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return False
 
 
-async def _connect_shared_client() -> Client | None:
+async def _connect_shared_client(generation: int) -> Client | None:
     """Open a Temporal client without holding ``_client_lock``.
 
     Waiters share this task via ``_get_shared_client``. Cancellation of a
     waiter must not cancel this connect (see ``asyncio.shield`` there).
-    This task is itself bounded: a hung ``Client.connect`` is cancelled so
-    the next ``_get_shared_client`` can start a replacement.
+    If this generation was abandoned, a late success is closed and not cached.
     """
     global _cached_client  # noqa: PLW0603
     try:
         settings = get_settings()
-        async with asyncio.timeout(_CONNECT_TIMEOUT_SECONDS):
-            client = await Client.connect(
-                settings.temporal_address,
-                namespace=settings.temporal_namespace,
-                tls=build_temporal_tls_config(),
-            )
-    except TimeoutError:
-        logger.warning("Temporal connect timed out")
+        client = await Client.connect(
+            settings.temporal_address,
+            namespace=settings.temporal_namespace,
+            tls=build_temporal_tls_config(),
+        )
+    except asyncio.CancelledError:
+        if generation == _connect_generation:
+            raise
+        logger.warning("Temporal connect cancelled")
         return None
     except (OSError, RuntimeError, RPCError) as e:
         logger.warning("Temporal unavailable for schedule management", error=str(e))
         return None
-    _cached_client = client
-    return client
+
+    extra: Client | None = None
+    cached: Client | None
+    async with _client_lock:
+        if generation != _connect_generation:
+            extra = client
+            cached = _cached_client
+        elif _cached_client is None:
+            _cached_client = client
+            return client
+        else:
+            extra = client if client is not _cached_client else None
+            cached = _cached_client
+
+    if extra is not None:
+        await _close_temporal_client(extra)
+    return cached
 
 
 async def _get_shared_client() -> Client | None:
@@ -218,18 +263,25 @@ async def _get_shared_client() -> Client | None:
     starting the in-flight connect task, so a hung connect cannot block the
     schedule reconciler from taking the lock. Waiters use ``asyncio.shield``
     so a timed-out reconciler cycle does not cancel an in-flight connect.
-    ``_connect_shared_client`` is bounded so a hang completes, and the next
-    caller starts a new connect instead of joining the same stuck task.
+    Each waiter is bounded: on timeout the in-flight task is abandoned so
+    the next caller starts a new connect even if ``Client.connect`` never
+    honours cancellation.
     """
     global _connect_task  # noqa: PLW0603
     async with _client_lock:
         if _cached_client is not None:
             return _cached_client
         if _connect_task is None or _connect_task.done():
-            _connect_task = asyncio.create_task(_connect_shared_client())
+            _connect_task = asyncio.create_task(_connect_shared_client(_connect_generation))
         connect_task = _connect_task
 
-    return await asyncio.shield(connect_task)
+    try:
+        async with asyncio.timeout(_CONNECT_TIMEOUT_SECONDS):
+            return await asyncio.shield(connect_task)
+    except TimeoutError:
+        await _abandon_in_flight_connect(connect_task)
+        logger.warning("Temporal connect timed out")
+        return None
 
 
 class ScheduledTriggerService:
