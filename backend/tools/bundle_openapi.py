@@ -16,7 +16,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -615,8 +615,9 @@ def _build_merged_spec(sub_specs: list[Path]) -> dict[str, Any]:
     # Remove shared schemas that are no longer referenced by any path or sub-spec schema
     _prune_unreferenced_shared_schemas(merged, shared_schema_names)
 
-    # Merge allOf of plain objects into flat schemas
-    return _flatten_plain_allof(merged)
+    # Merge allOf of plain objects into flat schemas. _flatten_plain_allof is a generic
+    # Any -> Any tree-walker, but its dict branch always returns a dict, so this is safe.
+    return cast("dict[str, Any]", _flatten_plain_allof(merged))
 
 
 # ---------------------------------------------------------------------------
