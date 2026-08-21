@@ -1,0 +1,178 @@
+---
+site_name: Syntara Documentation
+site_description: Documentation for the Syntara distributed multi-agent automation system
+site_url: https://syntara-orchestration.readthedocs.io/
+repo_url: https://github.com/syntara-orchestration/syntara
+edit_uri: edit/devel/docs/
+
+hooks:
+  - docs/hooks/resolve_symlink_edit_urls.py
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - llmstxt:
+      markdown_description: >-
+        Developer documentation for Syntara, a distributed multi-agent
+        automation system. Covers the Python/FastAPI backend, React/TypeScript
+        frontend, workflow engine, and development standards.
+      full_output: llms-full.txt
+      sections:
+        Backend:
+          - backend/*.md
+          - backend/**/*.md
+        Frontend:
+          - frontend/*.md
+          - frontend/**/*.md
+        CI:
+          - ci/*.md
+
+theme:
+  name: material
+  logo: syntara-icon.png
+  favicon: syntara-icon.png
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.indexes
+    - navigation.tracking
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+validation:
+  links:
+    not_found: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Backend:
+      - Getting Started: backend/developer-getting-started.md
+      - Authentication: backend/authentication.md
+      - Authorization: backend/authorization.md
+      - Approvals:
+          - Overview: backend/approvals/approval-overview.md
+          - Authorization Model: backend/approvals/approval-authorization-model.md
+          - Execution Pattern: backend/approvals/approval-execution-pattern.md
+      - Audit: backend/audit.md
+      - CLI: backend/cli.md
+      - Credentials: backend/credential.md
+      - Error Handling: backend/error-handling-strategy.md
+      - Execution Runtime: backend/execution-runtime.md
+      - File Storage: backend/file-storage.md
+      - Integrations: backend/integrations.md
+      - Periodic Background Execution: backend/periodic-background-execution.md
+      - Resilient Background Execution: backend/resilient-background-execution.md
+      - Runtime Settings: backend/runtime-settings.md
+      - S2S Certificate Auth: backend/s2s-cert-authentication.md
+      - Service Accounts: backend/service-accounts.md
+      - Structured Logging Research: backend/structured-logging-research.md
+      - Workflow Management: backend/workflow-management.md
+      - Workflow Versioning: backend/workflow-versioning.md
+      - Development:
+          - Development with Worktrees: backend/development-with-worktrees.md
+          - OpenAPI Status Code Analysis: backend/openapi-status-code-analysis.md
+      - Standards:
+          - Overview: backend/standards/README.md
+          - Access Control: backend/standards/access-control.md
+          - API Response Format: backend/standards/api-response-format.md
+          - Configuration: backend/standards/configuration.md
+          - Database: backend/standards/database.md
+          - Dependency Management: backend/standards/dependency-management.md
+          - Exceptions: backend/standards/exceptions.md
+          - Formatting: backend/standards/formatting.md
+          - Imports and Modules: backend/standards/imports-and-modules.md
+          - Locks: backend/standards/locks.md
+          - Logging: backend/standards/logging.md
+          - Observability: backend/standards/observability.md
+          - OpenAPI Spec Management: backend/standards/openapi-spec-management.md
+          - Questions: backend/standards/questions.md
+          - Redis: backend/standards/redis.md
+          - Services: backend/standards/services.md
+          - Static Analysis: backend/standards/static-analysis.md
+          - Testing: backend/standards/testing.md
+          - UI-API Parity: backend/standards/ui-api-parity.md
+          - WebSocket: backend/standards/websocket.md
+      - Workflow Engine:
+          - Overview: backend/workflow-engine/workflow-engine-overview.md
+          - Workflow Definition Guide: backend/workflow-engine/workflow-definition-guide.md
+          - Execution Lifecycle: backend/workflow-engine/execution-lifecycle.md
+          - Expression System: backend/workflow-engine/expression-system.md
+          - Node Settings: backend/workflow-engine/node-settings.md
+          - Retry Policies: backend/workflow-engine/retry-policies.md
+          - Manual Run and Testing: backend/workflow-engine/manual-run-and-testing.md
+          - Verify Test Workflow: backend/workflow-engine/verify-test-workflow.md
+          - AAP Nodes: backend/workflow-engine/aap-nodes.md
+          - Agentic Node: backend/workflow-engine/agentic-node.md
+          - Converge Node: backend/workflow-engine/converge-node.md
+          - Switch Node: backend/workflow-engine/switch-node.md
+          - Wait Node: backend/workflow-engine/wait-node.md
+          - Triggers:
+              - Overview: backend/workflow-engine/triggers/overview.md
+              - Manual Trigger: backend/workflow-engine/triggers/manual-trigger.md
+              - Scheduled Trigger: backend/workflow-engine/triggers/scheduled-trigger.md
+              - Webhook Triggers: backend/workflow-engine/triggers/webhook-triggers.md
+  - Frontend:
+      - Architecture: frontend/architecture.md
+      - Data Flow: frontend/data-flow.md
+      - Zustand Architecture: frontend/zustand-architecture.md
+      - WebSocket Architecture: frontend/websocket-architecture.md
+      - Execution Visualizer Protocol: frontend/execution-visualizer-protocol.md
+      - Error Handling: frontend/error-handling.md
+      - Permissions & RBAC: frontend/permissions-rbac.md
+      - V2 Migration Guide: frontend/v2-migration-guide.md
+      - Workflow Loading & Saving: frontend/workflow-loading-saving.md
+      - AI-Assisted Development: frontend/ai-assisted-development.md
+      - Filter Test Helpers: frontend/TEST_HELPERS_FILTER_TESTING.md
+      - Features:
+          - Approval UI Architecture: frontend/features/approval-ui-architecture.md
+          - Approval Builder Integration: frontend/features/approval-builder-integration.md
+          - Approval Execution Integration: frontend/features/approval-execution-integration.md
+      - User Guides:
+          - Using Search and Filters: frontend/user-guides/filtering.md
+  - CI:
+      - Secrets Inventory: ci/secrets-inventory.md
+      - Secrets Storage: ci/secrets-storage.md
