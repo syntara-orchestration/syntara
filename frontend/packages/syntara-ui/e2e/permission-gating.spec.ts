@@ -449,9 +449,10 @@ test.describe('Permission gating — Workflow actions', () => {
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
       const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      await kebab.click()
 
       const editItem = viewerApp.getByRole('menuitem', { name: /Edit workflow/i })
+      await expect(editItem).toBeVisible()
       await editItem.hover()
       await expect(viewerApp.getByRole('tooltip').filter({ hasText: 'workflow:update' })).toBeVisible()
     } finally {

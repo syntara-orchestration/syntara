@@ -426,17 +426,21 @@ test.describe('Pagination Footer — Integrations', () => {
 })
 
 test.describe('Pagination Footer — Identity Providers', () => {
-  test('pagination footer is visible on identity providers tab', async ({ app }) => {
-    await app.goto(toAppUrl('/system-administration/authentication'))
+  const guard = createUnavailableGuard('No identity provider data available')
 
+  test.beforeEach(async ({ app }) => {
+    await app.goto(toAppUrl('/system-administration/authentication'))
     const table = app.getByRole('grid', { name: 'Identity providers table' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) guard.markUnavailable()
     test.skip(!hasTable, 'No identity provider data available')
+  })
 
+  test('pagination footer is visible on identity providers tab', async ({ app }) => {
     const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
-    await expect(perPageToggle).toBeVisible({ timeout: 5000 })
+    await expect(perPageToggle).toBeVisible()
   })
 })
