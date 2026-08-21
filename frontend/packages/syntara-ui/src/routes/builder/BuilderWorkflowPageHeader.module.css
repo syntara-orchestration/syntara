@@ -1,0 +1,15 @@
+.titleSlot {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+/* PF TextInput is width 100% with no intrinsic min-width. Without grow and a
+   floor, this item collapses to 0 and only the edit icon remains visible. */
+.workflowName {
+  min-width: 20ch;
+}
+
+.workflowName :global(.pf-v6-c-form-control) {
+  width: 100%;
+}
