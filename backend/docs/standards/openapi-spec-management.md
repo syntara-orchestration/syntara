@@ -17,6 +17,7 @@ Syntara follows a **domain sub-spec → bundled spec** model:
 src/syntara/schemas/
 ├── openapi.yaml               # Bundled spec — all endpoints (generated — do not edit)
 ├── openapi-public.yaml        # Bundled spec — public endpoints only (generated — do not edit)
+├── openapi-public.json        # Same as above, JSON format (generated — do not edit)
 ├── base/                      # Shared base schemas (skipped during bundling)
 ├── {domain}/
 │   ├── openapi.yaml           # Domain sub-spec (edit this)
@@ -34,7 +35,7 @@ src/syntara/schemas/
 ## OpenAPI Version and Format
 
 - All OpenAPI specs MUST use version **3.1.0**
-- All spec files MUST be **YAML**
+- Domain sub-specs and bundled specs MUST be **YAML**; the public spec is also committed as JSON for the API catalog
 - Nullable fields MUST use modern JSON Schema union typing: `[type, "null"]`, not the deprecated `nullable: true`
 
 ## Makefile Targets
@@ -42,7 +43,7 @@ src/syntara/schemas/
 | Target | Purpose |
 |--------|---------|
 | `make api-spec-bundle` | Merge all domain sub-specs into `src/syntara/schemas/openapi.yaml` |
-| `make api-spec-bundle-public` | Merge public domain sub-specs into `src/syntara/schemas/openapi-public.yaml` |
+| `make api-spec-bundle-public` | Merge public domain sub-specs into `src/syntara/schemas/openapi-public.yaml` and `src/syntara/schemas/openapi-public.json` |
 | `make api-spec-bundle-all` | Run both `api-spec-bundle` and `api-spec-bundle-public` |
 | `make api-spec-drift` | Check that the committed spec matches the generated one (exit 1 if out of sync) |
 | `make api-spec-drift-public` | Same, for the public spec |
@@ -54,7 +55,7 @@ src/syntara/schemas/
 
 1. Edit the relevant domain sub-spec (`src/syntara/schemas/{domain}/openapi.yaml`)
 2. Run `make api-spec-bundle-all` to regenerate both bundled specs
-3. Commit the sub-spec change and both updated spec files
+3. Commit the sub-spec change and all updated spec files (`openapi.yaml`, `openapi-public.yaml`, `openapi-public.json`)
 
 ## Pre-commit Hooks
 
