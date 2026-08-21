@@ -16,6 +16,7 @@ import {
 } from './GroupMappingComponents'
 import type { MappingTableProps } from './GroupMappingComponents'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
+import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
 const mockMappedGroups: MappedGroup[] = [
@@ -384,10 +385,12 @@ describe('MappingTable', () => {
         rows={mockRows}
         isReadOnly
         showValidation
-        entryErrors={[
-          { idpGroupValue: { message: 'IdP group value is required' }, mappedGroupId: { message: 'Select a group' } },
-          null,
-        ]}
+        entryErrors={
+          [
+            { idpGroupValue: { message: 'IdP group value is required' }, mappedGroupId: { message: 'Select a group' } },
+            null,
+          ] as unknown as GroupMappingEditFormValues['entries']
+        }
       />
     )
 
@@ -401,7 +404,7 @@ describe('MappingTable', () => {
         rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
         isReadOnly
         showValidation
-        entryErrors={'not-an-array' as unknown as typeof editFormEntries}
+        entryErrors={'not-an-array' as unknown as GroupMappingEditFormValues['entries']}
       />
     )
 
@@ -415,7 +418,9 @@ describe('MappingTable', () => {
         rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
         isReadOnly
         showValidation
-        entryErrors={[{ idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } }]}
+        entryErrors={
+          [{ idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } }] as unknown as GroupMappingEditFormValues['entries']
+        }
       />
     )
 
