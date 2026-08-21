@@ -3,7 +3,7 @@ import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { NodeFormTabBarProvider } from './node-forms/shared/NodeFormTabBarContext'
@@ -81,7 +81,7 @@ export function NodeEditorLayout({
   else if (mode === 'add') closeAriaLabel = 'Cancel step creation'
 
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       isGlass={false}
@@ -204,6 +204,6 @@ export function NodeEditorLayout({
           />
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

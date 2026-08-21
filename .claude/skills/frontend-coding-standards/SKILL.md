@@ -338,7 +338,7 @@ export function MyListPage() {
   useCursorReset(items.length, hasActiveFilters, cursor, query.isFetching, setCursor)
 
   return (
-    <NxPage>
+    <SynPage>
       <FilterBar ... />
       <NxScrollableTableContainer
         footer={getFooterProps(query.data)}
@@ -355,7 +355,7 @@ export function MyListPage() {
       >
         Are you sure?
       </NxConfirmationDialog>
-    </NxPage>
+    </SynPage>
   )
 }
 ```
@@ -1670,11 +1670,11 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function WorkflowsPage() {
   const docLink = useDocLink('workflows')  // type-safe DocKey
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 
-`NxPageHeader` renders the `docLink` as an external link icon next to the page title.
+`SynPageHeader` renders the `docLink` as an external link icon next to the page title.
 
 For the workflow builder's node editor panel, pass `docLink` as a prop to `NodeEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
 
@@ -1696,10 +1696,10 @@ The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode th
 const docLink = useDocLink('myNewPage')
 ```
 
-3. Pass it to `NxPageHeader`:
+3. Pass it to `SynPageHeader`:
 
 ```typescript
-<NxPageHeader title="My New Page" docLink={docLink} />
+<SynPageHeader title="My New Page" docLink={docLink} />
 ```
 
 ### Community vs extended
@@ -1714,7 +1714,7 @@ Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). 
 ### Rules
 
 1. **Never hardcode doc URLs** -- always use `useDocLink(key)` so links follow community vs extended resolution
-2. **Every page with `NxPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
+2. **Every page with `SynPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
 3. **`DocKey` is enforced by TypeScript** -- passing a string not in `docsUrls.json` is a compile error
 4. **Keep paths as obvious placeholders until real URLs exist** -- use `__PLACEHOLDER__/...` (not subtle strings that could look real)
 
@@ -1857,17 +1857,17 @@ Look at sibling pages in the same route directory. If `IdentityProviderDetail.ts
 
 ## 37. Browser Tab Titles -- `toPageTitle`
 
-Every top-level page component (default export with an `<NxPage>` render) must include `<title>` as the first child of `<NxPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
+Every top-level page component (default export with an `<SynPage>` render) must include `<title>` as the first child of `<SynPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
 
 ```tsx
 import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -1885,12 +1885,12 @@ React 19 passes `ref` as a regular prop. Prefer the patterns below for all new a
 
 ```tsx
 // ❌ BAD — React 19 makes forwardRef unnecessary
-export const NxPanel = forwardRef<HTMLDivElement, NxPanelProps>(function NxPanel(props, ref) {
+export const SynPanel = forwardRef<HTMLDivElement, SynPanelProps>(function SynPanel(props, ref) {
   return <Panel ref={ref} {...props} />
 })
 
 // ✅ GOOD — accept ref as a regular prop
-export function NxPanel({ ref, ...props }: NxPanelProps & { ref?: Ref<HTMLDivElement> }) {
+export function SynPanel({ ref, ...props }: SynPanelProps & { ref?: Ref<HTMLDivElement> }) {
   return <Panel ref={ref} {...props} />
 }
 ```

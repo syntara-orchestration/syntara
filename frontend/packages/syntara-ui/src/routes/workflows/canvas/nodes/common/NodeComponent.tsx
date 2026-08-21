@@ -4,7 +4,7 @@ import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { Handle, type NodeProps, Position } from '@xyflow/react'
 import React, { useEffect, useMemo, useState } from 'react'
 
-import { NxPanel } from '../../../../../components/layout/NxPanel'
+import { SynPanel } from '../../../../../components/layout/SynPanel'
 import { FlowNodeType } from '../../../../../constants'
 import { ExecutionStatusBadge } from '../../../../builder/components/ExecutionStatusBadge'
 import type { ActivityStatus } from '../../../execution/types'
@@ -232,7 +232,7 @@ export function NodeComponent(props: {
 
   return (
     <NodeExpandedContext.Provider value={expandedContext}>
-      <NxPanel
+      <SynPanel
         hasNoPadding
         variant="raised"
         className={props.className}
@@ -308,7 +308,7 @@ export function NodeComponent(props: {
             }}
           />
         )}
-      </NxPanel>
+      </SynPanel>
     </NodeExpandedContext.Provider>
   )
 }

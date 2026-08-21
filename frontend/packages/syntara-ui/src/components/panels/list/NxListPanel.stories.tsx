@@ -5,8 +5,8 @@ import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
 
 import { useTableSort } from '../../../hooks/useTableSort'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { NxPage, NxPageBody } from '../../layout/NxPage'
-import { NxPageHeader } from '../../layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../layout/SynPage'
+import { SynPageHeader } from '../../layout/SynPageHeader'
 import { NxEmptyStateNoData } from '../../states/NxEmptyStateNoData'
 
 import {
@@ -80,11 +80,11 @@ const PAGE_WRAPPER_STYLE = { height: '600px', display: 'flex', flexDirection: 'c
 
 const panelDecorator: Decorator = (Story) => (
   <div style={PANEL_WRAPPER_STYLE}>
-    <NxPage>
-      <NxPageBody>
+    <SynPage>
+      <SynPageBody>
         <Story />
-      </NxPageBody>
-    </NxPage>
+      </SynPageBody>
+    </SynPage>
   </div>
 )
 
@@ -96,7 +96,7 @@ const meta: Meta<typeof NxListPanel> = {
     docs: {
       description: {
         component:
-          'Compound component that composes `NxPanel`, toolbar, and table into a consistent list view.\n\n' +
+          'Compound component that composes `SynPanel`, toolbar, and table into a consistent list view.\n\n' +
           '**Sub-components:**\n' +
           '- `NxListPanel` — pure layout wrapper; always full-height and scrollable\n' +
           '- `NxListPanelView` — owns the state machine; toolbar is hidden during initial load\n' +
@@ -446,9 +446,9 @@ export const ReadOnlyList: Story = {
   render: function ReadOnlyListStory() {
     return (
       <div style={PAGE_WRAPPER_STYLE}>
-        <NxPage>
-          <NxPageHeader title="Executions" />
-          <NxPageBody>
+        <SynPage>
+          <SynPageHeader title="Executions" />
+          <SynPageBody>
             <NxListPanel>
               <NxListPanelView
                 isPending={false}
@@ -461,8 +461,8 @@ export const ReadOnlyList: Story = {
                 body={<SampleTable rows={SAMPLE_ROWS} />}
               />
             </NxListPanel>
-          </NxPageBody>
-        </NxPage>
+          </SynPageBody>
+        </SynPage>
       </div>
     )
   },

@@ -23,7 +23,7 @@ import { FilterBar } from '../../components/filters/FilterBar'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { NxLabel } from '../../components/labels/NxLabel'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import type { KebabAction } from '../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../components/NxKebabMenu'
 import { NxLink } from '../../components/NxLink'
@@ -84,7 +84,9 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
 
   /* v8 ignore start -- v8 emits phantom branches from compiled hook destructuring */
-  const { allowed: canRun, isChecking } = useCanI('run', 'execution')
+  const { allowed: canRun, isChecking } = useCanI('run', 'execution', {
+    resourceProject: execution.project_id,
+  })
   const {
     isCurrentVersion,
     versionLabel,
@@ -266,7 +268,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
   }
 
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -365,6 +367,6 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
           </StackItem>
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

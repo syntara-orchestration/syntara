@@ -16,6 +16,7 @@ from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import FieldLimits
     from syntara.core.exceptions import SafeValueError
+    from syntara.workflows.workflow_engine.activities.approval_activity import fail_detached_approval_activity
     from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
     from syntara.workflows.workflow_engine.models.workflow_definition import (
         ActivityName,
@@ -49,23 +50,32 @@ class WorkflowApprovalMixin:
     resolver: NamespaceResolver
     _runtime_settings: dict[str, Any]
     skipped_nodes: set[str]
+    _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
 
-    async def _expire_approval_requests(self, node_id: str) -> None:
-        """Best-effort expire pending approval requests for a timed-out approval node."""
+    async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
+        """Best-effort expire pending approval requests.
+
+        node_id=None expires every pending approval for the execution;
+        a specific node_id scopes the expiry to that node only.
+        """
         try:
             await workflow.execute_activity(
                 ActivityName.EXPIRE_APPROVAL,
                 args=[self.execution_id, node_id],
-                activity_id=f"__internal__expire_approval_{node_id}",
+                activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         except Exception:  # noqa: BLE001
             workflow.logger.warning(
-                "Failed to expire approval requests for node %s (best-effort)",
+                "Failed to expire approval requests (best-effort): node_id=%s",
                 node_id,
             )
+
+    async def _expire_approval_requests(self, node_id: str) -> None:
+        """Expire pending approval requests for a timed-out approval node."""
+        await self._expire_approvals(node_id, activity_id=f"__internal__expire_approval_{node_id}")
 
     async def _maybe_expire_approval(
         self,
@@ -80,6 +90,46 @@ class WorkflowApprovalMixin:
             and isinstance(error.cause, TemporalTimeoutError)
         ):
             await self._expire_approval_requests(node_id)
+
+    async def _expire_remaining_approvals(self, graph: "WorkflowGraph") -> None:
+        """Expire any approvals left pending by a detached approval node.
+
+        Covers approval nodes left pending because a converge/failure path detached
+        them before a decision was recorded (e.g. two approval branches where the
+        workflow reaches its terminal state after only one is decided). Also fails
+        the underlying Temporal activity for each detached approval node so it
+        resolves immediately instead of lingering until its own start_to_close_timeout.
+
+        No-ops if nothing was detached: an approval that already resolved via its
+        own timeout (``_maybe_expire_approval``) or a normal decision needs no
+        further cleanup here.
+        """
+        detached_approval_ids = [
+            node_id for node_id in self._detached_nodes if graph.get_node(node_id).type == NodeType.APPROVAL
+        ]
+        if not detached_approval_ids:
+            return
+
+        await self._expire_approvals(None, activity_id="__internal__expire_remaining_approvals")
+
+        for node_id in detached_approval_ids:
+            await self._fail_detached_approval_activity(node_id)
+
+    async def _fail_detached_approval_activity(self, node_id: str) -> None:
+        """Best-effort fail the async APPROVAL activity for a single detached node."""
+        try:
+            await workflow.execute_local_activity(
+                fail_detached_approval_activity,
+                args=[workflow.info().workflow_id, workflow.info().run_id, node_id],
+                activity_id=f"__internal__fail_detached_approval_{node_id}",
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to fail detached approval activity (best-effort): node_id=%s",
+                node_id,
+            )
 
     async def _cancel_approval_requests(self) -> None:
         """Best-effort cancel all pending approval requests when workflow is cancelled.

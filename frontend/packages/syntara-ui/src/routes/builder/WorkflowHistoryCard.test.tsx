@@ -6,6 +6,8 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useCanI } from '../../hooks/useCanI'
+
 import { WorkflowHistoryCard, ExecutionHistoryRow } from './WorkflowHistoryCard'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -72,7 +74,7 @@ vi.mock('../../components/table/PaginationFooter', () => ({
 }))
 
 vi.mock('../../hooks/useCanI', () => ({
-  useCanI: () => ({ allowed: true, isChecking: false, isError: false }),
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
 }))
 
 const baseExecution: Execution = {
@@ -533,6 +535,12 @@ describe('ExecutionHistoryRow', () => {
     renderRow({ ...baseExecution, status: 'running' })
 
     expect(screen.queryByRole('button', { name: /Actions for execution/ })).not.toBeInTheDocument()
+  })
+
+  it('passes resourceProject to useCanI for retryable executions', () => {
+    renderRow({ ...baseExecution, status: 'failed', project_id: 'proj-abc' })
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-abc' })
   })
 
   it('opens the retry dialog from the kebab menu', async () => {

@@ -4,6 +4,17 @@ import { expect, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
 
 /**
+ * Dismisses the "Live updates paused" connection banner if visible.
+ * Uses role-based locator to stay off PatternFly class names.
+ */
+export async function dismissConnectionBanner(app: Page): Promise<void> {
+  const banner = app.getByRole('alert').filter({ hasText: 'Live updates paused' })
+  if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await banner.getByRole('button', { name: /close/i }).click()
+  }
+}
+
+/**
  * Waits for the approval review panel to be visible.
  * Verifies both URL navigation to execution detail with approval query param
  * and the "Review Approval" heading visibility.

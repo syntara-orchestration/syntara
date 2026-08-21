@@ -3,9 +3,9 @@ import type { MutableRefObject } from 'react'
 import { useLayoutEffect } from 'react'
 import { FormProvider } from 'react-hook-form'
 
-import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../../components/layout/NxPanel'
+import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../../components/layout/SynPanel'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
 
 import { GroupMappingEditPanel } from './GroupMappingEditPanel'
@@ -41,10 +41,10 @@ function GroupMappingFormEditorContent({
 
   return (
     <FormProvider {...editForm.form}>
-      <NxPage>
-        <NxPageHeader title={pageTitle} breadcrumbs={breadcrumbs} docLink={mappingDocLink} />
-        <NxPageBody>
-          <NxPanel
+      <SynPage>
+        <SynPageHeader title={pageTitle} breadcrumbs={breadcrumbs} docLink={mappingDocLink} />
+        <SynPageBody>
+          <SynPanel
             isFullHeight
             isScrollable
             panelMainBodyProps={{ style: { padding: 'var(--pf-t--global--spacer--lg)' } }}
@@ -65,9 +65,9 @@ function GroupMappingFormEditorContent({
             }
           >
             <GroupMappingEditPanel {...editForm.panel} />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     </FormProvider>
   )
 }

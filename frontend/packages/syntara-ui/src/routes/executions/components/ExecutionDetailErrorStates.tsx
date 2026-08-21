@@ -1,9 +1,9 @@
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { detachPromise } from '../../../utils/detachPromise'
 
 type ExecutionDetailErrorStatesProps = Readonly<{
@@ -25,43 +25,43 @@ export function ExecutionDetailErrorStates({
 }: ExecutionDetailErrorStatesProps) {
   if (!executionId) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Workflow Runs']} />
-        <NxPageHeader title="Error" />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Workflow Runs']} />
+        <SynPageHeader title="Error" />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxErrorState title="Invalid execution" message="No execution ID provided" />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (error) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Workflow Runs']} />
-        <NxPageHeader title="Error loading execution" />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Workflow Runs']} />
+        <SynPageHeader title="Error loading execution" />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxErrorState title="Error loading execution" message={error} onRetry={() => detachPromise(onRetry())} />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (isLoading) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Workflow Runs']} />
-        <NxPageHeader title="Loading execution" />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Workflow Runs']} />
+        <SynPageHeader title="Loading execution" />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxLoadingState />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 

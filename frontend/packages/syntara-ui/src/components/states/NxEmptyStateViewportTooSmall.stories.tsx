@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Full-height empty state displayed when the viewport width is below the minimum required for React Flow canvases (1024px). Used by `NxReactFlowViewportGuard` to prevent users from attempting to use the workflow builder or execution visualizer on screens that are too small.',
+          'Full-height empty state displayed when the viewport width is below the minimum required for React Flow canvases (1024px). Used by `SynReactFlowViewportGuard` to prevent users from attempting to use the workflow builder or execution visualizer on screens that are too small.',
       },
     },
   },

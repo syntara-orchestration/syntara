@@ -132,6 +132,67 @@ async def test_expire_api_error_returns_gracefully(execution_id: str, node_id: s
 
 
 @pytest.mark.asyncio
+async def test_expire_all_pending_when_node_id_none(execution_id: str) -> None:
+    """When node_id is omitted, pending approvals across all nodes are expired."""
+    approvals = [
+        {"id": str(uuid4()), "approval_node_id": "approval_1", "status": "pending"},
+        {"id": str(uuid4()), "approval_node_id": "approval_2", "status": "pending"},
+    ]
+
+    mock_client = AsyncMock()
+    mock_client.list_approvals_by_execution = AsyncMock(return_value=approvals)
+    mock_client.batch_expire = AsyncMock(return_value={"total_success": 2, "total_failed": 0})
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "syntara.workflows.workflow_engine.activities.approval_activity.AuditEventDispatcher",
+        ) as mock_dispatcher,
+    ):
+        result = await expire_approval_requests_activity(execution_id)
+
+    assert result["expired_count"] == 2
+    expired_ids = mock_client.batch_expire.call_args[0][0]
+    assert len(expired_ids) == 2
+    dispatched_node_ids = {call.args[0].approval_node_id for call in mock_dispatcher.dispatch.call_args_list}
+    assert dispatched_node_ids == {"approval_1", "approval_2"}
+
+
+@pytest.mark.asyncio
+async def test_expire_fails_before_mutating_on_malformed_record(execution_id: str) -> None:
+    """A record missing approval_node_id fails before batch_expire runs.
+
+    Guards against silently reporting "0 expired" while the mutation actually
+    succeeded: validation of the audit-record shape must happen before the
+    mutating API call, not after. Uses node_id=None (execution-wide expiry) since
+    the per-node filter path would otherwise drop the malformed record before
+    it's ever validated.
+    """
+    malformed_approval = {"id": str(uuid4()), "status": "pending"}  # missing approval_node_id
+
+    mock_client = AsyncMock()
+    mock_client.list_approvals_by_execution = AsyncMock(return_value=[malformed_approval])
+    mock_client.batch_expire = AsyncMock(return_value={"total_success": 1, "total_failed": 0})
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+        return_value=mock_client,
+    ):
+        result = await expire_approval_requests_activity(execution_id)
+
+    assert result["expired_count"] == 0
+    assert "error" in result
+    mock_client.batch_expire.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_expire_unexpected_error_returns_gracefully(execution_id: str, node_id: str) -> None:
     """Unexpected errors are caught and returned as error info, not raised."""
     mock_client = AsyncMock()

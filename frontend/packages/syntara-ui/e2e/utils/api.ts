@@ -80,7 +80,7 @@ export async function ensureProject(app: Page, name = 'default'): Promise<{ id: 
     const token = await getAuthToken(app)
     if (!token) return null
 
-    const listResp = await apiRequest(app, 'get', '/projects', { token })
+    const listResp = await apiRequest(app, 'get', '/projects?limit=100', { token })
     if (!listResp.ok()) return null
 
     const body = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
