@@ -56,6 +56,7 @@ describe('BuilderEditorToolbar', () => {
     handleSaveWorkflow: vi.fn().mockResolvedValue(true),
     onPublishClick: vi.fn(),
     onUnpublish: vi.fn(),
+    onDuplicate: vi.fn(),
     onPendingImport: vi.fn(),
     builderPermissions: {
       canEdit: true,
@@ -686,6 +687,89 @@ describe('BuilderEditorToolbar', () => {
     await user.hover(screen.getByRole('button', { name: /^Save$/i }))
 
     expect(await screen.findByText('No save permission')).toBeInTheDocument()
+  })
+
+  describe('Duplicate workflow action', () => {
+    it('renders Duplicate workflow in kebab menu', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen />)
+
+      expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toBeInTheDocument()
+    })
+
+    it('positions Duplicate between Verify and Export', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen />)
+
+      const menuItems = screen.getAllByRole('menuitem')
+      const verifyIndex = menuItems.findIndex((item) => item.textContent?.includes('Verify'))
+      const duplicateIndex = menuItems.findIndex((item) => item.textContent?.includes('Duplicate'))
+      const exportIndex = menuItems.findIndex((item) => item.textContent?.includes('Export'))
+
+      expect(duplicateIndex).toBeGreaterThan(verifyIndex)
+      expect(duplicateIndex).toBeLessThan(exportIndex)
+    })
+
+    it('fires onDuplicate handler when clicked', async () => {
+      const user = userEvent.setup()
+      const dispatch = vi.fn()
+      const onDuplicate = vi.fn()
+
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen dispatch={dispatch} onDuplicate={onDuplicate} />)
+
+      await user.click(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
+
+      expect(onDuplicate).toHaveBeenCalledTimes(1)
+      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
+    })
+
+    it('disables Duplicate when canEdit is false', () => {
+      render(
+        <BuilderEditorToolbar
+          {...defaultProps}
+          isKebabOpen
+          builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
+        />
+      )
+
+      expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('does not fire onDuplicate when canEdit is false', async () => {
+      const user = userEvent.setup()
+      const onDuplicate = vi.fn()
+
+      render(
+        <BuilderEditorToolbar
+          {...defaultProps}
+          isKebabOpen
+          onDuplicate={onDuplicate}
+          builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
+        />
+      )
+
+      await user.click(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
+
+      expect(onDuplicate).not.toHaveBeenCalled()
+    })
+
+    it('shows permission tooltip when canEdit is false', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <BuilderEditorToolbar
+          {...defaultProps}
+          isKebabOpen
+          builderPermissions={{
+            ...defaultProps.builderPermissions,
+            canEdit: false,
+            tooltips: { ...defaultProps.builderPermissions.tooltips, edit: 'No edit permission' },
+          }}
+        />
+      )
+
+      await user.hover(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
+
+      expect(await screen.findByText('No edit permission')).toBeInTheDocument()
+    })
   })
 
   it('has no accessibility violations', async () => {
