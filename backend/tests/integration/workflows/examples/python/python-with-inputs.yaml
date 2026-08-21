@@ -3,16 +3,6 @@ schema_version: "2.0.0"
 name: python-with-inputs
 description: Python script that receives inputs and produces outputs with environment variables
 
-inputs:
-  value1:
-    type: number
-    description: First value for calculation
-    default: 10
-  value2:
-    type: number
-    description: Second value for calculation
-    default: 20
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -43,9 +33,6 @@ nodes:
             print(f"Debug: {app_name} calculating {value1} + {value2}", file=__import__('sys').stderr)
 
         print(json.dumps({"result": result, "app": app_name}))
-    outputs:
-      result: $.output.result
-      app: $.output.app
 
   - id: print_result
     type: script
@@ -55,8 +42,6 @@ nodes:
         LOG_LEVEL: INFO
       code: |
         echo "[${LOG_LEVEL}] The result is: ${INPUT_RESULT}"
-    inputs:
-      result: ${calculator.output.result}
 edges:
-  - source: calculator
-    target: print_result
+  - from: calculator
+    to: print_result

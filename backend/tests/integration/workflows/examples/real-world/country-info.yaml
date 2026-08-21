@@ -13,13 +13,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  country_code:
-    type: string
-    description: ISO 3166-1 alpha-2 country code
-    default: US
-    pattern: ^[A-Z]{2}$
-
 nodes:
   - id: fetch_country
     name: Fetch Country Information
@@ -29,19 +22,6 @@ nodes:
       url: https://restcountries.com/v3.1/alpha/${trigger.country_code}
       headers:
         Accept: application/json
-    outputs:
-      countryData: $.body
-      name: $.body.0.name.common
-      officialName: $.body.0.name.official
-      capital: $.body.0.capital.0
-      region: $.body.0.region
-      subregion: $.body.0.subregion
-      population: $.body.0.population
-      area: $.body.0.area
-      languages: $.body.0.languages
-      currencies: $.body.0.currencies
-      timezones: $.body.0.timezones
-      flag: $.body.0.flags.png
     timeout: 30
 
   - id: fetch_neighbors
@@ -52,8 +32,6 @@ nodes:
       url: https://restcountries.com/v3.1/alpha/${trigger.country_code}?fields=borders
       headers:
         Accept: application/json
-    outputs:
-      borders: $.body.0.borders
     timeout: 30
 
   - id: analyze_country
@@ -128,25 +106,9 @@ nodes:
         }
 
         print(json.dumps(analysis, indent=2))
-    inputs:
-      name: ${fetch_country.output.name}
-      official_name: ${fetch_country.output.officialName}
-      capital: ${fetch_country.output.capital}
-      region: ${fetch_country.output.region}
-      subregion: ${fetch_country.output.subregion}
-      population: ${fetch_country.output.population}
-      area: ${fetch_country.output.area}
-      languages: ${fetch_country.output.languages}
-      currencies: ${fetch_country.output.currencies}
-      timezones: ${fetch_country.output.timezones}
-      borders: ${fetch_neighbors.output.borders}
-    outputs:
-      analysis: $.output
-      summary: $.output.summary
-      population: $.output.demographics.population
     timeout: 60
 edges:
-  - source: fetch_country
-    target: fetch_neighbors
-  - source: fetch_neighbors
-    target: analyze_country
+  - from: fetch_country
+    to: fetch_neighbors
+  - from: fetch_neighbors
+    to: analyze_country

@@ -15,8 +15,6 @@ nodes:
       language: bash
       code: |
         echo '{"counter": 0}'
-    outputs:
-      data: $.stdout
 
   - id: while_loop
     name: While Loop
@@ -32,11 +30,9 @@ nodes:
       language: bash
       code: |
         echo "Loop iteration executed"
-    outputs:
-      result: $.stdout
 edges:
-  - source: initialize_counter
-    target: while_loop
-  - source: while_loop
-    target: loop_task
+  - from: initialize_counter
+    to: while_loop
+  - from: while_loop
+    to: loop_task
     port: body

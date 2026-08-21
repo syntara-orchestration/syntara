@@ -11,12 +11,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  topic:
-    type: string
-    description: Topic for research and analysis pipeline
-    default: emerging technology trends
-
 nodes:
   - id: research_phase
     type: agentic
@@ -30,11 +24,6 @@ nodes:
         - Current state and recent developments
         - Key players and stakeholders
         - Important statistics and data points
-    inputs:
-      topic: ${trigger.topic}
-    outputs:
-      research_data: $.result.data
-      sources: $.result.sources
 
   - id: analysis_phase
     type: agentic
@@ -50,12 +39,6 @@ nodes:
         - Trend analysis
         - Risk assessment
         - Opportunity identification
-    inputs:
-      research_data: ${research_phase.output.research_data}
-    outputs:
-      insights: $.result.content
-      trends: $.result.content
-      risks: $.result.content
 
   - id: recommendation_phase
     type: agentic
@@ -73,15 +56,8 @@ nodes:
         - Top 3 strategic recommendations
         - Implementation roadmap
         - Success metrics
-    inputs:
-      insights: ${analysis_phase.output.insights}
-      trends: ${analysis_phase.output.trends}
-    outputs:
-      recommendations: $.result.recommendations
-      roadmap: $.result.roadmap
-      metrics: $.result.metrics
 edges:
-  - source: research_phase
-    target: analysis_phase
-  - source: analysis_phase
-    target: recommendation_phase
+  - from: research_phase
+    to: analysis_phase
+  - from: analysis_phase
+    to: recommendation_phase

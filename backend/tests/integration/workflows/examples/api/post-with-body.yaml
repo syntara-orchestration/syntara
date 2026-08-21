@@ -3,14 +3,6 @@ schema_version: "2.0.0"
 name: post-with-body
 description: HTTP POST request with JSON body and headers
 
-inputs:
-  data:
-    type: object
-    description: Data to post
-    default:
-      name: Test Resource
-      value: 123
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -25,6 +17,4 @@ nodes:
         Content-Type: application/json
         X-Custom-Header: test-value
       body: ${trigger.data}
-    inputs:
-      data: ${trigger.data}
 edges: []

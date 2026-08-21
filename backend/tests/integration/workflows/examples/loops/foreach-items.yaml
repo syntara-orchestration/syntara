@@ -3,12 +3,6 @@ schema_version: "2.0.0"
 name: foreach-loop-test
 description: Test forEach loop with bash
 
-inputs:
-  item_list:
-    type: array
-    description: List of items to process
-    default: [apple, banana, cherry]
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -30,11 +24,7 @@ nodes:
       code: |
         echo "Processing item: $INPUT_ITEM"
         echo "Item value: $INPUT_ITEM"
-    inputs:
-      item: ${item}
-    outputs:
-      processed: $.stdout
 edges:
-  - source: process_items
-    target: process_item
+  - from: process_items
+    to: process_item
     port: body

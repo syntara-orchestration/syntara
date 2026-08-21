@@ -13,16 +13,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  owner:
-    type: string
-    description: GitHub repository owner/organization
-    default: anthropics
-  repo:
-    type: string
-    description: GitHub repository name
-    default: anthropic-sdk-python
-
 nodes:
   - id: fetch_repo
     name: Fetch Repository Info
@@ -33,16 +23,6 @@ nodes:
       headers:
         Accept: application/vnd.github.v3+json
         User-Agent: Syntara-Workflow-Engine
-    outputs:
-      repoData: $.body
-      name: $.body.name
-      description: $.body.description
-      stars: $.body.stargazers_count
-      forks: $.body.forks_count
-      language: $.body.language
-      openIssues: $.body.open_issues_count
-      createdAt: $.body.created_at
-      updatedAt: $.body.updated_at
     timeout: 30
 
   - id: fetch_languages
@@ -54,8 +34,6 @@ nodes:
       headers:
         Accept: application/vnd.github.v3+json
         User-Agent: Syntara-Workflow-Engine
-    outputs:
-      languages: $.body
     timeout: 30
 
   - id: analyze_repo
@@ -115,23 +93,9 @@ nodes:
         }
 
         print(json.dumps(report, indent=2))
-    inputs:
-      name: ${fetch_repo.output.name}
-      description: ${fetch_repo.output.description}
-      stars: ${fetch_repo.output.stars}
-      forks: ${fetch_repo.output.forks}
-      language: ${fetch_repo.output.language}
-      open_issues: ${fetch_repo.output.openIssues}
-      created_at: ${fetch_repo.output.createdAt}
-      updated_at: ${fetch_repo.output.updatedAt}
-      languages: ${fetch_languages.output.languages}
-    outputs:
-      report: $.output
-      summary: $.output.summary
-      popularityScore: $.output.statistics.popularity_score
     timeout: 60
 edges:
-  - source: fetch_repo
-    target: fetch_languages
-  - source: fetch_languages
-    target: analyze_repo
+  - from: fetch_repo
+    to: fetch_languages
+  - from: fetch_languages
+    to: analyze_repo

@@ -19,8 +19,6 @@ nodes:
       code: |
         echo "Preparing data for analysis..."
         echo '{"status": "ready", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
-    outputs:
-      status: $.stdout
 
   - id: analyze_with_ai
     type: agentic
@@ -36,10 +34,6 @@ nodes:
         1. Key trends and patterns
         2. Statistical summary
         3. Recommendations
-    inputs:
-      data_status: ${prepare_data.output.status}
-    outputs:
-      analysis: $.result.content
 
   - id: generate_report
     type: script
@@ -50,12 +44,8 @@ nodes:
         echo "Generated: $(date)"
         echo ""
         echo "Analysis: $INPUT_ANALYSIS"
-    inputs:
-      analysis: ${analyze_with_ai.output.analysis}
-    outputs:
-      report: $.stdout
 edges:
-  - source: prepare_data
-    target: analyze_with_ai
-  - source: analyze_with_ai
-    target: generate_report
+  - from: prepare_data
+    to: analyze_with_ai
+  - from: analyze_with_ai
+    to: generate_report
