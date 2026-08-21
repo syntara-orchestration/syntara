@@ -27,7 +27,7 @@ class AgenticExecutorParameters:
         prompt (str): Prompt template for the agent
         agent (None | str | Unset):
         llm_model_id (None | str | Unset): UUID of the LLMModel record identifying the provider integration and model.
-        credential_id (None | str | Unset): Syntara credential UUID for LLM provider authentication
+        credential_id (None | str | Unset): Orchestrator credential UUID for LLM provider authentication
         file_ids (list[str] | Unset): File IDs for agent context
         response_schema (AgenticExecutorParametersResponseSchemaType0 | None | str | Unset): JSON Schema for structured
             output. When defined, agent output conforms to this schema.
