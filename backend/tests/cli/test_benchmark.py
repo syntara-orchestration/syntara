@@ -5,9 +5,7 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from orchestrator_cli.benchmark import BenchmarkSession, PhaseStats
-
 
 # ---------------------------------------------------------------------------
 # PhaseStats

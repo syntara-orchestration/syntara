@@ -171,9 +171,7 @@ def test_bundle_spec_falls_back_to_openapi_yaml_when_bundler_missing(
     # Use a path structure where tools/bundle_openapi.py definitely does not exist
     schemas_dir = tmp_path / "project" / "src" / "syntara" / "schemas"
     schemas_dir.mkdir(parents=True)
-    (schemas_dir / "openapi.yaml").write_text(
-        "openapi: 3.1.0\ninfo:\n  title: pre-bundled\n"
-    )
+    (schemas_dir / "openapi.yaml").write_text("openapi: 3.1.0\ninfo:\n  title: pre-bundled\n")
 
     result = spec_module._bundle_spec(schemas_dir)
 

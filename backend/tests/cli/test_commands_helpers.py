@@ -174,15 +174,7 @@ def test_extract_body_ref_returns_none_when_no_request_body() -> None:
 
 
 def test_extract_body_ref_returns_ref_from_json_content() -> None:
-    details = {
-        "requestBody": {
-            "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/MyModel"}
-                }
-            }
-        }
-    }
+    details = {"requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MyModel"}}}}}
     assert _extract_body_ref(details) == "#/components/schemas/MyModel"
 
 

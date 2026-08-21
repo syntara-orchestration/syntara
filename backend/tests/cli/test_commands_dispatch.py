@@ -13,13 +13,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
-
 from orchestrator_cli.commands import (
     _call_with_rate_limit_retry,
     _create_client,
     _format_response,
 )
-
 
 # ---------------------------------------------------------------------------
 # Response stubs
@@ -113,7 +111,7 @@ def test_rate_limit_retry_returns_successful_response() -> None:
     assert ep_mod.sync_detailed.call_count == 1
 
 
-def test_rate_limit_retry_raises_exit_on_4xx(capsys: pytest.CaptureFixture) -> None:
+def test_rate_limit_retry_raises_exit_on_4xx(capsys: pytest.CaptureFixture[str]) -> None:
     """A 4xx error must echo status and body to stderr then raise Exit(1)."""
     ep_mod = MagicMock()
     ep_mod.sync_detailed.return_value = _error(404, b'{"detail": "not found"}')
@@ -124,7 +122,7 @@ def test_rate_limit_retry_raises_exit_on_4xx(capsys: pytest.CaptureFixture) -> N
     assert "404" in err
 
 
-def test_rate_limit_retry_raises_exit_on_5xx(capsys: pytest.CaptureFixture) -> None:
+def test_rate_limit_retry_raises_exit_on_5xx(capsys: pytest.CaptureFixture[str]) -> None:
     """A 5xx server error must echo to stderr and raise Exit(1)."""
     ep_mod = MagicMock()
     ep_mod.sync_detailed.return_value = _error(500, b'{"detail": "internal error"}')
@@ -170,7 +168,7 @@ def test_rate_limit_retry_raises_exit_after_max_retries(
     assert "maximum retries" in capsys.readouterr().err
 
 
-def test_rate_limit_retry_parses_non_json_error_body(capsys: pytest.CaptureFixture) -> None:
+def test_rate_limit_retry_parses_non_json_error_body(capsys: pytest.CaptureFixture[str]) -> None:
     """A non-JSON error body is decoded and included in the error output."""
     ep_mod = MagicMock()
     ep_mod.sync_detailed.return_value = _error(502, b"Bad Gateway")
@@ -186,7 +184,7 @@ def test_rate_limit_retry_parses_non_json_error_body(capsys: pytest.CaptureFixtu
 # ---------------------------------------------------------------------------
 
 
-def test_format_response_prints_parsed_dict_to_stdout(capsys: pytest.CaptureFixture) -> None:
+def test_format_response_prints_parsed_dict_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
     """When response.parsed has to_dict(), its JSON is pretty-printed to stdout."""
     parsed = MagicMock()
     parsed.to_dict.return_value = {"id": "abc"}

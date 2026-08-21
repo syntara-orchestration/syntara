@@ -18,7 +18,7 @@ _URL = "http://localhost:8000"
 _TOKEN = "test-token-abc"  # noqa: S105
 
 
-@pytest.fixture()
+@pytest.fixture
 def config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect auth storage to a temp dir so tests never touch ~/.orchestrator."""
     d = tmp_path / ".orchestrator"
@@ -81,12 +81,16 @@ def test_load_token_returns_none_when_file_is_invalid_json(config_dir: Path) -> 
 def test_load_token_returns_none_and_deletes_file_when_expired(config_dir: Path) -> None:
     """load_token deletes the token file and returns None when expires_at is in the past."""
     path = auth_module._token_path(_URL)
-    path.write_text(json.dumps({
-        "base_url": _URL,
-        "access_token": _TOKEN,
-        "saved_at": time.time() - 7200,
-        "expires_at": time.time() - 3600,
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "base_url": _URL,
+                "access_token": _TOKEN,
+                "saved_at": time.time() - 7200,
+                "expires_at": time.time() - 3600,
+            }
+        )
+    )
     assert auth_module.load_token(_URL) is None
     assert not path.exists()
 
