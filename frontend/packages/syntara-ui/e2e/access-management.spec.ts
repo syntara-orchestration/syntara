@@ -297,16 +297,16 @@ test.describe('Access Management — User Detail Tabs', () => {
     await expect(app.getByRole('tab', { name: /Users/i })).toHaveAttribute('aria-selected', 'true')
 
     // Wait for users table
-    const table = app.getByRole('grid', { name: 'Users table' })
+    const table = app.getByRole('grid', { name: 'Users' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
     test.skip(!hasTable, 'No users data available; seed data required')
 
-    // Click the first username button in the table to navigate to detail
+    // Click the first username link in the table to navigate to detail
     const firstRow = table.getByRole('row').nth(1) // skip header row
-    await firstRow.locator('td[data-label="Username"]').getByRole('button').click()
+    await firstRow.locator('td').nth(0).getByRole('link').click()
 
     // Should be on user detail page
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/`))

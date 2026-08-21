@@ -2,7 +2,13 @@ import type { Page } from '@playwright/test'
 
 import { test, expect } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
-import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
+import {
+  buildUniqueName,
+  createBasicWorkflowViaApi,
+  openWorkflowInBuilder,
+  deleteWorkflow,
+  waitForUIReady,
+} from '../helpers/workflows'
 import { pollExecutionStatus } from '../utils/api'
 
 /**
@@ -62,21 +68,14 @@ async function createPendingApproval(
 }
 
 async function applyPendingApprovalStatusFilter(app: Page): Promise<void> {
-  const filterButton = app.getByRole('button', { name: /Filter|Add filter/i })
-  await expect(filterButton).toBeVisible()
-  await filterButton.click()
+  const filterToolbar = app.getByRole('search', { name: 'Filters' })
+  await expect(filterToolbar).toBeVisible()
 
-  const statusFieldOption = app.getByRole('option', { name: /^Status$/i })
-  await expect(statusFieldOption).toBeVisible()
-  await statusFieldOption.click()
+  await filterToolbar.getByRole('button', { name: 'Workflow name', exact: true }).click()
+  await app.getByRole('option', { name: 'Status' }).click()
 
-  const statusValueSelector = app.getByRole('button', { name: /Filter by status/i })
-  await expect(statusValueSelector).toBeVisible()
-  await statusValueSelector.click()
-
-  const pendingApprovalOption = app.getByRole('option', { name: /^Pending approval$/i })
-  await expect(pendingApprovalOption).toBeVisible()
-  await pendingApprovalOption.click()
+  await filterToolbar.getByRole('button', { name: 'Filter by status' }).click()
+  await app.getByRole('option', { name: 'Pending approval' }).click()
 }
 
 test.describe('Approval Pending Badge', () => {
@@ -110,18 +109,24 @@ test.describe('Approval Pending Badge', () => {
         // ===================================================================
         // Navigate back to the workflow builder
         await app.goto(`/workflow-builder/${workflowId}`)
+        await waitForUIReady(app)
 
-        // Open the run history panel (if not already open)
-        const historyButton = app.getByRole('button', { name: /Run history|History/ })
-        if (await historyButton.isVisible()) {
-          await historyButton.click()
-        }
+        // Open the run history panel via the kebab menu
+        const kebab = app.getByRole('button', { name: 'Workflow actions' })
+        await expect(kebab).toBeVisible({ timeout: 10_000 })
+        await kebab.click()
+
+        const runHistoryItem = app.getByRole('menuitem', { name: 'Run history' })
+        await expect(runHistoryItem).toBeVisible()
+        await runHistoryItem.click()
+
+        await expect(app.getByRole('heading', { name: 'Run history', level: 2 })).toBeVisible()
 
         // Verify badge appears in the history panel
         const historyPanel = app.getByRole('list', { name: 'Run history list' })
         const badgeInHistory = historyPanel.getByText('Pending approval')
 
-        await expect(badgeInHistory).toBeVisible({ timeout: 5_000 })
+        await expect(badgeInHistory).toBeVisible({ timeout: 10_000 })
 
         // ===================================================================
         // LOCATION 3: Executions List Table

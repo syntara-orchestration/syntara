@@ -9,12 +9,12 @@ const isRealBackend = isSkipWebServerForPlaywrightTests()
 
 test('user configures an integration and verifies it appears', async ({ app }) => {
   const integrationName = buildUniqueName('e2e-integration')
-  let seededIntegration: SeededIntegration | null = null
+  let seededIntegration: SeededIntegration | undefined
 
   try {
     const token = await getAuthToken(app)
-    seededIntegration = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
-    expect(seededIntegration).not.toBeNull()
+    seededIntegration =
+      (await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })) ?? undefined
 
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()

@@ -48,8 +48,8 @@ async function openAgentToolSelector(app: Page, projectName: string) {
 }
 
 test.describe('Integration project scope — selector visibility', () => {
-  let projectScopedIntegration: SeededIntegration | null = null
-  let globalIntegration: SeededIntegration | null = null
+  let projectScopedIntegration: SeededIntegration | undefined
+  let globalIntegration: SeededIntegration | undefined
   let projectAId: string | null = null
   let projectAName: string | null = null
   let projectBId: string | null = null
@@ -72,24 +72,26 @@ test.describe('Integration project scope — selector visibility', () => {
 
       if (!projectAId || !projectBId) return
 
-      globalIntegration = await createIntegrationViaApi(page, {
-        name: buildUniqueName('e2e-scope-global'),
-        token,
-        discoveredTools: [{ name: 'global_tool', enabled: true }],
-      })
+      globalIntegration =
+        (await createIntegrationViaApi(page, {
+          name: buildUniqueName('e2e-scope-global'),
+          token,
+          discoveredTools: [{ name: 'global_tool', enabled: true }],
+        })) ?? undefined
 
-      projectScopedIntegration = await createIntegrationViaApi(page, {
-        name: buildUniqueName('e2e-scope-projA'),
-        token,
-        discoveredTools: [{ name: 'scoped_tool', enabled: true }],
-      })
+      projectScopedIntegration =
+        (await createIntegrationViaApi(page, {
+          name: buildUniqueName('e2e-scope-projA'),
+          token,
+          discoveredTools: [{ name: 'scoped_tool', enabled: true }],
+        })) ?? undefined
       if (projectScopedIntegration) {
         const patched = await patchIntegrationScopeViaApi(page, projectScopedIntegration.id, 'project', token)
         const assigned =
           patched &&
           projectAId &&
           (await assignIntegrationProjectViaApi(page, projectScopedIntegration.id, projectAId, token))
-        if (!assigned) projectScopedIntegration = null
+        if (!assigned) projectScopedIntegration = undefined
       }
     } finally {
       await page.close()

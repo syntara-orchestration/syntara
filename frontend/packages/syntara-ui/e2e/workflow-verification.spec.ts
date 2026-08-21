@@ -400,7 +400,9 @@ test.describe('Variable reference validation', () => {
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/is not a defined input field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText(/missing_field.*is not a defined input field/i)).toBeVisible({
+        timeout: VERIFY_BANNER_TIMEOUT,
+      })
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

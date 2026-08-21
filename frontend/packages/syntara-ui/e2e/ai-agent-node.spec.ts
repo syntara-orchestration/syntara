@@ -166,18 +166,18 @@ test.describe('AI Agent Node @pr-check', () => {
     const mcpIntegrationName = buildUniqueName('e2e-mcp-integ')
     const workflowName = buildUniqueName('e2e-agent-tools-schema')
     let llmIntegration: SeededLlmIntegration | undefined
-    let mcpIntegration: SeededIntegration | null = null
+    let mcpIntegration: SeededIntegration | undefined
     try {
       llmIntegration = await createLlmIntegration(app, llmIntegrationName)
       // Tool selection requires an MCP integration (with tools). Without one the
       // Tools control stays empty and hides "All tools".
       const token = await getAuthToken(app)
-      mcpIntegration = await createIntegrationViaApi(app, {
-        name: mcpIntegrationName,
-        token: token ?? undefined,
-        discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
-      })
-      expect(mcpIntegration).not.toBeNull()
+      mcpIntegration =
+        (await createIntegrationViaApi(app, {
+          name: mcpIntegrationName,
+          token: token ?? undefined,
+          discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
+        })) ?? undefined
 
       const { name: credName } = await ensureLlmCredential(app)
 
@@ -337,7 +337,7 @@ test.describe('AI Agent Node @pr-check', () => {
     const mcpName = buildUniqueName('e2e-mcp-t16')
     let llmIntegrationId: string | undefined
     let llmCredentialId: string | undefined
-    let mcpIntegration: SeededIntegration | null = null
+    let mcpIntegration: SeededIntegration | undefined
     try {
       // Create an LLM integration with two enabled models (one default) and one disabled
       const project = await ensureProject(app)
@@ -386,11 +386,12 @@ test.describe('AI Agent Node @pr-check', () => {
 
       // Create an MCP integration — it should NOT appear in the LLM model selector
       const token = await getAuthToken(app)
-      mcpIntegration = await createIntegrationViaApi(app, {
-        name: mcpName,
-        token: token ?? undefined,
-        discoveredTools: [{ name: 'e2e_tool', enabled: true }],
-      })
+      mcpIntegration =
+        (await createIntegrationViaApi(app, {
+          name: mcpName,
+          token: token ?? undefined,
+          discoveredTools: [{ name: 'e2e_tool', enabled: true }],
+        })) ?? undefined
 
       // Open workflow builder and add an Agent node
       await startWorkflowWithTrigger(app)

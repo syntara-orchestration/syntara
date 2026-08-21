@@ -8,13 +8,12 @@ const seededIntegrations: SeededIntegration[] = []
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const prefix = buildUniqueName('e2e-intfilt')
-    for (let i = 1; i <= 12; i++) {
-      const name = i === 1 ? `${prefix}-copilot` : `${prefix}-integration-${i}`
-      const integration = await createIntegrationViaApi(page, { name, token })
-      if (integration) seededIntegrations.push(integration)
-    }
+  if (!token) throw new Error('integration-filtering beforeAll: could not obtain auth token')
+  const prefix = buildUniqueName('e2e-intfilt')
+  for (let i = 1; i <= 22; i++) {
+    const name = i === 1 ? `${prefix}-copilot` : `${prefix}-integration-${i}`
+    const integration = await createIntegrationViaApi(page, { name, token })
+    if (integration) seededIntegrations.push(integration)
   }
   await page.close()
 })
@@ -33,9 +32,9 @@ test.describe('Integration Filtering', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const grid = app.getByRole('grid', { name: 'Integrations table' })
+    const grid = app.getByRole('grid', { name: 'Integrations' })
     const hasGrid = await grid
-      .waitFor({ state: 'visible', timeout: 5000 })
+      .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
     if (!hasGrid) guard.markUnavailable()
@@ -48,7 +47,7 @@ test.describe('Integration Filtering', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
 
     // Wait for table to load
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     await expect(table).toBeVisible()
 
     // Act - Search for "copilot" using name filter
@@ -90,7 +89,7 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/name%5Bcontains%5D=slack/)
 
     // Act - Clear filter using chip close button
-    await nameChipGroup.locator('.pf-v6-c-label', { hasText: 'slack' }).getByRole('button', { name: /close/i }).click()
+    await nameChipGroup.getByRole('button', { name: 'Close slack' }).click()
 
     // Assert - Filter removed
     await expect(nameChipGroup).not.toBeVisible()
@@ -102,11 +101,13 @@ test.describe('Integration Filtering', () => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
 
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     await expect(table).toBeVisible()
 
     // Act - Switch to Status field and apply "Available" status filter
-    const fieldSelector = app.locator('#filter-toolbar').getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -129,7 +130,7 @@ test.describe('Integration Filtering', () => {
     test.skip(!hasAvailable, 'No integrations with "Available" status; seed data required')
 
     // Act - Switch to "Error" status (replaces "Available")
-    await app.locator('#filter-toolbar').getByRole('button', { name: 'Available', exact: true }).click()
+    await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Available', exact: true }).click()
     await app.getByRole('option', { name: 'Error' }).click()
 
     // Assert - Status filter updated to "Error"
@@ -141,10 +142,7 @@ test.describe('Integration Filtering', () => {
     await expect(app).not.toHaveURL(/status=available/)
 
     // Act - Remove status filter
-    await statusChipGroup
-      .locator('.pf-v6-c-label', { hasText: 'Error' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await statusChipGroup.getByRole('button', { name: 'Close Error' }).click()
 
     // Assert - Status filter removed
     await expect(statusChipGroup).not.toBeVisible()
@@ -166,7 +164,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/name%5Bcontains%5D=integration/)
 
     // Act - Switch to Status and add status filter
-    const fieldSelector = app.locator('#filter-toolbar').getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -178,7 +178,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/status=error/)
 
     // Act - Switch to Integration type and add filter (re-query field selector)
-    const fieldSelector2 = app.locator('#filter-toolbar').getByRole('button', { name: 'Status', exact: true })
+    const fieldSelector2 = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Status', exact: true })
     await fieldSelector2.click()
     await app.getByRole('option', { name: 'Integration type' }).click()
     await app.getByRole('button', { name: 'Filter by integration type' }).click()
@@ -219,7 +221,9 @@ test.describe('Integration Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Apply status filter
-    const fieldSelector = app.locator('#filter-toolbar').getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -324,7 +328,9 @@ test.describe('Integration Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Apply status filter
-    const fieldSelector = app.locator('#filter-toolbar').getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
@@ -337,10 +343,7 @@ test.describe('Integration Filtering', () => {
     await expect(statusChipGroup.getByText('Available')).toBeVisible()
 
     // Act - Remove name filter chip
-    await nameChipGroup
-      .locator('.pf-v6-c-label', { hasText: 'monitor' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await nameChipGroup.getByRole('button', { name: 'Close monitor' }).click()
 
     // Assert - Name filter removed, status filter remains
     await expect(nameChipGroup).not.toBeVisible()
@@ -351,10 +354,7 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/status=available/)
 
     // Act - Remove status filter chip
-    await statusChipGroup
-      .locator('.pf-v6-c-label', { hasText: 'Available' })
-      .getByRole('button', { name: /close/i })
-      .click()
+    await statusChipGroup.getByRole('button', { name: 'Close Available' }).click()
 
     // Assert - All filters removed
     await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list')).toHaveCount(0)
@@ -367,7 +367,7 @@ test.describe('Integration Filtering', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
 
     // Wait for table to load
-    await expect(app.getByRole('grid', { name: 'Integrations table' })).toBeVisible()
+    await expect(app.getByRole('grid', { name: 'Integrations' })).toBeVisible()
 
     // Apply filter with impossible name that will never match our mock data
     await app.getByPlaceholder('Filter by name').fill('ZZZZZ_NONEXISTENT_12345')
@@ -385,13 +385,13 @@ test.describe('Integration Filtering', () => {
 
     // Assert - Filter removed, table visible again
     await expect(nameChipGroup).not.toBeVisible()
-    await expect(app.getByRole('grid', { name: 'Integrations table' })).toBeVisible()
+    await expect(app.getByRole('grid', { name: 'Integrations' })).toBeVisible()
   })
 
   test('pagination works', async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const grid = app.getByRole('grid', { name: 'Integrations table' })
+    const grid = app.getByRole('grid', { name: 'Integrations' })
     await expect(grid).toBeVisible()
 
     const rowCount = await grid.getByRole('row').count()
@@ -411,8 +411,8 @@ test.describe('Integration Filtering', () => {
     await expect(prevButton).toBeDisabled()
     await nextButton.click()
 
-    // Wait for page 2 to load (prev button becomes enabled)
-    await expect(prevButton).not.toBeDisabled()
+    // Wait for page 2 to load (prev button becomes enabled after cursor fetch)
+    await expect(prevButton).not.toBeDisabled({ timeout: 10_000 })
 
     // Act - Go back to page 1
     await prevButton.click()
@@ -429,7 +429,7 @@ test.describe('Integration Filtering', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
 
     // Wait for table to load
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     await expect(table).toBeVisible()
 
     // Act - Apply name filter (use a term likely to match some integrations)
@@ -446,7 +446,9 @@ test.describe('Integration Filtering', () => {
     await expect(app).toHaveURL(/name%5Bcontains%5D=integration/)
 
     // Act - Add status filter (switch to Status field and select "Available")
-    const fieldSelector = app.locator('#filter-toolbar').getByRole('button', { name: 'Name', exact: true })
+    const fieldSelector = app
+      .getByRole('search', { name: 'Filters' })
+      .getByRole('button', { name: 'Name', exact: true })
     await fieldSelector.click()
     await app.getByRole('option', { name: 'Status' }).click()
     await app.getByRole('button', { name: 'Filter by status' }).click()
