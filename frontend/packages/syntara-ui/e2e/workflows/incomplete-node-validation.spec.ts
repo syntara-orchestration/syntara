@@ -52,7 +52,7 @@ async function addIncompleteAapNode(page: Page, name: string) {
 }
 
 test.describe('UI-32: Workflow Verification — Missing Required Configuration', { tag: '@pr-check' }, () => {
-  test('unconfigured AAP node triggers verification error', async ({ app }) => {
+  test('unconfigured AAP node triggers verification error', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Builds the workflow through the UI before verifying — the default budget is
     // too tight for that plus a verify retry on a loaded cluster.
     test.setTimeout(90_000)

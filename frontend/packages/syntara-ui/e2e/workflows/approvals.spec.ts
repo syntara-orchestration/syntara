@@ -503,7 +503,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
+  test('UI-29: self-contained approve flow via approvals queue', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create a workflow with an approval node so we control the approval name
     const workflowName = buildUniqueName('e2e-approve')
     const approvalNodeName = buildUniqueName('gate')
