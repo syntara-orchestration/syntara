@@ -57,6 +57,7 @@ import { NodeActionsContext } from './NodeActionsContext'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
 import { createAddStepHandler } from './utils/panelActions'
+import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewContext'
@@ -357,14 +358,10 @@ export function BuilderContent(props: BuilderContentProps) {
   )
 
   const { mutate: duplicateWorkflow, isPending: isDuplicating } = workflowClient.useMutation('post', '/workflows')
-  const handleDuplicateVersion = useCallback(
-    (version: WorkflowVersion) => {
+
+  const executeDuplicateWorkflow = useCallback(
+    (definition: Record<string, unknown>) => {
       if (isDuplicating || !workflow?.name || !workflow.project_id) return
-      const definition = version.workflow_definition
-      if (!definition) {
-        showError({ title: 'Failed to duplicate workflow', description: 'Version has no definition to duplicate' })
-        return
-      }
       const timestamp = Date.now().toString(36)
       const suffix = ` - duplicate-${timestamp}`
       const maxBaseLength = 255 - suffix.length
@@ -410,6 +407,30 @@ export function BuilderContent(props: BuilderContentProps) {
     },
     [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation]
   )
+
+  const handleDuplicateVersion = useCallback(
+    (version: WorkflowVersion) => {
+      const definition = version.workflow_definition
+      if (!definition) {
+        showError({ title: 'Failed to duplicate workflow', description: 'Version has no definition to duplicate' })
+        return
+      }
+      executeDuplicateWorkflow(definition)
+    },
+    [executeDuplicateWorkflow, showError]
+  )
+
+  const handleDuplicateWorkflow = useCallback(() => {
+    if (!currentWorkflow) return
+    const { edges, nodePositions } = useWorkflowStore.getState()
+    const activities = currentWorkflow.workflow.activities ?? []
+    const triggers = currentWorkflow.triggers ?? []
+    const definition = buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+      edges,
+      nodePositions,
+    })
+    executeDuplicateWorkflow(definition)
+  }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow])
 
   const versionPanel = useBuilderVersionPanel({
     workflowId,
@@ -523,6 +544,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   handleSaveWorkflow={guardedSaveWorkflow}
                   onPublish={onPublish}
                   onUnpublish={onUnpublish}
+                  onDuplicate={handleDuplicateWorkflow}
                   onPendingImport={setPendingImport}
                   isLiveRunActive={isLiveRunActive}
                   executionId={mostRecentExecutionId}

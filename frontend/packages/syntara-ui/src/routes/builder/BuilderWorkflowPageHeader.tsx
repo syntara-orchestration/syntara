@@ -47,6 +47,7 @@ type BuilderToolbarContentProps = Readonly<{
   handleSaveWorkflow: () => Promise<boolean>
   onPublishClick: () => void
   onUnpublish: () => void
+  onDuplicate: () => void
   onPendingImport: (data: PendingImportData) => void
   triggers?: { id: string; name?: string }[]
   isBuiltin: boolean
@@ -96,6 +97,7 @@ function BuilderToolbarContent({
   handleSaveWorkflow,
   onPublishClick,
   onUnpublish,
+  onDuplicate,
   onPendingImport,
   triggers,
   isAddNodePanelOpen,
@@ -194,6 +196,7 @@ function BuilderToolbarContent({
       handleSaveWorkflow={handleSaveWorkflow}
       onPublishClick={onPublishClick}
       onUnpublish={onUnpublish}
+      onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
       isAddNodePanelOpen={isAddNodePanelOpen}
@@ -318,6 +321,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   handleSaveWorkflow: () => Promise<boolean>
   onPublish: (publishName?: string, description?: string, onSettled?: () => void) => void
   onUnpublish: () => void
+  onDuplicate: () => void
   isViewingVersion?: boolean
   versionHistoryOpen?: boolean
   viewedVersionDate?: string | null
@@ -366,6 +370,7 @@ export function BuilderWorkflowPageHeader({
   handleSaveWorkflow,
   onPublish,
   onUnpublish,
+  onDuplicate,
   isViewingVersion,
   versionHistoryOpen,
   viewedVersionDate,
@@ -406,6 +411,7 @@ export function BuilderWorkflowPageHeader({
       handleSaveWorkflow={handleSaveWorkflow}
       onPublishClick={() => publishDialog.open(true)}
       onUnpublish={onUnpublish}
+      onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
       isAddNodePanelOpen={isAddNodePanelOpen}

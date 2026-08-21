@@ -89,6 +89,7 @@ describe('BuilderWorkflowPageHeader', () => {
     handleSaveWorkflow: vi.fn().mockResolvedValue(true),
     onPublish: vi.fn(),
     onUnpublish: vi.fn(),
+    onDuplicate: vi.fn(),
     onPendingImport: vi.fn(),
     builderPermissions: {
       canEdit: true,
