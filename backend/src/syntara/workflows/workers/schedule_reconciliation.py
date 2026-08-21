@@ -42,8 +42,8 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 logger = structlog.stdlib.get_logger(__name__)
 
 # Skip this cycle if Temporal connect, list, or mutate hangs. Waiters shield
-# the shared connect; a timed-out get_client abandons that connect so the
-# next caller can replace it even if Client.connect ignores cancellation.
+# the shared connect; a timed-out get_client returns None to this cycle only
+# and leaves the connect running for overlapping publish/delete waiters.
 _RECONCILE_TEMPORAL_TIMEOUT_SECONDS = 10.0
 
 

@@ -957,6 +957,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
                     connect_task.cancel()
                     await asyncio.gather(connect_task, return_exceptions=True)
                     scheduled_trigger_service_mod._connect_task = None
+                    scheduled_trigger_service_mod._connect_started_at = None
 
         assert result == mock_workflow
         assert mock_workflow.published_version_id is None
