@@ -3487,6 +3487,27 @@ export const handlers = [
         { status: 404 }
       )
     }
+    // AAP-87778: block delete while any integration still references this credential
+    // as its management_credential_id, mirroring the real backend's 409 instead of
+    // silently nulling the reference.
+    const referencingIntegrations = integrations.filter((i) => i.management_credential_id === credential_id)
+    if (referencingIntegrations.length > 0) {
+      const names = referencingIntegrations
+        .slice(0, 5)
+        .map((i) => `'${i.name}'`)
+        .join(', ')
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/resource-conflict',
+          title: 'Credential In Use',
+          detail: `Cannot delete credential '${credentials[index].name}': still in use by ${referencingIntegrations.length} integration${referencingIntegrations.length !== 1 ? 's' : ''} (${names}). Remove the credential from these integrations before deleting it.`,
+          code: 'CREDENTIAL_IN_USE',
+          retryable: false,
+          instance: `/api/v1/credentials/${credential_id}`,
+        },
+        { status: 409 }
+      )
+    }
     credentials.splice(index, 1)
     return new HttpResponse(null, { status: 204 })
   }),

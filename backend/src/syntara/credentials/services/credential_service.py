@@ -16,7 +16,7 @@ import structlog
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_ssh_private_key
 from sqlalchemy import Select, case, func, literal_column, or_
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -662,6 +662,16 @@ class CredentialService(BaseService):
                 The caller must detach the credential from all referencing
                 integrations first.
 
+                The upfront count-based check below has a TOCTOU race: an
+                integration could be attached between that check and the
+                delete below. The `integrations.management_credential_id`
+                FK is `ON DELETE RESTRICT` (not `SET NULL`) specifically so
+                the database itself rejects the delete in that case rather
+                than silently nulling the reference; the `except
+                IntegrityError` re-raises that as the same clean
+                CredentialInUseError instead of a generic constraint-violation
+                response.
+
         """
         from syntara.authz.models import Project  # noqa: PLC0415
 
@@ -709,7 +719,25 @@ class CredentialService(BaseService):
             await self._secret_service.delete_secret(secret_id)
 
         await self.session.delete(credential)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Rare race: an integration was attached to this credential after the
+            # count check above but before this commit. The FK's ON DELETE RESTRICT
+            # (not SET NULL) makes the database reject the delete instead of
+            # silently nulling the reference — surface it as the same clean 409
+            # rather than a generic integrity-constraint response.
+            await self.session.rollback()
+            logger.warning(
+                "Credential delete raced with a new integration reference",
+                credential_id=str(credential_id),
+                credential_name=cred_name,
+                exc_info=exc,
+            )
+            int_counts = await self.get_integration_counts([credential_id])
+            int_ref_count = int_counts.get(credential_id, 0) or 1
+            integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
+            raise CredentialInUseError(cred_name, integration_names, int_ref_count) from exc
         logger.info("Credential deleted", credential_id=str(credential_id))
         AuditEventDispatcher.dispatch(
             CredentialLifecycleEvent(

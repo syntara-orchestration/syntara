@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from syntara.authz.exceptions import BuiltinProtectionError
 from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
@@ -123,6 +123,7 @@ def mock_session() -> MagicMock:
     session = MagicMock()
     session.add = MagicMock()
     session.commit = AsyncMock()
+    session.rollback = AsyncMock()
     session.refresh = AsyncMock()
     session.flush = AsyncMock()
     session.delete = AsyncMock()
@@ -668,6 +669,61 @@ class TestDeleteCredential:
 
         mock_secret_service.delete_secret.assert_not_called()
         mock_session.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_raises_credential_in_use_on_integrity_error_race(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+    ) -> None:
+        """AAP-87778 follow-up: TOCTOU race.
+
+        An integration is attached between the upfront count check and the
+        commit. The FK's ON DELETE RESTRICT makes the commit raise
+        IntegrityError instead of silently nulling the reference; this must
+        surface as the same clean CredentialInUseError, not a generic 400.
+        """
+        credential = Credential(
+            id=uuid4(),
+            name="Raced Cred",
+            credential_type_id=uuid4(),
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.commit.side_effect = IntegrityError("DELETE", {}, Exception("FK violation"))
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        with (
+            # First call (upfront check): no references yet. Second call (inside the
+            # except block, after the race): one integration attached.
+            patch.object(
+                service,
+                "get_integration_counts",
+                new_callable=AsyncMock,
+                side_effect=[{}, {credential.id: 1}],
+            ),
+            patch.object(
+                service,
+                "_get_referencing_integration_names",
+                new_callable=AsyncMock,
+                return_value=["Racing Integration"],
+            ),
+        ):
+            with pytest.raises(CredentialInUseError) as exc_info:
+                await service.delete_credential(credential.id)
+
+            assert exc_info.value.integration_names == ["Racing Integration"]
+            assert "Racing Integration" in exc_info.value.message
+
+        mock_session.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_raises_when_project_is_builtin(
