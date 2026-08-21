@@ -8,8 +8,8 @@ import { executionsClient, workflowClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { NxErrorState } from '../../components/states/NxErrorState'
-import { NxLoadingState } from '../../components/states/NxLoadingState'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 
 import { BuilderContent } from './BuilderContent'
@@ -81,7 +81,7 @@ export default function BuilderEdit() {
         <SynPageHeader title="Error loading workflow" />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxErrorState title="Error loading workflow" message={error} />
+            <SynErrorState title="Error loading workflow" message={error} />
           </SynPanel>
         </SynPageBody>
       </SynPage>
@@ -97,7 +97,7 @@ export default function BuilderEdit() {
         <SynPageHeader title="Loading workflow" />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxLoadingState />
+            <SynLoadingState />
           </SynPanel>
         </SynPageBody>
       </SynPage>

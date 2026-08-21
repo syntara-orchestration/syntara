@@ -9,7 +9,7 @@ import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
@@ -114,7 +114,7 @@ export function SelectUserStep({
       )}
       {users.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
         </StackItem>
       )}
       {users.length > 0 && (
@@ -223,7 +223,7 @@ export function SelectIdentityStep({
       )}
       {identities.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       )}
       {!showSelectionUi && (

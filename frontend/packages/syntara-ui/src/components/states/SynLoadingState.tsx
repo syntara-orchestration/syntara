@@ -1,9 +1,9 @@
 import { Flex, FlexItem, Spinner } from '@patternfly/react-core'
 
-import styles from './NxLoadingState.module.css'
+import styles from './SynLoadingState.module.css'
 
 /** Centered full-height loading spinner — drop-in replacement for page or panel content while a query is in flight. */
-export function NxLoadingState() {
+export function SynLoadingState() {
   return (
     <Flex
       data-testid="loading-state"

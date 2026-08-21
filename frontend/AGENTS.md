@@ -74,7 +74,7 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 
 1. **No unsafe `as` casts on API responses** -- use typed client responses or type guards
 2. **`vitest-axe` test for every new component** -- at least one `toHaveNoViolations()`
-3. **`NxErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
+3. **`SynErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
 4. **Zod + react-hook-form** -- never manual `useState` per field; use `zodResolver`
 5. **Reset `defaultValues` in edit modals** -- `reset()` in `useEffect` keyed on `[isOpen, item]`
 6. **Extract shared patterns** -- use `NxConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
@@ -259,7 +259,7 @@ Use **`FilterBar` + `useCursorPagination`** (not a hand-rolled cursor/`useFilter
 2. **Wire pagination + filters + sort** with `useCursorPagination` — it owns URL-synced filters, sort (`defaultSort` / `columns`), cursor reset, and `queryParams`.
 3. **Render** `FilterBar` (or `NxListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
 4. **Query** with the typed client: `client.useQuery('get', '/resource', { params: { query: queryParams } })`.
-5. **Empty filtered results** → `NxEmptyStateFilter` with clear-all; unfiltered empty → `NxEmptyStateNoData`.
+5. **Empty filtered results** → `SynEmptyStateFilter` with clear-all; unfiltered empty → `SynEmptyStateNoData`.
 
 ```typescript
 import { FilterBar } from '../../components/filters/FilterBar'

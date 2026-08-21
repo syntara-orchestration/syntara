@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxLoadingState } from './NxLoadingState'
 import { pageDecorator } from './storyDecorators'
+import { SynLoadingState } from './SynLoadingState'
 
-const meta: Meta<typeof NxLoadingState> = {
-  component: NxLoadingState,
+const meta: Meta<typeof SynLoadingState> = {
+  component: SynLoadingState,
   decorators: [pageDecorator],
   tags: ['autodocs'],
 }

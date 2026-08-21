@@ -188,7 +188,7 @@ The following four compositions are the canonical page structures. Storybook doc
 | **List page**      | `SynPageHeader` (Create CTA) → `SynPageBody` → `SynPanel isFullHeight` → `SynPanelContentStack variant="inset"` → filter bar + table |
 | **Detail page**    | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight` → `SynPanelContentStack` (default) → tabs + content                 |
 | **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…</ActionGroup>}` → form body (max-width 600px) |
-| **Error in panel** | Same shell as list page → `SynPageBody isCentered` + `NxErrorState` **inside** `SynPanel` (page header and shell remain visible)   |
+| **Error in panel** | Same shell as list page → `SynPageBody isCentered` + `SynErrorState` **inside** `SynPanel` (page header and shell remain visible)   |
 
 ### Sticky Form Footer
 
@@ -472,11 +472,11 @@ Each empty state scenario maps to a specific icon, optional `status` prop, and s
 - For non-status empty states (no data, no results, configuration, no access), icons render in **gray by default** — do not manually set a color
 - Variant sizing: `sm` inside tables, modals, or wizards; `lg` for full-page empty states; `xl` for getting started or full-page success; `xs` (with `headingLevel="h3"`) for narrow, height-constrained panel-embedded contexts, e.g. builder side panels (step Input/Output panels) or node execution detail panels, where even `sm` is too tall
 - **CTA deduplication:** When the empty state includes a primary create/configure CTA button, **hide the page-header primary button** to avoid duplicate CTAs. The empty state CTA is sufficient — the header button reappears once data exists.
-- **Tab-level empty states:** Use the shared `NxEmptyStateNoData` component (not ad-hoc `EmptyState`) with the correct heading level (`h2` inside tabs) and `isFullHeight` prop
+- **Tab-level empty states:** Use the shared `SynEmptyStateNoData` component (not ad-hoc `EmptyState`) with the correct heading level (`h2` inside tabs) and `isFullHeight` prop
 - **Three-state list page pattern:** Every list page must handle three states in this order:
   1. Query error/loading → `useQueryState(query, { title, onRetry })` returns a loading or error component
-  2. Truly empty (no data AND no active filters) → `NxEmptyStateNoData` with create CTA; **hide FilterBar entirely**
-  3. Has data OR has active filters → show `FilterBar`; if data is empty with filters, show `NxEmptyStateFilter` inside the scroll area
+  2. Truly empty (no data AND no active filters) → `SynEmptyStateNoData` with create CTA; **hide FilterBar entirely**
+  3. Has data OR has active filters → show `FilterBar`; if data is empty with filters, show `SynEmptyStateFilter` inside the scroll area
 - **Access denied empty state:** Use `EmptyStateAccessDenied` (with `RhUiLockIcon`) when a user navigates directly to a page they cannot read. Message format: "You don't have permission to view {resource}. Contact your administrator to request access."
 
 ---
@@ -918,10 +918,10 @@ Any async or background status change (e.g., a canvas-visible resource transitio
 
 ### Error Feedback
 
-- For page-level data loading errors, use `useQueryState(query, { title: '...', onRetry: ... })` — this hooks up the `NxErrorState` component with a retry button automatically for retryable (5xx) errors
-- For mutation errors (create/update/delete), use `useMutationErrorHandler` — this wires up `NxErrorState` and toast alerts automatically
+- For page-level data loading errors, use `useQueryState(query, { title: '...', onRetry: ... })` — this hooks up the `SynErrorState` component with a retry button automatically for retryable (5xx) errors
+- For mutation errors (create/update/delete), use `useMutationErrorHandler` — this wires up `SynErrorState` and toast alerts automatically
 - For form validation errors, use inline field-level errors via PatternFly's Validated component (see Form Component section)
-- **Error state placement:** Error states render **inside `SynPanel`** using `SynPageBody isCentered` + `NxErrorState` — not as a bare centered message outside the content frame. The page header and app shell remain visible so the user can navigate away.
+- **Error state placement:** Error states render **inside `SynPanel`** using `SynPageBody isCentered` + `SynErrorState` — not as a bare centered message outside the content frame. The page header and app shell remain visible so the user can navigate away.
 
 ### Session Timeout Warning
 
@@ -1301,7 +1301,7 @@ Can user read this section?
 
 ```tsx
 onCreateWorkflow={permissions.canCreate ? handler : undefined}
-// NxEmptyStateNoData only renders button when addData callback is defined
+// SynEmptyStateNoData only renders button when addData callback is defined
 ```
 
 ### Read-Only Mode (Builder)
@@ -1323,8 +1323,8 @@ Standard format via `permissionTooltip()`:
 
 For create/edit forms accessible via direct URL:
 
-1. `isChecking` → `NxLoadingState`
-2. `isError` → `NxErrorState title="Unable to verify permissions"`
+1. `isChecking` → `SynLoadingState`
+2. `isError` → `SynErrorState title="Unable to verify permissions"`
 3. `!allowed` → `EmptyStateAccessDenied`
 4. `allowed` → render children
 
@@ -1338,13 +1338,13 @@ When a list page shows an empty state with a CTA (e.g., "Create credential"), th
 
 ```typescript
 // ❌ BAD -- toolbar is gated but empty-state bypasses permissions
-<NxEmptyStateNoData addData={() => setAddModalOpen(true)} />
+<SynEmptyStateNoData addData={() => setAddModalOpen(true)} />
 
 // ✅ GOOD -- pass undefined to hide the CTA when unauthorized
-<NxEmptyStateNoData addData={permissions.canCreate ? () => setAddModalOpen(true) : undefined} />
+<SynEmptyStateNoData addData={permissions.canCreate ? () => setAddModalOpen(true) : undefined} />
 ```
 
-Apply this pattern to every component that accepts an `addData` or action callback prop for empty states: `NxEmptyStateNoData`, custom empty states, and `EmptyState` with action buttons.
+Apply this pattern to every component that accepts an `addData` or action callback prop for empty states: `SynEmptyStateNoData`, custom empty states, and `EmptyState` with action buttons.
 
 **The same permission-aware branching applies inline, inside an open form** — not just at the page-empty-state level. When a form field's usefulness depends on another resource existing (e.g., an AI Agent node's "Tools" field is only useful once an MCP integration exists), and no such resource exists yet, show a disabled placeholder plus helper text that includes an actionable link to create one **only if** the current user has permission to create that resource; otherwise show plain, non-actionable helper text. Don't render an actionable link the user can't actually follow through on.
 
@@ -1749,7 +1749,7 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 - Panels use `SynPanel isFullHeight` for proper internal scroll behavior — do not hand-roll `display: flex; flexDirection: column` inline styles when `isFullHeight` exists
 - Panels may use a `ResizableDivider` to allow users to resize panel split areas
 - The most recent run details can display inline in the editor after workflow execution
-- **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `NxEmptyStateFilter` with a "Clear all filters" button.
+- **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `SynEmptyStateFilter` with a "Clear all filters" button.
 - **Human-readable error messages:** Execution error messages must resolve internal activity IDs to human-readable node names. Use a name map (`Map<activityId, nodeName>`) and `resolveErrorDetails()` to replace IDs in error strings before displaying them to users. Never show raw activity IDs in user-facing error alerts.
 
 ### AI Agent Reasoning Trace ("Agent Steps")
@@ -1945,7 +1945,7 @@ The project ships with Storybook for documenting and reviewing `Nx*` components.
 - **Light and dark mode:** Preview components in both themes via the Storybook toolbar (System / Light / Dark) before sign-off
 - **Composed stories over isolated demos:** Stories should reflect real app compositions (e.g., a full list page layout), not isolated prop playgrounds
 - **Autodocs:** Foundational `Nx*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
-- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`
+- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`
 
 ---
 
