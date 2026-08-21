@@ -1,4 +1,6 @@
 ---
+# CI fork-coverage probe (DONT MERGE) - this path is in both the backend and
+# frontend SCA filters, so touching it exercises both Snyk SCA jobs.
 name: SCA - Snyk Dependencies
 
 on:
