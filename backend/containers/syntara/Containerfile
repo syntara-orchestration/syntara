@@ -106,6 +106,9 @@ ARG APP_SEGMENT_WRITE_KEY=""
 USER root
 
 # Install Python 3.12 runtime and dependencies via RPM
+# util-linux provides unshare(1) and pivot_root(8) for script node
+# filesystem sandbox (mount namespace isolation when Landlock LSM
+# is unavailable). util-linux-core alone lacks pivot_root.
 RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
         libatomic \
         python3.12 \
@@ -113,6 +116,7 @@ RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
         python3.12-cffi \
         openblas-serial \
         libgomp \
+        util-linux \
     && microdnf clean all
 
 # Set python3 symlink via alternatives
