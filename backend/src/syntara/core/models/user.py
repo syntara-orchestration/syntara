@@ -118,8 +118,9 @@ class User(SoftDeletableResource, table=True):
 
     @property
     def display_name(self) -> str:
-        """Computed display name from first and last name."""
-        return " ".join(part for part in (self.first_name, self.last_name) if part)
+        """First and last name, or username when both are blank."""
+        name = " ".join(part for part in (self.first_name, self.last_name) if part)
+        return name or self.username
 
     password_hash: str | None = Field(
         default=None,

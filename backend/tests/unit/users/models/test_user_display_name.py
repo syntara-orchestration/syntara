@@ -20,9 +20,9 @@ def test_display_name_skips_empty_first_name() -> None:
     assert user.display_name == "Doe"
 
 
-def test_display_name_empty_when_both_names_blank() -> None:
+def test_display_name_falls_back_to_username_when_both_names_blank() -> None:
     user = User(id=uuid4(), username="jdoe", first_name="")
-    assert user.display_name == ""
+    assert user.display_name == "jdoe"
 
 
 def test_user_model_accepts_empty_first_name() -> None:

@@ -227,7 +227,7 @@ function UserTableRow({
         </NxLink>
       </Td>
       <Td dataLabel="Name">
-        <Truncate content={userDisplayName(user) || user.username} />
+        <Truncate content={userDisplayName(user)} />
       </Td>
       <Td dataLabel="Email">
         <Truncate content={user.email ?? ''} />

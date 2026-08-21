@@ -244,7 +244,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                     {!member.is_enabled && <DisabledBadge />}
                   </Td>
                   <Td dataLabel="Name">
-                    <Truncate content={userDisplayName(member) || member.username} />
+                    <Truncate content={userDisplayName(member)} />
                   </Td>
                   <Td dataLabel="Email">
                     <Truncate content={member.email ?? ''} />

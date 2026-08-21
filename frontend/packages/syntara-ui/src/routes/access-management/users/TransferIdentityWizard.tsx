@@ -222,7 +222,7 @@ export function TransferIdentityWizard() {
   if (!userData) return <SynLoadingState />
 
   const targetUsername = userData.username
-  const selectedUserDisplayName = selectedUser ? userDisplayName(selectedUser) || selectedUser.username : ''
+  const selectedUserDisplayName = selectedUser ? userDisplayName(selectedUser) : ''
 
   return (
     <SynPage>
