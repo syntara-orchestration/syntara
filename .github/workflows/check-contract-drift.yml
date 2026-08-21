@@ -6,15 +6,6 @@ on:
   push:
     branches: [devel, early-access]
   workflow_dispatch:
-    inputs:
-      # TEMPORARY validation input — remove before merging
-      # chore/hide-outdated-konflux-comments. Leave empty for a normal drift check.
-      pr_number:
-        description: >-
-          DO NOT MERGE scaffold. PR number whose outdated Konflux Test Results
-          comments should be hidden. Empty = normal contract-drift check.
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -25,7 +16,6 @@ env:
 jobs:
   check-drift:
     name: Check Contract Drift
-    if: github.event_name != 'workflow_dispatch' || inputs.pr_number == ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,155 +46,3 @@ jobs:
             git diff frontend/packages/syntara-contracts/src/
             exit 1
           fi
-
-  # -------------------------------------------------------------------------
-  # TEMPORARY — DO NOT MERGE this job.
-  # Validation scaffold: Check Contract Drift already exists on devel with
-  # workflow_dispatch, so we can run THIS BRANCH's copy with GITHUB_TOKEN:
-  #
-  #   gh workflow run check-contract-drift.yml \
-  #     --ref chore/hide-outdated-konflux-comments \
-  #     -f pr_number=284
-  #
-  # Same GraphQL minimizeComment logic as hide-outdated-konflux-comments.yml.
-  # Delete this job and the pr_number input before merge.
-  # -------------------------------------------------------------------------
-  hide-outdated-konflux-comments:
-    name: TEMPORARY Hide outdated Konflux comments
-    if: github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Minimize older Konflux Test Results comments
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
-        env:
-          PR_NUMBER: ${{ inputs.pr_number }}
-        with:
-          script: |
-            const KONFLUX_BOT = 'orchestrator-konflux-ci';
-            const LIST_QUERY = `
-              query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
-                repository(owner: $owner, name: $name) {
-                  pullRequest(number: $number) {
-                    comments(first: 100, after: $cursor) {
-                      nodes {
-                        id
-                        author { login }
-                        body
-                        isMinimized
-                        createdAt
-                      }
-                      pageInfo { hasNextPage endCursor }
-                    }
-                  }
-                }
-              }
-            `;
-            const MINIMIZE_MUTATION = `
-              mutation($id: ID!) {
-                minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) {
-                  minimizedComment { isMinimized }
-                }
-              }
-            `;
-
-            function normalizeLogin(login) {
-              return (login || '').replace(/\[bot\]$/i, '');
-            }
-
-            function classifySuite(body) {
-              if (!body || !body.includes('Test Results')) {
-                return 'unknown';
-              }
-              if (/\.spec\.ts\b/.test(body)) {
-                return 'ui';
-              }
-              if (/\btests\.[A-Za-z0-9_.]+/.test(body)) {
-                return 'api';
-              }
-              const match = body.match(/\|\s*Total Tests\s*\|\s*(\d+)\s*\|/);
-              if (!match) {
-                return 'unknown';
-              }
-              const total = Number(match[1]);
-              if (total <= 550) {
-                return 'api';
-              }
-              if (total >= 650) {
-                return 'ui';
-              }
-              return 'unknown';
-            }
-
-            async function listComments(owner, name, number) {
-              const comments = [];
-              let cursor = null;
-              for (;;) {
-                const data = await github.graphql(LIST_QUERY, {
-                  owner,
-                  name,
-                  number,
-                  cursor,
-                });
-                const pr = data.repository && data.repository.pullRequest;
-                if (!pr) {
-                  throw new Error(`Pull request #${number} not found`);
-                }
-                comments.push(...pr.comments.nodes);
-                if (!pr.comments.pageInfo.hasNextPage) {
-                  return comments;
-                }
-                cursor = pr.comments.pageInfo.endCursor;
-              }
-            }
-
-            const prNumber = parseInt(process.env.PR_NUMBER, 10);
-            if (!Number.isInteger(prNumber) || prNumber < 1) {
-              core.setFailed(`Invalid PR number: ${process.env.PR_NUMBER}`);
-              return;
-            }
-
-            const { owner, repo } = context.repo;
-            const comments = await listComments(owner, repo, prNumber);
-            const bySuite = { api: [], ui: [] };
-
-            for (const comment of comments) {
-              const login = comment.author && comment.author.login;
-              if (normalizeLogin(login) !== KONFLUX_BOT) {
-                continue;
-              }
-              const suite = classifySuite(comment.body);
-              if (suite !== 'api' && suite !== 'ui') {
-                continue;
-              }
-              bySuite[suite].push(comment);
-            }
-
-            let minimized = 0;
-            for (const [suite, suiteComments] of Object.entries(bySuite)) {
-              suiteComments.sort(
-                (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-              );
-              const [latest, ...older] = suiteComments;
-              if (latest) {
-                console.log(
-                  `Keeping latest ${suite} comment ${latest.id} (${latest.createdAt})`,
-                );
-              }
-              for (const comment of older) {
-                if (comment.isMinimized) {
-                  console.log(`Already minimized ${suite} comment ${comment.id}`);
-                  continue;
-                }
-                console.log(
-                  `Minimizing outdated ${suite} comment ${comment.id} (${comment.createdAt})`,
-                );
-                await github.graphql(MINIMIZE_MUTATION, { id: comment.id });
-                minimized += 1;
-              }
-            }
-
-            console.log(
-              `Minimized ${minimized} outdated Konflux comment(s) on PR #${prNumber}`,
-            );
