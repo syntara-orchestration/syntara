@@ -237,7 +237,7 @@ Terminal States: APPROVED, REJECTED, EXPIRED, CANCELLED
 
 1. Workflow engine calls `POST /approvals` with execution context
 2. `ApprovalService.create_approval()`:
-   - Validates `(execution_id, approval_node_id)` uniqueness
+   - Validates `(execution_id, approval_node_id, loop_iteration_path)` uniqueness
    - Inserts `ApprovalRequest` row with `status=pending`
    - Creates junction table entries for approver users/groups
    - Emits `ApprovalRequestedEvent` to audit system
@@ -279,7 +279,8 @@ The `ApprovalRequest` model stores all data for an approval gate:
 | `project_id` | UUID | Project this approval belongs to (denormalized from execution) |
 | `name` | str | Human-readable name for the approval request |
 | `execution_id` | UUID | Parent workflow execution ID (soft reference) |
-| `approval_node_id` | str | Activity ID from workflow definition |
+| `approval_node_id` | str | Canvas node ID from the workflow definition |
+| `loop_iteration_path` | list[int] | Enclosing-loop indices, outermost first (`[]` when not inside a loop) |
 | `status` | ApprovalRequestStatus | Current approval status (pending/approved/rejected/expired/cancelled) |
 | `timeout_at` | datetime or None | When this request expires |
 | `next_step_approved` | dict | First activity that executes if approved (ActivitySummary JSON) |
@@ -301,7 +302,7 @@ The `ApprovalRequest` model stores all data for an approval gate:
 
 When a workflow execution reaches an approval node, the workflow engine creates an `ApprovalRequest`:
 
-1. **Validate uniqueness**: Ensures no approval already exists for this `(execution_id, approval_node_id)` pair
+1. **Validate uniqueness**: Ensures no approval already exists for this `(execution_id, approval_node_id, loop_iteration_path)` triple. Loop-body approvals keep the canvas `approval_node_id` and send `loop_iteration_path` (for example `[0]` then `[1]`, or `[1, 0]` when nested) so each iteration can create its own request. The Temporal activity ID is stored separately as `temporal_activity_id`.
 2. **Insert approval record**: Creates the `ApprovalRequest` with status=`pending`
 3. **Populate approver lists**: Links authorized users and groups via junction tables
 4. **Commit transaction**: All inserts succeed or fail atomically

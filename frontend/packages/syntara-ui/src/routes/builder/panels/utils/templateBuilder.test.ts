@@ -39,6 +39,14 @@ describe('buildExpression', () => {
     expect(result).toBe('${trigger_manual.stdout}')
   })
 
+  it('strips execution composite iteration keys to the canvas node ID', () => {
+    const result = buildExpression({
+      nodeId: 'approval2#iter-5',
+      fieldPath: ['hostname'],
+    })
+    expect(result).toBe('${approval2.hostname}')
+  })
+
   it('rejects nodeId containing expression injection characters', () => {
     expect(() => buildExpression({ nodeId: 'node}; malicious; ${', fieldPath: ['field'] })).toThrow(
       'disallowed characters'

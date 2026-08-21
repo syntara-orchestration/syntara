@@ -2,6 +2,12 @@ import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAlerts } from '../../../providers/alerts'
+import {
+  canvasNodeIdFromApprovalNodeId,
+  findApprovalForCanvasNode,
+  findNodeByApprovalNodeId,
+  innermostLoopIterationIndex,
+} from '../../approvals/approvalNodeId'
 import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
@@ -127,7 +133,7 @@ export function useExecutionApprovalPanel(
     executionId,
     fetchForNode: async (nodeId: string) => {
       const fetchedApprovals = await fetchApprovals()
-      return fetchedApprovals.find((a) => a.approval_node_id === nodeId) ?? null
+      return findApprovalForCanvasNode(fetchedApprovals, nodeId) ?? null
     },
     onApprovalDetected: handleDetected,
   })
@@ -158,10 +164,14 @@ export function useExecutionApprovalPanel(
   useEffect(() => {
     if (!panelOpen || !currentApproval) return
 
-    const nodeId = currentApproval.approval_node_id
+    const canvasId = canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id)
+    const innermost = innermostLoopIterationIndex(currentApproval)
 
     const unsubscribe = useExecutionStore.subscribe(() => {
-      const activityState = useExecutionStore.getState().activityStates.get(nodeId)
+      const activityStates = useExecutionStore.getState().activityStates
+      const iterKey = innermost === undefined ? undefined : `${canvasId}#iter-${innermost}`
+      const activityState =
+        (iterKey !== undefined ? activityStates.get(iterKey) : undefined) ?? activityStates.get(canvasId)
       const status = activityState?.status
       if (status && status !== ACTIVITY_STATUS.WAITING && isTerminalState(status)) {
         dismiss()
@@ -174,7 +184,7 @@ export function useExecutionApprovalPanel(
   const approvalMessage = useMemo(() => {
     if (!currentApproval || !workflowDefinition) return undefined
     const nodes = workflowDefinition.nodes ?? workflowDefinition.workflow?.activities ?? []
-    const node = nodes.find((n) => n.id === currentApproval.approval_node_id)
+    const node = findNodeByApprovalNodeId(nodes, currentApproval.approval_node_id)
     return getApprovalPromptFromNode(node)
   }, [currentApproval, workflowDefinition])
 

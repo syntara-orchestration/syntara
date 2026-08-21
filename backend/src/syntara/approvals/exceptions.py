@@ -40,12 +40,20 @@ class ApprovalAlreadyDecidedError(ApprovalError):
 class ApprovalAlreadyRequestedError(ApprovalError):
     """Raised when attempting to create an approval that already exists for the execution and node."""
 
-    def __init__(self, execution_id: UUID, approval_node_id: str) -> None:
-        """Initialize exception with execution ID and approval node ID."""
+    def __init__(
+        self,
+        execution_id: UUID,
+        approval_node_id: str,
+        loop_iteration_path: list[int] | None = None,
+    ) -> None:
+        """Initialize exception with execution ID, canvas node ID, and loop path."""
         self.execution_id = execution_id
         self.approval_node_id = approval_node_id
+        self.loop_iteration_path = [*loop_iteration_path] if loop_iteration_path is not None else []
         super().__init__(
-            f"Approval request already exists for execution {execution_id} and approval node '{approval_node_id}'"
+            "Approval request already exists for execution "
+            f"{execution_id}, approval node '{approval_node_id}', "
+            f"loop_iteration_path={self.loop_iteration_path}"
         )
 
 
