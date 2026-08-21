@@ -141,6 +141,25 @@ npm run e2e:ui              # Run e2e playwright tests in the playwright UI
 npm run e2e:visual-regression        # Page screenshot visual regression (mock API + UI via Playwright webServer)
 npm run e2e:visual-regression:update # Same, with --update-snapshots (see packages/syntara-ui/VISUAL_REGRESSION.md)
 
+# E2E test suite tags — Playwright tags that control where each test runs:
+#   @pr-check      Fast critical-path tests; select with --grep @pr-check
+#   @konflux-skip  Tests excluded from Konflux pipelines via --grep-invert @konflux-skip (flaky in that env only)
+#   @local-only    Visual regression tests; excluded from all CI automatically
+# Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
+#
+# When to apply @konflux-skip:
+#   - Test creates a real workflow execution and waits for Temporal to complete it
+#     (approval flows, multi-step runs, badge checks) — Temporal under Konflux cluster
+#     load frequently times out or returns unexpected states.
+#   - Test has a wall-clock budget >25s; Konflux runner load regularly pushes it over.
+#   - Test relies on the backend Temporal worker reaching an external URL (httpbin,
+#     webhooks, LLM APIs) — the worker's network is more restricted than the test runner.
+# How to apply:
+#   test('name', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+#   After editing, run: npx --prefix .. prettier --write <file>
+#   (Prettier may reformat to multi-line — that is correct and expected.)
+# See also: root CLAUDE.md → "Konflux CI Environment" for backend skip patterns.
+
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
 npm run test:coverage
