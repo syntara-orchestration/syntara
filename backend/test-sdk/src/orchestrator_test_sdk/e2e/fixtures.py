@@ -512,10 +512,25 @@ def llm_model_id(
     seeds it with the model from APP_OPENROUTER_MODEL, and yields the database
     UUID of that LLMModel record.  The integration (and its models) are deleted
     on teardown.
+
+    If a stale integration with the same name exists (e.g. from a timed-out
+    prior attempt whose teardown never ran), it is deleted first so the
+    create does not 409.
     """
+    integration_name = f"e2e-llm-provider-{worker_id}"
+
+    existing_resp = syntara_api.integrations.list(integration_type=IntegrationType.LLM_PROVIDER)
+    existing_list = existing_resp.assert_and_get()
+    stale = next((i for i in existing_list.resources if i.name == integration_name), None)
+    if stale is not None:
+        try:
+            syntara_api.integrations.delete(integration_id=stale.id)
+        except Exception:
+            logger.warning("Failed to delete stale integration %s, proceeding anyway", stale.id)
+
     integration = syntara_api.integrations.create(
         body=IntegrationCreate(
-            name=f"e2e-llm-provider-{worker_id}",
+            name=integration_name,
             description="LLM provider for E2E tests",
             integration_type=IntegrationType.LLM_PROVIDER,
             configuration=LLMProviderConfiguration(
