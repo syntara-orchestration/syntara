@@ -585,4 +585,25 @@ describe('useExecutionApprovalPanel', () => {
 
     expect(result.current.panelOpen).toBe(true)
   })
+
+  it('auto-dismisses using this approval iteration activity key', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const loopApproval = { ...mockApproval, loop_iteration_path: [2] }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+
+    storeHelpers.setStatus('node-1#iter-2', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-2', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
+  })
 })

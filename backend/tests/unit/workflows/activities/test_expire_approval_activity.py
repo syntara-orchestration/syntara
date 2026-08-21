@@ -164,6 +164,7 @@ def test_is_approval_for_node_requires_numeric_iter_suffix(node_id: str) -> None
     assert _is_approval_for_node(f"{node_id}_iter_0", node_id)
     assert _is_approval_for_node(f"{node_id}_iter_12", node_id)
     assert _is_approval_for_node(f"{node_id}_iter_1_iter_0", node_id)
+    assert _is_approval_for_node(node_id, f"{node_id}_iter_0")
     assert not _is_approval_for_node(f"{node_id}_iter_notanumber", node_id)
     assert not _is_approval_for_node("other_node_iter_1", node_id)
     assert not _is_approval_for_node(f"{node_id}_iter_1_extra", node_id)

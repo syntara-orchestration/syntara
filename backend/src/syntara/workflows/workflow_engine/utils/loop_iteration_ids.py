@@ -1,22 +1,25 @@
-"""Canonical loop-iteration Temporal / approval IDs.
+"""Canonical loop-iteration Temporal IDs.
 
-A node outside any loop keeps its canvas ID. Inside one or more loops the ID is
-the canvas ID plus one ``_iter_{n}`` suffix per enclosing loop, outermost first.
+A node outside any loop keeps its canvas ID. Inside one or more loops the
+Temporal activity ID is the canvas ID plus one ``_iter_{n}`` suffix per
+enclosing loop, outermost first.
 
 Loop *control* activities always append their own ``current_index`` after any
 enclosing-loop indices (see ``loop_control_activity_id``).
 
+The Approvals API ``approval_node_id`` stays the canvas ID. Iteration identity
+for approval rows is ``loop_iteration_path`` (the same index chain).
+
 Examples::
 
     approval                    # no loop
-    approval_iter_3             # single loop, index 3
+    approval_iter_3             # single loop, Temporal id, index 3
     approval_iter_1_iter_0      # outer index 1, inner index 0
     outer_iter_0                # top-level loop control, index 0
     inner_iter_1_iter_0         # nested loop control, outer 1, inner 0
 
-Encoding the full chain means an inner loop resetting ``current_index`` cannot
-reuse an ID from a previous outer iteration (unique on
-``(execution_id, approval_node_id)`` and on Temporal ``activity_id``).
+``workflow.patched`` keeps in-flight executions on pre-upgrade Temporal IDs
+(canvas ID for loop-body approvals; own index only for nested loop control).
 """
 
 from __future__ import annotations
@@ -24,11 +27,26 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
+from temporalio import workflow
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+LOOP_ITERATION_UNIQUE_IDS_PATCH = "loop-iteration-unique-ids"
+
 _LOOP_ITER_CHAIN_RE = re.compile(r"(?:_iter_\d+)+$")
 _LOOP_ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
+
+
+def use_unique_loop_iteration_ids() -> bool:
+    """Return True for new executions; False when replaying pre-patch history.
+
+    Outside a Temporal workflow (unit tests) this returns True so helpers
+    exercise the unique-id path by default.
+    """
+    if not workflow.in_workflow():
+        return True
+    return workflow.patched(LOOP_ITERATION_UNIQUE_IDS_PATCH)
 
 
 def strip_loop_iteration_suffixes(activity_id: str) -> str:
@@ -72,6 +90,21 @@ def loop_index_chain(
     return indices
 
 
+def approval_temporal_activity_id(
+    node_id: str,
+    loop_body_map: Mapping[str, str],
+    node_control_data: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Temporal activity ID for an approval node.
+
+    New executions use the loop-index chain. Pre-patch in-flight executions
+    keep the canvas node ID so replay matches history.
+    """
+    if not use_unique_loop_iteration_ids():
+        return node_id
+    return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))
+
+
 def loop_control_activity_id(
     node_id: str,
     current_index: int,
@@ -80,24 +113,28 @@ def loop_control_activity_id(
 ) -> str:
     """Temporal activity ID for a loop control node.
 
-    Top-level loops are ``{node_id}_iter_{current_index}``. A loop nested
-    inside another loop prepends each enclosing ``current_index`` (outermost
-    first) so an inner loop that resets to 0 on the next outer iteration
-    cannot reuse a Temporal activity ID.
+    Top-level loops are ``{node_id}_iter_{current_index}`` on both code paths.
+    Nested loops prepend enclosing indices on the new path; pre-patch replay
+    uses only ``current_index``.
     """
-    enclosing = loop_index_chain(node_id, loop_body_map, node_control_data)
-    return join_loop_iteration_id(node_id, [*enclosing, current_index])
+    if use_unique_loop_iteration_ids():
+        enclosing = loop_index_chain(node_id, loop_body_map, node_control_data)
+        return join_loop_iteration_id(node_id, [*enclosing, current_index])
+    return join_loop_iteration_id(node_id, [current_index])
+
+
+def _is_iteration_suffix(remainder: str) -> bool:
+    return _LOOP_ITER_CHAIN_RE.fullmatch(remainder) is not None
 
 
 def matches_loop_iteration_id(stored_id: str, canvas_or_activity_id: str) -> bool:
     """Return True if ``stored_id`` is this canvas node or a loop-iteration ID for it.
 
-    ``canvas_or_activity_id`` may itself be a nested iteration ID (expire of
-    one in-flight request) or the bare canvas ID (expire-all for the node).
+    Matches suffixed stored ids against a canvas query, and legacy canvas stored
+    ids against a suffixed query (pre-upgrade rows expired after deploy).
     """
     if stored_id == canvas_or_activity_id:
         return True
-    if not stored_id.startswith(canvas_or_activity_id):
-        return False
-    remainder = stored_id[len(canvas_or_activity_id) :]
-    return _LOOP_ITER_CHAIN_RE.fullmatch(remainder) is not None
+    if stored_id.startswith(canvas_or_activity_id) and _is_iteration_suffix(stored_id[len(canvas_or_activity_id) :]):
+        return True
+    return canvas_or_activity_id.startswith(stored_id) and _is_iteration_suffix(canvas_or_activity_id[len(stored_id) :])
