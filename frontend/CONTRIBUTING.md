@@ -133,6 +133,7 @@ The Podman Compose E2E UI tests automatically run when frontend-relevant changes
 ```
 
 **When to use it:**
+
 - Backend-only PRs where you want to verify the UI still works
 - Workflow or CI configuration changes
 - Debugging test failures
