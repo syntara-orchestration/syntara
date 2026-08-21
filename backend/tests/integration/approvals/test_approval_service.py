@@ -9,6 +9,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.approvals.audit.approval import (
@@ -790,6 +791,199 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
             await test_db_session.refresh(approval)
             assert approval.status == ApprovalRequestStatus.APPROVED
             assert approval.decided_by == test_user.id
+
+
+class TestApprovalServiceCancelPendingForExecution(TestApprovalServiceBase):
+    """Test ApprovalService.cancel_pending_for_execution method.
+
+    Regression coverage for AAP bug: a workflow execution could be cancelled
+    while its approval stayed pending long enough to still be approved/rejected,
+    leaving execution=cancelled and approval=approved permanently inconsistent.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cancels_only_pending_approvals_for_the_execution(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """Only PENDING approvals for the given execution are cancelled."""
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+
+        approvals = await approvals_factory.create_approvals(
+            count=3,
+            execution_id=execution_id,
+            statuses=[ApprovalRequestStatus.PENDING, ApprovalRequestStatus.APPROVED, ApprovalRequestStatus.PENDING],
+        )
+        pending_approval, already_approved, other_pending_approval = approvals
+
+        # Unrelated execution's pending approval must not be touched.
+        other_executions = await executions_factory.create_executions(count=1)
+        other_execution_approvals = await approvals_factory.create_pending_approvals(
+            count=1, execution_id=other_executions[0].id
+        )
+        unrelated_approval = other_execution_approvals[0]
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+
+        assert len(cancelled) == 2
+
+        await test_db_session.refresh(pending_approval)
+        await test_db_session.refresh(other_pending_approval)
+        await test_db_session.refresh(already_approved)
+        await test_db_session.refresh(unrelated_approval)
+
+        assert pending_approval.status == ApprovalRequestStatus.CANCELLED
+        assert pending_approval.decided_by == test_user.id
+        assert pending_approval.decided_at is not None
+        assert pending_approval.decision_notes == "Workflow execution was cancelled"
+
+        assert other_pending_approval.status == ApprovalRequestStatus.CANCELLED
+
+        # Already-decided approval is left exactly as it was.
+        assert already_approved.status == ApprovalRequestStatus.APPROVED
+
+        # Pending approval on a different execution is untouched.
+        assert unrelated_approval.status == ApprovalRequestStatus.PENDING
+
+    @pytest.mark.asyncio
+    async def test_does_not_dispatch_audit_events(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """cancel_pending_for_execution() defers audit dispatch to the caller.
+
+        Dispatching immediately would record a permanent "cancelled" audit
+        event even if the caller's later step (the Temporal RPC) fails and the
+        cancellation is reverted via reopen_cancelled().
+        """
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+        await approvals_factory.create_pending_approvals(count=1, execution_id=execution_id)
+
+        with patch("syntara.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
+            cancelled = await service.cancel_pending_for_execution(execution_id)
+
+        assert len(cancelled) == 1
+        mock_dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dispatch_cancelled_events_records_audit_event(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """dispatch_cancelled_events() records the audit event cancel_pending_for_execution() withheld."""
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+        await approvals_factory.create_pending_approvals(count=2, execution_id=execution_id)
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+
+        with patch("syntara.approvals.services.approval_service.AuditEventDispatcher.dispatch") as mock_dispatch:
+            service.dispatch_cancelled_events(cancelled)
+
+        assert mock_dispatch.call_count == 2
+        dispatched_decisions = {call.args[0].decision for call in mock_dispatch.call_args_list}
+        assert dispatched_decisions == {"cancelled"}
+
+    @pytest.mark.asyncio
+    async def test_reopen_cancelled_reverts_to_pending(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """reopen_cancelled undoes cancel_pending_for_execution, restoring PENDING.
+
+        Used when a later step in the same logical cancel operation (the
+        Temporal RPC) fails, so the execution was never actually cancelled.
+        """
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+        approvals = await approvals_factory.create_pending_approvals(count=2, execution_id=execution_id)
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+        assert len(cancelled) == 2
+
+        await service.reopen_cancelled(cancelled)
+
+        for approval in approvals:
+            await test_db_session.refresh(approval)
+            assert approval.status == ApprovalRequestStatus.PENDING
+            assert approval.decided_by is None
+            assert approval.decided_at is None
+            assert approval.decision_notes is None
+
+    @pytest.mark.asyncio
+    async def test_reopen_cancelled_ignores_row_with_mismatched_fingerprint(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """reopen_cancelled() only reverts rows matching the exact cancel fingerprint.
+
+        If the row was re-cancelled by something else (different decided_by/
+        decided_at/notes) in between, a stale approvals list must not clobber
+        that unrelated cancellation.
+        """
+        service = self._create_test_service(test_db_session, test_user)
+
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = executions[0].id
+        await approvals_factory.create_pending_approvals(count=1, execution_id=execution_id)
+
+        cancelled = await service.cancel_pending_for_execution(execution_id)
+        assert len(cancelled) == 1
+        approval = cancelled[0]
+
+        # Simulate another actor re-cancelling the same row with a different
+        # fingerprint via a raw, non-ORM UPDATE, so the `cancelled` list (still
+        # in the session identity map) keeps holding the original, now-stale
+        # fingerprint instead of getting auto-synced to the new values.
+        # decided_by is FK-constrained to an existing principal, so reuse
+        # test_user.id -- the differing decided_at/notes alone are enough to
+        # make the fingerprint not match.
+        other_decided_at = datetime.now(UTC) + timedelta(seconds=1)
+        await test_db_session.execute(
+            text(
+                "UPDATE approval_requests "
+                "SET decided_by = :decided_by, decided_at = :decided_at, decision_notes = :notes "
+                "WHERE id = :approval_id"
+            ),
+            {
+                "decided_by": str(test_user.id),
+                "decided_at": other_decided_at,
+                "notes": "Cancelled for a different reason",
+                "approval_id": str(approval.id),
+            },
+        )
+        await test_db_session.commit()
+
+        await service.reopen_cancelled(cancelled)
+
+        await test_db_session.refresh(approval)
+        assert approval.status == ApprovalRequestStatus.CANCELLED
+        assert approval.decision_notes == "Cancelled for a different reason"
 
 
 class TestApprovalServiceBatchDecide(TestApprovalServiceBase):
