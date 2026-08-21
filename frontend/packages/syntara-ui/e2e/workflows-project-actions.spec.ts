@@ -9,41 +9,38 @@
  * - Permission gating for project actions
  */
 import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName, createBasicWorkflow, deleteWorkflow, deleteProject } from './helpers/workflows'
+import { buildUniqueName } from './helpers/workflows'
+import { createProjectViaApi, createWorkflowViaApi, deleteProjectViaApi, deleteWorkflowViaApi } from './utils/api'
 
 test.describe('Workflows Page - Project Actions in All Projects View', () => {
   test('project group header shows kebab menu with edit and delete actions', async ({ app }) => {
-    test.setTimeout(60_000)
-
     const projectName = buildUniqueName('e2e-project')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
+    let workflowId: string | undefined
 
     try {
-      // Create a project with a workflow so it appears in the grouped view
-      await app.goto(toAppUrl('/workflows'))
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
-      // Create project via project selector
+      // Navigate to All projects view
+      await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await expect(createDialog).toBeVisible()
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(projectName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
-
-      // Create a workflow in this project
-      await createBasicWorkflow(app, workflowName, 'Test workflow')
-
-      // Go back to All projects view
-      await app.goto(toAppUrl('/workflows'))
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
 
       // Find the project group header row
       const projectRow = app.getByRole('row').filter({ hasText: projectName })
-      await expect(projectRow).toBeVisible()
+      await expect(projectRow).toBeVisible({ timeout: 15_000 })
 
       // Find and click the kebab menu for this project
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
@@ -54,40 +51,40 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(app.getByRole('menuitem', { name: /Edit project/i })).toBeVisible()
       await expect(app.getByRole('menuitem', { name: /Delete project/i })).toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
-      await deleteProject(app, projectName)
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
   test('edit project from group header updates name immediately', async ({ app }) => {
-    test.setTimeout(60_000)
-
     const originalName = buildUniqueName('e2e-project-original')
     const updatedName = buildUniqueName('e2e-project-updated')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
+    let workflowId: string | undefined
 
     try {
-      // Create project
-      await app.goto(toAppUrl('/workflows'))
-      const projectSelector = app.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(originalName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
-
-      // Create workflow
-      await createBasicWorkflow(app, workflowName, 'Test')
+      const project = await createProjectViaApi(app, originalName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
       // Navigate to All projects view
       await app.goto(toAppUrl('/workflows'))
+      const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
 
       // Open project kebab menu
       const projectRow = app.getByRole('row').filter({ hasText: originalName })
+      await expect(projectRow).toBeVisible({ timeout: 15_000 })
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await projectKebab.click()
       await app.getByRole('menuitem', { name: /Edit project/i }).click()
@@ -105,38 +102,39 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(app.getByRole('row').filter({ hasText: updatedName })).toBeVisible({ timeout: 10_000 })
       await expect(app.getByRole('row').filter({ hasText: originalName })).not.toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
-      await deleteProject(app, updatedName) // Use updated name since project was renamed
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
-  test.skip('delete project shows confirmation dialog with cascade warnings', async ({ app }) => {
-    test.setTimeout(60_000)
-
+  test('delete project shows confirmation dialog with cascade warnings', async ({ app }) => {
     const projectName = buildUniqueName('e2e-project-delete')
     const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
+    let workflowId: string | undefined
 
     try {
-      // Create project and workflow
-      await app.goto(toAppUrl('/workflows'))
-      const projectSelector = app.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(projectName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
-
-      await createBasicWorkflow(app, workflowName, 'Test')
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+      const workflow = await createWorkflowViaApi(
+        app,
+        workflowName,
+        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+        [],
+        [],
+        { projectId }
+      )
+      workflowId = workflow.id
 
       // Navigate to All projects view
       await app.goto(toAppUrl('/workflows'))
+      const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
 
       // Open delete from project kebab
       const projectRow = app.getByRole('row').filter({ hasText: projectName })
+      await expect(projectRow).toBeVisible({ timeout: 15_000 })
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await projectKebab.click()
       await app.getByRole('menuitem', { name: /Delete project/i }).click()
@@ -145,8 +143,8 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       const deleteDialog = app.getByRole('dialog', { name: /Delete project/i })
       await expect(deleteDialog).toBeVisible()
       await expect(deleteDialog.getByText(projectName)).toBeVisible()
-      await expect(deleteDialog.getByText(/workflows.*permanently deleted/i)).toBeVisible()
-      await expect(deleteDialog.getByText(/role assignments.*removed/i)).toBeVisible()
+      await expect(deleteDialog.getByText(/^All workflows in this project will be permanently/i)).toBeVisible()
+      await expect(deleteDialog.getByText(/^All project role assignments will be removed/i)).toBeVisible()
 
       // Verify destructive acknowledgement checkbox is required
       const confirmButton = deleteDialog.getByRole('button', { name: 'Delete' })
@@ -160,80 +158,55 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await deleteDialog.getByRole('button', { name: 'Cancel' }).click()
       await expect(deleteDialog).not.toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
-      await deleteProject(app, projectName)
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 })
 
 test.describe('Workflows Page - Project Actions in Selected Project View', () => {
-  test.skip('page header shows project kebab menu when specific project selected', async ({ app }) => {
-    test.setTimeout(60_000)
-
+  test('page header shows project kebab menu when specific project selected', async ({ app }) => {
     const projectName = buildUniqueName('e2e-project-header')
-    const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
 
     try {
-      // Create project and workflow
+      const project = await createProjectViaApi(app, projectName)
+      projectId = project.id
+
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(projectName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
-
-      await createBasicWorkflow(app, workflowName, 'Test')
-
-      // Ensure we're viewing this specific project
-      await app.goto(toAppUrl('/workflows'))
       await projectSelector.click()
       await app.getByRole('option', { name: projectName }).click()
 
-      // Find and click the kebab menu in the page header
+      // Project is now selected — kebab should be visible in header
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
-      await expect(headerKebab).toBeVisible()
+      await expect(headerKebab).toBeVisible({ timeout: 15_000 })
       await headerKebab.click()
 
-      // Verify Edit and Delete actions are present
       await expect(app.getByRole('menuitem', { name: /Edit project/i })).toBeVisible()
       await expect(app.getByRole('menuitem', { name: /Delete project/i })).toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
-      await deleteProject(app, projectName)
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 
-  test.skip('edit project from header updates name in project selector', async ({ app }) => {
-    test.setTimeout(60_000)
-
+  test('edit project from header updates name in project selector', async ({ app }) => {
     const originalName = buildUniqueName('e2e-project-orig')
     const updatedName = buildUniqueName('e2e-project-upd')
-    const workflowName = buildUniqueName('e2e-workflow')
+    let projectId: string | undefined
 
     try {
-      // Create project and workflow
+      const project = await createProjectViaApi(app, originalName)
+      projectId = project.id
+
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await app.getByRole('option', { name: 'Create project' }).click()
-
-      const createDialog = app.getByRole('dialog', { name: /Create project/i })
-      await createDialog.getByRole('textbox', { name: 'Project name' }).fill(originalName)
-      await createDialog.getByRole('button', { name: 'Create project' }).click()
-      await expect(createDialog).not.toBeVisible({ timeout: 15_000 })
-
-      await createBasicWorkflow(app, workflowName, 'Test')
-
-      // Select the project
-      await app.goto(toAppUrl('/workflows'))
       await projectSelector.click()
       await app.getByRole('option', { name: originalName }).click()
 
       // Edit via header kebab
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
+      await expect(headerKebab).toBeVisible({ timeout: 15_000 })
       await headerKebab.click()
       await app.getByRole('menuitem', { name: /Edit project/i }).click()
 
@@ -247,8 +220,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       // Verify the project selector shows the updated name
       await expect(projectSelector).toHaveValue(updatedName)
     } finally {
-      await deleteWorkflow(app, workflowName)
-      await deleteProject(app, updatedName) // Use updated name since project was renamed
+      if (projectId) await deleteProjectViaApi(app, projectId)
     }
   })
 })
