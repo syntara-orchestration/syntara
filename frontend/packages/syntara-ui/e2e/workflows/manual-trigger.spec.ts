@@ -44,7 +44,7 @@ test.describe('Manual Trigger', () => {
 
         await app.goto(toAppUrl('/workflows'))
         await expect(app.getByRole('grid', { name: 'Workflows table' })).toBeVisible({ timeout: 15_000 })
-      await app.getByPlaceholder('Filter by name').fill(workflowName)
+        await app.getByPlaceholder('Filter by name').fill(workflowName)
         await app.getByRole('button', { name: 'Apply filter' }).click()
         await expect(app.getByRole('link', { name: workflowName, exact: true })).toBeVisible({ timeout: 30_000 })
 
