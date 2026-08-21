@@ -40,6 +40,7 @@ class ApprovalCreateRequest:
                 Essential context for approvers to make a decision.
                 Contains workflow identification, inputs, and the output from the immediately
                 preceding activity.
+            prompt (None | str | Unset): Resolved guidance message from the approval node, shown to approvers
             timeout_at (datetime.datetime | None | Unset): When this request expires (null = no timeout)
             next_step_rejected (ActivitySummary | None | Unset): First activity that executes if rejected
             approver_user_ids (list[UUID] | None | Unset): User IDs who can approve (null = any user with approval:decide
@@ -53,6 +54,7 @@ class ApprovalCreateRequest:
     name: str
     next_step_approved: ActivitySummary
     workflow_context: WorkflowContext
+    prompt: None | str | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
     next_step_rejected: ActivitySummary | None | Unset = UNSET
     approver_user_ids: list[UUID] | None | Unset = UNSET
@@ -73,6 +75,12 @@ class ApprovalCreateRequest:
         next_step_approved = self.next_step_approved.to_dict()
 
         workflow_context = self.workflow_context.to_dict()
+
+        prompt: None | str | Unset
+        if isinstance(self.prompt, Unset):
+            prompt = UNSET
+        else:
+            prompt = self.prompt
 
         timeout_at: None | str | Unset
         if isinstance(self.timeout_at, Unset):
@@ -126,6 +134,8 @@ class ApprovalCreateRequest:
                 "workflow_context": workflow_context,
             }
         )
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
         if timeout_at is not UNSET:
             field_dict["timeout_at"] = timeout_at
         if next_step_rejected is not UNSET:
@@ -154,6 +164,15 @@ class ApprovalCreateRequest:
         next_step_approved = ActivitySummary.from_dict(d.pop("next_step_approved"))
 
         workflow_context = WorkflowContext.from_dict(d.pop("workflow_context"))
+
+        def _parse_prompt(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        prompt = _parse_prompt(d.pop("prompt", UNSET))
 
         def _parse_timeout_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -240,6 +259,7 @@ class ApprovalCreateRequest:
             name=name,
             next_step_approved=next_step_approved,
             workflow_context=workflow_context,
+            prompt=prompt,
             timeout_at=timeout_at,
             next_step_rejected=next_step_rejected,
             approver_user_ids=approver_user_ids,

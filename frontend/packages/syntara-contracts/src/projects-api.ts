@@ -1371,6 +1371,11 @@ export interface components {
        */
       name: string
       /**
+       * Prompt
+       * @description Resolved guidance message from the approval node, shown to approvers
+       */
+      prompt?: string | null
+      /**
        * @description Current approval status
        * @default pending
        */

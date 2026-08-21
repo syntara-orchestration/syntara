@@ -222,6 +222,27 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
+  it('prefers persisted approval.prompt over workflow definition', () => {
+    const withPrompt = { ...mockApproval, prompt: 'From approval record' }
+    const nodeClick = makeNodeClick(withPrompt, [withPrompt])
+    const wfDef = {
+      nodes: [{ id: 'node-1', parameters: { prompt: 'From definition' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('From approval record')
+  })
+
+  it('returns approval.prompt when workflow definition is missing', () => {
+    const withPrompt = { ...mockApproval, prompt: 'From approval record' }
+    const { result } = renderHook(() =>
+      useExecutionApprovalPanel('exec-1', '', makeNodeClick(withPrompt, [withPrompt]), undefined)
+    )
+
+    expect(result.current.approvalMessage).toBe('From approval record')
+  })
+
   it('returns approvalMessage from v2 parameters.prompt', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {

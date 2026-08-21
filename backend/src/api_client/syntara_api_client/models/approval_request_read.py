@@ -51,6 +51,7 @@ class ApprovalRequestRead:
             updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
             labels (ApprovalRequestReadLabels | Unset): Key-value pairs for resource labeling and filtering Example:
                 {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
+            prompt (None | str | Unset): Resolved guidance message from the approval node, shown to approvers
             status (ApprovalRequestStatus | Unset): Approval request status enumeration.
             timeout_at (datetime.datetime | None | Unset): When this request expires
             next_step_rejected (ActivitySummary | None | Unset): First activity that executes if rejected
@@ -74,6 +75,7 @@ class ApprovalRequestRead:
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
     labels: ApprovalRequestReadLabels | Unset = UNSET
+    prompt: None | str | Unset = UNSET
     status: ApprovalRequestStatus | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
     next_step_rejected: ActivitySummary | None | Unset = UNSET
@@ -115,6 +117,12 @@ class ApprovalRequestRead:
         labels: dict[str, Any] | Unset = UNSET
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
+
+        prompt: None | str | Unset
+        if isinstance(self.prompt, Unset):
+            prompt = UNSET
+        else:
+            prompt = self.prompt
 
         status: str | Unset = UNSET
         if not isinstance(self.status, Unset):
@@ -198,6 +206,8 @@ class ApprovalRequestRead:
             field_dict["updated_at"] = updated_at
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
         if status is not UNSET:
             field_dict["status"] = status
         if timeout_at is not UNSET:
@@ -268,6 +278,15 @@ class ApprovalRequestRead:
             labels = UNSET
         else:
             labels = ApprovalRequestReadLabels.from_dict(_labels)
+
+        def _parse_prompt(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        prompt = _parse_prompt(d.pop("prompt", UNSET))
 
         _status = d.pop("status", UNSET)
         status: ApprovalRequestStatus | Unset
@@ -391,6 +410,7 @@ class ApprovalRequestRead:
             created_at=created_at,
             updated_at=updated_at,
             labels=labels,
+            prompt=prompt,
             status=status,
             timeout_at=timeout_at,
             next_step_rejected=next_step_rejected,
