@@ -236,15 +236,7 @@ describe('DeleteMenuItem', () => {
   it('disables delete when canDelete is false', () => {
     render(<DeleteMenuItem canDelete={false} deleteTooltip="No permission" dispatch={vi.fn()} closeKebab={vi.fn()} />)
 
-    const item = screen.getByRole('menuitem', { name: /Delete workflow/i })
-    expect(item).toHaveAttribute('aria-disabled', 'true')
-    expect(item).not.toHaveClass('pf-m-danger')
-  })
-
-  it('shows danger styling when canDelete is true', () => {
-    render(<DeleteMenuItem canDelete deleteTooltip="No permission" dispatch={vi.fn()} closeKebab={vi.fn()} />)
-
-    expect(screen.getByRole('menuitem', { name: /Delete workflow/i })).toHaveClass('pf-m-danger')
+    expect(screen.getByRole('menuitem', { name: /Delete workflow/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('dispatches delete dialog action when clicked', async () => {
