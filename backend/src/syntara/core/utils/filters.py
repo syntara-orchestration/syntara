@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, TypeVar
+from uuid import UUID
 
 import structlog
 from pydantic import BaseModel
@@ -299,6 +300,31 @@ def _convert_numeric_value(value: str, python_type: type[int | float], field_att
         raise SafeValueError(msg) from e
 
 
+def _convert_uuid_value(value: str, field_attr: Any) -> str:  # noqa: ANN401
+    """Validate that a string is a valid UUID.
+
+    Args:
+        value: String value to validate
+        field_attr: SQLAlchemy field attribute for error context
+
+    Returns:
+        The original string value (validated but not converted, since
+        SQLAlchemy handles the actual type coercion)
+
+    Raises:
+        SafeValueError: If the value is not a valid UUID
+
+    """
+    try:
+        UUID(value)
+    except ValueError as e:
+        field_name = getattr(field_attr, "key", "unknown")
+        expected = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        msg = f"Invalid UUID value '{value}' for field '{field_name}'. Expected format: {expected}"
+        raise SafeValueError(msg) from e
+    return value
+
+
 def _convert_enum_value(value: str, python_type: type[Enum], field_attr: Any) -> Enum:  # noqa: ANN401
     """Convert string value to enum type.
 
@@ -378,7 +404,11 @@ def _convert_filter_value(value: FilterValue, field_attr: Any) -> FilterValue:  
     if python_type in (int, float):
         return _convert_numeric_value(value, python_type, field_attr)
 
-    # For other types (str, UUID, custom types), use string comparison
+    # Handle UUID fields
+    if python_type is UUID:
+        return _convert_uuid_value(value, field_attr)
+
+    # For other types (str, custom types), use string comparison
     return value
 
 

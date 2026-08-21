@@ -500,6 +500,12 @@ def _merge_plain_allof(schema: dict[str, Any]) -> dict[str, Any]:  # noqa: C901,
         if not isinstance(item, dict) or any(k in item for k in _complex_kw):
             return schema
 
+    # Don't merge when items have conflicting types (e.g. string + object in
+    # deepObject filter params) — the allOf is a type union, not composition.
+    types_seen = {item["type"] for item in all_of if "type" in item}
+    if len(types_seen) > 1:
+        return schema
+
     merged_props: dict[str, Any] = {}
     merged_required: list[str] = []
     item_type: str | None = None

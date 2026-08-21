@@ -44,6 +44,51 @@ def _extract_route_permission(route: object) -> dict[str, object] | None:
     return None
 
 
+def _extract_filterable_model(route: object) -> Any:
+    """Extract a FilterableModel instance from a route's dependencies, or None."""
+    from syntara.authz.resource_actions import _get_dep_instance, _iter_route_deps
+    from syntara.core.openapi.filterable import FilterableModel
+
+    for dep in _iter_route_deps(route):
+        inner = _get_dep_instance(dep)
+        if isinstance(inner, FilterableModel):
+            return inner
+    return None
+
+
+def _inject_filter_params(app: FastAPI, spec: dict[str, Any]) -> None:
+    """Add deepObject-style filter query params to spec operations.
+
+    Walks the assembled FastAPI routes, finds FilterableModel dependencies,
+    and injects the generated OpenAPI params into the corresponding spec
+    operations.  This enables the drift checker to validate that hand-authored
+    sub-spec filter params match the model metadata.
+    """
+    from syntara.core.router_discovery import iter_api_routes
+
+    paths = spec.get("paths", {})
+    for route in iter_api_routes(app):
+        filterable = _extract_filterable_model(route)
+        if filterable is None:
+            continue
+
+        path = route.path
+        if path not in paths:
+            continue
+
+        filter_params = filterable.to_openapi_params()
+        for method in route.methods or []:
+            method_lower = method.lower()
+            op = paths[path].get(method_lower)
+            if op is None:
+                continue
+            existing = op.setdefault("parameters", [])
+            existing_names = {p["name"] for p in existing if isinstance(p, dict)}
+            for param in filter_params:
+                if param["name"] not in existing_names:
+                    existing.append(param)
+
+
 def _inject_permission_metadata(app: FastAPI, spec: dict[str, Any]) -> None:
     """Add x-app-permission to spec operations from PermissionChecker deps.
 
@@ -239,6 +284,7 @@ def main() -> int:
     spec = app.openapi()
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)
+    _inject_filter_params(app, spec)
     _consolidate_identical_input_output_schemas(spec)
 
     # Strip auth responses from explicitly unauthenticated endpoints
