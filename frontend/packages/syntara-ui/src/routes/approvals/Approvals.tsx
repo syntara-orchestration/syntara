@@ -9,8 +9,8 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
@@ -162,9 +162,9 @@ function ApprovalsContent({
     return (
       <SynPageBody isCentered>
         {hasActiveFilters ? (
-          <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
         ) : (
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No approvals found"
             description="No approvals are currently pending or available."
           />

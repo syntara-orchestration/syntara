@@ -26,7 +26,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { NxLink } from '../../../components/NxLink'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
@@ -219,7 +219,7 @@ export function TransferIdentityWizard() {
   }
 
   const userData = userQuery.data
-  if (!userData) return <NxLoadingState />
+  if (!userData) return <SynLoadingState />
 
   const targetUsername = userData.username
   const selectedUserDisplayName = selectedUser ? userDisplayName(selectedUser) || selectedUser.username : ''

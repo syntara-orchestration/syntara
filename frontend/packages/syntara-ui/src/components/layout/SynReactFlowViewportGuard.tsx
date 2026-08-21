@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { panelContentStackStyle } from '../../app/panelContentStackStyle'
 import { detachPromise } from '../../utils/detachPromise'
-import { NxEmptyStateViewportTooSmall } from '../states/NxEmptyStateViewportTooSmall'
+import { SynEmptyStateViewportTooSmall } from '../states/SynEmptyStateViewportTooSmall'
 
 import styles from './SynReactFlowViewportGuard.module.css'
 
@@ -30,7 +30,7 @@ export function SynReactFlowViewportGuard({ children, onReturn }: SynReactFlowVi
         </Stack>
       </StackItem>
       <StackItem isFilled className={styles.emptyState} data-testid="viewport-guard-empty-state">
-        <NxEmptyStateViewportTooSmall onReturn={handleReturn} />
+        <SynEmptyStateViewportTooSmall onReturn={handleReturn} />
       </StackItem>
     </Stack>
   )

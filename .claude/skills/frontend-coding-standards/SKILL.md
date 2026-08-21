@@ -98,16 +98,16 @@ function isCredentialArray(value: unknown): value is Credential[] {
 
 ---
 
-## 4. Always Use `NxErrorState` Component — Never Raw Error Markup
+## 4. Always Use `SynErrorState` Component — Never Raw Error Markup
 
-The project has a standard `NxErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
+The project has a standard `SynErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
 
 ```typescript
 // ❌ BAD
 {error && <span>Unable to load profile information.</span>}
 
 // ✅ GOOD
-<NxErrorState
+<SynErrorState
   title="Unable to load profile"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -768,11 +768,11 @@ mutate(data, {
 
 ### Retry Button in Error States
 
-The `NxErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
+The `SynErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
 
 ```typescript
 // Retry button appears automatically for 5xx errors or errors with retryable=true
-<NxErrorState
+<SynErrorState
   title="Failed to load data"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -1403,7 +1403,7 @@ function UserFormFields({ isEdit, control }: Props) {
 | **Client state (global)**    | Zustand stores (workflow builder)                              | React Context with manual reducers           |
 | **Styling**                  | PatternFly components + PF6 design tokens + CSS modules        | Inline style objects, raw HTML, hardcoded px |
 | **API calls**                | Typed clients from `client.tsx`                                | Raw `fetch()`                                |
-| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `NxErrorState`     | Ad-hoc try/catch with custom JSX             |
+| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `SynErrorState`     | Ad-hoc try/catch with custom JSX             |
 | **Pagination**               | `useCursorPagination`                                          | Manual cursor/filter/queryParams state       |
 | **Dialogs**                  | `NxConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
 
@@ -1794,9 +1794,9 @@ When interactive elements (checkboxes, buttons, toggles) repeat inside a list or
 
 ---
 
-## 36. Invalid and Not-Found States Must Use `NxEmptyState*` Components
+## 36. Invalid and Not-Found States Must Use `SynEmptyState*` Components
 
-When a detail page receives an invalid ID or the resource is not found (404), render a structured `NxEmptyState*` component (`NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, or `NxEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
+When a detail page receives an invalid ID or the resource is not found (404), render a structured `SynEmptyState*` component (`SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, or `SynEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
 
 **Reference:** [PatternFly Empty State](https://www.patternfly.org/components/empty-state), [Nielsen Norman: Error Messages](https://www.nngroup.com/articles/error-message-guidelines/)
 
@@ -1819,9 +1819,9 @@ if (isNotFound) {
 if (!isValidId) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
+      <SynEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
         The identity provider ID in the URL is not valid.
-      </NxEmptyState>
+      </SynEmptyState>
     </PageShell>
   )
 }
@@ -1830,14 +1830,14 @@ if (!isValidId) {
 if (isNotFound) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         headingLevel="h2"
         titleText="Identity provider not found"
         isFullHeight
       >
         The identity provider may have been deleted.{' '}
         <Link to="/system-administration/authentication">Return to Authentication</Link>.
-      </NxEmptyStateNoData>
+      </SynEmptyStateNoData>
     </PageShell>
   )
 }
@@ -1847,13 +1847,13 @@ if (isNotFound) {
 
 | Scenario                          | Component                              | Icon             |
 | --------------------------------- | -------------------------------------- | ---------------- |
-| Invalid ID format (bad URL param) | `NxEmptyState`                         | `RhUiSearchIcon` |
-| Resource not found (404 from API) | `NxEmptyStateNoData` or `NxEmptyState` | `SearchIcon`     |
-| No permission to view             | `NxEmptyState` with `status="danger"`  | `LockIcon`       |
+| Invalid ID format (bad URL param) | `SynEmptyState`                         | `RhUiSearchIcon` |
+| Resource not found (404 from API) | `SynEmptyStateNoData` or `SynEmptyState` | `SearchIcon`     |
+| No permission to view             | `SynEmptyState` with `status="danger"`  | `LockIcon`       |
 
 ### Consistency Rule
 
-Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<NxEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
+Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<SynEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
 
 ## 37. Browser Tab Titles -- `toPageTitle`
 

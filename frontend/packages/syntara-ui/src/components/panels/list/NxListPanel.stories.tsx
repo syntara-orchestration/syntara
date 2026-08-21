@@ -7,7 +7,7 @@ import { useTableSort } from '../../../hooks/useTableSort'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import { SynPage, SynPageBody } from '../../layout/SynPage'
 import { SynPageHeader } from '../../layout/SynPageHeader'
-import { NxEmptyStateNoData } from '../../states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
 
 import {
   NxListPanel,
@@ -279,7 +279,7 @@ export const NoDataNoToolbar: Story = {
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No resources yet"
             description="Create your first resource to get started."
             buttonText="Create resource"
@@ -304,7 +304,7 @@ export const NoDataCustom: Story = {
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No resources yet"
             description="Create your first resource to get started."
             buttonText="Create resource"

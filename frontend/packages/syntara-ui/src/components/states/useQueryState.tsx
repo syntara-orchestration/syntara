@@ -1,9 +1,9 @@
 import { useApiErrorAlert } from '../../hooks/useApiErrorAlert'
 import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
 
-import { NxEmptyStateServiceUnavailable } from './NxEmptyStateServiceUnavailable'
-import { NxErrorState } from './NxErrorState'
-import { NxLoadingState } from './NxLoadingState'
+import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
+import { SynErrorState } from './SynErrorState'
+import { SynLoadingState } from './SynLoadingState'
 
 export type QueryStateOptions = {
   title?: string
@@ -54,15 +54,15 @@ export function useQueryState(
   if (error) {
     // Check for 503 Service Unavailable errors
     if (isServiceUnavailableError(error)) {
-      return <NxEmptyStateServiceUnavailable description={getErrorMessage(error)} />
+      return <SynEmptyStateServiceUnavailable description={getErrorMessage(error)} />
     }
 
     // Regular errors - pass retry handler (prefer explicit onRetry, fallback to refetch)
-    return <NxErrorState title={title} message={error} onRetry={onRetry ?? refetch} />
+    return <SynErrorState title={title} message={error} onRetry={onRetry ?? refetch} />
   }
 
   if (isPending) {
-    return <NxLoadingState />
+    return <SynLoadingState />
   }
 
   return null

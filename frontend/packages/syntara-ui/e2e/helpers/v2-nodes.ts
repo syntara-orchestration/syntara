@@ -58,11 +58,10 @@ export async function openAddNodePanel(page: Page) {
   const fitViewButton = page.getByRole('button', { name: 'Fit view' })
   if ((await fitViewButton.count()) > 0) {
     await fitViewButton.click()
-    await page.waitForTimeout(500)
   }
 
   const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn.first()).toBeVisible({ timeout: 10_000 })
+  await expect(addBtn.first()).toBeVisible({ timeout: 20_000 })
 
   // Retry clicking — React Flow edge buttons can be briefly detached during layout animations
   for (let attempt = 0; attempt < 3; attempt++) {

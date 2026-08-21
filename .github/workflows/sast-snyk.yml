@@ -14,16 +14,39 @@ on:
   workflow_call:
     secrets:
       SNYK_TOKEN:
-        required: true
+        # Not `required: true`: a caller running for a fork PR has no token to
+        # pass, and a required-but-empty secret fails the job before any step
+        # runs. The `preflight` job detects the missing token and skips the scan.
+        required: false
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
+  preflight:
+    name: Snyk SAST (Preflight)
+    runs-on: ubuntu-latest
+    outputs:
+      has_snyk_token: ${{ steps.token.outputs.has_snyk_token }}
+    steps:
+      - name: Check for Snyk token
+        id: token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo "has_snyk_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::SNYK_TOKEN not available - skipping Snyk SAST scan."
+            echo "has_snyk_token=false" >> "$GITHUB_OUTPUT"
+          fi
+
   snyk-sast:
     name: Snyk SAST (Code Analysis)
     runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.has_snyk_token == 'true'
     steps:
       # Checkout code to scan
       # For PRs: checks out PR HEAD
