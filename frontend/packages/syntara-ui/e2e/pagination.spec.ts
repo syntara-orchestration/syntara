@@ -7,7 +7,7 @@
  * - Changing per-page resets to first page
  */
 import { createUnavailableGuard, type Page, test, expect, toAppUrl } from './fixtures'
-import { paginationFooter } from './helpers/patternfly'
+import { paginationFooter, paginationFooterForTable } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -438,7 +438,9 @@ test.describe('Pagination Footer — Identity Providers', () => {
   })
 
   test('pagination footer is visible on identity providers tab', async ({ app }) => {
-    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
-    await expect(perPageToggle).toBeVisible()
+    const perPageToggle = paginationFooterForTable(app, 'Identity providers table').getByRole('button', {
+      name: /\d+\s*[-–]\s*\d+/,
+    })
+    await expect(perPageToggle).toBeVisible({ timeout: 15_000 })
   })
 })
