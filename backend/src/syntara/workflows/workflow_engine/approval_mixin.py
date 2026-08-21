@@ -37,6 +37,12 @@ _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
 _APPROVAL_PROMPT_PATCH = "aap-87735-approval-prompt"
 
 
+def _warn_approval_prompt(message: str) -> None:
+    """Log prompt-coercion issues without crashing outside a workflow."""
+    if workflow.in_workflow():
+        workflow.logger.warning(message)
+
+
 def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None:
     """Return the resolved approval-node prompt, or None if absent/blank.
 
@@ -61,7 +67,7 @@ def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None
                 text = json.dumps(prompt, default=str)
                 from_json = True
             except (TypeError, ValueError):
-                workflow.logger.warning("Could not serialize approval prompt; storing no prompt")
+                _warn_approval_prompt("Could not serialize approval prompt; storing no prompt")
     else:
         text = str(prompt).strip() or None
 
@@ -73,12 +79,12 @@ def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None
         return text
 
     if from_json:
-        workflow.logger.warning(
+        _warn_approval_prompt(
             f"Approval prompt JSON length {len(text)} exceeds {max_len} characters; storing no prompt"
         )
         return None
 
-    workflow.logger.warning(f"Approval prompt length {len(text)} exceeds {max_len} characters; truncating")
+    _warn_approval_prompt(f"Approval prompt length {len(text)} exceeds {max_len} characters; truncating")
     return text[:max_len]
 
 

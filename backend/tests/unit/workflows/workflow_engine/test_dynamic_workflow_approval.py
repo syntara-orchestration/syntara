@@ -10,6 +10,7 @@ Tests cover:
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 from temporalio.exceptions import ApplicationError
@@ -529,6 +530,25 @@ class TestPrepareApprovalArgs:
         assert zero_args[10] == "0"
         assert object_args[10] == '{"amount": 15000}'
         assert list_args[10] == '["a", "b"]'
+
+    @pytest.mark.asyncio
+    async def test_datetime_and_uuid_prompt_is_coerced(self) -> None:
+        """Non-JSON-native values in a resolved object must not crash the node."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        dt = datetime(2026, 1, 1, tzinfo=UTC)
+        uid = UUID("00000000-0000-0000-0000-000000000001")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"when": dt, "id": uid}})
+            scalar_args = await wf._prepare_approval_args(node, graph, {"prompt": dt})
+            key_args = await wf._prepare_approval_args(node, graph, {"prompt": {dt: "x"}})
+
+        assert object_args[10] == '{"when": "2026-01-01 00:00:00+00:00", "id": "00000000-0000-0000-0000-000000000001"}'
+        assert scalar_args[10] == "2026-01-01 00:00:00+00:00"
+        assert key_args[10] is None
 
     @pytest.mark.asyncio
     async def test_unserializable_prompt_is_none(self) -> None:
