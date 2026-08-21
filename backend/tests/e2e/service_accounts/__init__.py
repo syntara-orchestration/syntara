@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from orchestrator_test_sdk.e2e import unique_name
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client import Client
 from syntara_api_client.models.body_token import BodyToken
@@ -41,9 +42,11 @@ def create_sa_with_credential(
         body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=project_id),
     ).assert_and_get()
 
-    cred = api.service_account_credentials.create(
-        service_account_id=sa.id,
-        body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+    cred = _retry_api_call(
+        lambda: api.service_account_credentials.create(
+            service_account_id=sa.id,
+            body=ServiceAccountCredentialCreate(credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS),
+        )
     ).assert_and_get()
 
     return sa, cred.identifier, cred.client_secret

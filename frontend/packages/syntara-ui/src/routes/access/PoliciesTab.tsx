@@ -6,7 +6,7 @@ import { useCallback, useMemo } from 'react'
 
 import { IconLabel } from '../../components/IconLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
@@ -183,7 +183,7 @@ export function PoliciesTab() {
         isEmpty={policies.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<NxEmptyStateNoData title="No policies found" description="No policies are available." />}
+        noDataState={<SynEmptyStateNoData title="No policies found" description="No policies are available." />}
         toolbar={
           showToolbar ? (
             <NxListPanelToolbar

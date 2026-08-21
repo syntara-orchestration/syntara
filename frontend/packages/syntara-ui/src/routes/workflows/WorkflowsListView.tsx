@@ -2,7 +2,7 @@ import { Th, Thead, Tr, type ThProps } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { TableFooterProps } from '../../components/table/NxScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
@@ -70,7 +70,7 @@ export function WorkflowsListView({
       hasActiveFilters={hasActiveFilters}
       onClearAllFilters={onClearAllFilters}
       noDataState={
-        <NxEmptyStateNoData
+        <SynEmptyStateNoData
           title="No workflows yet"
           description="Create your first workflow to get started."
           buttonText="Create workflow"

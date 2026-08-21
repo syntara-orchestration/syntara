@@ -20,7 +20,10 @@ on:
   workflow_call:
     secrets:
       SNYK_TOKEN:
-        required: true
+        # Not `required: true`: a caller running for a fork PR has no token to
+        # pass, and a required-but-empty secret fails the job before any step
+        # runs. The `changes` job detects the missing token and skips the scans.
+        required: false
 
 permissions:
   contents: read
@@ -34,7 +37,20 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      has_snyk_token: ${{ steps.token.outputs.has_snyk_token }}
     steps:
+      - name: Check for Snyk token
+        id: token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo "has_snyk_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::SNYK_TOKEN not available - skipping Snyk SCA scans."
+            echo "has_snyk_token=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
@@ -55,7 +71,10 @@ jobs:
     name: Snyk SCA (Backend)
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || (github.event.pull_request == null && github.event.merge_group == null)
+    if: >-
+      needs.changes.outputs.has_snyk_token == 'true'
+      && (needs.changes.outputs.backend == 'true'
+          || (github.event.pull_request == null && github.event.merge_group == null))
     steps:
       # Checkout code to scan
       - name: Checkout code to scan
@@ -215,7 +234,10 @@ jobs:
     name: Snyk SCA (Frontend)
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || (github.event.pull_request == null && github.event.merge_group == null)
+    if: >-
+      needs.changes.outputs.has_snyk_token == 'true'
+      && (needs.changes.outputs.frontend == 'true'
+          || (github.event.pull_request == null && github.event.merge_group == null))
     steps:
       # Checkout code to scan
       - name: Checkout code to scan

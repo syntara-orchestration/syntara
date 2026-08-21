@@ -25,8 +25,8 @@ import { Controller, type Control } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
@@ -408,7 +408,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No group mappings"
         description="There are no group mappings to display for this identity provider."
       />
@@ -425,7 +425,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
       />
       {filteredEntries.length === 0 ? (
         <StackItem isFilled style={READ_ONLY_EMPTY_FILTER_STATE_STYLE}>
-          <NxEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
+          <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
         <NxScrollableTableContainer

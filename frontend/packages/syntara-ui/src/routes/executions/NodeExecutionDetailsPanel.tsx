@@ -26,7 +26,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxLabel } from '../../components/labels/NxLabel'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
@@ -327,7 +327,9 @@ function NodeContentArea({
   const [outputView, setOutputView] = useState<PanelView>('json')
 
   if (error) {
-    return <NxErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    return (
+      <SynErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    )
   }
   if (isLoading) {
     return <Spinner aria-label="Loading activity data" />

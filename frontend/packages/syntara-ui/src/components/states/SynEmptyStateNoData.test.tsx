@@ -3,44 +3,44 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxEmptyStateNoData } from './NxEmptyStateNoData'
+import { SynEmptyStateNoData } from './SynEmptyStateNoData'
 
-describe('NxEmptyStateNoData', () => {
+describe('SynEmptyStateNoData', () => {
   it('has no accessibility violations', async () => {
-    const { container } = render(<NxEmptyStateNoData />)
+    const { container } = render(<SynEmptyStateNoData />)
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
   it('renders with default title and description', () => {
-    render(<NxEmptyStateNoData />)
+    render(<SynEmptyStateNoData />)
 
     expect(screen.getByText('No data available')).toBeInTheDocument()
     expect(screen.getByText('There is no data to display at this time.')).toBeInTheDocument()
   })
 
   it('renders with custom title', () => {
-    render(<NxEmptyStateNoData title="No workflows found" />)
+    render(<SynEmptyStateNoData title="No workflows found" />)
 
     expect(screen.getByText('No workflows found')).toBeInTheDocument()
   })
 
   it('renders with custom description', () => {
-    render(<NxEmptyStateNoData description="Create your first item to get started." />)
+    render(<SynEmptyStateNoData description="Create your first item to get started." />)
 
     expect(screen.getByText('Create your first item to get started.')).toBeInTheDocument()
   })
 
   it('shows add data button when addData is provided', () => {
     const addData = vi.fn()
-    render(<NxEmptyStateNoData addData={addData} />)
+    render(<SynEmptyStateNoData addData={addData} />)
 
     expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
   })
 
   it('does not show add data button when addData is not provided', () => {
-    render(<NxEmptyStateNoData />)
+    render(<SynEmptyStateNoData />)
 
     expect(screen.queryByRole('button', { name: 'Add data' })).not.toBeInTheDocument()
   })
@@ -48,7 +48,7 @@ describe('NxEmptyStateNoData', () => {
   it('calls addData when button is clicked', async () => {
     const user = userEvent.setup()
     const addData = vi.fn()
-    render(<NxEmptyStateNoData addData={addData} />)
+    render(<SynEmptyStateNoData addData={addData} />)
 
     await user.click(screen.getByRole('button', { name: 'Add data' }))
     expect(addData).toHaveBeenCalledTimes(1)
@@ -56,13 +56,13 @@ describe('NxEmptyStateNoData', () => {
 
   it('renders with custom button text', () => {
     const addData = vi.fn()
-    render(<NxEmptyStateNoData addData={addData} buttonText="Create Workflow" />)
+    render(<SynEmptyStateNoData addData={addData} buttonText="Create Workflow" />)
 
     expect(screen.getByRole('button', { name: 'Create Workflow' })).toBeInTheDocument()
   })
 
   it('renders with custom image', () => {
-    render(<NxEmptyStateNoData imageSrc="/empty-state.png" imageAlt="No items" />)
+    render(<SynEmptyStateNoData imageSrc="/empty-state.png" imageAlt="No items" />)
 
     const image = screen.getByRole('img', { name: 'No items' })
     expect(image).toBeInTheDocument()
@@ -70,7 +70,7 @@ describe('NxEmptyStateNoData', () => {
   })
 
   it('uses default alt text for image when not provided', () => {
-    render(<NxEmptyStateNoData imageSrc="/empty-state.png" />)
+    render(<SynEmptyStateNoData imageSrc="/empty-state.png" />)
 
     const image = screen.getByRole('img', { name: 'No data' })
     expect(image).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('NxEmptyStateNoData', () => {
   it('renders all custom props together', () => {
     const addData = vi.fn()
     render(
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No Workflows"
         description="Create your first workflow"
         buttonText="New Workflow"
@@ -97,7 +97,7 @@ describe('NxEmptyStateNoData', () => {
 
   it('renders primary variant button', () => {
     const addData = vi.fn()
-    render(<NxEmptyStateNoData addData={addData} />)
+    render(<SynEmptyStateNoData addData={addData} />)
 
     const button = screen.getByRole('button', { name: 'Add data' })
     expect(button).toHaveClass('pf-m-primary')
