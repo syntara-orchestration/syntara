@@ -6,6 +6,14 @@ description: Test forEach loop with bash
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          item_list:
+            type: array
+            description: List of items to process
+            default: [apple, banana, cherry]
 
 nodes:
   - id: process_items
@@ -21,10 +29,12 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_ITEM: ${loop.item}
       code: |
         echo "Processing item: $INPUT_ITEM"
         echo "Item value: $INPUT_ITEM"
 edges:
-  - source: process_items
+  - from: process_items
     to: process_item
     port: body

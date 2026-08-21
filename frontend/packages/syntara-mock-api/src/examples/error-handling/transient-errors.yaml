@@ -6,6 +6,18 @@ description: Test retry on transient errors
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          seed:
+            type: integer
+            description: |
+              Random seed for deterministic testing (optional).
+              When provided, ensures reproducible behavior in tests.
+              Seed advances by attempt number (attempt 1=seed, attempt 2=seed+1, etc).
+              Example: Seed 4 produces [3, 8] = FAIL, SUCCESS (tests retry mechanism).
+              In production, omit this parameter to use true randomness.
 
 nodes:
   - id: transient_task
@@ -13,6 +25,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_SEED: ${trigger.seed}
       code: |
         # Simulate transient failure (e.g., network timeout)
         # Seed RANDOM for deterministic testing if seed provided

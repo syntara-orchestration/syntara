@@ -28,7 +28,7 @@ nodes:
       prompt: |
         Analyze the provided data and generate insights.
 
-        Data status: ${prepare_data.output.status}
+        Data status: ${prepare_data.stdout}
 
         Provide:
         1. Key trends and patterns
@@ -39,13 +39,15 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_ANALYSIS: ${analyze_with_ai.output}
       code: |
         echo "=== Analysis Report ==="
         echo "Generated: $(date)"
         echo ""
         echo "Analysis: $INPUT_ANALYSIS"
 edges:
-  - source: prepare_data
+  - from: prepare_data
     to: analyze_with_ai
-  - source: analyze_with_ai
+  - from: analyze_with_ai
     to: generate_report

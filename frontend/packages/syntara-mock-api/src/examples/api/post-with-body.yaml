@@ -6,6 +6,14 @@ description: HTTP POST request with JSON body and headers
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          data:
+            type: object
+            description: Data to post
+            default: "{'name': 'Test Resource', 'value': 123}"
 
 nodes:
   - id: create_resource

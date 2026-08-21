@@ -38,7 +38,7 @@ nodes:
         sleep 1
         echo "Step 3: Complete"
 edges:
-  - source: step1
+  - from: step1
     to: step2
-  - source: step2
+  - from: step2
     to: step3

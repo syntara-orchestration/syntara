@@ -6,6 +6,14 @@ description: Test condition with multiple activities in then/else branches
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          score:
+            type: integer
+            description: Test score
+            default: 75
 
 nodes:
   - id: score_evaluation
@@ -47,13 +55,13 @@ nodes:
         echo "You can retake the test after 30 days"
         echo "Study materials: /path/to/materials"
 edges:
-  - source: score_evaluation
+  - from: score_evaluation
     to: pass_notification
     port: then
-  - source: pass_notification
+  - from: pass_notification
     to: certificate
-  - source: score_evaluation
+  - from: score_evaluation
     to: fail_notification
     port: else
-  - source: fail_notification
+  - from: fail_notification
     to: retry_info

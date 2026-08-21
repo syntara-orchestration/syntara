@@ -45,11 +45,11 @@ nodes:
       method: DELETE
       url: http://test-api.example.com/api/users/123
 edges:
-  - source: get_request
+  - from: get_request
     to: post_request
-  - source: post_request
+  - from: post_request
     to: put_request
-  - source: put_request
+  - from: put_request
     to: patch_request
-  - source: patch_request
+  - from: patch_request
     to: delete_request

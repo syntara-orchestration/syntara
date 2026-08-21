@@ -6,6 +6,14 @@ description: Test switch node default path when no case matches
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          status:
+            type: string
+            description: Request status
+            default: pending
 
 nodes:
   - id: route_status

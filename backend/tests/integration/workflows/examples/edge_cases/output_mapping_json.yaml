@@ -12,15 +12,19 @@ nodes:
     name: Generate JSON Output
     type: script
     parameters:
-      language: bash
+      language: python
       code: |
-        echo '{"user": "Alice", "age": 30, "active": true}'
+        import json
+        print(json.dumps({"user": "Alice", "age": 30, "active": True}))
 
   - id: use_parsed_data
     name: Use Parsed JSON Data
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_USER_NAME: ${generate_json.stdout_json.user}
+        INPUT_USER_AGE: ${generate_json.stdout_json.age}
       code: |
         echo "User: $INPUT_USER_NAME, Age: $INPUT_USER_AGE"
 edges:

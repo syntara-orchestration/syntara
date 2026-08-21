@@ -13,6 +13,16 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          user_id:
+            type: integer
+            description: User ID to analyze
+            default: 1
+            minimum: 1
+            maximum: 10
 
 nodes:
   - id: fetch_user
@@ -54,6 +64,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_POSTS: ${fetch_posts.body}
       code: |
         import json
         import os
@@ -96,6 +108,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_TODOS: ${fetch_todos.body}
       code: |
         import json
         import os
@@ -123,6 +137,13 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_NAME: ${fetch_user.body.name}
+        INPUT_USERNAME: ${fetch_user.body.username}
+        INPUT_EMAIL: ${fetch_user.body.email}
+        INPUT_COMPANY: ${fetch_user.body.company.name}
+        INPUT_POST_ANALYSIS: ${analyze_posts.stdout_json}
+        INPUT_TODO_ANALYSIS: ${analyze_todos.stdout_json}
       code: |
         import json
         import os

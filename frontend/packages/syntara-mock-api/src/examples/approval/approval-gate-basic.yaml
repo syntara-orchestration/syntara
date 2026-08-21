@@ -31,9 +31,9 @@ nodes:
       language: bash
       code: echo "Deploying to production..."
 edges:
-  - source: trigger_manual
+  - from: trigger_manual
     to: pre_check
-  - source: pre_check
+  - from: pre_check
     to: approval_gate
-  - source: approval_gate
+  - from: approval_gate
     to: deploy

@@ -12,15 +12,20 @@ nodes:
     name: Fetch Data
     type: script
     parameters:
-      language: bash
+      language: python
       code: |
-        echo '{"user_id": "123", "name": "Alice", "score": 95}'
+        import json
+        print(json.dumps({"user_id": "123", "name": "Alice", "score": 95}))
 
   - id: process_data
     name: Process Data
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_USER_ID: ${fetch_data.stdout_json.user_id}
+        INPUT_NAME: ${fetch_data.stdout_json.name}
+        INPUT_SCORE: ${fetch_data.stdout_json.score}
       code: |
         echo "Processing data for user: $INPUT_NAME (ID: $INPUT_USER_ID)"
         echo "Score: $INPUT_SCORE"

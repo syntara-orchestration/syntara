@@ -6,6 +6,18 @@ description: Demonstrates an approval gate before deploying to production
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          environment:
+            type: string
+            description: Target deployment environment
+            default: production
+          version:
+            type: string
+            description: Application version to deploy
+            default: 3.2.0
 
 nodes:
   - id: staging_tests
@@ -13,6 +25,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VERSION: ${trigger.version}
       code: |
         echo "Running staging tests for v${INPUT_VERSION}"
         echo "Tests passed: 42"
@@ -34,6 +48,9 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VERSION: ${trigger.version}
+        INPUT_ENV: ${trigger.environment}
       code: |
         echo "Deploying v${INPUT_VERSION} to ${INPUT_ENV}"
         echo "Deployment successful!"
@@ -47,11 +64,11 @@ nodes:
         echo "Approval rejected — rolling back staging environment"
 
 edges:
-  - source: staging_tests
+  - from: staging_tests
     to: approval_gate
-  - source: approval_gate
+  - from: approval_gate
     to: deploy_to_prod
     port: approved
-  - source: approval_gate
+  - from: approval_gate
     to: rollback_staging
     port: rejected

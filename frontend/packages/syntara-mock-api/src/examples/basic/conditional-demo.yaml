@@ -6,6 +6,14 @@ description: Demonstrates conditional branching based on temperature input
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          temperature:
+            type: number
+            description: Temperature in Celsius
+            default: 25
 
 nodes:
   - id: check_temperature
@@ -13,6 +21,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_TEMP: ${trigger.temperature}
       code: |
         echo "Current temperature: ${INPUT_TEMP}°C"
         echo "Checked at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -57,6 +67,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_TEMP: ${trigger.temperature}
       code: |
         echo "☀️  Pleasant weather conditions!"
         echo "Temperature is just right: ${INPUT_TEMP}°C"
@@ -68,6 +80,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_TEMP: ${trigger.temperature}
       code: |
         echo ""
         echo "=== Weather Check Complete ==="
@@ -79,19 +93,19 @@ nodes:
         echo "  • Mild weather (15-30°C): Shows pleasant weather message"
         echo "=============================="
 edges:
-  - source: check_temperature
+  - from: check_temperature
     to: temperature_routing
-  - source: temperature_routing
+  - from: temperature_routing
     to: hot_weather
     port: then
-  - source: temperature_routing
+  - from: temperature_routing
     to: check_cold
     port: else
-  - source: check_cold
+  - from: check_cold
     to: cold_weather
     port: then
-  - source: check_cold
+  - from: check_cold
     to: mild_weather
     port: else
-  - source: temperature_routing
+  - from: temperature_routing
     to: summary

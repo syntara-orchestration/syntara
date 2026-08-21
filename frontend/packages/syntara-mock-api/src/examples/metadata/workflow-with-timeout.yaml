@@ -31,5 +31,5 @@ nodes:
         sleep 10
         echo "This should not complete due to workflow timeout"
 edges:
-  - source: quick_task
+  - from: quick_task
     to: slow_task

@@ -10,6 +10,14 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          user_request:
+            type: string
+            description: User request to be classified and routed to appropriate specialist
+            default: How do I optimize database query performance?
 
 nodes:
   - id: classify_request
@@ -32,7 +40,7 @@ nodes:
   - id: route_to_specialist
     name: Route to Specialist
     type: condition
-    condition: ${classify_request.output.domain} == 'technical'
+    condition: ${classify_request.output} == 'technical'
 
   - id: technical_specialist
     name: Technical Specialist
@@ -46,7 +54,7 @@ nodes:
   - id: check_business
     name: Check if Business Domain
     type: condition
-    condition: ${classify_request.output.domain} == 'business'
+    condition: ${classify_request.output} == 'business'
 
   - id: business_specialist
     name: Business Specialist

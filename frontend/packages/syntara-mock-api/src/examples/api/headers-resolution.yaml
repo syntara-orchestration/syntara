@@ -6,6 +6,18 @@ description: Test header resolution from inputs and variables
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          customHeader:
+            type: string
+            description: Custom header value
+            default: custom-value
+          apiKey:
+            type: string
+            description: API key for authentication
+            default: api-key-123
 
 nodes:
   - id: headers_test

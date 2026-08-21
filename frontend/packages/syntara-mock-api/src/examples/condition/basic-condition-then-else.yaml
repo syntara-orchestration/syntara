@@ -6,6 +6,14 @@ description: Test condition activity type with then/else branches
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          age:
+            type: integer
+            description: Person's age
+            default: 25
 
 nodes:
   - id: age_check
@@ -31,9 +39,9 @@ nodes:
         echo "You are a minor (age < 18)"
         echo "Access denied"
 edges:
-  - source: age_check
+  - from: age_check
     to: adult_message
     port: then
-  - source: age_check
+  - from: age_check
     to: minor_message
     port: else

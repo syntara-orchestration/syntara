@@ -45,15 +45,15 @@ nodes:
       code: |
         echo "Cleaning up pipeline"
 edges:
-  - source: setup
+  - from: setup
     to: parallel_processing_fork
-  - source: parallel_processing_fork
+  - from: parallel_processing_fork
     to: process_a
-  - source: parallel_processing_fork
+  - from: parallel_processing_fork
     to: process_b
-  - source: process_a
+  - from: process_a
     to: parallel_processing_join
-  - source: process_b
+  - from: process_b
     to: parallel_processing_join
-  - source: parallel_processing_join
+  - from: parallel_processing_join
     to: cleanup

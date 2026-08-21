@@ -12,24 +12,35 @@ nodes:
     name: Fetch Data
     type: script
     parameters:
-      language: bash
+      language: python
       code: |
-        echo '{"user_id": "123", "name": "John Doe", "age": 30}'
+        import json
+        print(json.dumps({"user_id": "123", "name": "John Doe", "age": 30}))
 
   - id: process_data
     name: Process Data
     type: script
     parameters:
-      language: bash
+      language: python
+      environment:
+        INPUT_USER_ID: ${fetch_data.stdout_json.user_id}
+        INPUT_NAME: ${fetch_data.stdout_json.name}
       code: |
-        echo "Processing user: $INPUT_NAME (ID: $INPUT_USER_ID)"
-        echo '{"processed": true, "user_id": "'"$INPUT_USER_ID"'"}'
+        import json
+        import os
+
+        name = os.getenv("INPUT_NAME", "")
+        user_id = os.getenv("INPUT_USER_ID", "")
+        print(f"Processing user: {name} (ID: {user_id})")
+        print(json.dumps({"processed": True, "user_id": user_id}))
 
   - id: finalize
     name: Finalize
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_PROCESSED: ${process_data.stdout_json.processed}
       code: |
         echo "Finalization complete for processed=$INPUT_PROCESSED"
 edges:

@@ -6,6 +6,14 @@ description: Demonstrates using custom environment variables in script activitie
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          user_name:
+            type: string
+            description: User name for personalized greeting
+            default: Alice
 
 nodes:
   - id: bash_with_env
@@ -16,6 +24,7 @@ nodes:
         API_URL: https://api.example.com
         API_VERSION: v1
         ENVIRONMENT: production
+        INPUT_USER_NAME: ${trigger.user_name}
       code: |
         echo "API Endpoint: ${API_URL}/${API_VERSION}"
         echo "Environment: ${ENVIRONMENT}"
@@ -30,6 +39,7 @@ nodes:
         DATABASE_PORT: '5432'
         DATABASE_NAME: myapp
         LOG_LEVEL: INFO
+        INPUT_USER_NAME: ${trigger.user_name}
       code: |
         import json
         import os
@@ -55,6 +65,7 @@ nodes:
       environment:
         SERVICE_NAME: WorkflowEngine
         MAX_RETRIES: '3'
+        INPUT_USER_NAME: ${trigger.user_name}
       code: |
         echo "Service: ${SERVICE_NAME}"
         echo "Max Retries: ${MAX_RETRIES}"

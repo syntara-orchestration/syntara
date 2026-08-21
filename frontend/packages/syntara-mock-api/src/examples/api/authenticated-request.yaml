@@ -6,6 +6,14 @@ description: API request with Authorization header from inputs
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          apiToken:
+            type: string
+            description: API authentication token
+            default: Bearer test-token-123
 
 nodes:
   - id: authenticated_fetch

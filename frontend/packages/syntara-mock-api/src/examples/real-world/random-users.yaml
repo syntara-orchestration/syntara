@@ -12,6 +12,16 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          count:
+            type: integer
+            description: Number of random users to generate
+            default: 5
+            minimum: 1
+            maximum: 20
 
 nodes:
   - id: fetch_users
@@ -32,6 +42,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_USERS: ${fetch_users.body.results}
       code: |
         import json
         import os
@@ -75,5 +87,5 @@ nodes:
         print(json.dumps(report, indent=2))
     timeout: 60
 edges:
-  - source: fetch_users
+  - from: fetch_users
     to: process_users

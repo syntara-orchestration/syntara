@@ -18,6 +18,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_RAW_DATA: ${fetch_data.body}
       code: |
         import json
         import os
@@ -30,6 +32,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VALIDATED: ${process_data.stdout_json.processed}
       code: |
         # Validation check
         if [ "${INPUT_VALIDATED}" = "true" ]; then
@@ -47,11 +51,11 @@ nodes:
       url: http://test-api.example.com/api/create
       body:
         validated: true
-        data: ${process_data.output.processed_data}
+        data: ${process_data.stdout_json.processed}
 edges:
-  - source: fetch_data
+  - from: fetch_data
     to: process_data
-  - source: process_data
+  - from: process_data
     to: validate_data
-  - source: validate_data
+  - from: validate_data
     to: send_results

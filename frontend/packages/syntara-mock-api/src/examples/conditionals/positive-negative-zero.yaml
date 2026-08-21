@@ -17,6 +17,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VALUE: ${trigger.number}
       code: |
         echo "Value is: $INPUT_VALUE"
         echo "{\"value\": $INPUT_VALUE}"

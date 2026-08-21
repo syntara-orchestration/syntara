@@ -6,6 +6,14 @@ description: Loop execution with alternating executor types
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          items:
+            type: array
+            description: Items to process
+            default: [item1, item2, item3]
 
 nodes:
   - id: process_items
@@ -20,6 +28,9 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_ITEM: ${loop.item}
+        INPUT_INDEX: ${loop.index}
       code: |
         import os
         item = os.getenv('INPUT_ITEM', '')

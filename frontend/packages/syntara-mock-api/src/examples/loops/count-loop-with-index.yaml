@@ -18,6 +18,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_ITERATION_NUM: ${loop.index}
       code: |
         echo "Iteration number: ${INPUT_ITERATION_NUM}"
 edges:

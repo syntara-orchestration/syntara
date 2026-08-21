@@ -12,6 +12,15 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          country_code:
+            type: string
+            description: ISO 3166-1 alpha-2 country code
+            default: US
+            pattern: "^[A-Z]{2}$"
 
 nodes:
   - id: fetch_country
@@ -39,6 +48,18 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_NAME: ${fetch_country.body.0.name.common}
+        INPUT_OFFICIAL_NAME: ${fetch_country.body.0.name.official}
+        INPUT_CAPITAL: ${fetch_country.body.0.capital.0}
+        INPUT_REGION: ${fetch_country.body.0.region}
+        INPUT_SUBREGION: ${fetch_country.body.0.subregion}
+        INPUT_POPULATION: ${fetch_country.body.0.population}
+        INPUT_AREA: ${fetch_country.body.0.area}
+        INPUT_LANGUAGES: ${fetch_country.body.0.languages}
+        INPUT_CURRENCIES: ${fetch_country.body.0.currencies}
+        INPUT_TIMEZONES: ${fetch_country.body.0.timezones}
+        INPUT_BORDERS: ${fetch_neighbors.body.0.borders}
       code: |
         import json
         import os

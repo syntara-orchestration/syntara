@@ -26,6 +26,6 @@ nodes:
       language: bash
       code: echo "Should not execute"
 edges:
-  - source: invalid_foreach
+  - from: invalid_foreach
     to: loop_task
     port: body

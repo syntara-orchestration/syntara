@@ -26,5 +26,5 @@ nodes:
       code: |
         echo "${FAREWELL}, World!"
 edges:
-  - source: say_hello
+  - from: say_hello
     to: say_goodbye

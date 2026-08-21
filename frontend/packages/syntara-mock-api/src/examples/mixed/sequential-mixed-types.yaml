@@ -11,14 +11,17 @@ nodes:
   - id: bash_step
     type: script
     parameters:
-      language: bash
+      language: python
       code: |
-        echo '{"data": "from bash"}'
+        import json
+        print(json.dumps({"data": "from bash"}))
 
   - id: python_step
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_BASH_DATA: ${bash_step.stdout_json.data}
       code: |
         import json
         import os
@@ -33,9 +36,9 @@ nodes:
       method: POST
       url: http://test-api.example.com/api/create
       body:
-        data: ${python_step.output.processed}
+        data: ${python_step.stdout_json.processed}
 edges:
-  - source: bash_step
+  - from: bash_step
     to: python_step
-  - source: python_step
+  - from: python_step
     to: api_step

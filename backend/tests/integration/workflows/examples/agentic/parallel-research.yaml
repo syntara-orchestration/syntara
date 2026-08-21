@@ -10,6 +10,14 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          topic:
+            type: string
+            description: Topic for parallel comprehensive research
+            default: cloud computing platforms
 
 nodes:
   - id: parallel_research_fork
@@ -65,9 +73,9 @@ nodes:
       prompt: |
         Synthesize the following research findings into a comprehensive report:
 
-        Technical: ${technical_research.output.technical_findings}
-        Market: ${market_research.output.market_findings}
-        Regulatory: ${regulatory_research.output.regulatory_findings}
+        Technical: ${technical_research.output}
+        Market: ${market_research.output}
+        Regulatory: ${regulatory_research.output}
 
         Provide:
         - Executive summary

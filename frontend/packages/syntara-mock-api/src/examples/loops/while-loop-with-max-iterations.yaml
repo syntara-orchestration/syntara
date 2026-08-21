@@ -23,6 +23,6 @@ nodes:
       code: |
         echo "Iteration executed"
 edges:
-  - source: while_with_max
+  - from: while_with_max
     to: iteration_task
     port: body

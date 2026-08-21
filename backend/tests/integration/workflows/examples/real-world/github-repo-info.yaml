@@ -12,6 +12,18 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          owner:
+            type: string
+            description: GitHub repository owner/organization
+            default: anthropics
+          repo:
+            type: string
+            description: GitHub repository name
+            default: anthropic-sdk-python
 
 nodes:
   - id: fetch_repo
@@ -41,6 +53,16 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_NAME: ${fetch_repo.body.name}
+        INPUT_DESCRIPTION: ${fetch_repo.body.description}
+        INPUT_STARS: ${fetch_repo.body.stargazers_count}
+        INPUT_FORKS: ${fetch_repo.body.forks_count}
+        INPUT_LANGUAGE: ${fetch_repo.body.language}
+        INPUT_OPEN_ISSUES: ${fetch_repo.body.open_issues_count}
+        INPUT_CREATED_AT: ${fetch_repo.body.created_at}
+        INPUT_UPDATED_AT: ${fetch_repo.body.updated_at}
+        INPUT_LANGUAGES: ${fetch_languages.body}
       code: |
         import json
         import os

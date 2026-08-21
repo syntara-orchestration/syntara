@@ -6,6 +6,19 @@ description: Test expression resolution with multiple placeholders and nested pa
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          firstName:
+            type: string
+            default: John
+          lastName:
+            type: string
+            default: Doe
+          timeout:
+            type: integer
+            default: 30
 
 nodes:
   - id: test_multiple_placeholders
@@ -13,6 +26,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_GREETING: "Hello, ${trigger.firstName} ${trigger.lastName}!"
       code: |
         echo "Greeting: $INPUT_GREETING"
 
@@ -21,6 +36,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_TIMEOUT_VALUE: ${trigger.timeout}
       code: |
         echo "Timeout: $INPUT_TIMEOUT_VALUE seconds"
 
@@ -29,6 +46,8 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_PREVIOUS_RESULT: ${test_multiple_placeholders.stdout}
       code: |
         echo "Previous output was: $INPUT_PREVIOUS_RESULT"
 edges:

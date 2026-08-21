@@ -6,6 +6,18 @@ description: Test query parameter construction
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          filter:
+            type: string
+            description: Filter parameter
+            default: active
+          limit:
+            type: number
+            description: Limit parameter
+            default: 10
 
 nodes:
   - id: query_test
