@@ -4,8 +4,10 @@ These tests verify that InvocationService methods correctly dispatch domain even
 which are then converted to AuditEvents by the registered handlers.
 """
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -18,9 +20,18 @@ from syntara.audit.models.audit_event import EventCategory, EventSeverity, Event
 from syntara.audit.sanitization import REDACTED
 from syntara.core.models import User
 from syntara.files.models import FileMetadata
+from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
     from syntara.audit.models.audit_event import AuditEvent
+
+
+def _attach_cancel_update(mock_session: AsyncMock, *, rowcount: int = 1) -> None:
+    mock_result = MagicMock()
+    mock_result.rowcount = rowcount
+    mock_session.exec = AsyncMock(return_value=mock_result)
+    mock_session.rollback = AsyncMock()
+    mock_session.refresh = AsyncMock()
 
 
 class TestInvocationServiceCreateAuditEvents:
@@ -220,6 +231,13 @@ class TestInvocationServiceCreateAuditEvents:
 class TestInvocationServiceCancelAuditEvents:
     """Tests for audit event emission from InvocationService.cancel_invocation()."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_runtime_settings(  # type: ignore[misc]
+        self, override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]]
+    ) -> None:
+        with override_runtime_settings():
+            yield
+
     def setup_method(self) -> None:
         """Register invocations audit handlers before each test."""
         from syntara.invocations.audit.invocation_cancelled import (
@@ -250,6 +268,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock()
+        _attach_cancel_update(mock_session)
         mock_file_manager = Mock()
         mock_file_manager.get_files_metadata = AsyncMock(return_value=[])
 
@@ -400,6 +419,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock()
+        _attach_cancel_update(mock_session)
         mock_retriever = AsyncMock()
         mock_retriever.delete_file = AsyncMock(return_value=True)
         mock_file_manager = Mock()
@@ -444,6 +464,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock(side_effect=Exception("DB Error"))
+        _attach_cancel_update(mock_session)
         mock_file_manager = Mock()
         mock_file_manager.get_files_metadata = AsyncMock(return_value=[])
 
