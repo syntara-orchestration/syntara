@@ -17,9 +17,21 @@ export function pfWidget(page: Page, type: 'Alert' | 'Pagination') {
   return page.locator(`[data-ouia-component-type="PF6/${type}"]`)
 }
 
-/** Compact list pagination (count text + per-page toggle + prev/next). */
+/**
+ * Compact list pagination (count text + per-page toggle + prev/next).
+ * PatternFly may emit more than one `PF6/Pagination` node (top + bottom, or an
+ * inner wrapper). Specs cannot use `.last()`; pick the footer here.
+ */
 export function paginationFooter(page: Page) {
-  return pfWidget(page, 'Pagination')
+  return pfWidget(page, 'Pagination').last()
+}
+
+/** Pagination pinned to the scrollable table that owns `gridName`. */
+export function paginationFooterForTable(page: Page, gridName: string) {
+  return page
+    .getByTestId('scrollable-table-container-root')
+    .filter({ has: page.getByRole('grid', { name: gridName }) })
+    .locator('[data-ouia-component-type="PF6/Pagination"]')
 }
 
 /**
