@@ -18,6 +18,7 @@ from sqlmodel import and_, col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
+from syntara.approvals.services.approval_service import ApprovalService
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.config.base import get_settings
@@ -95,7 +96,7 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
+    def enrich(self, query: Select) -> Select:
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
@@ -1071,8 +1072,14 @@ class ExecutionService(BaseService):
     async def cancel_execution(self, execution_id: UUID) -> None:
         """Cancel a running workflow execution.
 
-        Requests Temporal to cancel the workflow. The actual status update
-        to CANCELLED happens asynchronously via activity_sync_service.
+        Requests Temporal to cancel the workflow; the execution's own status
+        update to CANCELLED happens asynchronously via activity_sync_service.
+        Any pending approval for this execution is cancelled synchronously,
+        before the Temporal RPC, so a decision request racing the cancellation
+        can't slip through: a decide() call from that point on either loses the
+        row lock race outright or finds the approval already cancelled. If the
+        Temporal RPC then fails, the cancellation is reverted so we don't leave
+        approvals cancelled for an execution that was never actually cancelled.
 
         Args:
             execution_id: Execution ID to cancel
@@ -1113,9 +1120,21 @@ class ExecutionService(BaseService):
             current_status=execution.status.value,
         )
 
+        approval_service = ApprovalService(self.session, self.user)
+        cancelled_approvals = await approval_service.cancel_pending_for_execution(execution_id)
+
         try:
             await self.temporal_service.cancel_workflow(temporal_workflow_id=execution.temporal_workflow_id)
         except Exception as exc:
+            try:
+                await approval_service.reopen_cancelled(cancelled_approvals)
+            except Exception:
+                logger.exception(
+                    "Failed to revert approval cancellation after failed Temporal cancel RPC; "
+                    "approvals may be incorrectly left cancelled",
+                    execution_id=execution_id,
+                    approval_ids=[str(approval.id) for approval in cancelled_approvals],
+                )
             self._emit_lifecycle_event(
                 execution_id=execution.id,
                 workflow_id=execution.workflow_id,
