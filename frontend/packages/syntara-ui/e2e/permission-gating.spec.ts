@@ -950,7 +950,7 @@ test.describe('Permission gating — Identity Provider actions', () => {
     await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'identity-provider:create' })).toBeVisible()
   })
 
-  test.fixme('auditor: IdP row actions are aria-disabled', async ({ app, auditorApp }) => {
+  test('auditor: IdP row actions are aria-disabled', { tag: ['@konflux-skip'] }, async ({ app, auditorApp }) => {
     const idpName = buildUniqueName('e2e-perm-idp')
     const idp = await createIdentityProviderViaApi(app, {
       name: idpName,
