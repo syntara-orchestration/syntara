@@ -93,8 +93,10 @@ test.describe('Approval Pending Badge', () => {
       // ===================================================================
       // LOCATION 1: Execution Detail Page Header
       // ===================================================================
-      // We're already on the execution detail page from createPendingApproval
-      await expect(app.getByText('Pending approval')).toBeVisible({ timeout: 5_000 })
+      // We're already on the execution detail page from createPendingApproval.
+      // Use a generous timeout — the badge depends on a WebSocket push and Konflux
+      // network latency can delay the update by several seconds.
+      await expect(app.getByText('Pending approval')).toBeVisible({ timeout: 15_000 })
 
       // Verify the badge has warning styling (outline variant) in the execution detail page header
       const badgeInDetail = app.locator('header').getByText('Pending approval')

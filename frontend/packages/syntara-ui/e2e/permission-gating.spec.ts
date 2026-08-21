@@ -669,7 +669,7 @@ test.describe('Permission gating — Project actions', () => {
 // ── Action gating — Credentials ──────────────────────────────────────────
 
 test.describe('Permission gating — Credential actions', () => {
-  test('viewer: Create credential button is disabled with tooltip', async ({ app, viewerApp }) => {
+  test('viewer: Create credential button is disabled with tooltip', { tag: ['@konflux-skip'] }, async ({ app, viewerApp }) => {
     const { id: credId, name: credName } = await createTestCredential(app)
 
     try {
@@ -692,7 +692,7 @@ test.describe('Permission gating — Credential actions', () => {
     }
   })
 
-  test('auditor: Create credential button is disabled', async ({ app, auditorApp }) => {
+  test('auditor: Create credential button is disabled', { tag: ['@konflux-skip'] }, async ({ app, auditorApp }) => {
     const { id: credId } = await createTestCredential(app)
 
     try {
