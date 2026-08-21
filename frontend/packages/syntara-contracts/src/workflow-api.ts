@@ -75,7 +75,7 @@ export interface paths {
     post?: never
     /**
      * Delete workflow
-     * @description Delete a workflow.
+     * @description Delete a workflow and cancel any executions still in progress.
      */
     delete: operations['delete_workflow']
     options?: never
@@ -2603,10 +2603,45 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/resource-conflict",
+           *       "title": "Workflow Delete Conflict",
+           *       "detail": "A workflow execution started while the workflow was being deleted. Try again.",
+           *       "code": "WORKFLOW_DELETE_CONFLICT",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/service-unavailable",
+           *       "title": "Temporal Service Unavailable",
+           *       "detail": "Temporal workflow service is currently unavailable",
+           *       "code": "TEMPORAL_UNAVAILABLE",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
   update_workflow: {

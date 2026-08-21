@@ -14,6 +14,8 @@ from syntara.workflows.error_handlers import (
     definition_invalid_handler,
     execution_not_found_handler,
     publish_validation_handler,
+    temporal_unavailable_handler,
+    workflow_delete_conflict_handler,
     workflow_name_conflict_handler,
     workflow_not_found_handler,
     workflow_not_published_handler,
@@ -406,3 +408,58 @@ class TestWorkflowVersionConflictHandler:
         assert data["expected_version_name"] == "v2-release"
         assert data["expected_created_at"] == created_at.isoformat()
         assert data["created_at"] == created_at.isoformat()
+
+
+class TestWorkflowDeleteConflictHandler:
+    """Test suite for workflow_delete_conflict_handler (AAP-87750)."""
+
+    def test_returns_409_with_delete_conflict_code(self) -> None:
+        from syntara.workflows.exceptions import WorkflowDeleteConflictError
+
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/workflows/123"
+
+        response = workflow_delete_conflict_handler(request, WorkflowDeleteConflictError("deploy-app", 2))
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 409
+        assert response.media_type == "application/problem+json"
+
+        data = json.loads(bytes(response.body).decode())
+        assert data["type"] == PROBLEM_TYPES["resource_conflict"]
+        assert data["title"] == "Workflow Delete Conflict"
+        # Distinct from the generic CONFLICT code so clients can tell them apart.
+        assert data["code"] == "WORKFLOW_DELETE_CONFLICT"
+        # Retrying is expected to succeed once the new run is picked up.
+        assert data["retryable"] is True
+
+    def test_does_not_leak_the_workflow_name(self) -> None:
+        from syntara.workflows.exceptions import WorkflowDeleteConflictError
+
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/workflows/123"
+
+        response = workflow_delete_conflict_handler(request, WorkflowDeleteConflictError("secret-name", 1))
+
+        body = bytes(response.body).decode()
+        assert "secret-name" not in body
+
+
+class TestTemporalUnavailableHandler:
+    """The 503 documented on delete_workflow must match what is returned."""
+
+    def test_returns_503_with_temporal_unavailable_code(self) -> None:
+        from syntara.workflows.exceptions import TemporalUnavailableError
+
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/workflows/123"
+
+        response = temporal_unavailable_handler(request, TemporalUnavailableError("cancellation"))
+
+        assert response.status_code == 503
+        data = json.loads(bytes(response.body).decode())
+        assert data["type"] == PROBLEM_TYPES["service_unavailable"]
+        assert data["title"] == "Temporal Service Unavailable"
+        # The OpenAPI example for delete_workflow advertises exactly this code.
+        assert data["code"] == "TEMPORAL_UNAVAILABLE"
+        assert data["retryable"] is True

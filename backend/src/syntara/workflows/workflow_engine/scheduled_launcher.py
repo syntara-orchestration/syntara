@@ -160,6 +160,10 @@ class ScheduledExecutionLauncher:
         info = activity.info()
         scheduled_at = info.scheduled_time
         triggered_at = info.started_time
+        # The workflow that scheduled this activity is the ScheduledWorkflowLauncher.
+        # Persisted on the execution so deletion can cancel the parent rather than a
+        # child that may not exist yet — see Execution.launcher_temporal_workflow_id.
+        launcher_workflow_id = info.workflow_id
 
         logger.info(
             "Setting up scheduled execution",
@@ -172,7 +176,9 @@ class ScheduledExecutionLauncher:
         recorder = get_metrics_recorder()
 
         try:
-            result = await self._create_execution(workflow_id, trigger_node_id, scheduled_at, triggered_at)
+            result = await self._create_execution(
+                workflow_id, trigger_node_id, scheduled_at, triggered_at, launcher_workflow_id
+            )
 
             try:
                 recorder.record(
@@ -216,6 +222,7 @@ class ScheduledExecutionLauncher:
         trigger_node_id: str,
         scheduled_at: datetime,
         triggered_at: datetime,
+        launcher_workflow_id: str | None,
     ) -> dict[str, Any]:
         """Set up execution record and return data for child workflow start.
 
@@ -292,6 +299,7 @@ class ScheduledExecutionLauncher:
                 workflow_version_id=wf_version_id,
                 project_id=wf_project_id,
                 temporal_workflow_id=temporal_workflow_id,
+                launcher_temporal_workflow_id=launcher_workflow_id,
                 status=ExecutionStatus.PENDING,
                 input_data=input_data,
                 trigger_node_id=trigger_node_id,

@@ -60,19 +60,25 @@ def _mock_session_with_two_queries(
     execution: Execution | None,
     version: WorkflowVersion | None,
 ) -> tuple[AsyncSession, Mock]:
-    """Mock session that returns execution on first exec(), version on second.
+    """Mock session for retry_execution's three queries, in order.
+
+    1. the original execution, 2. the FOR KEY SHARE lock on its workflow,
+    3. the workflow version.
 
     Returns the session and a separate Mock for .add() so callers can assert on it.
     """
     exec_result = Mock()
     exec_result.one_or_none.return_value = execution
 
+    lock_result = Mock()
+    lock_result.one_or_none.return_value = getattr(execution, "workflow", None)
+
     version_result = Mock()
     version_result.one_or_none.return_value = version
 
     add_mock = Mock()
     mock_session = Mock(spec=AsyncSession)
-    mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
+    mock_session.exec = AsyncMock(side_effect=[exec_result, lock_result, version_result])
     mock_session.add = add_mock
     mock_session.commit = AsyncMock()
     return mock_session, add_mock
@@ -290,10 +296,12 @@ class TestRetryExecution:
 
         exec_result = Mock()
         exec_result.one_or_none.return_value = execution
+        lock_result = Mock()
+        lock_result.one_or_none.return_value = execution.workflow
         version_result = Mock()
         version_result.one_or_none.return_value = version
         mock_session = Mock(spec=AsyncSession)
-        mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
+        mock_session.exec = AsyncMock(side_effect=[exec_result, lock_result, version_result])
         mock_session.add = Mock()
         mock_session.commit = AsyncMock(side_effect=Exception("DB commit failed"))
         mock_user = Mock(spec=User)

@@ -4,17 +4,19 @@ This service encapsulates execution-related business logic, separating it from
 HTTP/API concerns in the FastAPI endpoints.
 """
 
-from collections.abc import Iterable
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+import asyncio
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID, uuid4
 
 import jsonschema
 import structlog
 from referencing.exceptions import Unresolvable
+from sqlalchemy import func as sa_func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
-from sqlmodel import and_, col, func, select
+from sqlmodel import and_, col, func, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
@@ -66,6 +68,31 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 MAX_CALLBACK_ERROR_MSG_LENGTH = 500
+
+# Bound on concurrent Temporal cancellation RPCs issued when deleting a workflow.
+MAX_CONCURRENT_EXECUTION_CANCELS = 10
+
+_WORKFLOW_DELETED_APPROVAL_NOTE = "Workflow was deleted"
+
+_WORKFLOW_DELETED_EXECUTION_NOTE = "Cancelled because the workflow was deleted"
+
+
+class ExecutionCancellationResult(NamedTuple):
+    """Outcome of cancelling a workflow's in-flight executions.
+
+    ``already_gone`` matters: Temporal has no record of those runs, so no
+    completion event will ever arrive to drive them terminal.  The caller must
+    finalise them itself via :meth:`ExecutionService.finalize_gone_executions`,
+    otherwise they stay non-terminal forever — the exact symptom AAP-87750 reports.
+    """
+
+    requested: list[UUID]
+    already_gone: list[UUID]
+
+    @property
+    def all_ids(self) -> list[UUID]:
+        """Every execution acted on, whichever way it resolved."""
+        return [*self.requested, *self.already_gone]
 
 
 async def count_active_executions(session: "AsyncSession") -> int:
@@ -325,10 +352,19 @@ class ExecutionService(BaseService):
                 WorkflowVersion.workflow_id == Workflow.id,
                 WorkflowVersion.version == Workflow.current_version,
             )
+        # FOR KEY SHARE on the workflow row, taken BEFORE Temporal is started and held
+        # until this transaction commits the execution row.  It conflicts with the
+        # FOR UPDATE that workflow deletion takes, so a delete cannot slip between this
+        # lookup and the insert and leave a running Temporal workflow disassociated.
+        # KEY SHARE (not SHARE) is the weakest sufficient lock: it does not conflict with
+        # the FOR NO KEY UPDATE that ordinary non-key workflow updates take, and share
+        # locks do not conflict with each other, so concurrent executions are unaffected.
+        # ``of=Workflow`` keeps the lock off the joined workflow_versions row.
         result = await self.session.exec(
             select(Workflow, WorkflowVersion)
             .join(WorkflowVersion, version_join)  # type: ignore[arg-type]
             .where(Workflow.id == workflow_id)
+            .with_for_update(read=True, key_share=True, of=Workflow)
         )
         row = result.first()
 
@@ -682,6 +718,7 @@ class ExecutionService(BaseService):
 
         # Step 1: Validate workflow exists (is_enabled intentionally not checked —
         # users may test nodes in disabled/draft workflows during development)
+        # FOR KEY SHARE before Temporal starts — see create_execution for the rationale.
         result = await self.session.exec(
             select(Workflow, WorkflowVersion)
             .join(
@@ -692,6 +729,7 @@ class ExecutionService(BaseService):
                 ),
             )
             .where(Workflow.id == workflow_id)
+            .with_for_update(read=True, key_share=True, of=Workflow)
         )
         row = result.first()
 
@@ -1121,6 +1159,263 @@ class ExecutionService(BaseService):
             mode=execution.mode.value,
         )
 
+    async def cancel_active_executions(
+        self,
+        *,
+        workflow_id: UUID,
+        workflow_name: str = "",
+    ) -> ExecutionCancellationResult:
+        """Request Temporal cancellation of every non-terminal execution of a workflow.
+
+        Performs **no database writes** — the caller owns the transaction and should
+        call :meth:`cancel_pending_approvals_for_executions` inside it afterwards.
+        Execution status is deliberately left alone: the real
+        ``WORKFLOW_EXECUTION_CANCELED`` event drives it to CANCELLED through
+        ``ActivitySyncService``, which also sets ``completed_at`` and finalises
+        activities.  Pre-setting the status here would trip that handler's
+        terminal-state idempotency guard and lose all of it.
+
+        For scheduled runs the *launcher* is cancelled rather than the orchestrator:
+        see ``Execution.launcher_temporal_workflow_id``.
+
+        Args:
+            workflow_id: Workflow whose in-flight executions should be stopped.
+            workflow_name: Name recorded on the emitted lifecycle events.  Passed in
+                because the workflow row is about to be deleted by the caller.
+
+        Returns:
+            An :class:`ExecutionCancellationResult` splitting the executions into
+            those Temporal accepted a cancel for and those it has no record of.
+            Both are empty when nothing was active.
+
+        Raises:
+            TemporalUnavailableError: If executions need cancelling but no Temporal
+                service is configured.
+            Exception: The first cancellation failure, once all of them have been
+                awaited.  Note that some executions may already have been cancelled
+                when this raises — partial cancellation is unavoidable because each
+                cancel is a separate, independently-committing external call.
+
+        """
+        result = await self.session.exec(
+            select(Execution).where(
+                Execution.workflow_id == workflow_id,
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        executions = list(result.all())
+
+        if not executions:
+            # Nothing to stop, so a Temporal outage must not block the delete.
+            return ExecutionCancellationResult(requested=[], already_gone=[])
+
+        if self.temporal_service is None:
+            operation = "workflow execution cancellation"
+            raise TemporalUnavailableError(operation)
+
+        temporal_service = self.temporal_service
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXECUTION_CANCELS)
+
+        async def cancel_one(execution: Execution) -> bool:
+            # Cancel the launcher for scheduled runs; it REQUEST_CANCELs its child,
+            # which also covers the window where the child has not started yet.
+            target = execution.launcher_temporal_workflow_id or execution.temporal_workflow_id
+            async with semaphore:
+                return await temporal_service.cancel_workflow(temporal_workflow_id=target)
+
+        logger.info(
+            "Cancelling active executions for workflow",
+            workflow_id=str(workflow_id),
+            execution_count=len(executions),
+        )
+
+        # NOT fail-fast: asyncio.gather propagates the first exception to the awaiter
+        # but leaves siblings running, so bailing early would abandon in-flight cancels.
+        # Await every one, then decide.
+        outcomes = await asyncio.gather(
+            *(cancel_one(execution) for execution in executions),
+            return_exceptions=True,
+        )
+
+        failures = [outcome for outcome in outcomes if isinstance(outcome, BaseException)]
+        requested: list[UUID] = []
+        already_gone: list[UUID] = []
+        for execution, outcome in zip(executions, outcomes, strict=True):
+            if isinstance(outcome, BaseException):
+                continue
+            if outcome:
+                requested.append(execution.id)
+            else:
+                already_gone.append(execution.id)
+            self._emit_lifecycle_event(
+                execution_id=execution.id,
+                workflow_id=execution.workflow_id,
+                workflow_name=workflow_name,
+                action=ExecutionAction.CANCELLED,
+                mode=execution.mode.value,
+            )
+
+        if failures:
+            logger.error(
+                "Failed to cancel some active executions",
+                workflow_id=str(workflow_id),
+                failed_count=len(failures),
+                total_count=len(executions),
+            )
+            raise failures[0]
+
+        if already_gone:
+            logger.warning(
+                "Executions had no run in Temporal and must be finalised locally",
+                workflow_id=str(workflow_id),
+                stale_count=len(already_gone),
+            )
+
+        return ExecutionCancellationResult(requested=requested, already_gone=already_gone)
+
+    async def finalize_gone_executions(self, execution_ids: Sequence[UUID]) -> int:
+        """Drive executions terminal when Temporal has no run to report on them.
+
+        Used for rows whose cancellation came back "not found": no
+        ``WORKFLOW_EXECUTION_CANCELED`` event will ever arrive, so
+        ``ActivitySyncService`` will never finalise them and they would sit
+        non-terminal forever.  ``D7``'s idempotency objection does not apply here
+        precisely because no event is coming.
+
+        Stages the change on the session **without committing** — the caller owns
+        the transaction.
+
+        Args:
+            execution_ids: Executions Temporal has no record of.
+
+        Returns:
+            Number of rows finalised.
+
+        """
+        if not execution_ids:
+            return 0
+
+        from syntara.core.database.session import apply_audit_context  # noqa: PLC0415
+
+        now = datetime.now(UTC)
+
+        # Core DML bypasses the ORM before_flush hook that propagates actor context.
+        await self.session.run_sync(lambda sync_session: apply_audit_context(sync_session))
+
+        # completed_at must be strictly greater than created_at
+        # (check_execution_completed_at_after_created_at).
+        completed_at = sa_func.greatest(
+            now,
+            col(Execution.created_at) + timedelta(microseconds=1),
+        )
+        statement = (
+            update(Execution)
+            .where(
+                col(Execution.id).in_(execution_ids),
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+            .values(
+                status=ExecutionStatus.CANCELLED,
+                completed_at=completed_at,
+                error_details=_WORKFLOW_DELETED_EXECUTION_NOTE,
+                updated_at=now,
+            )
+            .returning(col(Execution.id))
+        )
+        finalised = len((await self.session.execute(statement)).all())
+        if finalised:
+            logger.info("Finalised executions with no Temporal run", execution_count=finalised)
+        return finalised
+
+    async def cancel_pending_approvals_for_executions(
+        self,
+        execution_ids: Sequence[UUID],
+        *,
+        decided_by: UUID,
+    ) -> int:
+        """Cancel every pending approval belonging to the given executions.
+
+        Stages the change on the session **without committing** — the caller owns the
+        transaction, so a rolled-back delete also rolls back these cancellations and
+        the audit events recorded for them.
+
+        Deliberately does not route through :meth:`ApprovalService.batch_decide`: that
+        runs an approver-list authorization check per approval, which the user issuing
+        a workflow delete will usually fail.  Only cert-authenticated service principals
+        bypass it.  This is a system-initiated cancellation, not a human decision.
+
+        Args:
+            execution_ids: Executions whose pending approvals should be cancelled.
+            decided_by: Acting user recorded on the cancellation.  Passed in rather
+                than read from ``self.user`` because the caller may have ended its
+                read transaction first, which expires ORM objects in this session.
+
+        Returns:
+            Number of approvals cancelled.
+
+        """
+        if not execution_ids:
+            return 0
+
+        from syntara.approvals.audit.approval import ApprovalDecidedEvent  # noqa: PLC0415
+        from syntara.approvals.models.api_models import ApprovalRequestStatus  # noqa: PLC0415
+        from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+        from syntara.core.database.session import apply_audit_context  # noqa: PLC0415
+
+        decided_at = datetime.now(UTC)
+
+        # This is Core DML, which bypasses the ORM before_flush hook that normally
+        # propagates actor context to Postgres.  Without this the audit triggers would
+        # not see the acting principal.
+        await self.session.run_sync(lambda sync_session: apply_audit_context(sync_session))
+
+        # RETURNING gives us approval_node_id and created_at, both required to build
+        # ApprovalDecidedEvent; a bare UPDATE would yield neither.
+        statement = (
+            update(ApprovalRequest)
+            .where(
+                col(ApprovalRequest.execution_id).in_(execution_ids),
+                col(ApprovalRequest.status) == ApprovalRequestStatus.PENDING,
+            )
+            .values(
+                status=ApprovalRequestStatus.CANCELLED,
+                decided_at=decided_at,
+                decided_by=decided_by,
+                decision_notes=_WORKFLOW_DELETED_APPROVAL_NOTE,
+            )
+            .returning(
+                col(ApprovalRequest.id),
+                col(ApprovalRequest.execution_id),
+                col(ApprovalRequest.approval_node_id),
+                col(ApprovalRequest.created_at),
+            )
+        )
+        rows = (await self.session.execute(statement)).all()
+
+        for approval_id, execution_id, approval_node_id, created_at in rows:
+            wait_time_ms = int((decided_at - created_at).total_seconds() * 1000)
+            # Same event the Temporal cancel path produces via batch_decide.  That path
+            # will not fire a duplicate: its CANCEL_APPROVAL activity lists *pending*
+            # approvals, and by then there are none.
+            AuditEventDispatcher.dispatch(
+                ApprovalDecidedEvent(
+                    approval_id=approval_id,
+                    execution_id=execution_id,
+                    approval_node_id=approval_node_id,
+                    decision=ApprovalRequestStatus.CANCELLED.value,
+                    decided_by=decided_by,
+                    decided_at=decided_at,
+                    wait_time_ms=wait_time_ms,
+                    decision_notes=_WORKFLOW_DELETED_APPROVAL_NOTE,
+                ),
+                session=self.session.sync_session,
+            )
+
+        if rows:
+            logger.info("Cancelled pending approvals for deleted workflow", approval_count=len(rows))
+
+        return len(rows)
+
     async def retry_execution(self, execution_id: UUID) -> ExecutionRead:
         """Retry a completed execution, re-running with the same version and inputs.
 
@@ -1161,6 +1456,17 @@ class ExecutionService(BaseService):
         # Step 3: Validate workflow still exists (NULL if hard-deleted)
         workflow = original.workflow
         if workflow is None:
+            raise ExecutionNotRetryableError(execution_id, "workflow has been deleted")
+
+        # Take FOR KEY SHARE on the workflow row before Temporal is started — see
+        # create_execution for the rationale.  This needs its own statement: the query
+        # above loads Execution.workflow via selectinload, which emits a *separate*
+        # SELECT, so `of=Workflow` cannot be attached to it.
+        locked_workflow = await self.session.exec(
+            select(Workflow).where(Workflow.id == workflow.id).with_for_update(read=True, key_share=True)
+        )
+        if locked_workflow.one_or_none() is None:
+            # Deleted between the selectinload above and acquiring the lock.
             raise ExecutionNotRetryableError(execution_id, "workflow has been deleted")
 
         # Step 4: Fetch the workflow version used by the original execution

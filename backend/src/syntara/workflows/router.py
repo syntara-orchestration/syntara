@@ -228,6 +228,31 @@ def get_execution_service(
     return ExecutionService(db, current_user, temporal_service=temporal_service)
 
 
+def get_workflow_deletion_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
+    temporal_service: Annotated[
+        TemporalExecutionService | None,
+        Depends(get_temporal_execution_service),
+    ],
+) -> WorkflowService:
+    """Dependency provider for WorkflowService on the delete route only.
+
+    Deleting a workflow has to stop its in-progress runs, which needs Temporal.
+    Kept separate from ``get_workflow_service`` because building the Temporal client
+    opens a fresh gRPC connection per request, and every other workflow endpoint
+    would pay that cost for nothing.
+    """
+    execution_service = ExecutionService(db, current_user, temporal_service=temporal_service)
+    return WorkflowService(
+        db,
+        current_user,
+        request.app.state.authz_evaluator,
+        execution_service=execution_service,
+    )
+
+
 # ============================================================================
 # Workflow endpoints
 # ============================================================================
@@ -383,12 +408,51 @@ async def update_workflow(
     dependencies=[Depends(_wf_perm_delete)],
     operation_id="delete_workflow",
     response_description="Workflow deleted",
+    # Declared per-route rather than in problem_details_response_map(), which has no
+    # 503 and applies to every endpoint.  The media type is written out directly
+    # because apply_rfc9457_media_types() only renames codes in that shared map.
+    # Declared per-route: problem_details_response_map() has no 503, and its generic
+    # 409 does not carry this endpoint's code.  Examples must mirror what the handlers
+    # actually return (workflow_delete_conflict_handler / temporal_unavailable_handler)
+    # — `code` is the field clients switch on.
+    responses={
+        409: {
+            "description": "Conflict",
+            "content": {
+                "application/problem+json": {
+                    "schema": {"$ref": "#/components/schemas/ErrorData"},
+                    "example": {
+                        "type": "https://api.example.com/errors/resource-conflict",
+                        "title": "Workflow Delete Conflict",
+                        "detail": "A workflow execution started while the workflow was being deleted. Try again.",
+                        "code": "WORKFLOW_DELETE_CONFLICT",
+                        "retryable": True,
+                    },
+                }
+            },
+        },
+        503: {
+            "description": "Service Unavailable",
+            "content": {
+                "application/problem+json": {
+                    "schema": {"$ref": "#/components/schemas/ErrorData"},
+                    "example": {
+                        "type": "https://api.example.com/errors/service-unavailable",
+                        "title": "Temporal Service Unavailable",
+                        "detail": "Temporal workflow service is currently unavailable",
+                        "code": "TEMPORAL_UNAVAILABLE",
+                        "retryable": True,
+                    },
+                }
+            },
+        },
+    },
 )
 async def delete_workflow(
     workflow_id: UUID,
-    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    service: Annotated[WorkflowService, Depends(get_workflow_deletion_service)],
 ) -> None:
-    """Delete a workflow."""
+    """Delete a workflow and cancel any executions still in progress."""
     await service.delete_workflow(workflow_id)
 
 

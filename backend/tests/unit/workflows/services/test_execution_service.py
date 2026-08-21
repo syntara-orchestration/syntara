@@ -1003,7 +1003,9 @@ class TestRetryExecutionTriggerNodeId:
         mock_exec_result.one_or_none = Mock(return_value=original)
         mock_version_result = Mock()
         mock_version_result.one_or_none = Mock(return_value=workflow_version)
-        mock_session.exec = AsyncMock(side_effect=[mock_exec_result, mock_version_result])
+        mock_lock_result = Mock()
+        mock_lock_result.one_or_none = Mock(return_value=original.workflow)
+        mock_session.exec = AsyncMock(side_effect=[mock_exec_result, mock_lock_result, mock_version_result])
         mock_session.scalar = AsyncMock(return_value=0)
 
         mock_user = Mock(spec=User)

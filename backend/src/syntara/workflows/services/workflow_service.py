@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import func, select, update
+from sqlmodel import col, func, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -39,6 +39,8 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    TemporalUnavailableError,
+    WorkflowDeleteConflictError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -47,7 +49,7 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
-from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -63,6 +65,7 @@ from syntara.workflows.validators import validate_workflow_references, workflow_
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse
+    from syntara.workflows.services.execution_service import ExecutionService
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -100,10 +103,27 @@ class WorkflowService(BaseService):
     including CRUD operations, validation, and version management.
     """
 
-    def __init__(self, session: AsyncSession, user: User, opa_client: AuthzEvaluator | None = None) -> None:
-        """Initialize WorkflowService with database session and user context."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        user: User,
+        opa_client: AuthzEvaluator | None = None,
+        execution_service: "ExecutionService | None" = None,
+    ) -> None:
+        """Initialize WorkflowService with database session and user context.
+
+        Args:
+            session: Database session.
+            user: Acting user.
+            opa_client: Authorization evaluator.
+            execution_service: Only supplied on the delete route, which needs Temporal
+                to stop in-progress runs.  Every other endpoint leaves this None so a
+                Temporal client is not connected on unrelated workflow operations.
+
+        """
         super().__init__(session, user, convert_resource_mixin=WorkflowConvertResourceMixin())
         self.opa_client = opa_client
+        self.execution_service = execution_service
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -1461,8 +1481,38 @@ class WorkflowService(BaseService):
         )
         return workflow, new_version
 
+    async def _all_execution_ids(self, workflow_id: UUID) -> set[UUID]:
+        """Return IDs of every execution of the workflow, terminal or not."""
+        result = await self.session.exec(select(Execution.id).where(Execution.workflow_id == workflow_id))
+        return set(result.all())
+
+    async def _active_execution_ids(self, workflow_id: UUID) -> set[UUID]:
+        """Return IDs of the workflow's non-terminal executions."""
+        result = await self.session.exec(
+            select(Execution.id).where(
+                Execution.workflow_id == workflow_id,
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        return set(result.all())
+
     async def delete_workflow(self, workflow_id: UUID) -> None:
-        """Hard-delete a workflow and disassociate its executions.
+        """Hard-delete a workflow, stopping any runs still in progress.
+
+        Runs in three deliberate phases, because Temporal cancellation is an
+        irreversible external side effect while the delete is a transaction:
+
+        1. **Read** — authorize, reject built-ins, collect active execution IDs.
+        2. **Temporal** — request cancellation before any write.  On failure nothing
+           has been written, so the workflow simply is not deleted.
+        3. **Write** — lock the workflow row, re-check for executions that started in
+           between, cancel their pending approvals, and delete.  One commit.
+
+        Cancelling each execution also cancels its pending approvals through the
+        engine's own cleanup, but that is asynchronous and does not run at all when
+        the worker is down, so phase 3 cancels them synchronously as well.  Execution
+        *status* is deliberately not set here — see
+        :meth:`ExecutionService.cancel_active_executions`.
 
         Executions are preserved with workflow_id/workflow_version_id set to NULL.
         Workflow versions cascade via the DB FK (ondelete=CASCADE).
@@ -1473,12 +1523,77 @@ class WorkflowService(BaseService):
         Raises:
             WorkflowNotFoundError: If workflow not found
             BuiltinWorkflowDeleteError: If workflow is a built-in
+            WorkflowDeleteConflictError: If an execution started while deleting
+            TemporalUnavailableError: If runs need stopping but Temporal is unreachable
 
         """
+        # ---- Phase 1: read -------------------------------------------------
         workflow = await self.get_workflow_by_id(workflow_id)
 
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
+
+        workflow_name = workflow.name
+        acting_user_id = self.user.id
+        known_execution_ids = await self._active_execution_ids(workflow_id)
+
+        # End the read transaction so the pooled connection is not left idle in a
+        # transaction across the Temporal fan-out below.  commit() rather than
+        # rollback(): the session is configured expire_on_commit=False, so this
+        # releases the transaction without expiring the ORM identity map.  Rolling
+        # back *would* expire it — including the User loaded by the auth dependency —
+        # and the next attribute access would lazy-load outside the async greenlet.
+        await self.session.commit()
+
+        # ---- Phase 2: Temporal (before any write) --------------------------
+        gone_execution_ids: list[UUID] = []
+        if self.execution_service is not None:
+            cancellation = await self.execution_service.cancel_active_executions(
+                workflow_id=workflow_id,
+                workflow_name=workflow_name,
+            )
+            # Fold in anything phase 2 saw that phase 1 did not.  Under READ COMMITTED
+            # its query can legitimately observe a run that committed in between; that
+            # run has now been cancelled, so it must be treated as known rather than
+            # counted as "appeared" and rejected — and its approvals still need cancelling.
+            known_execution_ids |= set(cancellation.all_ids)
+            gone_execution_ids = cancellation.already_gone
+        elif known_execution_ids:
+            # No execution service wired but runs are in flight — refuse rather than
+            # orphan them.  Deletes of workflows with nothing running still succeed.
+            operation = "workflow execution cancellation"
+            raise TemporalUnavailableError(operation)
+
+        # ---- Phase 3: write ------------------------------------------------
+        # Re-fetch under FOR UPDATE.  Execution creation takes FOR KEY SHARE on this
+        # same row before starting Temporal, so acquiring this lock fences any
+        # concurrent start: it either committed before us (and the re-query below
+        # sees it) or it blocks here and then fails its FK check once we commit.
+        locked = await self.session.exec(select(Workflow).where(Workflow.id == workflow_id).with_for_update())
+        locked_workflow = locked.one_or_none()
+        if locked_workflow is None:
+            raise WorkflowNotFoundError(workflow_id)
+        workflow = locked_workflow
+
+        appeared = await self._active_execution_ids(workflow_id) - known_execution_ids
+        if appeared:
+            # No rollback here for the same reason: the session teardown unwinds the
+            # transaction (and releases the FOR UPDATE lock) as the request ends.
+            raise WorkflowDeleteConflictError(workflow_name, len(appeared))
+
+        if self.execution_service is not None:
+            # Temporal had no run for these, so no completion event is coming and
+            # ActivitySyncService will never finalise them.  Do it here.
+            await self.execution_service.finalize_gone_executions(gone_execution_ids)
+
+            # Every execution of this workflow, not just the ones that were active.
+            # A run that already failed or was terminated can still hold a pending
+            # approval, and once workflow_id is NULLed below nothing can find it again.
+            all_execution_ids = await self._all_execution_ids(workflow_id)
+            await self.execution_service.cancel_pending_approvals_for_executions(
+                sorted(all_execution_ids),
+                decided_by=acting_user_id,
+            )
 
         # Delete associated webhook triggers (DB rows)
         webhook_service = WebhookTriggerService(self.session, self.user)
@@ -1498,25 +1613,30 @@ class WorkflowService(BaseService):
         workflow.is_enabled = False
         await self.session.flush()
 
+        # Hoist identity into locals: a failed commit rolls the session back, which
+        # restores and expires the deleted instance.  Touching workflow.name after that
+        # triggers a sync refresh and raises MissingGreenlet, masking the real error.
+        deleted_project_id = workflow.project_id
+
         # Hard delete — versions cascade via DB FK
         await self.session.delete(workflow)
         try:
             await self.session.commit()
         except Exception as exc:
             self._emit_lifecycle_event(
-                workflow_id=workflow.id,
-                workflow_name=workflow.name,
+                workflow_id=workflow_id,
+                workflow_name=workflow_name,
                 action=WorkflowAction.DELETED,
-                project_id=workflow.project_id,
+                project_id=deleted_project_id,
                 error_type=type(exc).__name__,
             )
             raise
 
         self._emit_lifecycle_event(
-            workflow_id=workflow.id,
-            workflow_name=workflow.name,
+            workflow_id=workflow_id,
+            workflow_name=workflow_name,
             action=WorkflowAction.DELETED,
-            project_id=workflow.project_id,
+            project_id=deleted_project_id,
         )
 
         await self._delete_scheduled_triggers(workflow_id)

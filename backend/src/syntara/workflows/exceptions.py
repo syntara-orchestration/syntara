@@ -186,6 +186,23 @@ class BuiltinWorkflowDeleteError(WorkflowError):
         super().__init__(f"The built-in '{workflow_name}' workflow cannot be deleted")
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_delete_conflict_handler")
+class WorkflowDeleteConflictError(WorkflowError):
+    """Raised when a new execution starts while a workflow is being deleted.
+
+    Retrying the delete is expected to succeed: the newly-started execution is
+    picked up by the next attempt's cancellation pass.
+    """
+
+    def __init__(self, workflow_name: str, execution_count: int) -> None:
+        """Initialize exception with workflow name and the number of new executions."""
+        self.workflow_name = workflow_name
+        self.execution_count = execution_count
+        super().__init__(
+            f"{execution_count} execution(s) started while deleting workflow '{workflow_name}'",
+        )
+
+
 @fastapi_exception(handler="syntara.workflows.error_handlers.builtin_workflow_modify_handler")
 class BuiltinWorkflowModifyError(WorkflowError):
     """Raised when attempting to modify a built-in workflow."""

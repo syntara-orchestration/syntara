@@ -1,6 +1,6 @@
 """Unit tests for publish_workflow_version validation and no-copy publish behavior."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -24,6 +24,7 @@ def mock_service() -> WorkflowService:
     service = WorkflowService.__new__(WorkflowService)
     service.session = session
     service.user = user
+    service.execution_service = None
     return service
 
 
@@ -644,8 +645,22 @@ class TestScheduledTriggerSyncGracefulDegradation:
         mock_workflow.name = "test-wf"
         mock_workflow.project_id = uuid4()
 
+        # delete_workflow issues four queries: active executions, the FOR UPDATE
+        # re-fetch, the active-execution re-check, then the disassociating UPDATE.
+        no_executions = Mock()
+        no_executions.all = Mock(return_value=[])
+        locked = Mock()
+        locked.one_or_none = Mock(return_value=mock_workflow)
+
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(
+                mock_service.session,
+                "exec",
+                new_callable=AsyncMock,
+                side_effect=[no_executions, locked, no_executions, Mock()],
+            ),
+            patch.object(mock_service.session, "rollback", new_callable=AsyncMock),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,

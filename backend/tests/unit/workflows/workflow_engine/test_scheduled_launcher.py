@@ -83,7 +83,9 @@ class TestExecutionMetadata:
             launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            result = await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+            result = await launcher._create_execution(
+                workflow_id, "trigger_1", scheduled_at, triggered_at, "launcher-wf-1"
+            )
 
         # Verify execution was added to session
         mock_session.add.assert_called_once()
@@ -96,6 +98,11 @@ class TestExecutionMetadata:
 
         # Verify trigger_type and interface fields on the execution itself
         assert execution.trigger_type == "scheduled_trigger"
+
+        # The parent launcher's workflow ID must be persisted: deletion cancels the
+        # launcher, not the child, because the child may not exist yet (AAP-87750).
+        assert execution.launcher_temporal_workflow_id == "launcher-wf-1"
+        assert execution.temporal_workflow_id != "launcher-wf-1"
         assert execution.interface is None
 
         # Verify execution_metadata
@@ -271,7 +278,9 @@ class TestSetupActivityNoTemporalStart:
             launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            result = await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+            result = await launcher._create_execution(
+                workflow_id, "trigger_1", scheduled_at, triggered_at, "launcher-wf-1"
+            )
 
         assert "execution_id" in result
         assert "temporal_workflow_id" in result
@@ -322,7 +331,9 @@ class TestSetupActivityNoTemporalStart:
             launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            result = await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+            result = await launcher._create_execution(
+                workflow_id, "trigger_1", scheduled_at, triggered_at, "launcher-wf-1"
+            )
 
         execution_id = result["execution_id"]
         expected_temporal_id = f"my-workflow-{execution_id}"
@@ -378,7 +389,7 @@ class TestScheduledLauncherConcurrencyLimit:
             launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(ApplicationError, match="concurrency limit reached") as exc_info:
-                await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+                await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at, "launcher-wf-1")
 
         assert exc_info.value.non_retryable is True
         mock_count.assert_awaited_once_with(mock_session)
@@ -427,7 +438,9 @@ class TestScheduledLauncherConcurrencyLimit:
             launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            result = await launcher._create_execution(workflow_id, "trigger_1", scheduled_at, triggered_at)
+            result = await launcher._create_execution(
+                workflow_id, "trigger_1", scheduled_at, triggered_at, "launcher-wf-1"
+            )
 
         mock_count.assert_awaited_once_with(mock_session)
         mock_session.add.assert_called_once()

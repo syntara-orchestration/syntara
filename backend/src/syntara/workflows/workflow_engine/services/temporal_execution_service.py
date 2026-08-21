@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from temporalio.client import Client
-from temporalio.service import RPCError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE, get_settings
 from syntara.core.exceptions import SafeValueError
@@ -192,7 +192,7 @@ class TemporalExecutionService:
     async def cancel_workflow(
         self,
         temporal_workflow_id: str,
-    ) -> None:
+    ) -> bool:
         """Cancel a running workflow.
 
         Sends a cancellation signal to Temporal. The actual status update
@@ -201,8 +201,14 @@ class TemporalExecutionService:
         Args:
             temporal_workflow_id: Temporal workflow ID
 
+        Returns:
+            ``True`` if cancellation was requested of a live run.  ``False`` if
+            Temporal has no such run, meaning it is provably gone and **no
+            completion event will ever arrive** for it — callers that track
+            execution state must finalise those rows themselves.
+
         Raises:
-            Exception: If cancellation fails
+            RPCError: If Temporal rejects the call for any other reason.
 
         """
         try:
@@ -215,14 +221,20 @@ class TemporalExecutionService:
             logger.info("Workflow cancelled successfully", temporal_workflow_id=temporal_workflow_id)
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            # Match the gRPC status, not the message text.  Temporal words a missing
+            # run several different ways — a closed run reports that the workflow
+            # execution has already completed, which contains no "not found" — so
+            # substring matching mis-classifies real failures as no-ops and vice versa.
+            if e.status == RPCStatusCode.NOT_FOUND:
                 logger.info(
-                    "Workflow already completed, cancel is a no-op",
+                    "Workflow not found in Temporal, cancel is a no-op",
                     temporal_workflow_id=temporal_workflow_id,
+                    detail=str(e),
                 )
-                return
+                return False
             logger.exception("Failed to cancel workflow", temporal_workflow_id=temporal_workflow_id)
             raise
+        return True
 
     async def complete_async_activity(
         self,

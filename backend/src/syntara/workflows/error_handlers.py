@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         WebhookTriggerPathConflictError,
         WorkflowConcurrencyLimitError,
         WorkflowDefinitionInvalidError,
+        WorkflowDeleteConflictError,
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
@@ -205,6 +206,24 @@ def workflow_name_conflict_handler(request: Request, exc: "WorkflowNameConflictE
         detail="A workflow with this name already exists in this project",
         code="WORKFLOW_NAME_CONFLICT",
         retryable=False,
+        instance=str(request.url),
+    )
+
+
+def workflow_delete_conflict_handler(request: Request, exc: "WorkflowDeleteConflictError") -> JSONResponse:
+    """Handle WorkflowDeleteConflictError with RFC 9457 format."""
+    logger.warning(
+        "Workflow delete conflicted with a newly started execution",
+        workflow_name=exc.workflow_name,
+        execution_count=exc.execution_count,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Workflow Delete Conflict",
+        detail="A workflow execution started while the workflow was being deleted. Try again.",
+        code="WORKFLOW_DELETE_CONFLICT",
+        retryable=True,
         instance=str(request.url),
     )
 

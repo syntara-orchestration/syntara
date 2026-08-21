@@ -281,7 +281,7 @@ paths:
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
     delete:
       summary: Delete workflow
-      description: Delete a workflow.
+      description: Delete a workflow and cancel any executions still in progress.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -310,9 +310,31 @@ paths:
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/resource-conflict
+                title: Workflow Delete Conflict
+                detail: A workflow execution started while the workflow was being deleted. Try again.
+                code: WORKFLOW_DELETE_CONFLICT
+                retryable: true
         '422':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/service-unavailable
+                title: Temporal Service Unavailable
+                detail: Temporal workflow service is currently unavailable
+                code: TEMPORAL_UNAVAILABLE
+                retryable: true
         "429":
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':

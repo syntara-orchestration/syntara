@@ -26606,7 +26606,7 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Delete a workflow.
+      description: Delete a workflow and cancel any executions still in progress.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -26682,11 +26682,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorData'
               example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
+                type: https://api.example.com/errors/resource-conflict
+                title: Workflow Delete Conflict
+                detail: A workflow execution started while the workflow was being deleted. Try again.
+                code: WORKFLOW_DELETE_CONFLICT
+                retryable: true
         '422':
           description: Validation Error
           content:
@@ -26700,6 +26700,18 @@ paths:
                 code: VALIDATION_ERROR
                 retryable: false
                 instance: /api/v1/workflows
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/service-unavailable
+                title: Temporal Service Unavailable
+                detail: Temporal workflow service is currently unavailable
+                code: TEMPORAL_UNAVAILABLE
+                retryable: true
         '429':
           description: Too Many Requests
           content:

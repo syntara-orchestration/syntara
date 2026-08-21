@@ -158,6 +158,24 @@ class Execution(UserOwnedResource, table=True):
         description="Temporal workflow ID for orchestration",
     )
 
+    # Parent launcher workflow ID (scheduled executions only).
+    #
+    # A scheduled run is started by ScheduledWorkflowLauncher, which commits this row
+    # in a setup activity and only *then* starts the orchestrator as a child workflow.
+    # During that gap ``temporal_workflow_id`` names a child that does not exist yet, so
+    # cancelling it is a silent no-op and the launcher goes on to start it anyway.
+    # Cancelling the launcher instead closes that window: its ParentClosePolicy is
+    # REQUEST_CANCEL, which either stops a child that has started or prevents one that
+    # has not.  NULL for every non-scheduled execution.
+    launcher_temporal_workflow_id: str | None = Field(
+        default=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
+        nullable=True,
+        index=True,
+        description="Parent launcher Temporal workflow ID (scheduled executions only)",
+    )
+
     # Status
     status: ExecutionStatus = Field(
         default=ExecutionStatus.PENDING,
