@@ -41,7 +41,7 @@ function useFetchApprovalForNode(executionId: string): {
 
 - Uses `approvalsClient.useQuery('get', '/approvals', ...)` with `enabled: false` to disable automatic fetching
 - Query params: `execution_id` and `status: 'pending'`
-- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by `approval_node_id` (including `{nodeId}_iter_{n}` and nested `{nodeId}_iter_{outer}_iter_{inner}` IDs used when the approval sits inside a loop)
+- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by canvas `approval_node_id` (pending first, else latest `loop_iteration_path`). Legacy `{nodeId}_iter_{n}` suffixes are a fallback only.
 - Returns `null` if no matching approval is found
 - `clear()` resets the loading state (e.g., when closing the review view)
 

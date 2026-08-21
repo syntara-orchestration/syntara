@@ -1,6 +1,9 @@
 """Unit tests for loop-iteration Temporal / approval ID helpers."""
 
+from unittest.mock import patch
+
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    approval_temporal_activity_id,
     innermost_iteration_index,
     join_loop_iteration_id,
     loop_control_activity_id,
@@ -123,12 +126,36 @@ def test_loop_control_activity_id_same_inner_next_outer_differs() -> None:
     assert first != second
 
 
+def test_loop_control_activity_id_unpatched_nested_uses_own_index_only() -> None:
+    """Pre-patch nested loop control IDs used only the inner current_index."""
+    body_map = {"inner": "outer"}
+    control = {"outer": {"current_index": 2}}
+    with patch(
+        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+        return_value=False,
+    ):
+        assert loop_control_activity_id("inner", 0, body_map, control) == "inner_iter_0"
+
+
+def test_approval_temporal_activity_id_new_and_unpatched() -> None:
+    """New runs suffix Temporal IDs; unpatched replay keeps the canvas ID."""
+    body_map = {"approval": "loop"}
+    control = {"loop": {"current_index": 3}}
+    assert approval_temporal_activity_id("approval", body_map, control) == "approval_iter_3"
+    with patch(
+        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+        return_value=False,
+    ):
+        assert approval_temporal_activity_id("approval", body_map, control) == "approval"
+
+
 def test_matches_loop_iteration_id() -> None:
-    """Expire-by-canvas-id matches any depth of numeric suffixes."""
+    """Expire-by-canvas-id matches any depth of numeric suffixes, including reverse."""
     assert matches_loop_iteration_id("approval", "approval")
     assert matches_loop_iteration_id("approval_iter_1", "approval")
     assert matches_loop_iteration_id("approval_iter_1_iter_0", "approval")
     assert matches_loop_iteration_id("approval_iter_1_iter_0", "approval_iter_1_iter_0")
+    assert matches_loop_iteration_id("approval", "approval_iter_1")
     assert not matches_loop_iteration_id("approval_iter_notanumber", "approval")
     assert not matches_loop_iteration_id("other_iter_1", "approval")
     assert not matches_loop_iteration_id("approval_iter_0", "approval_iter_1")

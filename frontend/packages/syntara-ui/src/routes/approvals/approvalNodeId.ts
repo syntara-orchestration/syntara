@@ -1,11 +1,10 @@
 /**
- * Helpers for matching approval_node_id to canvas / activity IDs.
+ * Helpers for matching approval records to canvas / activity IDs.
  *
- * Outside a loop, approval_node_id is the canvas node ID. Inside one or more
- * loops each combination of enclosing indices stores
- * ``{nodeId}_iter_{outer}_iter_{inner}`` so each iteration can create its own
- * approval request. Activity records for later iterations use the composite
- * key ``{nodeId}#iter-{n}``.
+ * `approval_node_id` is the canvas node ID. Loop identity is
+ * `loop_iteration_path` (outermost first). Legacy / mock rows may still
+ * encode iteration as `{nodeId}_iter_{n}` suffixes; those are a fallback only.
+ * Activity records for later iterations use the composite key `{nodeId}#iter-{n}`.
  */
 
 const LOOP_ITER_CHAIN = /(?:_iter_\d+)+$/
@@ -14,6 +13,7 @@ const COMPOSITE_ITER_SEP = '#iter-'
 type ApprovalNodeRef = {
   approval_node_id: string
   status?: string
+  loop_iteration_path?: number[]
 }
 
 /** Strip loop-iteration and composite-key suffixes to the canvas node ID. */
@@ -28,7 +28,7 @@ export function matchesApprovalNodeId(approvalNodeId: string, canvasOrActivityId
   return canvasNodeIdFromApprovalNodeId(approvalNodeId) === canvasNodeIdFromApprovalNodeId(canvasOrActivityId)
 }
 
-function iterationSortKey(approvalNodeId: string): number[] {
+function suffixIterationKey(approvalNodeId: string): number[] {
   const chain = LOOP_ITER_CHAIN.exec(approvalNodeId)?.[0] ?? ''
   const indices: number[] = []
   const iterNum = /_iter_(\d+)/g
@@ -38,6 +38,13 @@ function iterationSortKey(approvalNodeId: string): number[] {
     match = iterNum.exec(chain)
   }
   return indices
+}
+
+function iterationSortKey(approval: ApprovalNodeRef): number[] {
+  if (approval.loop_iteration_path && approval.loop_iteration_path.length > 0) {
+    return approval.loop_iteration_path
+  }
+  return suffixIterationKey(approval.approval_node_id)
 }
 
 function compareIterationKeys(left: number[], right: number[]): number {
@@ -56,20 +63,25 @@ function pickLatestLoopApproval<T extends ApprovalNodeRef>(matches: T[]): T | un
   const [latest, ...rest] = pool
   if (latest === undefined) return undefined
   return rest.reduce(
-    (best, current) =>
-      compareIterationKeys(iterationSortKey(current.approval_node_id), iterationSortKey(best.approval_node_id)) >= 0
-        ? current
-        : best,
+    (best, current) => (compareIterationKeys(iterationSortKey(current), iterationSortKey(best)) >= 0 ? current : best),
     latest
   )
+}
+
+export function innermostLoopIterationIndex(approval: ApprovalNodeRef): number | undefined {
+  const key = iterationSortKey(approval)
+  return key.length > 0 ? key[key.length - 1] : undefined
 }
 
 export function findApprovalForCanvasNode<T extends ApprovalNodeRef>(
   approvals: T[],
   canvasOrActivityId: string
 ): T | undefined {
-  const exact = approvals.find((approval) => approval.approval_node_id === canvasOrActivityId)
-  if (exact) return exact
+  const canvasId = canvasNodeIdFromApprovalNodeId(canvasOrActivityId)
+  if (canvasOrActivityId !== canvasId) {
+    const exactSuffixed = approvals.find((approval) => approval.approval_node_id === canvasOrActivityId)
+    if (exactSuffixed) return exactSuffixed
+  }
   return pickLatestLoopApproval(
     approvals.filter((approval) => matchesApprovalNodeId(approval.approval_node_id, canvasOrActivityId))
   )

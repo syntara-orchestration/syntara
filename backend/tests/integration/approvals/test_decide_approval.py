@@ -86,6 +86,7 @@ class TestDecideApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="This change looks good to deploy to production.",
         )
 
@@ -134,6 +135,7 @@ class TestDecideApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="This change needs more testing before deployment.",
         )
 
@@ -178,6 +180,7 @@ class TestDecideApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="Approved via alias key",
         )
 
@@ -217,6 +220,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=None,
             )
 
@@ -243,6 +247,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[1].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=None,
             )
 
@@ -480,6 +485,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=normal_notes,
             )
 
@@ -509,6 +515,7 @@ class TestDecideApprovalContract:
                 approval_id=long_approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=acceptable_long_notes,
             )
 

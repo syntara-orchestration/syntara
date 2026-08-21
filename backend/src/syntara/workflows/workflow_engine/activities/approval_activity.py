@@ -32,9 +32,9 @@ logger = structlog.stdlib.get_logger(__name__)
 def _is_approval_for_node(stored_node_id: str, node_id: str) -> bool:
     """Return True if ``stored_node_id`` is this canvas node, including loop iterations.
 
-    Loop-body approvals store ``{node_id}_iter_{outer}_iter_{inner}...``.
-    Exact match covers a specific iteration; any depth of numeric ``_iter_N``
-    suffixes covers expire-by-canvas-id.
+    New rows store the canvas ID. Legacy rows may still have
+    ``{node_id}_iter_{outer}_iter_{inner}...``. Exact match covers a specific
+    iteration; suffix matching covers expire-by-canvas-id and leftover suffixes.
     """
     return matches_loop_iteration_id(stored_node_id, node_id)
 
@@ -55,6 +55,8 @@ async def create_approval_request_activity(
     approver_user_ids: list[str] | None = None,
     approver_group_ids: list[str] | None = None,
     project_id: str = "",
+    loop_iteration_path: list[int] | None = None,
+    temporal_activity_id: str | None = None,
 ) -> NoReturn:
     """Create an approval request via the Approvals API.
 
@@ -64,7 +66,7 @@ async def create_approval_request_activity(
 
     Args:
         execution_id: Parent workflow execution ID (UUID string).
-        approval_node_id: Activity ID from workflow definition.
+        approval_node_id: Canvas node ID from the workflow definition.
         name: Display name for the approval request.
         next_step_approved: First activity if approved (id, name, type), or None.
         workflow_context: Context dict (workflow_version_id, workflow_name, inputs, previous_step).
@@ -73,6 +75,9 @@ async def create_approval_request_activity(
         approver_user_ids: List of user UUIDs who can approve (None = any user with permission).
         approver_group_ids: List of group UUIDs whose members can approve.
         project_id: Project ID for the approval request (from parent execution).
+        loop_iteration_path: Enclosing-loop indices, outermost first (empty if none).
+        temporal_activity_id: Temporal activity ID to signal on decide. Defaults to
+            ``approval_node_id`` for callers that predate this field.
 
     Raises:
         ApprovalActivityError: If approval request creation fails.
@@ -103,6 +108,8 @@ async def create_approval_request_activity(
         "next_step_rejected": next_step_rejected,
         "approver_user_ids": approver_user_ids,
         "approver_group_ids": approver_group_ids,
+        "loop_iteration_path": loop_iteration_path or [],
+        "temporal_activity_id": temporal_activity_id or approval_node_id,
     }
 
     try:

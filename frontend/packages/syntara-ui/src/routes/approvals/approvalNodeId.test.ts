@@ -3,6 +3,7 @@ import {
   findApprovalForCanvasNode,
   findApprovalIndexForCanvasNode,
   findNodeByApprovalNodeId,
+  innermostLoopIterationIndex,
   lookupMapByApprovalNodeId,
   matchesApprovalNodeId,
 } from './approvalNodeId'
@@ -84,10 +85,34 @@ describe('findApprovalForCanvasNode', () => {
     expect(findApprovalForCanvasNode(loopApprovals, 'a1')?.id).toBe('iter1')
   })
 
+  it('picks pending then latest path when rows share the canvas approval_node_id', () => {
+    const loopApprovals = [
+      { id: 'first', approval_node_id: 'a1', loop_iteration_path: [0], status: 'approved' },
+      { id: 'second', approval_node_id: 'a1', loop_iteration_path: [1], status: 'pending' },
+    ]
+    expect(findApprovalForCanvasNode(loopApprovals, 'a1')?.id).toBe('second')
+  })
+
+  it('does not return the first exact canvas match when later iterations share it', () => {
+    const loopApprovals = [
+      { id: 'first', approval_node_id: 'a1', loop_iteration_path: [0] },
+      { id: 'second', approval_node_id: 'a1', loop_iteration_path: [1] },
+    ]
+    expect(findApprovalForCanvasNode(loopApprovals, 'a1')?.id).toBe('second')
+  })
+
   it('picks the latest nested-loop iteration by outer then inner index', () => {
     const nested = [
       { id: 'outer0', approval_node_id: 'a1_iter_0_iter_1' },
       { id: 'outer1', approval_node_id: 'a1_iter_1_iter_0' },
+    ]
+    expect(findApprovalForCanvasNode(nested, 'a1')?.id).toBe('outer1')
+  })
+
+  it('ranks nested loop_iteration_path outermost first', () => {
+    const nested = [
+      { id: 'outer0', approval_node_id: 'a1', loop_iteration_path: [0, 1] },
+      { id: 'outer1', approval_node_id: 'a1', loop_iteration_path: [1, 0] },
     ]
     expect(findApprovalForCanvasNode(nested, 'a1')?.id).toBe('outer1')
   })
@@ -136,5 +161,19 @@ describe('lookupMapByApprovalNodeId', () => {
   it('returns undefined for a missing map or id', () => {
     expect(lookupMapByApprovalNodeId(undefined, 'a1')).toBeUndefined()
     expect(lookupMapByApprovalNodeId(map, null)).toBeUndefined()
+  })
+})
+
+describe('innermostLoopIterationIndex', () => {
+  it('uses loop_iteration_path when present', () => {
+    expect(innermostLoopIterationIndex({ approval_node_id: 'a1', loop_iteration_path: [1, 0] })).toBe(0)
+  })
+
+  it('falls back to a legacy suffix', () => {
+    expect(innermostLoopIterationIndex({ approval_node_id: 'a1_iter_3' })).toBe(3)
+  })
+
+  it('returns undefined when the node is not in a loop', () => {
+    expect(innermostLoopIterationIndex({ approval_node_id: 'a1' })).toBeUndefined()
   })
 })

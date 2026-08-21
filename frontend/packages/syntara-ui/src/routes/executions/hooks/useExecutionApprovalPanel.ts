@@ -6,10 +6,10 @@ import {
   canvasNodeIdFromApprovalNodeId,
   findApprovalForCanvasNode,
   findNodeByApprovalNodeId,
+  innermostLoopIterationIndex,
 } from '../../approvals/approvalNodeId'
 import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
-import { buildLatestIterationMap } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
 import { useAutoApprovalDetection } from './useAutoApprovalDetection'
@@ -165,11 +165,13 @@ export function useExecutionApprovalPanel(
     if (!panelOpen || !currentApproval) return
 
     const canvasId = canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id)
+    const innermost = innermostLoopIterationIndex(currentApproval)
 
     const unsubscribe = useExecutionStore.subscribe(() => {
       const activityStates = useExecutionStore.getState().activityStates
-      const latest = buildLatestIterationMap(activityStates)
-      const activityState = latest.get(canvasId) ?? activityStates.get(canvasId)
+      const iterKey = innermost === undefined ? undefined : `${canvasId}#iter-${innermost}`
+      const activityState =
+        (iterKey !== undefined ? activityStates.get(iterKey) : undefined) ?? activityStates.get(canvasId)
       const status = activityState?.status
       if (status && status !== ACTIVITY_STATUS.WAITING && isTerminalState(status)) {
         dismiss()

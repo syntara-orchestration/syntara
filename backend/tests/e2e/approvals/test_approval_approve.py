@@ -308,7 +308,7 @@ class TestApproveInLoop:
         4. Poll until terminal.
 
         Expected:
-        - Two distinct approval_node_id values: a1_iter_0 and a1_iter_1.
+        - Two distinct rows with approval_node_id ``a1`` and paths [0] then [1].
         - Execution COMPLETED; body_script and after_loop completed.
         """
         name = unique_name("e2e-approve-in-loop")
@@ -327,8 +327,11 @@ class TestApproveInLoop:
         exec_id = UUID(str(execution.id))
 
         first = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
-        assert first.approval_node_id == "a1_iter_0", (
-            f"First iteration approval_node_id should be a1_iter_0, got: {first.approval_node_id!r}"
+        assert first.approval_node_id == "a1", (
+            f"First iteration approval_node_id should be a1, got: {first.approval_node_id!r}"
+        )
+        assert first.loop_iteration_path == [0], (
+            f"First iteration loop_iteration_path should be [0], got: {first.loop_iteration_path!r}"
         )
         syntara_api.approvals.decide(
             approval_id=UUID(str(first.id)),
@@ -336,8 +339,11 @@ class TestApproveInLoop:
         ).assert_and_get()
 
         second = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
-        assert second.approval_node_id == "a1_iter_1", (
-            f"Second iteration approval_node_id should be a1_iter_1, got: {second.approval_node_id!r}"
+        assert second.approval_node_id == "a1", (
+            f"Second iteration approval_node_id should be a1, got: {second.approval_node_id!r}"
+        )
+        assert second.loop_iteration_path == [1], (
+            f"Second iteration loop_iteration_path should be [1], got: {second.loop_iteration_path!r}"
         )
         assert second.id != first.id
         syntara_api.approvals.decide(
