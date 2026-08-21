@@ -915,6 +915,78 @@ class TestConvergeAnyStrategy:
         assert "node_b" in wf.skipped_nodes, "node_b should be skipped (it's an unmet converge input)"
         assert "node_d" not in wf.skipped_nodes, "node_d must not be skipped (outside converge parallel section)"
 
+    def test_skip_incomplete_predecessors_does_not_cascade_deep_chain_outside_parallel_section(self) -> None:
+        """Multi-hop chain outside the parallel section must not be skipped.
+
+        Graph: trigger -> node_a -> converge (ANY n=1)
+               trigger -> node_b -> converge
+               node_b  -> node_d  -> node_e   (both outside converge parallel section)
+        """
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node(
+            "converge_node",
+            {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
+        )
+        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+        backend.add_node("node_e", {"id": "node_e", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "node_a", None)
+        backend.add_edge("trigger", "node_b", None)
+        backend.add_edge("node_a", "converge_node", None)
+        backend.add_edge("node_b", "converge_node", None)
+        backend.add_edge("converge_node", "node_c", None)
+        backend.add_edge("node_b", "node_d", None)
+        backend.add_edge("node_d", "node_e", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf._build_converge_branch_nodes_index(graph)
+        wf.resolver.set_namespace("node_a", {"status": "completed"})
+
+        wf._skip_incomplete_predecessors("converge_node", graph, "n_required met", {})
+
+        assert "node_b" in wf.skipped_nodes
+        assert "node_d" not in wf.skipped_nodes, "node_d is outside parallel section"
+        assert "node_e" not in wf.skipped_nodes, "node_e is outside parallel section"
+
+    def test_fail_converge_node_does_not_skip_nodes_outside_parallel_section(self) -> None:
+        """_fail_converge_node also calls _skip_incomplete_predecessors — fix applies to the failure/timeout path.
+
+        Graph: trigger -> node_a -> converge (ANY n=1)
+               trigger -> node_b -> converge
+               node_b  -> node_d
+        """
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node(
+            "converge_node",
+            {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
+        )
+        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "node_a", None)
+        backend.add_edge("trigger", "node_b", None)
+        backend.add_edge("node_a", "converge_node", None)
+        backend.add_edge("node_b", "converge_node", None)
+        backend.add_edge("converge_node", "node_c", None)
+        backend.add_edge("node_b", "node_d", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf._build_converge_branch_nodes_index(graph)
+        wf.resolver.set_namespace("node_a", {"status": "completed"})
+
+        wf._fail_converge_node("converge_node", "timeout", graph, {})
+
+        assert "converge_node" in wf.failed_nodes
+        assert "node_b" in wf.skipped_nodes, "node_b should be skipped (unmet branch)"
+        assert "node_d" not in wf.skipped_nodes, "node_d must not be skipped (outside parallel section)"
+
     def test_should_skip_successor_triggers_any_skip(self) -> None:
         graph = self._build_any_converge_graph({"strategy": "any", "n_required": 1})
         converge_node = graph.get_node("converge_node")
