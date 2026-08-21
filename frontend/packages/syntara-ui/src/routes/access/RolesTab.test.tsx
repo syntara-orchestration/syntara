@@ -263,6 +263,7 @@ describe('RolesTab', () => {
 
       expect(screen.getByText('No roles yet')).toBeInTheDocument()
       expect(screen.getByText('No roles are available.')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Create role' })).not.toBeInTheDocument()
     })
   })
 
@@ -392,6 +393,25 @@ describe('RolesTab', () => {
       await user.click(kebabs[0])
 
       expect(await screen.findByRole('menuitem', { name: /edit role/i })).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('disables Delete role when user lacks delete permission', async () => {
+      mockUseRolePermissions.mockReturnValue({
+        ...defaultRolePermissions,
+        canDelete: false,
+        tooltips: {
+          ...defaultRolePermissions.tooltips,
+          delete: 'You need permission to delete roles.',
+        },
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const kebabs = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      await user.click(kebabs[0])
+
+      expect(await screen.findByRole('menuitem', { name: /delete role/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('opens delete confirmation when delete action is clicked', async () => {

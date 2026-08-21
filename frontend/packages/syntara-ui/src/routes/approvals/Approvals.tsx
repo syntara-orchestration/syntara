@@ -164,7 +164,10 @@ function ApprovalsContent({
         {hasActiveFilters ? (
           <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
         ) : (
-          <SynEmptyStateNoData title="No approvals yet" description="No approvals are currently pending or available." />
+          <SynEmptyStateNoData
+            title="No approvals yet"
+            description="No approvals are currently pending or available."
+          />
         )}
       </SynPageBody>
     )

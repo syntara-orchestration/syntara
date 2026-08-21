@@ -419,7 +419,9 @@ describe('MappingTable', () => {
         isReadOnly
         showValidation
         entryErrors={
-          [{ idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } }] as unknown as GroupMappingEditFormValues['entries']
+          [
+            { idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } },
+          ] as unknown as GroupMappingEditFormValues['entries']
         }
       />
     )

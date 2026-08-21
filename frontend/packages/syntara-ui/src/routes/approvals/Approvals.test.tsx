@@ -1290,6 +1290,21 @@ describe('Approvals Component', () => {
       expect(screen.getByRole('button', { name: 'Reject' })).toHaveAttribute('aria-disabled', 'true')
     })
 
+    it('does not apply permission tooltip while decide-project permissions are loading', () => {
+      vi.mocked(useApprovalDecideProjects).mockReturnValue({
+        canDecideAllProjects: false,
+        canDecideProjectNames: EMPTY_PROJECT_NAMES,
+        canReadProjectNames: EMPTY_PROJECT_NAMES,
+        isLoading: true,
+        error: null,
+      })
+
+      render(<Approvals />)
+
+      expect(screen.getByRole('button', { name: 'Approve' })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: 'Reject' })).not.toHaveAttribute('aria-disabled', 'true')
+    })
+
     it('does not show access denied when user has read permission', () => {
       vi.mocked(useApprovalPermissions).mockReturnValue({
         canRead: true,
