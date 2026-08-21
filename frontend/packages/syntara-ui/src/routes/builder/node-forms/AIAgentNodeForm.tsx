@@ -11,7 +11,7 @@ import {
 import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI, ToolManagerAPI } from '@syntara/contracts'
 import type { ReactNode } from 'react'
-import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control, UseFormSetValue } from 'react-hook-form'
 import { Controller, FormProvider, useForm, useFormContext, useFormState, useWatch } from 'react-hook-form'
 
@@ -42,6 +42,7 @@ import { ToolsMultiSelect } from './ToolsMultiSelect'
 import { useAllEnabledMcpIntegrations } from './useAllEnabledMcpIntegrations'
 import { useAllTools } from './useAllTools'
 import { useFilesMetadata } from './useFilesMetadata'
+import type { MarkPersistedFn } from './useFileUploadState'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 type ToolWithParameters = ToolManagerAPI.components['schemas']['ToolWithParameters']
@@ -58,7 +59,11 @@ export type AIAgentFormSubmitData = {
 export type AIAgentFormInitialData = Partial<AIAgentFormData>
 
 export type AIAgentNodeFormProps = {
-  onSubmit: (data: AIAgentFormSubmitData) => void
+  /**
+   * Persist the form. Return `false` (or throw) when persist fails so session
+   * uploads stay DELETEable. `void` / `true` means success.
+   */
+  onSubmit: (data: AIAgentFormSubmitData) => boolean | void | Promise<boolean | void>
   initialData?: AIAgentFormInitialData
   existingFileIds?: string[]
   onHeaderContentChange?: (content: ReactNode | null) => void
@@ -373,6 +378,17 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
   const { data: hydratedFiles, isError: isFilesError } = useFilesMetadata(props.existingFileIds)
   const [userFiles, setUserFiles] = useState<UploadedFile[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
+  const [markPersisted, setMarkPersisted] = useState<MarkPersistedFn | null>(null)
+  const deletingFileIdsRef = useRef<Set<string>>(new Set())
+
+  const onMarkPersistedReady = useCallback((fn: MarkPersistedFn | null) => {
+    // Functional update so a function value is stored, not invoked as a setState updater.
+    setMarkPersisted(() => fn)
+  }, [])
+
+  const onDeletingFileIdsChange = useCallback((ids: Set<string>) => {
+    deletingFileIdsRef.current = ids
+  }, [])
 
   const completedFiles = useMemo(() => {
     const userIds = new Set(userFiles.map((f) => f.id))
@@ -415,15 +431,31 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     ...props.initialData,
   }
 
-  const handleSubmit = (data: AIAgentFormData) => {
-    // Parse response schema (already validated by Zod superRefine)
-    const trimmed = data.responseSchema?.trim()
-    const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
+  const { onSubmit: onSubmitProp } = props
+  const handleSubmit = useCallback(
+    async (data: AIAgentFormData) => {
+      const trimmed = data.responseSchema?.trim()
+      const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
-    const fileIds: string[] = completedFiles.filter((f) => f.status === 'success').map((f) => f.id)
+      const currentDeletingIds = deletingFileIdsRef.current
+      const fileIds: string[] = completedFiles
+        .filter((f) => f.status === 'success' && !currentDeletingIds.has(f.id))
+        .map((f) => f.id)
 
-    props.onSubmit({ ...data, fileIds, parsedResponseSchema })
-  }
+      try {
+        const result = onSubmitProp({ ...data, fileIds, parsedResponseSchema })
+        const outcome = result instanceof Promise ? await result : result
+        if (outcome === false) {
+          return false
+        }
+        markPersisted?.(fileIds)
+        return true
+      } catch {
+        return false
+      }
+    },
+    [completedFiles, onSubmitProp, markPersisted]
+  )
 
   const methods = useForm<AIAgentFormData>({
     resolver: zodResolver(aiAgentFormSchema, undefined, { mode: 'sync' }),
@@ -431,6 +463,11 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     mode: 'onChange',
     reValidateMode: 'onChange',
   })
+
+  const onFormSubmit = useCallback(
+    (e: React.FormEvent) => methods.handleSubmit(handleSubmit)(e),
+    [methods, handleSubmit]
+  )
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
   useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
@@ -442,14 +479,25 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
       removeFile,
       removeFilesByName,
       isFilesError: isFilesError && !!props.existingFileIds?.length,
+      onMarkPersistedReady,
+      onDeletingFileIdsChange,
     }),
-    [completedFiles, addFiles, removeFile, removeFilesByName, isFilesError, props.existingFileIds]
+    [
+      completedFiles,
+      addFiles,
+      removeFile,
+      removeFilesByName,
+      isFilesError,
+      props.existingFileIds,
+      onMarkPersistedReady,
+      onDeletingFileIdsChange,
+    ]
   )
 
   return (
     <AIAgentFileContext.Provider value={fileContextValue}>
       <FormProvider {...methods}>
-        <NodeFormContainer formId="ai-agent-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+        <NodeFormContainer formId="ai-agent-node-form" onSubmit={onFormSubmit}>
           <AIAgentFormFields
             onHeaderContentChange={props.onHeaderContentChange}
             projectId={props.projectId}
