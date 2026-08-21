@@ -577,7 +577,10 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": too_long})
 
-        assert args[10] == too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH]
+        truncated = too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH - 1] + "…"
+        assert args[10] == truncated
+        assert args[10].endswith("…")
+        assert len(args[10]) == FieldLimits.DESCRIPTION_MAX_LENGTH
 
     @pytest.mark.asyncio
     async def test_oversized_json_prompt_is_dropped(self) -> None:

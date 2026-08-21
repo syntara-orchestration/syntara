@@ -51,7 +51,8 @@ def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None
     ``${trigger.amount}`` is kept. Skip booleans and empty containers — those
     are not human-readable guidance. Serialize objects with ``json.dumps``;
     if that fails or the JSON exceeds the column limit, store None rather than
-    a broken fragment.
+    a broken fragment. Oversized plain text is truncated to the column limit
+    with a trailing ellipsis so approvers can see it was clipped.
     """
     prompt = resolved_parameters.get("prompt")
     if prompt is None or isinstance(prompt, bool):
@@ -85,7 +86,7 @@ def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None
         return None
 
     _warn_approval_prompt(f"Approval prompt length {len(text)} exceeds {max_len} characters; truncating")
-    return text[:max_len]
+    return text[: max_len - 1] + "…"
 
 
 class WorkflowApprovalMixin:
@@ -327,6 +328,9 @@ class WorkflowApprovalMixin:
             approver_user_ids = None
             approver_group_ids = None
 
+        # Temporal replay: new activity args must always be appended, never
+        # inserted. In-flight executions without the patch still send the
+        # original 10-element payload.
         args: list[Any] = [
             self.execution_id,
             node.id,
