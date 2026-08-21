@@ -375,6 +375,25 @@ describe('RolesTab', () => {
       })
     })
 
+    it('disables Edit role when user lacks update permission', async () => {
+      mockUseRolePermissions.mockReturnValue({
+        ...defaultRolePermissions,
+        canUpdate: false,
+        tooltips: {
+          ...defaultRolePermissions.tooltips,
+          update: 'You need permission to update roles.',
+        },
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const kebabs = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      await user.click(kebabs[0])
+
+      expect(await screen.findByRole('menuitem', { name: /edit role/i })).toHaveAttribute('aria-disabled', 'true')
+    })
+
     it('opens delete confirmation when delete action is clicked', async () => {
       const user = userEvent.setup()
       render(<RolesTab />, { wrapper: createWrapper() })

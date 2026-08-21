@@ -1172,6 +1172,55 @@ describe('Approvals Component', () => {
       expect(mockRefetch).toHaveBeenCalled()
       expect(screen.queryByText('1 selected')).not.toBeInTheDocument()
     })
+    it('refetches approvals after a successful bulk reject', async () => {
+      const mockRefetch = vi.fn()
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: mockRefetch,
+      } as never)
+
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      const rowCheckbox = screen.getAllByRole('checkbox', { name: /select row/i })[0]
+      await user.click(rowCheckbox)
+      await user.click(screen.getByRole('button', { name: 'Reject' }))
+
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Reject' }))
+
+      expect(mockBulkMutate).toHaveBeenCalledOnce()
+      const callbacks = mockBulkMutate.mock.calls[0][1] as {
+        onSuccess: (response: { total_success: number; total_failed: number; results: unknown[] }) => void
+      }
+      act(() => {
+        callbacks.onSuccess({ total_success: 1, total_failed: 0, results: [] })
+      })
+
+      expect(mockRefetch).toHaveBeenCalled()
+    })
+
+    it('enables bulk actions when user can decide on at least one project', async () => {
+      vi.mocked(useApprovalDecideProjects).mockReturnValue({
+        canDecideAllProjects: false,
+        canDecideProjectNames: new Set(['Default']),
+        canReadProjectNames: new Set(['Default']),
+        isLoading: false,
+        error: null,
+      })
+
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      const rowCheckbox = screen.getAllByRole('checkbox', { name: /select row/i })[0]
+      await user.click(rowCheckbox)
+
+      expect(screen.getByRole('button', { name: 'Approve' })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: 'Reject' })).not.toHaveAttribute('aria-disabled', 'true')
+    })
   })
 
   describe('Permission gating', () => {
