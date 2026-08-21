@@ -30,8 +30,8 @@ import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
@@ -313,7 +313,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
   if (groups.length === 0) {
     return (
       <>
-        <NxEmptyStateNoData
+        <SynEmptyStateNoData
           title="No groups"
           description="This user is not a member of any groups."
           buttonText="Add to group"
@@ -367,7 +367,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
 
         {filteredGroups.length === 0 ? (
           <SynPageBody isCentered>
-            <NxEmptyStateFilter
+            <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)

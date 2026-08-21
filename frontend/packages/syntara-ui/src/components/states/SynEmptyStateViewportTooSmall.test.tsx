@@ -5,17 +5,17 @@ import { axe } from 'vitest-axe'
 
 import { REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../../constants/viewport'
 
-import { NxEmptyStateViewportTooSmall } from './NxEmptyStateViewportTooSmall'
+import { SynEmptyStateViewportTooSmall } from './SynEmptyStateViewportTooSmall'
 
-describe('NxEmptyStateViewportTooSmall', () => {
+describe('SynEmptyStateViewportTooSmall', () => {
   it('has no accessibility violations', async () => {
-    const { container } = render(<NxEmptyStateViewportTooSmall onReturn={vi.fn()} />)
+    const { container } = render(<SynEmptyStateViewportTooSmall onReturn={vi.fn()} />)
 
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('renders copy from viewport constants', () => {
-    render(<NxEmptyStateViewportTooSmall onReturn={vi.fn()} />)
+    render(<SynEmptyStateViewportTooSmall onReturn={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.title })).toBeInTheDocument()
     expect(screen.getByText(REACT_FLOW_VIEWPORT_EMPTY_STATE.body)).toBeInTheDocument()
@@ -25,7 +25,7 @@ describe('NxEmptyStateViewportTooSmall', () => {
     const user = userEvent.setup()
     const onReturn = vi.fn()
 
-    render(<NxEmptyStateViewportTooSmall onReturn={onReturn} />)
+    render(<SynEmptyStateViewportTooSmall onReturn={onReturn} />)
     await user.click(screen.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel }))
 
     expect(onReturn).toHaveBeenCalledOnce()

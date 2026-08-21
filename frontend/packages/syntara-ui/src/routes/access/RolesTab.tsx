@@ -10,7 +10,7 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { NxLabel } from '../../components/labels/NxLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -297,7 +297,7 @@ export function RolesTab() {
         isEmpty={roles.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<NxEmptyStateNoData title="No roles found" description="No roles are available." />}
+        noDataState={<SynEmptyStateNoData title="No roles found" description="No roles are available." />}
         toolbar={
           roles.length > 0 || hasActiveFilters ? (
             <NxListPanelToolbar

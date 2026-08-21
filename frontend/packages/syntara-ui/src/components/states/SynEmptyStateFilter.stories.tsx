@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxEmptyStateFilter } from './NxEmptyStateFilter'
 import { pageDecorator } from './storyDecorators'
+import { SynEmptyStateFilter } from './SynEmptyStateFilter'
 
-const meta: Meta<typeof NxEmptyStateFilter> = {
-  component: NxEmptyStateFilter,
+const meta: Meta<typeof SynEmptyStateFilter> = {
+  component: SynEmptyStateFilter,
   decorators: [pageDecorator],
   tags: ['autodocs'],
 }
