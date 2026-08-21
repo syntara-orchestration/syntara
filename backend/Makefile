@@ -793,39 +793,32 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 		echo "Installing oasdiff..."; \
 		./scripts/openapi/install-oasdiff.sh; \
 	fi
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
-			--base $(OPENAPI_BASE_REF) \
-			--head HEAD \
-			--format text \
-			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
-	else \
-		./scripts/openapi/check-breaking-changes.py \
-			--base $(OPENAPI_BASE_REF) \
-			--head HEAD \
-			--format text \
-			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
-	fi
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	CMD="./scripts/openapi/check-breaking-changes.py \
+		--base $(OPENAPI_BASE_REF) \
+		--head HEAD \
+		--format text \
+		--fallback-spec-path backend/src/syntara/schemas/openapi.yaml"; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
+		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
+	fi; \
+	eval $$CMD
 	@echo "Checking public OpenAPI spec for breaking changes..."
 	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
+	PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	CMD="./scripts/openapi/check-breaking-changes.py \
+		--base $(OPENAPI_BASE_REF) \
+		--head HEAD \
+		--format text \
+		--spec-path backend/src/syntara/schemas/openapi-public.yaml \
+		--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml"; \
 	if [ -n "$$PR_BODY_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
-			--base $(OPENAPI_BASE_REF) \
-			--head HEAD \
-			--format text \
-			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
-			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
-	else \
-		./scripts/openapi/check-breaking-changes.py \
-			--base $(OPENAPI_BASE_REF) \
-			--head HEAD \
-			--format text \
-			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
-			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml; \
-	fi
+		CMD="$$CMD --pr-body \"$$PR_BODY_TEXT\""; \
+	fi; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
+		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
+	fi; \
+	eval $$CMD
 	@echo "OpenAPI breaking changes check complete"
 
 .PHONY: check-openapi-breaking-pre-commit
@@ -836,7 +829,7 @@ check-openapi-breaking-pre-commit: ## Pre-commit: breaking changes when openapi.
 	elif git rev-parse --verify origin/$(OPENAPI_BASE_REF) >/dev/null 2>&1; then \
 		BASE_REF="origin/$(OPENAPI_BASE_REF)"; \
 	fi; \
-	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) 2>/dev/null; then \
+	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) 2>/dev/null; then \
 		echo "OpenAPI spec unchanged vs $$BASE_REF, skipping breaking changes check"; \
 		exit 0; \
 	fi; \

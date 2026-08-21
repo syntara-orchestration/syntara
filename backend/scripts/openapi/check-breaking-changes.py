@@ -4,10 +4,21 @@
 This script compares two OpenAPI specs and detects breaking changes,
 returning structured JSON output for consumption by CI or local tooling.
 
+The gate enforces two rules:
+
+  1. Every OpenAPI spec change MUST bump ``info.version`` (major/minor/patch).
+     The bump is how the engineer signals their interpretation of the change to
+     reviewers and how API consumers become aware of spec updates.
+  2. Breaking changes are never allowed in place. A breaking change is only
+     permitted when the privileged ``breaking-change-approved`` label is present
+     (a formal override restricted to engineering leadership). Otherwise it is
+     blocked, full stop. A genuinely new major version is a new spec served from
+     a separate URL path, so it would not register as a breaking change here.
+
 Usage:
     ./check-breaking-changes.py --base devel --head HEAD
     ./check-breaking-changes.py --base-spec baseline.yaml --head-spec current.yaml
-    ./check-breaking-changes.py --pr-body "$(cat pr_description.txt)"
+    ./check-breaking-changes.py --base devel --head HEAD --pr-labels "breaking-change-approved"
 
 Returns:
     JSON with structure:
@@ -15,27 +26,48 @@ Returns:
         "has_breaking_changes": bool,
         "breaking_changes": str,
         "all_changes": str,
-        "acknowledged": bool,
-        "justification": str,
-        "ack_insufficient": bool
+        "has_changes": bool,
+        "version_bumped": bool,
+        "base_version": str,
+        "head_version": str,
+        "version_bump_type": str | null,
+        "breaking_approved": bool,
+        "spec_path": str,
+        "gate_code": str
     }
 
 Exit codes:
-    0 - No breaking changes OR breaking changes acknowledged
-    1 - Breaking changes detected and not acknowledged
+    0 - Change is allowed (no changes, non-breaking change with a version bump,
+        or an approved breaking change with a version bump)
+    1 - Change is blocked (breaking without approval, or any spec change with no
+        version bump)
     2 - Error running oasdiff or processing specs
 """
+
+from __future__ import annotations
 
 import argparse
 import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 
 DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
+# Privileged override label for breaking changes. Restricted to engineering
+# leadership at the repo level; CI only checks for its presence.
+BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
+
+
+@dataclass(frozen=True)
+class GateDecision:
+    """Result of applying the OpenAPI versioning gate."""
+
+    allowed: bool
+    code: str
+    message: str
 
 
 def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
@@ -53,7 +85,7 @@ def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.Compl
         sys.exit(2)
 
 
-def get_spec_from_git(ref: str, spec_path: str) -> Optional[str]:
+def get_spec_from_git(ref: str, spec_path: str) -> str | None:
     """Get OpenAPI spec content from a git reference.
 
     Returns None if the path does not exist on the given ref (e.g. file was
@@ -70,7 +102,51 @@ def get_spec_from_git(ref: str, spec_path: str) -> Optional[str]:
     return result.stdout
 
 
-def check_breaking_changes(base_spec: str, head_spec: str) -> Tuple[bool, str]:
+def extract_info_version(content: str) -> str | None:
+    """Extract info.version from OpenAPI spec YAML content."""
+    in_info = False
+    for line in content.split("\n"):
+        if line.startswith("info:"):
+            in_info = True
+            continue
+        if in_info:
+            if line and not line[0].isspace():
+                break
+            stripped = line.strip()
+            if stripped.startswith("version:"):
+                return stripped.split(":", 1)[1].strip().strip("\"'")
+    return None
+
+
+def parse_semver(version: str) -> tuple[int, int, int] | None:
+    """Parse a semver string into (major, minor, patch). Returns None on failure."""
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)", version)
+    if not match:
+        return None
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+def get_version_bump_type(base_version: str, head_version: str) -> str | None:
+    """Determine the version bump type between base and head.
+
+    Returns "major", "minor", "patch", or None (no bump / downgrade / unparseable).
+    """
+    base = parse_semver(base_version)
+    head = parse_semver(head_version)
+    if base is None or head is None:
+        return None
+    if head[0] > base[0]:
+        return "major"
+    if head == base:
+        return None
+    if head[1] > base[1] and head[0] == base[0]:
+        return "minor"
+    if head[2] > base[2] and head[0] == base[0] and head[1] == base[1]:
+        return "patch"
+    return None
+
+
+def check_breaking_changes(base_spec: str, head_spec: str) -> tuple[bool, str]:
     """Run oasdiff breaking changes check.
 
     Args:
@@ -130,48 +206,110 @@ def get_all_changes(base_spec: str, head_spec: str) -> str:
     return (result.stdout + result.stderr).strip()
 
 
-def check_acknowledgment(pr_body: str) -> Dict[str, any]:
-    """Check if breaking changes are acknowledged in PR body.
+def check_approval_label(pr_labels: str) -> bool:
+    """Check if the breaking-change approval label is present on the PR.
 
     Args:
-        pr_body: PR description text
+        pr_labels: Comma-separated list of PR label names
 
     Returns:
-        Dict with keys: acknowledged, justification, ack_insufficient
+        True if the ``breaking-change-approved`` label is present
     """
-    if not pr_body:
-        return {
-            "acknowledged": False,
-            "justification": "",
-            "ack_insufficient": False,
-        }
+    if not pr_labels:
+        return False
+    labels = [label.strip().lower() for label in pr_labels.split(",")]
+    return BREAKING_CHANGE_APPROVED_LABEL.lower() in labels
 
-    # Pattern: breaking-change-ack: <justification>
-    ack_pattern = re.compile(r"breaking-change-ack\s*:\s*(.+)", re.IGNORECASE)
-    match = ack_pattern.search(pr_body)
 
-    if not match:
-        return {
-            "acknowledged": False,
-            "justification": "",
-            "ack_insufficient": False,
-        }
+def spec_has_changes(
+    base_content: str,
+    head_content: str,
+    *,
+    has_breaking: bool,
+    all_changes: str,
+) -> bool:
+    """True if the spec changed, including edits oasdiff does not report.
 
-    justification = match.group(1).strip()
+    File content is the source of truth so whitespace, description, and other
+    metadata edits still require an info.version bump. Changelog/breaking
+    output is a fallback when the files cannot be compared.
+    """
+    if has_breaking:
+        return True
+    if (base_content or "") != (head_content or ""):
+        return True
+    text = (all_changes or "").strip()
+    return bool(text) and not re.match(r"^no changes\b", text, re.IGNORECASE)
 
-    # Validate justification is substantial (minimum 20 chars)
-    if len(justification) < 20:
-        return {
-            "acknowledged": False,
-            "justification": justification,
-            "ack_insufficient": True,
-        }
 
-    return {
-        "acknowledged": True,
-        "justification": justification,
-        "ack_insufficient": False,
-    }
+def evaluate_gate(
+    *,
+    has_breaking: bool,
+    has_changes: bool,
+    version_bumped: bool,
+    breaking_approved: bool,
+) -> GateDecision:
+    """Apply the OpenAPI versioning gate. Returns whether the PR is allowed.
+
+    Rules:
+      * No spec changes -> allowed.
+      * Breaking changes without the approval label -> blocked, full stop.
+      * Any spec change without an info.version bump -> blocked.
+      * Approved breaking change (with bump) or non-breaking change (with bump)
+        -> allowed.
+    """
+    if not has_breaking and not has_changes:
+        return GateDecision(
+            allowed=True,
+            code="ok",
+            message="No OpenAPI spec changes detected",
+        )
+
+    if has_breaking and not breaking_approved:
+        return GateDecision(
+            allowed=False,
+            code="breaking_blocked",
+            message=(
+                "BLOCKED: This PR introduces breaking changes to the current API version. "
+                "Breaking changes are never allowed in place.\n"
+                "  - A new major version must be a new spec served from a separate URL path "
+                "(it would not register as a breaking change here).\n"
+                f"  - For an approved emergency override, request the '{BREAKING_CHANGE_APPROVED_LABEL}' "
+                "label from engineering leadership."
+            ),
+        )
+
+    if not version_bumped:
+        return GateDecision(
+            allowed=False,
+            code="version_bump_required",
+            message=(
+                "BLOCKED: The OpenAPI spec changed but info.version was not bumped. "
+                "Every spec change must bump info.version (major/minor/patch) to signal "
+                "the change to reviewers and API consumers."
+            ),
+        )
+
+    if has_breaking:
+        return GateDecision(
+            allowed=True,
+            code="breaking_approved",
+            message=(
+                f"ALLOWED: Breaking change permitted via the '{BREAKING_CHANGE_APPROVED_LABEL}' "
+                "label (privileged override)."
+            ),
+        )
+
+    return GateDecision(
+        allowed=True,
+        code="ok",
+        message="Non-breaking spec change with a version bump",
+    )
+
+
+def read_spec_content(spec_path: str) -> str:
+    """Read spec content from a file path."""
+    return Path(spec_path).read_text()
 
 
 def main():
@@ -208,10 +346,10 @@ def main():
         default=None,
     )
 
-    # PR body for acknowledgment check
+    # PR labels for the breaking-change approval override
     parser.add_argument(
-        "--pr-body",
-        help="PR description text to check for acknowledgment",
+        "--pr-labels",
+        help="Comma-separated list of PR label names",
         default="",
     )
 
@@ -230,19 +368,23 @@ def main():
 
     args = parser.parse_args()
 
+    # Track spec content for version extraction
+    base_spec_content = None
+    head_spec_content = None
+
     # Determine base spec source
     if args.base_spec:
         base_spec_path = args.base_spec
+        base_spec_content = read_spec_content(base_spec_path)
     elif args.base:
-        spec_content = get_spec_from_git(args.base, args.spec_path)
-        if spec_content is None and args.fallback_spec_path:
+        base_spec_content = get_spec_from_git(args.base, args.spec_path)
+        if base_spec_content is None and args.fallback_spec_path:
             print(
-                f"Spec not found at '{args.spec_path}' on '{args.base}'; "
-                f"trying fallback '{args.fallback_spec_path}'",
+                f"Spec not found at '{args.spec_path}' on '{args.base}'; trying fallback '{args.fallback_spec_path}'",
                 file=sys.stderr,
             )
-            spec_content = get_spec_from_git(args.base, args.fallback_spec_path)
-        if spec_content is None:
+            base_spec_content = get_spec_from_git(args.base, args.fallback_spec_path)
+        if base_spec_content is None:
             print(
                 f"Spec path not found on base ref '{args.base}' (file is new or renamed). "
                 f"Skipping breaking changes check.",
@@ -252,7 +394,7 @@ def main():
         import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(spec_content)
+            f.write(base_spec_content)
             base_spec_path = f.name
     else:
         print("ERROR: Must specify --base or --base-spec", file=sys.stderr)
@@ -262,14 +404,21 @@ def main():
     # Determine head spec source
     if args.head:
         # Get spec from git reference - write to temp file
-        spec_content = get_spec_from_git(args.head, args.spec_path)
+        head_spec_content = get_spec_from_git(args.head, args.spec_path)
         import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(spec_content)
+            f.write(head_spec_content)
             head_spec_path = f.name
     else:
         head_spec_path = args.head_spec
+        head_spec_content = read_spec_content(head_spec_path)
+
+    # Extract versions
+    base_version = extract_info_version(base_spec_content) if base_spec_content else ""
+    head_version = extract_info_version(head_spec_content) if head_spec_content else ""
+    version_bump_type = get_version_bump_type(base_version, head_version) if base_version and head_version else None
+    version_bumped = version_bump_type is not None
 
     # Check for breaking changes
     has_breaking, breaking_output = check_breaking_changes(base_spec_path, head_spec_path)
@@ -277,43 +426,52 @@ def main():
     # Get all changes
     all_changes = get_all_changes(base_spec_path, head_spec_path)
 
-    # Check acknowledgment
-    ack_result = check_acknowledgment(args.pr_body)
+    has_changes = spec_has_changes(
+        base_spec_content or "",
+        head_spec_content or "",
+        has_breaking=has_breaking,
+        all_changes=all_changes,
+    )
+
+    # Check the breaking-change approval label
+    breaking_approved = check_approval_label(args.pr_labels)
+
+    decision = evaluate_gate(
+        has_breaking=has_breaking,
+        has_changes=has_changes,
+        version_bumped=version_bumped,
+        breaking_approved=breaking_approved,
+    )
 
     # Build result
     result = {
         "has_breaking_changes": has_breaking,
         "breaking_changes": breaking_output,
         "all_changes": all_changes,
-        **ack_result,
+        "has_changes": has_changes,
+        "version_bumped": version_bumped,
+        "base_version": base_version or "",
+        "head_version": head_version or "",
+        "version_bump_type": version_bump_type,
+        "breaking_approved": breaking_approved,
+        "spec_path": args.spec_path,
+        "gate_code": decision.code,
     }
 
     # Output
     if args.format == "json":
         output_text = json.dumps(result, indent=2)
     else:
-        # Text format
-        lines = []
-        if has_breaking:
-            lines.append("BREAKING CHANGES DETECTED")
-            lines.append("=" * 50)
-            lines.append(breaking_output)
-            lines.append("")
-            if ack_result["acknowledged"]:
-                lines.append(f"Acknowledged: {ack_result['justification']}")
-            elif ack_result["ack_insufficient"]:
-                lines.append(f"Insufficient acknowledgment: {ack_result['justification']}")
-            else:
-                lines.append("NOT ACKNOWLEDGED - Add 'breaking-change-ack: <justification>' to PR")
-        else:
-            lines.append("No breaking changes detected")
-
-        if all_changes and all_changes != breaking_output:
-            lines.append("")
-            lines.append("All changes:")
-            lines.append("-" * 50)
-            lines.append(all_changes)
-
+        lines = _format_text_output(
+            has_breaking=has_breaking,
+            breaking_output=breaking_output,
+            all_changes=all_changes,
+            decision=decision,
+            base_version=base_version,
+            head_version=head_version,
+            version_bump_type=version_bump_type,
+            spec_path=args.spec_path,
+        )
         output_text = "\n".join(lines)
 
     # Write output
@@ -322,11 +480,45 @@ def main():
     else:
         print(output_text)
 
-    # Exit with appropriate code
-    if has_breaking and not ack_result["acknowledged"]:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    sys.exit(0 if decision.allowed else 1)
+
+
+def _format_text_output(
+    *,
+    has_breaking: bool,
+    breaking_output: str,
+    all_changes: str,
+    decision: GateDecision,
+    base_version: str,
+    head_version: str,
+    version_bump_type: str | None,
+    spec_path: str,
+) -> list[str]:
+    """Format results as human-readable text lines."""
+    lines = []
+
+    # Version info header — always include spec path and versions for CI errors
+    lines.append(f"Spec: {spec_path}")
+    lines.append(f"Version: {base_version or 'unknown'} -> {head_version or 'unknown'}")
+    if version_bump_type:
+        lines.append(f"Bump type: {version_bump_type}")
+    lines.append("")
+
+    if has_breaking:
+        lines.append("BREAKING CHANGES DETECTED")
+        lines.append("=" * 50)
+        lines.append(breaking_output)
+        lines.append("")
+
+    lines.append(decision.message)
+
+    if all_changes and all_changes != breaking_output:
+        lines.append("")
+        lines.append("All changes:")
+        lines.append("-" * 50)
+        lines.append(all_changes)
+
+    return lines
 
 
 if __name__ == "__main__":

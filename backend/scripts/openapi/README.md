@@ -24,6 +24,10 @@ Installs the `oasdiff` tool with checksum verification to prevent supply chain a
 #### `check-breaking-changes.py`
 Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resolves the spec path relative to the git root, so it works from any subdirectory (e.g., `backend/` in the monorepo).
 
+The gate enforces two rules:
+1. **Every spec change must bump `info.version`** (major/minor/patch). A spec change with no bump is blocked. CI does not enforce a specific bump type — it is the engineer's signal to reviewers and consumers.
+2. **Breaking changes are blocked in place** — full stop. The only override is the privileged `breaking-change-approved` label (restricted to engineering leadership). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still bump `info.version`.
+
 ```bash
 # Compare current branch against devel
 ./check-breaking-changes.py --base devel --head HEAD
@@ -31,16 +35,17 @@ Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resol
 # Compare specific spec files
 ./check-breaking-changes.py --base-spec old.yaml --head-spec new.yaml
 
-# Include PR body for acknowledgment check
-./check-breaking-changes.py --base devel --head HEAD --pr-body "$(cat pr_description.txt)"
+# Include PR labels for the breaking-change approval override
+./check-breaking-changes.py --base devel --head HEAD \
+  --pr-labels "breaking-change-approved,bug"
 
 # Output as text instead of JSON
 ./check-breaking-changes.py --base devel --head HEAD --format text
 ```
 
 **Exit Codes:**
-- `0` - No breaking changes OR breaking changes acknowledged
-- `1` - Breaking changes detected and not acknowledged
+- `0` - Allowed: no changes, non-breaking change with a version bump, or approved breaking change with a version bump
+- `1` - Blocked: breaking change without approval, or any spec change with no version bump
 - `2` - Error running oasdiff or processing specs
 
 **Output (JSON):**
@@ -49,9 +54,14 @@ Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resol
   "has_breaking_changes": bool,
   "breaking_changes": "oasdiff output...",
   "all_changes": "full changelog...",
-  "acknowledged": bool,
-  "justification": "justification text",
-  "ack_insufficient": bool
+  "has_changes": bool,
+  "version_bumped": bool,
+  "base_version": "1.0.0",
+  "head_version": "1.0.0",
+  "version_bump_type": "major" | "minor" | "patch" | null,
+  "breaking_approved": bool,
+  "spec_path": "backend/src/syntara/schemas/openapi.yaml",
+  "gate_code": "ok" | "breaking_approved" | "breaking_blocked" | "version_bump_required"
 }
 ```
 
@@ -187,22 +197,25 @@ make check-openapi-contracts
 ### 4. Test Full Workflow Locally
 
 ```bash
-# 1. Check for breaking changes with PR body
-PR_BODY="breaking-change-ack: This change is necessary for the new feature"
-
+# 1. Check for breaking changes (blocks on breaking changes or a missing version bump)
 ./scripts/openapi/check-breaking-changes.py \
   --base devel \
   --head HEAD \
-  --pr-body "$PR_BODY" \
   --output /tmp/breaking-results.json
 
-# 2. Check contract regeneration
+# 2. If a breaking change is unavoidable (requires the privileged label in CI):
+./scripts/openapi/check-breaking-changes.py \
+  --base devel \
+  --head HEAD \
+  --pr-labels "breaking-change-approved" \
+  --output /tmp/breaking-results.json
+
+# 3. Check contract regeneration
 ./scripts/openapi/check-contract-regeneration.py \
   --changed-files-from devel \
-  --pr-body "$PR_BODY" \
   --output /tmp/contract-regeneration-results.json
 
-# 3. View results
+# 4. View results
 cat /tmp/breaking-results.json | jq
 cat /tmp/contract-regeneration-results.json | jq
 ```
@@ -242,7 +255,7 @@ These scripts are used by the monorepo CI workflow (`.github/workflows/ci-backen
 
 The CI `pre-commit` job:
 1. Fetches `devel` for OpenAPI baseline comparison
-2. Passes `OPENAPI_PR_BODY` from the pull request for breaking-change acknowledgment
+2. Passes `OPENAPI_PR_LABELS` so the `breaking-change-approved` override can succeed on the required backend check
 
 The `openapi-breaking-changes` job:
 1. Detects changes to `backend/src/syntara/schemas/openapi.yaml`
