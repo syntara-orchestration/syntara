@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
-import { NxPageBreadcrumbsCollapsedMiddle } from './NxPageBreadcrumbsCollapsedMiddle'
+import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
 
 export type { AppBreadcrumbItem }
 
@@ -44,13 +44,13 @@ function useNarrowViewportForBreadcrumb() {
   return useSyncExternalStore(subscribeNarrowMedia, getNarrowMediaSnapshot, getNarrowMediaServerSnapshot)
 }
 
-type NxPageBreadcrumbsProps = Readonly<{
+type SynPageBreadcrumbsProps = Readonly<{
   /** Ordered breadcrumb segments. Requires at least two items to render. */
   items: readonly AppBreadcrumbItem[]
 }>
 
 /** Breadcrumb trail where parent items are links and the last item is the current page. On narrow viewports, two or more middle segments collapse into a dropdown. */
-export function NxPageBreadcrumbs(props: NxPageBreadcrumbsProps) {
+export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
   const { items } = props
   const isNarrow = useNarrowViewportForBreadcrumb()
 
@@ -73,7 +73,7 @@ export function NxPageBreadcrumbs(props: NxPageBreadcrumbsProps) {
           ) : (
             <BreadcrumbItem isActive>{first.label}</BreadcrumbItem>
           )}
-          <NxPageBreadcrumbsCollapsedMiddle middleItems={middle} />
+          <SynPageBreadcrumbsCollapsedMiddle middleItems={middle} />
           <BreadcrumbItem isActive>{last.label}</BreadcrumbItem>
         </>
       ) : (

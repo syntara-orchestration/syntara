@@ -21,12 +21,12 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
   return (
     <>
       {execution.status ? (
-        <FlexItem>
+        <FlexItem data-testid="execution-status-badge">
           <StatusLabel status={execution.status} />
         </FlexItem>
       ) : null}
       {execution.approval_pending ? (
-        <FlexItem>
+        <FlexItem data-testid="approval-status-badge">
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
         </FlexItem>
       ) : null}
@@ -79,12 +79,15 @@ export function ExecutionDetailHeaderToolbar({
           onReviewClick={onReviewClick}
         />
       )}
-      {isCancellable && <CancelExecutionButton executionId={executionId} />}
+      {isCancellable && execution && (
+        <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
+      )}
       {isRetryable && execution && (
         <RetryExecutionButton
           executionId={executionId}
           workflowId={execution.workflow_id}
           workflowVersionId={execution.workflow_version_id}
+          projectId={execution.project_id}
         />
       )}
       <Button variant="secondary" onClick={onCopyToEditor}>

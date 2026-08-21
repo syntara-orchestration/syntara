@@ -204,7 +204,7 @@ export type IdentityProvidersHeaderToolbarState = {
 }
 
 type IdentityProvidersTabProps = {
-  /** Lift create actions into Authentication's NxPageHeader (Credentials list pattern). */
+  /** Lift create actions into Authentication's SynPageHeader (Credentials list pattern). */
   onHeaderToolbarStateChange?: (state: IdentityProvidersHeaderToolbarState | null) => void
 }
 

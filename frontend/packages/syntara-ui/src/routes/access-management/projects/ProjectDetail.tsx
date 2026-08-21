@@ -25,12 +25,12 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -210,9 +210,9 @@ export function ProjectDetail() {
   const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTab)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[projectData.name, 'Projects']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[projectData.name, 'Projects']} />
+      <SynPageHeader
         title={projectData.name}
         docLink={projectsDocLink}
         breadcrumbs={projectCrumbs}
@@ -224,7 +224,7 @@ export function ProjectDetail() {
           />
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <NxListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
@@ -250,7 +250,7 @@ export function ProjectDetail() {
             <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
           )}
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <ProjectFormModal
         project={projectData}
@@ -287,6 +287,6 @@ export function ProjectDetail() {
           </StackItem>
         </Stack>
       </NxConfirmationDialog>
-    </NxPage>
+    </SynPage>
   )
 }

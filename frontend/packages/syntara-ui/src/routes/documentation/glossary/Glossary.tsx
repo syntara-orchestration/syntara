@@ -8,11 +8,11 @@ import {
 } from '@patternfly/react-core'
 import { useMemo } from 'react'
 
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useFuse } from '../../../hooks/useFuse'
 
 import { useGlossaryTerms } from './useGlossaryTerms'
@@ -28,9 +28,9 @@ export default function Glossary() {
   const { search, setSearch, items: results } = useFuse(memoizedTerms, GLOSSARY_SEARCH_KEYS)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Glossary']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Glossary']} />
+      <SynPageHeader
         title="Glossary"
         toolbar={
           <SearchInput
@@ -43,14 +43,14 @@ export default function Glossary() {
         }
       />
       {results.length === 0 ? (
-        <NxPageBody>
-          <NxPanel isFullHeight>
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxEmptyStateFilter clearAllFilters={() => setSearch('')} />
-          </NxPanel>
-        </NxPageBody>
+          </SynPanel>
+        </SynPageBody>
       ) : (
-        <NxPageBody>
-          <NxPanel isFullHeight isScrollable>
+        <SynPageBody>
+          <SynPanel isFullHeight isScrollable>
             <DescriptionList>
               {results.map((result) => (
                 <DescriptionListGroup key={result.term}>
@@ -63,9 +63,9 @@ export default function Glossary() {
                 </DescriptionListGroup>
               ))}
             </DescriptionList>
-          </NxPanel>
-        </NxPageBody>
+          </SynPanel>
+        </SynPageBody>
       )}
-    </NxPage>
+    </SynPage>
   )
 }

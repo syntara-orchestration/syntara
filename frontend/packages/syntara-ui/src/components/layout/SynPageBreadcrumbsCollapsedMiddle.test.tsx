@@ -5,14 +5,14 @@ import { axe } from 'vitest-axe'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
-import { NxPageBreadcrumbsCollapsedMiddle } from './NxPageBreadcrumbsCollapsedMiddle'
+import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
 
 const MIDDLE_ITEMS: readonly AppBreadcrumbItem[] = [
   { label: 'Mid A', href: '/a' },
   { label: 'Mid B', href: '/b' },
 ]
 
-describe('NxPageBreadcrumbsCollapsedMiddle', () => {
+describe('SynPageBreadcrumbsCollapsedMiddle', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'matchMedia',
@@ -31,13 +31,13 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
   })
 
   it('renders a toggle button with the item count', () => {
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
     expect(screen.getByRole('button', { name: 'Earlier pages, 2 levels' })).toBeInTheDocument()
   })
 
   it('opens the dropdown on toggle click and shows menu items', async () => {
     const user = userEvent.setup()
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
 
@@ -47,7 +47,7 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
 
   it('uses client-side navigation on regular menu item click', async () => {
     const user = userEvent.setup()
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
 
@@ -67,7 +67,7 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
 
   it('allows modifier-key clicks to use default browser behavior', async () => {
     const user = userEvent.setup()
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
 
@@ -89,7 +89,7 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
 
   it('closes the dropdown after clicking a menu item', async () => {
     const user = userEvent.setup()
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />)
 
     const toggle = screen.getByRole('button', { name: 'Earlier pages, 2 levels' })
     await user.click(toggle)
@@ -101,7 +101,7 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
   it('renders items without href as non-link menu entries', async () => {
     const user = userEvent.setup()
     const items: readonly AppBreadcrumbItem[] = [{ label: 'No link' }, { label: 'Has link', href: '/link' }]
-    render(<NxPageBreadcrumbsCollapsedMiddle middleItems={items} />)
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={items} />)
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
 
@@ -114,7 +114,7 @@ describe('NxPageBreadcrumbsCollapsedMiddle', () => {
     const user = userEvent.setup()
     const { container } = render(
       <Breadcrumb>
-        <NxPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />
+        <SynPageBreadcrumbsCollapsedMiddle middleItems={MIDDLE_ITEMS} />
       </Breadcrumb>
     )
 

@@ -28,8 +28,8 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
@@ -332,7 +332,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
 
   return (
     <>
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
             <FlexItem grow={{ default: 'grow' }}>
@@ -366,14 +366,14 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         </StackItem>
 
         {filteredGroups.length === 0 ? (
-          <NxPageBody isCentered>
+          <SynPageBody isCentered>
             <NxEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)
               }}
             />
-          </NxPageBody>
+          </SynPageBody>
         ) : (
           <NxScrollableTableContainer
             caption="User groups table"
@@ -429,7 +429,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
             </Tbody>
           </NxScrollableTableContainer>
         )}
-      </NxPanelContentStack>
+      </SynPanelContentStack>
 
       <AddToGroupModal
         userId={userId}

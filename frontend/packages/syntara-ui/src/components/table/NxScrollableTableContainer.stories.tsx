@@ -15,8 +15,8 @@ import { Fragment, useState } from 'react'
 
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { FilterBar } from '../filters/FilterBar'
-import { NxPanel } from '../layout/NxPanel'
-import { NxPanelContentStack } from '../layout/NxPanelContentStack'
+import { SynPanel } from '../layout/SynPanel'
+import { SynPanelContentStack } from '../layout/SynPanelContentStack'
 
 import { NxScrollableTableContainer } from './NxScrollableTableContainer'
 
@@ -81,24 +81,24 @@ const STORY_FILTER_FIELDS = [
 
 /**
  * Mirrors the real app shell that every list page uses:
- *   NxPanel isFullHeight
- *     NxPanelContentStack variant="inset"
+ *   SynPanel isFullHeight
+ *     SynPanelContentStack variant="inset"
  *       StackItem → FilterBar  (static, non-functional)
  *       NxScrollableTableContainer   ← Story renders here
  *
- * The height-constrained outer div simulates NxPageBody giving the panel a
+ * The height-constrained outer div simulates SynPageBody giving the panel a
  * bounded height so the table can scroll internally.
  */
 const panelDecorator: Decorator = (Story) => (
   <div style={{ height: '500px', display: 'flex', flexDirection: 'column' }}>
-    <NxPanel isFullHeight>
-      <NxPanelContentStack variant="inset">
+    <SynPanel isFullHeight>
+      <SynPanelContentStack variant="inset">
         <StackItem>
           <FilterBar fieldDefinitions={STORY_FILTER_FIELDS} filters={[]} onFilterChange={() => {}} showClearAll />
         </StackItem>
         <Story />
-      </NxPanelContentStack>
-    </NxPanel>
+      </SynPanelContentStack>
+    </SynPanel>
   </div>
 )
 
@@ -112,7 +112,7 @@ const meta: Meta<typeof NxScrollableTableContainer> = {
         component:
           'Scrollable table container with sticky headers and optional pagination.\n\n' +
           '**Layout contract:** The root element is a `StackItem isFilled` — it must be a **direct child** ' +
-          'of a `Stack` (typically `NxPanelContentStack`). Wrapping it in another `StackItem` breaks ' +
+          'of a `Stack` (typically `SynPanelContentStack`). Wrapping it in another `StackItem` breaks ' +
           'flex layout and the table will not fill the panel height.\n\n' +
           '**Props:**\n' +
           '- `isExpandable` — set when using expandable rows so PatternFly can size columns correctly ' +

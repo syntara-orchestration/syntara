@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
@@ -136,7 +136,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <NxListPanelView
         isPending={query.isPending}
         error={query.error}
@@ -175,6 +175,6 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
           </NxListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

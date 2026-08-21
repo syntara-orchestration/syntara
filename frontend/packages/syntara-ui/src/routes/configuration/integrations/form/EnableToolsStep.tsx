@@ -22,7 +22,7 @@ import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 
@@ -130,7 +130,7 @@ function EnableToolsStep({
   }
 
   return (
-    <NxPanelContentStack className={styles.stepContainerMinWidth}>
+    <SynPanelContentStack className={styles.stepContainerMinWidth}>
       <StackItem>
         <Toolbar>
           <ToolbarContent>
@@ -185,7 +185,7 @@ function EnableToolsStep({
           ))}
         </Tbody>
       </NxScrollableTableContainer>
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 

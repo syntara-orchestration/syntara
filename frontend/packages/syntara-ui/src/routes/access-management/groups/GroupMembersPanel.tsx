@@ -8,8 +8,8 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
@@ -164,7 +164,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
 
   return (
     <>
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
             <FlexItem grow={{ default: 'grow' }}>
@@ -201,14 +201,14 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         </StackItem>
 
         {filteredMembers.length === 0 ? (
-          <NxPageBody isCentered>
+          <SynPageBody isCentered>
             <NxEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)
               }}
             />
-          </NxPageBody>
+          </SynPageBody>
         ) : (
           <NxScrollableTableContainer
             caption="Group members table"
@@ -268,7 +268,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
             </Tbody>
           </NxScrollableTableContainer>
         )}
-      </NxPanelContentStack>
+      </SynPanelContentStack>
 
       <AddMemberModal
         groupId={groupId}

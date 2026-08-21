@@ -116,7 +116,7 @@ Check whether the changes follow:
 | Manual `Promise.all` + cancellation for parallel fetches       | #25 -- use `useQueries` from TanStack Query                                                               |
 | `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #26 -- track deferred work in an issue, not code comments                                                 |
 | Hardcoded documentation URLs                                   | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`           |
-| `NxPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
+| `SynPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
 | Hardcoded colors in CSS modules                                | ESLint can't catch these; review CSS module files manually                                                |
 | `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
 | `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
@@ -97,7 +97,7 @@ function ThreePanelLayout({
   onClosePanel,
 }: Readonly<ThreePanelLayoutProps>) {
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -168,7 +168,7 @@ function ThreePanelLayout({
           )}
         </FlexItem>
       </Flex>
-    </NxPanel>
+    </SynPanel>
   )
 }
 
@@ -231,7 +231,7 @@ function SinglePanelLayout({
     [execution.error_details, nameMap]
   )
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -290,7 +290,7 @@ function SinglePanelLayout({
           />
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }
 

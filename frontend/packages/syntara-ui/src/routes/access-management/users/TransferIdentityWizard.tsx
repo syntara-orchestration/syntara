@@ -22,13 +22,13 @@ import { useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { usersClient } from '../../../client'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { DocLinkButton, NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { NxLink } from '../../../components/NxLink'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxLoadingState } from '../../../components/states/NxLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -225,9 +225,9 @@ export function TransferIdentityWizard() {
   const selectedUserDisplayName = selectedUser ? userDisplayName(selectedUser) || selectedUser.username : ''
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[`Transfer identity to ${targetUsername}`, 'Users']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[`Transfer identity to ${targetUsername}`, 'Users']} />
+      <SynPageHeader
         title={`Transfer identity to ${targetUsername}`}
         titleSlot={
           <Stack>
@@ -249,8 +249,8 @@ export function TransferIdentityWizard() {
           </Stack>
         }
       />
-      <NxPageBody>
-        <NxPanel isFullHeight hasNoPadding>
+      <SynPageBody>
+        <SynPanel isFullHeight hasNoPadding>
           <Wizard onClose={navigateBack} onStepChange={handleStepChange} isVisitRequired height="100%">
             <WizardStep
               name="Select a user"
@@ -296,8 +296,8 @@ export function TransferIdentityWizard() {
                 ))}
             </WizardStep>
           </Wizard>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

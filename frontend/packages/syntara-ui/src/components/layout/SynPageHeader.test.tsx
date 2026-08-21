@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxPageHeader } from './NxPageHeader'
+import { SynPageHeader } from './SynPageHeader'
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -21,22 +21,22 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('NxPageHeader', () => {
+describe('SynPageHeader', () => {
   it('renders string title as heading', () => {
-    render(<NxPageHeader title="Test Title" />)
+    render(<SynPageHeader title="Test Title" />)
 
     expect(screen.getByRole('heading', { name: 'Test Title' })).toBeInTheDocument()
   })
 
   it('renders without toolbar when toolbar is omitted', () => {
-    render(<NxPageHeader title="No Toolbar" />)
+    render(<SynPageHeader title="No Toolbar" />)
 
     expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
   })
 
   it('renders toolbar actions', () => {
     render(
-      <NxPageHeader
+      <SynPageHeader
         title="With Actions"
         toolbar={
           <>
@@ -52,14 +52,14 @@ describe('NxPageHeader', () => {
   })
 
   it('renders heading at h1 level', () => {
-    render(<NxPageHeader title="Main Heading" />)
+    render(<SynPageHeader title="Main Heading" />)
 
     const heading = screen.getByRole('heading', { level: 1 })
     expect(heading).toHaveTextContent('Main Heading')
   })
 
   it('does not render breadcrumbs when fewer than two items', () => {
-    render(<NxPageHeader title="Page" breadcrumbs={[{ label: 'Only' }]} />)
+    render(<SynPageHeader title="Page" breadcrumbs={[{ label: 'Only' }]} />)
 
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Page' })).toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('NxPageHeader', () => {
 
   it('renders breadcrumbs above the title when two or more items', () => {
     render(
-      <NxPageHeader
+      <SynPageHeader
         title="Create user"
         breadcrumbs={[
           { label: 'Access management', href: '/system-administration/access-management' },
@@ -86,7 +86,7 @@ describe('NxPageHeader', () => {
   })
 
   it('renders doc link button when docLink is provided', () => {
-    render(<NxPageHeader title="Workflows" docLink="https://docs.ansible.com/workflows" />)
+    render(<SynPageHeader title="Workflows" docLink="https://docs.ansible.com/workflows" />)
 
     const link = screen.getByRole('link', { name: /View documentation/i })
     expect(link).toHaveAttribute('href', 'https://docs.ansible.com/workflows')
@@ -94,14 +94,14 @@ describe('NxPageHeader', () => {
   })
 
   it('does not render doc link button when docLink is omitted', () => {
-    render(<NxPageHeader title="Workflows" />)
+    render(<SynPageHeader title="Workflows" />)
 
     expect(screen.queryByRole('link', { name: /View documentation/i })).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations with breadcrumbs', async () => {
     const { container } = render(
-      <NxPageHeader
+      <SynPageHeader
         title="Settings"
         breadcrumbs={[
           { label: 'Configuration', href: '/configuration/integrations' },

@@ -110,7 +110,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 
 ### Documentation Links
 
-- [ ] Pages with `NxPageHeader` pass `docLink={useDocLink('key')}` — no hardcoded doc URLs
+- [ ] Pages with `SynPageHeader` pass `docLink={useDocLink('key')}` — no hardcoded doc URLs
 - [ ] New pages have a corresponding entry in `src/utils/docs/docsUrls.json`
 
 ### PR Completeness

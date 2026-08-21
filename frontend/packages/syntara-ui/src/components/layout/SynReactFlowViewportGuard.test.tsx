@@ -6,18 +6,18 @@ import { AppRoute } from '../../app/AppRoute'
 import { REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../../constants/viewport'
 import { routerTestState } from '../../test/setup'
 
-import { NxReactFlowViewportGuard } from './NxReactFlowViewportGuard'
+import { SynReactFlowViewportGuard } from './SynReactFlowViewportGuard'
 
-describe('NxReactFlowViewportGuard', () => {
+describe('SynReactFlowViewportGuard', () => {
   beforeEach(() => {
     routerTestState.navigate.mockClear()
   })
 
   it('renders canvas content at supported viewport sizes', () => {
     render(
-      <NxReactFlowViewportGuard>
+      <SynReactFlowViewportGuard>
         <div>Workflow canvas</div>
-      </NxReactFlowViewportGuard>
+      </SynReactFlowViewportGuard>
     )
 
     expect(screen.getByText('Workflow canvas')).toBeInTheDocument()
@@ -37,9 +37,9 @@ describe('NxReactFlowViewportGuard', () => {
     const user = userEvent.setup()
 
     render(
-      <NxReactFlowViewportGuard>
+      <SynReactFlowViewportGuard>
         <div>Workflow canvas</div>
-      </NxReactFlowViewportGuard>
+      </SynReactFlowViewportGuard>
     )
 
     const returnButton = screen.getByRole('button', {
@@ -56,9 +56,9 @@ describe('NxReactFlowViewportGuard', () => {
     const customReturn = vi.fn()
 
     render(
-      <NxReactFlowViewportGuard onReturn={customReturn}>
+      <SynReactFlowViewportGuard onReturn={customReturn}>
         <div>Workflow canvas</div>
-      </NxReactFlowViewportGuard>
+      </SynReactFlowViewportGuard>
     )
 
     const returnButton = screen.getByRole('button', {
@@ -73,9 +73,9 @@ describe('NxReactFlowViewportGuard', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <NxReactFlowViewportGuard>
+      <SynReactFlowViewportGuard>
         <div>Workflow canvas</div>
-      </NxReactFlowViewportGuard>
+      </SynReactFlowViewportGuard>
     )
 
     expect(await axe(container)).toHaveNoViolations()

@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
@@ -151,7 +151,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <NxListPanelView
         isPending={query.isPending}
         error={query.error}
@@ -190,6 +190,6 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
           </NxListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

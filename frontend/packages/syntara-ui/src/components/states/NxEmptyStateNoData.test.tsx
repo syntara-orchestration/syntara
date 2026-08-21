@@ -106,12 +106,7 @@ describe('NxEmptyStateNoData', () => {
 
   it('renders secondary actions when addData and secondaryActions are provided', () => {
     const addData = vi.fn()
-    render(
-      <NxEmptyStateNoData
-        addData={addData}
-        secondaryActions={<Button variant="link">Learn more</Button>}
-      />
-    )
+    render(<NxEmptyStateNoData addData={addData} secondaryActions={<Button variant="link">Learn more</Button>} />)
 
     expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Learn more' })).toBeInTheDocument()

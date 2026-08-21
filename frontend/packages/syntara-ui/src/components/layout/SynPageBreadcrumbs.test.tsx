@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxPageBreadcrumbs } from './NxPageBreadcrumbs'
+import { SynPageBreadcrumbs } from './SynPageBreadcrumbs'
 
 function stubNarrowViewport() {
   vi.stubGlobal(
@@ -18,7 +18,7 @@ function stubNarrowViewport() {
   )
 }
 
-describe('NxPageBreadcrumbs', () => {
+describe('SynPageBreadcrumbs', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'matchMedia',
@@ -37,12 +37,12 @@ describe('NxPageBreadcrumbs', () => {
   })
 
   it('returns null when fewer than two items', () => {
-    render(<NxPageBreadcrumbs items={[{ label: 'Only' }]} />)
+    render(<SynPageBreadcrumbs items={[{ label: 'Only' }]} />)
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
   it('renders links and current page', () => {
-    render(<NxPageBreadcrumbs items={[{ label: 'Parent', href: '/parent' }, { label: 'Current' }]} />)
+    render(<SynPageBreadcrumbs items={[{ label: 'Parent', href: '/parent' }, { label: 'Current' }]} />)
 
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
     const parentLink = screen.getByRole('link', { name: 'Parent' })
@@ -52,7 +52,9 @@ describe('NxPageBreadcrumbs', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <NxPageBreadcrumbs items={[{ label: 'One', href: '/one' }, { label: 'Two', href: '/two' }, { label: 'Three' }]} />
+      <SynPageBreadcrumbs
+        items={[{ label: 'One', href: '/one' }, { label: 'Two', href: '/two' }, { label: 'Three' }]}
+      />
     )
 
     expect(await axe(container)).toHaveNoViolations()
@@ -62,7 +64,7 @@ describe('NxPageBreadcrumbs', () => {
     stubNarrowViewport()
 
     render(
-      <NxPageBreadcrumbs
+      <SynPageBreadcrumbs
         items={[
           { label: 'First', href: '/first' },
           { label: 'Mid A', href: '/a' },
@@ -83,7 +85,7 @@ describe('NxPageBreadcrumbs', () => {
     stubNarrowViewport()
 
     render(
-      <NxPageBreadcrumbs
+      <SynPageBreadcrumbs
         items={[
           { label: 'First', href: '/first' },
           { label: 'Mid A', href: '/a' },
@@ -114,7 +116,7 @@ describe('NxPageBreadcrumbs', () => {
     const longLabel = `Project ${'x'.repeat(400)}`
 
     render(
-      <NxPageBreadcrumbs items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]} />
+      <SynPageBreadcrumbs items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]} />
     )
 
     expect(screen.getByText(longLabel)).toBeInTheDocument()
@@ -122,7 +124,7 @@ describe('NxPageBreadcrumbs', () => {
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {
     render(
-      <NxPageBreadcrumbs items={[{ label: 'Home', href: '/home' }, { label: 'Unlinked step' }, { label: 'Done' }]} />
+      <SynPageBreadcrumbs items={[{ label: 'Home', href: '/home' }, { label: 'Unlinked step' }, { label: 'Done' }]} />
     )
 
     expect(screen.getByText('Unlinked step')).toBeInTheDocument()
@@ -133,7 +135,7 @@ describe('NxPageBreadcrumbs', () => {
     stubNarrowViewport()
 
     render(
-      <NxPageBreadcrumbs
+      <SynPageBreadcrumbs
         items={[
           { label: 'Section' },
           { label: 'Mid A', href: '/a' },
@@ -153,7 +155,7 @@ describe('NxPageBreadcrumbs', () => {
     stubNarrowViewport()
 
     render(
-      <NxPageBreadcrumbs
+      <SynPageBreadcrumbs
         items={[
           { label: 'First', href: '/first' },
           { label: 'Mid no href' },
@@ -176,7 +178,7 @@ describe('NxPageBreadcrumbs', () => {
     stubNarrowViewport()
 
     render(
-      <NxPageBreadcrumbs
+      <SynPageBreadcrumbs
         items={[
           { label: 'First', href: '/first' },
           { label: 'Mid A', href: '/a' },

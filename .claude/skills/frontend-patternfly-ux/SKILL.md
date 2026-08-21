@@ -62,7 +62,7 @@ How this UI is anchored, and how it relates to other design tooling:
   3. **Engage PatternFly.** If UX confirms the gap, UX coordinates with PatternFly on resolution — new component, variant, token, or an accepted override — often via a PatternFly GitHub issue or direct conversation.
   4. **Document and track.** If a temporary override is approved, create an issue with the label `patternfly-override` to track technical debt. Link the PatternFly issue if one exists.
   5. **Resolve upstream.** The aim is to remove the override by contributing back to PatternFly. Overrides without a resolution path should be periodically reviewed.
-- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `NxPage`, `NxPanel`, `NxConfirmationDialog`, `NxDetailList`) and live in `frontend/packages/syntara-ui/src/components/` organized by subdirectory: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. These wrap raw PatternFly primitives with project-specific defaults and behavior — use the `Nx*` wrapper, not the raw PF component, for these patterns.
+- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `SynPage`, `SynPanel`, `NxConfirmationDialog`, `NxDetailList`) and live in `frontend/packages/syntara-ui/src/components/` organized by subdirectory: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. These wrap raw PatternFly primitives with project-specific defaults and behavior — use the `Nx*` wrapper, not the raw PF component, for these patterns.
 - **What this is not** — The experience is **not** built on custom libraries. This product deliberately uses a PatternFly-first stack.
 
 ---
@@ -157,22 +157,22 @@ Every page **must** follow this structural hierarchy:
 | ------------------ | --------------------------- | ---------------------------------------- |
 | App Shell          | `Compass`                   | Overall application frame                |
 | Navigation         | `AppDockedNav`              | Left sidebar with icons                  |
-| Page Content       | `CompassContent` + `NxPage` | Main content area wrapper                |
-| Page Header        | `NxPageHeader`              | Page title and actions                   |
-| Content Frame      | `NxPanel`                   | `Panel` → `PanelMain` → `PanelMainBody`  |
-| Content Stack      | `NxPanelContentStack`       | Full-height flex column inside `NxPanel` |
+| Page Content       | `CompassContent` + `SynPage` | Main content area wrapper                |
+| Page Header        | `SynPageHeader`              | Page title and actions                   |
+| Content Frame      | `SynPanel`                   | `Panel` → `PanelMain` → `PanelMainBody`  |
+| Content Stack      | `SynPanelContentStack`       | Full-height flex column inside `SynPanel` |
 | Main Content       | Table / Canvas / Form       | Primary page content                     |
 | Footer (on tables) | `PaginationFooter`          | Navigation between table pages           |
 
-For **floating panels on the workflow canvas** under the glass theme, prefer `NxPanel` with `variant="raised"` for compact controls (opaque + shadow) or `opaqueFloatingFill` for large flat shells without raised chrome; see JSDoc on `frontend/packages/syntara-ui/src/components/layout/NxPanel.tsx`.
+For **floating panels on the workflow canvas** under the glass theme, prefer `SynPanel` with `variant="raised"` for compact controls (opaque + shadow) or `opaqueFloatingFill` for large flat shells without raised chrome; see JSDoc on `frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx`.
 
 ### Centered Layout for Loading / Empty States
 
-Use `NxPageBody` with `isCentered` for page-level centered layouts (loading spinners, empty states). For nested slots (e.g. `StackItem` + `isFilled`), use `flexCenteredBothAxes` from `src/app/flexCenteredBothAxes.ts`.
+Use `SynPageBody` with `isCentered` for page-level centered layouts (loading spinners, empty states). For nested slots (e.g. `StackItem` + `isFilled`), use `flexCenteredBothAxes` from `src/app/flexCenteredBothAxes.ts`.
 
 ### Panel Content Stack
 
-Use `NxPanelContentStack` (from `frontend/packages/syntara-ui/src/components/layout/NxPanelContentStack.tsx`) as the main content column inside `NxPanel isFullHeight`. It provides the correct flex behavior (`flex: 1`, `minHeight: 0`) so nested scroll areas resolve height correctly.
+Use `SynPanelContentStack` (from `frontend/packages/syntara-ui/src/components/layout/SynPanelContentStack.tsx`) as the main content column inside `SynPanel isFullHeight`. It provides the correct flex behavior (`flex: 1`, `minHeight: 0`) so nested scroll areas resolve height correctly.
 
 | Variant   | Use case                                                            |
 | --------- | ------------------------------------------------------------------- |
@@ -181,35 +181,35 @@ Use `NxPanelContentStack` (from `frontend/packages/syntara-ui/src/components/lay
 
 ### Page Layout Archetypes
 
-The following four compositions are the canonical page structures. Storybook documents each as a composed story under `NxPage`.
+The following four compositions are the canonical page structures. Storybook documents each as a composed story under `SynPage`.
 
 | Archetype          | Structure                                                                                                                        |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| **List page**      | `NxPageHeader` (Create CTA) → `NxPageBody` → `NxPanel isFullHeight` → `NxPanelContentStack variant="inset"` → filter bar + table |
-| **Detail page**    | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight` → `NxPanelContentStack` (default) → tabs + content                 |
-| **Form page**      | `NxPageBreadcrumbs` → `NxPageHeader` → `NxPanel isFullHeight footer={<ActionGroup>…</ActionGroup>}` → form body (max-width 600px) |
-| **Error in panel** | Same shell as list page → `NxPageBody isCentered` + `NxErrorState` **inside** `NxPanel` (page header and shell remain visible)   |
+| **List page**      | `SynPageHeader` (Create CTA) → `SynPageBody` → `SynPanel isFullHeight` → `SynPanelContentStack variant="inset"` → filter bar + table |
+| **Detail page**    | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight` → `SynPanelContentStack` (default) → tabs + content                 |
+| **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…</ActionGroup>}` → form body (max-width 600px) |
+| **Error in panel** | Same shell as list page → `SynPageBody isCentered` + `NxErrorState` **inside** `SynPanel` (page header and shell remain visible)   |
 
 ### Sticky Form Footer
 
-Form submit and cancel buttons live in a **pinned footer at the bottom of the content panel**, not in the page header toolbar. Use the `NxPanel` `footer` prop:
+Form submit and cancel buttons live in a **pinned footer at the bottom of the content panel**, not in the page header toolbar. Use the `SynPanel` `footer` prop:
 
 ```tsx
-<NxPanel isFullHeight footer={<ActionGroup>{/* Save + Cancel buttons */}</ActionGroup>}>
+<SynPanel isFullHeight footer={<ActionGroup>{/* Save + Cancel buttons */}</ActionGroup>}>
   {/* form body */}
-</NxPanel>
+</SynPanel>
 ```
 
-- When `NxPanel` is `isScrollable`, `PanelMain` scrolls while the footer stays pinned — no custom sticky CSS needed
+- When `SynPanel` is `isScrollable`, `PanelMain` scrolls while the footer stays pinned — no custom sticky CSS needed
 - Cancel button uses `variant="link"` (per UX design system)
-- `NxPanel.module.css` normalizes footer padding (`--spacer--md`), widens button spacing, and adds a visible divider border
+- `SynPanel.module.css` normalizes footer padding (`--spacer--md`), widens button spacing, and adds a visible divider border
 - **Applies to:** Create/Edit User, Configure Integration, Edit Group Mapping, Settings tabs, Integration Tools, Approval Detail
 - **Does NOT apply to:** Builder forms (use node editor panel footer), modals/dialogs (buttons inside modal footer)
 - **Does NOT apply to:** Check Access / Who Can forms — these are inline query forms inside a tab panel with no header buttons to move
 
 **`NxListPanel` — canonical list page implementation:**
 
-List pages should use the `NxListPanel` compound component API instead of manually assembling `NxPanelContentStack` + `useQueryState` + three-state branching:
+List pages should use the `NxListPanel` compound component API instead of manually assembling `SynPanelContentStack` + `useQueryState` + three-state branching:
 
 - **`NxListPanelView`** — handles loading/error/empty/filter states declaratively via props: `tabKey`, `isPending`, `isFetching`, `isEmpty`, `hasActiveFilters`, `noDataState`, `toolbar`, `children`
 - **`NxListPanelToolbar`** — wraps `FilterBar` + action buttons; automatically wraps content in `<fieldset disabled={isFetching}>` with a screen-reader legend during refetch
@@ -226,17 +226,17 @@ There are different kinds of page headers:
   - Right-aligned page actions
 
 - **Details page header**
-  - Left-aligned breadcrumbs (via `NxPageBreadcrumbs`) + page title
+  - Left-aligned breadcrumbs (via `SynPageBreadcrumbs`) + page title
   - Optional: resource type label badge alongside the resource name
   - Right-aligned toolbar actions ordered left to right: `Switch` toggle (if applicable) → Edit button (primary) → kebab menu with remaining actions
 
 - **Form page header**
-  - Left-aligned breadcrumbs (via `NxPageBreadcrumbs`) + page title
-  - No action buttons in the header — Save and Cancel live in the `NxPanel` sticky footer (see Sticky Form Footer above)
+  - Left-aligned breadcrumbs (via `SynPageBreadcrumbs`) + page title
+  - No action buttons in the header — Save and Cancel live in the `SynPanel` sticky footer (see Sticky Form Footer above)
 
 ### Breadcrumbs
 
-Use `NxPageBreadcrumbs` for detail and form page navigation.
+Use `SynPageBreadcrumbs` for detail and form page navigation.
 
 - Renders **nothing** when fewer than 2 items (single-level pages have no breadcrumb)
 - Last item is the current page (rendered as non-link text)
@@ -246,12 +246,12 @@ Use `NxPageBreadcrumbs` for detail and form page navigation.
 For live examples:
 
 ```
-list-all-documentation → find "NxPageBreadcrumbs" → get-documentation("NxPageBreadcrumbs")
+list-all-documentation → find "SynPageBreadcrumbs" → get-documentation("SynPageBreadcrumbs")
 ```
 
 ### Tabs
 
-When a page uses tabs, the tabs must live inside `NxPanel`, not outside it.
+When a page uses tabs, the tabs must live inside `SynPanel`, not outside it.
 
 - Tab labels should be clear, professional, and action-oriented
 - Use sentence case for tab labels (e.g. "Activity log", not "Activity Log")
@@ -270,8 +270,8 @@ When a page uses tabs, the tabs must live inside `NxPanel`, not outside it.
 For live examples and story-driven documentation, use the Storybook MCP:
 
 ```
-list-all-documentation → find "NxUrlTabs" / "NxPage" / "NxPageHeader" / "NxPanel" /
-"NxPageBreadcrumbs" / "NxConfirmationDialog" / "NxDetailList" / "NxCodeBlock" → get-documentation(...)
+list-all-documentation → find "NxUrlTabs" / "SynPage" / "SynPageHeader" / "SynPanel" /
+"SynPageBreadcrumbs" / "NxConfirmationDialog" / "NxDetailList" / "NxCodeBlock" → get-documentation(...)
 ```
 
 ---
@@ -370,7 +370,7 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - `title="Section Name"` + `titleElement="h3"` for each group
   - **Grouping logic:** General (identity/metadata) -> Connection (endpoints/secrets) -> Options (toggles/advanced)
   - Section-scoped actions belong inside their section (e.g., "Test connection" inside the Connection section, not the global footer)
-- **Scrollable form panels:** Full-page forms that may exceed viewport height need `NxPanel isFullHeight isScrollable`. Without `isScrollable`, bottom fields overflow outside the panel boundary. Constrain form width with `maxWidth: '600px'` inside a `Stack hasGutter`.
+- **Scrollable form panels:** Full-page forms that may exceed viewport height need `SynPanel isFullHeight isScrollable`. Without `isScrollable`, bottom fields overflow outside the panel boundary. Constrain form width with `maxWidth: '600px'` inside a `Stack hasGutter`.
 - **Validation errors must be visible in collapsible forms:** When a form uses collapsible sections (accordion, expandable panels), validation errors inside collapsed sections must either (a) auto-expand the section containing the error, or (b) show a summary indicator on the collapsed header (e.g., error count badge, danger styling). Users must never submit a form and see no feedback because errors are hidden inside a collapsed panel. Every invalid field must show an inline error message below it -- `validated="error"` styling alone (red border with no message) is insufficient.
 
 ### Typeahead Selector Patterns
@@ -418,7 +418,7 @@ For fields where users can select multiple items (e.g., group assignment on user
   - Default max height of 24rem with scroll; use `noMaxHeight` when inside a height-constrained parent
 - Use consistent formatting for dates and durations — follow PatternFly's [Date/Time guidelines](https://www.patternfly.org/ux-writing/numerics/#date-and-time-formats)
 - Header includes title and primary actions for the specific resource (pulled from the table row actions)
-- **Title:** Pass the resource name as a plain string to `NxPageHeader` / `title` — no decorative icons in h1
+- **Title:** Pass the resource name as a plain string to `SynPageHeader` / `title` — no decorative icons in h1
 - **Informational metadata as plain text:** Attributes like credential type, authentication method, or resource category are plain text — not `Label` badges. Use `Label` only when visual distinction or status communication is needed (see §11).
 - **Created / Modified columns in tables:** Use inline `UserTimestamp` mode — `username · date` on one line. Stacked mode is for detail views only.
 - **User name display:**
@@ -487,11 +487,11 @@ When building or reviewing any page, verify every item:
 
 ### Structure
 
-- [ ] Uses `NxPage` as outer wrapper
-- [ ] Uses `NxPageHeader` for title and actions
-- [ ] Uses `StackItem isFilled` + `NxPanel isFullHeight` for content
-- [ ] Uses `NxPanelContentStack` for the main content column inside `NxPanel`
-- [ ] Loading / empty states use `NxPageBody isCentered`
+- [ ] Uses `SynPage` as outer wrapper
+- [ ] Uses `SynPageHeader` for title and actions
+- [ ] Uses `StackItem isFilled` + `SynPanel isFullHeight` for content
+- [ ] Uses `SynPanelContentStack` for the main content column inside `SynPanel`
+- [ ] Loading / empty states use `SynPageBody isCentered`
 - [ ] Inner content has consistent padding
 
 ### Header
@@ -586,7 +586,7 @@ h2 step title
 - Changing selection on step 1 resets step 2 selections
 - `isVisitRequired` on wizard prevents skipping ahead
 
-**Layout:** `NxPage` → `NxPageHeader` → `NxPanel isFullHeight hasNoPadding` → `Wizard height="100%"`
+**Layout:** `SynPage` → `SynPageHeader` → `SynPanel isFullHeight hasNoPadding` → `Wizard height="100%"`
 
 **Terminology alignment:** Action verb must be consistent across button text, loading state, toast, and error message (e.g., "Transfer identity" → "Transferring..." → "Identity transferred" → "Failed to transfer identity").
 
@@ -639,7 +639,7 @@ Use when the edit experience is too complex for inline editing on a detail tab:
 
 - Detail tab stays **read-only** with an "Edit [resource]" button navigating to the edit route
 - Edit page at a dedicated route (e.g., `.../group-mapping/edit`)
-- Page shell: `NxPage` → `NxPageHeader` with breadcrumbs + toolbar (Save primary + Cancel link)
+- Page shell: `SynPage` → `SynPageHeader` with breadcrumbs + toolbar (Save primary + Cancel link)
 - Permission check: `useCanI('update', 'resource')` → `EmptyStateAccessDenied` if denied
 - Query params for entry mode variants: `?discover=1`, `?new=1`
 
@@ -921,7 +921,7 @@ Any async or background status change (e.g., a canvas-visible resource transitio
 - For page-level data loading errors, use `useQueryState(query, { title: '...', onRetry: ... })` — this hooks up the `NxErrorState` component with a retry button automatically for retryable (5xx) errors
 - For mutation errors (create/update/delete), use `useMutationErrorHandler` — this wires up `NxErrorState` and toast alerts automatically
 - For form validation errors, use inline field-level errors via PatternFly's Validated component (see Form Component section)
-- **Error state placement:** Error states render **inside `NxPanel`** using `NxPageBody isCentered` + `NxErrorState` — not as a bare centered message outside the content frame. The page header and app shell remain visible so the user can navigate away.
+- **Error state placement:** Error states render **inside `SynPanel`** using `SynPageBody isCentered` + `NxErrorState` — not as a bare centered message outside the content frame. The page header and app shell remain visible so the user can navigate away.
 
 ### Session Timeout Warning
 
@@ -967,7 +967,7 @@ For high-frequency bulk decisions where speed matters (e.g., Approvals), bulk ac
 
 **Bulk action toolbar:**
 
-- Lives in the `NxPageHeader` toolbar — always visible, not inside a kebab
+- Lives in the `SynPageHeader` toolbar — always visible, not inside a kebab
 - Shows `"{n} selected"` when selection > 0
 - **Approve:** secondary button + `RhUiLikeIcon`
 - **Reject:** secondary `isDanger` button + `RhUiDislikeIcon`
@@ -1488,7 +1488,7 @@ These badges use `Label` with no icons — text and color only.
 The version history side panel lets users browse, compare, and manage published workflow versions.
 
 - **Trigger:** Kebab menu → "Version history" (under Views group)
-- **Layout:** Right-side `NxPanel isFullHeight` with `SidePanelHeader` titled "Version history"
+- **Layout:** Right-side `SynPanel isFullHeight` with `SidePanelHeader` titled "Version history"
 - **Version list:** PatternFly `SimpleList` grouped by date headers (e.g., "Jun 25, 2026")
   - Each item shows: version name, publish timestamp
   - Clicking a version loads a **read-only** view of that version on the canvas
@@ -1576,10 +1576,10 @@ Trigger configuration supports two scheduling types:
 ### Canvas Controls
 
 - Should be anchored to the **bottom-left corner** of the canvas view
-- Canvas overlays (controls, step legend, undo/redo) use `NxPanel` with `variant="raised"` for opaque + shadow
+- Canvas overlays (controls, step legend, undo/redo) use `SynPanel` with `variant="raised"` for opaque + shadow
 - Legend toggle uses accessible labels **Show step legend** / **Hide step legend**
 - Workflow steps on the canvas also use `variant="raised"` with a border-radius override to match `Card` / canvas chrome
-- **Minimum supported viewport:** The React Flow canvas is gated by a width-only check (currently 1024px, defined in `constants/viewport.ts`) — there is no height gate. Below the threshold, `NxReactFlowViewportGuard` shows a full-page "viewport too small" empty state while keeping the nav bar visible, rather than rendering a broken or unusably cramped canvas.
+- **Minimum supported viewport:** The React Flow canvas is gated by a width-only check (currently 1024px, defined in `constants/viewport.ts`) — there is no height gate. Below the threshold, `SynReactFlowViewportGuard` shows a full-page "viewport too small" empty state while keeping the nav bar visible, rather than rendering a broken or unusably cramped canvas.
 
 ### Canvas step styling
 
@@ -1645,9 +1645,9 @@ When a node is opened for editing, the builder can display a three-column layout
 
 | Column | Content | Panel style |
 | ------ | ------- | ----------- |
-| **Left** | Input data (upstream output / trigger data) | Default `NxPanel` |
-| **Center** | Node parameters (the form) | `NxPanel variant="raised"` — visually elevated to signal "this is where you edit" |
-| **Right** | Output data (downstream preview / schema) | Default `NxPanel` |
+| **Left** | Input data (upstream output / trigger data) | Default `SynPanel` |
+| **Center** | Node parameters (the form) | `SynPanel variant="raised"` — visually elevated to signal "this is where you edit" |
+| **Right** | Output data (downstream preview / schema) | Default `SynPanel` |
 
 - Input/Output panels support Schema / Table / JSON view toggle (see Data Panel View Modes)
 - **Branching nodes** (Condition, Switch): The center column header includes a branch-handle dropdown (`MenuToggle` with branch icon) for selecting which output path to inspect in the Output panel
@@ -1695,7 +1695,7 @@ Payload-validation UI for webhook and event-driven (EDA) triggers uses a **Simpl
 
 Pending approval review happens inline in the execution viewer rather than on a dedicated full-page route.
 
-- **Layout:** Right-side `NxPanel isFullHeight` + `SidePanelHeader` + scrollable `ApprovalDetailContent`; mirrors `WorkflowHistoryCard` layout pattern
+- **Layout:** Right-side `SynPanel isFullHeight` + `SidePanelHeader` + scrollable `ApprovalDetailContent`; mirrors `WorkflowHistoryCard` layout pattern
 - **Mutual exclusivity:** History panel and approval panel cannot be open simultaneously
 - **Auto-open:** `useAutoApprovalDetection` automatically opens the panel when a pending approval is detected on the current execution
 - **Components:** `ApprovalSidePanel`, `useExecutionApprovalPanel`, `ApprovalDetailContent`
@@ -1746,7 +1746,7 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 ### Execution View Panels
 
 - The **run details panel** provides an Overview/Details toggle for inspecting execution state
-- Panels use `NxPanel isFullHeight` for proper internal scroll behavior — do not hand-roll `display: flex; flexDirection: column` inline styles when `isFullHeight` exists
+- Panels use `SynPanel isFullHeight` for proper internal scroll behavior — do not hand-roll `display: flex; flexDirection: column` inline styles when `isFullHeight` exists
 - Panels may use a `ResizableDivider` to allow users to resize panel split areas
 - The most recent run details can display inline in the editor after workflow execution
 - **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `NxEmptyStateFilter` with a "Clear all filters" button.
@@ -1804,7 +1804,7 @@ PatternFly handles the internal accessibility of its elements (e.g., a dropdown 
 
 - **Proper Heading Hierarchy:** Headings (`<h1>` through `<h6>`) must be used sequentially without skipping levels. Screen reader users rely on headings to map out the page.
 - **Landmarks:** Use semantic tags (`<main>`, `<nav>`, `<header>`, `<footer>`, `<aside>`) or ARIA landmark roles so users can quickly jump to specific regions of the application.
-- **Dynamic per-page browser tab titles:** Every routed page must render a dynamic browser title via React 19's native title hoisting, using the shared `NxPageTitle` / `toPageTitle(segments)` utility. Segments run narrow to broad (most specific first); `null`/blank entries are auto-scrubbed and the app-name suffix is appended automatically. This is machine-enforced: the `require-page-title` ESLint rule (`eslint-plugin-syntara/rules/require-page-title.js`) fails any route file missing it.
+- **Dynamic per-page browser tab titles:** Every routed page must render a dynamic browser title via React 19's native title hoisting, using the shared `SynPageTitle` / `toPageTitle(segments)` utility. Segments run narrow to broad (most specific first); `null`/blank entries are auto-scrubbed and the app-name suffix is appended automatically. This is machine-enforced: the `require-page-title` ESLint rule (`eslint-plugin-syntara/rules/require-page-title.js`) fails any route file missing it.
 
 #### Keyboard Navigation & Focus Management
 
@@ -1945,7 +1945,7 @@ The project ships with Storybook for documenting and reviewing `Nx*` components.
 - **Light and dark mode:** Preview components in both themes via the Storybook toolbar (System / Light / Dark) before sign-off
 - **Composed stories over isolated demos:** Stories should reflect real app compositions (e.g., a full list page layout), not isolated prop playgrounds
 - **Autodocs:** Foundational `Nx*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
-- **Available stories:** `NxPage`, `NxPageHeader`, `NxPageBreadcrumbs`, `NxPanel`, `NxPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`
+- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`
 
 ---
 
@@ -1968,7 +1968,7 @@ When implementing a new page or feature, use this decision tree:
 What are you building?
 ├── List/table view
 │   ├── Use NxScrollableTableContainer (standard variant by default, "compact" only for dense supplementary tables)
-│   ├── Add NxPageHeader with title + primary action
+│   ├── Add SynPageHeader with title + primary action
 │   ├── Add FilterBar (Attribute Search)
 │   ├── Add cursor-based pagination footer via NxScrollableTableContainer's footer prop
 │   ├── "Created"/"Modified" columns: username (linked) + date together
@@ -1976,7 +1976,7 @@ What are you building?
 │
 ├── Detail view
 │   ├── Use NxDetailList + NxDetail (vertical default; isHorizontal for compact)
-│   ├── Add NxPageBreadcrumbs + NxPageHeader with title + resource actions
+│   ├── Add SynPageBreadcrumbs + SynPageHeader with title + resource actions
 │   ├── NxDetail with empty children renders nothing (no placeholder needed)
 │   └── Use NxCodeBlock for JSON/script/log display
 │
@@ -1985,7 +1985,7 @@ What are you building?
 │   ├── 2–4 simple fields? → Modal
 │   ├── Use PatternFly Basic Form, left-aligned, one column, max-width 600px
 │   ├── Use Zod + react-hook-form for validation
-│   └── Save/Cancel buttons in NxPanel footer (sticky), NOT in page header
+│   └── Save/Cancel buttons in SynPanel footer (sticky), NOT in page header
 │
 ├── Delete/Remove/Cancel/Stop (destructive)
 │   ├── Always use confirmation modal (Small variant)
@@ -2032,7 +2032,7 @@ What are you building?
 ├── Canvas/builder view
 │   ├── Use React Flow + PatternFly wrapper
 │   ├── Left-to-right layout
-│   ├── Canvas controls at bottom-left (NxPanel variant="raised")
+│   ├── Canvas controls at bottom-left (SynPanel variant="raised")
 │   ├── Side panel for step details (not modal)
 │   ├── Three-column node editor: Input | Parameters (raised) | Output
 │   ├── Version history panel: SimpleList grouped by date, view-only mode

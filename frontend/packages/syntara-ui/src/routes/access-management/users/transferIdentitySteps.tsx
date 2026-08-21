@@ -7,7 +7,7 @@ import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { DateCell } from '../../../components/table/DateCell'
@@ -77,7 +77,7 @@ export function SelectUserStep({
   const showSelectionUi = users.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -159,7 +159,7 @@ export function SelectUserStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 
@@ -191,7 +191,7 @@ export function SelectIdentityStep({
   const showSelectionUi = identities.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -294,6 +294,6 @@ export function SelectIdentityStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxPageBreadcrumbs } from './NxPageBreadcrumbs'
+import { SynPageBreadcrumbs } from './SynPageBreadcrumbs'
 
-const meta: Meta<typeof NxPageBreadcrumbs> = {
-  component: NxPageBreadcrumbs,
+const meta: Meta<typeof SynPageBreadcrumbs> = {
+  component: SynPageBreadcrumbs,
   tags: ['autodocs'],
   parameters: {
     docs: {

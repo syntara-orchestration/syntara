@@ -2,7 +2,7 @@ import { Content, Tab } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
 import { createTestRouter } from '../../test/createTestRouter'
-import { NxPanel } from '../layout/NxPanel'
+import { SynPanel } from '../layout/SynPanel'
 
 import { NxUrlTabs } from './NxUrlTabs'
 
@@ -37,9 +37,9 @@ const DefaultStoryRouter = createTestRouter('/resource/details')
 function DefaultStory() {
   return (
     <DefaultStoryRouter>
-      <NxPanel>
+      <SynPanel>
         <StandardTabs basePath="/resource" />
-      </NxPanel>
+      </SynPanel>
     </DefaultStoryRouter>
   )
 }
@@ -48,9 +48,9 @@ const SecondTabActiveRouter = createTestRouter('/resource/activity-log')
 function SecondTabActiveStory() {
   return (
     <SecondTabActiveRouter>
-      <NxPanel>
+      <SynPanel>
         <StandardTabs basePath="/resource" />
-      </NxPanel>
+      </SynPanel>
     </SecondTabActiveRouter>
   )
 }
@@ -60,9 +60,9 @@ function DefaultTabFallbackStory() {
   // URL has no tab segment — `defaultTab` takes over without any redirect.
   return (
     <DefaultTabFallbackRouter>
-      <NxPanel>
+      <SynPanel>
         <StandardTabs basePath="/resource" defaultTab="activity-log" />
-      </NxPanel>
+      </SynPanel>
     </DefaultTabFallbackRouter>
   )
 }
@@ -71,7 +71,7 @@ const ValidTabsRouter = createTestRouter('/resource/details')
 function ValidTabsStory() {
   return (
     <ValidTabsRouter>
-      <NxPanel>
+      <SynPanel>
         <NxUrlTabs
           basePath="/resource"
           defaultTab="details"
@@ -88,7 +88,7 @@ function ValidTabsStory() {
             <TabPane label="Access roles" />
           </Tab>
         </NxUrlTabs>
-      </NxPanel>
+      </SynPanel>
     </ValidTabsRouter>
   )
 }
@@ -97,9 +97,9 @@ const TabNavigationRouter = createTestRouter('/resource/details')
 function TabNavigationStory() {
   return (
     <TabNavigationRouter>
-      <NxPanel>
+      <SynPanel>
         <StandardTabs basePath="/resource" />
-      </NxPanel>
+      </SynPanel>
     </TabNavigationRouter>
   )
 }
@@ -118,7 +118,7 @@ const meta: Meta<typeof NxUrlTabs> = {
           'All other props are forwarded to PatternFly `Tabs`.\n\n' +
           '---\n\n' +
           '**UX guidelines (from the AO design system):**\n\n' +
-          '- Tabs must live inside `NxPanel` (the `CompassPanel` equivalent), not outside it.\n' +
+          '- Tabs must live inside `SynPanel` (the `CompassPanel` equivalent), not outside it.\n' +
           '- Tab labels must use **sentence case** (e.g. "Activity log", not "Activity Log").\n' +
           '- Labels should be clear, professional, and action-oriented.\n' +
           '- Avoid colloquial language, slang, or informal phrasing in labels.\n' +
@@ -131,14 +131,14 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/** First tab active — the URL segment matches the first tab key. `NxUrlTabs` lives inside `NxPanel`. */
+/** First tab active — the URL segment matches the first tab key. `NxUrlTabs` lives inside `SynPanel`. */
 export const Default: Story = {
   render: () => <DefaultStory />,
   parameters: {
     docs: {
       description: {
         story:
-          'Basic three-tab configuration inside `NxPanel`. The initial URL points at `details`, so that tab is active. Multi-word labels ("Activity log", "Access roles") demonstrate the sentence-case convention.',
+          'Basic three-tab configuration inside `SynPanel`. The initial URL points at `details`, so that tab is active. Multi-word labels ("Activity log", "Access roles") demonstrate the sentence-case convention.',
       },
     },
   },
