@@ -1234,6 +1234,13 @@ describe('Approvals Component', () => {
       expect(screen.queryByRole('table')).not.toBeInTheDocument()
     })
 
+    it('disables bulk actions when user cannot decide on any project', () => {
+      render(<Approvals />)
+
+      expect(screen.getByRole('button', { name: 'Approve' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: 'Reject' })).toHaveAttribute('aria-disabled', 'true')
+    })
+
     it('does not show access denied when user has read permission', () => {
       vi.mocked(useApprovalPermissions).mockReturnValue({
         canRead: true,

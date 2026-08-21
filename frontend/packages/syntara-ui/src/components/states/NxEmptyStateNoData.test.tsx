@@ -104,6 +104,14 @@ describe('NxEmptyStateNoData', () => {
     expect(button).toHaveClass('pf-m-primary')
   })
 
+  it('renders addData button without secondary actions when only addData is provided', () => {
+    const addData = vi.fn()
+    render(<NxEmptyStateNoData addData={addData} />)
+
+    expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Learn more' })).not.toBeInTheDocument()
+  })
+
   it('renders secondary actions when addData and secondaryActions are provided', () => {
     const addData = vi.fn()
     render(<NxEmptyStateNoData addData={addData} secondaryActions={<Button variant="link">Learn more</Button>} />)

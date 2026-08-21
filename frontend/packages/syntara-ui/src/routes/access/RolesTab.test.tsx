@@ -45,14 +45,22 @@ vi.mock('../../hooks/invalidateAuthzCaches', () => ({
 }))
 
 vi.mock('./useRolePermissions', () => ({
-  useRolePermissions: () => ({
-    canCreate: true,
-    canUpdate: true,
-    canDelete: true,
-    isLoading: false,
-    tooltips: { create: '', update: '', delete: '' },
-  }),
+  useRolePermissions: () => mockUseRolePermissions(),
 }))
+
+const defaultRolePermissions = {
+  canCreate: true,
+  canUpdate: true,
+  canDelete: true,
+  isLoading: false,
+  tooltips: {
+    create: 'You need permission to create roles.',
+    update: 'You need permission to update roles.',
+    delete: 'You need permission to delete roles.',
+  },
+}
+
+const mockUseRolePermissions = vi.hoisted(() => vi.fn(() => defaultRolePermissions))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -114,6 +122,8 @@ describe('RolesTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    mockUseRolePermissions.mockImplementation(() => defaultRolePermissions)
 
     // Default: useQueryState returns null (success state)
     vi.mocked(useQueryState).mockReturnValue(null)
@@ -625,6 +635,34 @@ describe('RolesTab', () => {
       expect(screen.getByText('read-all')).toBeVisible()
     })
 
+    it('expand-all button expands all rows, clicking again collapses them', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const expandAllButton = screen.getByRole('button', { name: /expand all/i })
+      await user.click(expandAllButton)
+
+      expect(screen.getByText('admin-policy')).toBeVisible()
+      expect(screen.getByText('workflow-edit')).toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: /expand all|collapse all/i }))
+
+      expect(screen.queryByText('admin-policy')).not.toBeVisible()
+      expect(screen.queryByText('workflow-edit')).not.toBeVisible()
+    })
+
+    it('collapses an expanded row when the details button is clicked again', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+      expect(screen.getByText('admin-policy')).toBeVisible()
+
+      await user.click(expandButtons[0])
+      expect(screen.queryByText('admin-policy')).not.toBeVisible()
+    })
+
     it('toggling a single row does not affect other rows', async () => {
       const user = userEvent.setup()
       render(<RolesTab />, { wrapper: createWrapper() })
@@ -678,6 +716,26 @@ describe('RolesTab', () => {
       )
 
       expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    })
+  })
+
+  describe('Create role permission gating', () => {
+    it('disables Create role when user lacks create permission', () => {
+      mockUseRolePermissions.mockReturnValue({
+        canCreate: false,
+        canUpdate: true,
+        canDelete: true,
+        isLoading: false,
+        tooltips: {
+          create: 'You need permission to create roles.',
+          update: 'You need permission to update roles.',
+          delete: 'You need permission to delete roles.',
+        },
+      })
+
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      expect(screen.getByRole('button', { name: 'Create role' })).toHaveAttribute('aria-disabled', 'true')
     })
   })
 
