@@ -43,7 +43,7 @@ src/syntara/schemas/
 | Target | Purpose |
 |--------|---------|
 | `make api-spec-bundle` | Merge all domain sub-specs into `src/syntara/schemas/openapi.yaml` |
-| `make api-spec-bundle-public` | Merge public domain sub-specs into `openapi-public.yaml` and `openapi-public.json` |
+| `make api-spec-bundle-public` | Merge public domain sub-specs into `src/syntara/schemas/openapi-public.yaml` and `src/syntara/schemas/openapi-public.json` |
 | `make api-spec-bundle-all` | Run both `api-spec-bundle` and `api-spec-bundle-public` |
 | `make api-spec-drift` | Check that the committed spec matches the generated one (exit 1 if out of sync) |
 | `make api-spec-drift-public` | Same, for the public spec |

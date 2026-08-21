@@ -717,6 +717,12 @@ GENERATED_PUBLIC_HEADER = """\
 """
 
 
+def _default_output_path(args: argparse.Namespace) -> Path:
+    """Compute the default output path from --public and --format."""
+    base = DEFAULT_PUBLIC_OUTPUT if args.public else DEFAULT_OUTPUT
+    return base.with_suffix("." + args.format)
+
+
 def main() -> None:
     """Discover sub-specs, merge them, and write the bundled OpenAPI document."""
     args = _parse_args()
@@ -762,8 +768,7 @@ def main() -> None:
         print(full_output)
         return
 
-    default_output = str(DEFAULT_PUBLIC_OUTPUT) if args.public else str(DEFAULT_OUTPUT)
-    output_path = Path(args.output or default_output).resolve()
+    output_path = Path(args.output or _default_output_path(args)).resolve()
     output_path.write_text(full_output, encoding="utf-8")
     print(f"\nBundled spec written to: {output_path.relative_to(PROJECT_ROOT)}")
 

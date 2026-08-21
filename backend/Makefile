@@ -575,6 +575,7 @@ services-clean: ## Stop all services and remove all data (destructive)
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
 OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -619,6 +620,10 @@ api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full 
 
 .PHONY: api-spec-drift-all
 api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+
+.PHONY: print-openapi-generated-files
+print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)
+	@echo $(OPENAPI_GENERATED_FILES)
 
 
 # Tools
