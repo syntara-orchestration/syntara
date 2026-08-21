@@ -303,15 +303,15 @@ class TestIntegrationRefreshContract:
         with patch(MCP_DISCOVER_PATCH, new=AsyncMock(return_value=discover_result)):
             response = await auth_client.post(f"{BASE_URL}/{integration_id}/refresh")
 
-        # The refresh fails, but the failure must be recorded, not swallowed.
-        assert response.status_code >= 500
+        # The refresh fails (409 for IntegrityError), but the failure must be recorded.
+        assert response.status_code == 409
 
-        get_resp = await auth_client.get(f"{BASE_URL}/{integration_id}")
-        assert get_resp.status_code == 200
-        integration_data = get_resp.json()
-        assert integration_data["refresh_status"] == IntegrationRefreshStatus.ERROR.value
-        assert integration_data["refresh_error"] is not None
-        assert integration_data["last_refreshed_at"] is not None
+        test_db_session.expire_all()
+        refreshed = await test_db_session.get(Integration, UUID(integration_id))
+        assert refreshed is not None
+        assert refreshed.refresh_status == IntegrationRefreshStatus.ERROR
+        assert refreshed.refresh_error is not None
+        assert refreshed.last_refreshed_at is not None
 
     async def test_refresh_refreshed_at_is_iso_timestamp(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
