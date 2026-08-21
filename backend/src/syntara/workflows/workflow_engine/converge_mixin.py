@@ -406,12 +406,9 @@ class WorkflowConvergeMixin:
                     succ_id in self.skipped_nodes
                     or succ_id in self.failed_nodes
                     or self.resolver.has_namespace(succ_id)
+                    or succ_id not in boundary
+                    or graph.get_node(succ_id).type == NodeType.CONVERGE
                 ):
-                    continue
-                succ_node = graph.get_node(succ_id)
-                if succ_node.type == NodeType.CONVERGE:
-                    continue
-                if succ_id not in boundary:
                     continue
                 pred_ids = graph.get_predecessors(succ_id)
                 if all(p in self.skipped_nodes or p in self.failed_nodes for p in pred_ids):
