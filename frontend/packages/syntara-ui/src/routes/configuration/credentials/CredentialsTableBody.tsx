@@ -9,19 +9,22 @@ import {
   Tooltip,
   Truncate,
 } from '@patternfly/react-core'
-import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
+import { RhUiCaretDownIcon, RhUiCaretRightIcon, RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ExpandableRowContent, Tbody, Td, Tr } from '@patternfly/react-table'
-import { Fragment } from 'react'
+import { Fragment, useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import groupedTableStyles from '../../../components/groupedTable.module.css'
+import { IconLabel } from '../../../components/IconLabel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
+import { builtinProjectTooltip } from '../../../hooks/permissionUtils'
 import type { ProjectRead } from '../../access/types'
 
 import type { Credential, CredentialType } from './credentialConstants'
+import { useCredentialPermissions } from './useCredentialPermissions'
 
 /** Total visible columns including expand toggle and actions. */
 const COLUMN_COUNT = 9
@@ -33,10 +36,11 @@ type CredentialRowProps = {
   credType: CredentialType | undefined
   rowIndex: number
   isExpanded: boolean
+  isBuiltinProject: boolean
   onToggleRow: (id: string) => void
-  getRowActions: (credential: Credential) => CredentialRowAction[]
+  onEdit: (credential: Credential) => void
+  onDelete: (credential: Credential) => void
   onToggleEnabled: (credential: Credential) => void
-  getToggleDisabledTooltip?: (credential: Credential) => string | undefined
 }
 
 function CredentialRow({
@@ -44,14 +48,45 @@ function CredentialRow({
   credType,
   rowIndex,
   isExpanded,
+  isBuiltinProject,
   onToggleRow,
-  getRowActions,
+  onEdit,
+  onDelete,
   onToggleEnabled,
-  getToggleDisabledTooltip,
 }: Readonly<CredentialRowProps>) {
+  const permissions = useCredentialPermissions({ resourceProject: credential.project_id })
+
   const hasDescription = Boolean(credential.description?.trim())
-  const actions = getRowActions(credential)
-  const toggleDisabledTooltip = getToggleDisabledTooltip?.(credential)
+
+  const actions = useMemo<KebabAction[]>(() => {
+    const updateTooltip = permissions.canUpdate ? undefined : { content: permissions.tooltips.update }
+    const noUpdate = isBuiltinProject ? { content: builtinProjectTooltip('edit this credential') } : updateTooltip
+    const deleteTooltip = permissions.canDelete ? undefined : { content: permissions.tooltips.delete }
+    const noDelete = isBuiltinProject ? { content: builtinProjectTooltip('delete this credential') } : deleteTooltip
+    return [
+      {
+        key: 'edit',
+        title: <IconLabel icon={<RhUiEditIcon />}>Edit credential</IconLabel>,
+        isAriaDisabled: isBuiltinProject || !permissions.canUpdate,
+        tooltipProps: noUpdate,
+        onClick: () => onEdit(credential),
+      },
+      { key: 'sep-delete', isSeparator: true },
+      {
+        key: 'delete',
+        title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
+        isDanger: true,
+        isAriaDisabled: isBuiltinProject || !permissions.canDelete,
+        tooltipProps: noDelete,
+        onClick: () => onDelete(credential),
+      },
+    ]
+  }, [permissions, isBuiltinProject, credential, onEdit, onDelete])
+
+  const toggleDisabledTooltip = useMemo(() => {
+    if (isBuiltinProject) return builtinProjectTooltip('enable or disable this credential')
+    return permissions.canUpdate ? undefined : permissions.tooltips.enable
+  }, [isBuiltinProject, permissions.canUpdate, permissions.tooltips.enable])
 
   return (
     <Tbody isExpanded={isExpanded}>
@@ -140,9 +175,10 @@ type GroupedCredentialsTableBodyProps = {
   typeMap: Map<string, CredentialType>
   expandedRows: Set<string>
   onToggleRow: (id: string) => void
-  getRowActions: (credential: Credential) => CredentialRowAction[]
+  onEdit: (credential: Credential) => void
+  onDelete: (credential: Credential) => void
   onToggleEnabled: (credential: Credential) => void
-  getToggleDisabledTooltip?: (credential: Credential) => string | undefined
+  getIsBuiltinProject: (credential: Credential) => boolean
 }
 
 export function GroupedCredentialsTableBody({
@@ -152,9 +188,10 @@ export function GroupedCredentialsTableBody({
   typeMap,
   expandedRows,
   onToggleRow,
-  getRowActions,
+  onEdit,
+  onDelete,
   onToggleEnabled,
-  getToggleDisabledTooltip,
+  getIsBuiltinProject,
 }: Readonly<GroupedCredentialsTableBodyProps>) {
   const credentialIndexMap = new Map<string, number>()
   let globalIndex = 0
@@ -190,10 +227,11 @@ export function GroupedCredentialsTableBody({
                   credType={typeMap.get(credential.credential_type_id)}
                   rowIndex={(credential.id ? credentialIndexMap.get(credential.id) : undefined) ?? 0}
                   isExpanded={expandedRows.has(credential.id!)}
+                  isBuiltinProject={getIsBuiltinProject(credential)}
                   onToggleRow={onToggleRow}
-                  getRowActions={getRowActions}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
                   onToggleEnabled={onToggleEnabled}
-                  getToggleDisabledTooltip={getToggleDisabledTooltip}
                 />
               ))}
           </Fragment>
@@ -208,9 +246,10 @@ type FlatCredentialsTableBodyProps = {
   typeMap: Map<string, CredentialType>
   expandedRows: Set<string>
   onToggleRow: (id: string) => void
-  getRowActions: (credential: Credential) => CredentialRowAction[]
+  onEdit: (credential: Credential) => void
+  onDelete: (credential: Credential) => void
   onToggleEnabled: (credential: Credential) => void
-  getToggleDisabledTooltip?: (credential: Credential) => string | undefined
+  getIsBuiltinProject: (credential: Credential) => boolean
 }
 
 export function FlatCredentialsTableBody({
@@ -218,9 +257,10 @@ export function FlatCredentialsTableBody({
   typeMap,
   expandedRows,
   onToggleRow,
-  getRowActions,
+  onEdit,
+  onDelete,
   onToggleEnabled,
-  getToggleDisabledTooltip,
+  getIsBuiltinProject,
 }: Readonly<FlatCredentialsTableBodyProps>) {
   return (
     <>
@@ -231,10 +271,11 @@ export function FlatCredentialsTableBody({
           credType={typeMap.get(credential.credential_type_id)}
           rowIndex={rowIndex}
           isExpanded={expandedRows.has(credential.id!)}
+          isBuiltinProject={getIsBuiltinProject(credential)}
           onToggleRow={onToggleRow}
-          getRowActions={getRowActions}
+          onEdit={onEdit}
+          onDelete={onDelete}
           onToggleEnabled={onToggleEnabled}
-          getToggleDisabledTooltip={getToggleDisabledTooltip}
         />
       ))}
     </>
