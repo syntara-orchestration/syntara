@@ -398,13 +398,13 @@ export function UserIdentitiesPanel({
     )
   }
 
-  // Prevent "No identity providers configured" from flashing before useAuthProviders settles.
+  // Prevent "No identity providers configured yet" from flashing before useAuthProviders settles.
   if (isProvidersLoading && identities.length === 0) return <SynLoadingState />
 
   if (!showTable) {
     return (
       <>
-        <EmptyState headingLevel="h3" titleText="No identity providers configured" icon={RhUiKeyIcon}>
+        <EmptyState headingLevel="h3" titleText="No identity providers configured yet" icon={RhUiKeyIcon}>
           <EmptyStateBody>
             There are no identity providers configured. Configure an identity provider to enable federated
             authentication.

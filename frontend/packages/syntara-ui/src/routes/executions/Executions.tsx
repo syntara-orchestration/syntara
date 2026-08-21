@@ -159,7 +159,7 @@ export default function Executions() {
         <SynPanel isFullHeight>
           {visibleExecutions.length === 0 && !hasActiveFilters ? (
             <SynPageBody isCentered>
-              <SynEmptyStateNoData title="No executions found" description="No executions found." />
+              <SynEmptyStateNoData title="No executions yet" description="No workflow runs have been recorded yet." />
             </SynPageBody>
           ) : (
             <SynPanelContentStack variant="inset">

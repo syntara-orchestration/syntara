@@ -314,7 +314,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
     return (
       <>
         <SynEmptyStateNoData
-          title="No groups"
+          title="No groups yet"
           description="This user is not a member of any groups."
           buttonText="Add to group"
           addData={groupPermissions.canManageMembers ? () => setAddModalOpen(true) : undefined}

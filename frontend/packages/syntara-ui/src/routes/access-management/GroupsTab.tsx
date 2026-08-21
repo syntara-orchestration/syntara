@@ -101,7 +101,7 @@ export function GroupsTab() {
         onClearAllFilters={handleClearAllFilters}
         noDataState={
           <SynEmptyStateNoData
-            title="No groups"
+            title="No groups yet"
             description="Create a group to organize users and manage access."
             buttonText="Create group"
             addData={permissions.canCreate ? () => formDialog.open(null) : undefined}

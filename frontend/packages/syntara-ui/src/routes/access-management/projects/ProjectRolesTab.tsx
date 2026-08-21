@@ -167,7 +167,7 @@ export function ProjectRolesTab({ projectId }: Readonly<{ projectId: string }>) 
           onClearAllFilters={clearAllFilters}
           noDataState={
             <SynEmptyStateNoData
-              title="No roles found"
+              title="No roles yet"
               description="No roles are available for this project."
               buttonText="Add role"
               addData={() => setIsAddDialogOpen(true)}

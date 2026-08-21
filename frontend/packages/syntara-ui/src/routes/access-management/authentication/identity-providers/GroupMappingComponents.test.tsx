@@ -16,6 +16,7 @@ import {
 } from './GroupMappingComponents'
 import type { MappingTableProps } from './GroupMappingComponents'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
+import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
 const mockMappedGroups: MappedGroup[] = [
@@ -67,6 +68,20 @@ describe('EmptyMappingState', () => {
     expect(screen.getByRole('heading', { name: /no group mappings configured/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /discover groups/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add manually/i })).not.toBeInTheDocument()
+  })
+
+  it('shows only Discover groups when onAddManually is omitted', () => {
+    render(<EmptyMappingState onTestSignIn={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: /discover groups/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add manually/i })).not.toBeInTheDocument()
+  })
+
+  it('shows only Add manually when onTestSignIn is omitted', () => {
+    render(<EmptyMappingState onAddManually={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: /discover groups/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add manually/i })).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
@@ -362,6 +377,57 @@ describe('MappingTable', () => {
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
+
+  it('evaluates entryErrors on read-only rows without crashing', () => {
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={mockRows}
+        isReadOnly
+        showValidation
+        entryErrors={
+          [
+            { idpGroupValue: { message: 'IdP group value is required' }, mappedGroupId: { message: 'Select a group' } },
+            null,
+          ] as unknown as GroupMappingEditFormValues['entries']
+        }
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
+
+  it('ignores invalid entryErrors shapes without crashing', () => {
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
+        isReadOnly
+        showValidation
+        entryErrors={'not-an-array' as unknown as GroupMappingEditFormValues['entries']}
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
+
+  it('ignores entry field errors with non-string messages', () => {
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
+        isReadOnly
+        showValidation
+        entryErrors={
+          [
+            { idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } },
+          ] as unknown as GroupMappingEditFormValues['entries']
+        }
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
 })
 
 describe('ReadOnlyView', () => {
@@ -464,6 +530,27 @@ describe('ReadOnlyView', () => {
     await waitFor(() => {
       expect(screen.queryByText('idp-row-0')).not.toBeInTheDocument()
       expect(screen.getByText('idp-row-20')).toBeInTheDocument()
+    })
+  })
+
+  it('returns to the previous page from client-side pagination', async () => {
+    const user = userEvent.setup()
+    const manyEntries: GroupMappingEntry[] = Array.from({ length: 21 }, (_, i) => ({
+      key: `km${i}`,
+      idpGroupValue: `idp-row-${i}`,
+      mappedGroupId: 'g1',
+    }))
+
+    render(<ReadOnlyView {...readOnlyDefaults} entries={manyEntries} />)
+
+    await user.click(screen.getByRole('button', { name: 'Go to next page' }))
+    await waitFor(() => {
+      expect(screen.getByText('idp-row-20')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Go to previous page' }))
+    await waitFor(() => {
+      expect(screen.getByText('idp-row-0')).toBeInTheDocument()
     })
   })
 })

@@ -297,7 +297,7 @@ export function RolesTab() {
         isEmpty={roles.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<SynEmptyStateNoData title="No roles found" description="No roles are available." />}
+        noDataState={<SynEmptyStateNoData title="No roles yet" description="No roles are available." />}
         toolbar={
           roles.length > 0 || hasActiveFilters ? (
             <NxListPanelToolbar

@@ -256,7 +256,7 @@ function TableContent({
       return (
         <SynPageBody isCentered>
           <SynEmptyStateNoData
-            title="No role assignments"
+            title="No role assignments yet"
             description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
             buttonText="Assign role"
             addData={openAssignIfAllowed}
@@ -409,7 +409,7 @@ export function RoleAssignmentsPanel({
     return (
       <>
         <SynEmptyStateNoData
-          title="No role assignments"
+          title="No role assignments yet"
           description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
           buttonText="Assign role"
           addData={openAssignIfAllowed}

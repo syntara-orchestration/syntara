@@ -333,7 +333,7 @@ export function UsersTab() {
         onClearAllFilters={handleClearAllFilters}
         noDataState={
           <SynEmptyStateNoData
-            title="No users"
+            title="No users yet"
             description="Create a user to manage access to the platform."
             buttonText="Create user"
             addData={handleCreateUser}

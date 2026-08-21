@@ -162,7 +162,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
         onClearAllFilters={noop}
         noDataState={
           <SynEmptyStateNoData
-            title="No workflows using this credential"
+            title="No workflows yet"
             description="This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential."
           />
         }

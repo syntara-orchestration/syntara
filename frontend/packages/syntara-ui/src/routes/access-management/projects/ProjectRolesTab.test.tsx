@@ -22,9 +22,12 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../../access/builtinFilterDefinitions', () => ({
-  builtinFilterDefinitions: [],
-}))
+vi.mock('../../access/builtinFilterDefinitions', async () => {
+  const actual = await vi.importActual<typeof import('../../access/builtinFilterDefinitions')>(
+    '../../access/builtinFilterDefinitions'
+  )
+  return actual
+})
 
 vi.mock('./AddProjectRoleDialog', () => ({
   AddProjectRoleDialog: () => null,
@@ -34,17 +37,19 @@ vi.mock('./EditProjectRoleDialog', () => ({
   EditProjectRoleDialog: () => null,
 }))
 
-vi.mock('../../../components/filters', () => ({
-  FilterBar: () => <div data-testid="filter-bar" />,
-}))
-
-vi.mock('../../../hooks/routing/useSearchParams', () => ({
-  useSearchParams: () => [new URLSearchParams(), vi.fn()] as const,
-}))
-
 vi.mock('../../../hooks/routing/useSearch', () => ({ useSearch: () => '' }))
 vi.mock('../../../hooks/routing/useLocation', () => ({ useLocation: () => '/' }))
+
 vi.mock('../../../hooks/routing/useNavigate', () => ({ useNavigate: () => vi.fn() }))
+
+let searchParams = new URLSearchParams()
+const setSearchParams = vi.fn((updater: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams)) => {
+  searchParams = typeof updater === 'function' ? updater(searchParams) : updater
+})
+
+vi.mock('../../../hooks/routing/useSearchParams', () => ({
+  useSearchParams: () => [searchParams, setSearchParams] as const,
+}))
 
 const mockDeleteMutate = vi.fn()
 
@@ -98,6 +103,7 @@ describe('ProjectRolesTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    searchParams = new URLSearchParams()
     mockRefetch.mockResolvedValue({})
     setupMocks()
   })
@@ -155,7 +161,7 @@ describe('ProjectRolesTab', () => {
     setupMocks([])
     render(<ProjectRolesTab projectId="proj-1" />, { wrapper })
 
-    expect(screen.getByText('No roles found')).toBeInTheDocument()
+    expect(screen.getByText('No roles yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add role' })).toBeInTheDocument()
   })
 
@@ -312,5 +318,32 @@ describe('ProjectRolesTab', () => {
     })
 
     expect(mockRefetch).not.toHaveBeenCalled()
+  })
+
+  it('shows filter empty state when filters are active but no results match', async () => {
+    vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
+      const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
+      const hasNameFilter = opts?.params?.query?.['name[contains]']
+      return {
+        data: hasNameFilter
+          ? { resources: [], total: 0, next: null }
+          : { resources: mockRoles, total: mockRoles.length, next: null },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: mockRefetch,
+      } as never
+    })
+
+    const user = userEvent.setup()
+    render(<ProjectRolesTab projectId="proj-1" />, { wrapper })
+
+    const nameFilter = screen.getByRole('textbox', { name: /name filter/i })
+    await user.type(nameFilter, 'nonexistent')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByText('No results found')).toBeInTheDocument()
+    })
   })
 })

@@ -306,7 +306,7 @@ export function AssignmentsTab() {
         onClearAllFilters={handleClearAllFilters}
         noDataState={
           <SynEmptyStateNoData
-            title="No assignments found"
+            title="No assignments yet"
             description="Assign roles to users or groups to grant access."
             buttonText="Add assignment"
             addData={openAddDialog}
