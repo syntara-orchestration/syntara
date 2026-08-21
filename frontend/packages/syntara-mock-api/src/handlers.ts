@@ -3485,15 +3485,15 @@ export const handlers = [
     // silently nulling the reference.
     const referencingIntegrations = integrations.filter((i) => i.management_credential_id === credential_id)
     if (referencingIntegrations.length > 0) {
-      const names = referencingIntegrations
-        .slice(0, 5)
-        .map((i) => `'${i.name}'`)
-        .join(', ')
+      const shown = referencingIntegrations.slice(0, 5)
+      const names = shown.map((i) => `'${i.name}'`).join(', ')
+      const remaining = referencingIntegrations.length - shown.length
+      const suffix = remaining > 0 ? ` and ${remaining} more` : ''
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/resource-conflict',
           title: 'Credential In Use',
-          detail: `Cannot delete credential '${credentials[index].name}': still in use by ${referencingIntegrations.length} integration${referencingIntegrations.length !== 1 ? 's' : ''} (${names}). Remove the credential from these integrations before deleting it.`,
+          detail: `Cannot delete credential '${credentials[index].name}': still in use by ${referencingIntegrations.length} integration${referencingIntegrations.length !== 1 ? 's' : ''} (${names}${suffix}). Remove the credential from these integrations before deleting it.`,
           code: 'CREDENTIAL_IN_USE',
           retryable: false,
           instance: `/api/v1/credentials/${credential_id}`,

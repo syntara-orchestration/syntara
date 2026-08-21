@@ -56,17 +56,28 @@ class CredentialInUseError(CredentialError):
     """
 
     def __init__(self, name: str, integration_names: list[str], total_count: int) -> None:
-        """Initialize with credential name and a sample of referencing integration names."""
+        """Initialize with credential name and a sample of referencing integration names.
+
+        integration_names may legitimately be empty relative to a positive
+        total_count in the rare "double-race" case (an integration reference
+        detected the reference right after a TOCTOU-triggered IntegrityError,
+        but was itself gone by the time names were re-queried). Falls back to
+        generic wording rather than rendering an empty or misleading name list.
+        """
         self.name = name
         self.integration_names = integration_names
         self.total_count = total_count
 
-        shown = ", ".join(f"'{n}'" for n in integration_names)
-        remaining = total_count - len(integration_names)
-        suffix = f" and {remaining} more" if remaining > 0 else ""
         plural = "s" if total_count != 1 else ""
+        if integration_names:
+            shown = ", ".join(f"'{n}'" for n in integration_names)
+            remaining = total_count - len(integration_names)
+            suffix = f" and {remaining} more" if remaining > 0 else ""
+            where = f" ({shown}{suffix})"
+        else:
+            where = ""
         super().__init__(
             f"Cannot delete credential '{name}': still in use by {total_count} "
-            f"integration{plural} ({shown}{suffix}). Remove the credential from "
+            f"integration{plural}{where}. Remove the credential from "
             "these integrations before deleting it."
         )
