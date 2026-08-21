@@ -34,7 +34,8 @@ export function RotateDialogBody({
 
   const selectedLabel =
     GRACE_PERIOD_OPTIONS.find((opt) => opt.value === gracePeriod)?.label ??
-    GRACE_PERIOD_OPTIONS.find((opt) => opt.value === DEFAULT_GRACE_PERIOD)!.label
+    GRACE_PERIOD_OPTIONS.find((opt) => opt.value === DEFAULT_GRACE_PERIOD)?.label ??
+    ''
 
   const renderToggle = useCallback(
     (ref: Ref<MenuToggleElement>) => (

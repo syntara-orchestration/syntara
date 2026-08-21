@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
@@ -61,24 +60,6 @@ async function createPendingApproval(
   return { workflowId, executionId, workflowName }
 }
 
-async function applyPendingApprovalStatusFilter(app: Page): Promise<void> {
-  const filterButton = app.getByRole('button', { name: /Filter|Add filter/i })
-  await expect(filterButton).toBeVisible()
-  await filterButton.click()
-
-  const statusFieldOption = app.getByRole('option', { name: /^Status$/i })
-  await expect(statusFieldOption).toBeVisible()
-  await statusFieldOption.click()
-
-  const statusValueSelector = app.getByRole('button', { name: /Filter by status/i })
-  await expect(statusValueSelector).toBeVisible()
-  await statusValueSelector.click()
-
-  const pendingApprovalOption = app.getByRole('option', { name: /^Pending approval$/i })
-  await expect(pendingApprovalOption).toBeVisible()
-  await pendingApprovalOption.click()
-}
-
 test.describe('Approval Pending Badge', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
@@ -138,9 +119,14 @@ test.describe('Approval Pending Badge', () => {
       await expect(pausedStatus).toBeVisible()
 
       // ===================================================================
-      // VERIFICATION: Filter by "Pending approval" via Status filter
+      // VERIFICATION: Filter by "Pending approval" status
       // ===================================================================
-      await applyPendingApprovalStatusFilter(app)
+      const filterToolbar = app.getByRole('search', { name: 'Filters' })
+      await filterToolbar.getByRole('button', { name: 'Workflow name', exact: true }).click()
+      await app.getByRole('option', { name: 'Status' }).click()
+      await filterToolbar.getByRole('button', { name: 'Filter by status' }).click()
+      await app.getByRole('option', { name: 'Pending approval' }).click()
+      await expect(app).toHaveURL(/approval_pending=true/)
       await expect(badgeInList).toBeVisible()
     } finally {
       // Cleanup: Delete the workflow
@@ -184,7 +170,6 @@ test.describe('Approval Pending Badge', () => {
       const reachedTerminal = await app
         .getByRole('row')
         .filter({ hasText: /Successful|Failed/ })
-        .nth(0)
         .waitFor({ state: 'visible', timeout: 30_000 })
         .then(() => true)
         .catch(() => false)
@@ -204,7 +189,6 @@ test.describe('Approval Pending Badge', () => {
 
       // Navigate to executions list
       await app.goto('/executions')
-      await app.waitForLoadState('networkidle')
       await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
 
       // Wait for any WebSocket updates to settle after page load

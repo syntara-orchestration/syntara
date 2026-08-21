@@ -8,8 +8,7 @@
  * Each spec file should use a unique prefix (via buildUniqueName) to avoid
  * conflicts with parallel Playwright workers.
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { apiRequest, createCredentialViaApi, deleteCredentialViaApi, ensureProject, getAuthToken } from '../utils/api'
 
 export type SeededIntegration = {

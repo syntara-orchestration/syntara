@@ -6,8 +6,7 @@
  * - UI-29: Self-contained approve flow — create workflow with approval node,
  *   run it, find the pending approval in the queue, approve it, verify execution resumes
  */
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
@@ -91,7 +90,7 @@ test('user filters approvals by name and status', async ({ app }) => {
   await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true }).click()
   await app.getByRole('option', { name: 'Status' }).click()
   await app.getByRole('button', { name: 'Filter by status' }).click()
-  await app.getByRole('listbox').getByText('Approved').click()
+  await app.getByRole('menuitem', { name: 'Approved' }).click()
 
   const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
   await expect(nameChipGroup.getByText('Policy')).toBeVisible()
@@ -445,9 +444,13 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(batchId)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Step 1: Click header row checkbox to select all
-      const headerRow = table.getByRole('row').nth(0)
-      const selectAllCheckbox = headerRow.getByRole('checkbox')
+      const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible()
+
+      // PatternFly `Th select` sets aria-label="Select all rows" on the header checkbox.
+      const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
+      await expect(selectAllCheckbox).toBeEnabled()
       await selectAllCheckbox.check()
 
       // Step 2: Verify all approvals are selected (2 in this case)
@@ -466,7 +469,6 @@ test.describe('Approval Workflow Operations', () => {
       await expect(batchToolbar).not.toBeVisible()
 
       // Step 6: Verify all checkboxes are unchecked
-      const rows = table.getByRole('row')
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
       await expect(rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox')).not.toBeChecked()
     } finally {

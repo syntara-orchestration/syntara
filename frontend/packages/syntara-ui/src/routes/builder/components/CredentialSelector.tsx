@@ -84,7 +84,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
   }
   const typeMap = new Map<string, CredentialType>()
   for (const ct of credentialTypes) {
-    typeMap.set(ct.id!, ct)
+    if (ct.id) typeMap.set(ct.id, ct)
   }
   const groupMap = new Map<string, TypeGroup>()
   for (const cred of credentials) {
@@ -93,6 +93,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
       const ct = typeMap.get(typeId)
       groupMap.set(typeId, { typeId, typeName: ct?.name ?? 'Unknown', credentials: [] })
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groupMap.set(typeId, ...) above
     groupMap.get(typeId)!.credentials.push(cred)
   }
   return Array.from(groupMap.values())

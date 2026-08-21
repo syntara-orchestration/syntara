@@ -32,9 +32,9 @@ Before writing custom utilities, hooks, or helpers, check whether the library or
 - `URLSearchParams` instead of manual query string parsing
 - `AbortController` instead of custom cancellation logic
 - `URL` constructor instead of string concatenation for URLs
-- `crypto.getRandomValues()` + a wrapper instead of Math.random() for IDs
+- `crypto.getRandomValues()` when you need raw bytes; for string IDs use `generateUUID()` from `frontend/packages/syntara-ui/src/utils/generateUUID.ts` (wraps `uuid` v4 — not `crypto.getRandomValues()`)
 
-**Caveat -- verify browser API availability in all deployment contexts.** Some Web APIs are restricted to secure contexts (HTTPS or localhost). For example, `crypto.randomUUID()` is unavailable over plain HTTP and causes a runtime crash. The project uses `generateUUID()` from `frontend/packages/syntara-ui/src/utils/generateUUID.ts` which wraps `crypto.getRandomValues()` (available in all contexts). When using a native API, check [MDN's "Secure context: required" badge](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) and verify the app works over both HTTP and HTTPS.
+**Caveat -- verify browser API availability in all deployment contexts.** Some Web APIs are restricted to secure contexts (HTTPS or localhost). For example, `crypto.randomUUID()` is unavailable over plain HTTP and causes a runtime crash. This app uses `generateUUID()` (`uuid` v4) instead of `crypto.randomUUID()`. When using a native API, check [MDN's "Secure context: required" badge](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) and verify the app works over both HTTP and HTTPS.
 
 When reviewing code, flag any pattern that duplicates what a dependency or browser API already exposes. If unsure whether a library covers a use case, check [`.claude/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) and fetch the `llms.txt` URL for that library.
 
@@ -137,19 +137,7 @@ const { register, handleSubmit } = useForm<FormData>({
 
 ### Loading state: Use `isPending` from mutations, not `formState.isSubmitting`
 
-**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`.
-
-`formState.isSubmitting` only covers the synchronous `handleSubmit` wrapper. It does not reflect the actual async mutation state. Use `isPending` from the mutation hook for real loading indicators.
-
-```typescript
-// ❌ BAD — isSubmitting resolves before the mutation completes
-const { formState: { isSubmitting } } = useForm()
-<Button isLoading={isSubmitting}>Save</Button>
-
-// ✅ GOOD — isPending tracks the actual mutation lifecycle
-const { mutate, isPending } = credentialsClient.useMutation('post', '/credentials')
-<Button isLoading={isPending}>Save</Button>
-```
+**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`. Use `isPending` from the mutation hook.
 
 ### Step form (with Zod)
 
@@ -1283,22 +1271,9 @@ return groups.map(([id, { credentials }]) => {
 
 ## 27. `aria-label` Only on Interactive Elements
 
-**Enforced by ESLint:** `no-restricted-syntax` (error for `<span>`). See `eslint.config.js`.
+**Enforced by ESLint:** `no-restricted-syntax` (error) for `aria-label` on `<span>`. See `eslint.config.js`. Still flag `aria-label` on a generic `<div>` in review — that selector is span-only. Use `aria-label` on buttons, inputs, widgets, landmarks, images, or iframes.
 
-Do not add `aria-label` to non-interactive elements like `<span>` or `<div>`. Assistive technologies only announce `aria-label` on interactive elements, widgets, landmarks, images, and iframes. On a `<span>`, it is ignored by most screen readers.
-
-```typescript
-// ❌ BAD — aria-label on a non-interactive span
-<span aria-label="Status indicator">{statusText}</span>
-
-// ✅ GOOD — inner text content is sufficient for screen readers
-<span>{statusText}</span>
-
-// ✅ GOOD — aria-label on an interactive element
-<Button aria-label="Close dialog" variant="plain" icon={<TimesIcon />} />
-```
-
-**Reference:** [MDN aria-label](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-label) -- "in practice, it is supported only on interactive elements, widgets, landmarks, images, and iframes."
+**Reference:** [MDN aria-label](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-label).
 
 ---
 
@@ -1974,3 +1949,15 @@ Rules of thumb:
 - Skip `useOptimistic` when the success path is entangled with conflict handling, dirty client stores, or multi-step workflows (e.g. workflow publish).
 
 Reference implementation: `useOptimisticCredentialEnabled` (credentials list enable/disable).
+
+---
+
+## 41. Derive Named Booleans for Repeated Conditions
+
+**When a boolean check is used more than once, extract it into a named constant.** That also names the intent (`isCredentialRequired` vs repeating `CREDENTIAL_REQUIRED_TYPES.has(...)`). Same rule in hooks and utilities, not just components.
+
+---
+
+## 42. Use `ReactNode` Lists for Multi-Item Toast/Alert Content — Not `join('\n')`
+
+**When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse `\n` in HTML, so joined warnings appear on one line. `showAlert` / `showWarning` `description` already accepts `ReactNode`. Use a **module-scoped** helper (not nested in the caller) that renders PatternFly `List` / `ListItem` — not a raw `<ul>` or inline `style`.
