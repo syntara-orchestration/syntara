@@ -120,6 +120,28 @@ The application will be available at:
 - Maintainers will provide feedback
 - Be prepared to make requested changes
 
+### Manual CI Triggers
+
+Some CI jobs can be manually triggered via slash commands in PR comments. Only repository owners and members can use these commands.
+
+#### `/run-podman-e2e-ui` - Manual E2E UI Test Runs
+
+The Podman Compose E2E UI tests automatically run when frontend-relevant changes are detected (changes in `frontend/` or `.github/workflows/`). For backend-only PRs or workflow changes, you can manually trigger these tests by commenting:
+
+```
+/run-podman-e2e-ui
+```
+
+**When to use it:**
+- Backend-only PRs where you want to verify the UI still works
+- Workflow or CI configuration changes
+- Debugging test failures
+- Re-running tests after transient failures
+
+**Authorization:** Repository owners and members only
+
+The test run will appear in the PR checks automatically. Results are visible in the same place as automatic E2E runs.
+
 ## Code Readability Rules
 
 We enforce code readability through ESLint rules that keep functions small, files focused, and logic simple. The size/readability thresholds below are generally configured as `warn` so they guide refactoring without blocking every PR, but new code should still respect them.
