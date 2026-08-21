@@ -49,6 +49,7 @@ function ProjectRolesTable({
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete role</IconLabel>,
+      isDanger: true,
       onClick: () => onDelete(role),
     },
   ]

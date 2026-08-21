@@ -118,6 +118,7 @@ function getRowActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete user</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(user) : undefined,

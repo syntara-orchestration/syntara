@@ -127,7 +127,7 @@ describe('useNodeMenuActions', () => {
       })
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['View step details', 'Run step', 'Disable', 'Duplicate', 'Replace', 'Delete'])
+      expect(labels).toEqual(['View step details', 'Run step', 'Disable', 'Duplicate', 'Replace', '', 'Delete'])
     })
 
     it('calls onViewDetails with the node id', () => {
@@ -193,13 +193,14 @@ describe('useNodeMenuActions', () => {
       expect(last.variant).toBe('danger')
     })
 
-    it('delete is the last action with no separator', () => {
+    it('delete is last, preceded by a separator when other actions exist', () => {
       const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }), {
         wrapper: withNodeActions(defaultNodeActions),
       })
 
       const actions = result.current
-      expect(actions.every((a) => !a.separator)).toBe(true)
+      expect(actions[actions.length - 1].id).toBe('delete')
+      expect(actions[actions.length - 2]).toMatchObject({ id: 'sep-delete', separator: true })
     })
   })
 
@@ -227,7 +228,7 @@ describe('useNodeMenuActions', () => {
       )
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['Replace', 'Delete'])
+      expect(labels).toEqual(['Replace', '', 'Delete'])
     })
 
     it('does not include view details, run step, duplicate, or disable for control flow nodes', () => {
@@ -291,10 +292,11 @@ describe('useNodeMenuActions', () => {
         })
       )
 
-      // Without context: custom action, delete (no separator)
-      expect(result.current).toHaveLength(2)
+      // Without context: custom action, separator, delete
+      expect(result.current).toHaveLength(3)
       expect(result.current[0].label).toBe('Custom')
-      expect(result.current[1].label).toBe('Delete')
+      expect(result.current[1].separator).toBe(true)
+      expect(result.current[2].label).toBe('Delete')
     })
 
     it('calls additional action onClick when clicked', () => {
@@ -354,12 +356,13 @@ describe('useNodeMenuActions', () => {
         useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, additionalActions: actions })
       )
 
-      // Should have: 3 custom actions, delete (no separator)
-      expect(result.current).toHaveLength(4)
+      // Should have: 3 custom actions, separator, delete
+      expect(result.current).toHaveLength(5)
       expect(result.current[0].label).toBe('Action 1')
       expect(result.current[1].label).toBe('Action 2')
       expect(result.current[2].label).toBe('Action 3')
-      expect(result.current[3].label).toBe('Delete')
+      expect(result.current[3].separator).toBe(true)
+      expect(result.current[4].label).toBe('Delete')
     })
   })
 })

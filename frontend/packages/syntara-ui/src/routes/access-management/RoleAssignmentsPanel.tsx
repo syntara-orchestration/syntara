@@ -61,6 +61,7 @@ function getAssignmentActions(
   return [
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(row) : undefined,

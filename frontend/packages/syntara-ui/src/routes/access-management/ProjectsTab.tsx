@@ -61,6 +61,7 @@ function getRowActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete project</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(project) : undefined,

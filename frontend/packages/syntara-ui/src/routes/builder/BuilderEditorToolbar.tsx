@@ -202,24 +202,27 @@ function WorkflowKebabMenu({
                 </DropdownItem>
               )}
               {showExistingWorkflowItems && (
-                <DropdownItem
-                  isAriaDisabled={!canDelete}
-                  tooltipProps={canDelete ? undefined : { content: builderPermissions.tooltips.delete }}
-                  onClick={
-                    canDelete
-                      ? () => {
-                          dispatch({ type: 'SET_DELETE_DIALOG', payload: true })
-                          closeKebab()
-                        }
-                      : undefined
-                  }
-                  isDanger={canDelete}
-                >
-                  <Icon isInline className={toolbarStyles.menuIcon}>
-                    <RhUiTrashIcon />
-                  </Icon>
-                  Delete workflow
-                </DropdownItem>
+                <>
+                  <Divider />
+                  <DropdownItem
+                    isAriaDisabled={!canDelete}
+                    tooltipProps={canDelete ? undefined : { content: builderPermissions.tooltips.delete }}
+                    onClick={
+                      canDelete
+                        ? () => {
+                            dispatch({ type: 'SET_DELETE_DIALOG', payload: true })
+                            closeKebab()
+                          }
+                        : undefined
+                    }
+                    isDanger={canDelete}
+                  >
+                    <Icon isInline className={toolbarStyles.menuIcon}>
+                      <RhUiTrashIcon />
+                    </Icon>
+                    Delete workflow
+                  </DropdownItem>
+                </>
               )}
             </DropdownList>
           </DropdownGroup>

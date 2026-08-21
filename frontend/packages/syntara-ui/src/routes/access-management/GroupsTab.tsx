@@ -189,6 +189,7 @@ export function GroupsTab() {
                             { isSeparator: true },
                             {
                               title: <IconLabel icon={<RhUiTrashIcon />}>Delete group</IconLabel>,
+                              isDanger: true,
                               isAriaDisabled: !permissions.canDelete,
                               tooltipProps: permissions.canDelete
                                 ? undefined

@@ -226,6 +226,7 @@ function getGroupActions(
   return [
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Remove from group</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove({ id: group.id, name: group.name }) : undefined,

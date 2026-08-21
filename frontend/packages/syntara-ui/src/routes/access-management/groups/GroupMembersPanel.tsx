@@ -60,6 +60,7 @@ function getMemberActions(
   return [
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Remove member</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove(member) : undefined,

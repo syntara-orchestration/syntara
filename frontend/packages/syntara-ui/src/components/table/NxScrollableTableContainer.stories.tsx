@@ -65,7 +65,8 @@ function StatusLabel({ status }: Readonly<{ status: StatusValue }>) {
 
 const ROW_ACTIONS = [
   { title: 'Edit', onClick: () => {} },
-  { title: 'Delete', onClick: () => {} },
+  { isSeparator: true },
+  { title: 'Delete', onClick: () => {}, isDanger: true },
 ]
 
 const STORY_FILTER_FIELDS = [

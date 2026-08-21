@@ -95,11 +95,12 @@ describe('SynEmptyStateNoData', () => {
     expect(screen.getByRole('img', { name: 'Workflow icon' })).toBeInTheDocument()
   })
 
-  it('renders primary variant button', () => {
+  it('renders primary variant button with add icon', () => {
     const addData = vi.fn()
     render(<SynEmptyStateNoData addData={addData} />)
 
     const button = screen.getByRole('button', { name: 'Add data' })
     expect(button).toHaveClass('pf-m-primary')
+    expect(button.querySelector('svg')).toBeInTheDocument()
   })
 })
