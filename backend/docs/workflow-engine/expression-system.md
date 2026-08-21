@@ -28,7 +28,8 @@ ${namespace.field.nested_field}
 | `{node_id}` | Any upstream node's output | Nodes downstream of that node |
 | `workflow_context` | Workflow metadata (`now`, `today`, execution info) | All nodes |
 | `loop` | Loop iteration data (`item`, `index`), scoped to the enclosing loop | Inside a loop body only |
-| `variables` | Workflow-level variables | **Not yet implemented** — recognized by the validator but never populated; `${variables.*}` raises `KeyError` at runtime |
+| `input` / `inputs` | Leftover V1 names for trigger payload | **Not supported** — rejected at save-time validation. Use `${trigger.*}` |
+| `variables` | Workflow-level variables | **Not implemented** — rejected at save-time validation |
 | `secrets` | Resolved credential values | **Not available as a namespace** — credentials are injected per-node via `credential_id` and never placed in the resolver |
 
 There is no `input`/`inputs` namespace — workflow input data flows through `trigger` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)).
