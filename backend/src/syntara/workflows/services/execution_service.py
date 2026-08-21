@@ -1139,6 +1139,21 @@ class ExecutionService(BaseService):
             )
             raise
 
+        # Best-effort: cancel any in-flight agentic invocations linked to
+        # this execution.  Agentic activities use async-completion so the
+        # Temporal cancel above does not reach the running agent process.
+        try:
+            from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
+                cancel_invocations_for_execution,
+            )
+
+            await cancel_invocations_for_execution(self.session, execution_id)
+        except Exception:
+            logger.exception(
+                "Best-effort invocation cancellation failed",
+                execution_id=execution_id,
+            )
+
         self._emit_lifecycle_event(
             execution_id=execution.id,
             workflow_id=execution.workflow_id,

@@ -1038,3 +1038,65 @@ class TestAgentOrchestratorClientPayloadConstruction:
         assert captured_payload["contextData"]["metadata"]["input_data"] == "metadata_input"
         assert captured_payload["contextData"]["metadata"]["model"] == "metadata_model"
         assert captured_payload["contextData"]["metadata"]["custom"] == "value"
+
+
+class TestCancelInvocation:
+    """Tests for AgentOrchestratorClient.cancel_invocation."""
+
+    @pytest.mark.asyncio
+    async def test_cancel_success(self) -> None:
+        response = MagicMock()
+        response.is_success = True
+        response.status_code = 200
+
+        async with AgentOrchestratorClient() as client:
+            client.http_client.post = AsyncMock(return_value=response)  # type: ignore[method-assign]
+            result = await client.cancel_invocation("inv-123")
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_cancel_not_found_returns_false(self) -> None:
+        response = MagicMock()
+        response.is_success = False
+        response.status_code = 404
+
+        async with AgentOrchestratorClient() as client:
+            client.http_client.post = AsyncMock(return_value=response)  # type: ignore[method-assign]
+            result = await client.cancel_invocation("inv-missing")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_conflict_returns_false(self) -> None:
+        response = MagicMock()
+        response.is_success = False
+        response.status_code = 409
+
+        async with AgentOrchestratorClient() as client:
+            client.http_client.post = AsyncMock(return_value=response)  # type: ignore[method-assign]
+            result = await client.cancel_invocation("inv-done")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_connection_error_returns_false(self) -> None:
+        async with AgentOrchestratorClient() as client:
+            client.http_client.post = AsyncMock(side_effect=httpx.ConnectError("unreachable"))  # type: ignore[method-assign]
+            result = await client.cancel_invocation("inv-123")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_passes_reason(self) -> None:
+        response = MagicMock()
+        response.is_success = True
+        response.status_code = 200
+
+        async with AgentOrchestratorClient() as client:
+            mock_post = AsyncMock(return_value=response)
+            client.http_client.post = mock_post  # type: ignore[method-assign]
+            await client.cancel_invocation("inv-123", reason="User requested")
+
+        call_kwargs = mock_post.call_args
+        assert call_kwargs.kwargs["json"] == {"reason": "User requested"}
