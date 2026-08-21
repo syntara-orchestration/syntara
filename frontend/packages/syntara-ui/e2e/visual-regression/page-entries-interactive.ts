@@ -703,7 +703,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
       // "Run history" lives inside the "Workflow actions" kebab menu, not a standalone button
       await page.getByLabel('Workflow actions').click()
       await page.getByRole('menuitem', { name: /Run history/i }).click()
-      await expect(page.getByRole('heading', { name: 'Run History' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Run history' })).toBeVisible()
       // Wait for pagination footer to ensure full render
       await expect(page.getByRole('navigation', { name: /pagination/i })).toBeVisible()
     },
