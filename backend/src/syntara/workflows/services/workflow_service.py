@@ -164,7 +164,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.one_or_none()
@@ -768,7 +767,6 @@ class WorkflowService(BaseService):
             select(Workflow)
             .filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .with_for_update()
         )
@@ -797,7 +795,6 @@ class WorkflowService(BaseService):
             .filter(
                 WorkflowVersion.workflow_id == workflow.id,  # type: ignore[arg-type]
                 WorkflowVersion.version.in_([workflow.current_version, expected_version]),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         rows = result.all()
@@ -831,7 +828,6 @@ class WorkflowService(BaseService):
             pub_result = await self.session.exec(
                 select(WorkflowVersion).filter(
                     WorkflowVersion.id == workflow.published_version_id,  # type: ignore[arg-type]
-                    WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             published_ver = pub_result.one_or_none()
@@ -860,7 +856,6 @@ class WorkflowService(BaseService):
         result = await self.session.exec(
             select(Workflow).filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         workflow = result.one_or_none()
@@ -892,7 +887,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == workflow.current_version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         current_version = version_result.one_or_none()
@@ -1532,13 +1526,16 @@ class WorkflowService(BaseService):
         return workflow, new_version
 
     async def delete_workflow(self, workflow_id: UUID) -> None:
-        """Soft delete a workflow.
+        """Hard-delete a workflow and cascade-delete its versions and executions.
+
+        Versions and executions are cascade-deleted via DB FK (ondelete=CASCADE).
 
         Args:
             workflow_id: UUID of workflow to delete
 
         Raises:
             WorkflowNotFoundError: If workflow not found
+            BuiltinWorkflowDeleteError: If workflow is a built-in
 
         """
         workflow = await self.get_workflow_by_id(workflow_id)
@@ -1546,12 +1543,18 @@ class WorkflowService(BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
-        # Delete associated webhook triggers before soft-deleting the workflow
+        # Delete associated webhook triggers (DB rows)
         webhook_service = WebhookTriggerService(self.session, self.user)
         await webhook_service.delete_triggers_for_workflow(workflow_id)
 
-        # Soft delete
-        workflow.soft_delete(self.user.id)
+        # Break self-referential FK before delete
+        # (constraint: is_enabled must be False when published_version_id is NULL)
+        workflow.published_version_id = None
+        workflow.is_enabled = False
+        await self.session.flush()
+
+        # Hard delete — versions and executions cascade via DB FK
+        await self.session.delete(workflow)
         try:
             await self.session.commit()
         except Exception as exc:

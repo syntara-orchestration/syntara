@@ -327,8 +327,6 @@ class TestBuildWorkflowWithVersionResponse:
         workflow.project_id = uuid4()
         workflow.created_at = MagicMock()
         workflow.updated_at = MagicMock()
-        workflow.deleted_at = None
-        workflow.deleted_by = None
         workflow.updated_by = None
 
         version = MagicMock()
@@ -342,8 +340,6 @@ class TestBuildWorkflowWithVersionResponse:
         version.created_by = uuid4()
         version.created_at = MagicMock()
         version.updated_at = MagicMock()
-        version.deleted_at = None
-        version.deleted_by = None
 
         result = await _build_workflow_with_version_response(workflow, version, mock_service)
 
@@ -375,8 +371,6 @@ class TestBuildWorkflowWithVersionResponse:
         workflow.project_id = uuid4()
         workflow.created_at = MagicMock()
         workflow.updated_at = MagicMock()
-        workflow.deleted_at = None
-        workflow.deleted_by = None
         workflow.updated_by = None
 
         version = MagicMock()
@@ -390,8 +384,6 @@ class TestBuildWorkflowWithVersionResponse:
         version.created_by = uuid4()
         version.created_at = MagicMock()
         version.updated_at = MagicMock()
-        version.deleted_at = None
-        version.deleted_by = None
 
         result = await _build_workflow_with_version_response(workflow, version, mock_service)
 

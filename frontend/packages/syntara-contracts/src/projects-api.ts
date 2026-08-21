@@ -1130,7 +1130,6 @@ export interface components {
      * @description Schema for workflow response (GET /workflows/{id}).
      *
      *     Includes all fields from the database table model.
-     *     Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
      */
     WorkflowRead: {
       /**
@@ -1193,10 +1192,6 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
     }
