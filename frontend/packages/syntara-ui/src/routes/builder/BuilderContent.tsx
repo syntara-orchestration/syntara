@@ -501,192 +501,190 @@ export function BuilderContent(props: BuilderContentProps) {
         <VersionViewProvider value={versionPanel.isViewingVersion}>
           <SynPage>
             <SynReactFlowViewportGuard>
-              <Stack hasGutter>
-                <StackItem>
-                  <BuilderWorkflowPageHeader
+              <StackItem>
+                <BuilderWorkflowPageHeader
+                  workflowName={workflowName}
+                  workflowDescription={workflowDescription}
+                  isNew={isNew}
+                  workflow={workflow?.id ? { id: workflow.id } : undefined}
+                  isPending={isCreating || isUpdating}
+                  isDirty={isDirty}
+                  lastSavedAt={workflow?.updated_at}
+                  isKebabOpen={isKebabOpen}
+                  publishedVersionId={workflow?.published_version_id ?? null}
+                  currentVersionId={workflow?.version?.id}
+                  isPublishing={isPublishing}
+                  ProjectSelector={ProjectSelector}
+                  dispatch={dispatch}
+                  markDirty={markDirty}
+                  handleToggleHistory={handleToggleHistory}
+                  handleToggleVersionHistory={versionPanel.handleToggleVersionHistory}
+                  handleToggleDetails={handleToggleDetails}
+                  handleSaveWorkflow={guardedSaveWorkflow}
+                  onPublish={onPublish}
+                  onUnpublish={onUnpublish}
+                  onPendingImport={setPendingImport}
+                  isLiveRunActive={isLiveRunActive}
+                  executionId={mostRecentExecutionId}
+                  executionStatus={mostRecentExecution?.status}
+                  projectId={builderProjectId}
+                  onBackToEditor={isLiveRunActive ? handleCloseMostRecentRunPanel : undefined}
+                  hasApprovalPending={!!pendingApproval}
+                  isApprovalLoading={isApprovalLoading}
+                  isApprovalPanelOpen={approvalViewOpen}
+                  onReviewApproval={openApprovalView}
+                  triggers={triggers}
+                  isAddNodePanelOpen={isAddNodePanelOpen}
+                  hasNoWorkflowNodes={hasNoWorkflowNodes}
+                  isBuiltin={currentWorkflow?.is_builtin === true}
+                  builderPermissions={builderPermissions}
+                  isViewingVersion={versionPanel.isViewingVersion}
+                  versionHistoryOpen={versionHistoryOpen}
+                  viewedVersionDate={versionPanel.viewedVersionDate}
+                  viewedVersionStatus={versionPanel.viewedVersionStatus}
+                  onExitVersionView={versionPanel.handleExitVersionView}
+                  onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
+                  isNodeEditorOpen={isNodeEditorOpen}
+                />
+              </StackItem>
+              <BuilderReadOnlyBanner
+                canEdit={builderPermissions.canEdit}
+                isLoading={builderPermissions.isLoading}
+                isBuiltin={currentWorkflow?.is_builtin === true}
+              />
+              <ValidationBanner
+                errors={state.validationErrors}
+                dismissed={state.validationBannerDismissed}
+                source={state.validationSource ?? 'verify'}
+                dispatch={dispatch}
+                onNavigateToNode={handleNavigateToNode}
+              />
+              <StackItem isFilled className={styles.filledMinHeight}>
+                <Flex
+                  alignItems={{ default: 'alignItemsStretch' }}
+                  flexWrap={{ default: 'nowrap' }}
+                  gap={{ default: 'gapSm' }}
+                  className={styles.canvasFlex}
+                >
+                  <FlexItem
+                    className={styles.canvasFlexItem}
+                    style={{ pointerEvents: isNodeEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
+                  >
+                    <Stack className={styles.canvasStack}>
+                      <StackItem isFilled className={styles.filledMinHeight}>
+                        <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
+                          <VersionInfoCard
+                            title={versionPanel.viewedVersionName}
+                            date={versionPanel.viewedVersionDate}
+                            description={versionPanel.viewedVersionDescription}
+                            publishedAt={versionPanel.viewedVersionPublishedAt}
+                            unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
+                          />
+                          <BuilderFlow
+                            workflowId={workflowId}
+                            readOnly={versionPanel.isViewingVersion}
+                            canEdit={builderPermissions.canEdit}
+                            panelOpen={isAddNodePanelOpen || !!selectedNode}
+                            activeEdgeButtonNodeId={isAddNodePanelOpen ? sourceNodeId : null}
+                            activeEdgeButtonHandle={isAddNodePanelOpen ? sourceHandle : null}
+                            activeEdgeId={isAddNodePanelOpen ? edgeIdToReplace : null}
+                            executionStatus={canvasExecutionStatus}
+                            copiedRunActivityIds={copiedRunActivityIds}
+                            disableDeleteKey={isNodeEditorOpen}
+                            disableSpacePanning={isNodeEditorOpen || confirmDialogOpen}
+                            onNodeClick={wrappedHandleNodeClick}
+                            onAddNodeFromEdge={handleAddNodeFromEdge}
+                            onNodesDeleted={handleNodesDeleted}
+                            newNodeDesiredPosition={state.newNodeDesiredPosition}
+                            onClearDesiredPosition={handleClearDesiredPosition}
+                            validationErrors={state.validationErrors}
+                          />
+                        </SynPanel>
+                      </StackItem>
+                      {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
+                        <ExecutionDetailsPanelWrapper
+                          executionId={mostRecentExecutionId}
+                          workflowDefinition={
+                            workflow?.version?.workflow_definition as Parameters<
+                              typeof ExecutionDetailsPanelWrapper
+                            >[0]['workflowDefinition']
+                          }
+                          selectedNodeId={mostRecentSelectedNodeId}
+                          selectedNodeName={mostRecentSelectedNodeName}
+                          onNodeSelect={handleMostRecentNodeSelect}
+                          panelHeight={mostRecentPanelHeight}
+                          onResize={handleMostRecentResize}
+                          isTerminalStatus={isTerminalStatus}
+                          onClosePanel={handleCloseMostRecentRunPanel}
+                        />
+                      )}
+                    </Stack>
+                  </FlexItem>
+                  <BuilderSidePanels
+                    isAddNodePanelOpen={isAddNodePanelOpen}
+                    isNodeEditorOpen={isNodeEditorOpen}
+                    canEdit={builderPermissions.canEdit}
+                    sourceNodeId={sourceNodeId}
+                    replacementNodeId={replacementNodeId}
+                    hasNoWorkflowNodes={hasNoWorkflowNodes}
+                    dispatch={dispatch}
+                    historyCardOpen={historyCardOpen}
+                    isNew={isNew}
+                    executions={executionsQuery.data?.resources ?? []}
+                    onExecutionNavigate={handleExecutionNavigate}
+                    executionFilters={executionFilters}
+                    onFilterChange={handleExecutionFilterChange}
+                    executionPaginationFooterProps={executionPaginationFooterProps}
+                    detailsOpen={detailsOpen}
+                    workflow={workflow}
                     workflowName={workflowName}
                     workflowDescription={workflowDescription}
-                    isNew={isNew}
-                    workflow={workflow?.id ? { id: workflow.id } : undefined}
-                    isPending={isCreating || isUpdating}
-                    isDirty={isDirty}
-                    lastSavedAt={workflow?.updated_at}
-                    isKebabOpen={isKebabOpen}
-                    publishedVersionId={workflow?.published_version_id ?? null}
-                    currentVersionId={workflow?.version?.id}
-                    isPublishing={isPublishing}
-                    ProjectSelector={ProjectSelector}
-                    dispatch={dispatch}
                     markDirty={markDirty}
-                    handleToggleHistory={handleToggleHistory}
-                    handleToggleVersionHistory={versionPanel.handleToggleVersionHistory}
-                    handleToggleDetails={handleToggleDetails}
-                    handleSaveWorkflow={guardedSaveWorkflow}
-                    onPublish={onPublish}
-                    onUnpublish={onUnpublish}
-                    onPendingImport={setPendingImport}
-                    isLiveRunActive={isLiveRunActive}
-                    executionId={mostRecentExecutionId}
-                    executionStatus={mostRecentExecution?.status}
-                    projectId={builderProjectId}
-                    onBackToEditor={isLiveRunActive ? handleCloseMostRecentRunPanel : undefined}
-                    hasApprovalPending={!!pendingApproval}
-                    isApprovalLoading={isApprovalLoading}
-                    isApprovalPanelOpen={approvalViewOpen}
-                    onReviewApproval={openApprovalView}
-                    triggers={triggers}
-                    isAddNodePanelOpen={isAddNodePanelOpen}
-                    hasNoWorkflowNodes={hasNoWorkflowNodes}
-                    isBuiltin={currentWorkflow?.is_builtin === true}
-                    builderPermissions={builderPermissions}
-                    isViewingVersion={versionPanel.isViewingVersion}
-                    versionHistoryOpen={versionHistoryOpen}
-                    viewedVersionDate={versionPanel.viewedVersionDate}
-                    viewedVersionStatus={versionPanel.viewedVersionStatus}
-                    onExitVersionView={versionPanel.handleExitVersionView}
-                    onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
-                    isNodeEditorOpen={isNodeEditorOpen}
                   />
-                </StackItem>
-                <BuilderReadOnlyBanner
-                  canEdit={builderPermissions.canEdit}
-                  isLoading={builderPermissions.isLoading}
-                  isBuiltin={currentWorkflow?.is_builtin === true}
-                />
-                <ValidationBanner
-                  errors={state.validationErrors}
-                  dismissed={state.validationBannerDismissed}
-                  source={state.validationSource ?? 'verify'}
-                  dispatch={dispatch}
-                  onNavigateToNode={handleNavigateToNode}
-                />
-                <StackItem isFilled className={styles.filledMinHeight}>
-                  <Flex
-                    alignItems={{ default: 'alignItemsStretch' }}
-                    flexWrap={{ default: 'nowrap' }}
-                    gap={{ default: 'gapSm' }}
-                    className={styles.canvasFlex}
-                  >
-                    <FlexItem
-                      className={styles.canvasFlexItem}
-                      style={{ pointerEvents: isNodeEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
-                    >
-                      <Stack className={styles.canvasStack}>
-                        <StackItem isFilled className={styles.filledMinHeight}>
-                          <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
-                            <VersionInfoCard
-                              title={versionPanel.viewedVersionName}
-                              date={versionPanel.viewedVersionDate}
-                              description={versionPanel.viewedVersionDescription}
-                              publishedAt={versionPanel.viewedVersionPublishedAt}
-                              unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
-                            />
-                            <BuilderFlow
-                              workflowId={workflowId}
-                              readOnly={versionPanel.isViewingVersion}
-                              canEdit={builderPermissions.canEdit}
-                              panelOpen={isAddNodePanelOpen || !!selectedNode}
-                              activeEdgeButtonNodeId={isAddNodePanelOpen ? sourceNodeId : null}
-                              activeEdgeButtonHandle={isAddNodePanelOpen ? sourceHandle : null}
-                              activeEdgeId={isAddNodePanelOpen ? edgeIdToReplace : null}
-                              executionStatus={canvasExecutionStatus}
-                              copiedRunActivityIds={copiedRunActivityIds}
-                              disableDeleteKey={isNodeEditorOpen}
-                              disableSpacePanning={isNodeEditorOpen || confirmDialogOpen}
-                              onNodeClick={wrappedHandleNodeClick}
-                              onAddNodeFromEdge={handleAddNodeFromEdge}
-                              onNodesDeleted={handleNodesDeleted}
-                              newNodeDesiredPosition={state.newNodeDesiredPosition}
-                              onClearDesiredPosition={handleClearDesiredPosition}
-                              validationErrors={state.validationErrors}
-                            />
-                          </SynPanel>
-                        </StackItem>
-                        {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
-                          <ExecutionDetailsPanelWrapper
-                            executionId={mostRecentExecutionId}
-                            workflowDefinition={
-                              workflow?.version?.workflow_definition as Parameters<
-                                typeof ExecutionDetailsPanelWrapper
-                              >[0]['workflowDefinition']
-                            }
-                            selectedNodeId={mostRecentSelectedNodeId}
-                            selectedNodeName={mostRecentSelectedNodeName}
-                            onNodeSelect={handleMostRecentNodeSelect}
-                            panelHeight={mostRecentPanelHeight}
-                            onResize={handleMostRecentResize}
-                            isTerminalStatus={isTerminalStatus}
-                            onClosePanel={handleCloseMostRecentRunPanel}
-                          />
-                        )}
-                      </Stack>
+
+                  {!isNodeEditorOpen && approvalViewOpen && pendingApproval && (
+                    <FlexItem className={styles.approvalPanelSlot}>
+                      <ApprovalSidePanel
+                        approval={pendingApproval}
+                        message={approvalMessage}
+                        onClose={handleApprovalClose}
+                        onDecisionSubmitted={handleApprovalDismiss}
+                        onNavigate={setLocation}
+                      />
                     </FlexItem>
-                    <BuilderSidePanels
-                      isAddNodePanelOpen={isAddNodePanelOpen}
-                      isNodeEditorOpen={isNodeEditorOpen}
-                      canEdit={builderPermissions.canEdit}
+                  )}
+
+                  <VersionHistorySidePanel
+                    sidePanel={versionPanel.versionSidePanel}
+                    isNodeEditorOpen={isNodeEditorOpen}
+                    editPermission={{
+                      canEdit: builderPermissions.canEdit,
+                      tooltip: builderPermissions.tooltips.edit,
+                    }}
+                  />
+
+                  <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
+                    <NodeEditorOverlay
+                      isOpen={isNodeEditorOpen}
+                      mode={nodeEditorMode}
+                      selectedNode={selectedNode}
+                      nodeTypeId={nodeEditorNodeTypeId}
+                      nodeSubtypeId={nodeEditorNodeSubtypeId}
                       sourceNodeId={sourceNodeId}
                       replacementNodeId={replacementNodeId}
-                      hasNoWorkflowNodes={hasNoWorkflowNodes}
-                      dispatch={dispatch}
-                      historyCardOpen={historyCardOpen}
-                      isNew={isNew}
-                      executions={executionsQuery.data?.resources ?? []}
-                      onExecutionNavigate={handleExecutionNavigate}
-                      executionFilters={executionFilters}
-                      onFilterChange={handleExecutionFilterChange}
-                      executionPaginationFooterProps={executionPaginationFooterProps}
-                      detailsOpen={detailsOpen}
-                      workflow={workflow}
-                      workflowName={workflowName}
-                      workflowDescription={workflowDescription}
-                      markDirty={markDirty}
+                      executionId={mostRecentExecutionId}
+                      workflowId={workflowId}
+                      onConnect={handleConnectFromPanel}
+                      onClose={handleCloseNodeEditor}
+                      onNavigateToNode={handleNavigateToNode}
+                      onAddStep={handleAddStepFromPanel}
+                      projectId={builderProjectId}
+                      workflowMetadata={workflowMetadata}
+                      onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
                     />
-
-                    {!isNodeEditorOpen && approvalViewOpen && pendingApproval && (
-                      <FlexItem className={styles.approvalPanelSlot}>
-                        <ApprovalSidePanel
-                          approval={pendingApproval}
-                          message={approvalMessage}
-                          onClose={handleApprovalClose}
-                          onDecisionSubmitted={handleApprovalDismiss}
-                          onNavigate={setLocation}
-                        />
-                      </FlexItem>
-                    )}
-
-                    <VersionHistorySidePanel
-                      sidePanel={versionPanel.versionSidePanel}
-                      isNodeEditorOpen={isNodeEditorOpen}
-                      editPermission={{
-                        canEdit: builderPermissions.canEdit,
-                        tooltip: builderPermissions.tooltips.edit,
-                      }}
-                    />
-
-                    <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                      <NodeEditorOverlay
-                        isOpen={isNodeEditorOpen}
-                        mode={nodeEditorMode}
-                        selectedNode={selectedNode}
-                        nodeTypeId={nodeEditorNodeTypeId}
-                        nodeSubtypeId={nodeEditorNodeSubtypeId}
-                        sourceNodeId={sourceNodeId}
-                        replacementNodeId={replacementNodeId}
-                        executionId={mostRecentExecutionId}
-                        workflowId={workflowId}
-                        onConnect={handleConnectFromPanel}
-                        onClose={handleCloseNodeEditor}
-                        onNavigateToNode={handleNavigateToNode}
-                        onAddStep={handleAddStepFromPanel}
-                        projectId={builderProjectId}
-                        workflowMetadata={workflowMetadata}
-                        onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
-                      />
-                    </NodeEditorAutoSubmitContext.Provider>
-                  </Flex>
-                </StackItem>
-              </Stack>
+                  </NodeEditorAutoSubmitContext.Provider>
+                </Flex>
+              </StackItem>
             </SynReactFlowViewportGuard>
 
             <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
