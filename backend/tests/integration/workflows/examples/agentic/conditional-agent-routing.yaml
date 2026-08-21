@@ -10,12 +10,14 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
-
-inputs:
-  user_request:
-    type: string
-    description: User request to be classified and routed to appropriate specialist
-    default: How do I optimize database query performance?
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          user_request:
+            type: string
+            description: User request to be classified and routed to appropriate specialist
+            default: How do I optimize database query performance?
 
 nodes:
   - id: classify_request
@@ -34,15 +36,11 @@ nodes:
         - creative: Content creation, design, marketing
 
         Respond with ONLY one word: technical, business, or creative
-    inputs:
-      user_request: ${trigger.user_request}
-    outputs:
-      domain: $.result.content
 
   - id: route_to_specialist
     name: Route to Specialist
     type: condition
-    condition: ${classify_request.output.domain} == 'technical'
+    condition: ${classify_request.output} == 'technical'
 
   - id: technical_specialist
     name: Technical Specialist
@@ -52,15 +50,11 @@ nodes:
       model: claude-3-5-sonnet-20241022
       prompt: |
         Provide technical assistance for: ${trigger.user_request}
-    inputs:
-      user_request: ${trigger.user_request}
-    outputs:
-      response: $.result.content
 
   - id: check_business
     name: Check if Business Domain
     type: condition
-    condition: ${classify_request.output.domain} == 'business'
+    condition: ${classify_request.output} == 'business'
 
   - id: business_specialist
     name: Business Specialist
@@ -70,10 +64,6 @@ nodes:
       model: claude-3-5-sonnet-20241022
       prompt: |
         Provide business guidance for: ${trigger.user_request}
-    inputs:
-      user_request: ${trigger.user_request}
-    outputs:
-      response: $.result.content
 
   - id: creative_specialist
     name: Creative Specialist
@@ -83,22 +73,18 @@ nodes:
       model: claude-3-5-sonnet-20241022
       prompt: |
         Provide creative assistance for: ${trigger.user_request}
-    inputs:
-      user_request: ${trigger.user_request}
-    outputs:
-      response: $.result.content
 edges:
-  - source: classify_request
-    target: route_to_specialist
-  - source: route_to_specialist
-    target: technical_specialist
+  - from: classify_request
+    to: route_to_specialist
+  - from: route_to_specialist
+    to: technical_specialist
     port: then
-  - source: route_to_specialist
-    target: check_business
+  - from: route_to_specialist
+    to: check_business
     port: else
-  - source: check_business
-    target: business_specialist
+  - from: check_business
+    to: business_specialist
     port: then
-  - source: check_business
-    target: creative_specialist
+  - from: check_business
+    to: creative_specialist
     port: else

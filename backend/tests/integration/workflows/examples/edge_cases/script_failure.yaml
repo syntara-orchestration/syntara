@@ -16,6 +16,4 @@ nodes:
       code: |
         echo "This script will fail" >&2
         exit 1
-    outputs:
-      result: $.stdout
 edges: []

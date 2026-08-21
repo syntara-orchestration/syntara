@@ -4,8 +4,8 @@ import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
-const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
-const UNSUPPORTED_NAMESPACES = new Set(['input', 'inputs', 'variables'])
+const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context'])
+const UNSUPPORTED_NAMESPACES = new Set(['input', 'inputs', 'variables', 'workflow'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -116,8 +116,8 @@ type RefContext = {
 function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): ValidationError {
   const stepName = activity.name ?? activity.id
   const suggestion =
-    ref.namespace === 'variables'
-      ? 'Workflow-level ${variables.*} is not supported'
+    ref.namespace === 'variables' || ref.namespace === 'workflow'
+      ? `Workflow-level \${${ref.namespace}.*} is not supported`
       : 'Use ${trigger.field} for trigger payload'
   return {
     id: `var-ref-unsupported-${activity.id}-${ref.namespace}`,

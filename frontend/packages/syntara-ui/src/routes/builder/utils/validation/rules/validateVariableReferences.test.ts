@@ -24,7 +24,7 @@ function makeTriggerWithInputs(fields: string[]): Activity {
 
 describe('validateVariableReferences', () => {
   describe('unsupported leftover namespaces', () => {
-    it.each(['input', 'inputs', 'variables'])(
+    it.each(['input', 'inputs', 'variables', 'workflow'])(
       'errors on ${%s.*} even when the field exists on the trigger schema',
       (namespace) => {
         const activities: Activity[] = [
@@ -41,8 +41,8 @@ describe('validateVariableReferences', () => {
         expect(errors[0].severity).toBe('error')
         expect(errors[0].nodeId).toBe('task-1')
         expect(errors[0].message).toContain(`"${namespace}" is not a supported namespace`)
-        if (namespace === 'variables') {
-          expect(errors[0].suggestion).toContain('variables')
+        if (namespace === 'variables' || namespace === 'workflow') {
+          expect(errors[0].suggestion).toContain(namespace)
         } else {
           expect(errors[0].suggestion).toContain('${trigger.field}')
         }
@@ -176,12 +176,12 @@ describe('validateVariableReferences', () => {
   })
 
   describe('skipped namespaces', () => {
-    it.each(['workflow', 'workflow_context'])('does not error for ${%s.*} references', (namespace) => {
+    it('does not error for ${workflow_context.*} references', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
           type: 'script',
-          parameters: { code: `\${${namespace}.some_field}` },
+          parameters: { code: '${workflow_context.some_field}' },
         }),
       ]
 

@@ -15,8 +15,6 @@ nodes:
       language: bash
       code: |
         echo "Setting up pipeline"
-    outputs:
-      status: $.stdout
 
   - id: parallel_processing_fork
     name: Parallel Processing (fork)
@@ -28,8 +26,6 @@ nodes:
       language: bash
       code: |
         echo "Processing A"
-    outputs:
-      result: $.stdout
 
   - id: process_b
     type: script
@@ -37,8 +33,6 @@ nodes:
       language: bash
       code: |
         echo "Processing B"
-    outputs:
-      result: $.stdout
 
   - id: parallel_processing_join
     type: join
@@ -50,18 +44,16 @@ nodes:
       language: bash
       code: |
         echo "Cleaning up pipeline"
-    outputs:
-      status: $.stdout
 edges:
-  - source: setup
-    target: parallel_processing_fork
-  - source: parallel_processing_fork
-    target: process_a
-  - source: parallel_processing_fork
-    target: process_b
-  - source: process_a
-    target: parallel_processing_join
-  - source: process_b
-    target: parallel_processing_join
-  - source: parallel_processing_join
-    target: cleanup
+  - from: setup
+    to: parallel_processing_fork
+  - from: parallel_processing_fork
+    to: process_a
+  - from: parallel_processing_fork
+    to: process_b
+  - from: process_a
+    to: parallel_processing_join
+  - from: process_b
+    to: parallel_processing_join
+  - from: parallel_processing_join
+    to: cleanup
