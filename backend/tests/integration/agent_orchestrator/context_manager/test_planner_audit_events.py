@@ -8,7 +8,7 @@ Verifies that ContextManagerPlanner emits the expected audit events during execu
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractContextManager
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -25,10 +25,18 @@ from syntara.agent_orchestrator.context_manager import (
 )
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
+from syntara.core.cache.stream import StreamClient
 from syntara.core.models import User
 from tests.fixtures.settings import FakeSettingsCache
+
+
+async def _signal_invocation_cancelled(invocation_id: UUID) -> None:
+    """Set the Redis cancel key the planner checks before falling back to DB."""
+    async with StreamClient() as client:
+        await client.set_key(get_invocation_cancel_key(invocation_id), "1", 60)
 
 
 class TestContextPlanningEventDispatch:
@@ -531,6 +539,7 @@ class TestCancellationEventDispatch:
         await test_db_session.flush()
         await test_db_session.refresh(invocation)
         invocation_id = invocation.id
+        await _signal_invocation_cancelled(invocation_id)
 
         # Mock services
         mock_retrieve_service = AsyncMock()
@@ -603,6 +612,7 @@ class TestCancellationEventDispatch:
         await test_db_session.flush()
         await test_db_session.refresh(invocation)
         invocation_id = invocation.id
+        await _signal_invocation_cancelled(invocation_id)
 
         # Mock services
         mock_retrieve_service = AsyncMock()
