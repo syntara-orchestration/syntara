@@ -36,6 +36,6 @@ nodes:
         echo "Task 3 complete"
 edges:
   - source: task_1
-    target: task_2
+    to: task_2
   - source: task_2
-    target: task_3
+    to: task_3

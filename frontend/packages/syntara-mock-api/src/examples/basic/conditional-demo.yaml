@@ -7,12 +7,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  temperature:
-    type: number
-    description: Temperature in Celsius
-    default: 25
-
 nodes:
   - id: check_temperature
     name: Check Temperature
@@ -23,10 +17,6 @@ nodes:
         echo "Current temperature: ${INPUT_TEMP}°C"
         echo "Checked at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         echo "$INPUT_TEMP"
-    inputs:
-      temp: ${trigger.temperature}
-    outputs:
-      temp_value: $.stdout
 
   - id: temperature_routing
     name: Temperature-Based Routing
@@ -72,8 +62,6 @@ nodes:
         echo "Temperature is just right: ${INPUT_TEMP}°C"
         echo "  - Enjoy outdoor activities"
         echo "  - No special precautions needed"
-    inputs:
-      temp: ${trigger.temperature}
 
   - id: summary
     name: "Generate Weather Summary Report (${trigger.temperature})"
@@ -90,22 +78,20 @@ nodes:
         echo "  • Cold weather (<15°C): Shows heating recommendations"
         echo "  • Mild weather (15-30°C): Shows pleasant weather message"
         echo "=============================="
-    inputs:
-      temp: ${trigger.temperature}
 edges:
   - source: check_temperature
-    target: temperature_routing
+    to: temperature_routing
   - source: temperature_routing
-    target: hot_weather
+    to: hot_weather
     port: then
   - source: temperature_routing
-    target: check_cold
+    to: check_cold
     port: else
   - source: check_cold
-    target: cold_weather
+    to: cold_weather
     port: then
   - source: check_cold
-    target: mild_weather
+    to: mild_weather
     port: else
   - source: temperature_routing
-    target: summary
+    to: summary

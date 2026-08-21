@@ -46,10 +46,10 @@ nodes:
       url: http://test-api.example.com/api/users/123
 edges:
   - source: get_request
-    target: post_request
+    to: post_request
   - source: post_request
-    target: put_request
+    to: put_request
   - source: put_request
-    target: patch_request
+    to: patch_request
   - source: patch_request
-    target: delete_request
+    to: delete_request

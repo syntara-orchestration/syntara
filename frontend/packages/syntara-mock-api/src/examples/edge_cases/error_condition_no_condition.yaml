@@ -20,5 +20,5 @@ nodes:
       code: echo "Then branch"
 edges:
   - source: invalid_condition
-    target: then_task
+    to: then_task
     port: then

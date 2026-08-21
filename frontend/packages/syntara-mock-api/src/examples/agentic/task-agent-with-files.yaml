@@ -29,8 +29,6 @@ nodes:
         - 'a1b2c3d4-0001-0001-0001-000000000001'
         - 'a1b2c3d4-0001-0001-0001-000000000002'
         - 'a1b2c3d4-0001-0001-0001-000000000003'
-    outputs:
-      analysis: $.result.content
 
   - id: generate_report
     type: script
@@ -41,11 +39,9 @@ nodes:
         import json
         analysis = json.loads('${analyze_docs.analysis}')
         print(f"Report generated from {len(analysis)} documents")
-    inputs:
-      analysis: ${analyze_docs.analysis}
 
 edges:
   - source: trigger_manual
-    target: analyze_docs
+    to: analyze_docs
   - source: analyze_docs
-    target: generate_report
+    to: generate_report

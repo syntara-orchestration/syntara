@@ -11,12 +11,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  research_topic:
-    type: string
-    description: Topic to research
-    default: artificial intelligence
-
 nodes:
   - id: research_topic
     type: agentic
@@ -30,8 +24,4 @@ nodes:
         1. Key facts and statistics
         2. Recent developments (if applicable)
         3. Relevant context
-    inputs:
-      topic: ${trigger.research_topic}
-    outputs:
-      summary: $.result.content
 edges: []

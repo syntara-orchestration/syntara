@@ -7,16 +7,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  environment:
-    type: string
-    description: Target deployment environment
-    default: production
-  version:
-    type: string
-    description: Application version to deploy
-    default: '3.2.0'
-
 nodes:
   - id: staging_tests
     name: Staging Tests
@@ -28,12 +18,6 @@ nodes:
         echo "Tests passed: 42"
         echo "Tests failed: 0"
         echo "Coverage: 94.5%"
-    inputs:
-      version: ${trigger.version}
-    outputs:
-      tests_passed: 42
-      tests_failed: 0
-      coverage: 94.5
 
   - id: approval_gate
     name: Production Deployment Approval
@@ -53,9 +37,6 @@ nodes:
       code: |
         echo "Deploying v${INPUT_VERSION} to ${INPUT_ENV}"
         echo "Deployment successful!"
-    inputs:
-      version: ${trigger.version}
-      env: ${trigger.environment}
 
   - id: rollback_staging
     name: Rollback Staging
@@ -67,10 +48,10 @@ nodes:
 
 edges:
   - source: staging_tests
-    target: approval_gate
+    to: approval_gate
   - source: approval_gate
-    target: deploy_to_prod
+    to: deploy_to_prod
     port: approved
   - source: approval_gate
-    target: rollback_staging
+    to: rollback_staging
     port: rejected

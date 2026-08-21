@@ -3,16 +3,6 @@ schema_version: "2.0.0"
 name: query-params
 description: Test query parameter construction
 
-inputs:
-  filter:
-    type: string
-    description: Filter parameter
-    default: active
-  limit:
-    type: number
-    description: Limit parameter
-    default: 10
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -27,7 +17,4 @@ nodes:
         filter: ${trigger.filter}
         limit: ${trigger.limit}
         sort: name
-    inputs:
-      filter: ${trigger.filter}
-      limit: ${trigger.limit}
 edges: []

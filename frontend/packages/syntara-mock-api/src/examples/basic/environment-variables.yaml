@@ -3,12 +3,6 @@ schema_version: "2.0.0"
 name: environment-variables-demo
 description: Demonstrates using custom environment variables in script activities
 
-inputs:
-  user_name:
-    type: string
-    description: User name for personalized greeting
-    default: Alice
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -26,10 +20,6 @@ nodes:
         echo "API Endpoint: ${API_URL}/${API_VERSION}"
         echo "Environment: ${ENVIRONMENT}"
         echo "User: ${INPUT_USER_NAME}"
-    inputs:
-      user_name: ${trigger.user_name}
-    outputs:
-      endpoint: $.stdout
 
   - id: python_with_env
     type: script
@@ -57,10 +47,6 @@ nodes:
         }
 
         print(json.dumps(config, indent=2))
-    inputs:
-      user_name: ${trigger.user_name}
-    outputs:
-      parameters: $.output
 
   - id: bash_with_combined
     type: script
@@ -73,12 +59,8 @@ nodes:
         echo "Service: ${SERVICE_NAME}"
         echo "Max Retries: ${MAX_RETRIES}"
         echo "User: ${INPUT_USER_NAME}"
-    inputs:
-      user_name: ${trigger.user_name}
-    outputs:
-      message: $.stdout
 edges:
   - source: bash_with_env
-    target: python_with_env
+    to: python_with_env
   - source: python_with_env
-    target: bash_with_combined
+    to: bash_with_combined

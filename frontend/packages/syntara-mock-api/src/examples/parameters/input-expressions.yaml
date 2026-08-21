@@ -15,8 +15,6 @@ nodes:
       language: bash
       code: |
         echo '{"count": 42, "status": "active"}'
-    outputs:
-      data: $.stdout
 
   - id: consumer
     name: Consumer Activity
@@ -25,9 +23,6 @@ nodes:
       language: bash
       code: |
         echo "Count: $INPUT_COUNT, Status: $INPUT_STATUS"
-    inputs:
-      count: ${source.output.data.count}
-      status: ${source.output.data.status}
 edges:
   - source: source
-    target: consumer
+    to: consumer

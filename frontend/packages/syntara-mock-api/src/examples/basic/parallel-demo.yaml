@@ -47,16 +47,16 @@ nodes:
         echo "All parallel tasks completed!"
 edges:
   - source: parallel_tasks_fork
-    target: task1
+    to: task1
   - source: parallel_tasks_fork
-    target: task2
+    to: task2
   - source: parallel_tasks_fork
-    target: task3
+    to: task3
   - source: task1
-    target: parallel_tasks_join
+    to: parallel_tasks_join
   - source: task2
-    target: parallel_tasks_join
+    to: parallel_tasks_join
   - source: task3
-    target: parallel_tasks_join
+    to: parallel_tasks_join
   - source: parallel_tasks_join
-    target: summary
+    to: summary

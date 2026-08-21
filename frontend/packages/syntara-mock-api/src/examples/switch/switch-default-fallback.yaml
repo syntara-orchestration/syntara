@@ -3,12 +3,6 @@ schema_version: "2.0.0"
 name: switch-default-fallback-test
 description: Test switch node default path when no case matches
 
-inputs:
-  status:
-    type: string
-    description: Request status
-    default: pending
-
 triggers:
   - id: trigger_manual
     type: manual_trigger

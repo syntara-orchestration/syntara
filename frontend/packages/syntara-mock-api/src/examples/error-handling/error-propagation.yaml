@@ -35,6 +35,6 @@ nodes:
         echo "This should not execute if second task fails"
 edges:
   - source: first_task
-    target: second_task
+    to: second_task
   - source: second_task
-    target: third_task
+    to: third_task

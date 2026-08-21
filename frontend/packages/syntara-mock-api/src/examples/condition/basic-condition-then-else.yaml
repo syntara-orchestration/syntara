@@ -3,12 +3,6 @@ schema_version: "2.0.0"
 name: basic-condition-test
 description: Test condition activity type with then/else branches
 
-inputs:
-  age:
-    type: integer
-    description: Person's age
-    default: 25
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -27,8 +21,6 @@ nodes:
       code: |
         echo "You are an adult (age >= 18)"
         echo "Access granted"
-    outputs:
-      message: $.stdout
 
   - id: minor_message
     name: Minor Message
@@ -38,12 +30,10 @@ nodes:
       code: |
         echo "You are a minor (age < 18)"
         echo "Access denied"
-    outputs:
-      message: $.stdout
 edges:
   - source: age_check
-    target: adult_message
+    to: adult_message
     port: then
   - source: age_check
-    target: minor_message
+    to: minor_message
     port: else

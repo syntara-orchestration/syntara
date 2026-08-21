@@ -3,17 +3,6 @@ schema_version: "2.0.0"
 name: expression-resolution-test
 description: Test expression resolution with multiple placeholders and nested paths
 
-inputs:
-  firstName:
-    type: string
-    default: John
-  lastName:
-    type: string
-    default: Doe
-  timeout:
-    type: integer
-    default: 30
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
@@ -26,10 +15,6 @@ nodes:
       language: bash
       code: |
         echo "Greeting: $INPUT_GREETING"
-    inputs:
-      greeting: Hello, ${trigger.firstName} ${trigger.lastName}!
-    outputs:
-      result: $.stdout
 
   - id: test_variable_reference
     name: Test Trigger Field Reference
@@ -38,10 +23,6 @@ nodes:
       language: bash
       code: |
         echo "Timeout: $INPUT_TIMEOUT_VALUE seconds"
-    inputs:
-      timeout_value: ${trigger.timeout}
-    outputs:
-      result: $.stdout
 
   - id: test_activity_output_reference
     name: Test Activity Output Reference
@@ -50,12 +31,8 @@ nodes:
       language: bash
       code: |
         echo "Previous output was: $INPUT_PREVIOUS_RESULT"
-    inputs:
-      previous_result: ${test_multiple_placeholders.output.result}
-    outputs:
-      final: $.stdout
 edges:
   - source: test_multiple_placeholders
-    target: test_variable_reference
+    to: test_variable_reference
   - source: test_variable_reference
-    target: test_activity_output_reference
+    to: test_activity_output_reference

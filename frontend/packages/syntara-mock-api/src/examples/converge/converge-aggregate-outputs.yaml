@@ -41,16 +41,16 @@ nodes:
       aggregateOutputs: true
 edges:
   - source: parallel_aggregate_fork
-    target: data_task1
+    to: data_task1
   - source: parallel_aggregate_fork
-    target: data_task2
+    to: data_task2
   - source: parallel_aggregate_fork
-    target: data_task3
+    to: data_task3
   - source: data_task1
-    target: parallel_aggregate_join
+    to: parallel_aggregate_join
   - source: data_task2
-    target: parallel_aggregate_join
+    to: parallel_aggregate_join
   - source: data_task3
-    target: parallel_aggregate_join
+    to: parallel_aggregate_join
   - source: parallel_aggregate_join
-    target: converge_aggregate
+    to: converge_aggregate

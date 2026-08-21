@@ -15,8 +15,6 @@ nodes:
       language: bash
       code: |
         echo '{"user": "Alice", "age": 30, "active": true}'
-    outputs:
-      parsed_data: $.stdout
 
   - id: use_parsed_data
     name: Use Parsed JSON Data
@@ -25,11 +23,6 @@ nodes:
       language: bash
       code: |
         echo "User: $INPUT_USER_NAME, Age: $INPUT_USER_AGE"
-    inputs:
-      user_name: ${generate_json.output.parsed_data.user}
-      user_age: ${generate_json.output.parsed_data.age}
-    outputs:
-      result: $.stdout
 edges:
   - source: generate_json
-    target: use_parsed_data
+    to: use_parsed_data

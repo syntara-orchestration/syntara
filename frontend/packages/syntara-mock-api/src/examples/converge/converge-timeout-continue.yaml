@@ -53,14 +53,14 @@ nodes:
         echo "Post-converge task executed after timeout"
 edges:
   - source: parallel_tasks_fork
-    target: fast_task
+    to: fast_task
   - source: parallel_tasks_fork
-    target: slow_task
+    to: slow_task
   - source: fast_task
-    target: parallel_tasks_join
+    to: parallel_tasks_join
   - source: slow_task
-    target: parallel_tasks_join
+    to: parallel_tasks_join
   - source: parallel_tasks_join
-    target: converge_with_timeout_continue
+    to: converge_with_timeout_continue
   - source: converge_with_timeout_continue
-    target: post_converge_task
+    to: post_converge_task

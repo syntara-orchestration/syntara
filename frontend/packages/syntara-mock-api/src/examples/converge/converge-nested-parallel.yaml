@@ -53,22 +53,22 @@ nodes:
       strategy: all
 edges:
   - source: group1_fork
-    target: branch1a
+    to: branch1a
   - source: group1_fork
-    target: branch1b
+    to: branch1b
   - source: branch1a
-    target: group1_join
+    to: group1_join
   - source: branch1b
-    target: group1_join
+    to: group1_join
   - source: group1_join
-    target: group2_fork
+    to: group2_fork
   - source: group2_fork
-    target: branch2a
+    to: branch2a
   - source: group2_fork
-    target: branch2b
+    to: branch2b
   - source: branch2a
-    target: group2_join
+    to: group2_join
   - source: branch2b
-    target: group2_join
+    to: group2_join
   - source: group2_join
-    target: converge_groups
+    to: converge_groups

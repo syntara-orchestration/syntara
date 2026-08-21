@@ -14,8 +14,6 @@ nodes:
       language: bash
       code: |
         echo '{"data": "from bash"}'
-    outputs:
-      data: $.data
 
   - id: python_step
     type: script
@@ -28,10 +26,6 @@ nodes:
         bash_data = os.getenv('INPUT_BASH_DATA', 'none')
         result = {"processed": bash_data, "by": "python"}
         print(json.dumps(result))
-    inputs:
-      bash_data: ${bash_step.output.data}
-    outputs:
-      processed: $.processed
 
   - id: api_step
     type: http_request
@@ -42,6 +36,6 @@ nodes:
         data: ${python_step.output.processed}
 edges:
   - source: bash_step
-    target: python_step
+    to: python_step
   - source: python_step
-    target: api_step
+    to: api_step

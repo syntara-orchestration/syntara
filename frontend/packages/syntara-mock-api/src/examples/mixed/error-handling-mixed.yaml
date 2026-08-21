@@ -27,4 +27,4 @@ nodes:
       initialInterval: 1
 edges:
   - source: bash_success
-    target: python_fail
+    to: python_fail

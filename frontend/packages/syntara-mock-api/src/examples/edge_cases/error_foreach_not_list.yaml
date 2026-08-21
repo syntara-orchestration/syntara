@@ -27,5 +27,5 @@ nodes:
       code: echo "Should not execute"
 edges:
   - source: invalid_foreach
-    target: loop_task
+    to: loop_task
     port: body

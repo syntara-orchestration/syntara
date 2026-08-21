@@ -14,8 +14,6 @@ nodes:
       code: |
         echo "Running pre-deployment checks..."
         echo "All checks passed"
-    outputs:
-      result: $.stdout
 
   - id: approval_gate
     name: Deployment Approval
@@ -32,12 +30,10 @@ nodes:
     parameters:
       language: bash
       code: echo "Deploying to production..."
-    outputs:
-      result: $.stdout
 edges:
   - source: trigger_manual
-    target: pre_check
+    to: pre_check
   - source: pre_check
-    target: approval_gate
+    to: approval_gate
   - source: approval_gate
-    target: deploy
+    to: deploy

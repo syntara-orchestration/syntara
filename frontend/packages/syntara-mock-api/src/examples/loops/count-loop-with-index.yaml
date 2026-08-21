@@ -20,10 +20,6 @@ nodes:
       language: bash
       code: |
         echo "Iteration number: ${INPUT_ITERATION_NUM}"
-    inputs:
-      iteration_num: ${iteration_num}
-    outputs:
-      result: $.stdout
 edges:
   - from: trigger_manual
     to: count_with_index

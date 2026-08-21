@@ -35,14 +35,14 @@ nodes:
     type: join
 edges:
   - source: parallel_mixed_fork
-    target: bash_branch
+    to: bash_branch
   - source: parallel_mixed_fork
-    target: python_branch
+    to: python_branch
   - source: parallel_mixed_fork
-    target: api_branch
+    to: api_branch
   - source: bash_branch
-    target: parallel_mixed_join
+    to: parallel_mixed_join
   - source: python_branch
-    target: parallel_mixed_join
+    to: parallel_mixed_join
   - source: api_branch
-    target: parallel_mixed_join
+    to: parallel_mixed_join

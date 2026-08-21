@@ -22,9 +22,7 @@ nodes:
       language: bash
       code: |
         echo "Iteration executed"
-    outputs:
-      result: $.stdout
 edges:
   - source: while_with_max
-    target: iteration_task
+    to: iteration_task
     port: body

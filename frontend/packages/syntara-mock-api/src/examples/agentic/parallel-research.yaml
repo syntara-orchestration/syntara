@@ -11,12 +11,6 @@ triggers:
   - id: trigger_manual
     type: manual_trigger
 
-inputs:
-  topic:
-    type: string
-    description: Topic for parallel comprehensive research
-    default: cloud computing platforms
-
 nodes:
   - id: parallel_research_fork
     type: fork
@@ -33,10 +27,6 @@ nodes:
         - Technical architecture and implementation
         - Performance characteristics
         - Technical challenges and solutions
-    inputs:
-      topic: ${trigger.topic}
-    outputs:
-      technical_findings: $.result.content
 
   - id: market_research
     type: agentic
@@ -50,10 +40,6 @@ nodes:
         - Market size and growth
         - Key competitors and market share
         - Market trends and opportunities
-    inputs:
-      topic: ${trigger.topic}
-    outputs:
-      market_findings: $.result.content
 
   - id: regulatory_research
     type: agentic
@@ -67,10 +53,6 @@ nodes:
         - Relevant regulations and standards
         - Compliance requirements
         - Legal considerations
-    inputs:
-      topic: ${trigger.topic}
-    outputs:
-      regulatory_findings: $.result.content
 
   - id: parallel_research_join
     type: join
@@ -92,25 +74,18 @@ nodes:
         - Key takeaways from each domain
         - Cross-domain insights
         - Overall recommendations
-    inputs:
-      technical: ${technical_research.output.technical_findings}
-      market: ${market_research.output.market_findings}
-      regulatory: ${regulatory_research.output.regulatory_findings}
-    outputs:
-      final_report: $.result.report
-      executive_summary: $.result.executive_summary
 edges:
   - source: parallel_research_fork
-    target: technical_research
+    to: technical_research
   - source: parallel_research_fork
-    target: market_research
+    to: market_research
   - source: parallel_research_fork
-    target: regulatory_research
+    to: regulatory_research
   - source: technical_research
-    target: parallel_research_join
+    to: parallel_research_join
   - source: market_research
-    target: parallel_research_join
+    to: parallel_research_join
   - source: regulatory_research
-    target: parallel_research_join
+    to: parallel_research_join
   - source: parallel_research_join
-    target: synthesize_findings
+    to: synthesize_findings

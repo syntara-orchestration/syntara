@@ -34,8 +34,8 @@ nodes:
       strategy: all
 edges:
   - source: seq1
-    target: seq2
+    to: seq2
   - source: seq2
-    target: seq3
+    to: seq3
   - source: seq3
-    target: converge_sequential
+    to: converge_sequential

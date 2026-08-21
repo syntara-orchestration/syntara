@@ -20,10 +20,6 @@ nodes:
       code: |
         echo "Value is: $INPUT_VALUE"
         echo "{\"value\": $INPUT_VALUE}"
-    inputs:
-      value: ${trigger.number}
-    outputs:
-      result: $.stdout
 
   - id: positive_branch
     name: Positive Branch
