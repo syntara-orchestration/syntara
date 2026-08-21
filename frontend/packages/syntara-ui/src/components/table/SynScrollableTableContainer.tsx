@@ -4,8 +4,8 @@ import type { ReactNode } from 'react'
 
 import { SynPanel } from '../layout/SynPanel'
 
-import styles from './SynScrollableTableContainer.module.css'
 import { PaginationFooter, type PaginationFooterProps } from './PaginationFooter'
+import styles from './SynScrollableTableContainer.module.css'
 import { useScrollOverflow } from './useScrollOverflow'
 
 /** Footer props passed to {@link SynScrollableTableContainer}. Forwarded directly to {@link PaginationFooter}. */

@@ -7,11 +7,11 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
+import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynLink } from '../../../components/SynLink'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -140,7 +140,10 @@ function ServiceAccountRow({
         />
       </Td>
       <Td isActionCell>
-        <SynKebabMenu actions={getRowActions(sa, onEdit, onDelete, permissions)} aria-label={`Actions for ${sa.name}`} />
+        <SynKebabMenu
+          actions={getRowActions(sa, onEdit, onDelete, permissions)}
+          aria-label={`Actions for ${sa.name}`}
+        />
       </Td>
     </Tr>
   )

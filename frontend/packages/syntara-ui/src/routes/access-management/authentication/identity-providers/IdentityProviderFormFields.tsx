@@ -24,8 +24,8 @@ import { Controller, useWatch, type Control, type UseFormSetValue, type UseFormT
 
 import { OIDC_REDIRECT_URI } from '../../../../client'
 import { TagInput } from '../../../../components/forms/TagInput'
-import { SynSelect } from '../../../../components/SynSelect'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
+import { SynSelect } from '../../../../components/SynSelect'
 import { detachPromise } from '../../../../utils/detachPromise'
 
 import { UserClaimMappingFields } from './ClaimMappingFields'

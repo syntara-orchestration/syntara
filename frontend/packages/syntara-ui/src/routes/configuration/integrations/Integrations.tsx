@@ -12,14 +12,14 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import type { KebabAction } from '../../../components/SynKebabMenu'
-import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import {
   NxListPanel,
   NxListPanelTable,
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
