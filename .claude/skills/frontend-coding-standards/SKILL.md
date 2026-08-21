@@ -137,7 +137,7 @@ const { register, handleSubmit } = useForm<FormData>({
 
 ### Loading state: Use `isPending` from mutations, not `formState.isSubmitting`
 
-**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`. Use `isPending` from the mutation hook. Do not restate BAD/GOOD here.
+**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`. Use `isPending` from the mutation hook.
 
 ### Step form (with Zod)
 
