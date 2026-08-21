@@ -46,10 +46,10 @@ ruleTester.run('no-hardcoded-doc-urls', rule, {
     {
       code: `
         import { useDocLink } from '../../utils/docs/useDocLink';
-        import { NxPageHeader } from '../../components';
+        import { SynPageHeader } from '../../components';
         function WorkflowsPage() {
           const docLink = useDocLink('workflows');
-          return <NxPageHeader title="Workflows" docLink={docLink} />;
+          return <SynPageHeader title="Workflows" docLink={docLink} />;
         }
       `,
     },

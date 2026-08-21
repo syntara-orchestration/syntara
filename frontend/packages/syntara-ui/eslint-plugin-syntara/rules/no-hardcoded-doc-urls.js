@@ -50,7 +50,7 @@ export default {
     type: 'problem',
     docs: {
       description:
-        "Disallow hardcoded documentation URLs. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and pass the result to `NxPageHeader`'s `docLink` prop. Add new keys to `docsUrls.json` when adding new pages.",
+        "Disallow hardcoded documentation URLs. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and pass the result to `SynPageHeader`'s `docLink` prop. Add new keys to `docsUrls.json` when adding new pages.",
       recommended: true,
       url: 'See frontend/AGENTS.md checklist item #27 and `.claude/skills/frontend-coding-standards/SKILL.md` section 33.',
     },
