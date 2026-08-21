@@ -6,9 +6,12 @@ import json
 import stat
 import sys
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from orchestrator_cli import auth as auth_module
 
 _URL = "http://localhost:8000"

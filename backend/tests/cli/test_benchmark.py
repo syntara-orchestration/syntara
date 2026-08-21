@@ -80,7 +80,7 @@ def test_enabled_session_render_lines_includes_phase_stats_and_metadata() -> Non
 
 
 def test_enabled_session_emit_writes_to_stderr_and_is_idempotent(
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """emit() writes to stderr on the first call; subsequent calls are no-ops."""
     session = BenchmarkSession(enabled=True)
@@ -98,7 +98,7 @@ def test_enabled_session_emit_writes_to_stderr_and_is_idempotent(
 
 def test_emit_summary_delegates_to_session(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """emit_summary() writes the session benchmark output to stderr."""
     from orchestrator_cli import benchmark as bm

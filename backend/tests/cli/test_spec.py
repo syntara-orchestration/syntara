@@ -117,7 +117,7 @@ def test_load_spec_raises_when_no_spec_available(
 
 
 # ---------------------------------------------------------------------------
-# _collect_source_files (E3)
+# _collect_source_files
 # ---------------------------------------------------------------------------
 
 
@@ -141,7 +141,7 @@ def test_collect_source_files_returns_sorted_deduplicated_schema_files(
 
 
 # ---------------------------------------------------------------------------
-# _build_manifest (E4)
+# _build_manifest
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +207,7 @@ def test_load_cached_spec_migrates_legacy_yaml_to_json(
 
 
 # ---------------------------------------------------------------------------
-# _save_manifest (E7)
+# _save_manifest
 # ---------------------------------------------------------------------------
 
 
@@ -235,8 +235,10 @@ def test_load_spec_rebundles_and_updates_cache_when_manifest_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When source hashes differ from the saved manifest, the spec is re-bundled
-    and both the JSON cache and the manifest file are updated."""
+    """When source hashes differ from the saved manifest, the spec is re-bundled.
+
+    Both the JSON cache and the manifest file are updated on a hash mismatch.
+    """
     schemas_dir = tmp_path / "schemas"
     schemas_dir.mkdir()
 

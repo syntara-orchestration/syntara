@@ -36,7 +36,7 @@ class _MockResponse:
     status_code: _StatusCode
     is_success: bool
     content: bytes = b""
-    headers: dict = dataclasses.field(default_factory=dict)
+    headers: dict[str, str] = dataclasses.field(default_factory=dict)
     parsed: object = None
 
 
@@ -62,7 +62,7 @@ def _rate_limited(retry_after: int = 0) -> _MockResponse:
 
 
 def test_create_client_raises_and_emits_error_when_no_token(
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """_create_client must echo an error and raise Exit(1) when auth is required but token is absent."""
     with pytest.raises(typer.Exit):
@@ -137,7 +137,7 @@ def test_rate_limit_retry_raises_exit_on_5xx(capsys: pytest.CaptureFixture) -> N
 
 def test_rate_limit_retry_retries_on_429_then_succeeds(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A single 429 triggers a retry; the second call succeeds and the response is returned."""
     monkeypatch.setattr(time, "sleep", lambda _: None)
@@ -157,7 +157,7 @@ def test_rate_limit_retry_retries_on_429_then_succeeds(
 
 def test_rate_limit_retry_raises_exit_after_max_retries(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Exit(1) is raised after _MAX_RATE_LIMIT_RETRIES consecutive 429 responses."""
     monkeypatch.setattr(time, "sleep", lambda _: None)
@@ -199,7 +199,7 @@ def test_format_response_prints_parsed_dict_to_stdout(capsys: pytest.CaptureFixt
 
 
 def test_format_response_pretty_prints_json_bytes_when_no_parsed(
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """JSON bytes in response.content are pretty-printed to stdout when parsed is absent."""
     resp = _ok(b'{"status": "ok"}')
@@ -211,7 +211,7 @@ def test_format_response_pretty_prints_json_bytes_when_no_parsed(
 
 
 def test_format_response_prints_raw_text_for_non_json_content(
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Non-JSON bytes in response.content are decoded and printed as plain text."""
     resp = _ok(b"plain text response")
@@ -222,7 +222,7 @@ def test_format_response_prints_raw_text_for_non_json_content(
 
 
 def test_format_response_returns_none_when_response_has_no_content(
-    capsys: pytest.CaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """An empty response body returns None and produces no stdout output."""
     resp = _ok(b"")

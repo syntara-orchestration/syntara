@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from orchestrator_cli.commands import (
     _build_body_data,
     _extract_body_fields,
@@ -25,7 +28,7 @@ from orchestrator_cli.commands import (
 
 
 @pytest.mark.parametrize(
-    "name, expected",
+    ("name", "expected"),
     [
         ("camelCase", "camel_case"),
         ("kebab-case", "kebab_case"),
@@ -97,7 +100,7 @@ def test_openapi_default_returns_none_when_required() -> None:
 # _is_complex_field
 # ---------------------------------------------------------------------------
 
-_SPEC: dict = {
+_SPEC: dict[str, object] = {
     "components": {
         "schemas": {
             "StatusEnum": {"type": "string", "enum": ["active", "inactive"]},
@@ -187,7 +190,7 @@ def test_extract_body_ref_returns_ref_from_json_content() -> None:
 # _extract_body_fields
 # ---------------------------------------------------------------------------
 
-_BODY_SPEC: dict = {
+_BODY_SPEC: dict[str, object] = {
     "components": {
         "schemas": {
             "CreateBody": {
