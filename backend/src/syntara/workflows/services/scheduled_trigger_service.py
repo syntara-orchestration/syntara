@@ -9,6 +9,8 @@ updated, published, unpublished, or deleted.
 """
 
 import asyncio
+import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import structlog
@@ -49,10 +51,44 @@ SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkfl
 
 _client_lock = asyncio.Lock()
 _cached_client: Client | None = None
+_connect_task: asyncio.Task[Client | None] | None = None
+_connect_started_at: float | None = None
+
+# Waiters bound how long they join an in-flight connect. A timeout returns
+# None to that waiter only; the connect keeps running so overlapping waiters
+# can still receive it. A new wait replaces ``_connect_task`` when the
+# current one is older than this budget, without cancelling waiters still
+# joined to the previous task.
+_CONNECT_TIMEOUT_SECONDS = 10.0
 
 _search_attr_available: bool | None = None
 
 _CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
+
+
+async def _abort_schedule_delete(
+    should_abort: Callable[[], Awaitable[bool]] | None,
+    *,
+    workflow_id: str,
+    deleted: int | None = None,
+    remaining: int | None = None,
+) -> bool:
+    """Return True when a republish guard says to stop deleting schedules."""
+    if should_abort is None or not await should_abort():
+        return False
+    if deleted is None:
+        logger.info(
+            "Skipping scheduled trigger deletion because the workflow is published",
+            workflow_id=workflow_id,
+        )
+    else:
+        logger.info(
+            "Skipping remaining scheduled trigger deletion because the workflow is published",
+            workflow_id=workflow_id,
+            deleted=deleted,
+            remaining=remaining,
+        )
+    return True
 
 
 async def _update_schedule_with_retry(
@@ -79,10 +115,50 @@ async def _update_schedule_with_retry(
 
 
 def _invalidate_client_cache() -> None:
-    """Clear the cached Temporal client so the next call reconnects."""
+    """Clear the cached Temporal client so the next call reconnects.
+
+    Leaves ``_connect_task`` in place. An in-flight connect must keep a
+    strong reference; ``_get_shared_client`` starts a new task only after
+    the current one is done or older than the waiter budget.
+    """
     global _cached_client, _search_attr_available  # noqa: PLW0603
     _cached_client = None
     _search_attr_available = None
+
+
+async def _close_temporal_client(client: Client) -> None:
+    """Close a discarded Temporal client; ignore SDK/mock close failures."""
+    close = getattr(client, "close", None)
+    if not callable(close):
+        return
+    try:
+        result = close()
+        if asyncio.iscoroutine(result):
+            await result
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to close discarded Temporal client", exc_info=True)
+
+
+def _should_start_shared_connect(now: float) -> bool:
+    """Return True when a new wait should start a connect task.
+
+    Caller must hold ``_client_lock``. Replacing ``_connect_task`` does not
+    cancel the previous task; waiters already joined to it keep awaiting
+    that result.
+    """
+    if _connect_task is None or _connect_task.done():
+        return True
+    if _connect_started_at is None:
+        return True
+    return now - _connect_started_at >= _CONNECT_TIMEOUT_SECONDS
+
+
+def _start_shared_connect_locked(now: float) -> asyncio.Task[Client | None]:
+    """Start a new shared connect. Caller must hold ``_client_lock``."""
+    global _connect_task, _connect_started_at  # noqa: PLW0603
+    _connect_task = asyncio.create_task(_connect_shared_client())
+    _connect_started_at = now
+    return _connect_task
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
@@ -143,29 +219,69 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return False
 
 
+async def _connect_shared_client() -> Client | None:
+    """Open a Temporal client without holding ``_client_lock``.
+
+    Waiters share this task via ``_get_shared_client``. Cancellation of a
+    waiter must not cancel this connect (see ``asyncio.shield`` there).
+    A late success does not replace an already-cached client.
+    """
+    global _cached_client  # noqa: PLW0603
+    try:
+        settings = get_settings()
+        client = await Client.connect(
+            settings.temporal_address,
+            namespace=settings.temporal_namespace,
+            tls=build_temporal_tls_config(),
+        )
+    except (OSError, RuntimeError, RPCError) as e:
+        logger.warning("Temporal unavailable for schedule management", error=str(e))
+        return None
+
+    extra: Client | None = None
+    cached: Client | None
+    async with _client_lock:
+        if _cached_client is None:
+            _cached_client = client
+            return client
+        extra = client if client is not _cached_client else None
+        cached = _cached_client
+
+    if extra is not None:
+        await _close_temporal_client(extra)
+    return cached
+
+
 async def _get_shared_client() -> Client | None:
     """Return a module-level cached Temporal client.
 
     Connects once and reuses across all ``ScheduledTriggerService`` instances
     so that lifecycle hooks share a single gRPC connection.  The cache is
     invalidated on connection-level errors so the next call reconnects.
+
+    ``Client.connect`` runs outside ``_client_lock``. The lock only serializes
+    starting the in-flight connect task, so a hung connect cannot block the
+    schedule reconciler from taking the lock. Waiters use ``asyncio.shield``
+    so a timed-out reconciler cycle does not cancel an in-flight connect.
+    Each waiter is bounded: a timeout returns None to that waiter only and
+    leaves the connect running so overlapping waiters can still receive it.
+    A new wait replaces ``_connect_task`` when the current one is older than
+    the budget, without cancelling waiters still joined to the previous task.
     """
-    global _cached_client  # noqa: PLW0603
     async with _client_lock:
         if _cached_client is not None:
             return _cached_client
+        now = time.monotonic()
+        connect_task = _start_shared_connect_locked(now) if _should_start_shared_connect(now) else _connect_task
+        if connect_task is None:
+            connect_task = _start_shared_connect_locked(now)
 
-        try:
-            settings = get_settings()
-            _cached_client = await Client.connect(
-                settings.temporal_address,
-                namespace=settings.temporal_namespace,
-                tls=build_temporal_tls_config(),
-            )
-            return _cached_client
-        except (OSError, RuntimeError, RPCError) as e:
-            logger.warning("Temporal unavailable for schedule management", error=str(e))
-            return None
+    try:
+        async with asyncio.timeout(_CONNECT_TIMEOUT_SECONDS):
+            return await asyncio.shield(connect_task)
+    except TimeoutError:
+        logger.warning("Temporal connect timed out")
+        return None
 
 
 class ScheduledTriggerService:
@@ -230,7 +346,7 @@ class ScheduledTriggerService:
         Creates or updates schedules for each scheduled trigger node and
         deletes schedules for trigger nodes that were removed.  Only called
         on publish.  Unpublish and delete use
-        ``WorkflowService._delete_scheduled_triggers`` for best-effort
+        ``WorkflowService._schedule_trigger_deletion`` for best-effort
         cleanup; the schedule reconciliation worker handles any orphans.
 
         Args:
@@ -307,6 +423,8 @@ class ScheduledTriggerService:
     async def delete_triggers_for_workflow(
         self,
         workflow_id: str,
+        *,
+        should_abort: Callable[[], Awaitable[bool]] | None = None,
     ) -> int:
         """Delete all Temporal Schedules for a workflow.
 
@@ -315,8 +433,15 @@ class ScheduledTriggerService:
         iterate the workflow definition, so schedules created by any
         version are cleaned up — not just those in the current draft.
 
+        ``should_abort`` is re-checked after connect, after listing, and
+        before each delete so a republish that lands during cleanup keeps
+        the new schedules. Fail closed in that callback; the reconciler
+        removes orphans.
+
         Args:
             workflow_id: The workflow UUID (as string).
+            should_abort: Optional callback; when it returns True, remaining
+                deletes are skipped.
 
         Returns:
             Number of schedules deleted.
@@ -331,10 +456,23 @@ class ScheduledTriggerService:
             return 0
 
         try:
+            if await _abort_schedule_delete(should_abort, workflow_id=workflow_id):
+                return 0
+
             all_schedule_ids = await self._list_workflow_schedules(client, workflow_id)
+            if await _abort_schedule_delete(should_abort, workflow_id=workflow_id):
+                return 0
+
             deleted = 0
 
             for schedule_id in all_schedule_ids:
+                if await _abort_schedule_delete(
+                    should_abort,
+                    workflow_id=workflow_id,
+                    deleted=deleted,
+                    remaining=len(all_schedule_ids) - deleted,
+                ):
+                    break
                 if await self.delete_schedule(client, schedule_id):
                     deleted += 1
         except (OSError, RuntimeError, RPCError) as exc:
