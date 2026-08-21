@@ -1,4 +1,4 @@
-import { Button, Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
@@ -112,9 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <Label key={name} isCompact>
-                        {name}
-                      </Label>
+                      <NxLabel key={name}>{name}</NxLabel>
                     ))}
                   </LabelGroup>
                 ) : (

@@ -1,10 +1,11 @@
-import { Button, Flex, Label, Tooltip } from '@patternfly/react-core'
+import { Button, Flex, Tooltip } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
+import { NxLabel } from '../../components/labels/NxLabel'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
@@ -103,20 +104,19 @@ function PermissionsTableContent({
               <code>{perm.policy_name}</code>
             </Td>
             <Td dataLabel="Effect">
-              <Label
+              <NxLabel
                 color={perm.effect === 'allow' ? 'green' : 'red'}
                 icon={perm.effect === 'allow' ? <RhUiCheckCircleIcon /> : <RhUiCloseCircleIcon />}
-                isCompact
               >
                 {perm.effect}
-              </Label>
+              </NxLabel>
             </Td>
             <Td dataLabel="Actions">
               <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
                 {perm.actions.map((a) => (
-                  <Label key={a} color="blue" isCompact>
+                  <NxLabel key={a} color="blue">
                     {a}
-                  </Label>
+                  </NxLabel>
                 ))}
               </Flex>
             </Td>
@@ -209,7 +209,7 @@ export function MyPermissionsView() {
   )
 
   return (
-    <NxPanelContentStack hasGutter>
+    <SynPanelContentStack hasGutter>
       <NxListPanelView
         isPending={isLoading}
         error={error}
@@ -244,6 +244,6 @@ export function MyPermissionsView() {
           </NxListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

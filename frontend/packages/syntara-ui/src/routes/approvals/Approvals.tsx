@@ -5,14 +5,14 @@ import { useMemo, useReducer, useState } from 'react'
 
 import { EmptyStateAccessDenied } from '../../components/EmptyStateAccessDenied'
 import { FilterBar } from '../../components/filters/FilterBar'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
-import { NxPageTitle } from '../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { permissionTooltip } from '../../hooks/permissionUtils'
@@ -160,7 +160,7 @@ function ApprovalsContent({
 }: Readonly<ApprovalsContentProps>) {
   if (sortedApprovals.length === 0) {
     return (
-      <NxPageBody isCentered>
+      <SynPageBody isCentered>
         {hasActiveFilters ? (
           <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
         ) : (
@@ -169,7 +169,7 @@ function ApprovalsContent({
             description="No approvals are currently pending or available."
           />
         )}
-      </NxPageBody>
+      </SynPageBody>
     )
   }
 
@@ -298,26 +298,26 @@ export default function Approvals() {
   // Show loading spinner while checking permissions
   if (permissions.isChecking) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Approvals']} />
-        <NxPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} />
-        <NxPageBody isCentered>
+      <SynPage>
+        <SynPageTitle segments={['Approvals']} />
+        <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} />
+        <SynPageBody isCentered>
           <Spinner aria-label="Loading approval permissions" />
-        </NxPageBody>
-      </NxPage>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   // Show access denied if user lacks read permission
   if (!permissions.canRead) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Approvals']} />
-        <NxPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} />
-        <NxPageBody isCentered>
+      <SynPage>
+        <SynPageTitle segments={['Approvals']} />
+        <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} />
+        <SynPageBody isCentered>
           <EmptyStateAccessDenied description="You do not have permission to view approvals. Contact your administrator to request access." />
-        </NxPageBody>
-      </NxPage>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -444,13 +444,13 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
   // Show query state (loading/error)
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Approvals']} />
-        <NxPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} projectSelector={ProjectSelector} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Approvals']} />
+        <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} projectSelector={ProjectSelector} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -471,9 +471,9 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
   const isEmpty = sortedApprovals.length === 0
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Approvals']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Approvals']} />
+      <SynPageHeader
         title="Approvals"
         docLink={approvalsDocLink ?? undefined}
         projectSelector={ProjectSelector}
@@ -494,9 +494,9 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
         }
       />
 
-      <NxPageBody>
-        <NxPanel isFullHeight>
-          <NxPanelContentStack variant="inset">
+      <SynPageBody>
+        <SynPanel isFullHeight>
+          <SynPanelContentStack variant="inset">
             {(!isEmpty || hasActiveFilters) && (
               <StackItem>
                 <FilterBar
@@ -533,9 +533,9 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
               approvalPermissions={approvalPermissions}
               isLoadingPermissions={isLoadingDecideProjects}
             />
-          </NxPanelContentStack>
-        </NxPanel>
-      </NxPageBody>
+          </SynPanelContentStack>
+        </SynPanel>
+      </SynPageBody>
 
       <BulkActionDialogs
         bulkApproveDialogOpen={bulkApproveDialogOpen}
@@ -547,6 +547,6 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
         selectedCount={selectedApprovalIds.size}
         isBulkActionPending={isBulkActionPending}
       />
-    </NxPage>
+    </SynPage>
   )
 }

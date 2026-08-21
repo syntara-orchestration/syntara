@@ -5,11 +5,11 @@ import { useLayoutEffect, useMemo } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { breadcrumbsAccessManagementHub } from '../../app/breadcrumbBuilders'
 import { EmptyStateAccessDenied } from '../../components/EmptyStateAccessDenied'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxPageTitle } from '../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
@@ -115,15 +115,15 @@ export function AccessManagement() {
 
   if (!isLoading && !canAccessPage) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Access Management']} />
-        <NxPageHeader title="Access Management" breadcrumbs={[{ label: 'Access Management' }]} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Access Management']} />
+        <SynPageHeader title="Access Management" breadcrumbs={[{ label: 'Access Management' }]} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <EmptyStateAccessDenied description="You don't have permission to view access management. Contact your administrator to request access." />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -131,10 +131,10 @@ export function AccessManagement() {
   const hubBreadcrumbs = breadcrumbsAccessManagementHub(activeTabDef?.label ?? 'Access Management')
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Access Management']} />
-      <NxPageHeader title="Access Management" docLink={accessDocLink} breadcrumbs={hubBreadcrumbs} />
-      <NxPageBody>
+    <SynPage>
+      <SynPageTitle segments={['Access Management']} />
+      <SynPageHeader title="Access Management" docLink={accessDocLink} breadcrumbs={hubBreadcrumbs} />
+      <SynPageBody>
         <NxListPanel>
           <NxListPanelTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabKeys}>
             {validTabDefs.map((tab) => (
@@ -176,7 +176,7 @@ export function AccessManagement() {
             />
           )}
         </NxListPanel>
-      </NxPageBody>
-    </NxPage>
+      </SynPageBody>
+    </SynPage>
   )
 }

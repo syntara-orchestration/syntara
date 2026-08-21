@@ -4,8 +4,8 @@ import type { ExecutionStatus } from '@syntara/contracts'
 import { type Dispatch, type ReactNode } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPageTitle } from '../../components/NxPageTitle'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useDocLink } from '../../utils/docs/useDocLink'
@@ -25,6 +25,7 @@ type BuilderToolbarContentProps = Readonly<{
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
+  projectId?: string
   hasApprovalPending?: boolean
   isApprovalLoading?: boolean
   isApprovalPanelOpen?: boolean
@@ -73,6 +74,7 @@ function BuilderToolbarContent({
   isLiveRunActive,
   executionId,
   executionStatus,
+  projectId,
   hasApprovalPending,
   isApprovalLoading,
   isApprovalPanelOpen,
@@ -161,7 +163,9 @@ function BuilderToolbarContent({
             Review approval
           </Button>
         )}
-        {isCancellable && executionId && <CancelExecutionButton executionId={executionId} />}
+        {isCancellable && executionId && projectId && (
+          <CancelExecutionButton executionId={executionId} projectId={projectId} />
+        )}
         <Button variant="primary" onClick={onBackToEditor}>
           Back to editor
         </Button>
@@ -294,6 +298,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
+  projectId?: string
   onBackToEditor?: () => void
   hasApprovalPending?: boolean
   isApprovalLoading?: boolean
@@ -341,6 +346,7 @@ export function BuilderWorkflowPageHeader({
   isLiveRunActive,
   executionId,
   executionStatus,
+  projectId,
   onBackToEditor,
   hasApprovalPending,
   isApprovalLoading,
@@ -378,6 +384,7 @@ export function BuilderWorkflowPageHeader({
       isLiveRunActive={isLiveRunActive}
       executionId={executionId}
       executionStatus={executionStatus}
+      projectId={projectId}
       hasApprovalPending={hasApprovalPending}
       isApprovalLoading={isApprovalLoading}
       isApprovalPanelOpen={isApprovalPanelOpen}
@@ -420,9 +427,9 @@ export function BuilderWorkflowPageHeader({
 
   return (
     <>
-      <NxPageTitle segments={[dirtyTitle, 'Workflows']} />
+      <SynPageTitle segments={[dirtyTitle, 'Workflows']} />
       {isViewingVersion ? (
-        <NxPageHeader
+        <SynPageHeader
           title={workflowName}
           docLink={builderDocLink}
           titleProps={{ size: TitleSizes['2xl'] }}
@@ -437,7 +444,7 @@ export function BuilderWorkflowPageHeader({
           toolbar={toolbar}
         />
       ) : (
-        <NxPageHeader
+        <SynPageHeader
           title={workflowName}
           docLink={builderDocLink}
           titleSlot={

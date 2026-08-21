@@ -29,15 +29,15 @@ import { NxDetail } from '../../../components/details/NxDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxLink } from '../../../components/NxLink'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -349,27 +349,27 @@ export function IntegrationDetail() {
 
   if (!integrationId) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Integration', 'Integrations']} />
-        <NxPageHeader title="Error" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Integration', 'Integrations']} />
+        <SynPageHeader title="Error" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxErrorState title="Invalid integration" message="No integration ID provided" />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Integration', 'Integrations']} />
-        <NxPageHeader title="Integration" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Integration', 'Integrations']} />
+        <SynPageHeader title="Integration" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -379,9 +379,9 @@ export function IntegrationDetail() {
   const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[integration.name, 'Integrations']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[integration.name, 'Integrations']} />
+      <SynPageHeader
         breadcrumbs={integrationCrumbs}
         title={integration.name}
         docLink={docLink}
@@ -396,8 +396,8 @@ export function IntegrationDetail() {
         }
       />
 
-      <NxPageBody>
-        <NxPanel isFullHeight isScrollable footer={footer} className={styles.tabsFullHeight}>
+      <SynPageBody>
+        <SynPanel isFullHeight isScrollable footer={footer} className={styles.tabsFullHeight}>
           <NxUrlTabs
             basePath={integrationBasePath}
             defaultTab="details"
@@ -443,8 +443,8 @@ export function IntegrationDetail() {
               </Tab>
             )}
           </NxUrlTabs>
-        </NxPanel>
-      </NxPageBody>
+        </SynPanel>
+      </SynPageBody>
 
       <IntegrationDialogs
         validateDialog={validateDialog}
@@ -454,6 +454,6 @@ export function IntegrationDetail() {
         onDelete={handleDelete}
         onDisable={handleDisable}
       />
-    </NxPage>
+    </SynPage>
   )
 }

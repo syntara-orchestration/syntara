@@ -389,6 +389,57 @@ class TestLLMModelValidation:
 
 
 # ---------------------------------------------------------------------------
+# LLM Model validation — import mode (is_import=True)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestLLMModelImportCleanup:
+    """When is_import=True, missing/disabled LLM models are cleared with warnings instead of errors."""
+
+    async def test_deleted_model_cleared_on_import(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        deleted_id = str(uuid4())
+        definition = _agentic_definition(llm_model_id=deleted_id)
+        findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=True)
+        assert len(findings) == 1
+        assert findings[0].severity == "warning"
+        assert "no longer available" in findings[0].message
+        assert findings[0].node_id == "node-1"
+        assert "llm_model_id" not in definition["nodes"][0]["parameters"]
+
+    async def test_disabled_model_cleared_on_import(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        intg = await _create_integration(test_db_session, test_user, integration_type=IntegrationType.LLM_PROVIDER)
+        model = await _create_llm_model(test_db_session, test_user, intg, enabled=False, name="gpt-disabled")
+        definition = _agentic_definition(llm_model_id=str(model.id))
+        findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=True)
+        assert len(findings) == 1
+        assert findings[0].severity == "warning"
+        assert "no longer available" in findings[0].message
+        assert "llm_model_id" not in definition["nodes"][0]["parameters"]
+
+    async def test_valid_model_not_cleared_on_import(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        intg = await _create_integration(test_db_session, test_user, integration_type=IntegrationType.LLM_PROVIDER)
+        model = await _create_llm_model(test_db_session, test_user, intg)
+        definition = _agentic_definition(llm_model_id=str(model.id))
+        findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=True)
+        assert findings == []
+        assert definition["nodes"][0]["parameters"]["llm_model_id"] == str(model.id)
+
+    async def test_save_mode_still_rejects_deleted_model(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        definition = _agentic_definition(llm_model_id=str(uuid4()))
+        with pytest.raises(SafeValueError, match="no longer available"):
+            await validate_workflow_references(test_db_session, definition, test_project_id, is_import=False)
+
+
+# ---------------------------------------------------------------------------
 # Tool validation
 # ---------------------------------------------------------------------------
 

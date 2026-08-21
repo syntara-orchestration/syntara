@@ -101,9 +101,9 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 27. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 28. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 29. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `NxPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
+30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `SynPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
 31. **No `new Date()` in mock API seed data** -- seed data in `packages/syntara-mock-api/src/resources/` and `utils/` must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
-32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<NxPage>`) must render a `<title>` as its first `<NxPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
+32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
 33. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
 34. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
 35. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
@@ -207,7 +207,7 @@ For how the UI is structured, see these comprehensive guides:
 | **UX / PatternFly design system**   | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../.claude/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                   |
 | **Library docs / llms.txt links**   | [`.claude/skills/frontend-library-references/SKILL.md`](../.claude/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                       |
 | **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                          |
-| **Page content frame (`NxPanel`)**  | `packages/syntara-ui/src/components/layout/NxPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                           |
+| **Page content frame (`SynPanel`)** | `packages/syntara-ui/src/components/layout/SynPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                          |
 | **Documentation links**             | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                   |
 
 ### Quick Reference: Common Tasks
@@ -230,7 +230,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed
-4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<NxPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
 
 #### How do I add filters to a list page?
 
@@ -363,7 +363,7 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function MyPage() {
   const docLink = useDocLink('workflows') // DocKey is type-safe — only keys from docsUrls.json
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 

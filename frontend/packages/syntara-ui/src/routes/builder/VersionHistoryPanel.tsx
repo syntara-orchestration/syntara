@@ -37,8 +37,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 
 import { AppRoute } from '../../app/AppRoute'
 import { MultiSelectFilter } from '../../components/filters/MultiSelectFilter'
-import pageMainSlotStyles from '../../components/layout/NxPage.module.css'
-import { NxPanel } from '../../components/layout/NxPanel'
+import pageMainSlotStyles from '../../components/layout/SynPage.module.css'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { NxLink } from '../../components/NxLink'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
@@ -427,7 +427,7 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
   }
 
   return (
-    <NxPanel hasNoPadding isFullHeight className={styles.panelRoot}>
+    <SynPanel hasNoPadding isFullHeight className={styles.panelRoot}>
       <div className={styles.panelInner}>
         <Stack className={styles.panelStack}>
           <StackItem className={styles.panelHeader}>
@@ -495,6 +495,6 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
           )}
         </Stack>
       </div>
-    </NxPanel>
+    </SynPanel>
   )
 }

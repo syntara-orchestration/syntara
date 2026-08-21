@@ -26,7 +26,6 @@ OIDC_CALLBACK_PATH = f"{API_V1_PATH_PREFIX}/auth/oidc/callback"
 # data.
 EXCLUDED_PATHS: frozenset[str] = frozenset(
     {
-        "/health",
         "/healthz/live",
         "/healthz/ready",
         "/api",

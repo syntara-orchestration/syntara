@@ -7,13 +7,13 @@ import { credentialsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import { builtinProjectTooltip } from '../../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
@@ -324,20 +324,20 @@ export default function Credentials() {
   })
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Credentials']} />
-        <NxPageHeader title="Credentials" docLink={credentialsDocLink} projectSelector={ProjectSelector} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Credentials']} />
+        <SynPageHeader title="Credentials" docLink={credentialsDocLink} projectSelector={ProjectSelector} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Credentials']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Credentials']} />
+      <SynPageHeader
         title="Credentials"
         docLink={credentialsDocLink}
         projectSelector={ProjectSelector}
@@ -353,19 +353,19 @@ export default function Credentials() {
       />
 
       {credentials.length === 0 && !hasActiveFilters ? (
-        <NxPageBody>
-          <NxPanel isFullHeight>
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <CredentialEmptyState
               onCreateCredential={
                 permissions.canCreate && !isBuiltinSelected ? () => setCreateModalOpen(true) : undefined
               }
             />
-          </NxPanel>
-        </NxPageBody>
+          </SynPanel>
+        </SynPageBody>
       ) : (
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            <NxPanelContentStack>
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynPanelContentStack>
               <StackItem>
                 <FilterBar
                   fieldDefinitions={filterFieldDefinitions}
@@ -376,9 +376,9 @@ export default function Credentials() {
               </StackItem>
 
               {credentials.length === 0 ? (
-                <NxPageBody isCentered>
+                <SynPageBody isCentered>
                   <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
-                </NxPageBody>
+                </SynPageBody>
               ) : (
                 <NxScrollableTableContainer
                   isExpandable
@@ -430,9 +430,9 @@ export default function Credentials() {
                   )}
                 </NxScrollableTableContainer>
               )}
-            </NxPanelContentStack>
-          </NxPanel>
-        </NxPageBody>
+            </SynPanelContentStack>
+          </SynPanel>
+        </SynPageBody>
       )}
 
       <DisableCredentialDialog
@@ -471,6 +471,6 @@ export default function Credentials() {
         onSuccess={() => detachPromise(query.refetch())}
         defaultProjectId={selectedProject?.id}
       />
-    </NxPage>
+    </SynPage>
   )
 }

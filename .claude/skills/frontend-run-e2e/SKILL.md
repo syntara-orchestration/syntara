@@ -43,7 +43,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 | UI project path | `$REPO_ROOT/frontend/packages/syntara-ui` | `ls $REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts` |
 | Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f $REPO_ROOT/backend/.secrets/admin-password` |
 | CA cert path | `$REPO_ROOT/backend/.secrets/certs/ca.pem` | `test -f $REPO_ROOT/backend/.secrets/certs/ca.pem` |
-| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health` |
+| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready` |
 | Frontend URL | `http://localhost:5173` | `curl -sf http://localhost:5173 -o /dev/null` |
 
 Use the results to inform the wizard — if a check fails, mention it in the question so the user knows something needs attention.
@@ -100,7 +100,7 @@ Before running, verify the environment is ready. For real backend mode, the skil
 test -f $REPO_ROOT/backend/.secrets/admin-password && echo "OK: password file found" || echo "FAIL: password file not found — run: make -C backend secrets"
 
 # 2. Backend is responding
-curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make run-all"
+curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make run-all"
 
 # 3. Frontend is responding — start it if not
 curl -sf http://localhost:5173 -o /dev/null && echo "OK: frontend responding"

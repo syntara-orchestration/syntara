@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
@@ -97,7 +97,7 @@ function ThreePanelLayout({
   onClosePanel,
 }: Readonly<ThreePanelLayoutProps>) {
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -136,9 +136,11 @@ function ThreePanelLayout({
               />
             </section>
           )}
-          <div className={styles.activityListScrollWrapper}>
+          <Stack className={styles.activityListScrollWrapper}>
             {activityOrder.length === 0 && hasFilteredOutActivities ? (
-              <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+              <StackItem isFilled>
+                <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+              </StackItem>
             ) : (
               <CompactActivityList
                 activityStates={activityStates}
@@ -147,7 +149,7 @@ function ThreePanelLayout({
                 selectedNodeId={selectedNodeId}
               />
             )}
-          </div>
+          </Stack>
         </FlexItem>
 
         <Divider orientation={{ default: 'vertical' }} />
@@ -166,7 +168,7 @@ function ThreePanelLayout({
           )}
         </FlexItem>
       </Flex>
-    </NxPanel>
+    </SynPanel>
   )
 }
 
@@ -229,7 +231,7 @@ function SinglePanelLayout({
     [execution.error_details, nameMap]
   )
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -273,22 +275,22 @@ function SinglePanelLayout({
           </StackItem>
         )}
 
-        <StackItem isFilled style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-          {activityOrder.length === 0 && hasFilteredOutActivities ? (
+        {activityOrder.length === 0 && hasFilteredOutActivities ? (
+          <StackItem isFilled style={{ minHeight: 0 }}>
             <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
-          ) : (
-            <ExecutionActivityTable
-              activityStates={activityStates}
-              activityOrder={activityOrder}
-              now={now}
-              executionError={resolvedError}
-              onRowClick={onRowClick}
-              selectedNodeId={selectedNodeId}
-            />
-          )}
-        </StackItem>
+          </StackItem>
+        ) : (
+          <ExecutionActivityTable
+            activityStates={activityStates}
+            activityOrder={activityOrder}
+            now={now}
+            executionError={resolvedError}
+            onRowClick={onRowClick}
+            selectedNodeId={selectedNodeId}
+          />
+        )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }
 

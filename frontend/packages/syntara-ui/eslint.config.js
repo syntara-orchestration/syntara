@@ -164,10 +164,10 @@ export default tseslint.config(
       ],
     },
   },
-  // NxLink.tsx wraps TanStack Link for general use. NxPageBreadcrumbs also
+  // NxLink.tsx wraps TanStack Link for general use. SynPageBreadcrumbs also
   // imports Link directly because NxLink renders a PF6 Button (wrong for breadcrumb styling).
   {
-    files: ['**/components/NxLink.tsx', '**/components/layout/NxPageBreadcrumbs.tsx'],
+    files: ['**/components/NxLink.tsx', '**/components/layout/SynPageBreadcrumbs.tsx'],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',
     },

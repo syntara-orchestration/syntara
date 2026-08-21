@@ -22,7 +22,7 @@ import {
 import { type ComponentType, type CSSProperties } from 'react'
 
 import AnsibleIcon from '../../../assets/ansible-automation-platform.svg?react'
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { AAP_NODE_IDS, RegistryNodeId } from '../../../constants'
 
 import { APPROVAL_BRANCH_TOKENS } from './nodes/common/approvalBranchTokens'
@@ -171,7 +171,7 @@ function CanvasLegendHeader(props: Readonly<{ regionId: string; hide: () => void
 export function CanvasLegend(props: CanvasLegendProps) {
   return (
     <div id={props.regionId}>
-      <NxPanel
+      <SynPanel
         data-testid="canvas-legend"
         variant="raised"
         panelMainBodyProps={{ style: { padding: 'var(--pf-t--global--spacer--lg)' } }}
@@ -219,7 +219,7 @@ export function CanvasLegend(props: CanvasLegendProps) {
             <ApprovalBranchLegendSwatch variant="rejected" label="Rejected" />
           </StackItem>
         </Stack>
-      </NxPanel>
+      </SynPanel>
     </div>
   )
 }

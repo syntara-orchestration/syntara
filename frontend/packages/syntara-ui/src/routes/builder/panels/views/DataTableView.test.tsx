@@ -11,6 +11,7 @@ describe('DataTableView', () => {
 
     expect(screen.getByRole('columnheader', { name: 'hostname' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'port' })).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Test data' })).toBeInTheDocument()
   })
 
   it('renders cell values', () => {
@@ -43,6 +44,13 @@ describe('DataTableView', () => {
     render(<DataTableView data={data} ariaLabel="Custom label" />)
 
     expect(screen.getByRole('grid', { name: 'Custom label' })).toBeInTheDocument()
+  })
+
+  it('renders a compact table', () => {
+    const data = { result: 'ok' }
+    render(<DataTableView data={data} ariaLabel="Test data" />)
+
+    expect(screen.getByRole('grid', { name: 'Test data' })).toHaveClass('pf-m-compact')
   })
 
   it('has no accessibility violations', async () => {

@@ -16,14 +16,14 @@ import { NxDetail } from '../../../components/details/NxDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxErrorState } from '../../../components/states/NxErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -253,27 +253,27 @@ export default function CredentialDetail() {
 
   if (!credentialId) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Credential', 'Credentials']} />
-        <NxPageHeader title="Error" breadcrumbs={breadcrumbsCredentialEarlyShell('Error')} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Error" breadcrumbs={breadcrumbsCredentialEarlyShell('Error')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <NxErrorState title="Invalid credential" message="No credential ID provided" />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Credential', 'Credentials']} />
-        <NxPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -286,9 +286,9 @@ export default function CredentialDetail() {
   const credentialCrumbs = breadcrumbsCredentialDetail(credential.id, credential.name, activeTab)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[credential.name, 'Credentials']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[credential.name, 'Credentials']} />
+      <SynPageHeader
         breadcrumbs={credentialCrumbs}
         title={credential.name}
         docLink={credentialsDocLink}
@@ -318,8 +318,8 @@ export default function CredentialDetail() {
         }
       />
 
-      <NxPageBody>
-        <NxPanel isFullHeight className={styles.tabsFullHeight}>
+      <SynPageBody>
+        <SynPanel isFullHeight className={styles.tabsFullHeight}>
           <NxUrlTabs
             basePath={credentialBasePath}
             defaultTab="details"
@@ -385,8 +385,8 @@ export default function CredentialDetail() {
               </Tab>
             )}
           </NxUrlTabs>
-        </NxPanel>
-      </NxPageBody>
+        </SynPanel>
+      </SynPageBody>
 
       <DisableCredentialDialog
         credential={credentialToDisable}
@@ -420,6 +420,6 @@ export default function CredentialDetail() {
         credentialToEdit={credential}
         onSuccess={() => detachPromise(credQuery.refetch())}
       />
-    </NxPage>
+    </SynPage>
   )
 }

@@ -310,7 +310,7 @@ test.describe('Node editor panels', () => {
     workflowId = app.url().split('/').pop() ?? workflowId
 
     // --- Verify each node's output data ---
-    // Scope text assertions to the Output panel's NxPanel container using the
+    // Scope text assertions to the Output panel's SynPanel container using the
     // panelContainer CSS module class (Vite preserves the name in the hashed class).
     const outputPanel = app.locator('[class*="panelContainer"]').filter({
       has: app.getByRole('heading', { name: 'Output', exact: true }),
