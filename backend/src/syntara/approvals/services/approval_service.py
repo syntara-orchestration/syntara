@@ -720,8 +720,12 @@ class ApprovalService(BaseService):
 
         Callers that perform a further, potentially-failing step as part of the
         same logical cancel operation (e.g. asking Temporal to cancel the
-        workflow) should pass the returned approvals to ``reopen_cancelled()``
-        if that later step fails, since this call commits immediately.
+        workflow) should not treat this call as the end of the operation: this
+        commits immediately, but does NOT dispatch audit events. Call
+        ``dispatch_cancelled_events()`` once that later step succeeds, or
+        ``reopen_cancelled()`` if it fails — dispatching here, before the
+        outcome is known, would record a permanent "cancelled" audit event even
+        for a cancellation that gets reverted.
 
         Args:
             execution_id: Execution whose pending approvals should be cancelled
@@ -749,19 +753,36 @@ class ApprovalService(BaseService):
 
         await self.session.commit()
 
-        for approval in approvals:
-            self._dispatch_decided_event(approval, ApprovalRequestStatus.CANCELLED.value, decided_at, notes)
-
         return approvals
+
+    def dispatch_cancelled_events(self, approvals: Sequence[ApprovalRequest]) -> None:
+        """Dispatch audit events for approvals ``cancel_pending_for_execution()`` cancelled.
+
+        Call only once the caller's own later step (e.g. the Temporal RPC) has
+        actually succeeded, so the audit trail never records a cancellation
+        that was subsequently reverted via ``reopen_cancelled()``.
+
+        Args:
+            approvals: Approvals previously returned by cancel_pending_for_execution()
+
+        """
+        for approval in approvals:
+            assert approval.decided_at is not None  # noqa: S101 -- set by cancel_pending_for_execution
+            self._dispatch_decided_event(
+                approval, ApprovalRequestStatus.CANCELLED.value, approval.decided_at, approval.decision_notes
+            )
 
     async def reopen_cancelled(self, approvals: Sequence[ApprovalRequest]) -> None:
         """Revert approvals that ``cancel_pending_for_execution()`` just cancelled.
 
         Compensation for when a later step in the same logical cancel operation
         (the Temporal RPC) failed, so the execution was never actually
-        cancelled. Only reverts rows still exactly as that call left them; a
-        concurrent decision can't have landed in between since ``decide()``
-        requires status=PENDING, which was no longer true once cancelled.
+        cancelled. Only reverts rows matching the exact cancellation fingerprint
+        (status, decided_by, decided_at, decision_notes) that call left behind,
+        so an unrelated cancellation of the same row in between is never
+        clobbered. A concurrent decision can't have landed in between anyway,
+        since ``decide()`` requires status=PENDING, which was no longer true
+        once cancelled.
 
         Args:
             approvals: Approvals previously returned by cancel_pending_for_execution()
@@ -770,11 +791,15 @@ class ApprovalService(BaseService):
         if not approvals:
             return
 
+        fingerprint = approvals[0]
         approval_ids = [approval.id for approval in approvals]
         stmt = (
             update(ApprovalRequest)
             .where(ApprovalRequest.id.in_(approval_ids))  # type: ignore[attr-defined]
             .where(ApprovalRequest.status == ApprovalRequestStatus.CANCELLED)  # type: ignore[arg-type]
+            .where(ApprovalRequest.decided_by == fingerprint.decided_by)  # type: ignore[arg-type]
+            .where(ApprovalRequest.decided_at == fingerprint.decided_at)  # type: ignore[arg-type]
+            .where(ApprovalRequest.decision_notes == fingerprint.decision_notes)  # type: ignore[arg-type]
             .values(status=ApprovalRequestStatus.PENDING, decided_by=None, decided_at=None, decision_notes=None)
         )
         await self.session.exec(stmt)

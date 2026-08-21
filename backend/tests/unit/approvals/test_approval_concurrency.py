@@ -37,7 +37,7 @@ from syntara.authz.models.project import Project
 from syntara.core.models import User
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
 
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -205,7 +205,7 @@ async def _cancel_pending_with_own_session(
     session_factory: async_sessionmaker[AsyncSession],
     user_id: UUID,
     execution_id: UUID,
-) -> list[ApprovalRequest]:
+) -> Sequence[ApprovalRequest]:
     """Run cancel_pending_for_execution() on a dedicated session."""
     async with session_factory() as session:
         user = await session.get(User, user_id)
@@ -365,7 +365,7 @@ async def test_concurrent_execution_cancel_and_decide_only_one_succeeds(
         )
         cancel_result, decide_result = results
 
-        assert not isinstance(cancel_result, Exception), f"Cancel should never raise: {cancel_result}"
+        assert not isinstance(cancel_result, BaseException), f"Cancel should never raise: {cancel_result}"
         cancel_won = len(cancel_result) == 1
         decide_won = not isinstance(decide_result, Exception)
         decide_lost = isinstance(decide_result, ApprovalAlreadyDecidedError)

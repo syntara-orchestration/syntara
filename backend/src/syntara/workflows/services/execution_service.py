@@ -96,7 +96,7 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:
+    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
@@ -1081,6 +1081,16 @@ class ExecutionService(BaseService):
         Temporal RPC then fails, the cancellation is reverted so we don't leave
         approvals cancelled for an execution that was never actually cancelled.
 
+        This only closes the race for approvals still PENDING at the moment
+        cancellation is requested. If decide() already committed (e.g. the
+        execution was still RUNNING and got approved a moment before someone
+        requested cancellation), cancel_pending_for_execution() finds nothing
+        to cancel and the Temporal cancel proceeds regardless -- the execution
+        ends CANCELLED with an already-APPROVED approval. That's a distinct,
+        intentionally-allowed race (a decision made while genuinely running
+        stands even if the run is cancelled moments later), not the bug this
+        method fixes.
+
         Args:
             execution_id: Execution ID to cancel
 
@@ -1144,6 +1154,8 @@ class ExecutionService(BaseService):
                 error_type=type(exc).__name__,
             )
             raise
+
+        approval_service.dispatch_cancelled_events(cancelled_approvals)
 
         self._emit_lifecycle_event(
             execution_id=execution.id,

@@ -1,5 +1,6 @@
 """Unit tests for ExecutionService.cancel_execution method."""
 
+from collections.abc import Sequence
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -34,11 +35,12 @@ def _mock_session_returning(execution: Execution | None) -> AsyncSession:
     return mock_session
 
 
-def _patch_approval_service(cancelled: list[object] | None = None):  # noqa: ANN202
+def _patch_approval_service(cancelled: Sequence[object] | None = None):  # noqa: ANN202
     """Patch the ApprovalService used by cancel_execution to avoid a real DB call."""
     mock_instance = Mock()
     mock_instance.cancel_pending_for_execution = AsyncMock(return_value=cancelled if cancelled is not None else [])
     mock_instance.reopen_cancelled = AsyncMock()
+    mock_instance.dispatch_cancelled_events = Mock()
     return (
         patch(
             "syntara.workflows.services.execution_service.ApprovalService",
@@ -81,6 +83,7 @@ class TestCancelExecution:
         mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
         mock_approval_service.cancel_pending_for_execution.assert_awaited_once_with(execution.id)
         mock_approval_service.reopen_cancelled.assert_not_awaited()
+        mock_approval_service.dispatch_cancelled_events.assert_called_once_with([])
 
     @pytest.mark.asyncio
     async def test_cancel_execution_not_found(self) -> None:
@@ -196,6 +199,7 @@ class TestCancelExecution:
 
         mock_approval_service.cancel_pending_for_execution.assert_awaited_once_with(execution.id)
         mock_approval_service.reopen_cancelled.assert_awaited_once_with(cancelled)
+        mock_approval_service.dispatch_cancelled_events.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_cancel_execution_original_error_survives_a_failed_revert(self) -> None:
@@ -223,6 +227,8 @@ class TestCancelExecution:
         with patcher, pytest.raises(RuntimeError, match="temporal unreachable"):
             await service.cancel_execution(execution.id)
 
+        mock_approval_service.dispatch_cancelled_events.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_cancel_execution_cancels_pending_approvals_before_temporal_rpc(self) -> None:
         """cancel_execution cancels pending approvals before asking Temporal to cancel.
@@ -238,7 +244,7 @@ class TestCancelExecution:
         mock_temporal = Mock(spec=TemporalExecutionService)
 
         call_order: list[str] = []
-        cancelled = [Mock()]
+        cancelled: list[object] = [Mock()]
 
         async def _fake_cancel_pending_for_execution(_execution_id: object) -> list[object]:
             call_order.append("cancel_approvals")
@@ -257,10 +263,14 @@ class TestCancelExecution:
 
         patcher, mock_approval_service = _patch_approval_service(cancelled=cancelled)
         mock_approval_service.cancel_pending_for_execution.side_effect = _fake_cancel_pending_for_execution
+        mock_approval_service.dispatch_cancelled_events = Mock(
+            side_effect=lambda *_: call_order.append("dispatch_events")
+        )
         with patcher as mock_approval_service_cls:
             await service.cancel_execution(execution.id)
 
         mock_approval_service_cls.assert_called_once_with(mock_session, mock_user)
         mock_approval_service.cancel_pending_for_execution.assert_awaited_once_with(execution.id)
         mock_approval_service.reopen_cancelled.assert_not_awaited()
-        assert call_order == ["cancel_approvals", "temporal_cancel"]
+        mock_approval_service.dispatch_cancelled_events.assert_called_once_with(cancelled)
+        assert call_order == ["cancel_approvals", "temporal_cancel", "dispatch_events"]
