@@ -109,18 +109,18 @@ test.describe('Approval Pending Badge', () => {
         // ===================================================================
         // Navigate back to the workflow builder
         await app.goto(`/workflow-builder/${workflowId}`)
-      await waitForUIReady(app)
+        await waitForUIReady(app)
 
-      // Open the run history panel via the kebab menu
-      const kebab = app.getByRole('button', { name: 'Workflow actions' })
-      await expect(kebab).toBeVisible({ timeout: 10_000 })
-      await kebab.click()
+        // Open the run history panel via the kebab menu
+        const kebab = app.getByRole('button', { name: 'Workflow actions' })
+        await expect(kebab).toBeVisible({ timeout: 10_000 })
+        await kebab.click()
 
         const runHistoryItem = app.getByRole('menuitem', { name: 'Run history' })
         await expect(runHistoryItem).toBeVisible()
-      await runHistoryItem.click()
+        await runHistoryItem.click()
 
-      await expect(app.getByRole('heading', { name: 'Run history', level: 2 })).toBeVisible()
+        await expect(app.getByRole('heading', { name: 'Run history', level: 2 })).toBeVisible()
 
         // Verify badge appears in the history panel
         const historyPanel = app.getByRole('list', { name: 'Run history list' })

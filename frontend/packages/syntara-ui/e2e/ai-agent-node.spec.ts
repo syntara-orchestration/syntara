@@ -172,11 +172,12 @@ test.describe('AI Agent Node @pr-check', () => {
       // Tool selection requires an MCP integration (with tools). Without one the
       // Tools control stays empty and hides "All tools".
       const token = await getAuthToken(app)
-      mcpIntegration = await createIntegrationViaApi(app, {
-        name: mcpIntegrationName,
-        token: token ?? undefined,
-        discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
-      })
+      mcpIntegration =
+        (await createIntegrationViaApi(app, {
+          name: mcpIntegrationName,
+          token: token ?? undefined,
+          discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
+        })) ?? undefined
 
       const { name: credName } = await ensureLlmCredential(app)
 
@@ -385,11 +386,12 @@ test.describe('AI Agent Node @pr-check', () => {
 
       // Create an MCP integration — it should NOT appear in the LLM model selector
       const token = await getAuthToken(app)
-      mcpIntegration = await createIntegrationViaApi(app, {
-        name: mcpName,
-        token: token ?? undefined,
-        discoveredTools: [{ name: 'e2e_tool', enabled: true }],
-      })
+      mcpIntegration =
+        (await createIntegrationViaApi(app, {
+          name: mcpName,
+          token: token ?? undefined,
+          discoveredTools: [{ name: 'e2e_tool', enabled: true }],
+        })) ?? undefined
 
       // Open workflow builder and add an Agent node
       await startWorkflowWithTrigger(app)

@@ -72,17 +72,19 @@ test.describe('Integration project scope — selector visibility', () => {
 
       if (!projectAId || !projectBId) return
 
-      globalIntegration = await createIntegrationViaApi(page, {
-        name: buildUniqueName('e2e-scope-global'),
-        token,
-        discoveredTools: [{ name: 'global_tool', enabled: true }],
-      })
+      globalIntegration =
+        (await createIntegrationViaApi(page, {
+          name: buildUniqueName('e2e-scope-global'),
+          token,
+          discoveredTools: [{ name: 'global_tool', enabled: true }],
+        })) ?? undefined
 
-      projectScopedIntegration = await createIntegrationViaApi(page, {
-        name: buildUniqueName('e2e-scope-projA'),
-        token,
-        discoveredTools: [{ name: 'scoped_tool', enabled: true }],
-      })
+      projectScopedIntegration =
+        (await createIntegrationViaApi(page, {
+          name: buildUniqueName('e2e-scope-projA'),
+          token,
+          discoveredTools: [{ name: 'scoped_tool', enabled: true }],
+        })) ?? undefined
       if (projectScopedIntegration) {
         const patched = await patchIntegrationScopeViaApi(page, projectScopedIntegration.id, 'project', token)
         const assigned =

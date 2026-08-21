@@ -21,7 +21,9 @@ import { getAuthToken } from './utils/api'
 
 async function createIntegration(app: Page, name: string): Promise<SeededIntegration> {
   const token = await getAuthToken(app)
-  return createIntegrationViaApi(app, { name, token: token ?? undefined })
+  const integration = await createIntegrationViaApi(app, { name, token: token ?? undefined })
+  if (!integration) throw new Error('Failed to create integration')
+  return integration
 }
 
 async function navigateToResourcesTab(app: Page, integrationName: string) {

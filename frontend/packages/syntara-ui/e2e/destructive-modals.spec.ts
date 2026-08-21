@@ -71,7 +71,8 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
     try {
       // Create integration via API
       const token = await getAuthToken(app)
-      seededIntegration = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
+      seededIntegration =
+        (await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })) ?? undefined
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()

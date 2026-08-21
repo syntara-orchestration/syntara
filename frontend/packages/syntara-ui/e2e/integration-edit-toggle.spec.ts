@@ -20,6 +20,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: originalName, token: token ?? undefined })
+      if (!seeded) throw new Error('Failed to create integration')
       integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))
@@ -67,6 +68,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
+      if (!seeded) throw new Error('Failed to create integration')
       integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))
@@ -121,6 +123,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
     try {
       const token = await getAuthToken(app)
       const seeded = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
+      if (!seeded) throw new Error('Failed to create integration')
       integrationId = seeded.id
 
       await app.goto(toAppUrl('/configuration/integrations'))

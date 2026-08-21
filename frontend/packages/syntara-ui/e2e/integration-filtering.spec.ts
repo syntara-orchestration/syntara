@@ -13,7 +13,7 @@ test.beforeAll(async ({ browser }) => {
   for (let i = 1; i <= 22; i++) {
     const name = i === 1 ? `${prefix}-copilot` : `${prefix}-integration-${i}`
     const integration = await createIntegrationViaApi(page, { name, token })
-    seededIntegrations.push(integration)
+    if (integration) seededIntegrations.push(integration)
   }
   await page.close()
 })

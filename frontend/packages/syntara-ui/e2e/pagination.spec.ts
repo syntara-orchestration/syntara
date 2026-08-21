@@ -70,7 +70,7 @@ test.beforeAll(async ({ browser }) => {
 
   for (let i = 1; i <= 2; i++) {
     const integration = await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token })
-    seededIntegrations.push(integration)
+    if (integration) seededIntegrations.push(integration)
   }
 
   for (let i = 1; i <= 16; i++) {
