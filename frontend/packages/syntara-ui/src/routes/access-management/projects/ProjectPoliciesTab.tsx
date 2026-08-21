@@ -52,6 +52,7 @@ function ProjectPoliciesTable({
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete policy</IconLabel>,
+      isDanger: true,
       onClick: () => onDelete(policy),
     },
   ]
@@ -208,7 +209,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete policy?"
-        confirmLabel="Delete"
+        confirmLabel="Delete policy"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

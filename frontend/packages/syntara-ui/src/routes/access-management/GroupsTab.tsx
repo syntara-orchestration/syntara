@@ -179,7 +179,7 @@ export function GroupsTab() {
                         <ActionsColumn
                           items={[
                             {
-                              title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
+                              title: <IconLabel icon={<RhUiEditFillIcon />}>Edit group</IconLabel>,
                               isAriaDisabled: !permissions.canUpdate,
                               tooltipProps: permissions.canUpdate
                                 ? undefined
@@ -188,7 +188,8 @@ export function GroupsTab() {
                             },
                             { isSeparator: true },
                             {
-                              title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+                              title: <IconLabel icon={<RhUiTrashIcon />}>Delete group</IconLabel>,
+                              isDanger: true,
                               isAriaDisabled: !permissions.canDelete,
                               tooltipProps: permissions.canDelete
                                 ? undefined
@@ -221,7 +222,7 @@ export function GroupsTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete group?"
-        confirmLabel="Delete"
+        confirmLabel="Delete group"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

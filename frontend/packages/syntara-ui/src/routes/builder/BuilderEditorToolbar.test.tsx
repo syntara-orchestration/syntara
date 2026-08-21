@@ -233,7 +233,7 @@ describe('BuilderEditorToolbar', () => {
   it('renders Save button', () => {
     render(<BuilderEditorToolbar {...defaultProps} />)
 
-    expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
   })
 
   it('calls handleSaveWorkflow when Save is clicked', async () => {
@@ -242,7 +242,7 @@ describe('BuilderEditorToolbar', () => {
 
     render(<BuilderEditorToolbar {...defaultProps} handleSaveWorkflow={handleSaveWorkflow} />)
 
-    await user.click(screen.getByRole('button', { name: /^Save$/i }))
+    await user.click(screen.getByRole('button', { name: /^Save workflow$/i }))
 
     expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
   })
@@ -263,21 +263,21 @@ describe('BuilderEditorToolbar', () => {
   it('Save button is always clickable for new workflows (validation happens on save, not before)', () => {
     render(<BuilderEditorToolbar {...defaultProps} isNew={true} isDirty={false} workflow={undefined} />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     expect(saveButton).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('disables Save button when there are no unsaved changes', () => {
     render(<BuilderEditorToolbar {...defaultProps} isDirty={false} />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     expect(saveButton).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('enables Save button when there are unsaved changes', () => {
     render(<BuilderEditorToolbar {...defaultProps} isDirty={true} />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     expect(saveButton).not.toHaveAttribute('aria-disabled', 'true')
   })
 
@@ -285,7 +285,7 @@ describe('BuilderEditorToolbar', () => {
     const user = userEvent.setup()
     render(<BuilderEditorToolbar {...defaultProps} isDirty={false} lastSavedAt="2026-01-15T14:30:00Z" />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     await user.hover(saveButton)
 
     expect(await screen.findByText(/Last saved/)).toBeInTheDocument()
@@ -295,7 +295,7 @@ describe('BuilderEditorToolbar', () => {
     const user = userEvent.setup()
     render(<BuilderEditorToolbar {...defaultProps} isDirty={true} lastSavedAt="2026-01-15T14:30:00Z" />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     await user.hover(saveButton)
 
     expect(await screen.findByText(/Last saved/)).toBeInTheDocument()
@@ -305,10 +305,10 @@ describe('BuilderEditorToolbar', () => {
     const user = userEvent.setup()
     render(<BuilderEditorToolbar {...defaultProps} isDirty={true} lastSavedAt={undefined} />)
 
-    const saveButton = screen.getByRole('button', { name: /^Save$/i })
+    const saveButton = screen.getByRole('button', { name: /^Save workflow$/i })
     await user.hover(saveButton)
 
-    expect(await screen.findByText('Save workflow')).toBeInTheDocument()
+    expect(await screen.findByRole('tooltip', { name: 'Save workflow' })).toBeInTheDocument()
   })
 
   it('renders Publish button for existing workflows', () => {
@@ -385,7 +385,7 @@ describe('BuilderEditorToolbar', () => {
       render(<BuilderEditorToolbar {...defaultProps} builderPermissions={deniedPermissions({ canEdit: false })} />)
 
       expect(screen.getByRole('button', { name: /Add step/i })).toHaveAttribute('aria-disabled', 'true')
-      expect(screen.getByRole('button', { name: /^Save$/i })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).toHaveAttribute('aria-disabled', 'true')
       expect(screen.getByRole('button', { name: /Publish/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
@@ -406,7 +406,7 @@ describe('BuilderEditorToolbar', () => {
       )
 
       await user.click(screen.getByRole('button', { name: /Add step/i }))
-      await user.click(screen.getByRole('button', { name: /^Save$/i }))
+      await user.click(screen.getByRole('button', { name: /^Save workflow$/i }))
       await user.click(screen.getByRole('button', { name: /Publish/i }))
 
       expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_ADD_NODE_PANEL' }))
@@ -683,7 +683,7 @@ describe('BuilderEditorToolbar', () => {
       />
     )
 
-    await user.hover(screen.getByRole('button', { name: /^Save$/i }))
+    await user.hover(screen.getByRole('button', { name: /^Save workflow$/i }))
 
     expect(await screen.findByText('No save permission')).toBeInTheDocument()
   })
@@ -707,7 +707,7 @@ describe('BuilderEditorToolbar', () => {
 
       expect(screen.getByRole('button', { name: /Add step/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^Run$/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
     })
 
     it('handles re-render with kebab open', () => {
@@ -755,7 +755,7 @@ describe('BuilderEditorToolbar', () => {
       const { rerender } = render(<BuilderEditorToolbar {...props} />)
       rerender(<BuilderEditorToolbar {...props} />)
 
-      expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
     })
 
     it('handles prop change from editable to read-only', () => {
@@ -774,7 +774,7 @@ describe('BuilderEditorToolbar', () => {
       const { rerender } = render(<BuilderEditorToolbar {...defaultProps} isDirty={false} />)
       rerender(<BuilderEditorToolbar {...defaultProps} isDirty />)
 
-      expect(screen.getByRole('button', { name: /^Save$/i })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).not.toHaveAttribute('aria-disabled', 'true')
     })
   })
 
@@ -787,7 +787,7 @@ describe('BuilderEditorToolbar', () => {
       expect(runButton).toHaveAttribute('aria-disabled', 'true')
       expect(screen.queryByRole('button', { name: /Publish/i })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Add step/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
     })
 
     it('hides Run history, Delete, and Unpublish in kebab when workflow is undefined', () => {
@@ -814,7 +814,7 @@ describe('BuilderEditorToolbar', () => {
       expect(screen.queryByRole('button', { name: /Add step/i })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^Run$/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Publish/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
     })
 
     it('renders toolbar when canEdit is false and hasNoWorkflowNodes is true but isNew is false', () => {
@@ -869,9 +869,9 @@ describe('BuilderEditorToolbar', () => {
       const user = userEvent.setup()
       render(<BuilderEditorToolbar {...defaultProps} isDirty lastSavedAt={null} />)
 
-      await user.hover(screen.getByRole('button', { name: /^Save$/i }))
+      await user.hover(screen.getByRole('button', { name: /^Save workflow$/i }))
 
-      expect(await screen.findByText('Save workflow')).toBeInTheDocument()
+      expect(await screen.findByRole('tooltip', { name: 'Save workflow' })).toBeInTheDocument()
     })
 
     it('shows all kebab items for published existing workflow', () => {

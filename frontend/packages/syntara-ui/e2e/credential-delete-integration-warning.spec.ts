@@ -133,7 +133,7 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
       await expect(modal.getByText(new RegExp(integrationName))).toBeVisible({ timeout: 15_000 })
 
       await modal.getByRole('checkbox').click()
-      await modal.getByRole('button', { name: 'Delete' }).click()
+      await modal.getByRole('button', { name: 'Delete credential' }).click()
 
       await expect(app.getByText('Credential deleted')).toBeVisible({ timeout: 10_000 })
       await expect(row).not.toBeVisible({ timeout: 10_000 })

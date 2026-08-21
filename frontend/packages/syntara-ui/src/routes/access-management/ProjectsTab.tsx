@@ -53,14 +53,15 @@ function getRowActions(
 ): IAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit project</IconLabel>,
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
       onClick: permissions.canUpdate ? () => onEdit(project) : undefined,
     },
     { isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete project</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(project) : undefined,
@@ -161,7 +162,7 @@ function DeleteProjectDialog({
       onClose={onClose}
       onConfirm={onDelete}
       title="Delete project?"
-      confirmLabel="Delete"
+      confirmLabel="Delete project"
       confirmVariant="danger"
       titleIconVariant="warning"
       destructiveAcknowledgement={{

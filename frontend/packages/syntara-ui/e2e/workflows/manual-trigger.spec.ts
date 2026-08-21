@@ -39,7 +39,7 @@ test.describe('Manual Trigger', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(workflowName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/.+/)
 
         await app.goto(toAppUrl('/workflows'))

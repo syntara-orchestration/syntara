@@ -362,7 +362,7 @@ describe('ProjectsTab', () => {
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
 
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       expect(deleteButton).toBeDisabled()
 
       const ackCheckbox = screen.getByRole('checkbox')
@@ -390,7 +390,7 @@ describe('ProjectsTab', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as { onSuccess: () => void; onSettled: () => void }
@@ -421,7 +421,7 @@ describe('ProjectsTab', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {

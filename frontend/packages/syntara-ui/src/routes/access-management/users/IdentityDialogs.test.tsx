@@ -130,7 +130,7 @@ describe('IdentityDialogs', () => {
       const user = userEvent.setup()
       const { props } = renderDialogs({ identityToDetach: mockIdentity })
 
-      await user.click(screen.getByRole('button', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('button', { name: 'Disconnect identity' }))
 
       expect(props.onConfirmDetach).toHaveBeenCalledTimes(1)
     })
@@ -180,7 +180,7 @@ describe('IdentityDialogs', () => {
       const user = userEvent.setup()
       renderDialogs({ convertProvider: mockConvertProvider })
 
-      const confirmButton = screen.getByRole('button', { name: 'Convert and link' })
+      const confirmButton = screen.getByRole('button', { name: 'Convert and link identity' })
       expect(confirmButton).toBeDisabled()
 
       const checkbox = screen.getByRole('checkbox', { name: 'I understand this action is irreversible' })
@@ -194,7 +194,7 @@ describe('IdentityDialogs', () => {
       const { props } = renderDialogs({ convertProvider: mockConvertProvider })
 
       await user.click(screen.getByRole('checkbox', { name: 'I understand this action is irreversible' }))
-      await user.click(screen.getByRole('button', { name: 'Convert and link' }))
+      await user.click(screen.getByRole('button', { name: 'Convert and link identity' }))
 
       expect(props.onConfirmConvert).toHaveBeenCalledTimes(1)
     })
@@ -306,7 +306,7 @@ describe('IdentityActionsKebab', () => {
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
 
-      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect' })
+      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect identity' })
       expect(disconnectItem).not.toHaveAttribute('aria-disabled', 'true')
     })
 
@@ -316,7 +316,7 @@ describe('IdentityActionsKebab', () => {
       renderKebab({ ...defaultConnectedProps, onDisconnect })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
 
       expect(onDisconnect).toHaveBeenCalledTimes(1)
     })
@@ -327,7 +327,7 @@ describe('IdentityActionsKebab', () => {
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
 
-      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect' })
+      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect identity' })
       expect(disconnectItem).toHaveAttribute('aria-disabled', 'true')
     })
   })

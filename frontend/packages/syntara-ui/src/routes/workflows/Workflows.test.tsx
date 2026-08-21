@@ -1063,7 +1063,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // Verify success
@@ -1130,7 +1130,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // Verify error alert
@@ -1351,7 +1351,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // After onSettled, the delete dialog should be closed
@@ -1415,7 +1415,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // After onSettled, the delete dialog should be closed even on error
@@ -2214,7 +2214,7 @@ describe('Workflows Component', () => {
       await openPublishDialogForFirstRow(user)
 
       // Fill form and submit
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       await waitFor(() => {
@@ -2282,7 +2282,7 @@ describe('Workflows Component', () => {
       render(<Workflows />, { wrapper })
       await openPublishDialogForFirstRow(user)
 
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       await waitFor(() => {
@@ -2345,7 +2345,7 @@ describe('Workflows Component', () => {
       render(<Workflows />, { wrapper })
       await openPublishDialogForFirstRow(user)
 
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       // Dialog should close after settled
@@ -2512,7 +2512,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {
@@ -2594,7 +2594,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {
@@ -2674,7 +2674,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {

@@ -52,7 +52,7 @@ test.skip('builder import shows confirmation modal for existing workflow', async
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('radio', { name: /Import as new workflow/ })).toBeVisible()
     await expect(dialog.getByRole('radio', { name: /Import into current workflow/ })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Import' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Import workflow' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
 
     await dialog.getByRole('button', { name: 'Cancel' }).click()
@@ -84,7 +84,7 @@ test('import into current workflow overwrites canvas and saves', async ({ app })
     await expect(dialog).toBeVisible()
 
     await dialog.getByRole('radio', { name: /Import into current workflow/ }).click()
-    await dialog.getByRole('button', { name: 'Import' }).click()
+    await dialog.getByRole('button', { name: 'Import workflow' }).click()
     await expect(dialog).not.toBeVisible()
 
     expect(app.url()).toBe(originalUrl)
@@ -114,7 +114,7 @@ test.skip('import as new workflow creates a new workflow and navigates', async (
     const dialog = app.getByRole('dialog', { name: 'Import workflow?' })
     await expect(dialog).toBeVisible()
 
-    await dialog.getByRole('button', { name: 'Import' }).click()
+    await dialog.getByRole('button', { name: 'Import workflow' }).click()
     await expect(dialog).not.toBeVisible()
 
     await expect(app).toHaveURL(/workflow-builder\/.+/)

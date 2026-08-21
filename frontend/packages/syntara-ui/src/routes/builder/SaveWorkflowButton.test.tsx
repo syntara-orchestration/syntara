@@ -16,9 +16,11 @@ const defaultProps = {
 }
 
 describe('SaveWorkflowButton', () => {
-  it('renders Save text', () => {
+  it('renders Save workflow with a save icon', () => {
     render(<SaveWorkflowButton {...defaultProps} />)
-    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: /save workflow/i })
+    expect(button).toBeInTheDocument()
+    expect(button.querySelector('svg')).toBeInTheDocument()
   })
 
   it('shows Saving... when isPending', () => {

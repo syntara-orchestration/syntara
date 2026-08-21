@@ -15,7 +15,7 @@ export function CredentialEmptyState({ onCreateCredential }: Readonly<Credential
       {onCreateCredential && (
         <EmptyStateFooter>
           <EmptyStateActions>
-            <Button variant="primary" onClick={onCreateCredential}>
+            <Button variant="primary" icon={<RhUiAddIcon />} onClick={onCreateCredential}>
               Create credential
             </Button>
           </EmptyStateActions>

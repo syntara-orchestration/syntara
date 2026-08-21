@@ -29,6 +29,8 @@ type UseNodeMenuActionsOptions = {
   additionalActions?: NodeMenuAction[]
 }
 
+const noop = () => undefined
+
 /**
  * Custom hook for managing the canvas step kebab menu in the workflow builder.
  * Defines menu items per canvas step category (`MenuNodeType`).
@@ -146,7 +148,11 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
   const allAdditionalActions = [...builderActions, ...additionalActions]
 
   if (allAdditionalActions.length > 0) {
-    return [...allAdditionalActions, deleteAction]
+    return [
+      ...allAdditionalActions,
+      { id: 'sep-delete', label: '', onClick: noop, separator: true },
+      deleteAction,
+    ]
   }
 
   return [deleteAction]

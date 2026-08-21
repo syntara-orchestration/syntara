@@ -261,7 +261,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       await waitFor(() => {
@@ -289,11 +289,11 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Confirm removal
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {
@@ -311,7 +311,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Cancel
@@ -419,10 +419,10 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {
@@ -449,10 +449,10 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {

@@ -221,7 +221,7 @@ describe('EditAssignmentDialog', () => {
     it('renders Save and Cancel buttons', () => {
       render(<EditAssignmentDialog {...defaultProps} />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     })
 
@@ -263,7 +263,7 @@ describe('EditAssignmentDialog', () => {
       render(<EditAssignmentDialog {...defaultProps} onClose={onClose} />, { wrapper })
 
       // Submit without changing the role
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(onClose).toHaveBeenCalled()
@@ -303,7 +303,7 @@ describe('EditAssignmentDialog', () => {
       await user.click(viewerOption)
 
       // Submit
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         // mutateAsync should be called (delete old, create new)
@@ -334,7 +334,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -363,7 +363,7 @@ describe('EditAssignmentDialog', () => {
       const adminOption = await screen.findByRole('option', { name: 'Admin' })
       await user.click(adminOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -391,7 +391,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -419,7 +419,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(onSuccess).toHaveBeenCalled()
@@ -443,7 +443,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['role-assignments'] })
@@ -487,7 +487,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText('Invalid assignment: missing project ID')).toBeInTheDocument()
@@ -502,7 +502,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText('Invalid assignment: missing project ID')).toBeInTheDocument()
@@ -522,7 +522,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText(/did not include an assignment id/i)).toBeInTheDocument()
@@ -552,7 +552,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         // mutateAsync was called but failed
@@ -582,7 +582,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -615,7 +615,7 @@ describe('EditAssignmentDialog', () => {
       const adminOption = await screen.findByRole('option', { name: 'Admin' })
       await user.click(adminOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalledTimes(3)
@@ -646,7 +646,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalledTimes(3)

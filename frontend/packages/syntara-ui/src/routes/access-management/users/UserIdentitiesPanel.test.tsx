@@ -261,7 +261,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
 
       expect(screen.getByText('Disconnect identity?')).toBeInTheDocument()
       expect(screen.getByText(/Disconnecting will remove sign-in access for this identity/)).toBeInTheDocument()
@@ -276,8 +276,8 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
-      await user.click(screen.getByRole('button', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
+      await user.click(screen.getByRole('button', { name: 'Disconnect identity' }))
 
       expect(mockMutate).toHaveBeenCalledTimes(1)
       const callArgs = mockMutate.mock.calls[0]
@@ -293,7 +293,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
 
       expect(screen.getByText('Disconnect identity?')).toBeInTheDocument()
 
@@ -324,8 +324,8 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
-      await user.click(screen.getByRole('button', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
+      await user.click(screen.getByRole('button', { name: 'Disconnect identity' }))
 
       const callbacks = mockMutate.mock.calls[0][1] as {
         onSuccess: () => void
@@ -349,8 +349,8 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
-      await user.click(screen.getByRole('button', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
+      await user.click(screen.getByRole('button', { name: 'Disconnect identity' }))
 
       const callbacks = mockMutate.mock.calls[0][1] as {
         onError: () => void
@@ -413,7 +413,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      expect(screen.getByRole('menuitem', { name: 'Disconnect' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: 'Disconnect identity' })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('shows aria-disabled Disconnect menuitem with tooltip for last identity without password', async () => {
@@ -423,7 +423,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect' })
+      const disconnectItem = screen.getByRole('menuitem', { name: 'Disconnect identity' })
       expect(disconnectItem).toHaveAttribute('aria-disabled', 'true')
       // Clicking the disabled item should not open the confirmation modal
       await user.click(disconnectItem)
@@ -448,7 +448,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
-      expect(screen.getByRole('menuitem', { name: 'Disconnect' })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: 'Disconnect identity' })).not.toHaveAttribute('aria-disabled', 'true')
     })
 
     it('enables Disconnect for the only identity when hasPassword is true (password fallback exists)', async () => {
@@ -458,7 +458,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={true} />, { wrapper })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      expect(screen.getByRole('menuitem', { name: 'Disconnect' })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: 'Disconnect identity' })).not.toHaveAttribute('aria-disabled', 'true')
     })
   })
 
@@ -506,7 +506,7 @@ describe('UserIdentitiesPanel', () => {
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[0])
       await user.click(screen.getByRole('menuitem', { name: 'Connect' }))
 
-      const confirmButton = screen.getByRole('button', { name: 'Convert and link' })
+      const confirmButton = screen.getByRole('button', { name: 'Convert and link identity' })
       expect(confirmButton).toBeDisabled()
 
       const checkbox = screen.getByRole('checkbox', { name: /I understand this action is irreversible/ })
@@ -883,7 +883,7 @@ describe('UserIdentitiesPanel', () => {
 
       // Open the second row's kebab (Okta) and click Disconnect
       await user.click(screen.getAllByRole('button', { name: 'Identity actions' })[1])
-      await user.click(screen.getByRole('menuitem', { name: 'Disconnect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Disconnect identity' }))
 
       // Modal should show Okta identity details
       expect(screen.getByText('Disconnect identity?')).toBeInTheDocument()

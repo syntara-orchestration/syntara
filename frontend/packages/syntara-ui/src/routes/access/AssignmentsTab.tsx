@@ -103,6 +103,7 @@ function getAssignmentRowActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete assignment</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onDelete(row) : undefined,
@@ -367,7 +368,7 @@ export function AssignmentsTab() {
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteItem)}
           title="Remove assignment?"
-          confirmLabel="Remove"
+          confirmLabel="Remove assignment"
           confirmVariant="danger"
           titleIconVariant="warning"
         >

@@ -196,7 +196,7 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
           isLoading={isPending}
           icon={isEditMode ? undefined : <RhUiAddIcon />}
         >
-          {isEditMode ? 'Save' : 'Create group'}
+          {isEditMode ? 'Save group' : 'Create group'}
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

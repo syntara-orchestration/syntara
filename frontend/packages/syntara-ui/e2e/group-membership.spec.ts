@@ -133,7 +133,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       const userName = await selectedOption.locator('> *').nth(0).textContent()
       await selectedOption.click()
 
-      await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Add member' }).click()
 
       await expect(dialog).not.toBeVisible()
       await expect(app.getByText(/member added/i)).toBeVisible()
@@ -144,7 +144,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
 
         const memberRow = app.getByRole('row').filter({ hasText: memberName })
         await memberRow.getByRole('button', { name: /kebab toggle/i }).click()
-        await app.getByRole('menuitem', { name: 'Remove' }).click()
+        await app.getByRole('menuitem', { name: 'Remove member' }).click()
 
         await expect(app.getByRole('dialog')).toBeVisible()
         await app.getByRole('button', { name: 'Remove', exact: true }).click()

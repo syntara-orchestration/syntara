@@ -350,7 +350,7 @@ export function MyListPage() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete item"
-        confirmLabel="Delete"
+        confirmLabel="Delete item"
         confirmVariant="danger"
       >
         Are you sure?
@@ -810,7 +810,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
   onClose={onClose}
   onConfirm={handleDelete}
   title="Delete workflow?"
-  confirmLabel="Delete"
+  confirmLabel="Delete workflow"
   confirmVariant="danger"
   titleIconVariant="warning"
   destructiveAcknowledgement={{

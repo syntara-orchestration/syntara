@@ -200,7 +200,7 @@ describe('GroupFormModal Component', () => {
       })
 
       expect(screen.getByText('Edit Admins')).toBeInTheDocument()
-      expect(screen.getByText('Save')).toBeInTheDocument()
+      expect(screen.getByText('Save group')).toBeInTheDocument()
     })
 
     it('pre-populates form fields with group data', () => {
@@ -232,7 +232,7 @@ describe('GroupFormModal Component', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Admins')
 
-      await user.click(screen.getByText('Save'))
+      await user.click(screen.getByText('Save group'))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()
@@ -280,7 +280,7 @@ describe('GroupFormModal Component', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Admins')
 
-      await user.click(screen.getByText('Save'))
+      await user.click(screen.getByText('Save group'))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()

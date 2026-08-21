@@ -89,6 +89,7 @@ function getRoleActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(role) : undefined,
@@ -354,7 +355,7 @@ export function RolesTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete role?"
-        confirmLabel="Delete"
+        confirmLabel="Delete role"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

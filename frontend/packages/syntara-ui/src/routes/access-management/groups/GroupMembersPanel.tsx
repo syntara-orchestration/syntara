@@ -59,7 +59,8 @@ function getMemberActions(
 ): IAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Remove member</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove(member) : undefined,
@@ -283,7 +284,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
         title="Remove member?"
-        confirmLabel="Remove"
+        confirmLabel="Remove member"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

@@ -145,7 +145,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const isEdit = mode === 'edit'
   const usersDocLink = useDocLink(isEdit ? 'users' : 'createUser')
   const pageTitle = isEdit ? 'Edit User' : 'Create User'
-  const submitLabel = isEdit ? 'Save' : 'Create user'
+  const submitLabel = isEdit ? 'Save user' : 'Create user'
 
   const { userId, isValidId, userQuery, isBuiltinUser, isFederatedUser, isSelf, formValues } = useUserFormData(isEdit)
 

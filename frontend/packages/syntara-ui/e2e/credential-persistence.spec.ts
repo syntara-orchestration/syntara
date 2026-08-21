@@ -72,7 +72,7 @@ test.describe('Credential Persistence', () => {
       // (credentials are fetched when "Set up connection" is clicked after model selection)
       await selectLlmCredential(app, credName)
 
-      await app.getByRole('button', { name: 'Create' }).click()
+      await app.getByRole('button', { name: 'Create credential' }).click()
       await closeNodeEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
@@ -115,7 +115,7 @@ test.describe('Credential Persistence', () => {
 
       await selectCredential(app, 'Authentication credential', credName)
 
-      await app.getByRole('button', { name: 'Create' }).click()
+      await app.getByRole('button', { name: 'Create credential' }).click()
       await closeNodeEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
@@ -171,7 +171,7 @@ test.describe('Credential Persistence', () => {
         await app.getByLabel('Job template', { exact: true }).fill('${trigger.template}')
       }
 
-      await app.getByRole('button', { name: 'Create' }).click()
+      await app.getByRole('button', { name: 'Create credential' }).click()
       await closeNodeEditorPanel(app)
       await saveWorkflow(app, workflowName)
 

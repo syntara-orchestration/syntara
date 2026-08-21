@@ -70,7 +70,7 @@ test.describe('UI-32: Workflow Verification — Missing Required Configuration',
       // Save and capture the workflow ID for reliable API-based cleanup
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
       workflowId = app.url().match(/workflow-builder\/([a-f0-9-]{36})/)?.[1]
 

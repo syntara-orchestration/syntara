@@ -60,7 +60,8 @@ function getAssignmentActions(
 ): IAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(row) : undefined,
@@ -500,7 +501,7 @@ export function RoleAssignmentsPanel({
         onClose={() => setRowToUnassign(null)}
         onConfirm={handleUnassign}
         title="Unassign role?"
-        confirmLabel="Unassign"
+        confirmLabel="Unassign role"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

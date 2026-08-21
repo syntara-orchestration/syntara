@@ -92,7 +92,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
       await expect(modal.getByText(new RegExp(integrationName))).toBeVisible()
 
       // Delete button should be disabled before checkbox
-      const deleteButton = modal.getByRole('button', { name: 'Delete' })
+      const deleteButton = modal.getByRole('button', { name: 'Delete integration' })
       await expect(deleteButton).toBeDisabled()
 
       // Check the acknowledgement checkbox
@@ -145,7 +145,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByText(/Disable integration/i)).toBeVisible()
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable integration' }).click()
       await expect(dialog).not.toBeVisible()
 
       // Verify the toggle shows disabled state

@@ -87,7 +87,8 @@ function getRowActions(
     },
     { isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete identity provider</IconLabel>,
+      isDanger: true,
       isDisabled: !id,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: tooltipWhenDenied(permissions.canDelete, permissions.tooltips.delete),

@@ -59,7 +59,7 @@ test.describe('Integration Tools', () => {
 
       if (hasTable) {
         // Verify Save changes button is present
-        await expect(app.getByRole('button', { name: 'Save changes' })).toBeVisible()
+        await expect(app.getByRole('button', { name: 'Save tools' })).toBeVisible()
 
         const checkboxes = toolsTable.getByRole('checkbox')
         const count = await checkboxes.count()
@@ -123,7 +123,7 @@ test.describe('Integration Tools', () => {
       }
 
       // Save changes
-      await app.getByRole('button', { name: 'Save changes' }).click()
+      await app.getByRole('button', { name: 'Save tools' }).click()
       // Verify success alert
       await expect(app.getByText('Changes saved')).toBeVisible()
     } finally {
@@ -235,7 +235,7 @@ test.describe('Integration Tools', () => {
       await expect(firstToolCheckbox).toBeChecked()
 
       // Save
-      await app.getByRole('button', { name: 'Save changes' }).click()
+      await app.getByRole('button', { name: 'Save tools' }).click()
       await expect(app.getByText('Changes saved')).toBeVisible()
 
       // Navigate away and back to resources tab
