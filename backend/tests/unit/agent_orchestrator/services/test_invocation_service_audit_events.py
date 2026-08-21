@@ -7,7 +7,7 @@ which are then converted to AuditEvents by the registered handlers.
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -24,6 +24,14 @@ from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
     from syntara.audit.models.audit_event import AuditEvent
+
+
+def _attach_cancel_update(mock_session: AsyncMock, *, rowcount: int = 1) -> None:
+    mock_result = MagicMock()
+    mock_result.rowcount = rowcount
+    mock_session.exec = AsyncMock(return_value=mock_result)
+    mock_session.rollback = AsyncMock()
+    mock_session.refresh = AsyncMock()
 
 
 class TestInvocationServiceCreateAuditEvents:
@@ -260,6 +268,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock()
+        _attach_cancel_update(mock_session)
         mock_file_manager = Mock()
         mock_file_manager.get_files_metadata = AsyncMock(return_value=[])
 
@@ -410,6 +419,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock()
+        _attach_cancel_update(mock_session)
         mock_retriever = AsyncMock()
         mock_retriever.delete_file = AsyncMock(return_value=True)
         mock_file_manager = Mock()
@@ -454,6 +464,7 @@ class TestInvocationServiceCancelAuditEvents:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_session.get = AsyncMock(return_value=invocation)
         mock_session.commit = AsyncMock(side_effect=Exception("DB Error"))
+        _attach_cancel_update(mock_session)
         mock_file_manager = Mock()
         mock_file_manager.get_files_metadata = AsyncMock(return_value=[])
 

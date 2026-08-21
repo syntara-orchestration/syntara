@@ -11,9 +11,23 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.models import InvocationContextData
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.audit.emitter import AuditActorContext
+
+
+@pytest.fixture(autouse=True)
+def _skip_cancel_poll(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Orchestration unit tests do not hit the database for cancel checks."""
+
+    async def _noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "syntara.agent_orchestrator.services.orchestration_service.raise_if_invocation_cancelled",
+        _noop,
+    )
 
 
 def create_mock_streaming_event(event_type: str, content: str | None = None) -> dict[str, Any]:
@@ -266,6 +280,54 @@ class TestOrchestrationServiceErrorHandling:
             # Verify error event was published
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_cancelled_invocation_skips_temporal_callbacks(self) -> None:
+        """Cancellation during execute must not send success or failure signals."""
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.plan_request.return_value = ContextPackage(payload={}, grounding_score=0.0)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_args, **_kwargs: mock_astream_events_generator("Hello")
+
+        async def _raise_cancelled(_invocation_id: object, _phase: str) -> None:
+            raise InvocationCancelledError(str(invocation_id), "orchestration")
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.raise_if_invocation_cancelled",
+                side_effect=_raise_cancelled,
+            ),
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_fail,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                new_callable=AsyncMock,
+            ) as mock_success,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+            mock_fail.assert_not_awaited()
+            mock_success.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_orchestration_service_publishes_error_event_on_failure(self) -> None:

@@ -19,29 +19,40 @@ def mock_user() -> MagicMock:
     return user
 
 
+def _session_with_invocation(invocation: MagicMock, *, rowcount: int = 1) -> AsyncMock:
+    mock_session = AsyncMock()
+    mock_session.get.return_value = invocation
+    mock_result = MagicMock()
+    mock_result.rowcount = rowcount
+    mock_session.exec = AsyncMock(return_value=mock_result)
+    mock_session.commit = AsyncMock()
+    mock_session.rollback = AsyncMock()
+    mock_session.refresh = AsyncMock()
+    return mock_session
+
+
 class TestInvocationServiceCancellation:
     """Test core cancellation business logic."""
 
     @pytest.mark.asyncio
     async def test_cancel_invocation_success(self, mock_user) -> None:
         """Test successful cancellation of running invocation."""
-        mock_session = AsyncMock()
-        service = InvocationService(mock_session, mock_user)
         invocation_id = uuid4()
 
-        # Setup: Running invocation owned by user
         mock_invocation = MagicMock()
         mock_invocation.created_by = mock_user.id
         mock_invocation.id = invocation_id
         mock_invocation.status = InvocationStatus.RUNNING
         mock_invocation.checkpoint_data = None
         mock_invocation.context_data = {"agent": "test-agent", "model": "test-model", "file_ids": []}
-        mock_session.get.return_value = mock_invocation
+        mock_session = _session_with_invocation(mock_invocation)
 
+        service = InvocationService(mock_session, mock_user)
         result = await service.cancel_invocation(invocation_id, "Test cancellation")
 
         assert result == CancellationResult.SUCCESS
         assert mock_invocation.status == InvocationStatus.CANCELLED
+        mock_session.exec.assert_awaited_once()
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
@@ -57,6 +68,7 @@ class TestInvocationServiceCancellation:
 
         assert result == CancellationResult.NOT_FOUND
         mock_session.commit.assert_not_called()
+        mock_session.exec.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_cancel_invocation_not_cancellable(self, mock_user) -> None:
@@ -65,7 +77,6 @@ class TestInvocationServiceCancellation:
         service = InvocationService(mock_session, mock_user)
         invocation_id = uuid4()
 
-        # Setup: Completed invocation owned by user
         mock_invocation = MagicMock()
         mock_invocation.created_by = mock_user.id
         mock_invocation.status = InvocationStatus.COMPLETED
@@ -75,20 +86,63 @@ class TestInvocationServiceCancellation:
 
         assert result == CancellationResult.NOT_CANCELLABLE
         mock_session.commit.assert_not_called()
+        mock_session.exec.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancel_loses_race_to_completion(self, mock_user) -> None:
+        """Conditional UPDATE with rowcount 0 means completion won the race."""
+        invocation_id = uuid4()
+        mock_invocation = MagicMock()
+        mock_invocation.created_by = mock_user.id
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.checkpoint_data = None
+        mock_invocation.context_data = {"file_ids": []}
+
+        mock_session = _session_with_invocation(mock_invocation, rowcount=0)
+
+        async def _refresh_to_completed(_invocation: object) -> None:
+            mock_invocation.status = InvocationStatus.COMPLETED
+
+        mock_session.refresh = AsyncMock(side_effect=_refresh_to_completed)
+
+        service = InvocationService(mock_session, mock_user)
+        result = await service.cancel_invocation(invocation_id, "Test cancellation")
+
+        assert result == CancellationResult.NOT_CANCELLABLE
+        assert mock_invocation.status == InvocationStatus.COMPLETED
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancel_commit_failure_rolls_back(self, mock_user) -> None:
+        """Commit failure rolls back so the request session stays usable."""
+        invocation_id = uuid4()
+        mock_invocation = MagicMock()
+        mock_invocation.created_by = mock_user.id
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.checkpoint_data = None
+        mock_invocation.context_data = {"file_ids": []}
+        mock_session = _session_with_invocation(mock_invocation)
+        mock_session.commit = AsyncMock(side_effect=Exception("DB Error"))
+
+        service = InvocationService(mock_session, mock_user)
+        with pytest.raises(Exception, match="DB Error"):
+            await service.cancel_invocation(invocation_id, "Test")
+
+        mock_session.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_cancel_invocation_signals_via_redis(self, mock_user) -> None:
         """Test that cancellation signals the agent loop via Redis after DB commit."""
-        mock_session = AsyncMock()
-        service = InvocationService(mock_session, mock_user)
         invocation_id = uuid4()
-
         mock_invocation = MagicMock()
         mock_invocation.id = invocation_id
         mock_invocation.status = InvocationStatus.RUNNING
         mock_invocation.checkpoint_data = None
         mock_invocation.context_data = {"file_ids": []}
-        mock_session.get.return_value = mock_invocation
+        mock_session = _session_with_invocation(mock_invocation)
+        service = InvocationService(mock_session, mock_user)
 
         with patch.object(service, "_signal_cancellation", new=AsyncMock()) as mock_signal:
             result = await service.cancel_invocation(invocation_id, "test reason")
@@ -136,7 +190,6 @@ class TestInvocationServiceCancellation:
     @pytest.mark.asyncio
     async def test_cancel_with_files_calls_retriever_delete(self, mock_user) -> None:
         """Cancellation deletes files via the storage retriever."""
-        mock_session = AsyncMock()
         file_id_1 = uuid4()
         file_id_2 = uuid4()
         invocation_id = uuid4()
@@ -150,7 +203,7 @@ class TestInvocationServiceCancellation:
             "model": "test-model",
             "file_ids": [str(file_id_1), str(file_id_2)],
         }
-        mock_session.get.return_value = mock_invocation
+        mock_session = _session_with_invocation(mock_invocation)
 
         mock_file_metadata = [
             FileMetadata(
@@ -191,15 +244,13 @@ class TestInvocationServiceCancellation:
     @pytest.mark.asyncio
     async def test_cancel_returns_success_when_cleanup_raises(self, mock_user) -> None:
         """A cleanup failure after DB commit must not 500 a successful cancel."""
-        mock_session = AsyncMock()
         invocation_id = uuid4()
-
         mock_invocation = MagicMock()
         mock_invocation.id = invocation_id
         mock_invocation.status = InvocationStatus.RUNNING
         mock_invocation.checkpoint_data = None
         mock_invocation.context_data = {}
-        mock_session.get.return_value = mock_invocation
+        mock_session = _session_with_invocation(mock_invocation)
 
         service = InvocationService(mock_session, mock_user)
 
@@ -216,7 +267,6 @@ class TestInvocationServiceCancellation:
     @pytest.mark.asyncio
     async def test_cancel_cleanup_continues_on_single_file_error(self, mock_user) -> None:
         """File cleanup is best-effort: one failure doesn't block the rest."""
-        mock_session = AsyncMock()
         file_id_1 = uuid4()
         file_id_2 = uuid4()
         invocation_id = uuid4()
@@ -230,7 +280,7 @@ class TestInvocationServiceCancellation:
             "model": "test-model",
             "file_ids": [str(file_id_1), str(file_id_2)],
         }
-        mock_session.get.return_value = mock_invocation
+        mock_session = _session_with_invocation(mock_invocation)
 
         mock_file_metadata = [
             FileMetadata(

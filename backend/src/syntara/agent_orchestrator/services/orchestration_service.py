@@ -32,7 +32,6 @@ from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAge
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError, ToolSelectionUnavailableError
-from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
@@ -50,6 +49,7 @@ from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     create_tool_awrapper,
     create_tool_wrapper,
 )
+from syntara.agent_orchestrator.utils.cancellation import is_invocation_cancelled, raise_if_invocation_cancelled
 from syntara.agent_orchestrator.utils.context_helpers import extract_request_id
 from syntara.agent_orchestrator.utils.token_usage import aggregate_token_usage
 from syntara.agent_orchestrator.utils.used_tools import aggregate_used_tools
@@ -534,6 +534,7 @@ class OrchestrationService:
                 # terminal error event and workflow failure signals fire (same path as
                 # mid-stream failures). Setup must not run before StreamClient.
                 graph: CompiledStateGraph[AgentState, None, Any, Any] = await self._setup_graph(initial_state)
+                await raise_if_invocation_cancelled(invocation_id, "orchestration")
 
                 # Execute graph with streaming events
                 config: RunnableConfig = cast("RunnableConfig", {"configurable": {"thread_id": session_id}})
@@ -604,7 +605,6 @@ class OrchestrationService:
                         invocation_id=invocation_id,
                     )
                 raise
-
             except Exception as e:
                 # Handle streaming errors
                 logger.exception(
@@ -637,11 +637,10 @@ class OrchestrationService:
         Uses its own ``StreamClient`` so that cancelling the task cannot
         corrupt the connection pool used by the stream publisher.
 
-        Known limitation: this watcher only improves *detection* latency.
-        The actual raise happens inside the ``async for`` body in the
-        stream loop, so an in-flight tool that blocks ``astream_events``
-        from yielding will keep running until it returns.  Cooperative
-        cancellation within tools is not yet implemented.
+        Known limitation: this watcher only improves *detection* latency
+        for the stream loop.  The actual raise happens inside the ``async for``
+        body, so an in-flight tool that blocks ``astream_events`` from yielding
+        keeps running until it returns or the tool wrapper's cancel check fires.
         """
         if interval is None:
             interval = _CANCELLATION_POLL_INTERVAL
@@ -694,7 +693,6 @@ class OrchestrationService:
             recorder=get_metrics_recorder(),
             model=self._get_model_name(),
         )
-
         cancel_key = get_invocation_cancel_key(invocation_id)
         cancel_event = asyncio.Event()
 
@@ -725,8 +723,7 @@ class OrchestrationService:
                 raise InvocationCancelledError(str(invocation_id), phase="streaming") from None
             try:
                 async with self._get_async_session_context() as session:
-                    inv = await session.get(Invocation, invocation_id)
-                    if inv is not None and inv.status == InvocationStatus.CANCELLED:
+                    if await is_invocation_cancelled(session, invocation_id):
                         raise InvocationCancelledError(str(invocation_id), phase="streaming") from None  # noqa: TRY301
             except InvocationCancelledError:
                 raise
@@ -778,8 +775,7 @@ class OrchestrationService:
         if not cancelled and (not redis_available or force_db_check):
             try:
                 async with self._get_async_session_context() as session:
-                    invocation = await session.get(Invocation, invocation_id)
-                    cancelled = invocation is not None and invocation.status == InvocationStatus.CANCELLED
+                    cancelled = await is_invocation_cancelled(session, invocation_id)
             except (SQLAlchemyError, OSError) as e:
                 logger.warning(
                     "DB cancellation fallback failed, continuing",

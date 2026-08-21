@@ -1147,7 +1147,7 @@ class ExecutionService(BaseService):
                 cancel_invocations_for_execution,
             )
 
-            await cancel_invocations_for_execution(self.session, execution_id)
+            await cancel_invocations_for_execution(self.session, self.user, execution_id)
         except Exception:
             logger.exception(
                 "Best-effort invocation cancellation failed",

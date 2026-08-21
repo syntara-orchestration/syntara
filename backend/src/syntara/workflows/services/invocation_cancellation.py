@@ -2,13 +2,13 @@
 
 When a user cancels a workflow execution, Temporal cancels the workflow but
 agentic activities have already exited via ``raise_complete_async()``.  The
-running agent process is unaware of the Temporal cancel.  This module bridges
-the gap by querying for active invocations that belong to the execution and
-marking them as CANCELLED in the database.  The agent loop detects the status
-change on its next DB poll and stops.
+running agent process is unaware of the Temporal cancel.  This module finds
+active invocations for the execution and cancels them through
+``InvocationService`` (audit events, file cleanup, conditional status update,
+Redis cancel signal). The running agent stops via the Redis watcher, with a
+DB status fallback when Redis is unavailable.
 """
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 import structlog
@@ -16,6 +16,9 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
+from syntara.core.models import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -33,7 +36,7 @@ async def find_active_invocations_for_execution(
     """
     result = await session.exec(
         select(Invocation).where(
-            Invocation.context_data["execution_id"].as_string() == str(execution_id),  # type: ignore[index]
+            Invocation.context_data["execution_id"].as_string() == str(execution_id),  # type: ignore[attr-defined]
             col(Invocation.status).in_(_CANCELLABLE_STATUSES),
         )
     )
@@ -42,13 +45,14 @@ async def find_active_invocations_for_execution(
 
 async def cancel_invocations_for_execution(
     session: AsyncSession,
+    user: User,
     execution_id: UUID,
     reason: str = "Workflow execution cancelled",
 ) -> int:
     """Cancel all active invocations belonging to *execution_id*.
 
-    Each invocation is individually try/excepted so one failure does not
-    block the others.  Returns the number of successfully cancelled
+    Each invocation is cancelled via ``InvocationService`` so one failure does
+    not block the others.  Returns the number of successfully cancelled
     invocations.
     """
     invocations = await find_active_invocations_for_execution(session, execution_id)
@@ -65,31 +69,27 @@ async def cancel_invocations_for_execution(
         count=len(invocations),
     )
 
+    service = InvocationService(session, user)
     cancelled = 0
-    now = datetime.now(UTC)
     for invocation in invocations:
         try:
-            invocation.status = InvocationStatus.CANCELLED
-            invocation.error_message = f"Workflow cancelled: {reason}"
-            invocation.completed_at = now
-            cancelled += 1
+            result = await service.cancel_invocation(invocation.id, reason)
+            if result == CancellationResult.SUCCESS:
+                cancelled += 1
         except Exception:
             logger.exception(
-                "Failed to mark invocation as cancelled",
+                "Failed to cancel invocation for execution",
                 invocation_id=invocation.id,
                 execution_id=execution_id,
             )
-
-    if cancelled:
-        try:
-            await session.commit()
-        except Exception:
-            logger.exception(
-                "Failed to commit invocation cancellations",
-                execution_id=execution_id,
-                attempted=cancelled,
-            )
-            return 0
+            try:
+                await session.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback after invocation cancel error",
+                    invocation_id=invocation.id,
+                    execution_id=execution_id,
+                )
 
     logger.info(
         "Invocation cancellation complete",

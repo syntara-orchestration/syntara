@@ -1,12 +1,13 @@
 """Unit tests for invocation_cancellation helper module."""
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
 
 from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.core.models import User
 from syntara.workflows.services.invocation_cancellation import (
     cancel_invocations_for_execution,
     find_active_invocations_for_execution,
@@ -26,7 +27,13 @@ def _make_invocation(
     return inv
 
 
+def _mock_user() -> User:
+    return Mock(spec=User)
+
+
 class TestFindActiveInvocationsForExecution:
+    """Lookup of cancellable invocations by execution_id."""
+
     @pytest.mark.asyncio
     async def test_returns_matching_invocations(self) -> None:
         execution_id = uuid4()
@@ -55,6 +62,8 @@ class TestFindActiveInvocationsForExecution:
 
 
 class TestCancelInvocationsForExecution:
+    """Bulk cancel delegates to InvocationService."""
+
     @pytest.mark.asyncio
     async def test_no_active_invocations_returns_zero(self) -> None:
         execution_id = uuid4()
@@ -65,79 +74,125 @@ class TestCancelInvocationsForExecution:
             new_callable=AsyncMock,
             return_value=[],
         ):
-            result = await cancel_invocations_for_execution(mock_session, execution_id)
+            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
         assert result == 0
 
     @pytest.mark.asyncio
-    async def test_cancels_single_invocation(self) -> None:
+    async def test_cancels_single_invocation_via_service(self) -> None:
         execution_id = uuid4()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
-        mock_session.commit = AsyncMock()
+        mock_service = Mock()
+        mock_service.cancel_invocation = AsyncMock(return_value=CancellationResult.SUCCESS)
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=[inv],
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[inv],
+            ),
+            patch(
+                "syntara.workflows.services.invocation_cancellation.InvocationService",
+                return_value=mock_service,
+            ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, execution_id)
+            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
         assert result == 1
-        assert inv.status == InvocationStatus.CANCELLED
-        assert "Workflow cancelled" in inv.error_message
-        assert inv.completed_at is not None
-        mock_session.commit.assert_awaited_once()
+        mock_service.cancel_invocation.assert_awaited_once_with(inv.id, "Workflow execution cancelled")
 
     @pytest.mark.asyncio
     async def test_cancels_multiple_invocations(self) -> None:
         execution_id = uuid4()
         invocations = [_make_invocation(str(execution_id)) for _ in range(3)]
         mock_session = Mock()
-        mock_session.commit = AsyncMock()
+        mock_service = Mock()
+        mock_service.cancel_invocation = AsyncMock(return_value=CancellationResult.SUCCESS)
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=invocations,
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=invocations,
+            ),
+            patch(
+                "syntara.workflows.services.invocation_cancellation.InvocationService",
+                return_value=mock_service,
+            ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, execution_id)
+            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
         assert result == 3
-        for inv in invocations:
-            assert inv.status == InvocationStatus.CANCELLED
-        mock_session.commit.assert_awaited_once()
+        assert mock_service.cancel_invocation.await_count == 3
 
     @pytest.mark.asyncio
-    async def test_commit_failure_returns_zero(self) -> None:
+    async def test_one_failure_does_not_block_others(self) -> None:
+        execution_id = uuid4()
+        invocations = [_make_invocation(str(execution_id)) for _ in range(2)]
+        mock_session = Mock()
+        mock_session.rollback = AsyncMock()
+        mock_service = Mock()
+        mock_service.cancel_invocation = AsyncMock(side_effect=[Exception("DB error"), CancellationResult.SUCCESS])
+
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=invocations,
+            ),
+            patch(
+                "syntara.workflows.services.invocation_cancellation.InvocationService",
+                return_value=mock_service,
+            ),
+        ):
+            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+
+        assert result == 1
+        mock_session.rollback.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_not_cancellable_is_not_counted(self) -> None:
         execution_id = uuid4()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
-        mock_session.commit = AsyncMock(side_effect=Exception("DB error"))
+        mock_service = Mock()
+        mock_service.cancel_invocation = AsyncMock(return_value=CancellationResult.NOT_CANCELLABLE)
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=[inv],
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[inv],
+            ),
+            patch(
+                "syntara.workflows.services.invocation_cancellation.InvocationService",
+                return_value=mock_service,
+            ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, execution_id)
+            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
         assert result == 0
 
     @pytest.mark.asyncio
-    async def test_custom_reason_in_error_message(self) -> None:
+    async def test_custom_reason_passed_to_service(self) -> None:
         execution_id = uuid4()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
-        mock_session.commit = AsyncMock()
+        mock_service = Mock()
+        mock_service.cancel_invocation = AsyncMock(return_value=CancellationResult.SUCCESS)
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=[inv],
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.find_active_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[inv],
+            ),
+            patch(
+                "syntara.workflows.services.invocation_cancellation.InvocationService",
+                return_value=mock_service,
+            ),
         ):
-            await cancel_invocations_for_execution(
-                mock_session, execution_id, reason="User requested"
-            )
+            await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id, reason="User requested")
 
-        assert inv.error_message == "Workflow cancelled: User requested"
+        mock_service.cancel_invocation.assert_awaited_once_with(inv.id, "User requested")

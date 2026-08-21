@@ -1,6 +1,6 @@
 """Unit tests for ExecutionService.cancel_execution method."""
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -60,7 +60,11 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        await service.cancel_execution(execution.id)
+        with patch(
+            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+            new_callable=AsyncMock,
+        ):
+            await service.cancel_execution(execution.id)
 
         mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
 
@@ -154,8 +158,6 @@ class TestCancelExecution:
     @pytest.mark.asyncio
     async def test_cancel_execution_propagates_to_invocations(self) -> None:
         """Test that invocation cancellation is called after Temporal cancel."""
-        from unittest.mock import patch
-
         execution = _make_execution(ExecutionStatus.RUNNING)
         mock_session = _mock_session_returning(execution)
         mock_user = Mock(spec=User)
@@ -174,13 +176,11 @@ class TestCancelExecution:
         ) as mock_cancel:
             await service.cancel_execution(execution.id)
 
-        mock_cancel.assert_awaited_once_with(mock_session, execution.id)
+        mock_cancel.assert_awaited_once_with(mock_session, mock_user, execution.id)
 
     @pytest.mark.asyncio
     async def test_cancel_execution_invocation_failure_does_not_block(self) -> None:
         """Test that invocation cancel failure does not prevent execution cancel."""
-        from unittest.mock import patch
-
         execution = _make_execution(ExecutionStatus.RUNNING)
         mock_session = _mock_session_returning(execution)
         mock_user = Mock(spec=User)

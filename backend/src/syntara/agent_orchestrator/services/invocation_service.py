@@ -16,11 +16,12 @@ Key design decisions:
 
 from collections.abc import AsyncGenerator, Callable, Iterable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
+from sqlmodel import col, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
@@ -374,23 +375,53 @@ class InvocationService(BaseService):
             )
             return CancellationResult.NOT_CANCELLABLE
 
-        # Update invocation with cancellation details using existing fields
-        invocation.status = InvocationStatus.CANCELLED
-        invocation.error_message = f"User cancelled: {reason}"
-        invocation.completed_at = datetime.now(UTC)
-
-        # Store cancellation metadata in checkpoint_data for debugging
+        now = datetime.now(UTC)
+        error_message = f"User cancelled: {reason}"
         cancellation_data: dict[str, object] = {
-            "cancelled_at": invocation.completed_at.isoformat(),
+            "cancelled_at": now.isoformat(),
             "cancelled_by": str(self.user.id),
             "reason": reason,
         }
+        checkpoint_data: dict[str, object] = dict(invocation.checkpoint_data) if invocation.checkpoint_data else {}
+        checkpoint_data.update(cancellation_data)
 
-        # Merge with existing checkpoint_data if it exists
-        if invocation.checkpoint_data:
-            invocation.checkpoint_data.update(cancellation_data)
-        else:
-            invocation.checkpoint_data = cancellation_data
+        # Conditional UPDATE so a concurrent COMPLETED/FAILED write cannot be
+        # overwritten by a stale in-memory CANCELLED assignment.
+        stmt = (
+            update(Invocation)
+            .where(Invocation.id == invocation_id)  # type: ignore[arg-type]
+            .where(col(Invocation.status).in_((InvocationStatus.CREATED, InvocationStatus.RUNNING)))
+            .values(
+                status=InvocationStatus.CANCELLED,
+                error_message=error_message,
+                completed_at=now,
+                checkpoint_data=checkpoint_data,
+            )
+        )
+        result = await self.session.exec(stmt)
+        if not bool(cast("Any", result).rowcount > 0):
+            await self.session.refresh(invocation)
+            logger.warning(
+                "Cancellation failed: Invocation not in cancellable state",
+                invocation_id=invocation_id,
+                status=invocation.status.value,
+            )
+            AuditEventDispatcher.dispatch(
+                InvocationCancelledEvent(
+                    invocation_id=invocation_id,
+                    result=InvocationCancellationResult.NOT_CANCELLABLE,
+                    reason=reason,
+                    current_status=invocation.status,
+                    activity_id=activity_id,
+                    activity_name=activity_name,
+                )
+            )
+            return CancellationResult.NOT_CANCELLABLE
+
+        invocation.status = InvocationStatus.CANCELLED
+        invocation.error_message = error_message
+        invocation.completed_at = now
+        invocation.checkpoint_data = checkpoint_data
 
         # Note: Document conversion workflows will complete harmlessly even for
         # cancelled invocations. Execution workflow cancellation is handled by Temporal.
@@ -447,6 +478,13 @@ class InvocationService(BaseService):
                     activity_name=activity_name,
                 )
             )
+            try:
+                await self.session.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback after invocation cancel commit error",
+                    invocation_id=invocation_id,
+                )
             raise
 
     async def _signal_cancellation(self, invocation_id: UUID) -> None:

@@ -437,35 +437,3 @@ class AgentOrchestratorClient:
             code=ErrorCode.UNEXPECTED_ERROR,
             details=str(last_error) if last_error else None,
         ) from last_error
-
-    async def cancel_invocation(
-        self,
-        invocation_id: str,
-        reason: str = "Workflow execution cancelled",
-    ) -> bool:
-        """Cancel an in-flight invocation (best-effort).
-
-        Returns True if the cancel request was accepted (2xx), False
-        otherwise.  Never raises -- all errors are logged and swallowed
-        so callers can treat this as fire-and-forget.
-        """
-        try:
-            response = await self.http_client.post(
-                f"/invocations/{invocation_id}/cancel",
-                json={"reason": reason},
-                timeout=self.timeout,
-            )
-            accepted = response.is_success
-            logger.info(
-                "Invocation cancel request sent",
-                invocation_id=invocation_id,
-                status_code=response.status_code,
-                accepted=accepted,
-            )
-            return accepted
-        except Exception:
-            logger.exception(
-                "Failed to send invocation cancel request",
-                invocation_id=invocation_id,
-            )
-            return False

@@ -22,9 +22,10 @@ from syntara.agent_orchestrator.audit.context_planning import (
     ContextPlanningStatus,
 )
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError
-from syntara.agent_orchestrator.models import Invocation, InvocationStatus, LLMCredentialConfig
+from syntara.agent_orchestrator.models import LLMCredentialConfig
 from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.agent_orchestrator.token_manager import TokenValidationService
+from syntara.agent_orchestrator.utils.cancellation import is_invocation_cancelled
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import get_db
@@ -124,8 +125,7 @@ class ContextManagerPlanner:
             # Slow path: only when Redis was down — create a short-lived session
             try:
                 async with self.get_async_session_context() as session:
-                    invocation = await session.get(Invocation, invocation_id)
-                    cancelled = invocation is not None and invocation.status == InvocationStatus.CANCELLED
+                    cancelled = await is_invocation_cancelled(session, invocation_id)
             except (SQLAlchemyError, OSError) as e:
                 logger.warning(
                     "Failed to check cancellation status for invocation, continuing execution",
