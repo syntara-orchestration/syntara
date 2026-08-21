@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test'
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { applyApprovalNameFilter } from '../helpers/approvals'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
 import { apiRequest, pollApprovalVisible, pollExecutionStatus } from '../utils/api'
 
@@ -61,7 +62,7 @@ async function createPendingApproval(
   // There is a brief async gap between the execution reaching "paused" and the approval
   // appearing in the approvals index — polling here prevents the race in the test setup.
   // In Konflux's environment the indexing lag can exceed 30s; treat as a skip (not a failure).
-  const approvalVisible = await pollApprovalVisible(app, approvalName)
+  const approvalVisible = await pollApprovalVisible(app, approvalName, { timeout: 45_000 })
     .then(() => true)
     .catch(() => false)
   test.skip(!approvalVisible, 'Approval record not visible in listing API — async indexing lag in Konflux')
@@ -138,7 +139,7 @@ test('user filters approvals by name and status', async ({ app }) => {
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test('user performs batch approval operations', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user performs batch approval operations', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -152,14 +153,7 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for the filter chip to confirm the filter was applied and the table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
+      await applyApprovalNameFilter(app, table, batchId)
 
       // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
@@ -227,13 +221,13 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
+      await applyApprovalNameFilter(app, table, batchId)
 
       // Step 1: Select both approvals using row-scoped checkboxes
       const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox').check()
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
       // Step 2: Verify batch toolbar and count
@@ -287,12 +281,13 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
+      await applyApprovalNameFilter(app, table, approval.approvalName, {
+        waitForRowText: approval.approvalName,
+      })
 
       // Step 1: Select the approval using row-scoped checkbox
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
+      await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
       await expect(app.getByText('1 selected')).toBeVisible()
 

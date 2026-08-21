@@ -54,6 +54,8 @@ vi.mock('../access/accessClient', () => ({
 // Mock useProjectSelector to avoid needing accessClient / QueryClientProvider
 const mockUseProjectSelector = vi.fn(() => ({
   selectedProject: null as { id: string; name: string } | null,
+  selectedProjectId: null as string | null,
+  stableProjectId: null as string | null,
   isAllProjects: true,
   projects: [] as { id: string; name: string }[],
   ProjectSelector: null,
@@ -273,6 +275,15 @@ describe('Approvals Component', () => {
       isError: false,
       refetch: vi.fn(),
     } as never)
+
+    mockUseProjectSelector.mockReturnValue({
+      selectedProject: null,
+      selectedProjectId: null,
+      stableProjectId: null,
+      isAllProjects: true,
+      projects: [],
+      ProjectSelector: null,
+    })
   })
 
   const mockApprovalsQuery = (data: Approval[], isPending = false, error: unknown = null) => {
@@ -1096,6 +1107,46 @@ describe('Approvals Component', () => {
     })
   })
 
+  describe('Project-scoped view', () => {
+    it('loads approvals from the project endpoint when a single project is selected', () => {
+      mockUseProjectSelector.mockReturnValue({
+        selectedProject: { id: 'proj-1', name: 'Project Alpha' },
+        selectedProjectId: 'proj-1',
+        stableProjectId: 'proj-1',
+        isAllProjects: false,
+        projects: [{ id: 'proj-1', name: 'Project Alpha' }],
+        ProjectSelector: null,
+      })
+
+      vi.mocked(accessClient.useQuery).mockReturnValue({
+        data: {
+          resources: mockApprovals,
+          next: null,
+          prev: null,
+          total: mockApprovals.length,
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never)
+
+      render(<Approvals />)
+
+      expect(screen.getByText('Test Approval 1')).toBeInTheDocument()
+      expect(screen.getByText('Test Approval 2')).toBeInTheDocument()
+      expect(vi.mocked(accessClient.useQuery)).toHaveBeenCalled()
+    })
+  })
+
   describe('Bulk actions', () => {
     const mockBulkMutate = vi.fn()
 
@@ -1140,6 +1191,36 @@ describe('Approvals Component', () => {
       await user.click(screen.getByRole('button', { name: 'Reject' }))
 
       expect(await screen.findByRole('heading', { name: /reject 1 approval step/i })).toBeInTheDocument()
+    })
+
+    it('closes bulk approve dialog without submitting or clearing selection', async () => {
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      await selectFirstPendingApproval(user)
+      await user.click(screen.getByRole('button', { name: 'Approve' }))
+
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      expect(mockBulkMutate).not.toHaveBeenCalled()
+    })
+
+    it('closes bulk reject dialog without submitting or clearing selection', async () => {
+      const user = userEvent.setup()
+      render(<Approvals />)
+
+      await selectFirstPendingApproval(user)
+      await user.click(screen.getByRole('button', { name: 'Reject' }))
+
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      expect(mockBulkMutate).not.toHaveBeenCalled()
     })
 
     it('refetches approvals after a successful bulk approve', async () => {

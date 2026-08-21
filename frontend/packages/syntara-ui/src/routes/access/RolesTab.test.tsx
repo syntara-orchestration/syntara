@@ -661,6 +661,14 @@ describe('RolesTab', () => {
   })
 
   describe('Expandable rows', () => {
+    it('renders a dash when a role has no description', () => {
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const viewerRow = screen.getByRole('row', { name: /viewer/i })
+      const descriptionCell = viewerRow.querySelector('td[data-label="Description"]')
+      expect(descriptionCell).toHaveTextContent('-')
+    })
+
     it('policies are hidden by default and shown when row is expanded', async () => {
       const user = userEvent.setup()
       render(<RolesTab />, { wrapper: createWrapper() })

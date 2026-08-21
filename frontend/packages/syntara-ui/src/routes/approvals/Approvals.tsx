@@ -45,9 +45,11 @@ export type ApprovalWithDetails = Approval & {
   workflowVersion?: number
 }
 
-type ApprovalsAction = { type: 'SET_EXPANDED_ROWS'; payload: Set<string> } | { type: 'TOGGLE_ROW'; payload: string }
+export type ApprovalsAction =
+  | { type: 'SET_EXPANDED_ROWS'; payload: Set<string> }
+  | { type: 'TOGGLE_ROW'; payload: string }
 
-function approvalsReducer(state: { expandedRows: Set<string> }, action: ApprovalsAction) {
+export function approvalsReducer(state: { expandedRows: Set<string> }, action: ApprovalsAction) {
   switch (action.type) {
     case 'SET_EXPANDED_ROWS':
       return { ...state, expandedRows: action.payload }

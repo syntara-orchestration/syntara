@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 import { expect, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
@@ -11,6 +11,30 @@ export async function dismissConnectionBanner(app: Page): Promise<void> {
   const banner = app.getByRole('alert').filter({ hasText: 'Live updates paused' })
   if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await banner.getByRole('button', { name: /close/i }).click()
+  }
+}
+
+/**
+ * Applies a name filter on the approvals list and waits until the UI reflects the filter.
+ * Waits for the filter chip and optional row content so batch tests do not race the table refresh.
+ */
+export async function applyApprovalNameFilter(
+  app: Page,
+  table: Locator,
+  nameFilter: string,
+  options?: { waitForRowText?: string }
+): Promise<void> {
+  await app.getByPlaceholder('Filter by name').fill(nameFilter)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
+
+  await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+    timeout: 15_000,
+  })
+
+  if (options?.waitForRowText) {
+    await expect(table.getByRole('row').filter({ hasText: options.waitForRowText })).toBeVisible({
+      timeout: 15_000,
+    })
   }
 }
 
@@ -50,11 +74,9 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
   const approvalsTable = app.getByRole('grid', { name: 'Approvals table' })
   await expect(approvalsTable).toBeVisible({ timeout: 15_000 })
 
-  await app.getByPlaceholder('Filter by name').fill(approvalName)
-  await app.getByRole('button', { name: 'Apply filter' }).click()
+  await applyApprovalNameFilter(app, approvalsTable, approvalName, { waitForRowText: approvalName })
 
   const approvalBtn = approvalsTable.getByRole('button', { name: approvalName })
-  await expect(approvalBtn).toBeVisible({ timeout: 15_000 })
   await approvalBtn.click()
 
   await waitForApprovalPanel(app)
