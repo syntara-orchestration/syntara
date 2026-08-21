@@ -240,7 +240,9 @@ class TestWorkflowDefinitionUpdates:
             assert len(current_definition["edges"]) == 3
 
             # Remove Node B from the workflow
-            current_definition["nodes"] = [node for node in current_definition["nodes"] if node["id"] != "script_node_b"]
+            current_definition["nodes"] = [
+                node for node in current_definition["nodes"] if node["id"] != "script_node_b"
+            ]
 
             # Remove all edges connected to Node B (A→B and B→C)
             current_definition["edges"] = [
