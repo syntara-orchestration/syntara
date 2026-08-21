@@ -172,7 +172,7 @@ Icons per scenario: No data → `PlusCircleIcon` (gray, `lg`), No results → `S
 
 - **CTA deduplication:** When empty state has a create/configure CTA, hide the page-header primary button — it reappears once data exists.
 - **Tab-level empty states:** Use shared `EmptyStateNoData` component with correct heading level (`h2` inside tabs) and `isFullHeight`.
-- **Three-state list page pattern:** 1) Query error/loading → `useQueryState` renders loading or error; 2) No data AND no filters → `NxEmptyStateNoData` (hide FilterBar); 3) Data OR active filters → show FilterBar; empty with filters → `NxEmptyStateFilter`.
+- **Three-state list page pattern:** 1) Query error/loading → `useQueryState` renders loading or error; 2) No data AND no filters → `SynEmptyStateNoData` (hide FilterBar); 3) Data OR active filters → show FilterBar; empty with filters → `SynEmptyStateFilter`.
 - **Access denied:** `EmptyStateAccessDenied` with `RhUiLockIcon` when user navigates directly to a page they can't read.
 
 ## CRUD Patterns
@@ -479,4 +479,4 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 - `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
-- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `NxErrorState`, `NxLoadingState`, `NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.
+- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.

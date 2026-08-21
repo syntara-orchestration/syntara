@@ -8,10 +8,10 @@ import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters
 import { FilterBar } from '../../filters/FilterBar'
 import { SynPanel } from '../../layout/SynPanel'
 import { SynPanelContentStack } from '../../layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../states/NxEmptyStateNoData'
-import { NxErrorState } from '../../states/NxErrorState'
-import { NxLoadingState } from '../../states/NxLoadingState'
+import { SynEmptyStateFilter } from '../../states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
+import { SynErrorState } from '../../states/SynErrorState'
+import { SynLoadingState } from '../../states/SynLoadingState'
 import { type TableFooterProps, NxScrollableTableContainer } from '../../table/NxScrollableTableContainer'
 import { NxUrlTabs } from '../../tabs/NxUrlTabs'
 
@@ -78,7 +78,7 @@ export type NxListPanelViewProps = {
   hasActiveFilters: boolean
   /** Called when the user clicks "Clear all filters". */
   onClearAllFilters: () => void
-  /** Custom no-data empty state. Defaults to `NxEmptyStateNoData`. */
+  /** Custom no-data empty state. Defaults to `SynEmptyStateNoData`. */
   noDataState?: ReactNode
 
   /**
@@ -125,10 +125,10 @@ function ListPanelStateContent({
   onClearAllFilters,
   noDataState,
 }: Omit<NxListPanelViewProps, 'body' | 'toolbar'>) {
-  if (isPending) return <NxLoadingState />
-  if (error) return <NxErrorState title={errorTitle} message={error} onRetry={onRetry} />
-  if (isEmpty && hasActiveFilters) return <NxEmptyStateFilter clearAllFilters={onClearAllFilters} />
-  if (isEmpty) return noDataState ?? <NxEmptyStateNoData />
+  if (isPending) return <SynLoadingState />
+  if (error) return <SynErrorState title={errorTitle} message={error} onRetry={onRetry} />
+  if (isEmpty && hasActiveFilters) return <SynEmptyStateFilter clearAllFilters={onClearAllFilters} />
+  if (isEmpty) return noDataState ?? <SynEmptyStateNoData />
   return null
 }
 

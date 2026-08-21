@@ -3,12 +3,12 @@ import { RhUiDesktopIcon } from '@patternfly/react-icons'
 
 import { REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../../constants/viewport'
 
-export type NxEmptyStateViewportTooSmallProps = {
+export type SynEmptyStateViewportTooSmallProps = {
   onReturn: () => void
 }
 
 /** Full-height empty state when the viewport width is below the minimum for React Flow canvases (1024px). Height is not gated. */
-export function NxEmptyStateViewportTooSmall({ onReturn }: Readonly<NxEmptyStateViewportTooSmallProps>) {
+export function SynEmptyStateViewportTooSmall({ onReturn }: Readonly<SynEmptyStateViewportTooSmallProps>) {
   return (
     <EmptyState headingLevel="h2" titleText={REACT_FLOW_VIEWPORT_EMPTY_STATE.title} icon={RhUiDesktopIcon} isFullHeight>
       <EmptyStateBody>{REACT_FLOW_VIEWPORT_EMPTY_STATE.body}</EmptyStateBody>

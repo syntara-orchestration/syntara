@@ -31,7 +31,7 @@ describe('ExecutionDetailErrorStates', () => {
       expect(screen.getByText('Failed to fetch execution')).toBeInTheDocument()
     })
 
-    it('passes onRetry handler to NxErrorState', () => {
+    it('passes onRetry handler to SynErrorState', () => {
       const mockOnRetry = vi.fn().mockResolvedValue(undefined)
       const mockError = new Error('Network error')
 
@@ -39,8 +39,8 @@ describe('ExecutionDetailErrorStates', () => {
         <ExecutionDetailErrorStates executionId="exec-123" isLoading={false} error={mockError} onRetry={mockOnRetry} />
       )
 
-      // NxErrorState receives the onRetry prop (wrapped in detachPromise)
-      // The actual retry button rendering is tested in NxErrorState's own tests
+      // SynErrorState receives the onRetry prop (wrapped in detachPromise)
+      // The actual retry button rendering is tested in SynErrorState's own tests
       expect(screen.getAllByText('Error loading execution').length).toBeGreaterThan(0)
     })
 
@@ -63,7 +63,7 @@ describe('ExecutionDetailErrorStates', () => {
         <ExecutionDetailErrorStates executionId="exec-123" isLoading={false} error={mockError} onRetry={mockOnRetry} />
       )
 
-      // The onRetry prop is wrapped with detachPromise before being passed to NxErrorState
+      // The onRetry prop is wrapped with detachPromise before being passed to SynErrorState
       // This test verifies the component renders without errors when onRetry is provided
       expect(screen.getAllByText('Error loading execution').length).toBeGreaterThan(0)
     })
@@ -91,7 +91,7 @@ describe('ExecutionDetailErrorStates', () => {
       render(<ExecutionDetailErrorStates executionId="exec-123" isLoading={true} error={null} onRetry={vi.fn()} />)
 
       expect(screen.getByText('Loading execution')).toBeInTheDocument()
-      // NxLoadingState renders a spinner
+      // SynLoadingState renders a spinner
       expect(screen.getByRole('progressbar')).toBeInTheDocument()
     })
 
