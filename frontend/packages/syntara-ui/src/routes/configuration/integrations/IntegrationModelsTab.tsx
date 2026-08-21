@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { integrationsClient } from '../../../client'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
+import { SynPageBody } from '../../../components/layout/SynPage'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
 import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
 import { NxErrorState } from '../../../components/states/NxErrorState'
@@ -251,28 +251,28 @@ export function IntegrationModelsTab({
 
   if (isLoading)
     return (
-      <NxPageBody isCentered>
+      <SynPageBody isCentered>
         <NxLoadingState />
-      </NxPageBody>
+      </SynPageBody>
     )
 
   if (error)
     return (
-      <NxPageBody isCentered>
+      <SynPageBody isCentered>
         <NxErrorState title="Unable to load models" message={error} onRetry={() => detachPromise(refetchModels())} />
-      </NxPageBody>
+      </SynPageBody>
     )
 
   if (models.length === 0)
     return (
-      <NxPageBody isCentered>
+      <SynPageBody isCentered>
         <NxEmptyStateNoData
           title="No models discovered yet"
           description="Click Refresh models to discover available models from this provider."
           buttonText="Refresh models"
           addData={canUpdate ? handleRefresh : undefined}
         />
-      </NxPageBody>
+      </SynPageBody>
     )
 
   return (

@@ -1,7 +1,7 @@
 import { Content, StackItem } from '@patternfly/react-core'
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxPanelContentStack } from './NxPanelContentStack'
+import { SynPanelContentStack } from './SynPanelContentStack'
 
 const panelDecorator: Decorator = (Story) => (
   <div
@@ -27,8 +27,8 @@ const CONTENT = (
   </>
 )
 
-const meta: Meta<typeof NxPanelContentStack> = {
-  component: NxPanelContentStack,
+const meta: Meta<typeof SynPanelContentStack> = {
+  component: SynPanelContentStack,
   tags: ['autodocs'],
   decorators: [panelDecorator],
   args: { children: CONTENT },
@@ -36,7 +36,7 @@ const meta: Meta<typeof NxPanelContentStack> = {
     docs: {
       description: {
         component:
-          'Full-height column layout for use inside `NxPanel isFullHeight`. Ensures nested scroll areas size correctly.\n\n' +
+          'Full-height column layout for use inside `SynPanel isFullHeight`. Ensures nested scroll areas size correctly.\n\n' +
           'Use `StackItem isFilled` for the scrollable content region (table, canvas) and a plain `StackItem` for fixed-height regions (filter bar, tabs).',
       },
     },

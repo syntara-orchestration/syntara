@@ -12,7 +12,7 @@ import {
 import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
-import { NxPageBreadcrumbs, type AppBreadcrumbItem } from './NxPageBreadcrumbs'
+import { SynPageBreadcrumbs, type AppBreadcrumbItem } from './SynPageBreadcrumbs'
 
 export type { AppBreadcrumbItem }
 
@@ -20,7 +20,7 @@ function isRenderableSlot(value: ReactNode): boolean {
   return value != null && value !== false
 }
 
-export type NxPageHeaderProps = Readonly<{
+export type SynPageHeaderProps = Readonly<{
   /** Primary page heading text (rendered as an `h1` unless `titleSlot` is set). */
   title: string
   /** External documentation URL rendered as an icon link next to the title. */
@@ -69,7 +69,7 @@ export function DocLinkButton({ href }: Readonly<{ href: string }>) {
   )
 }
 
-function renderTitleRegion(props: NxPageHeaderProps): ReactNode {
+function renderTitleRegion(props: SynPageHeaderProps): ReactNode {
   if (isRenderableSlot(props.titleSlot)) {
     return props.titleSlot
   }
@@ -111,7 +111,7 @@ function renderTitleRegion(props: NxPageHeaderProps): ReactNode {
   )
 }
 
-export function NxPageHeader(props: NxPageHeaderProps) {
+export function SynPageHeader(props: SynPageHeaderProps) {
   const titleRegion = renderTitleRegion(props)
 
   const crumbs = props.breadcrumbs
@@ -119,7 +119,7 @@ export function NxPageHeader(props: NxPageHeaderProps) {
   const titleForCompass = showCrumbs ? (
     <Stack hasGutter>
       <StackItem>
-        <NxPageBreadcrumbs items={crumbs} />
+        <SynPageBreadcrumbs items={crumbs} />
       </StackItem>
       <StackItem>{titleRegion}</StackItem>
     </Stack>

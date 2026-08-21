@@ -1,7 +1,7 @@
 import { Panel, PanelFooter, PanelMain, PanelMainBody, type PanelProps } from '@patternfly/react-core'
 import type { ComponentProps, CSSProperties, ReactNode, Ref } from 'react'
 
-import styles from './NxPanel.module.css'
+import styles from './SynPanel.module.css'
 
 /** Solid panel fill under glass theme without `variant="raised"` chrome (shadow / smaller radius). */
 const OPAQUE_FLOATING_PANEL_FILL_STYLE = {
@@ -18,9 +18,9 @@ type PanelMainBodyProps = Omit<ComponentProps<typeof PanelMainBody>, 'children'>
  * Inherited prop overrides: `isGlass` defaults **on** unless `isGlass={false}`, `isPill`, or
  * `variant="raised"` is set. `isScrollable + isFullHeight` auto-enables `isAutoHeight` (pass
  * `isAutoHeight={false}` to opt out). Avoid `overflow: hidden` between sibling `variant="raised"`
- * panels - it clips the box-shadow; use `NxPageBody` / `minHeight: 0` instead.
+ * panels - it clips the box-shadow; use `SynPageBody` / `minHeight: 0` instead.
  */
-export type NxPanelProps = Omit<PanelProps, 'children'> & {
+export type SynPanelProps = Omit<PanelProps, 'children'> & {
   /** Rendered inside `PanelMainBody`. */
   children?: ReactNode
   /**
@@ -54,7 +54,7 @@ function defaultIsGlass(
   return true
 }
 
-export function NxPanel({
+export function SynPanel({
   ref,
   hasNoPadding,
   children,
@@ -71,7 +71,7 @@ export function NxPanel({
   isGlass,
   opaqueFloatingFill,
   ...panelProps
-}: NxPanelProps) {
+}: SynPanelProps) {
   const { style: mainStyle, ...restPanelMain } = panelMainProps ?? {}
   const { style: bodyStyle, className: bodyClassName, ...restBody } = panelMainBodyProps ?? {}
 

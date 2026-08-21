@@ -40,11 +40,11 @@ function renderBreadcrumbDropdownToggle(
   return <BreadcrumbDropdownToggle toggleRef={toggleRef} isOpen={isOpen} middleCount={middleCount} onClick={onClick} />
 }
 
-export type NxPageBreadcrumbsCollapsedMiddleProps = Readonly<{
+export type SynPageBreadcrumbsCollapsedMiddleProps = Readonly<{
   middleItems: readonly AppBreadcrumbItem[]
 }>
 
-export function NxPageBreadcrumbsCollapsedMiddle(props: NxPageBreadcrumbsCollapsedMiddleProps) {
+export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsCollapsedMiddleProps) {
   const { middleItems } = props
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()

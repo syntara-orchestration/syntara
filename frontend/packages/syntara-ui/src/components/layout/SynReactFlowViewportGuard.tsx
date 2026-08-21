@@ -7,9 +7,9 @@ import { panelContentStackStyle } from '../../app/panelContentStackStyle'
 import { detachPromise } from '../../utils/detachPromise'
 import { NxEmptyStateViewportTooSmall } from '../states/NxEmptyStateViewportTooSmall'
 
-import styles from './NxReactFlowViewportGuard.module.css'
+import styles from './SynReactFlowViewportGuard.module.css'
 
-type NxReactFlowViewportGuardProps = {
+type SynReactFlowViewportGuardProps = {
   children: ReactNode
   /** Callback when user clicks the return button in the empty state. Defaults to navigating to Workflows. */
   onReturn?: () => void
@@ -18,7 +18,7 @@ type NxReactFlowViewportGuardProps = {
 const guardContentStyle: CSSProperties = { ...panelContentStackStyle, padding: '0 var(--pf-t--global--spacer--sm)' }
 
 /** Hides page content and shows a full-page empty state when the viewport width is below 1024px (nav bar remains visible). Height is not gated. */
-export function NxReactFlowViewportGuard({ children, onReturn }: NxReactFlowViewportGuardProps) {
+export function SynReactFlowViewportGuard({ children, onReturn }: SynReactFlowViewportGuardProps) {
   const navigate = useNavigate()
   const handleReturn = onReturn ?? (() => detachPromise(navigate({ to: AppRoute.Workflows.Root })))
 

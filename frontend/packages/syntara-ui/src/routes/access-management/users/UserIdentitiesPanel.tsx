@@ -14,7 +14,7 @@ import { OIDC_AUTHORIZE_PATH, identityProvidersClient, usersClient } from '../..
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
 import { ProviderIcon } from '../../../components/ProviderIcon'
 import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
@@ -416,7 +416,7 @@ export function UserIdentitiesPanel({
   }
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <StackItem>
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
           <FlexItem grow={{ default: 'grow' }}>
@@ -503,6 +503,6 @@ export function UserIdentitiesPanel({
         </NxScrollableTableContainer>
       )}
       {dialogs}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

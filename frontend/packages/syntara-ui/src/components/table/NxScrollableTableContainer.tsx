@@ -2,7 +2,7 @@ import { Stack, StackItem } from '@patternfly/react-core'
 import { Caption, Table, type TableProps } from '@patternfly/react-table'
 import type { ReactNode } from 'react'
 
-import { NxPanel } from '../layout/NxPanel'
+import { SynPanel } from '../layout/SynPanel'
 
 import styles from './NxScrollableTableContainer.module.css'
 import { PaginationFooter, type PaginationFooterProps } from './PaginationFooter'
@@ -57,7 +57,7 @@ export function NxScrollableTableContainer({
   const pinnedFooter = footer ? <PaginationFooter {...footer} /> : footerContent
   return (
     <StackItem isFilled data-testid="scrollable-table-container-root" className={styles.root}>
-      <NxPanel hasNoPadding isFullHeight isScrollable className={styles.panel}>
+      <SynPanel hasNoPadding isFullHeight isScrollable className={styles.panel}>
         <Stack className={styles.shellStack}>
           <div
             ref={wrapperRef}
@@ -86,7 +86,7 @@ export function NxScrollableTableContainer({
           </div>
           {pinnedFooter && <StackItem className={styles.footer}>{pinnedFooter}</StackItem>}
         </Stack>
-      </NxPanel>
+      </SynPanel>
     </StackItem>
   )
 }

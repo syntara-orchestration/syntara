@@ -1,8 +1,8 @@
 import type { Decorator } from '@storybook/react-vite'
 
-import { NxPage, NxPageBody } from '../layout/NxPage'
-import { NxPageHeader } from '../layout/NxPageHeader'
-import { NxPanel } from '../layout/NxPanel'
+import { SynPage, SynPageBody } from '../layout/SynPage'
+import { SynPageHeader } from '../layout/SynPageHeader'
+import { SynPanel } from '../layout/SynPanel'
 
 export const pageDecorator: Decorator = (Story) => (
   <div
@@ -13,13 +13,13 @@ export const pageDecorator: Decorator = (Story) => (
       border: '1px dashed var(--pf-t--global--border--color--default)',
     }}
   >
-    <NxPage>
-      <NxPageHeader title="Workflows" />
-      <NxPageBody isCentered>
-        <NxPanel isFullHeight>
+    <SynPage>
+      <SynPageHeader title="Workflows" />
+      <SynPageBody isCentered>
+        <SynPanel isFullHeight>
           <Story />
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   </div>
 )

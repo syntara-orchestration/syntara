@@ -13,13 +13,13 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxLink } from '../../../components/NxLink'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -259,9 +259,9 @@ export function ServiceAccountDetail() {
   const isEnabled = serviceAccount.status === 'active'
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[serviceAccount.name, 'Service Accounts']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[serviceAccount.name, 'Service Accounts']} />
+      <SynPageHeader
         title={serviceAccount.name}
         breadcrumbs={crumbs}
         docLink={docLink}
@@ -275,7 +275,7 @@ export function ServiceAccountDetail() {
           />
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <NxListPanelTabs
             basePath={basePath}
@@ -315,7 +315,7 @@ export function ServiceAccountDetail() {
             />
           )}
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <EditServiceAccountModal
         serviceAccount={serviceAccount}
@@ -353,6 +353,6 @@ export function ServiceAccountDetail() {
         You are about to disable the service account <strong>{serviceAccount.name}</strong>. You can re-enable the
         service account at any time.
       </NxConfirmationDialog>
-    </NxPage>
+    </SynPage>
   )
 }

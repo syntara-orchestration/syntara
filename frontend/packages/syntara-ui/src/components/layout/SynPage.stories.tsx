@@ -4,20 +4,20 @@ import { fn } from 'storybook/test'
 
 import { NxErrorState } from '../states/NxErrorState'
 
-import { NxPage, NxPageBody } from './NxPage'
-import { NxPageHeader } from './NxPageHeader'
-import { NxPanel } from './NxPanel'
-import { NxPanelContentStack } from './NxPanelContentStack'
+import { SynPage, SynPageBody } from './SynPage'
+import { SynPageHeader } from './SynPageHeader'
+import { SynPanel } from './SynPanel'
+import { SynPanelContentStack } from './SynPanelContentStack'
 
-const meta: Meta<typeof NxPage> = {
-  component: NxPage,
+const meta: Meta<typeof SynPage> = {
+  component: SynPage,
   tags: ['autodocs'],
   parameters: {
     docs: {
       description: {
         component:
-          '`NxPage` + `NxPageHeader` + `NxPageBody` form the standard page layout skeleton.\n\n' +
-          '`NxPageBody` is the main content area below the header. ' +
+          '`SynPage` + `SynPageHeader` + `SynPageBody` form the standard page layout skeleton.\n\n' +
+          '`SynPageBody` is the main content area below the header. ' +
           'Pass `isCentered` to center content on both axes — use this for loading spinners and empty states.',
       },
     },
@@ -52,21 +52,21 @@ export const FullListPageLayout: Story = {
     },
   },
   render: () => (
-    <NxPage>
-      <NxPageHeader title="Workflows" toolbar={<Button variant="primary">Create workflow</Button>} />
-      <NxPageBody>
-        <NxPanel isFullHeight>
-          <NxPanelContentStack variant="inset">
+    <SynPage>
+      <SynPageHeader title="Workflows" toolbar={<Button variant="primary">Create workflow</Button>} />
+      <SynPageBody>
+        <SynPanel isFullHeight>
+          <SynPanelContentStack variant="inset">
             <StackItem>
               <Content component="p">Filter bar</Content>
             </StackItem>
             <StackItem isFilled>
               <Content component="p">Table content area</Content>
             </StackItem>
-          </NxPanelContentStack>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+          </SynPanelContentStack>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   ),
 }
 
@@ -80,24 +80,24 @@ export const FullDetailPageLayout: Story = {
     },
   },
   render: () => (
-    <NxPage>
-      <NxPageHeader
+    <SynPage>
+      <SynPageHeader
         title="my-workflow"
         breadcrumbs={[{ label: 'Workflows', href: '/workflows' }, { label: 'my-workflow' }]}
       />
-      <NxPageBody>
-        <NxPanel isFullHeight>
-          <NxPanelContentStack>
+      <SynPageBody>
+        <SynPanel isFullHeight>
+          <SynPanelContentStack>
             <StackItem>
               <Content component="p">Tab bar</Content>
             </StackItem>
             <StackItem isFilled>
               <Content component="p">Tab content area</Content>
             </StackItem>
-          </NxPanelContentStack>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+          </SynPanelContentStack>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   ),
 }
 
@@ -111,8 +111,8 @@ export const FullFormPageLayout: Story = {
     },
   },
   render: () => (
-    <NxPage>
-      <NxPageHeader
+    <SynPage>
+      <SynPageHeader
         title="Create user"
         breadcrumbs={[
           { label: 'Access management', href: '/access-management' },
@@ -126,12 +126,12 @@ export const FullFormPageLayout: Story = {
           </>
         }
       />
-      <NxPageBody>
-        <NxPanel>
+      <SynPageBody>
+        <SynPanel>
           <Content component="p">Form fields</Content>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   ),
 }
 
@@ -141,18 +141,18 @@ export const ErrorPageLayout: Story = {
     docs: {
       description: {
         story:
-          'Error states live inside `NxPanel` within the page body — the same panel that normally holds table or form content.',
+          'Error states live inside `SynPanel` within the page body — the same panel that normally holds table or form content.',
       },
     },
   },
   render: () => (
-    <NxPage>
-      <NxPageHeader title="Workflows" toolbar={<Button variant="primary">Create workflow</Button>} />
-      <NxPageBody isCentered>
-        <NxPanel isFullHeight>
+    <SynPage>
+      <SynPageHeader title="Workflows" toolbar={<Button variant="primary">Create workflow</Button>} />
+      <SynPageBody isCentered>
+        <SynPanel isFullHeight>
           <NxErrorState message={{ detail: 'Connection timed out.', retryable: true }} onRetry={fn()} />
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   ),
 }

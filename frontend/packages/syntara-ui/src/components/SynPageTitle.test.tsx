@@ -2,40 +2,40 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxPageTitle } from './NxPageTitle'
+import { SynPageTitle } from './SynPageTitle'
 
-describe('NxPageTitle', () => {
+describe('SynPageTitle', () => {
   afterEach(() => {
     document.title = ''
   })
 
   it('sets document.title with a single segment', () => {
-    render(<NxPageTitle segments={['Workflows']} />)
+    render(<SynPageTitle segments={['Workflows']} />)
     expect(document.title).toBe('Workflows | Syntara')
   })
 
   it('sets document.title with multiple segments, most-specific first', () => {
-    render(<NxPageTitle segments={['My Workflow', 'Workflows']} />)
+    render(<SynPageTitle segments={['My Workflow', 'Workflows']} />)
     expect(document.title).toBe('My Workflow | Workflows | Syntara')
   })
 
   it('renders just the app title when segments is empty', () => {
-    render(<NxPageTitle segments={[]} />)
+    render(<SynPageTitle segments={[]} />)
     expect(document.title).toBe('Syntara')
   })
 
   it('filters out null and undefined segments', () => {
-    render(<NxPageTitle segments={[null, undefined, 'Workflows']} />)
+    render(<SynPageTitle segments={[null, undefined, 'Workflows']} />)
     expect(document.title).toBe('Workflows | Syntara')
   })
 
   it('filters out blank/whitespace-only segments', () => {
-    render(<NxPageTitle segments={['  ', 'Workflows']} />)
+    render(<SynPageTitle segments={['  ', 'Workflows']} />)
     expect(document.title).toBe('Workflows | Syntara')
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<NxPageTitle segments={['Workflows']} />)
+    const { container } = render(<SynPageTitle segments={['Workflows']} />)
     expect(await axe(container)).toHaveNoViolations()
   })
 })

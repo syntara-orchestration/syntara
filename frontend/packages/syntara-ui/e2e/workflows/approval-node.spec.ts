@@ -126,6 +126,7 @@ async function addApprovalNodeWithConfig(
 
 test.describe('Approval Node Configuration', () => {
   test('user configures Approval node with message, decision window, and fallback decision', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval')
 
     try {
@@ -159,6 +160,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user edits Approval node to verify configuration persistence', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval-edit')
 
     try {
@@ -204,14 +206,14 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test.skip('user configures Approval node with both fallback decision options', async ({ app }) => {
+  test('user configures Approval node with both fallback decision options', async ({ app }) => {
+    test.slow()
     const fallbackDecisions: Array<'approve' | 'reject'> = ['approve', 'reject']
     const workflowNames: string[] = []
 
     try {
-      // Test each fallback decision option in a separate workflow
-      // This avoids the non-deterministic behavior of openAddNodePanel().first()
-      // when multiple Approval nodes (each with two "Add connected step" buttons) exist
+      // Test each fallback decision option in a separate workflow to avoid
+      // non-deterministic openAddNodePanel().first() with multiple Approval nodes
       for (const decision of fallbackDecisions) {
         const workflowName = buildUniqueName(`e2e-approval-fallback-${decision}`)
         workflowNames.push(workflowName)
@@ -246,6 +248,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user adds Approval node, clicks to open details panel, configures, and saves', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval-click-edit')
 
     try {
@@ -291,6 +294,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user verifies Parameters panel displays all Approval node fields', async ({ app }) => {
+    test.slow()
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 

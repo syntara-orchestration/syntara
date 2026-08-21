@@ -37,15 +37,15 @@ import { adminClient, identityProvidersClient } from '../../../../client'
 import { NxConfirmationDialog } from '../../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../../components/IconLabel'
-import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../../components/layout/NxPanel'
+import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../../components/layout/SynPanel'
 import { NxKebabMenu } from '../../../../components/NxKebabMenu'
 import type { KebabAction } from '../../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../../components/NxPageTitle'
 import { NxListPanel, NxListPanelTabs } from '../../../../components/panels/list/NxListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../../hooks/useDialogState'
@@ -189,12 +189,12 @@ function identityProviderDetailBreadcrumbTrail(provider: ProviderData, idpDetail
 
 function IdentityProviderDetailEarlyLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <NxPage>
-      <NxPageHeader title="Identity Provider Details" breadcrumbs={breadcrumbsIdentityProviderDetailEarlyShell()} />
-      <NxPageBody>
-        <NxPanel isFullHeight>{children}</NxPanel>
-      </NxPageBody>
-    </NxPage>
+    <SynPage>
+      <SynPageHeader title="Identity Provider Details" breadcrumbs={breadcrumbsIdentityProviderDetailEarlyShell()} />
+      <SynPageBody>
+        <SynPanel isFullHeight>{children}</SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }
 
@@ -429,9 +429,9 @@ export function IdentityProviderDetail() {
   const mappingCount = identityProviderDetailMappingCount(groupMappingConfig)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[providerData.name ?? '', 'Identity Providers']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[providerData.name ?? '', 'Identity Providers']} />
+      <SynPageHeader
         title={providerData.name ?? ''}
         docLink={identityProvidersDocLink}
         breadcrumbs={idpDetailCrumbs}
@@ -457,7 +457,7 @@ export function IdentityProviderDetail() {
           />
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <IdentityProviderDetailTabStrip basePath={idpDetailBasePath} mappingCount={mappingCount} />
           <TabContent
@@ -469,7 +469,7 @@ export function IdentityProviderDetail() {
             readOnly={!canUpdate}
           />
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
       <IdentityProviderDeleteDialog
         isOpen={deleteDialogOpen}
         providerName={providerData.name ?? ''}
@@ -494,6 +494,6 @@ export function IdentityProviderDetail() {
         onConfirm={handleConfirmDisable}
         onClose={disableDialog.close}
       />
-    </NxPage>
+    </SynPage>
   )
 }
