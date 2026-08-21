@@ -406,10 +406,8 @@ jobs:
             }
             core.setFailed(`Timed out waiting for shared checks: ${required.join(', ')}`);
 
-  # Gate that E2E tests wait for to reduce costs by failing fast on lint/unit test failures.
-  # E2E tests (test-compose-e2e, konflux-frontend-gate, konflux-ui-tests-gate) are expensive
-  # (8-core runners, 90-120 min timeouts). By gating them on fast checks (~2-3 min total),
-  # we avoid burning runner time when basic validation fails.
+  # Gate for E2E tests to reduce costs. Expensive E2E jobs only start after
+  # fast checks pass, avoiding wasted resources when basic validation fails.
   frontend-checks-gate:
     name: (Frontend) Checks Gate
     runs-on: ubuntu-latest
