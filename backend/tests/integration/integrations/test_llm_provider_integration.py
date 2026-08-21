@@ -330,13 +330,13 @@ class TestLLMProviderCredentialResolution:
     ) -> None:
         """Integration whose credential was deleted after creation fails on validate.
 
-        AAP-87778: credentials.management_credential_id is now ON DELETE RESTRICT,
-        so a credential can no longer be hard-deleted while an integration
-        references it (which is the whole point of that fix). To simulate "the
-        credential is gone" for this validate-path test, detach the reference
-        first (a direct FK null-out, bypassing the app-level guard that would
-        normally reject this for a credential-required type like llm_provider)
-        and only then delete the now-unreferenced credential row.
+        credentials.management_credential_id is ON DELETE RESTRICT, so a
+        credential can no longer be hard-deleted while an integration
+        references it. To simulate "the credential is gone" for this
+        validate-path test, detach the reference first (a direct FK
+        null-out, bypassing the app-level guard that would normally reject
+        this for a credential-required type like llm_provider) and only
+        then delete the now-unreferenced credential row.
         """
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-cred-del")
 
@@ -365,7 +365,7 @@ class TestLLMProviderCredentialResolution:
     ) -> None:
         """Integration whose credential was deleted after creation fails on refresh.
 
-        AAP-87778: see test_validate_with_deleted_credential above for why the
+        See test_validate_with_deleted_credential above for why the
         reference is nulled directly before deleting the credential row.
         """
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-ref-cred-del")

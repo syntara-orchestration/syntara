@@ -634,7 +634,7 @@ class TestDeleteCredential:
         mock_user: MagicMock,
         mock_secret_service: MagicMock,
     ) -> None:
-        """AAP-87778: delete must be blocked (not silently nulled) while integrations reference it."""
+        """Delete must be blocked (not silently nulled) while integrations reference it."""
         credential = Credential(
             id=uuid4(),
             name="In-Use Cred",
@@ -677,7 +677,7 @@ class TestDeleteCredential:
         mock_user: MagicMock,
         mock_secret_service: MagicMock,
     ) -> None:
-        """AAP-87778 follow-up: TOCTOU race.
+        """TOCTOU race.
 
         An integration is attached between the upfront count check and the
         commit. The FK's ON DELETE RESTRICT makes the commit raise
