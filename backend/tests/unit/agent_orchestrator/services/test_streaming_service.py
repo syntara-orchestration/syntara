@@ -421,7 +421,9 @@ class TestGetOnIdle:
         on_idle = handler.get_on_idle(session_state, mock_client)
         assert on_idle is not None
 
-        await on_idle()  # should not raise
+        with patch.object(handler, "_check_invocation_exists", new_callable=AsyncMock) as mock_db:
+            await on_idle()
+            mock_db.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_on_idle_falls_back_to_db_when_redis_fails(self, handler: WebSocketStreamingHandler) -> None:
@@ -488,7 +490,7 @@ class TestCheckBeforeStreaming:
 
     @pytest.mark.asyncio
     async def test_raises_when_snapshot_is_cancelled(self, handler: WebSocketStreamingHandler) -> None:
-        """check_before_streaming must raise when snapshot invocation_status is CANCELLED (fast path)."""
+        """check_before_streaming must raise when snapshot invocation_status is CANCELLED."""
         invocation_id = uuid4()
         session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.CANCELLED}
 
@@ -496,54 +498,12 @@ class TestCheckBeforeStreaming:
             await handler.check_before_streaming(session_state)
 
     @pytest.mark.asyncio
-    async def test_raises_when_redis_cancel_key_exists(self, handler: WebSocketStreamingHandler) -> None:
-        """check_before_streaming must raise when live Redis check finds the cancel key."""
-        invocation_id = uuid4()
-        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
-
-        mock_client = AsyncMock()
-        mock_client.key_exists.return_value = True
-
-        with patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_sc_cls:
-            mock_sc_cls.return_value.__aenter__.return_value = mock_client
-            mock_sc_cls.return_value.__aexit__.return_value = None
-
-            with pytest.raises(InvocationCancelledStreamError):
-                await handler.check_before_streaming(session_state)
-
-    @pytest.mark.asyncio
-    async def test_raises_when_db_fallback_finds_cancelled(self, handler: WebSocketStreamingHandler) -> None:
-        """check_before_streaming must raise when Redis fails and DB shows CANCELLED."""
-        invocation_id = uuid4()
-        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
-
-        mock_client = AsyncMock()
-        mock_client.key_exists.side_effect = ConnectionError("Redis down")
-
-        with patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_sc_cls:
-            mock_sc_cls.return_value.__aenter__.return_value = mock_client
-            mock_sc_cls.return_value.__aexit__.return_value = None
-
-            with patch.object(handler, "_check_invocation_exists", new_callable=AsyncMock) as mock_db:
-                mock_db.return_value = InvocationStatus.CANCELLED
-
-                with pytest.raises(InvocationCancelledStreamError):
-                    await handler.check_before_streaming(session_state)
-
-    @pytest.mark.asyncio
     async def test_does_not_raise_when_status_is_running(self, handler: WebSocketStreamingHandler) -> None:
         """check_before_streaming must not raise for non-cancelled statuses."""
         invocation_id = uuid4()
         session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
 
-        mock_client = AsyncMock()
-        mock_client.key_exists.return_value = False
-
-        with patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_sc_cls:
-            mock_sc_cls.return_value.__aenter__.return_value = mock_client
-            mock_sc_cls.return_value.__aexit__.return_value = None
-
-            await handler.check_before_streaming(session_state)  # should not raise
+        await handler.check_before_streaming(session_state)  # should not raise
 
 
 class TestCheckBeforeStreamingWiring:

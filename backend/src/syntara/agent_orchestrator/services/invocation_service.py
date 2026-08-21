@@ -497,9 +497,9 @@ class InvocationService(BaseService):
 
         Best-effort: Redis failures are logged but do not prevent cancellation.
         """
-        from syntara.core.config.base import get_settings  # noqa: PLC0415
+        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
 
-        cancel_key_ttl_seconds = get_settings().cache_stream_ttl_seconds
+        cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
         try:
             async with StreamClient() as client:
                 cancel_key = get_invocation_cancel_key(invocation_id)

@@ -165,15 +165,8 @@ class TestInvocationServiceCancellation:
 
             await service._signal_cancellation(invocation_id)
 
-            # TTL matches stream TTL (cache_stream_ttl_seconds, default 86400s)
-            from syntara.core.config.base import get_settings
-
-            expected_ttl = get_settings().cache_stream_ttl_seconds
-            mock_client.set_key.assert_awaited_once_with(
-                f"invocation:{invocation_id}:cancelled",
-                "1",
-                expected_ttl,
-            )
+            # TTL matches Agent Execution timeout (3600s)
+            mock_client.set_key.assert_awaited_once_with(f"invocation:{invocation_id}:cancelled", "1", 3600)
             mock_client.publish.assert_not_awaited()
 
     @pytest.mark.asyncio

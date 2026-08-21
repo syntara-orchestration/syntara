@@ -166,53 +166,16 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         return str(session_state["invocation_id"])
 
     async def check_before_streaming(self, session_state: dict[str, Any]) -> None:
-        """Raise if the invocation is CANCELLED before reading events.
+        """Raise if the invocation is already CANCELLED before reading events.
 
-        Performs a live Redis + DB check rather than relying solely on
-        the ``invocation_status`` snapshot from ``create_session_state``.
-        The snapshot can become stale during ``wait_for_stream_ready``
-        (up to 30s), so a cancel that arrives during the wait would be
-        missed if we only checked the snapshot.  The live check covers
-        both the fast path (snapshot already CANCELLED) and the race
-        (cancelled after connect, before event replay).
+        Uses the ``invocation_status`` snapshot from ``create_session_state``.
+        Mid-stream cancel is detected via the Redis cancel key in ``on_idle``.
         """
         invocation_id = session_state["invocation_id"]
 
         if session_state.get("invocation_status") == InvocationStatus.CANCELLED:
             logger.info(
                 "Invocation already cancelled, aborting before streaming",
-                invocation_id=invocation_id,
-            )
-            raise InvocationCancelledStreamError(
-                resource_id=str(invocation_id),
-                resource_type="invocation",
-            )
-
-        cancel_key = get_invocation_cancel_key(invocation_id)
-        cancelled = False
-        try:
-            async with StreamClient() as client:
-                cancelled = await client.key_exists(cancel_key) is True
-        except Exception:  # noqa: BLE001
-            logger.debug(
-                "Pre-stream cancel key check failed, falling back to DB",
-                invocation_id=invocation_id,
-            )
-            try:
-                status = await self._check_invocation_exists(invocation_id)
-                cancelled = status == InvocationStatus.CANCELLED
-            except StreamingValidationError:
-                raise
-            except Exception:  # noqa: BLE001
-                logger.debug(
-                    "DB fallback also failed, will rely on on_idle",
-                    invocation_id=invocation_id,
-                )
-                return
-
-        if cancelled:
-            logger.info(
-                "Invocation cancelled (live check), aborting before streaming",
                 invocation_id=invocation_id,
             )
             raise InvocationCancelledStreamError(
@@ -227,14 +190,10 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
     ) -> Callable[[], Awaitable[None]] | None:
         """Return cancel-key checker invoked when XREAD returns no events.
 
-        Uses the same Redis-first + DB-fallback pattern as the pre-stream
-        wait.  Also short-circuits on the ``invocation_status`` snapshot
-        from ``create_session_state`` so that a late connect after the
-        cancel key has expired still raises immediately.
-
-        Every 30th invocation a DB check runs even when Redis is healthy,
-        so cancel-key expiry or Redis data-loss cannot permanently disable
-        cancel detection.
+        Redis-first, with a DB fallback only when Redis itself errors.
+        Also short-circuits on the ``invocation_status`` snapshot from
+        ``create_session_state`` so a late connect after the cancel key
+        has expired still raises immediately.
 
         Raises ``InvocationCancelledStreamError`` if the invocation
         has been cancelled, which aborts the event stream.
@@ -243,13 +202,8 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         invocation_id: UUID = session_state["invocation_id"]
         invocation_status = session_state.get("invocation_status")
         cancel_key = get_invocation_cancel_key(invocation_id)
-        idle_count = 0
-        db_check_every = 30
 
         async def _check_cancel_on_idle() -> None:
-            nonlocal idle_count
-            idle_count += 1
-
             if invocation_status == InvocationStatus.CANCELLED:
                 raise InvocationCancelledStreamError(
                     resource_id=str(invocation_id),
@@ -264,7 +218,7 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
                 redis_available = False
                 logger.debug("Idle cancel key check failed, falling back to DB", invocation_id=invocation_id)
 
-            if not cancelled and (not redis_available or idle_count % db_check_every == 0):
+            if not redis_available and not cancelled:
                 try:
                     status = await self._check_invocation_exists(invocation_id)
                     cancelled = status == InvocationStatus.CANCELLED
