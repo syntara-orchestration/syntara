@@ -3,11 +3,15 @@
 Thin layer that validates query params, resolves dependencies,
 and delegates to AAPProxyService.
 
-Authentication: Endpoints support optional per-user credential forwarding
-via the ``credential_id`` query parameter. If provided, the specified Syntara
-credential (type: "Ansible Automation Platform") is decrypted and used to
-authenticate against the AAP Controller. If not provided, falls back to
-environment variables (APP_AAP_TOKEN or APP_AAP_USERNAME/PASSWORD).
+Authentication: Endpoints accept optional ``credential_id`` and
+``integration_id`` query parameters. When both are omitted, the proxy uses
+the unique visible enabled AAP integration and its management credential
+(the same pair that integration validation already proved works). When more
+than one AAP integration is visible, pass ``integration_id`` to select one;
+``credential_id`` may still be omitted (management credential is used).
+When ``credential_id`` is provided, the specified Syntara credential (type:
+"Ansible Automation Platform") is decrypted and used instead; callers may
+only use credentials they own.
 
 Authorization: The ``current_user`` dependency ensures only authenticated
 Syntara users can call these endpoints. When using credential_id, users can

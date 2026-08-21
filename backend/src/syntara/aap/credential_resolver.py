@@ -217,6 +217,8 @@ async def resolve_aap_connection_from_credential(
     session: AsyncSession,
     credential_id: UUID | str,
     user_id: UUID,
+    *,
+    skip_ownership_check: bool = False,
 ) -> AAPConnection:
     """Resolve AAP auth from a Syntara credential.
 
@@ -227,7 +229,11 @@ async def resolve_aap_connection_from_credential(
     Args:
         session: Async database session.
         credential_id: UUID of the credential (accepts UUID or str for conversion).
-        user_id: User ID (UUID) for authorization check (required - credential owner must match).
+        user_id: User ID (UUID) for authorization check (required unless
+            ``skip_ownership_check`` is True).
+        skip_ownership_check: When True, skip the owner match. Use only for
+            an integration's management credential, which is authorized by
+            integration visibility rather than personal ownership.
 
     Returns:
         AAPConnection with decrypted auth. ``base_url`` is empty and
@@ -241,6 +247,7 @@ async def resolve_aap_connection_from_credential(
     Security:
         - credential_id is validated as UUID format to prevent SQL injection vectors
         - user_id is required (not optional) to prevent accidental bypass of authorization
+          unless ``skip_ownership_check`` is explicitly set by a trusted caller
 
     """
     # Validate and convert credential_id to UUID
@@ -252,7 +259,8 @@ async def resolve_aap_connection_from_credential(
     # Validate credential type, enabled status, and ownership
     _validate_credential_type(credential)
     _validate_credential_enabled(credential)
-    _validate_credential_ownership(credential, user_id)
+    if not skip_ownership_check:
+        _validate_credential_ownership(credential, user_id)
 
     # Decrypt credential fields
     secret_service: SecretService = create_secret_service(session)
