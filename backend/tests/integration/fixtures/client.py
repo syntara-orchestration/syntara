@@ -69,6 +69,11 @@ async def session_app(
         patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
+        # Prevent the lifespan warmup from opening a real gRPC connection to Temporal.
+        # Integration tests that need Temporal use temporal_env.client (WorkflowEnvironment)
+        # directly.  A real connect attempt here would leave a stale gRPC channel that
+        # hangs on Python 3.13 during process shutdown.
+        patch("syntara.api.main.get_shared_temporal_client", new_callable=AsyncMock, return_value=None),
     ):
         from syntara.core.seed import run_seeders
 

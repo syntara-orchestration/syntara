@@ -65,6 +65,7 @@ from syntara.core.exception_registry import register_exceptions
 from syntara.core.logging.logging import apply_runtime_log_level, build_uvicorn_logging_config
 from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
+from syntara.core.temporal.client import get_shared_client as get_shared_temporal_client
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
 from syntara.core.websocket.router import build_websocket_router
 from syntara.files.health import validate_file_storage_at_startup
@@ -261,6 +262,12 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
 
     metrics_cleanup_worker = get_metrics_cleanup_worker()
     metrics_cleanup_worker.start()
+
+    # Best-effort Temporal client warmup — avoids first-request gRPC latency.
+    if await get_shared_temporal_client() is None:
+        logger.warning("temporal_client_warmup_skipped", reason="server unavailable at startup")
+    else:
+        logger.info("temporal_client_warmed")
 
     queue_depth_poller = get_queue_depth_poller()
     queue_depth_poller.start()
