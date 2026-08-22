@@ -362,6 +362,11 @@ class WorkflowConvergeMixin:
         Used both when a converge timeout fires and when an 'any' strategy
         converge node has met its n_required threshold.
 
+        Only propagates the skip to nodes within the converge's parallel section
+        (ancestors of the converge's direct predecessors that are not common to
+        all branches). Nodes that branch off a predecessor but are outside the
+        parallel section are left untouched.
+
         Args:
             node_id: Converge node whose predecessors to check
             graph: Workflow graph
@@ -369,6 +374,7 @@ class WorkflowConvergeMixin:
             pending_tasks: Currently executing node tasks (in-flight nodes are not skipped)
 
         """
+        parallel_section = {k for k, v in self._converge_branch_nodes.items() if node_id in v}
         newly_skipped = []
         for pred_id in graph.get_predecessors(node_id):
             if pred_id not in self.skipped_nodes and not self.resolver.has_namespace(pred_id):
@@ -379,4 +385,33 @@ class WorkflowConvergeMixin:
                 newly_skipped.append(pred_id)
                 workflow.logger.info(f"Converge: predecessor {pred_id} skipped ({reason})")
         for pred_id in newly_skipped:
-            self._mark_downstream_as_skipped(pred_id, graph)
+            self._mark_downstream_as_skipped_bounded(pred_id, graph, parallel_section)
+
+    def _mark_downstream_as_skipped_bounded(
+        self,
+        start_node_id: str,
+        graph: WorkflowGraph,
+        boundary: set[str],
+    ) -> None:
+        """Like _mark_downstream_as_skipped but confined to nodes in `boundary`.
+
+        Prevents converge cancellation from propagating to nodes that branch off
+        a cancelled predecessor but are not part of the converge's parallel section.
+        """
+        queue = collections.deque([start_node_id])
+        while queue:
+            node_id = queue.popleft()
+            for succ_id in graph.get_successors(node_id):
+                if (
+                    succ_id in self.skipped_nodes
+                    or succ_id in self.failed_nodes
+                    or self.resolver.has_namespace(succ_id)
+                    or succ_id not in boundary
+                    or graph.get_node(succ_id).type == NodeType.CONVERGE
+                ):
+                    continue
+                pred_ids = graph.get_predecessors(succ_id)
+                if all(p in self.skipped_nodes or p in self.failed_nodes for p in pred_ids):
+                    self.skipped_nodes.add(succ_id)
+                    workflow.logger.info(f"Node {succ_id} marked as skipped (converge branch cancellation)")
+                    queue.append(succ_id)
