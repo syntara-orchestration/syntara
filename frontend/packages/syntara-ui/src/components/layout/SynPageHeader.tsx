@@ -13,6 +13,7 @@ import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
 import { SynPageBreadcrumbs, type AppBreadcrumbItem } from './SynPageBreadcrumbs'
+import styles from './SynPageHeader.module.css'
 
 export type { AppBreadcrumbItem }
 
@@ -129,6 +130,7 @@ export function SynPageHeader(props: SynPageHeaderProps) {
 
   return (
     <CompassMainHeader
+      className={styles.header}
       panelProps={{ isGlass: true }}
       title={titleForCompass}
       toolbar={
