@@ -147,6 +147,31 @@ describe('BuilderWorkflowPageHeader', () => {
     expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
   })
 
+  it('keeps the workflow name field visible next to the edit control', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} workflowName="Deploy app" />)
+
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
+    expect(screen.getByRole('button', { name: 'Apply details' })).toBeInTheDocument()
+  })
+
+  it('still shows the workflow name when the title row includes project and status controls', () => {
+    render(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isNew={false}
+        workflow={{ id: 'wf-1' }}
+        publishedVersionId={null}
+        workflowName="Deploy app"
+      />
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Workflow name' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Workflow name' })).toHaveValue('Deploy app')
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+  })
+
   it('updates workflow name and marks dirty on change', async () => {
     const user = userEvent.setup()
     const dispatch = vi.fn()
