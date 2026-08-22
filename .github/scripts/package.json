@@ -19,7 +19,7 @@
   "devDependencies": {
     "@types/node": "22.13.0",
     "msw": "2.8.5",
-    "tsx": "4.19.2",
+    "tsx": "4.23.12",
     "typescript": "5.7.3",
     "vitest": "3.1.2"
   }
