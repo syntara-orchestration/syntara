@@ -2,13 +2,18 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 const isShardedCoverage = process.env.CI === 'true' && Boolean(process.env.VITEST_COVERAGE_DIR)
+const isCoverageRun = process.argv.includes('--coverage') || isShardedCoverage
 
 // https://vitest.dev/config/
 export default defineConfig({
   plugins: [
     react({
       babel: {
-        plugins: [['babel-plugin-react-compiler']],
+        // Disable the React Compiler during coverage runs. The compiler transforms
+        // JSX into optimized code with internal branches that V8 tracks as real
+        // conditions, producing phantom uncovered branches in lcov reports.
+        // Upstream bug: https://github.com/facebook/react/issues/32950
+        plugins: isCoverageRun ? [] : [['babel-plugin-react-compiler']],
       },
     }),
   ],
