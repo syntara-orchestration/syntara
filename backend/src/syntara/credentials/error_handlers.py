@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         CredentialDecryptionError,
         CredentialDisabledError,
         CredentialError,
+        CredentialInUseError,
         CredentialNameConflictError,
         CredentialNotFoundError,
         CredentialValidationError,
@@ -94,6 +95,24 @@ def credential_disabled_error_handler(request: Request, exc: "CredentialDisabled
         title="Credential Disabled",
         detail=exc.message,
         code="CREDENTIAL_DISABLED",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def credential_in_use_error_handler(request: Request, exc: "CredentialInUseError") -> JSONResponse:
+    """Handle CredentialInUseError with RFC 9457 format."""
+    logger.warning(
+        "Blocked credential delete: still referenced by integrations",
+        credential_name=exc.name,
+        affected_integration_count=exc.total_count,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Credential In Use",
+        detail=exc.message,
+        code="CREDENTIAL_IN_USE",
         retryable=False,
         instance=str(request.url),
     )

@@ -15,8 +15,8 @@ from uuid import UUID
 import structlog
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_ssh_private_key
-from sqlalchemy import Select, case, func, literal_column, or_, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import Select, case, func, literal_column, or_
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -36,6 +36,7 @@ from syntara.core.services.secret_service import SecretService
 from syntara.credentials.audit.credential import CredentialEncryptionFailureEvent, CredentialLifecycleEvent
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
+    CredentialInUseError,
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
@@ -634,8 +635,44 @@ class CredentialService(BaseService):
             )
             return {}
 
+    async def _get_referencing_integration_names(self, credential_id: UUID, *, limit: int) -> list[str]:
+        """Fetch up to `limit` names of integrations using this credential as their management credential.
+
+        Used to build an actionable message for CredentialInUseError. The
+        total count comes separately from get_integration_counts.
+        """
+        stmt = (
+            select(Integration.name)
+            .where(Integration.management_credential_id == credential_id)
+            .order_by(Integration.name)
+            .limit(limit)
+        )
+        result = await self.session.exec(stmt)
+        return list(result.all())
+
     async def delete_credential(self, credential_id: UUID) -> None:
-        """Delete a credential and its secret data atomically."""
+        """Delete a credential and its secret data atomically.
+
+        Raises:
+            CredentialInUseError: If the credential is still set as the
+                management credential on one or more integrations. Deleting
+                it out from under those integrations would silently break
+                them — management_credential_id would be nulled with no
+                signal that validation_status is now stale.
+                The caller must detach the credential from all referencing
+                integrations first.
+
+                The upfront count-based check below has a TOCTOU race: an
+                integration could be attached between that check and the
+                delete below. The `integrations.management_credential_id`
+                FK is `ON DELETE RESTRICT` (not `SET NULL`) specifically so
+                the database itself rejects the delete in that case rather
+                than silently nulling the reference; the `except
+                IntegrityError` re-raises that as the same clean
+                CredentialInUseError instead of a generic constraint-violation
+                response.
+
+        """
         from syntara.authz.models import Project  # noqa: PLC0415
 
         credential = await self._get_or_raise(credential_id)
@@ -647,6 +684,12 @@ class CredentialService(BaseService):
             msg = f"Cannot delete credentials in built-in project '{project.name}'"
             raise BuiltinProtectionError(msg)
 
+        int_counts = await self.get_integration_counts([credential_id])
+        int_ref_count = int_counts.get(credential_id, 0)
+        if int_ref_count:
+            integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
+            raise CredentialInUseError(credential.name, integration_names, int_ref_count)
+
         wf_counts = await self.get_workflow_counts([credential_id])
         wf_ref_count = wf_counts.get(credential_id, 0)
         if wf_ref_count:
@@ -655,16 +698,6 @@ class CredentialService(BaseService):
                 credential_id=str(credential_id),
                 credential_name=credential.name,
                 affected_workflow_count=wf_ref_count,
-            )
-
-        int_counts = await self.get_integration_counts([credential_id])
-        int_ref_count = int_counts.get(credential_id, 0)
-        if int_ref_count:
-            logger.warning(
-                "Deleting credential still referenced by integrations",
-                credential_id=str(credential_id),
-                credential_name=credential.name,
-                affected_integration_count=int_ref_count,
             )
 
         cred_name = credential.name
@@ -685,14 +718,26 @@ class CredentialService(BaseService):
         if secret_id:
             await self._secret_service.delete_secret(secret_id)
 
-        await self.session.execute(
-            update(Integration)
-            .where(Integration.management_credential_id == credential_id)  # type: ignore[arg-type]
-            .values(management_credential_id=None)
-        )
-
         await self.session.delete(credential)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            # Rare race: an integration was attached to this credential after the
+            # count check above but before this commit. The FK's ON DELETE RESTRICT
+            # (not SET NULL) makes the database reject the delete instead of
+            # silently nulling the reference — surface it as the same clean 409
+            # rather than a generic integrity-constraint response.
+            await self.session.rollback()
+            logger.warning(
+                "Credential delete raced with a new integration reference",
+                credential_id=str(credential_id),
+                credential_name=cred_name,
+                exc_info=exc,
+            )
+            int_counts = await self.get_integration_counts([credential_id])
+            int_ref_count = int_counts.get(credential_id, 0) or 1
+            integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
+            raise CredentialInUseError(cred_name, integration_names, int_ref_count) from exc
         logger.info("Credential deleted", credential_id=str(credential_id))
         AuditEventDispatcher.dispatch(
             CredentialLifecycleEvent(
@@ -702,7 +747,8 @@ class CredentialService(BaseService):
                 action="deleted",
                 project_id=cred_project_id,
                 affected_workflow_count=wf_ref_count,
-                affected_integration_count=int_ref_count,
+                # Always 0: a non-zero integration ref count raises CredentialInUseError above.
+                affected_integration_count=0,
             ),
         )
 
