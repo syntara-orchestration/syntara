@@ -235,7 +235,7 @@ function BuilderEditorTitleSlot({
       alignItems={{ default: 'alignItemsCenter' }}
       flexWrap={{ default: 'nowrap' }}
     >
-      <FlexItem grow={{ default: 'grow' }} className={styles.workflowName}>
+      <FlexItem flex={{ default: 'flexNone' }} className={styles.workflowName}>
         <Tooltip
           content={builderPermissions.tooltips.edit}
           trigger={builderPermissions.canEdit ? 'manual' : 'mouseenter focus'}
