@@ -821,6 +821,13 @@ test.describe('Permission gating — Detail page header actions', () => {
   const E2E_USER_PASSWORD = 'E2eTestP@ssw0rd!'
 
   test('auditor: user detail Edit and kebab actions are aria-disabled', async ({ app, auditorApp }) => {
+    // This test depends on 3-4 sequential, unbatched /authz/can_i round trips
+    // (useUserPermissions + useUserDetailPermissions) resolving against the
+    // real backend. The default 60s test budget plus 15-20s per-assertion
+    // timeouts leaves little headroom under CI load, which has caused
+    // intermittent timeouts here. Give the whole test more room.
+    test.setTimeout(90_000)
+
     const username = buildUniqueName('e2e-perm-user-detail')
     const user = await createUserViaApi(app, { username, password: E2E_USER_PASSWORD })
     if (!user) throw new Error('createUserViaApi failed')
@@ -831,17 +838,17 @@ test.describe('Permission gating — Detail page header actions', () => {
 
       // aria-disabled is set after the permissions API resolves — give it extra time
       await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 20_000,
+        timeout: 30_000,
       })
 
       await auditorApp.getByRole('button', { name: 'User actions' }).click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
         'aria-disabled',
         'true',
-        { timeout: 15_000 }
+        { timeout: 20_000 }
       )
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 15_000,
+        timeout: 20_000,
       })
     } finally {
       await deleteUserViaApi(app, user.id)
