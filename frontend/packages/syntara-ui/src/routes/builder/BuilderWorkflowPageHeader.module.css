@@ -1,15 +1,19 @@
 .titleSlot {
-  width: 100%;
   min-width: 0;
+  max-width: 100%;
   height: 100%;
 }
 
-/* PF TextInput is width 100% with no intrinsic min-width. Without grow and a
-   floor, this item collapses to 0 and only the edit icon remains visible. */
+/* PF TextInput is width 100% with no intrinsic min-width, so a shrinking flex
+   item collapses the field to 0. Size the control itself; do not grow it to
+   fill the Compass title (that region already flex-grows next to the toolbar). */
 .workflowName {
   min-width: 20ch;
+  max-width: 40ch;
 }
 
 .workflowName :global(.pf-v6-c-form-control) {
-  width: 100%;
+  width: 24ch;
+  min-width: 20ch;
+  max-width: 100%;
 }
