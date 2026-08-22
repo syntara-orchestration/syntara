@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-312:9.5@sha256:306e4320c559d67c60874e3bb85c9f84afc84b66c350b3d4afe0abd65201d6e6
+FROM registry.access.redhat.com/ubi9/python-312:9.8-1787081761@sha256:74689dbf82199b2099873d81941f8c2996edfb1cefe544f115f46be06c30e093
 
 # Switch to root to install dependencies
 USER root
