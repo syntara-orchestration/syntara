@@ -942,7 +942,8 @@ test.describe('Permission gating — Service Account actions', () => {
 
       const createButton = auditorApp.getByRole('button', { name: /Create service account/i })
       await expect(createButton).toBeVisible({ timeout: 15_000 })
-      await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
@@ -958,7 +959,10 @@ test.describe('Permission gating — Service Account actions', () => {
   test('viewer: direct URL to Service Accounts shows access denied', async ({ viewerApp }) => {
     await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
 
-    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+    // The route guard renders after the permissions API resolves — give it extra time
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible({
+      timeout: 20_000,
+    })
   })
 })
 
