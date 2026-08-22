@@ -208,7 +208,7 @@ jobs:
             --json-file-output=snyk-python.json
 
       - name: Upload Snyk results to GitHub Security
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always() && hashFiles('scan/backend/snyk-python.sarif') != ''
         # continue-on-error: GitHub Advanced Security (required for SARIF upload)
         # is only available for public repos or paid Enterprise plan.
@@ -360,7 +360,7 @@ jobs:
             --json-file-output=snyk-npm.json
 
       - name: Upload Snyk results to GitHub Security
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always() && hashFiles('scan/frontend/snyk-npm.sarif') != ''
         # continue-on-error: GitHub Advanced Security (required for SARIF upload)
         # is only available for public repos or paid Enterprise plan.
