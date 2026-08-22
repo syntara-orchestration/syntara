@@ -29,6 +29,7 @@ const mockCredential = {
   inputs: { token: '$encrypted$', username: 'octocat' },
   enabled: true,
   labels: {},
+  project_id: 'proj-1',
   created_at: '2026-03-01T00:00:00Z',
   updated_at: '2026-03-18T00:00:00Z',
 }
@@ -935,5 +936,29 @@ describe('CredentialDetail', () => {
 
     const deleteItem = await screen.findByRole('menuitem', { name: /Delete credential/ })
     expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('passes resourceProject and enabled to useCredentialPermissions after credential loads', () => {
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceProject: 'proj-1', enabled: true })
+    )
+  })
+
+  it('passes enabled: false to useCredentialPermissions while credential is loading', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
+      if (path === '/credentials/{credential_id}') {
+        return { data: undefined, isPending: true, error: null, refetch: vi.fn() }
+      }
+      return { data: null, isPending: false, error: null, refetch: vi.fn() }
+    })
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }))
   })
 })

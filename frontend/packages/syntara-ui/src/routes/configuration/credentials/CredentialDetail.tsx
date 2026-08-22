@@ -91,6 +91,63 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
   })
 }
 
+type CredentialDetailToolbarProps = {
+  credential: Credential
+  canUpdate: boolean
+  canDelete: boolean
+  isPermissionsLoading: boolean
+  tooltips: { update: string; enable: string; delete: string }
+  onToggleEnabled: () => void
+  onEditClick: () => void
+  onDeleteClick: () => void
+}
+
+function CredentialDetailToolbar({
+  credential,
+  canUpdate,
+  canDelete,
+  isPermissionsLoading,
+  tooltips,
+  onToggleEnabled,
+  onEditClick,
+  onDeleteClick,
+}: Readonly<CredentialDetailToolbarProps>) {
+  const updateDisabled = isPermissionsLoading || !canUpdate
+  const deleteDisabled = isPermissionsLoading || !canDelete
+  const deleteTooltip = isPermissionsLoading || canDelete ? undefined : { content: tooltips.delete }
+
+  const kebabActions: KebabAction[] = [
+    {
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
+      isDanger: true,
+      isAriaDisabled: deleteDisabled,
+      tooltipProps: deleteTooltip,
+      onClick: onDeleteClick,
+    },
+  ]
+
+  return (
+    <>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.enable}>
+        <Switch
+          id="credential-detail-toggle"
+          label="Enabled"
+          isChecked={credential.enabled}
+          isDisabled={updateDisabled}
+          onChange={onToggleEnabled}
+        />
+      </DisabledWithTooltip>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.update}>
+        <Button variant="primary" icon={<RhUiEditIcon />} isAriaDisabled={updateDisabled} onClick={onEditClick}>
+          Edit credential
+        </Button>
+      </DisabledWithTooltip>
+      <NxKebabMenu actions={kebabActions} aria-label="Credential actions" />
+    </>
+  )
+}
+
 function filterTabsByPermission(
   permissionsLoading: boolean,
   canReadWorkflows: boolean,
@@ -115,7 +172,25 @@ export default function CredentialDetail() {
     [canReadWorkflows, canReadIntegrations, permissionsLoading]
   )
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const { canUpdate, canDelete, tooltips } = useCredentialPermissions()
+
+  // Fetch credential before permission checks so project_id is available
+  const credQuery = credentialsClient.useQuery(
+    'get',
+    '/credentials/{credential_id}',
+    { params: { path: { credential_id: credentialId } } },
+    { enabled: !!credentialId }
+  )
+  const credential = credQuery.data
+
+  const {
+    canUpdate,
+    canDelete,
+    isLoading: isPermissionsLoading,
+    tooltips,
+  } = useCredentialPermissions({
+    resourceProject: credential?.project_id,
+    enabled: !!credential?.project_id,
+  })
   const {
     credentialToDelete,
     affectedWorkflows: deleteAffectedWorkflows,
@@ -142,15 +217,6 @@ export default function CredentialDetail() {
   } = useDisableCredentialState()
 
   const { showAlert } = useAlerts()
-
-  // Fetch credential
-  const credQuery = credentialsClient.useQuery(
-    'get',
-    '/credentials/{credential_id}',
-    { params: { path: { credential_id: credentialId } } },
-    { enabled: !!credentialId }
-  )
-  const credential = credQuery.data
 
   // Fetch credential type
   const typeQuery = credentialsClient.useQuery(
@@ -235,17 +301,6 @@ export default function CredentialDetail() {
     onSettled: closeDeleteDialog,
   })
 
-  const kebabActions: KebabAction[] = [
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !canDelete,
-      tooltipProps: canDelete ? undefined : { content: tooltips.delete },
-      onClick: () => openDeleteDialog(credential!),
-    },
-  ]
-
   const queryState = useQueryState(credQuery, {
     title: 'Error loading credential',
     onRetry: () => detachPromise(credQuery.refetch()),
@@ -293,28 +348,16 @@ export default function CredentialDetail() {
         title={credential.name}
         docLink={credentialsDocLink}
         toolbar={
-          <>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.enable}>
-              <Switch
-                id="credential-detail-toggle"
-                label="Enabled"
-                isChecked={credential.enabled}
-                isDisabled={!canUpdate}
-                onChange={handleToggleEnabled}
-              />
-            </DisabledWithTooltip>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.update}>
-              <Button
-                variant="primary"
-                icon={<RhUiEditIcon />}
-                isAriaDisabled={!canUpdate}
-                onClick={() => setEditModalOpen(true)}
-              >
-                Edit credential
-              </Button>
-            </DisabledWithTooltip>
-            <NxKebabMenu actions={kebabActions} aria-label="Credential actions" />
-          </>
+          <CredentialDetailToolbar
+            credential={credential}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            isPermissionsLoading={isPermissionsLoading}
+            tooltips={tooltips}
+            onToggleEnabled={handleToggleEnabled}
+            onEditClick={() => setEditModalOpen(true)}
+            onDeleteClick={() => openDeleteDialog(credential)}
+          />
         }
       />
 

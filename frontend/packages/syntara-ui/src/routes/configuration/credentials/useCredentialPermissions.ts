@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+
 import { permissionTooltip } from '../../../hooks/permissionUtils'
 import { useCanI } from '../../../hooks/useCanI'
 
@@ -14,30 +16,56 @@ type CredentialPermissions = {
   }
 }
 
+type UseCredentialPermissionsOptions = {
+  /**
+   * Concrete project when the credentials list has one selected. Create uses
+   * `check_any_project` when omitted (toolbar on "All projects"); update /
+   * delete fall back to system-scoped `can_i` so system admins keep row
+   * actions. Prefer per-row `resourceProject` when adding stricter All-projects
+   * gating later.
+   */
+  resourceProject?: string
+  /**
+   * Skip all permission checks when false. Returns safe-false values with
+   * `isLoading: true`. Use when the project_id is not yet available (e.g.
+   * detail page while the credential query is in flight) to avoid a
+   * system-scoped check that briefly shows a denied state.
+   */
+  enabled?: boolean
+}
+
 /**
- * Permission checks for credential list page actions.
+ * Permission checks for credential actions.
  *
  * Checks: credential:create, credential:update, credential:delete.
  * All values default to `false` (safe-false) until the checks resolve.
  */
-export function useCredentialPermissions(): CredentialPermissions {
+export function useCredentialPermissions(options?: UseCredentialPermissionsOptions): CredentialPermissions {
   const resourceType = 'credential' as const
-  const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType)
-  const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType)
-  const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType)
+  const resourceProject = options?.resourceProject
+  const hasProject = Boolean(resourceProject)
+  const enabled = options?.enabled ?? true
 
-  const updatePermission = `${resourceType}:update` as const
+  const createOptions = hasProject ? { resourceProject, enabled } : { checkAnyProject: true as const, enabled }
+  const scopedOptions = hasProject ? { resourceProject, enabled } : { enabled }
 
-  return {
-    canCreate,
-    canUpdate,
-    canDelete,
-    isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete,
-    tooltips: {
-      create: permissionTooltip('create a credential', `${resourceType}:create`),
-      update: permissionTooltip('edit this credential', updatePermission),
-      enable: permissionTooltip('enable or disable this credential', updatePermission),
-      delete: permissionTooltip('delete this credential', `${resourceType}:delete`),
-    },
-  }
+  const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType, createOptions)
+  const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType, scopedOptions)
+  const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType, scopedOptions)
+
+  return useMemo(
+    () => ({
+      canCreate,
+      canUpdate,
+      canDelete,
+      isLoading: !enabled || isCheckingCreate || isCheckingUpdate || isCheckingDelete,
+      tooltips: {
+        create: permissionTooltip('create a credential', 'credential:create'),
+        update: permissionTooltip('edit this credential', 'credential:update'),
+        enable: permissionTooltip('enable or disable this credential', 'credential:update'),
+        delete: permissionTooltip('delete this credential', 'credential:delete'),
+      },
+    }),
+    [canCreate, canUpdate, canDelete, enabled, isCheckingCreate, isCheckingUpdate, isCheckingDelete]
+  )
 }

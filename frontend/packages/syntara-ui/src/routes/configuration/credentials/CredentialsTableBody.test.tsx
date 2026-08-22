@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -10,16 +12,41 @@ vi.mock('../../../components/table/LinkCell', () => ({
   LinkCell: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }))
 
+vi.mock('./useCredentialPermissions', () => ({
+  useCredentialPermissions: () => ({
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    isLoading: false,
+    tooltips: { create: '', update: '', enable: '', delete: '' },
+  }),
+}))
+
+vi.mock('../../../client', () => ({
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
 const sampleCredential: Credential = {
   id: 'cred-1',
   name: 'GitHub Token',
   enabled: true,
   credential_type_id: 'type-1',
+  project_id: 'proj-1',
 } as Credential
 
+function createWrapper() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: queryClient }, children)
+  }
+}
+
 describe('GroupedCredentialsTableBody', () => {
-  const getRowActions = vi.fn(() => [])
   const onToggleEnabled = vi.fn()
+  const onEdit = vi.fn()
+  const onDelete = vi.fn()
+  const getIsBuiltinProject = () => false
 
   it('renders project group header with credential rows', () => {
     const grouped = new Map([
@@ -35,10 +62,13 @@ describe('GroupedCredentialsTableBody', () => {
           typeMap={new Map([['type-1', { id: 'type-1', name: 'GitHub' } as never]])}
           expandedRows={new Set()}
           onToggleRow={vi.fn()}
-          getRowActions={getRowActions}
+          onEdit={onEdit}
+          onDelete={onDelete}
           onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
         />
-      </table>
+      </table>,
+      { wrapper: createWrapper() }
     )
 
     expect(screen.getByText('Project Alpha')).toBeInTheDocument()
@@ -57,10 +87,13 @@ describe('GroupedCredentialsTableBody', () => {
           typeMap={new Map([['type-1', { id: 'type-1', name: 'GitHub' } as never]])}
           expandedRows={new Set()}
           onToggleRow={vi.fn()}
-          getRowActions={getRowActions}
+          onEdit={onEdit}
+          onDelete={onDelete}
           onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
         />
-      </table>
+      </table>,
+      { wrapper: createWrapper() }
     )
 
     expect(screen.getByText('No project')).toBeInTheDocument()
@@ -83,10 +116,13 @@ describe('GroupedCredentialsTableBody', () => {
           typeMap={new Map()}
           expandedRows={new Set()}
           onToggleRow={vi.fn()}
-          getRowActions={getRowActions}
+          onEdit={onEdit}
+          onDelete={onDelete}
           onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
         />
-      </table>
+      </table>,
+      { wrapper: createWrapper() }
     )
 
     expect(screen.getByText('Project Alpha')).toBeInTheDocument()
