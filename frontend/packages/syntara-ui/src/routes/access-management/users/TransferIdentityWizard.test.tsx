@@ -83,7 +83,17 @@ vi.mock('../../../utils/generateUUID', () => ({
 
 vi.mock('./TransferIdentityWizard.module.css', () => ({ default: {} }))
 
-const mockUsers = {
+const mockUsers: {
+  resources: Array<{
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string | null
+  }>
+  next: null
+  total: number
+} = {
   resources: [
     { id: 'user-1', username: 'alice', email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
     { id: 'user-2', username: 'bob', email: 'bob@example.com', first_name: 'Bob', last_name: 'Jones' },
