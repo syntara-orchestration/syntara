@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { matchPattern, parseXfailEntries } from '../../e2e/xfailFromUrl'
+import {
+  DEFAULT_XFAIL_SOURCE,
+  applyListedXfail,
+  matchPattern,
+  parseXfailEntries,
+  resolveXfailSource,
+  toXfailMarkdownUrl,
+  xfailMode,
+} from '../../e2e/xfailFromUrl'
 
 describe('parseXfailEntries', () => {
   it('parses a single heading with reason', () => {
@@ -135,5 +143,99 @@ describe('matchPattern', () => {
     it('does not treat colon in non-file context as file:title syntax', () => {
       expect(matchPattern('file.spec.ts > API status: 200 > works', 'API status: 200 > works')).toBe(true)
     })
+
+    it('matches Currents playwright.md file:title headings', () => {
+      expect(
+        matchPattern(
+          'workflows/approvals.spec.ts > user cancels batch approval without API call',
+          'workflows/approvals.spec.ts: user cancels batch approval without API call'
+        )
+      ).toBe(true)
+      expect(
+        matchPattern(
+          'workflows/approvals.spec.ts > workflows/approvals.spec.ts > user performs batch rejection operations',
+          'workflows/approvals.spec.ts: user performs batch rejection operations'
+        )
+      ).toBe(true)
+    })
+  })
+})
+
+describe('resolveXfailSource', () => {
+  it('defaults to syntara-ci in CI when unset', () => {
+    expect(resolveXfailSource({ CI: 'true' })).toBe(DEFAULT_XFAIL_SOURCE)
+  })
+
+  it('does not default outside CI', () => {
+    expect(resolveXfailSource({})).toBeUndefined()
+  })
+
+  it('honors an explicit source in CI', () => {
+    expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: 'https://example.invalid/' })).toBe(
+      'https://example.invalid/'
+    )
+  })
+
+  it('treats empty SYNTARA_XFAIL_SOURCE as disabled even in CI', () => {
+    expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: '' })).toBeUndefined()
+    expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: '   ' })).toBeUndefined()
+  })
+
+  it('does not default when CI is explicitly false', () => {
+    expect(resolveXfailSource({ CI: 'false' })).toBeUndefined()
+    expect(resolveXfailSource({ CI: '0' })).toBeUndefined()
+  })
+})
+
+describe('toXfailMarkdownUrl', () => {
+  it('appends playwright.md to a trailing-slash base', () => {
+    expect(toXfailMarkdownUrl(DEFAULT_XFAIL_SOURCE, 'playwright.md')).toBe(`${DEFAULT_XFAIL_SOURCE}playwright.md`)
+  })
+
+  it('inserts a slash when the base has none', () => {
+    expect(toXfailMarkdownUrl('https://example.invalid/ci', 'playwright.md')).toBe(
+      'https://example.invalid/ci/playwright.md'
+    )
+  })
+})
+
+describe('xfailMode', () => {
+  it('uses expected-fail when Currents credentials are present', () => {
+    expect(
+      xfailMode({
+        CURRENTS_PROJECT_ID: 'proj',
+        CURRENTS_RECORD_KEY: 'key',
+      })
+    ).toBe('fail')
+    expect(xfailMode({ CURRENTS_API_KEY: 'api' })).toBe('fail')
+  })
+
+  it('skips when Currents credentials are missing or blank', () => {
+    expect(xfailMode({})).toBe('skip')
+    expect(
+      xfailMode({
+        CURRENTS_PROJECT_ID: '',
+        CURRENTS_RECORD_KEY: '  ',
+        CURRENTS_API_KEY: '',
+      })
+    ).toBe('skip')
+  })
+})
+
+describe('applyListedXfail', () => {
+  it('calls skip for skip mode', () => {
+    const skip = vi.fn()
+    const fail = vi.fn()
+    applyListedXfail({ skip, fail }, { pattern: 'foo.spec.ts', reason: 'flaky' }, 'skip')
+    expect(skip).toHaveBeenCalledWith(true, 'xfail: flaky')
+    expect(fail).not.toHaveBeenCalled()
+  })
+
+  it('calls fail for fail mode', () => {
+    const skip = vi.fn()
+    const fail = vi.fn()
+    applyListedXfail({ skip, fail }, { pattern: 'foo.spec.ts', reason: 'flaky' }, 'fail')
+    expect(fail).toHaveBeenCalledWith(true, 'xfail: flaky')
+    expect(skip).not.toHaveBeenCalled()
   })
 })

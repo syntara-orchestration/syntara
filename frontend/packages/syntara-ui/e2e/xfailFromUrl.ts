@@ -7,6 +7,63 @@ export type XfailEntry = {
   reason: string
 }
 
+export type XfailMode = 'fail' | 'skip'
+
+/** Shared Currents export. GHA sets SYNTARA_XFAIL_SOURCE to this; Konflux does not. */
+export const DEFAULT_XFAIL_SOURCE =
+  'https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/'
+
+export function toXfailMarkdownUrl(sourceBase: string, filename: string): string {
+  return sourceBase.endsWith('/') ? `${sourceBase}${filename}` : `${sourceBase}/${filename}`
+}
+
+function isCi(env: Record<string, string | undefined>): boolean {
+  const ci = env.CI
+  if (ci === '0' || ci === 'false') {
+    return false
+  }
+  return Boolean(ci)
+}
+
+/**
+ * Empty `SYNTARA_XFAIL_SOURCE` disables the list. Unset + CI uses {@link DEFAULT_XFAIL_SOURCE}
+ * so Konflux (no GHA secrets/env) still honors the same playwright.md GHA already loads.
+ */
+export function resolveXfailSource(env: Record<string, string | undefined>): string | undefined {
+  if ('SYNTARA_XFAIL_SOURCE' in env) {
+    const explicit = env.SYNTARA_XFAIL_SOURCE?.trim() ?? ''
+    return explicit || undefined
+  }
+  if (isCi(env)) {
+    return DEFAULT_XFAIL_SOURCE
+  }
+  return undefined
+}
+
+export function currentsActionsConfigured(env: Record<string, string | undefined>): boolean {
+  const apiKey = env.CURRENTS_API_KEY?.trim()
+  const projectId = env.CURRENTS_PROJECT_ID?.trim()
+  const recordKey = env.CURRENTS_RECORD_KEY?.trim()
+  return Boolean(apiKey || (projectId && recordKey))
+}
+
+/**
+ * GHA has Currents credentials and uses expected-fail so quarantined tests still run.
+ * Konflux does not: `test.fail()` would then fail the gate on unexpected passes of flaky tests.
+ */
+export function xfailMode(env: Record<string, string | undefined>): XfailMode {
+  return currentsActionsConfigured(env) ? 'fail' : 'skip'
+}
+
+export function applyListedXfail(testInfo: Pick<TestInfo, 'fail' | 'skip'>, match: XfailEntry, mode: XfailMode): void {
+  const message = `xfail: ${match.reason}`
+  if (mode === 'skip') {
+    testInfo.skip(true, message)
+    return
+  }
+  testInfo.fail(true, message)
+}
+
 const HEADING_RE = /^#\s+(.+)$/
 
 export function parseXfailEntries(content: string): XfailEntry[] {
