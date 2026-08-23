@@ -2,12 +2,16 @@ export const DRAG_TYPE_FIELD = 'syntara/input-field'
 export const DRAG_TYPE_CONTEXT = 'syntara/context-variable'
 
 export const DROP_TARGET_OUTLINE: React.CSSProperties = {
-  outline: '2px solid var(--pf-t--global--color--brand--default)',
+  outlineWidth: '2px',
+  outlineStyle: 'solid',
+  outlineColor: 'var(--pf-t--global--color--brand--default)',
   outlineOffset: '-2px',
 }
 
 export const DROP_TARGET_OUTLINE_ROUNDED: React.CSSProperties = {
-  outline: '2px solid var(--pf-t--global--color--brand--default)',
+  outlineWidth: '2px',
+  outlineStyle: 'solid',
+  outlineColor: 'var(--pf-t--global--color--brand--default)',
   borderRadius: 'var(--pf-t--global--border--radius--small)',
 }
 
