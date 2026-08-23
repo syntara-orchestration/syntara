@@ -474,7 +474,7 @@ describe('Workflows Component', () => {
 
       // Verify error alert is shown
       await waitFor(() => {
-        expect(screen.getByText('Workflow failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
         expect(screen.getByText(/Failed to start workflow "Important Project Workflow"/)).toBeInTheDocument()
       })
     })
@@ -514,7 +514,7 @@ describe('Workflows Component', () => {
 
       // Verify error alert is shown with generic message
       await waitFor(() => {
-        expect(screen.getByText('Workflow failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
         expect(
           screen.getByText(/Failed to start workflow "Important Project Workflow": An unexpected error occurred/)
         ).toBeInTheDocument()
@@ -1071,7 +1071,7 @@ describe('Workflows Component', () => {
         expect(mockDeleteMutate).toHaveBeenCalled()
         expect(mockRefetch).toHaveBeenCalled()
         expect(screen.getByText('Workflow deleted')).toBeInTheDocument()
-        expect(screen.getByText(/Successfully deleted workflow/)).toBeInTheDocument()
+        expect(screen.getByText(/Workflow ".+" has been deleted/)).toBeInTheDocument()
       })
     })
 
@@ -1136,8 +1136,7 @@ describe('Workflows Component', () => {
       // Verify error alert
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
-        expect(screen.getByText('Delete failed')).toBeInTheDocument()
-        expect(screen.getByText(/Failed to delete workflow/)).toBeInTheDocument()
+        expect(screen.getAllByText(/Failed to delete workflow/).length).toBeGreaterThanOrEqual(2)
       })
     })
 
@@ -1756,7 +1755,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
       })
     })
 
@@ -1793,7 +1792,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
       })
     })
 
@@ -1904,7 +1903,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
       })
     })
 
@@ -1918,7 +1917,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
       })
     })
 
@@ -1938,7 +1937,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
         expect(screen.getByText('Workflow has no definition to duplicate')).toBeInTheDocument()
       })
     })
@@ -1969,7 +1968,7 @@ describe('Workflows Component', () => {
       await user.click(duplicateItem)
 
       await waitFor(() => {
-        expect(screen.getByText('Duplicate failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
         expect(screen.getByText('Workflow must have a project ID')).toBeInTheDocument()
       })
     })
@@ -2222,7 +2221,7 @@ describe('Workflows Component', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Workflow published successfully')).toBeInTheDocument()
+        expect(screen.getByText('Workflow published')).toBeInTheDocument()
       })
     })
 
@@ -2517,7 +2516,7 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(mockUnpublishMutate).toHaveBeenCalled()
-        expect(screen.getByText('Workflow unpublished successfully')).toBeInTheDocument()
+        expect(screen.getByText('Workflow unpublished')).toBeInTheDocument()
       })
     })
 

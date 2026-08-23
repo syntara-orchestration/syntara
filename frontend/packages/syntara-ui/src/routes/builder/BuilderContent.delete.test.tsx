@@ -299,8 +299,7 @@ describe('BuilderContent - Delete Workflow', () => {
     // Verify error alert
     await waitFor(() => {
       expect(mockDeleteMutate).toHaveBeenCalled()
-      expect(screen.getByText('Delete failed')).toBeInTheDocument()
-      expect(screen.getByText(/Failed to delete workflow/)).toBeInTheDocument()
+      expect(screen.getAllByText(/Failed to delete workflow/).length).toBeGreaterThanOrEqual(2)
     })
   })
 

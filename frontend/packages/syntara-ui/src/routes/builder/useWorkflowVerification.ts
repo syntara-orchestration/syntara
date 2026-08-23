@@ -134,7 +134,7 @@ function processValidateResponse(
   if (callbacks.onValid) {
     callbacks.onValid()
   } else if (!callbacks.silent) {
-    callbacks.showSuccess({ title: 'Workflow definition is valid' })
+    callbacks.showSuccess({ title: 'Workflow verified' })
   }
 }
 

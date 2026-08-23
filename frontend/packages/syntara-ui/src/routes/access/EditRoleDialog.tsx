@@ -66,7 +66,7 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
       },
       {
         onSuccess: () => {
-          showSuccess({ title: 'Role updated', description: 'Role updated successfully' })
+          showSuccess({ title: 'Role updated', description: `${data.name} has been updated.` })
           invalidateAuthzCaches(queryClient)
           onSuccess()
           onClose()

@@ -590,10 +590,10 @@ export const workflowDialogPages: CanvasPageEntry[] = [
         // a published status badge so the DOM is fully settled before re-clicking
         await expect(page.getByRole('dialog')).not.toBeVisible()
         await expect(page.getByText('Published', { exact: true }).first()).toBeVisible()
-        // The "Workflow published successfully" toast auto-dismisses after several
+        // The "Workflow published" toast auto-dismisses after several
         // seconds — wait it out so it isn't still on screen (overlapping the
         // "Unpublish workflow?" dialog) when the final screenshot is captured.
-        await expect(page.getByText('Workflow published successfully')).not.toBeVisible({ timeout: 12_000 })
+        await expect(page.getByText('Workflow published', { exact: true })).not.toBeVisible({ timeout: 12_000 })
         await workflowKebab.click()
         const unpublishAfterPublish = page.getByRole('menuitem', { name: /Unpublish workflow/i })
         await expect(unpublishAfterPublish).toBeVisible()
@@ -637,7 +637,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
       await page.getByRole('button', { name: 'Publish' }).click()
       const publishedWorkflowId = new URL((await publishResponse).url()).pathname.split('/')[4] ?? null
       await expect(page.getByRole('dialog')).not.toBeVisible()
-      await expect(page.getByText('Workflow published successfully')).not.toBeVisible({ timeout: 12_000 })
+      await expect(page.getByText('Workflow published', { exact: true })).not.toBeVisible({ timeout: 12_000 })
 
       await workflowKebab.click()
       await page.getByRole('menuitem', { name: /Run published version/i }).click()

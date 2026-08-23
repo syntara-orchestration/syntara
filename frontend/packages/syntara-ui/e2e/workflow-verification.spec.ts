@@ -124,7 +124,7 @@ test.describe('Verify button in toolbar', () => {
 
       await triggerVerifyWorkflow(app)
 
-      await expect(app.getByText('Workflow definition is valid')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText('Workflow verified')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
       await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflow(app, workflowName)

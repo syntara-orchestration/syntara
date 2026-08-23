@@ -227,6 +227,8 @@ describe('EditRoleDialog', () => {
 
       expect(mockOnSuccess).toHaveBeenCalled()
       expect(mockOnClose).toHaveBeenCalled()
+      expect(screen.getByText('Role updated')).toBeInTheDocument()
+      expect(screen.getByText('my-custom-role has been updated.')).toBeInTheDocument()
     })
 
     it('shows error on failed mutation without calling onSuccess/onClose', async () => {
