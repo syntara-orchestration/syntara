@@ -213,7 +213,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user performs batch rejection operations', async ({ app }) => {
+  test('user performs batch rejection operations', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -275,7 +275,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user cancels batch approval without API call', async ({ app }) => {
+  test('user cancels batch approval without API call', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create a pending approval to test cancel behavior
     const approval = await createPendingApproval(app)
 

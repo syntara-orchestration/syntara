@@ -158,32 +158,33 @@ describe('matchPattern', () => {
         )
       ).toBe(true)
     })
+
+    it('matches when the test id uses an absolute e2e path', () => {
+      expect(
+        matchPattern(
+          '/workspace/frontend/packages/syntara-ui/e2e/workflows/approvals.spec.ts > Approval Workflow Operations > user cancels batch approval without API call',
+          'workflows/approvals.spec.ts: user cancels batch approval without API call'
+        )
+      ).toBe(true)
+    })
   })
 })
 
 describe('resolveXfailSource', () => {
-  it('defaults to syntara-ci in CI when unset', () => {
+  it('defaults to syntara-ci when unset, including outside CI', () => {
+    expect(resolveXfailSource({})).toBe(DEFAULT_XFAIL_SOURCE)
     expect(resolveXfailSource({ CI: 'true' })).toBe(DEFAULT_XFAIL_SOURCE)
   })
 
-  it('does not default outside CI', () => {
-    expect(resolveXfailSource({})).toBeUndefined()
-  })
-
-  it('honors an explicit source in CI', () => {
+  it('honors an explicit source', () => {
     expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: 'https://example.invalid/' })).toBe(
       'https://example.invalid/'
     )
   })
 
-  it('treats empty SYNTARA_XFAIL_SOURCE as disabled even in CI', () => {
+  it('treats empty SYNTARA_XFAIL_SOURCE as disabled', () => {
     expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: '' })).toBeUndefined()
-    expect(resolveXfailSource({ CI: 'true', SYNTARA_XFAIL_SOURCE: '   ' })).toBeUndefined()
-  })
-
-  it('does not default when CI is explicitly false', () => {
-    expect(resolveXfailSource({ CI: 'false' })).toBeUndefined()
-    expect(resolveXfailSource({ CI: '0' })).toBeUndefined()
+    expect(resolveXfailSource({ SYNTARA_XFAIL_SOURCE: '   ' })).toBeUndefined()
   })
 })
 

@@ -17,27 +17,17 @@ export function toXfailMarkdownUrl(sourceBase: string, filename: string): string
   return sourceBase.endsWith('/') ? `${sourceBase}${filename}` : `${sourceBase}/${filename}`
 }
 
-function isCi(env: Record<string, string | undefined>): boolean {
-  const ci = env.CI
-  if (ci === '0' || ci === 'false') {
-    return false
-  }
-  return Boolean(ci)
-}
-
 /**
- * Empty `SYNTARA_XFAIL_SOURCE` disables the list. Unset + CI uses {@link DEFAULT_XFAIL_SOURCE}
- * so Konflux (no GHA secrets/env) still honors the same playwright.md GHA already loads.
+ * Empty `SYNTARA_XFAIL_SOURCE` disables the list. Unset uses {@link DEFAULT_XFAIL_SOURCE}.
+ * GHA sets the env explicitly; Konflux does not, and its pods often omit `CI`, so gating
+ * on `CI` left the required UI gate running tests GHA already quarantines.
  */
 export function resolveXfailSource(env: Record<string, string | undefined>): string | undefined {
   if ('SYNTARA_XFAIL_SOURCE' in env) {
     const explicit = env.SYNTARA_XFAIL_SOURCE?.trim() ?? ''
     return explicit || undefined
   }
-  if (isCi(env)) {
-    return DEFAULT_XFAIL_SOURCE
-  }
-  return undefined
+  return DEFAULT_XFAIL_SOURCE
 }
 
 export function currentsActionsConfigured(env: Record<string, string | undefined>): boolean {
@@ -120,14 +110,32 @@ export async function loadXfailEntries(source: string): Promise<XfailEntry[]> {
   }
 }
 
-function buildTestId(testInfo: TestInfo): string {
-  const testDir = testInfo.project.testDir
-  let relPath = testInfo.file
-  if (testDir && relPath.startsWith(testDir)) {
-    relPath = relPath.slice(testDir.length).replace(/^[/\\]/, '')
+function e2eRelativePath(filePath: string): string {
+  const normalized = filePath.replaceAll('\\', '/')
+  const marker = '/e2e/'
+  const idx = normalized.lastIndexOf(marker)
+  if (idx !== -1) {
+    return normalized.slice(idx + marker.length)
   }
+  return normalized.slice(normalized.lastIndexOf('/') + 1)
+}
+
+function buildTestId(testInfo: TestInfo): string {
+  const relPath = e2eRelativePath(testInfo.file)
   const titles = testInfo.titlePath.filter(Boolean)
   return [relPath, ...titles].join(' > ')
+}
+
+function testIdIsInFile(testId: string, filePrefix: string): boolean {
+  const normalized = testId.replaceAll('\\', '/')
+  const prefix = filePrefix.replaceAll('\\', '/')
+  const first = normalized.split(' > ')[0] ?? ''
+  return (
+    first === prefix ||
+    first.endsWith(`/${prefix}`) ||
+    normalized.startsWith(`${prefix} > `) ||
+    normalized.startsWith(`${prefix}/`)
+  )
 }
 
 export function matchPattern(testId: string, pattern: string): boolean {
@@ -136,18 +144,20 @@ export function matchPattern(testId: string, pattern: string): boolean {
     const filePrefix = pattern.slice(0, colonIdx)
     if (filePrefix.includes('/') || filePrefix.endsWith('.ts') || filePrefix.endsWith('.js')) {
       const titlePart = pattern.slice(colonIdx + 2)
-      if (!titlePart) {
-        return testId.startsWith(filePrefix)
+      if (!testIdIsInFile(testId, filePrefix)) {
+        return false
       }
-      const fullPattern = `${filePrefix} > ${titlePart}`
-      return testId === fullPattern || (testId.startsWith(`${filePrefix} > `) && testId.endsWith(` > ${titlePart}`))
+      if (!titlePart) {
+        return true
+      }
+      return testId.endsWith(` > ${titlePart}`) || testId === `${filePrefix} > ${titlePart}`
     }
   }
 
   if (pattern.includes(' > ')) {
     return testId === pattern || testId.endsWith(` > ${pattern}`)
   }
-  return testId.startsWith(pattern)
+  return testId.startsWith(pattern) || testIdIsInFile(testId, pattern)
 }
 
 export function matchesXfail(testInfo: TestInfo, entries: XfailEntry[]): XfailEntry | null {
